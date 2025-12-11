@@ -1,0 +1,12 @@
+# Database
+# Connect to your PostgreSQL database (e.g. Supabase, Neon)
+DATABASE_URL="postgresql://user:password@localhost:5432/ai_interviewer"
+
+# NextAuth
+# You can generate a secret with `openssl rand -base64 32`
+AUTH_SECRET="changeme"
+AUTH_URL="http://localhost:3000"
+
+# LLM Providers
+OPENAI_API_KEY=""
+ANTHROPIC_API_KEY=""

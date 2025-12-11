@@ -1,0 +1,323 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Auth & User Management ---
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  memberships   Membership[]
+  ownedProjects Project[]
+
+  rewardGrants RewardGrant[]
+  reports      Report[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+ 
+  @@id([identifier, token])
+}
+
+// --- Core Entities ---
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   Membership[]
+  projects  Project[]
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           Role         @default(MEMBER)
+  
+  user           User         @relation(fields: [userId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId])
+}
+
+model Project {
+  id             String       @id @default(cuid())
+  name           String
+  organizationId String?
+  ownerId        String?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  owner          User?         @relation(fields: [ownerId], references: [id])
+  bots           Bot[]
+}
+
+// --- Bot & Interview Configuration ---
+
+model Bot {
+  id             String   @id @default(cuid())
+  projectId      String
+  slug           String   @unique
+  name           String
+  description    String?
+  
+  // Research Context
+  researchGoal   String?  @db.Text
+  targetAudience String?  @db.Text
+  language       String   @default("en")
+  tone           String?  // e.g. friendly, neutral
+  
+  // Limits
+  maxDurationMins Int     @default(10)
+  maxTurns        Int     @default(20)
+  maxOpenQuestions Int    @default(5)
+  
+  // Model Config
+  modelProvider  String   @default("openai")
+  modelName      String   @default("gpt-4o")
+  
+  // Privacy
+  anonymizationLevel String @default("partial")
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project        Project          @relation(fields: [projectId], references: [id])
+  knowledgeSources KnowledgeSource[]
+  topics         TopicBlock[]
+  conversations  Conversation[]
+  rewardConfig   RewardConfig?
+  
+  // Structured definitions
+  questionDefinitions QuestionDefinition[]
+  themes         Theme[]
+  insights       Insight[]
+  hotIdeas       HotIdea[]
+  reports        Report[]
+}
+
+model KnowledgeSource {
+  id        String   @id @default(cuid())
+  botId     String
+  type      String   // text, url
+  title     String?
+  content   String   @db.Text
+  
+  createdAt DateTime @default(now())
+  
+  bot       Bot      @relation(fields: [botId], references: [id])
+}
+
+model TopicBlock {
+  id          String   @id @default(cuid())
+  botId       String
+  orderIndex  Int
+  label       String
+  description String?  @db.Text
+  subGoals    String[] 
+  maxTurns    Int      @default(5)
+  
+  bot         Bot      @relation(fields: [botId], references: [id])
+  
+  @@index([botId, orderIndex])
+}
+
+model RewardConfig {
+  id        String   @id @default(cuid())
+  botId     String   @unique
+  enabled   Boolean  @default(false)
+  type      String   // coupon, redirect
+  payload   String   
+  
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+// --- Participant Data ---
+
+model Conversation {
+  id              String   @id @default(cuid())
+  botId           String
+  participantId   String
+  
+  status          String   // STARTED, IN_PROGRESS, COMPLETED, ABANDONED
+  fatigueScore    Int      @default(0)
+  currentTopicId  String?
+  
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  durationSeconds Int?
+  
+  sentimentScore  Float?
+  tags            String[]
+  
+  bot             Bot      @relation(fields: [botId], references: [id])
+  messages        Message[]
+  rewardGrant     RewardGrant?
+  
+  themeOccurrences ThemeOccurrence[]
+  answers         StructuredAnswer[]
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // sub-models: system, assistant, user
+  content        String   @db.Text
+  
+  createdAt      DateTime @default(now())
+  metadata       Json?    // e.g. { "skipped": true, "tokens": 120 }
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model RewardGrant {
+  id             String   @id @default(cuid())
+  conversationId String   @unique
+  userId         String?
+  code           String?
+  claimedAt      DateTime @default(now())
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User?    @relation(fields: [userId], references: [id])
+}
+
+// --- Analytics & Insights Models ---
+
+model QuestionDefinition {
+  id        String   @id @default(cuid())
+  botId     String
+  type      String   // LIKERT, SELECT, MULTI_SELECT
+  text      String
+  options   Json?    // e.g. ["Option A", "Option B"]
+  
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  answers   StructuredAnswer[]
+}
+
+model StructuredAnswer {
+  id             String   @id @default(cuid())
+  conversationId String
+  questionId     String
+  value          String
+  
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  question       QuestionDefinition @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model Theme {
+  id          String   @id @default(cuid())
+  botId       String
+  name        String
+  category    String?
+  description String?
+  
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  occurrences ThemeOccurrence[]
+}
+
+model ThemeOccurrence {
+  id             String   @id @default(cuid())
+  themeId        String
+  conversationId String
+  strengthScore  Float
+  snippet        String?  @db.Text
+  
+  theme          Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Insight {
+  id      String   @id @default(cuid())
+  botId   String
+  content String   @db.Text
+  
+  bot     Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model HotIdea {
+  id      String   @id @default(cuid())
+  botId   String
+  content String   @db.Text
+  
+  bot     Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  botId     String
+  userId    String
+  title     String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model MetricSummary {
+  id        String   @id @default(cuid())
+  key       String   @unique // composite key identifier
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+}

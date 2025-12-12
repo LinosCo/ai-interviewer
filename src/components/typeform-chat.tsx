@@ -48,7 +48,7 @@ export default function TypeformChat({
     const progress = messages.length > 0 ? Math.min(100, (messages.length / (totalTopics * 5)) * 100) : 0;
 
     // Get current question (last assistant message)
-    const currentQuestion = messages.filter(m => m.role === 'assistant').slice(-1)[0];
+    const currentQuestion = messages.filter((m: any) => m.role === 'assistant').slice(-1)[0];
 
     // Handle form submission
     const onSubmit = (e: React.FormEvent) => {
@@ -151,7 +151,7 @@ export default function TypeformChat({
                                 {/* Question number */}
                                 <div className="flex items-center gap-2 text-sm opacity-60">
                                     <span style={{ color: primaryColor }}>●</span>
-                                    <span>Question {messages.filter(m => m.role === 'assistant').length}</span>
+                                    <span>Question {messages.filter((m: any) => m.role === 'assistant').length}</span>
                                 </div>
 
                                 {/* Question text */}

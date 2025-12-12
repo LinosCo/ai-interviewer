@@ -68,13 +68,21 @@ export default function TypeformChat({
 
     // Start chat if no messages
     const startChat = () => {
+        console.log('Start chat clicked, append:', typeof append, append);
         if (append) {
             append({
                 role: 'user',
                 content: "I'm ready to start the interview."
             });
+        } else {
+            console.error('Append function not available!');
         }
     };
+
+    // Debug: Log append availability
+    useEffect(() => {
+        console.log('TypeformChat mounted. Append available:', !!append, typeof append);
+    }, [append]);
 
     return (
         <div
@@ -129,14 +137,19 @@ export default function TypeformChat({
                                 <p className="text-xl opacity-80 mb-8">
                                     Ready to share your thoughts? This will take about 5-10 minutes.
                                 </p>
-                                <button
-                                    onClick={startChat}
-                                    disabled={!append}
-                                    className="px-8 py-4 rounded-xl font-semibold text-white text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition disabled:opacity-50"
-                                    style={{ backgroundColor: primaryColor }}
-                                >
-                                    Start Interview →
-                                </button>
+                                {append ? (
+                                    <button
+                                        onClick={startChat}
+                                        className="px-8 py-4 rounded-xl font-semibold text-white text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition"
+                                        style={{ backgroundColor: primaryColor }}
+                                    >
+                                        Start Interview →
+                                    </button>
+                                ) : (
+                                    <div className="text-sm opacity-60">
+                                        Initializing chat...
+                                    </div>
+                                )}
                             </motion.div>
                         ) : currentQuestion ? (
                             // Current question

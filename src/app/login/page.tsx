@@ -10,7 +10,9 @@ export default function LoginPage() {
 
     // Redirect to dashboard if login successful (errorMessage is null and not pending)
     useEffect(() => {
+        // After form submission, if no error and not pending, redirect
         if (!isPending && errorMessage === null) {
+            console.log('Login successful, redirecting to dashboard...');
             router.push('/dashboard');
         }
     }, [errorMessage, isPending, router]);

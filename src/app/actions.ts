@@ -164,3 +164,32 @@ export async function deleteTopicAction(topicId: string, botId: string) {
     await prisma.topicBlock.delete({ where: { id: topicId } });
     revalidatePath(`/dashboard/bots/${botId}`);
 }
+
+export async function addKnowledgeSourceAction(botId: string, formData: FormData) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const title = formData.get('title') as string;
+    const content = formData.get('content') as string;
+    const type = formData.get('type') as string || 'TEXT'; // TEXT or FILE (though we only support text paste for MVP)
+
+    if (!content) return; // Silent fail or error?
+
+    await prisma.knowledgeSource.create({
+        data: {
+            botId,
+            title: title || 'Untitled Source',
+            type: type,
+            content: content
+        }
+    });
+    revalidatePath(`/dashboard/bots/${botId}`);
+}
+
+export async function deleteKnowledgeSourceAction(sourceId: string, botId: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    await prisma.knowledgeSource.delete({ where: { id: sourceId } });
+    revalidatePath(`/dashboard/bots/${botId}`);
+}

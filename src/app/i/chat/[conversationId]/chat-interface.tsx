@@ -83,7 +83,7 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                         />
                         <button
                             type="submit"
-                            disabled={isLoading || !input.trim()}
+                            disabled={isLoading || !(input || '').trim()}
                             className="bg-blue-600 text-white rounded-full p-3 w-12 h-12 flex items-center justify-center hover:bg-blue-700 disabled:opacity-50 transition"
                         >
                             →

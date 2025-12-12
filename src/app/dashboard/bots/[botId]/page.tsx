@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import BotConfigForm from './bot-config-form';
 import TopicsEditor from './topics-editor';
+import KnowledgeSourcesEditor from './knowledge-sources';
 import Link from 'next/link';
 
 export default async function BotEditorPage({ params }: { params: Promise<{ botId: string }> }) {
@@ -41,19 +42,8 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                 </div>
 
                 <div className="space-y-8">
-                    {/* Placeholder for Knowledge Sources */}
-                    <div className="bg-white p-6 rounded shadow">
-                        <h2 className="text-lg font-semibold mb-4 border-b pb-2">Knowledge Sources</h2>
-                        <p className="text-sm text-gray-500 mb-4">Upload documents or add text context.</p>
-                        <ul className="list-disc pl-5 mb-4">
-                            {bot.knowledgeSources.map(ks => (
-                                <li key={ks.id} className="text-sm">{ks.title || 'Untitled Source'} ({ks.type})</li>
-                            ))}
-                        </ul>
-                        <button className="w-full border border-dashed p-2 text-sm text-gray-500">
-                            + Add Source
-                        </button>
-                    </div>
+                    {/* Knowledge Sources Editor */}
+                    <KnowledgeSourcesEditor botId={bot.id} sources={bot.knowledgeSources} />
                 </div>
             </div>
         </div>

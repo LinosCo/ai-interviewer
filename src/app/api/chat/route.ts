@@ -11,10 +11,19 @@ export async function POST(req: Request) {
         console.log('Request body:', JSON.stringify(body, null, 2));
         const { messages, conversationId, botId } = body;
 
+        // Validate messages
+        if (!messages || !Array.isArray(messages)) {
+            console.error('Invalid messages format:', messages);
+            return new Response(
+                JSON.stringify({ error: 'Messages must be an array' }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
+            );
+        }
+
         // Verify conversation
         const conversation = await prisma.conversation.findUnique({
             where: { id: conversationId },
-            include: { messages: true } // We might need history check
+            include: { messages: true }
         });
 
         if (!conversation || conversation.botId !== botId) {
@@ -22,13 +31,9 @@ export async function POST(req: Request) {
             return new Response("Unauthorized", { status: 401 });
         }
 
-        // Save the latest User message (which is in 'messages' but not in DB yet)
-        // The 'messages' array from useChat includes all history + new user message.
+        // Save the latest User message
         const lastMessage = messages[messages.length - 1];
-        if (lastMessage.role === 'user') {
-            // Check if already saved? (Deduplication)
-            // Simple check: compare with DB last message? 
-            // For MVP we assume useChat sends it and we save it here.
+        if (lastMessage && lastMessage.role === 'user') {
             await prisma.message.create({
                 data: {
                     conversationId,
@@ -49,14 +54,25 @@ export async function POST(req: Request) {
             return new Response("Bot not found", { status: 404 });
         }
 
-        console.log('Calling runInterviewTurn...');
-        const coreMessages = convertToCoreMessages(messages);
+        console.log('Converting messages to core format...');
+        console.log('Messages to convert:', messages);
 
-        const response = runInterviewTurn(bot, conversation, coreMessages);
+        // Ensure messages have the correct format
+        const formattedMessages = messages.map((m: any) => ({
+            role: m.role,
+            content: m.content
+        }));
+
+        const coreMessages = convertToCoreMessages(formattedMessages);
+        console.log('Core messages:', coreMessages);
+
+        console.log('Calling runInterviewTurn...');
+        const response = await runInterviewTurn(bot, conversation, coreMessages);
         console.log('runInterviewTurn returned, streaming response');
         return response;
     } catch (error: any) {
         console.error("Chat API Error:", error);
+        console.error("Error stack:", error.stack);
         return new Response(
             JSON.stringify({ error: error.message || "Internal server error" }),
             { status: 500, headers: { 'Content-Type': 'application/json' } }

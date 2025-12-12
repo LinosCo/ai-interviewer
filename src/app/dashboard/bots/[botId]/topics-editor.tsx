@@ -38,16 +38,15 @@ export default function TopicsEditor({ botId, topics }: { botId: string, topics:
     );
 }
 
+import { RefinableField } from '@/components/refinable-field';
+
 function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel }: any) {
     const updateAction = updateTopicAction.bind(null, topic.id, botId);
-
-    // Local state for immediate feedback or we just rely on form defaultValues
 
     if (isEditing) {
         return (
             <div className="border border-blue-500 rounded p-4 bg-blue-50">
                 <form action={async (formData) => {
-                    // Extract data manually to handle subGoals transformation
                     const data = {
                         label: formData.get('label'),
                         description: formData.get('description'),
@@ -58,24 +57,39 @@ function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel }: any) {
                     onCancel();
                 }}>
                     <div className="grid grid-cols-2 gap-4 mb-2">
-                        <div>
-                            <label className="text-xs font-bold uppercase text-gray-500">Label</label>
-                            <input name="label" defaultValue={topic.label} className="w-full p-1 border rounded" />
-                        </div>
+                        <RefinableField
+                            label="Label"
+                            name="label"
+                            value={topic.label}
+                            context={`Topic ${index + 1}`}
+                            className="w-full"
+                        />
                         <div>
                             <label className="text-xs font-bold uppercase text-gray-500">Max Turns</label>
                             <input type="number" name="maxTurns" defaultValue={topic.maxTurns} className="w-full p-1 border rounded" />
                         </div>
                     </div>
                     <div className="mb-2">
-                        <label className="text-xs font-bold uppercase text-gray-500">Description (Purpose)</label>
-                        <textarea name="description" defaultValue={topic.description || ''} className="w-full p-1 border rounded h-16" />
+                        <RefinableField
+                            label="Description (Purpose)"
+                            name="description"
+                            value={topic.description || ''}
+                            context={`Topic ${index + 1}: ${topic.label}`}
+                            multiline
+                            className="w-full"
+                        />
                     </div>
                     <div className="mb-2">
-                        <label className="text-xs font-bold uppercase text-gray-500">Sub-Goals (One per line)</label>
-                        <textarea name="subGoals" defaultValue={topic.subGoals.join('\n')} className="w-full p-1 border rounded h-24" placeholder="- Ask about X..." />
+                        <RefinableField
+                            label="Sub-Goals (One per line)"
+                            name="subGoals"
+                            value={topic.subGoals.join('\n')}
+                            context={`Topic ${index + 1}: ${topic.label}`}
+                            multiline
+                            className="w-full"
+                        />
                     </div>
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-2 justify-end mt-4">
                         <button type="button" onClick={onCancel} className="text-gray-500 text-sm">Cancel</button>
                         <button type="submit" className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Save</button>
                     </div>

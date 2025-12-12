@@ -2,6 +2,7 @@
 
 import { updateBotAction } from '@/app/actions';
 import { Bot, TopicBlock, KnowledgeSource } from '@prisma/client';
+import { useState } from 'react';
 
 type BotWithRelations = Bot & {
     topics: TopicBlock[];
@@ -10,6 +11,7 @@ type BotWithRelations = Bot & {
 
 export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
     const updateAction = updateBotAction.bind(null, bot.id);
+    const [provider, setProvider] = useState(bot.modelProvider || 'openai');
 
     // Wrapper to ignore return type compatibility issues with form action
     const handleSubmit = async (formData: FormData) => {
@@ -30,6 +32,7 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                         <label className="block text-sm font-medium mb-1">Language</label>
                         <select name="language" defaultValue={bot.language} className="w-full border p-2 rounded">
                             <option value="en">English</option>
+                            <option value="it">Italiano</option>
                             <option value="es">Spanish</option>
                             <option value="fr">French</option>
                             <option value="de">German</option>
@@ -76,14 +79,37 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium mb-1">Model Provider</label>
-                            <select name="modelProvider" defaultValue={bot.modelProvider} className="w-full border p-2 rounded">
-                                <option value="openai">OpenAI (GPT-4)</option>
+                            <select
+                                name="modelProvider"
+                                value={provider}
+                                onChange={(e) => setProvider(e.target.value)}
+                                className="w-full border p-2 rounded"
+                            >
+                                <option value="openai">OpenAI (ChatGPT)</option>
                                 <option value="anthropic">Anthropic (Claude)</option>
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium mb-1">Model Name</label>
-                            <input name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded" placeholder="gpt-4o / claude-3-5-sonnet-20241022" />
+                            <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
+                                {provider === 'openai' ? (
+                                    <>
+                                        <option value="gpt-5.2">GPT-5.2 (Future/Preview)</option>
+                                        <option value="gpt-4o">GPT-4o (Recommended)</option>
+                                        <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    </>
+                                ) : (
+                                    <>
+                                        <option value="claude-4.5-sonnet">Claude 4.5 Sonnet (Future)</option>
+                                        <option value="claude-4.5-opus">Claude 4.5 Opus</option>
+                                        <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
+                                        <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
+                                        <option value="claude-3-opus-latest">Claude 3 Opus</option>
+                                    </>
+                                )}
+                            </select>
                         </div>
                     </div>
                     <div>

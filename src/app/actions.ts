@@ -384,3 +384,30 @@ export async function updateSettingsAction(userId: string, formData: FormData) {
 
     revalidatePath('/dashboard/settings');
 }
+
+export async function refineTextAction(currentText: string, fieldName: string, context: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) throw new Error("User not found");
+    const apiKey = (user as any).platformOpenaiApiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("No OpenAI API Key configured.");
+
+    const openai = createOpenAI({ apiKey });
+
+    const { text } = await generateObject({
+        model: openai('gpt-4o'),
+        schema: z.object({ text: z.string() }),
+        prompt: `Refine the following text for the field "${fieldName}" in a user research bot configuration.
+        Context: The bot is named or about: "${context}".
+        
+        Current Text: "${currentText}"
+        
+        Improve clarity, tone, and professionalism. Keep the meaning but make it better.
+        IMPORTANT: If the Current Text is in Italian, the refined text MUST be in Italian.
+        If the Current Text is in English, keep it in English. detect the language and stick to it.`,
+    });
+
+    return text;
+}

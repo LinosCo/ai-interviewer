@@ -12,10 +12,20 @@ export async function runInterviewTurn(
     conversation: Conversation,
     messages: CoreMessage[]
 ) {
-    // 1. Determine Model
-    const model = bot.modelProvider === 'anthropic'
-        ? anthropic(bot.modelName || 'claude-3-5-sonnet-20240620')
-        : openai(bot.modelName || 'gpt-4o');
+    // 1. Determine Model & Provider
+    let model;
+
+    if (bot.modelProvider === 'anthropic') {
+        const anthropicProvider = bot.anthropicApiKey
+            ? createAnthropic({ apiKey: bot.anthropicApiKey })
+            : anthropic; // Fallback to global instance
+        model = anthropicProvider(bot.modelName || 'claude-3-5-sonnet-20240620');
+    } else {
+        const openaiProvider = bot.openaiApiKey
+            ? createOpenAI({ apiKey: bot.openaiApiKey })
+            : openai; // Fallback to global instance
+        model = openaiProvider(bot.modelName || 'gpt-4o');
+    }
 
     // 2. Determine Context & State
     let currentTopicIndex = -1;

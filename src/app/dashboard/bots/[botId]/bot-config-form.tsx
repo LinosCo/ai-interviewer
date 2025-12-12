@@ -66,6 +66,49 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                 </div>
             </section>
 
+            <section>
+                <h2 className="text-lg font-semibold mb-4 border-b pb-2">Model & API Configuration</h2>
+                <div className="space-y-4">
+                    <div className="bg-yellow-50 p-4 rounded text-sm text-yellow-800">
+                        Leave keys empty to use the platform defaults (if configured).
+                        Keys provided here override environment variables for this bot.
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Model Provider</label>
+                            <select name="modelProvider" defaultValue={bot.modelProvider} className="w-full border p-2 rounded">
+                                <option value="openai">OpenAI (GPT-4)</option>
+                                <option value="anthropic">Anthropic (Claude)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Model Name</label>
+                            <input name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded" placeholder="gpt-4o / claude-3-5-sonnet-20241022" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">OpenAI API Key (Optional)</label>
+                        <input
+                            type="password"
+                            name="openaiApiKey"
+                            defaultValue={bot.openaiApiKey || ''}
+                            placeholder="sk-..."
+                            className="w-full border p-2 rounded font-mono"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Anthropic API Key (Optional)</label>
+                        <input
+                            type="password"
+                            name="anthropicApiKey"
+                            defaultValue={bot.anthropicApiKey || ''}
+                            placeholder="sk-ant-..."
+                            className="w-full border p-2 rounded font-mono"
+                        />
+                    </div>
+                </div>
+            </section>
+
             <div className="pt-4 align-right">
                 <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">
                     Save Changes

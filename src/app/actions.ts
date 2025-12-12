@@ -92,7 +92,25 @@ export async function updateBotAction(botId: string, formData: FormData) {
         language: formData.get('language') as string,
         tone: formData.get('tone') as string,
         maxDurationMins: Number(formData.get('maxDurationMins')),
+        modelProvider: formData.get('modelProvider') as string,
+        modelName: formData.get('modelName') as string,
+        openaiApiKey: formData.get('openaiApiKey') ? (formData.get('openaiApiKey') as string) : undefined,
+        anthropicApiKey: formData.get('anthropicApiKey') ? (formData.get('anthropicApiKey') as string) : undefined,
     };
+
+    // Filter out undefined keys so we don't overwrite with null if they were just left empty
+    // But here optional fields should be update-able to empty. 
+    // If user leaves empty, should we delete? 
+    // UI logic: defaultValue uses existing. If user clears it, it sends empty string.
+    // If empty string, we should save null or empty string?
+    // Let's rely on standard Prisma behavior, but if user inputs nothing (and it was previously set), 
+    // we want to keep it? No, if user clears input, they want to clear key.
+    // The Input has defaultValue={bot.key}. So if unchanged, it sends key.
+    // If changed to empty, it sends empty string.
+    // We should probably convert empty string to null.
+
+    if (data.openaiApiKey === '') data.openaiApiKey = null as any;
+    if (data.anthropicApiKey === '') data.anthropicApiKey = null as any;
 
     await prisma.bot.update({
         where: { id: botId },

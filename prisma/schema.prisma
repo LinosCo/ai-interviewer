@@ -137,6 +137,8 @@ model Bot {
   // Model Config
   modelProvider  String   @default("openai")
   modelName      String   @default("gpt-4o")
+  openaiApiKey   String?
+  anthropicApiKey String?
   
   // Privacy
   anonymizationLevel String @default("partial")

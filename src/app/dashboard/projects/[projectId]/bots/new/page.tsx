@@ -1,8 +1,7 @@
-'use client';
-
 import { createBotAction } from '@/app/actions';
 
-export default function NewBotPage({ params }: { params: { projectId: string } }) {
+export default async function NewBotPage(props: { params: Promise<{ projectId: string }> }) {
+    const params = await props.params;
     const createBotWithProject = createBotAction.bind(null, params.projectId);
 
     return (

@@ -93,7 +93,7 @@ Go to **Settings** -> **Environment Variables** and add the remaining keys:
 | `OPENAI_API_KEY`| `sk-...` | Your OpenAI Key. |
 | `ANTHROPIC_API_KEY` | `sk-...` | Your Anthropic Key (Optional). |
 
-*Note: `AUTH_URL` is generally not required on Vercel as it detects the deployment URL automatically.*
+*Note: `AUTH_URL` is generally not required on Vercel as it detects the deployment URL automatically.* 
 
 ### 5. Final Redeploy
 1. Go to **Deployments**.

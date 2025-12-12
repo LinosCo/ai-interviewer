@@ -16,6 +16,15 @@ export const authConfig = {
             }
             return true;
         },
+        async signIn() {
+            return true; // Allow sign in
+        },
+        async redirect({ url, baseUrl }) {
+            // Always redirect to dashboard after login
+            if (url.startsWith(baseUrl)) return url;
+            if (url.startsWith('/')) return `${baseUrl}${url}`;
+            return baseUrl + '/dashboard';
+        },
         session({ session, token }) {
             if (session.user && token.sub) {
                 session.user.id = token.sub;

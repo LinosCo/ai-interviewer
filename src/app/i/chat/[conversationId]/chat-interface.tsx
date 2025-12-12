@@ -16,6 +16,11 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
     const { messages, input, handleInputChange, handleSubmit, append, isLoading } = chatResponse;
 
+    // Debug: verify append is defined
+    useEffect(() => {
+        console.log('ChatInterface mounted. Append function:', typeof append, append);
+    }, []);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -104,6 +109,11 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                         <div className="text-gray-600 text-sm">Ready to begin?</div>
                         <button
                             onClick={() => {
+                                console.log('Start Chat clicked. Append:', typeof append);
+                                if (!append) {
+                                    alert('Chat system not ready. Please refresh the page.');
+                                    return;
+                                }
                                 // Send a hidden or system-like message to trigger the bot's greeting
                                 // 'append' is the correct way to programmatically add a message with useChat
                                 append({

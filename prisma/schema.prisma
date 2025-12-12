@@ -144,6 +144,12 @@ model Bot {
   openaiApiKey   String?
   anthropicApiKey String?
   
+  // Branding & Customization
+  logoUrl        String?  @db.Text // Base64 encoded image or URL
+  primaryColor   String   @default("#6366f1") // Indigo-500
+  backgroundColor String  @default("#ffffff")
+  textColor      String   @default("#1f2937") // Gray-800
+  
   // Privacy
   anonymizationLevel String @default("partial")
 

@@ -121,6 +121,11 @@ export async function updateBotAction(botId: string, formData: FormData) {
         modelName: formData.get('modelName') as string,
         openaiApiKey: formData.get('openaiApiKey') ? (formData.get('openaiApiKey') as string) : undefined,
         anthropicApiKey: formData.get('anthropicApiKey') ? (formData.get('anthropicApiKey') as string) : undefined,
+        // Branding fields
+        logoUrl: formData.get('logoUrl') as string | null,
+        primaryColor: formData.get('primaryColor') as string,
+        backgroundColor: formData.get('backgroundColor') as string,
+        textColor: formData.get('textColor') as string,
     };
 
     // Filter out undefined keys so we don't overwrite with null if they were just left empty
@@ -136,6 +141,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
 
     if (data.openaiApiKey === '') data.openaiApiKey = null as any;
     if (data.anthropicApiKey === '') data.anthropicApiKey = null as any;
+    if (data.logoUrl === '') data.logoUrl = null;
 
     await prisma.bot.update({
         where: { id: botId },

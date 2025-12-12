@@ -62,6 +62,93 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
             </section>
 
             <section>
+                <h2 className="text-lg font-semibold mb-4 border-b pb-2">🎨 Branding & Customization</h2>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Chat Logo</label>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            name="logo"
+                            className="w-full border p-2 rounded"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                        const logoInput = document.getElementById('logoUrl') as HTMLInputElement;
+                                        if (logoInput) logoInput.value = reader.result as string;
+                                    };
+                                    reader.readAsDataURL(file);
+                                }
+                            }}
+                        />
+                        <input type="hidden" id="logoUrl" name="logoUrl" defaultValue={bot.logoUrl || ''} />
+                        <p className="text-xs text-gray-500 mt-1">Recommended: 200x200px PNG with transparent background</p>
+                        {bot.logoUrl && (
+                            <div className="mt-2">
+                                <img src={bot.logoUrl} alt="Current logo" className="h-16 w-16 object-contain border rounded p-1" />
+                            </div>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Primary Color</label>
+                            <div className="flex gap-2 items-center">
+                                <input
+                                    type="color"
+                                    name="primaryColor"
+                                    defaultValue={bot.primaryColor || '#6366f1'}
+                                    className="h-10 w-20 border rounded cursor-pointer"
+                                />
+                                <span className="text-xs text-gray-500">{bot.primaryColor || '#6366f1'}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Background</label>
+                            <div className="flex gap-2 items-center">
+                                <input
+                                    type="color"
+                                    name="backgroundColor"
+                                    defaultValue={bot.backgroundColor || '#ffffff'}
+                                    className="h-10 w-20 border rounded cursor-pointer"
+                                />
+                                <span className="text-xs text-gray-500">{bot.backgroundColor || '#ffffff'}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Text Color</label>
+                            <div className="flex gap-2 items-center">
+                                <input
+                                    type="color"
+                                    name="textColor"
+                                    defaultValue={bot.textColor || '#1f2937'}
+                                    className="h-10 w-20 border rounded cursor-pointer"
+                                />
+                                <span className="text-xs text-gray-500">{bot.textColor || '#1f2937'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded border">
+                        <p className="text-sm font-medium mb-2">Preview</p>
+                        <div className="bg-white p-4 rounded shadow-sm" style={{ backgroundColor: bot.backgroundColor || '#ffffff' }}>
+                            <div className="flex items-center gap-2 mb-3">
+                                {bot.logoUrl && <img src={bot.logoUrl} alt="Logo" className="h-8 w-8 object-contain" />}
+                                <span style={{ color: bot.textColor || '#1f2937' }}>Sample Question?</span>
+                            </div>
+                            <button
+                                type="button"
+                                className="px-4 py-2 rounded text-white text-sm"
+                                style={{ backgroundColor: bot.primaryColor || '#6366f1' }}
+                            >
+                                Answer Button
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
                 <h2 className="text-lg font-semibold mb-4 border-b pb-2">Constraints</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

@@ -57,6 +57,10 @@ export default function LoginPage() {
                     >
                         {isPending ? 'Signing in...' : 'Sign In'}
                     </button>
+                    {/* Manual fallback link */}
+                    <div className="text-center text-xs text-gray-500 mt-4">
+                        Already logged in? <a href="/dashboard" className="text-blue-600 hover:underline">Go to Dashboard</a>
+                    </div>
                 </form>
             </div>
         </div>

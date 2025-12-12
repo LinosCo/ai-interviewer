@@ -137,18 +137,17 @@ export default function TypeformChat({
                                 <p className="text-xl opacity-80 mb-8">
                                     Ready to share your thoughts? This will take about 5-10 minutes.
                                 </p>
-                                {append ? (
-                                    <button
-                                        onClick={startChat}
-                                        className="px-8 py-4 rounded-xl font-semibold text-white text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition"
-                                        style={{ backgroundColor: primaryColor }}
-                                    >
-                                        Start Interview →
-                                    </button>
-                                ) : (
-                                    <div className="text-sm opacity-60">
-                                        Initializing chat...
-                                    </div>
+                                <button
+                                    onClick={startChat}
+                                    className="px-8 py-4 rounded-xl font-semibold text-white text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition"
+                                    style={{ backgroundColor: primaryColor }}
+                                >
+                                    Start Interview →
+                                </button>
+                                {!append && (
+                                    <p className="text-xs text-red-500 mt-2">
+                                        Note: Chat initialization may be slow. Check console for errors.
+                                    </p>
                                 )}
                             </motion.div>
                         ) : currentQuestion ? (

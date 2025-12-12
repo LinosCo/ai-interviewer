@@ -28,7 +28,7 @@ export default function InterviewChat({
     backgroundColor = '#ffffff',
     textColor = '#1f2937',
 }: InterviewChatProps) {
-    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = useChat({
+    const chatHelpers: any = useChat({
         api: '/api/chat',
         body: { conversationId, botId },
         initialMessages: initialMessages.length > 0 ? initialMessages : undefined,
@@ -36,6 +36,8 @@ export default function InterviewChat({
             console.error('Chat error:', error);
         },
     });
+
+    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = chatHelpers;
 
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const inputRef = useRef<HTMLTextAreaElement>(null);

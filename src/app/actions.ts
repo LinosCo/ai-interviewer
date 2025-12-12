@@ -396,7 +396,7 @@ export async function refineTextAction(currentText: string, fieldName: string, c
 
     const openai = createOpenAI({ apiKey });
 
-    const { text } = await generateObject({
+    const { object } = await generateObject({
         model: openai('gpt-4o'),
         schema: z.object({ text: z.string() }),
         prompt: `Refine the following text for the field "${fieldName}" in a user research bot configuration.
@@ -409,5 +409,5 @@ export async function refineTextAction(currentText: string, fieldName: string, c
         If the Current Text is in English, keep it in English. detect the language and stick to it.`,
     });
 
-    return text;
+    return object.text;
 }

@@ -5,9 +5,9 @@ import { AuthError } from 'next-auth';
 import { redirect } from 'next/navigation';
 
 export async function authenticate(
-    prevState: string | undefined,
+    prevState: string | null | undefined,
     formData: FormData,
-) {
+): Promise<string | null> {
     try {
         await signIn('credentials', formData, { redirect: false } as any);
         // Return null on success - the client will handle redirect

@@ -12,6 +12,19 @@ export async function runInterviewTurn(
     conversation: Conversation,
     messages: CoreMessage[]
 ) {
+    console.log('runInterviewTurn called with bot:', {
+        id: bot.id,
+        name: bot.name,
+        hasTopics: !!bot.topics,
+        topicsLength: bot.topics?.length
+    });
+
+    // Safety check: ensure topics exists
+    if (!bot.topics) {
+        console.error('Bot topics is undefined! Bot:', bot);
+        bot.topics = [];
+    }
+
     // 1. Determine Model & Provider
     let model;
     let apiKey: string | undefined;

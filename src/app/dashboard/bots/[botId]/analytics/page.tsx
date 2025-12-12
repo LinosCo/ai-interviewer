@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
+import AnalyticsView from './analytics-view';
 
 export default async function AnalyticsPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
@@ -11,7 +12,11 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ botI
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
-        include: { conversations: { orderBy: { startedAt: 'desc' } } }
+        include: {
+            conversations: { orderBy: { startedAt: 'desc' } },
+            themes: { include: { occurrences: true } },
+            insights: true
+        }
     });
 
     if (!bot) notFound();
@@ -37,6 +42,9 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ botI
                     <div className="text-sm text-gray-500">Completed</div>
                 </div>
             </div>
+
+            {/* Advanced Analytics View */}
+            <AnalyticsView bot={bot} themes={bot.themes} insights={bot.insights} />
 
             <div className="bg-white rounded shadow overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">

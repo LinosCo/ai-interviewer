@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 import { TopicBlock } from '@prisma/client';
 
 export default function ChatInterface({ conversationId, botId, initialMessages, topics }: any) {
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = useChat({
         api: '/api/chat',
         body: { conversationId, botId },
         initialMessages: initialMessages,
@@ -100,15 +100,12 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                 <div className="fixed inset-0 bg-white/80 backdrop-blur z-20 flex items-center justify-center">
                     <button
                         onClick={() => {
-                            // "system" message to kick off? Or just empty submit?
-                            // append({ role: 'system', content: 'START_INTERVIEW' }) // No, system msgs not meant for that.
-                            // We usually want the BOT to speak first.
-                            // I'll manually call API to get greeting, then add to messages?
-                            // Or simpler: User clicks "I'm ready" -> Sends "Hi" invisible? 
-                            // Let's make the USER say "I'm ready".
-                            handleSubmit({ preventDefault: () => { } } as any, { data: { command: 'START' } });
-                            // Wait, handleSubmit expects event.
-                            // `append({ role: 'user', content: "I'm ready to start." })`
+                            // Send a hidden or system-like message to trigger the bot's greeting
+                            // 'append' is the correct way to programmatically add a message with useChat
+                            append({
+                                role: 'user',
+                                content: "I'm ready to start the interview."
+                            });
                         }}
                         className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl animate-bounce"
                     >

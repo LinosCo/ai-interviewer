@@ -27,6 +27,10 @@ model User {
 
   rewardGrants RewardGrant[]
   reports      Report[]
+
+  // Platform Configuration
+  platformOpenaiApiKey    String?
+  platformAnthropicApiKey String?
 }
 
 model Account {

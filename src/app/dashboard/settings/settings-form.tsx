@@ -1,13 +1,20 @@
 'use client';
 
 import { updateSettingsAction } from '@/app/actions';
+import { useState } from 'react';
+import { showToast } from '@/components/toast';
 import { User } from '@prisma/client';
 
 export default function SettingsForm({ user }: { user: User }) {
     const updateAction = updateSettingsAction.bind(null, user.id);
 
+    const handleSubmit = async (formData: FormData) => {
+        await updateAction(formData);
+        showToast('✅ System settings saved successfully!', 'success');
+    };
+
     return (
-        <form action={updateAction} className="bg-white p-6 rounded shadow space-y-6">
+        <form action={handleSubmit} className="bg-white p-6 rounded shadow space-y-6">
             <div>
                 <h2 className="text-lg font-semibold border-b pb-2 mb-4">Platform API Keys</h2>
                 <p className="text-sm text-gray-500 mb-4">

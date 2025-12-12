@@ -5,14 +5,16 @@ import { useEffect, useRef } from 'react';
 import { TopicBlock } from '@prisma/client';
 
 export default function ChatInterface({ conversationId, botId, initialMessages, topics }: any) {
-    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = useChat({
+    const chatResponse: any = useChat({
         api: '/api/chat',
         body: { conversationId, botId },
         initialMessages: initialMessages,
         onFinish: () => {
             // Maybe refresh to get new state/topics?
         }
-    } as any) as any;
+    } as any);
+
+    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = chatResponse;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 

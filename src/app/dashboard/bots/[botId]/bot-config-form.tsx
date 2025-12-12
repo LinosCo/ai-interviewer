@@ -3,6 +3,7 @@
 import { updateBotAction } from '@/app/actions';
 import { Bot, TopicBlock, KnowledgeSource } from '@prisma/client';
 import { useState } from 'react';
+import { showToast } from '@/components/toast';
 
 type BotWithRelations = Bot & {
     topics: TopicBlock[];
@@ -16,6 +17,7 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
     // Wrapper to ignore return type compatibility issues with form action
     const handleSubmit = async (formData: FormData) => {
         await updateAction(formData);
+        showToast('✅ Bot settings saved successfully!', 'success');
     };
 
     return (

@@ -19,6 +19,8 @@ export async function authenticate(
                     return 'Something went wrong.';
             }
         }
+        // NextAuth throws NEXT_REDIRECT on successful login - we need to re-throw it
         throw error;
     }
+    // This line should never be reached because signIn redirects on success
 }

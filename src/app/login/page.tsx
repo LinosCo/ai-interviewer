@@ -1,11 +1,11 @@
 'use client';
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 import { authenticate } from './actions';
 
 export default function LoginPage() {
     // If we want manual client-side redirection to be super safe:
-    const [errorMessage, dispatch] = useFormState(authenticate, undefined);
+    const [errorMessage, dispatch] = useActionState(authenticate, undefined);
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-100">

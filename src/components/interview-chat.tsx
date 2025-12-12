@@ -29,7 +29,7 @@ export default function InterviewChat({
     textColor = '#1f2937',
 }: InterviewChatProps) {
     const chatHelpers: any = useChat({
-        fetch: async (input, init) => {
+        fetch: async (input: any, init: any) => {
             console.log('useChat fetch called with:', input, init);
             return fetch('/api/chat', {
                 ...init,
@@ -46,10 +46,10 @@ export default function InterviewChat({
             });
         },
         initialMessages: initialMessages.length > 0 ? initialMessages : undefined,
-        onError: (error) => {
+        onError: (error: any) => {
             console.error('Chat error:', error);
         },
-    });
+    } as any);
 
     const { messages, input, handleInputChange, handleSubmit, append, isLoading } = chatHelpers;
 

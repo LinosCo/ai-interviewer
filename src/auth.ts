@@ -20,7 +20,9 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
     ...authConfig,
     adapter: PrismaAdapter(prisma),
     session: { strategy: 'jwt' },
+    basePath: '/api/auth',
     trustHost: true,
+    debug: process.env.NODE_ENV === 'development',
     providers: [
         Credentials({
             async authorize(credentials) {

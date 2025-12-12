@@ -162,6 +162,7 @@ export async function generateBotConfigAction(prompt: string) {
 
     const schema = z.object({
         name: z.string().describe("A catchy name for the bot"),
+        description: z.string().optional().describe("Short internal description"),
         researchGoal: z.string().describe("The main objective of the interview"),
         targetAudience: z.string().describe("Who we are interviewing"),
         topics: z.array(z.object({

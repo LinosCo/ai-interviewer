@@ -159,35 +159,8 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                             Send
                         </button>
                     </form>
-                    {messages.length === 0 && append && (
-                        <div className="fixed inset-0 bg-gradient-to-b from-transparent via-white/60 to-white/90 backdrop-blur-sm z-20 flex items-center justify-center">
-                            <div className="text-center space-y-4">
-                                <div className="text-gray-600 text-sm">Ready to begin?</div>
-                                <button
-                                    onClick={() => {
-                                        console.log('Start Chat clicked. Append:', typeof append);
-                                        // Send a hidden or system-like message to trigger the bot's greeting
-                                        // 'append' is the correct way to programmatically add a message with useChat
-                                        append({
-                                            role: 'user',
-                                            content: "I'm ready to start the interview."
-                                        });
-                                    }}
-                                    className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition transform hover:scale-105"
-                                >
-                                    Start Chat
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                    {messages.length === 0 && !append && (
-                        <div className="fixed inset-0 bg-white flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                                <p className="text-gray-600">Loading chat...</p>
-                            </div>
-                        </div>
-                    )}
                 </div>
-                );
+            </div>
+        </div>
+    );
 }

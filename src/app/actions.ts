@@ -146,6 +146,46 @@ export async function updateBotAction(botId: string, formData: FormData) {
     return { success: true };
 }
 
+export async function generateBotConfigAction(prompt: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    // Fetch user to get keys
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) throw new Error("User not found");
+
+    // Use platform key or fallback to env
+    const apiKey = (user as any).platformOpenaiApiKey || process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("No OpenAI API Key configured in Settings.");
+
+    const openai = createOpenAI({ apiKey });
+
+    const schema = z.object({
+        name: z.string().describe("A catchy name for the bot"),
+        researchGoal: z.string().describe("The main objective of the interview"),
+        targetAudience: z.string().describe("Who we are interviewing"),
+        topics: z.array(z.object({
+            label: z.string(),
+            description: z.string(),
+            subGoals: z.array(z.string()).describe("3-5 specific questions or data points to gather")
+        })).describe("3-5 main topics to cover")
+    });
+
+    const result = await generateObject({
+        model: openai('gpt-4o'),
+        schema,
+        prompt: `You are an expert user researcher. Design an interview guide based on this concept: "${prompt}".
+        
+        Create a researched-backed structure with:
+        1. A clear research goal.
+        2. Defined target audience.
+        3. A logical flow of topics (Introduction -> Warm up -> Core Questions -> Wrap up).
+        `,
+    });
+
+    return result.object;
+}
+
 export async function generateBotAnalyticsAction(botId: string) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
@@ -321,4 +361,26 @@ export async function deleteKnowledgeSourceAction(sourceId: string, botId: strin
 
     await prisma.knowledgeSource.delete({ where: { id: sourceId } });
     revalidatePath(`/dashboard/bots/${botId}`);
+}
+
+export async function updateSettingsAction(userId: string, formData: FormData) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    // Simple security check:
+    const currentUser = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!currentUser || currentUser.id !== userId) throw new Error("Unauthorized");
+
+    const openaiKey = formData.get('platformOpenaiApiKey') as string;
+    const anthropicKey = formData.get('platformAnthropicApiKey') as string;
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: {
+            platformOpenaiApiKey: openaiKey || null,
+            platformAnthropicApiKey: anthropicKey || null,
+        }
+    });
+
+    revalidatePath('/dashboard/settings');
 }

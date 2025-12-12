@@ -9,7 +9,7 @@ export async function authenticate(
     formData: FormData,
 ) {
     try {
-        await signIn('credentials', formData, { redirect: false });
+        await signIn('credentials', formData, { redirect: false } as any);
         // Return null on success - the client will handle redirect
         return null;
     } catch (error) {

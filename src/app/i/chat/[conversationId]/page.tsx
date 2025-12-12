@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
-import TypeformChat from '@/components/typeform-chat';
+import InterviewChat from '@/components/interview-chat';
 
 export default async function ChatPage({ params }: { params: Promise<{ conversationId: string }> }) {
     const { conversationId } = await params;
@@ -26,7 +26,7 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
     }));
 
     return (
-        <TypeformChat
+        <InterviewChat
             conversationId={conversation.id}
             botId={conversation.botId}
             botName={conversation.bot.name}

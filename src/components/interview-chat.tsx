@@ -4,7 +4,7 @@ import { useChat } from '@ai-sdk/react';
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-interface TypeformChatProps {
+interface InterviewChatProps {
     conversationId: string;
     botId: string;
     botName: string;
@@ -17,7 +17,7 @@ interface TypeformChatProps {
     textColor?: string;
 }
 
-export default function TypeformChat({
+export default function InterviewChat({
     conversationId,
     botId,
     botName,
@@ -27,14 +27,16 @@ export default function TypeformChat({
     primaryColor = '#6366f1',
     backgroundColor = '#ffffff',
     textColor = '#1f2937',
-}: TypeformChatProps) {
-    const chatResponse: any = useChat({
+}: InterviewChatProps) {
+    const { messages, input, handleInputChange, handleSubmit, append, isLoading } = useChat({
         api: '/api/chat',
         body: { conversationId, botId },
-        initialMessages: initialMessages,
-    } as any);
+        initialMessages: initialMessages.length > 0 ? initialMessages : undefined,
+        onError: (error) => {
+            console.error('Chat error:', error);
+        },
+    });
 
-    const { messages, input, handleInputChange, handleSubmit, append, isLoading, setInput } = chatResponse;
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -81,7 +83,10 @@ export default function TypeformChat({
 
     // Debug: Log append availability
     useEffect(() => {
-        console.log('TypeformChat mounted. Append available:', !!append, typeof append);
+        console.log('InterviewChat mounted. Append available:', !!append, typeof append);
+        if (!append) {
+            console.error('useChat did not initialize append function. Check API route.');
+        }
     }, [append]);
 
     return (

@@ -31,11 +31,10 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                     const { email, password } = parsedCredentials.data;
                     const user = await getUser(email);
                     if (!user) return null;
-                    // For MVP, if no password set (e.g. OAuth user), fail
-                    // We need a password field in User model for credentials to work with standard schema?
-                    // Wait, Prisma Schema for User (from Adapter) doesn't have password.
-                    // I need to add 'password' field to User model manually in Schema!
-                    return user; // TODO: Compare password once we add password to User model.
+
+                    const passwordsMatch = await bcrypt.compare(password, user.password || '');
+                    if (passwordsMatch) return user;
+
                     // For now, allow login if user exists and we skip password check or check against a hardcoded hash?
                     // No, I must update Schema to add password.
                 }

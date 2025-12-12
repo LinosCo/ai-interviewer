@@ -41,7 +41,14 @@ A multi-tenant SaaS application for creating AI-powered qualitative research bot
    npx prisma db push
    ```
 
-4. **Run Locally**
+4. **Default Credentials**
+   The seed script creates a default admin user:
+   - **Email**: `admin@example.com`
+   - **Password**: `password123`
+   
+   To run seed manually: `npx prisma db seed`.
+
+5. **Run Locally**
    ```bash
    npm run dev
    ```
@@ -71,8 +78,9 @@ git push -u origin main
 2. It's easiest to create the database **after** the project is created but before a successful build, OR:
    - Click "Deploy" first (it might fail on DB connection initially if variables aren't there).
    - Once the project exists in Vercel, go to the **Storage** tab.
-   - Click **Connect Store** -> **Create New** -> **Postgres**.
-   - Accepts the defaults.
+   - Click **Connect Store** -> **Create New**.
+   - Select **Neon** (Serverless Postgres) or **Vercel Postgres** from the Marketplace list.
+   - Accept the defaults.
    - **Important**: This automatically adds `POSTGRES_PRISMA_URL`, `POSTGRES_URL`, etc., to your environment variables.
 
 ### 4. Configure Environment Variables

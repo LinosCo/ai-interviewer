@@ -5,12 +5,14 @@ import BotConfigForm from './bot-config-form';
 import TopicsEditor from './topics-editor';
 import Link from 'next/link';
 
-export default async function BotEditorPage({ params }: { params: { botId: string } }) {
+export default async function BotEditorPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
     if (!session?.user?.email) redirect('/login');
 
+    const { botId } = await params;
+
     const bot = await prisma.bot.findUnique({
-        where: { id: params.botId },
+        where: { id: botId },
         include: { topics: { orderBy: { orderIndex: 'asc' } }, knowledgeSources: true }
     });
 

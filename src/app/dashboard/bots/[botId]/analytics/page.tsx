@@ -3,12 +3,14 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 
-export default async function AnalyticsPage({ params }: { params: { botId: string } }) {
+export default async function AnalyticsPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
     if (!session?.user?.email) redirect('/login');
 
+    const { botId } = await params;
+
     const bot = await prisma.bot.findUnique({
-        where: { id: params.botId },
+        where: { id: botId },
         include: { conversations: { orderBy: { startedAt: 'desc' } } }
     });
 

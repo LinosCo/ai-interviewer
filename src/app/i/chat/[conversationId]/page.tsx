@@ -2,9 +2,10 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import ChatInterface from './chat-interface';
 
-export default async function ChatPage({ params }: { params: { conversationId: string } }) {
+export default async function ChatPage({ params }: { params: Promise<{ conversationId: string }> }) {
+    const { conversationId } = await params;
     const conversation = await prisma.conversation.findUnique({
-        where: { id: params.conversationId },
+        where: { id: conversationId },
         include: {
             bot: {
                 include: { topics: { orderBy: { orderIndex: 'asc' } } }

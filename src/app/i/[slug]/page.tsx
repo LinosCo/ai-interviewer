@@ -2,9 +2,10 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import StartInterviewButton from './start-button';
 
-export default async function InterviewPage({ params }: { params: { slug: string } }) {
+export default async function InterviewPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = await params;
     const bot = await prisma.bot.findUnique({
-        where: { slug: params.slug },
+        where: { slug },
     });
 
     if (!bot) notFound();

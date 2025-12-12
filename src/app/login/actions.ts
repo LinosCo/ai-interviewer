@@ -2,8 +2,6 @@
 
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
-import { redirect } from 'next/navigation';
-import { isRedirectError } from 'next/dist/client/components/redirect';
 
 export async function authenticate(
     prevState: string | null | undefined,
@@ -19,9 +17,9 @@ export async function authenticate(
         // If we get here without error, login was successful
         console.log('Login successful, result:', result);
         return null;
-    } catch (error) {
-        // Check if it's a redirect error (which means success in Next.js)
-        if (isRedirectError(error)) {
+    } catch (error: any) {
+        // Check if it's a redirect error (NEXT_REDIRECT)
+        if (error?.digest?.startsWith('NEXT_REDIRECT')) {
             console.log('Redirect error caught (this is actually success)');
             return null;
         }

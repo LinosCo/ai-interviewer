@@ -8,9 +8,9 @@ export default function LoginPage() {
     const router = useRouter();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
 
-    // Redirect to dashboard if login successful (no error message and not pending)
+    // Redirect to dashboard if login successful (errorMessage is null and not pending)
     useEffect(() => {
-        if (!isPending && !errorMessage && typeof errorMessage !== 'undefined') {
+        if (!isPending && errorMessage === null) {
             router.push('/dashboard');
         }
     }, [errorMessage, isPending, router]);

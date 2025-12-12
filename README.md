@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Interviewer Platform (MVP)
 
-## Getting Started
+A multi-tenant SaaS application for creating AI-powered qualitative research bots. Built with Next.js 14, Prisma, and Vercel AI SDK.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Bot Builder**: Configure research goals, target audience, and conversational flow.
+- **AI Interviewer**: Adaptive chat interface that probes for deeper insights.
+- **Analytics**: Basic conversation tracking (MVP) with scaffolds for Themes & Insights.
+- **Multi-Tenant**: Supports Projects and Teams (User-based tenancy for MVP).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: Next.js 14 (App Router)
+- **Database**: PostgreSQL (Prisma ORM)
+- **Auth**: NextAuth.js (v5 Beta)
+- **AI**: Vercel AI SDK + OpenAI / Anthropic
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## getting Started
 
-## Learn More
+1. **Clone & Install**
+   ```bash
+   git clone <repo>
+   cd ai-interviewer
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. **Environment Setup**
+   Copy `.env.template` (or just create `.env`):
+   ```env
+   DATABASE_URL="postgresql://user:pass@localhost:5432/ai_interviewer"
+   AUTH_SECRET="your_generated_secret"
+   AUTH_URL="http://localhost:3000"
+   OPENAI_API_KEY="sk-..."
+   ANTHROPIC_API_KEY="sk-..."
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Database Setup**
+   ```bash
+   npx prisma generate
+   npx prisma db push # For rapid prototyping (or `migrate dev`)
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. **Run Locally**
+   ```bash
+   npm run dev
+   ```
+   Visit `http://localhost:3000`.
 
-## Deploy on Vercel
+## Deployment (Vercel)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Push to GitHub.
+2. Import project in Vercel.
+3. Add Environment Variables (DATABASE_URL, OPENAI_API_KEY, etc.).
+4. Deploy.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*Note: Ensure your database (e.g. Neon, Supabase) is accessible from Vercel's IP range.*
+
+## Project Structure
+
+- `/src/app/dashboard`: Admin UI for creating bots.
+- `/src/app/i/[slug]`: Public participant interface.
+- `/src/lib/llm/orchestrator.ts`: Core logic for managing interview state and prompts.
+- `/prisma/schema.prisma`: Data model.

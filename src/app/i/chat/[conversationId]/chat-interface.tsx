@@ -1,6 +1,6 @@
 'use client';
 
-import { useChat } from 'ai/react';
+import { useChat } from '@ai-sdk/react';
 import { useEffect, useRef } from 'react';
 import { TopicBlock } from '@prisma/client';
 
@@ -12,7 +12,7 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
         onFinish: () => {
             // Maybe refresh to get new state/topics?
         }
-    });
+    } as any) as any;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -46,11 +46,11 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                     </div>
                 )}
 
-                {messages.map(m => (
+                {messages.map((m: any) => (
                     <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] rounded-2xl px-5 py-3 text-sm leading-relaxed shadow-sm ${m.role === 'user'
-                                ? 'bg-blue-600 text-white rounded-br-none'
-                                : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                            ? 'bg-blue-600 text-white rounded-br-none'
+                            : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
                             }`}>
                             {m.content}
 

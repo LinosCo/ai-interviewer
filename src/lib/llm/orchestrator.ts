@@ -18,22 +18,19 @@ export async function runInterviewTurn(
         : openai(bot.modelName || 'gpt-4o');
 
     // 2. Determine Context & State
-    // Simple state machine: Intro -> Topic 1... -> Closing
-    // We rely on conversation.currentTopicId or order logic.
-
     let currentTopicIndex = -1;
     if (conversation.currentTopicId) {
         currentTopicIndex = bot.topics.findIndex(t => t.id === conversation.currentTopicId);
     } else {
-        // Start or Intro
-        // If no topic set, we are at Intro (Topic 0) usually
+        // Start or Intro: Default to first topic if exists
         currentTopicIndex = 0;
-        // In a real app we'd update DB state here, but streaming response shouldn't block.
-        // We'll update state "lazily" or assume Topic 0 context.
     }
 
-    const currentTopic = bot.topics[currentTopicIndex];
-    const nextTopic = bot.topics[currentTopicIndex + 1];
+    // Safety check if topics empty or index invalid
+    if (currentTopicIndex === -1 && bot.topics.length > 0) currentTopicIndex = 0;
+
+    const currentTopic: TopicBlock | undefined = bot.topics[currentTopicIndex];
+    const nextTopic: TopicBlock | undefined = bot.topics[currentTopicIndex + 1];
 
     // 3. Construct System Prompt
     const systemPrompt = `
@@ -60,8 +57,6 @@ Current Progress: Topic ${currentTopicIndex + 1} of ${bot.topics.length}.
     `.trim();
 
     // 4. Stream Response
-    // We hook onFinish to save the assistant message to DB
-
     const result = await streamText({
         model,
         messages,
@@ -77,12 +72,44 @@ Current Progress: Topic ${currentTopicIndex + 1} of ${bot.topics.length}.
                 }
             });
 
-            // Save User Message (the last one in 'messages' array is likely the user's latest, 
-            // BUT 'messages' passed here includes it. We need to save it if not already saved.
-            // Actually, usually we save User message BEFORE calling runInterviewTurn.
-            // The API route should handle User message saving.
+            // State Transition Logic
+            if (currentTopic) {
+                // Heuristic: Check if we should move on.
+                // For this MVP, we will count how many assistant messages we have sent in TOTAL
+                // and if it exceeds cumulative thresholds, we move on. 
+                // A better way is to track "turns in current topic" in DB, but we lack the field.
+
+                // Let's assume 1 message = 1 turn.
+                const msgs = await prisma.message.count({ where: { conversationId: conversation.id, role: 'assistant' } });
+
+                // Simple logic: If we have > (Index+1) * 5 messages, move to next. 
+                // This assumes constant 5 turns per topic. 
+                // We should use currentTopic.maxTurns.
+
+                // Fetch all previous topics to sum their maxTurns
+                const previousTopics = bot.topics.slice(0, currentTopicIndex);
+                const previousTurnsBase = previousTopics.reduce((acc, t) => acc + (t.maxTurns || 5), 0);
+
+                // Current threshold
+                const currentThreshold = previousTurnsBase + (currentTopic.maxTurns || 5);
+
+                if (msgs >= currentThreshold) {
+                    if (nextTopic) {
+                        await prisma.conversation.update({
+                            where: { id: conversation.id },
+                            data: { currentTopicId: nextTopic.id }
+                        });
+                    } else {
+                        // End of topics -> Closing
+                        await prisma.conversation.update({
+                            where: { id: conversation.id },
+                            data: { currentTopicId: null, status: 'CLOSING' }
+                        });
+                    }
+                }
+            }
         }
     });
 
-    return result.toDataStreamResponse();
+    return (result as any).toDataStreamResponse();
 }

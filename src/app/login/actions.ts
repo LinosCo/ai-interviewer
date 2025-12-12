@@ -9,7 +9,9 @@ export async function authenticate(
     formData: FormData,
 ) {
     try {
-        await signIn('credentials', formData, { redirectTo: '/dashboard' });
+        await signIn('credentials', formData, { redirect: false });
+        // Return null on success - the client will handle redirect
+        return null;
     } catch (error) {
         if (error instanceof AuthError) {
             switch (error.type) {
@@ -19,8 +21,7 @@ export async function authenticate(
                     return 'Something went wrong.';
             }
         }
-        // NextAuth throws NEXT_REDIRECT on successful login - we need to re-throw it
-        throw error;
+        // For other errors, return generic message
+        return 'Authentication failed.';
     }
-    // This line should never be reached because signIn redirects on success
 }

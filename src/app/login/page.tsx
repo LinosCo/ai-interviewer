@@ -1,11 +1,19 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { authenticate } from './actions';
 
 export default function LoginPage() {
-    // If we want manual client-side redirection to be super safe:
-    const [errorMessage, dispatch] = useActionState(authenticate, undefined);
+    const router = useRouter();
+    const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
+
+    // Redirect to dashboard if login successful (no error message and not pending)
+    useEffect(() => {
+        if (!isPending && !errorMessage && typeof errorMessage !== 'undefined') {
+            router.push('/dashboard');
+        }
+    }, [errorMessage, isPending, router]);
 
     return (
         <div className="flex min-h-screen items-center justify-center bg-gray-100">
@@ -21,7 +29,8 @@ export default function LoginPage() {
                             type="email"
                             name="email"
                             required
-                            className="mt-1 block w-full rounded border-gray-300 shadow-sm p-2 border"
+                            disabled={isPending}
+                            className="mt-1 block w-full rounded border-gray-300 shadow-sm p-2 border disabled:opacity-50"
                             placeholder="user@example.com"
                         />
                     </div>
@@ -31,20 +40,21 @@ export default function LoginPage() {
                             type="password"
                             name="password"
                             required
-                            className="mt-1 block w-full rounded border-gray-300 shadow-sm p-2 border"
+                            disabled={isPending}
+                            className="mt-1 block w-full rounded border-gray-300 shadow-sm p-2 border disabled:opacity-50"
                             placeholder="******"
                         />
                     </div>
                     <div className="text-red-500 text-sm h-4">
                         {errorMessage && <p>{errorMessage}</p>}
                     </div>
-                    <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
-                        Sign In
+                    <button
+                        type="submit"
+                        disabled={isPending}
+                        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {isPending ? 'Signing in...' : 'Sign In'}
                     </button>
-                    {/* Add a manual link just in case */}
-                    <div className="text-center text-xs text-gray-400 mt-2">
-                        <a href="/dashboard">Go to Dashboard</a>
-                    </div>
                 </form>
             </div>
         </div>

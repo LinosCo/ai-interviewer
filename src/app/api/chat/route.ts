@@ -63,7 +63,7 @@ export async function POST(req: Request) {
             content: m.content
         }));
 
-        const coreMessages = convertToCoreMessages(formattedMessages);
+        const coreMessages = convertToCoreMessages(formattedMessages as any);
         console.log('Core messages:', coreMessages);
 
         console.log('Calling runInterviewTurn...');

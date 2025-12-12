@@ -54,6 +54,13 @@ export async function POST(req: Request) {
             return new Response("Bot not found", { status: 404 });
         }
 
+        console.log('Bot loaded:', {
+            id: bot.id,
+            name: bot.name,
+            topicsCount: bot.topics?.length,
+            topics: bot.topics
+        });
+
         console.log('Converting messages to core format...');
         console.log('Messages to convert:', messages);
 
@@ -66,7 +73,11 @@ export async function POST(req: Request) {
         const coreMessages = convertToCoreMessages(formattedMessages as any);
         console.log('Core messages:', coreMessages);
 
-        console.log('Calling runInterviewTurn...');
+        console.log('Calling runInterviewTurn with:', {
+            botId: bot.id,
+            conversationId: conversation.id,
+            messagesCount: coreMessages.length
+        });
         const response = await runInterviewTurn(bot, conversation, coreMessages);
         console.log('runInterviewTurn returned, streaming response');
         return response;

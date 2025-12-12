@@ -5,8 +5,11 @@ import { convertToCoreMessages } from 'ai';
 export const maxDuration = 60; // Allow long LLM generation
 
 export async function POST(req: Request) {
+    console.log('=== Chat API POST called ===');
     try {
-        const { messages, conversationId, botId } = await req.json();
+        const body = await req.json();
+        console.log('Request body:', JSON.stringify(body, null, 2));
+        const { messages, conversationId, botId } = body;
 
         // Verify conversation
         const conversation = await prisma.conversation.findUnique({
@@ -15,6 +18,7 @@ export async function POST(req: Request) {
         });
 
         if (!conversation || conversation.botId !== botId) {
+            console.error('Unauthorized: conversation not found or botId mismatch');
             return new Response("Unauthorized", { status: 401 });
         }
 
@@ -32,6 +36,7 @@ export async function POST(req: Request) {
                     content: lastMessage.content
                 }
             });
+            console.log('Saved user message to DB');
         }
 
         const bot = await prisma.bot.findUnique({
@@ -39,11 +44,17 @@ export async function POST(req: Request) {
             include: { topics: { orderBy: { orderIndex: 'asc' } } }
         });
 
-        if (!bot) return new Response("Bot not found", { status: 404 });
+        if (!bot) {
+            console.error('Bot not found:', botId);
+            return new Response("Bot not found", { status: 404 });
+        }
 
+        console.log('Calling runInterviewTurn...');
         const coreMessages = convertToCoreMessages(messages);
 
-        return runInterviewTurn(bot, conversation, coreMessages);
+        const response = runInterviewTurn(bot, conversation, coreMessages);
+        console.log('runInterviewTurn returned, streaming response');
+        return response;
     } catch (error: any) {
         console.error("Chat API Error:", error);
         return new Response(

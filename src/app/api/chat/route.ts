@@ -61,17 +61,15 @@ export async function POST(req: Request) {
             topics: bot.topics
         });
 
-        console.log('Converting messages to core format...');
-        console.log('Messages to convert:', messages);
+        console.log('Messages received:', messages);
 
-        // Ensure messages have the correct format
-        const formattedMessages = messages.map((m: any) => ({
-            role: m.role,
+        // Build core messages manually - ensure correct format
+        const coreMessages = messages.map((m: any) => ({
+            role: m.role as 'user' | 'assistant' | 'system',
             content: m.content
         }));
 
-        const coreMessages = convertToCoreMessages(formattedMessages as any);
-        console.log('Core messages:', coreMessages);
+        console.log('Core messages built:', coreMessages);
 
         console.log('Calling runInterviewTurn with:', {
             botId: bot.id,

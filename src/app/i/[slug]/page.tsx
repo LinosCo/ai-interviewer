@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import StartInterviewButton from './start-button';
 
+export const dynamic = 'force-dynamic';
+
 export default async function InterviewPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
     const bot = await prisma.bot.findUnique({

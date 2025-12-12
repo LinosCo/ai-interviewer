@@ -9,7 +9,7 @@ export async function authenticate(
     formData: FormData,
 ) {
     try {
-        await signIn('credentials', formData, { redirect: false } as any);
+        await signIn('credentials', formData);
     } catch (error) {
         if (error instanceof AuthError) {
             switch (error.type) {
@@ -21,7 +21,4 @@ export async function authenticate(
         }
         throw error;
     }
-
-    // If signIn is successful (no error thrown), manually redirect
-    redirect('/dashboard');
 }

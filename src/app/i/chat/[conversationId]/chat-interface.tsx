@@ -97,20 +97,23 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
             {/* Auto-start logic if empty */}
             {messages.length === 0 && (
-                <div className="fixed inset-0 bg-white/80 backdrop-blur z-20 flex items-center justify-center">
-                    <button
-                        onClick={() => {
-                            // Send a hidden or system-like message to trigger the bot's greeting
-                            // 'append' is the correct way to programmatically add a message with useChat
-                            append({
-                                role: 'user',
-                                content: "I'm ready to start the interview."
-                            });
-                        }}
-                        className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl animate-bounce"
-                    >
-                        Start Chat
-                    </button>
+                <div className="fixed inset-0 bg-gradient-to-b from-transparent via-white/60 to-white/90 backdrop-blur-sm z-20 flex items-center justify-center">
+                    <div className="text-center space-y-4">
+                        <div className="text-gray-600 text-sm">Ready to begin?</div>
+                        <button
+                            onClick={() => {
+                                // Send a hidden or system-like message to trigger the bot's greeting
+                                // 'append' is the correct way to programmatically add a message with useChat
+                                append({
+                                    role: 'user',
+                                    content: "I'm ready to start the interview."
+                                });
+                            }}
+                            className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition transform hover:scale-105"
+                        >
+                            Start Chat
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

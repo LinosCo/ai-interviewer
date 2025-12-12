@@ -14,16 +14,21 @@ export async function runInterviewTurn(
 ) {
     // 1. Determine Model & Provider
     let model;
+    let apiKey: string | undefined;
 
     if (bot.modelProvider === 'anthropic') {
-        const anthropicProvider = bot.anthropicApiKey
-            ? createAnthropic({ apiKey: bot.anthropicApiKey })
-            : anthropic; // Fallback to global instance
-        model = anthropicProvider(bot.modelName || 'claude-3-5-sonnet-20240620');
+        apiKey = bot.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            throw new Error("No Anthropic API key configured. Please add one in bot settings or system settings.");
+        }
+        const anthropicProvider = createAnthropic({ apiKey });
+        model = anthropicProvider(bot.modelName || 'claude-3-5-sonnet-latest');
     } else {
-        const openaiProvider = bot.openaiApiKey
-            ? createOpenAI({ apiKey: bot.openaiApiKey })
-            : openai; // Fallback to global instance
+        apiKey = bot.openaiApiKey || process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            throw new Error("No OpenAI API key configured. Please add one in bot settings or system settings.");
+        }
+        const openaiProvider = createOpenAI({ apiKey });
         model = openaiProvider(bot.modelName || 'gpt-4o');
     }
 

@@ -152,7 +152,7 @@ export default function InterviewChat({
                         <button
                             onClick={handleStart}
                             className="w-full py-4 px-6 rounded-xl font-semibold text-white text-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg"
-                            style={{ backgroundColor: primaryColor }}
+                            style={{ backgroundColor: primaryColor || '#6366f1' }}
                         >
                             Start Interview →
                         </button>
@@ -181,7 +181,7 @@ export default function InterviewChat({
         <div
             className="min-h-screen flex flex-col"
             style={{
-                background: `linear-gradient(135deg, ${primaryColor}10 0%, ${backgroundColor} 100%)`,
+                background: `linear-gradient(135deg, ${primaryColor || '#6366f1'}10 0%, ${backgroundColor || '#f9fafb'} 100%)`,
             }}
         >
             {/* Header */}
@@ -220,7 +220,7 @@ export default function InterviewChat({
                                         ? 'text-white shadow-lg'
                                         : 'bg-white text-gray-900 shadow-md'
                                         }`}
-                                    style={msg.role === 'user' ? { backgroundColor: primaryColor } : {}}
+                                    style={msg.role === 'user' ? { backgroundColor: primaryColor || '#6366f1' } : {}}
                                 >
                                     <p className="whitespace-pre-wrap leading-relaxed">
                                         {msg.content}
@@ -270,7 +270,7 @@ export default function InterviewChat({
                             type="submit"
                             disabled={!input.trim() || isLoading}
                             className="absolute right-3 bottom-3 w-10 h-10 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-110 active:scale-95"
-                            style={{ backgroundColor: primaryColor }}
+                            style={{ backgroundColor: primaryColor || '#6366f1' }}
                         >
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />

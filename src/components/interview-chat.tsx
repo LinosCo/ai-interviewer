@@ -142,11 +142,111 @@ export default function InterviewChat({
     const assistantMessages = messages.filter(m => m.role === 'assistant');
     const currentQuestion = assistantMessages[assistantMessages.length - 1];
     const totalQuestions = assistantMessages.length;
-    const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
+    const elapsedMinutes = startTime ? Math.floor((Date.now() - startTime) / 60000) : 0;
 
     // Calculate progress (rough estimate based on estimated duration)
     const estimatedMinutes = parseInt(estimatedDuration?.replace(/\D/g, '') || '10');
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
+
+    // Show landing page first
+    if (showLanding) {
+        return (
+            <div
+                className="min-h-screen flex items-center justify-center p-4"
+                style={{
+                    background: `linear-gradient(135deg, ${primaryColor || '#6366f1'}15 0%, ${primaryColor || '#6366f1'}05 100%)`,
+                }}
+            >
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-2xl w-full"
+                >
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12">
+                        {logoUrl && (
+                            <div className="flex justify-center mb-6">
+                                <img src={logoUrl} alt={botName} className="h-16 object-contain" />
+                            </div>
+                        )}
+
+                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-4">
+                            {botName}
+                        </h1>
+
+                        {botDescription && (
+                            <p className="text-lg text-gray-600 text-center mb-8">
+                                {botDescription}
+                            </p>
+                        )}
+
+                        {/* Duration */}
+                        {estimatedDuration && (
+                            <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium text-blue-900">Duration</span>
+                                    <span className="text-sm text-blue-700">{estimatedDuration}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Reward Info */}
+                        {rewardConfig?.enabled && rewardConfig.showOnLanding && rewardConfig.displayText && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="text-sm font-semibold text-green-900 mb-1">Reward</div>
+                                        <div className="text-sm text-green-700">{rewardConfig.displayText}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Privacy & Legal Info */}
+                        <div className="space-y-3 mb-8">
+                            {showAnonymityInfo && (
+                                <div className="text-sm text-gray-600 flex items-start gap-2">
+                                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    <span>
+                                        {privacyNotice || `Your responses are ${privacyLevel} and will be used for research purposes.`}
+                                    </span>
+                                </div>
+                            )}
+
+                            {showDataUsageInfo && dataUsageInfo && (
+                                <div className="text-sm text-gray-600 flex items-start gap-2">
+                                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{dataUsageInfo}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={handleStart}
+                            className="w-full py-4 px-6 rounded-xl font-semibold text-white text-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+                            style={{ backgroundColor: primaryColor || '#6366f1' }}
+                        >
+                            Start Interview →
+                        </button>
+
+                        <div className="mt-6 text-center text-xs text-gray-500">
+                            <a href="/privacy" className="hover:underline">Privacy Policy</a>
+                            {' • '}
+                            <span>You can skip any question</span>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        );
+    }
 
     return (
         <div

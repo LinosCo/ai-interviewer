@@ -57,32 +57,14 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                 throw new Error('Failed to get response');
             }
 
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-            let assistantMessage = '';
+            // Read plain text response
+            const assistantText = await response.text();
 
-            if (reader) {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-
-                    for (const line of lines) {
-                        if (line.startsWith('0:')) {
-                            const content = line.substring(2).replace(/^"(.*)"$/, '$1');
-                            assistantMessage += content;
-                        }
-                    }
-                }
-
-                setMessages(prev => [...prev, {
-                    id: Date.now().toString(),
-                    role: 'assistant',
-                    content: assistantMessage
-                }]);
-            }
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: assistantText
+            }]);
         } catch (error) {
             console.error('Chat error:', error);
             setMessages(prev => [...prev, {
@@ -116,8 +98,8 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                     >
                         <div
                             className={`max-w-[70%] rounded-lg px-4 py-2 ${msg.role === 'user'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white border border-gray-200 text-gray-800'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white border border-gray-200 text-gray-800'
                                 }`}
                         >
                             <p className="whitespace-pre-wrap">{msg.content}</p>

@@ -1,8 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { runInterviewTurn } from '@/lib/llm/orchestrator';
-import { convertToCoreMessages } from 'ai';
 
-export const maxDuration = 60; // Allow long LLM generation
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
     console.log('=== Chat API POST called ===');
@@ -57,28 +55,98 @@ export async function POST(req: Request) {
         console.log('Bot loaded:', {
             id: bot.id,
             name: bot.name,
-            topicsCount: bot.topics?.length,
-            topics: bot.topics
+            topicsCount: bot.topics?.length
         });
 
-        console.log('Messages received:', messages);
+        // Build system prompt
+        const currentTopic = bot.topics?.[0];
+        const systemPrompt = `You are an expert qualitative researcher conducting an interview.
+Your goal: ${bot.researchGoal}
+Audience Info: ${bot.targetAudience}
+Tone: ${bot.tone || 'Friendly and professional'}
+Language: ${bot.language}
 
-        // Build core messages manually - ensure correct format
-        const coreMessages = messages.map((m: any) => ({
-            role: m.role as 'user' | 'assistant' | 'system',
-            content: m.content
-        }));
+${currentTopic ? `Current Topic: ${currentTopic.label}
+Description: ${currentTopic.description}
+Sub-Goals: ${currentTopic.subGoals?.join(', ')}` : ''}
 
-        console.log('Core messages built:', coreMessages);
+INSTRUCTIONS:
+1. Ask ONE question at a time.
+2. Keep questions short and conversational.
+3. If the user answers briefly, probe deeper.
+4. Respect privacy.`;
 
-        console.log('Calling runInterviewTurn with:', {
-            botId: bot.id,
-            conversationId: conversation.id,
-            messagesCount: coreMessages.length
+        // Call OpenAI/Anthropic directly
+        const apiKey = bot.modelProvider === 'anthropic'
+            ? (bot.anthropicApiKey || process.env.ANTHROPIC_API_KEY)
+            : (bot.openaiApiKey || process.env.OPENAI_API_KEY);
+
+        if (!apiKey) {
+            throw new Error(`No API key configured for ${bot.modelProvider}`);
+        }
+
+        let responseText = '';
+
+        if (bot.modelProvider === 'anthropic') {
+            // Call Anthropic API
+            const response = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                    model: bot.modelName || 'claude-3-5-sonnet-latest',
+                    max_tokens: 1024,
+                    system: systemPrompt,
+                    messages: messages.map((m: any) => ({
+                        role: m.role === 'assistant' ? 'assistant' : 'user',
+                        content: m.content
+                    }))
+                })
+            });
+
+            const data = await response.json();
+            responseText = data.content?.[0]?.text || 'Sorry, I could not generate a response.';
+        } else {
+            // Call OpenAI API
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: bot.modelName || 'gpt-4o',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        ...messages.map((m: any) => ({
+                            role: m.role,
+                            content: m.content
+                        }))
+                    ]
+                })
+            });
+
+            const data = await response.json();
+            responseText = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
+        }
+
+        // Save assistant response
+        await prisma.message.create({
+            data: {
+                conversationId,
+                role: 'assistant',
+                content: responseText
+            }
         });
-        const response = await runInterviewTurn(bot, conversation, coreMessages);
-        console.log('runInterviewTurn returned, streaming response');
-        return response;
+
+        // Return simple text response
+        return new Response(responseText, {
+            headers: { 'Content-Type': 'text/plain' }
+        });
+
     } catch (error: any) {
         console.error("Chat API Error:", error);
         console.error("Error stack:", error.stack);

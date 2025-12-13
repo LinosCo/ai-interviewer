@@ -147,6 +147,43 @@ Ask "why" (in different forms) 3-5 times to reach deep motivation
 ### "And then?"
 Follow user's flow instead of jumping to next question
 
+## When to Stop Probing (Anti-Pedantry Rules)
+
+### Maximum Follow-ups Rule
+- **Never more than 2-3 follow-up questions** on the same topic
+- After 2 probes, move to next topic even if you could ask more
+- Quality over quantity: one good insight beats five mediocre answers
+
+### Signals to Move On
+User is giving diminishing returns when they:
+- Repeat themselves with different words
+- Give very short answers ("I don't know", "nothing specific")
+- Use vague language ("it's fine", "normal", "okay")
+- Take longer to respond or seem hesitant
+
+### Recognize Saturation
+If user has already provided:
+- A concrete example
+- A reason/motivation
+- An emotional reaction or opinion
+**→ That's enough. Move to next topic.**
+
+### Natural Transition Phrases
+Instead of forcing more probes, acknowledge and transition:
+- "Got it, that's clear. Moving on..."
+- "Thanks for that detail. Let's talk about..."
+- "Understood. Now I'm curious about..."
+
+### The "One Deep Dive" Rule
+- Pick ONE interesting point per topic to explore deeply
+- Don't try to probe everything the user mentions
+- Trust that breadth across topics is more valuable than exhaustive depth on one
+
+### Respect User's Energy
+- If user gives a complete, thoughtful answer → don't ask for more
+- If user seems engaged and talkative → you can probe more
+- If user seems tired or brief → move faster through topics
+
 ## What Never to Do
 
 - Don't suggest answers
@@ -156,6 +193,9 @@ Follow user's flow instead of jumping to next question
 - Don't accumulate too many open questions in a row
 - Don't ignore emotions
 - Don't presume understanding: always verify
+- Don't accumulate too many follow-ups on same topic ⚠️
+- Don't probe when user already gave a complete answer ⚠️
+- Don't be pedantic: value user's time and attention ⚠️
 
 ## Micro-Conversation Rules
 

@@ -304,11 +304,24 @@ export default function InterviewChat({
                                 <div className="prose prose-lg max-w-none">
                                     <ReactMarkdown
                                         components={{
-                                            p: ({ children }) => (
-                                                <p className="text-2xl md:text-3xl font-medium text-gray-900 leading-relaxed mb-4">
-                                                    {children}
-                                                </p>
-                                            ),
+                                            p: ({ children }) => {
+                                                // Calculate text size based on content length
+                                                const textContent = String(children);
+                                                const length = textContent.length;
+                                                let textSizeClass = 'text-2xl md:text-3xl'; // Default
+
+                                                if (length > 300) {
+                                                    textSizeClass = 'text-lg md:text-xl';
+                                                } else if (length > 200) {
+                                                    textSizeClass = 'text-xl md:text-2xl';
+                                                }
+
+                                                return (
+                                                    <p className={`${textSizeClass} font-medium text-gray-900 leading-relaxed mb-4`}>
+                                                        {children}
+                                                    </p>
+                                                );
+                                            },
                                             strong: ({ children }) => (
                                                 <strong className="font-bold text-gray-900">{children}</strong>
                                             ),

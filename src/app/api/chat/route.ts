@@ -82,7 +82,12 @@ INSTRUCTIONS:
             : (bot.openaiApiKey || process.env.OPENAI_API_KEY);
 
         if (!apiKey) {
-            throw new Error(`No API key configured for ${bot.modelProvider}`);
+            const errorMsg = `No API key configured for ${bot.modelProvider}. Please add your ${bot.modelProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key in the bot settings or dashboard settings.`;
+            console.error(errorMsg);
+            return new Response(
+                JSON.stringify({ error: errorMsg }),
+                { status: 400, headers: { 'Content-Type': 'application/json' } }
+            );
         }
 
         let responseText = '';

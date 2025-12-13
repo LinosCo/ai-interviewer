@@ -22,6 +22,8 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
     const estimatedMinutes = conversation.bot.topics.reduce((acc, t) => acc + (t.maxTurns || 5), 0);
     const estimatedDuration = `~${estimatedMinutes} mins`;
 
+    const bot = conversation.bot as any; // Type cast for optional branding fields
+
     return (
         <InterviewChat
             conversationId={conversation.id}
@@ -29,11 +31,10 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             botName={conversation.bot.name}
             botDescription={conversation.bot.description || undefined}
             estimatedDuration={estimatedDuration}
-            privacyLevel={conversation.bot.privacyLevel || 'Partial'}
-            logoUrl={conversation.bot.logoUrl}
-            primaryColor={conversation.bot.primaryColor}
-            backgroundColor={conversation.bot.backgroundColor}
+            privacyLevel={bot.privacyLevel || 'Partial'}
+            logoUrl={bot.logoUrl || null}
+            primaryColor={bot.primaryColor || '#6366f1'}
+            backgroundColor={bot.backgroundColor || '#f9fafb'}
         />
     );
 }
-

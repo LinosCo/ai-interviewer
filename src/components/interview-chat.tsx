@@ -115,7 +115,7 @@ export default function InterviewChat({
             <div
                 className="min-h-screen flex items-center justify-center p-4"
                 style={{
-                    background: `linear-gradient(135deg, ${primaryColor}15 0%, ${primaryColor}05 100%)`,
+                    background: `linear-gradient(135deg, ${primaryColor || '#6366f1'}15 0%, ${primaryColor || '#6366f1'}05 100%)`,
                 }}
             >
                 <motion.div
@@ -217,8 +217,8 @@ export default function InterviewChat({
                             >
                                 <div
                                     className={`max-w-[85%] rounded-2xl px-6 py-4 ${msg.role === 'user'
-                                            ? 'text-white shadow-lg'
-                                            : 'bg-white text-gray-900 shadow-md'
+                                        ? 'text-white shadow-lg'
+                                        : 'bg-white text-gray-900 shadow-md'
                                         }`}
                                     style={msg.role === 'user' ? { backgroundColor: primaryColor } : {}}
                                 >

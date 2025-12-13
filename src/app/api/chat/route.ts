@@ -76,19 +76,27 @@ INSTRUCTIONS:
 3. If the user answers briefly, probe deeper.
 4. Respect privacy.`;
 
-        // Call OpenAI/Anthropic directly
-        const apiKey = bot.modelProvider === 'anthropic'
-            ? (bot.anthropicApiKey || process.env.ANTHROPIC_API_KEY)
-            : (bot.openaiApiKey || process.env.OPENAI_API_KEY);
+        // Get API keys - use bot-specific first, then platform defaults
+        let apiKey: string | undefined;
+
+        if (bot.modelProvider === 'anthropic') {
+            // Try bot key first, then platform default
+            apiKey = bot.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+        } else {
+            // Try bot key first, then platform default
+            apiKey = bot.openaiApiKey || process.env.OPENAI_API_KEY;
+        }
 
         if (!apiKey) {
-            const errorMsg = `No API key configured for ${bot.modelProvider}. Please add your ${bot.modelProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key in the bot settings or dashboard settings.`;
+            const errorMsg = `No API key configured for ${bot.modelProvider}. Please add your ${bot.modelProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key in the dashboard settings (Settings → API Keys).`;
             console.error(errorMsg);
             return new Response(
-                JSON.stringify({ error: errorMsg }),
-                { status: 400, headers: { 'Content-Type': 'application/json' } }
+                errorMsg,
+                { status: 400, headers: { 'Content-Type': 'text/plain' } }
             );
         }
+
+        console.log(`Using ${bot.modelProvider} API key from ${bot.anthropicApiKey || bot.openaiApiKey ? 'bot settings' : 'platform defaults'}`);
 
         let responseText = '';
 

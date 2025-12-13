@@ -58,23 +58,58 @@ export async function POST(req: Request) {
             topicsCount: bot.topics?.length
         });
 
+        // Load system-wide interview methodology knowledge
+        const fs = require('fs');
+        const path = require('path');
+        let methodologyKnowledge = '';
+
+        try {
+            const knowledgePath = path.join(process.cwd(), 'knowledge', 'interview-methodology.md');
+            methodologyKnowledge = fs.readFileSync(knowledgePath, 'utf-8');
+        } catch (error) {
+            console.warn('Could not load interview methodology knowledge:', error);
+        }
+
+        // Load bot-specific knowledge sources
+        const botKnowledgeSources = await prisma.knowledgeSource.findMany({
+            where: { botId: bot.id }
+        });
+
+        const botKnowledge = botKnowledgeSources.length > 0
+            ? '\n\n## Bot-Specific Knowledge\n' + botKnowledgeSources.map(ks =>
+                `### ${ks.title}\n${ks.content}`
+            ).join('\n\n')
+            : '';
+
         // Build system prompt
         const currentTopic = bot.topics?.[0];
         const systemPrompt = `You are an expert qualitative researcher conducting an interview.
-Your goal: ${bot.researchGoal}
-Audience Info: ${bot.targetAudience}
+
+## Interview Methodology
+${methodologyKnowledge}
+
+## Your Mission
+Goal: ${bot.researchGoal}
+Audience: ${bot.targetAudience}
 Tone: ${bot.tone || 'Friendly and professional'}
 Language: ${bot.language}
 
-${currentTopic ? `Current Topic: ${currentTopic.label}
-Description: ${currentTopic.description}
-Sub-Goals: ${currentTopic.subGoals?.join(', ')}` : ''}
+${botKnowledge}
 
-INSTRUCTIONS:
-1. Ask ONE question at a time.
-2. Keep questions short and conversational.
-3. If the user answers briefly, probe deeper.
-4. Respect privacy.`;
+## Current Interview State
+${currentTopic ? `Topic: ${currentTopic.label}
+Description: ${currentTopic.description}
+Sub-Goals: ${currentTopic.subGoals?.join(', ')}` : 'Opening/Closing phase'}
+
+## Instructions
+1. Follow the interview methodology guidelines above
+2. Ask ONE question at a time
+3. Keep questions short and conversational
+4. Use probing techniques to go deeper
+5. Maintain neutrality and psychological safety
+6. Respect privacy
+
+Remember: Your goal is to understand, not to convince. Create a safe space for authentic responses.`.trim();
 
         // Get API keys - use bot-specific first, then platform defaults
         let apiKey: string | undefined;

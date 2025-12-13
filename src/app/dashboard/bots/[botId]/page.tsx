@@ -4,6 +4,8 @@ import { notFound, redirect } from 'next/navigation';
 import BotConfigForm from './bot-config-form';
 import TopicsEditor from './topics-editor';
 import KnowledgeSourcesEditor from './knowledge-sources';
+import LegalPrivacyEditor from './legal-privacy-editor';
+import RewardEditor from './reward-editor';
 import Link from 'next/link';
 
 export default async function BotEditorPage({ params }: { params: Promise<{ botId: string }> }) {
@@ -14,7 +16,11 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
-        include: { topics: { orderBy: { orderIndex: 'asc' } }, knowledgeSources: true }
+        include: {
+            topics: { orderBy: { orderIndex: 'asc' } },
+            knowledgeSources: true,
+            rewardConfig: true
+        }
     });
 
     if (!bot) notFound();
@@ -36,14 +42,26 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
                     <BotConfigForm bot={bot} />
-
-                    {/* Placeholder for Topics Editor */}
                     <TopicsEditor botId={bot.id} topics={bot.topics} />
                 </div>
 
                 <div className="space-y-8">
-                    {/* Knowledge Sources Editor */}
                     <KnowledgeSourcesEditor botId={bot.id} sources={bot.knowledgeSources} />
+
+                    <LegalPrivacyEditor
+                        botId={bot.id}
+                        privacyNotice={bot.privacyNotice}
+                        dataUsageInfo={bot.dataUsageInfo}
+                        consentText={bot.consentText}
+                        showAnonymityInfo={bot.showAnonymityInfo}
+                        showDataUsageInfo={bot.showDataUsageInfo}
+                        anonymizationLevel={bot.anonymizationLevel}
+                    />
+
+                    <RewardEditor
+                        botId={bot.id}
+                        rewardConfig={bot.rewardConfig}
+                    />
                 </div>
             </div>
         </div>

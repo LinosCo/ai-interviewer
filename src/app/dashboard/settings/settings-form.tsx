@@ -1,58 +1,75 @@
 'use client';
 
-import { updateSettingsAction } from '@/app/actions';
 import { useState } from 'react';
-import { showToast } from '@/components/toast';
-import { User } from '@prisma/client';
+import { useRouter } from 'next/navigation';
 
-export default function SettingsForm({ user }: { user: User }) {
-    const updateAction = updateSettingsAction.bind(null, user.id);
+interface PlatformSettingsFormProps {
+    userId: string;
+    currentKnowledge: string;
+    settingsId?: string;
+}
 
-    const handleSubmit = async (formData: FormData) => {
-        await updateAction(formData);
-        showToast('✅ System settings saved successfully!', 'success');
+export default function PlatformSettingsForm({ userId, currentKnowledge, settingsId }: PlatformSettingsFormProps) {
+    const [knowledge, setKnowledge] = useState(currentKnowledge);
+    const [isSaving, setIsSaving] = useState(false);
+    const router = useRouter();
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const response = await fetch('/api/platform-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId,
+                    settingsId,
+                    methodologyKnowledge: knowledge
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save settings');
+            }
+
+            router.refresh();
+            alert('Settings saved successfully!');
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            alert('Failed to save settings. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleReset = () => {
+        if (confirm('Reset to default methodology knowledge? This will overwrite your current settings.')) {
+            setKnowledge(currentKnowledge);
+        }
     };
 
     return (
-        <form action={handleSubmit} className="bg-white p-6 rounded shadow space-y-6">
-            <div>
-                <h2 className="text-lg font-semibold border-b pb-2 mb-4">Platform API Keys</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                    These keys will be used as the default for all bots if not overridden at the bot level.
-                    They are also used for system features like "AI Bot Builder" and analytics.
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6">
-                <div>
-                    <label className="block text-sm font-medium mb-1">OpenAI API Key</label>
-                    <input
-                        type="password"
-                        name="platformOpenaiApiKey"
-                        defaultValue={(user as any).platformOpenaiApiKey || ''}
-                        placeholder="sk-..."
-                        className="w-full border p-2 rounded font-mono"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Required for GPT-4 features.</p>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium mb-1">Anthropic API Key</label>
-                    <input
-                        type="password"
-                        name="platformAnthropicApiKey"
-                        defaultValue={(user as any).platformAnthropicApiKey || ''}
-                        placeholder="sk-ant-..."
-                        className="w-full border p-2 rounded font-mono"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Required for Claude features.</p>
-                </div>
-            </div>
-
-            <div className="pt-4 flex justify-end">
-                <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">
-                    Save System Settings
+        <div className="space-y-4">
+            <textarea
+                value={knowledge}
+                onChange={(e) => setKnowledge(e.target.value)}
+                className="w-full h-96 border border-gray-300 rounded-lg px-4 py-3 font-mono text-sm"
+                placeholder="Enter interview methodology knowledge..."
+            />
+            <div className="flex gap-3">
+                <button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button
+                    onClick={handleReset}
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                    Reset to Default
                 </button>
             </div>
-        </form>
+        </div>
     );
 }

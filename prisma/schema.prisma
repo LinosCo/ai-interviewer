@@ -31,6 +31,7 @@ model User {
   // Platform Configuration
   platformOpenaiApiKey    String?
   platformAnthropicApiKey String?
+  platformSettings        PlatformSettings?
 }
 
 model Account {
@@ -70,6 +71,18 @@ model VerificationToken {
   expires    DateTime
  
   @@id([identifier, token])
+}
+
+// Platform-wide settings
+model PlatformSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  methodologyKnowledge  String   @db.Text // Editable interview methodology
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // --- Core Entities ---
@@ -150,8 +163,13 @@ model Bot {
   backgroundColor String  @default("#ffffff")
   textColor      String   @default("#1f2937") // Gray-800
   
-  // Privacy
+  // Privacy & Legal
   anonymizationLevel String @default("partial")
+  privacyNotice      String? @db.Text // Custom privacy notice
+  dataUsageInfo      String? @db.Text // How data will be used
+  consentText        String? @db.Text // Custom consent text
+  showAnonymityInfo  Boolean @default(true)
+  showDataUsageInfo  Boolean @default(true)
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -197,13 +215,17 @@ model TopicBlock {
 }
 
 model RewardConfig {
-  id        String   @id @default(cuid())
-  botId     String   @unique
-  enabled   Boolean  @default(false)
-  type      String   // coupon, redirect
-  payload   String   
+  id          String   @id @default(cuid())
+  botId       String   @unique
+  enabled     Boolean  @default(false)
+  type        String   // coupon, redirect, gift_card, raffle
+  payload     String   // Coupon code, URL, or reward details
   
-  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  // Display on landing page
+  displayText String?  // e.g., "Get a 10% discount coupon"
+  showOnLanding Boolean @default(true)
+  
+  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 // --- Participant Data ---

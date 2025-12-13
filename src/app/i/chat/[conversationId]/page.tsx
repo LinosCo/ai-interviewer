@@ -8,7 +8,10 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
         where: { id: conversationId },
         include: {
             bot: {
-                include: { topics: { orderBy: { orderIndex: 'asc' } } }
+                include: {
+                    topics: { orderBy: { orderIndex: 'asc' } },
+                    rewardConfig: true
+                }
             },
             messages: {
                 orderBy: { createdAt: 'asc' }
@@ -31,10 +34,15 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             botName={conversation.bot.name}
             botDescription={conversation.bot.description || undefined}
             estimatedDuration={estimatedDuration}
-            privacyLevel={bot.privacyLevel || 'Partial'}
+            privacyLevel={bot.anonymizationLevel || 'partial'}
             logoUrl={bot.logoUrl || null}
             primaryColor={bot.primaryColor || '#6366f1'}
             backgroundColor={bot.backgroundColor || '#f9fafb'}
+            rewardConfig={bot.rewardConfig}
+            privacyNotice={bot.privacyNotice}
+            dataUsageInfo={bot.dataUsageInfo}
+            showAnonymityInfo={bot.showAnonymityInfo}
+            showDataUsageInfo={bot.showDataUsageInfo}
         />
     );
 }

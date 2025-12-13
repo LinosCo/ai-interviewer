@@ -20,6 +20,16 @@ interface InterviewChatProps {
     logoUrl?: string | null;
     primaryColor?: string | null;
     backgroundColor?: string | null;
+    rewardConfig?: {
+        enabled: boolean;
+        type: string;
+        displayText?: string | null;
+        showOnLanding: boolean;
+    } | null;
+    privacyNotice?: string | null;
+    dataUsageInfo?: string | null;
+    showAnonymityInfo?: boolean;
+    showDataUsageInfo?: boolean;
 }
 
 export default function InterviewChat({
@@ -32,22 +42,28 @@ export default function InterviewChat({
     logoUrl,
     primaryColor = '#6366f1',
     backgroundColor = '#f9fafb',
+    rewardConfig,
+    privacyNotice,
+    dataUsageInfo,
+    showAnonymityInfo = true,
+    showDataUsageInfo = true,
 }: InterviewChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const inputRef = useRef<HTMLTextAreaElement>(null);
-    const [startTime] = useState(Date.now());
+    const [startTime, setStartTime] = useState<number | null>(null);
     const [hasStarted, setHasStarted] = useState(false);
+    const [showLanding, setShowLanding] = useState(true);
 
-    // Auto-start the interview
-    useEffect(() => {
-        if (!hasStarted) {
-            setHasStarted(true);
-            handleSendMessage("I'm ready to start the interview.", true);
-        }
-    }, [hasStarted]);
+    // Start interview when user clicks button
+    const handleStart = async () => {
+        setShowLanding(false);
+        setHasStarted(true);
+        setStartTime(Date.now());
+        await handleSendMessage("I'm ready to start the interview.", true);
+    };
 
     // Auto-focus input when question changes
     useEffect(() => {

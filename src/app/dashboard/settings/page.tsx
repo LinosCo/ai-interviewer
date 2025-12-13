@@ -42,59 +42,14 @@ export default async function PlatformSettingsPage() {
                 </div>
 
                 <div className="space-y-6">
-                    {/* API Keys Section */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-xl font-semibold mb-4">API Keys</h2>
-                        <p className="text-sm text-gray-600 mb-4">
-                            These keys are used as defaults when individual bots don't have their own keys configured.
-                        </p>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    OpenAI API Key
-                                </label>
-                                <input
-                                    type="password"
-                                    defaultValue={user.platformOpenaiApiKey || ''}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                                    placeholder="sk-..."
-                                    disabled
-                                />
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Configure in environment variables (OPENAI_API_KEY)
-                                </p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Anthropic API Key
-                                </label>
-                                <input
-                                    type="password"
-                                    defaultValue={user.platformAnthropicApiKey || ''}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                                    placeholder="sk-ant-..."
-                                    disabled
-                                />
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Configure in environment variables (ANTHROPIC_API_KEY)
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Interview Methodology Section */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-xl font-semibold mb-4">Interview Methodology</h2>
-                        <p className="text-sm text-gray-600 mb-4">
-                            This knowledge base is automatically included in all chatbot prompts.
-                            Customize it to match your organization's interview methodology.
-                        </p>
-                        <PlatformSettingsForm
-                            userId={user.id}
-                            currentKnowledge={currentKnowledge}
-                            settingsId={user.platformSettings?.id}
-                        />
-                    </div>
+                    {/* Platform Settings Form - includes API keys and methodology */}
+                    <PlatformSettingsForm
+                        userId={user.id}
+                        currentKnowledge={currentKnowledge}
+                        settingsId={user.platformSettings?.id}
+                        platformOpenaiApiKey={user.platformOpenaiApiKey || ''}
+                        platformAnthropicApiKey={user.platformAnthropicApiKey || ''}
+                    />
                 </div>
             </div>
         </div>

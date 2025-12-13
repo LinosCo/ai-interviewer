@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { userId, settingsId, methodologyKnowledge } = await req.json();
+        const { userId, settingsId, methodologyKnowledge, platformOpenaiApiKey, platformAnthropicApiKey } = await req.json();
 
         // Verify user owns these settings
         const user = await prisma.user.findUnique({
@@ -19,6 +19,15 @@ export async function POST(req: NextRequest) {
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        // Update user's API keys
+        await prisma.user.update({
+            where: { id: userId },
+            data: {
+                platformOpenaiApiKey,
+                platformAnthropicApiKey
+            }
+        });
 
         // Upsert platform settings
         const settings = await prisma.platformSettings.upsert({

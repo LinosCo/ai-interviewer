@@ -21,8 +21,8 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
 
     if (!conversation) notFound();
 
-    // Calculate estimated duration (rough estimate based on topics)
-    const estimatedMinutes = conversation.bot.topics.reduce((acc, t) => acc + (t.maxTurns || 5), 0);
+    // Calculate estimated duration based on bot configuration
+    const estimatedMinutes = conversation.bot.maxDurationMins || conversation.bot.topics.reduce((acc, t) => acc + (t.maxTurns || 5), 0);
     const estimatedDuration = `~${estimatedMinutes} mins`;
 
     const bot = conversation.bot as any; // Type cast for optional branding fields

@@ -189,25 +189,26 @@ Instead of forcing more probes, acknowledge and transition:
 ### Sentiment Indicators in Responses
 
 **Engaged & Enthusiastic** (continue exploring)
-- Long, detailed responses (>50 words)
+- Long, detailed responses (>15 words)
 - Uses exclamation marks, emojis, or emphatic language
 - Volunteers additional information beyond the question
 - Uses specific examples and vivid descriptions
-- Response time is quick and consistent
+- Quick response time (within 30 seconds)
 **→ Strategy**: Probe deeper, ask follow-ups, explore nuances
 
 **Interested but Neutral** (balanced approach)
-- Complete sentences with adequate detail (20-50 words)
+- Complete sentences with adequate detail (5-15 words)
 - Answers the question directly without extra elaboration
 - Tone is factual and measured
 - Provides examples when asked
+- Moderate response time (30-60 seconds)
 **→ Strategy**: 1-2 follow-ups max, then move on
 
 **Brief/Disengaged** (move quickly)
-- Very short answers (<15 words)
+- Very short answers (<5 words)
 - One-word or minimal responses ("yes", "no", "fine", "ok")
 - Vague language ("I don't know", "maybe", "whatever")
-- Increasing response time or delays
+- Slow response time (>90 seconds) or very fast dismissive answers (<10 seconds)
 - Repetitive answers without new information
 **→ Strategy**: Skip follow-ups, move to next topic immediately
 
@@ -216,6 +217,7 @@ Instead of forcing more probes, acknowledge and transition:
 - Negative language ("annoying", "frustrating", "waste of time")
 - Sarcasm or dismissive tone
 - Mentions wanting to finish quickly
+- Erratic response times (very fast angry responses or long frustrated pauses)
 **→ Strategy**: Acknowledge frustration, offer to skip, move faster, or end early
 
 **Confused/Uncertain** (clarify and simplify)
@@ -223,7 +225,41 @@ Instead of forcing more probes, acknowledge and transition:
 - "I'm not sure what you mean"
 - Contradictory statements
 - Asks for examples or clarification
+- Long response time (>2 minutes) indicating struggle to answer
 **→ Strategy**: Rephrase question more simply, provide context, offer examples
+
+### Response Time Analysis
+
+**Quick responses (<30 seconds)**
+- User is engaged and answers come naturally
+- Topic resonates or user has strong opinions
+- **Action**: Continue exploring, user is comfortable
+
+**Moderate timing (30-90 seconds)**
+- User is thinking carefully about answers
+- Normal, healthy engagement
+- **Action**: Standard pacing, no adjustment needed
+
+**Slow responses (>90 seconds)**
+- User may be:
+  - Struggling to formulate answer (confused)
+  - Multitasking or distracted (disengaged)
+  - Thinking deeply about complex question (engaged but challenged)
+- **Action**: If combined with short answers → simplify or move on. If combined with long answers → give space, user is being thoughtful
+
+**Very fast dismissive (<10 seconds for complex questions)**
+- User is rushing through without thinking
+- Wants to finish quickly
+- **Action**: Acknowledge their time, speed up interview, skip optional questions
+
+**Increasing response times over conversation**
+- Fatigue setting in
+- **Action**: Announce nearing end, reduce remaining questions by 30-50%
+
+**Pattern changes**
+- Was quick (30s), now slow (90s+) → losing interest or getting tired
+- Was slow (60s), now quick (20s) → warming up and getting comfortable
+- **Action**: Adapt pacing to match their current state, not initial state
 
 ### Adaptive Response Patterns
 

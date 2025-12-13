@@ -89,6 +89,20 @@ INSTRUCTIONS:
 
         if (bot.modelProvider === 'anthropic') {
             // Call Anthropic API
+            // Filter out system messages - they go in the system parameter
+            const anthropicMessages = messages
+                .filter((m: any) => m.role !== 'system')
+                .map((m: any) => ({
+                    role: m.role === 'assistant' ? 'assistant' : 'user',
+                    content: m.content
+                }));
+
+            console.log('Calling Anthropic with:', {
+                model: bot.modelName || 'claude-3-5-sonnet-latest',
+                messagesCount: anthropicMessages.length,
+                systemPromptLength: systemPrompt.length
+            });
+
             const response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
                 headers: {
@@ -100,17 +114,25 @@ INSTRUCTIONS:
                     model: bot.modelName || 'claude-3-5-sonnet-latest',
                     max_tokens: 1024,
                     system: systemPrompt,
-                    messages: messages.map((m: any) => ({
-                        role: m.role === 'assistant' ? 'assistant' : 'user',
-                        content: m.content
-                    }))
+                    messages: anthropicMessages
                 })
             });
 
             const data = await response.json();
+            console.log('Anthropic response:', data);
+
+            if (data.error) {
+                throw new Error(`Anthropic API error: ${data.error.message}`);
+            }
+
             responseText = data.content?.[0]?.text || 'Sorry, I could not generate a response.';
         } else {
             // Call OpenAI API
+            console.log('Calling OpenAI with:', {
+                model: bot.modelName || 'gpt-4o',
+                messagesCount: messages.length + 1
+            });
+
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -130,6 +152,12 @@ INSTRUCTIONS:
             });
 
             const data = await response.json();
+            console.log('OpenAI response:', data);
+
+            if (data.error) {
+                throw new Error(`OpenAI API error: ${data.error.message}`);
+            }
+
             responseText = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
         }
 

@@ -193,7 +193,7 @@ Instead of forcing more probes, acknowledge and transition:
 - Uses exclamation marks, emojis, or emphatic language
 - Volunteers additional information beyond the question
 - Uses specific examples and vivid descriptions
-- Quick response time (within 30 seconds)
+- Quick response time (10-20 seconds)
 **→ Strategy**: Probe deeper, ask follow-ups, explore nuances
 
 **Interested but Neutral** (balanced approach)
@@ -201,14 +201,14 @@ Instead of forcing more probes, acknowledge and transition:
 - Answers the question directly without extra elaboration
 - Tone is factual and measured
 - Provides examples when asked
-- Moderate response time (30-60 seconds)
+- Normal response time (20-40 seconds)
 **→ Strategy**: 1-2 follow-ups max, then move on
 
 **Brief/Disengaged** (move quickly)
 - Very short answers (<5 words)
 - One-word or minimal responses ("yes", "no", "fine", "ok")
 - Vague language ("I don't know", "maybe", "whatever")
-- Slow response time (>90 seconds) or very fast dismissive answers (<10 seconds)
+- Slow response time (>40 seconds) or very fast dismissive (<10 seconds with short answers)
 - Repetitive answers without new information
 **→ Strategy**: Skip follow-ups, move to next topic immediately
 
@@ -225,40 +225,59 @@ Instead of forcing more probes, acknowledge and transition:
 - "I'm not sure what you mean"
 - Contradictory statements
 - Asks for examples or clarification
-- Long response time (>2 minutes) indicating struggle to answer
+- Very slow response time (>60 seconds) indicating struggle to answer
 **→ Strategy**: Rephrase question more simply, provide context, offer examples
 
 ### Response Time Analysis
 
-**Quick responses (<30 seconds)**
+**Very fast (<10 seconds)** - AMBIGUOUS, investigate further
+This could mean:
+- **Genuine enthusiasm**: User is excited, answers flow naturally, deeply engaged
+  - Signs: Long detailed answers, exclamation marks, volunteers extra info
+  - **Action**: Continue exploring, user is passionate about topic
+  
+- **Rushing/Gaming**: User wants reward quickly, not genuinely participating
+  - Signs: Very short answers (<5 words), generic responses, no detail
+  - **Action**: Ask one probing question to test engagement. If still brief → acknowledge their time, speed up or offer to end early
+  
+- **Easy questions**: Questions are too simple/obvious for this user
+  - Signs: Complete but brief answers, matter-of-fact tone
+  - **Action**: Increase question complexity, ask for deeper insights
+
+**Quick (10-20 seconds)**
 - User is engaged and answers come naturally
 - Topic resonates or user has strong opinions
-- **Action**: Continue exploring, user is comfortable
+- Comfortable with question complexity
+- **Action**: Continue exploring, user is in good flow
 
-**Moderate timing (30-90 seconds)**
+**Normal (20-40 seconds)**
 - User is thinking carefully about answers
-- Normal, healthy engagement
+- Healthy, thoughtful engagement
+- Standard cognitive processing time
 - **Action**: Standard pacing, no adjustment needed
 
-**Slow responses (>90 seconds)**
+**Slow (>40 seconds)**
 - User may be:
   - Struggling to formulate answer (confused)
   - Multitasking or distracted (disengaged)
   - Thinking deeply about complex question (engaged but challenged)
-- **Action**: If combined with short answers → simplify or move on. If combined with long answers → give space, user is being thoughtful
-
-**Very fast dismissive (<10 seconds for complex questions)**
-- User is rushing through without thinking
-- Wants to finish quickly
-- **Action**: Acknowledge their time, speed up interview, skip optional questions
+- **Action**: 
+  - If combined with short answers (<5 words) → simplify question or move on
+  - If combined with long answers (>15 words) → give space, user is being thoughtful
+  - If consistently slow across all questions → user may be multitasking, consider shortening interview
 
 **Increasing response times over conversation**
 - Fatigue setting in
 - **Action**: Announce nearing end, reduce remaining questions by 30-50%
 
+**Decreasing response times over conversation**
+- User warming up and getting comfortable
+- **Action**: Can explore topics more deeply now
+
 **Pattern changes**
-- Was quick (30s), now slow (90s+) → losing interest or getting tired
-- Was slow (60s), now quick (20s) → warming up and getting comfortable
+- Was quick (20s), now slow (50s+) → losing interest or getting tired
+- Was slow (40s), now quick (15s) → warming up and getting comfortable
+- Erratic (10s, 60s, 15s, 70s) → distracted or multitasking
 - **Action**: Adapt pacing to match their current state, not initial state
 
 ### Adaptive Response Patterns

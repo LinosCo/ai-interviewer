@@ -90,18 +90,36 @@ INSTRUCTIONS:
         if (bot.modelProvider === 'anthropic') {
             // Call Anthropic API
             // Filter out system messages - they go in the system parameter
-            const anthropicMessages = messages
+            let anthropicMessages = messages
                 .filter((m: any) => m.role !== 'system')
                 .map((m: any) => ({
                     role: m.role === 'assistant' ? 'assistant' : 'user',
                     content: m.content
                 }));
 
+            // Anthropic requires first message to be from user
+            if (anthropicMessages.length === 0 || anthropicMessages[0].role !== 'user') {
+                anthropicMessages = [
+                    { role: 'user', content: "I'm ready to start the interview." },
+                    ...anthropicMessages
+                ];
+            }
+
             console.log('Calling Anthropic with:', {
                 model: bot.modelName || 'claude-3-5-sonnet-latest',
                 messagesCount: anthropicMessages.length,
-                systemPromptLength: systemPrompt.length
+                systemPromptLength: systemPrompt.length,
+                firstMessage: anthropicMessages[0]
             });
+
+            const anthropicBody = {
+                model: bot.modelName || 'claude-3-5-sonnet-latest',
+                max_tokens: 1024,
+                system: systemPrompt,
+                messages: anthropicMessages
+            };
+
+            console.log('Anthropic request body:', JSON.stringify(anthropicBody, null, 2));
 
             const response = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
@@ -110,19 +128,14 @@ INSTRUCTIONS:
                     'x-api-key': apiKey,
                     'anthropic-version': '2023-06-01'
                 },
-                body: JSON.stringify({
-                    model: bot.modelName || 'claude-3-5-sonnet-latest',
-                    max_tokens: 1024,
-                    system: systemPrompt,
-                    messages: anthropicMessages
-                })
+                body: JSON.stringify(anthropicBody)
             });
 
             const data = await response.json();
-            console.log('Anthropic response:', data);
+            console.log('Anthropic response:', JSON.stringify(data, null, 2));
 
             if (data.error) {
-                throw new Error(`Anthropic API error: ${data.error.message}`);
+                throw new Error(`Anthropic API error: ${JSON.stringify(data.error)}`);
             }
 
             responseText = data.content?.[0]?.text || 'Sorry, I could not generate a response.';

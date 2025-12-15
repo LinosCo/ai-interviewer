@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Update user's methodology (PlatformSettings)
-        await prisma.platformSettings.upsert({
+        const settings = await prisma.platformSettings.upsert({
             where: { userId },
             update: { methodologyKnowledge },
             create: {

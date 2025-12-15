@@ -360,6 +360,7 @@ model Insight {
   botId   String
   type    String   @default("STRATEGIC") // STRATEGIC, QUOTE
   content String   @db.Text
+  citations Json?
   
   bot     Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
 }

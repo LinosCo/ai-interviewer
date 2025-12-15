@@ -124,6 +124,61 @@ export async function createProjectAction(formData: FormData) {
     redirect('/dashboard');
 }
 
+export async function deleteProjectAction(projectId: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) throw new Error("User not found");
+
+    if (user.role !== 'ADMIN') {
+        throw new Error("Only admins can delete projects.");
+    }
+
+    await prisma.project.delete({ where: { id: projectId } });
+    revalidatePath('/dashboard');
+}
+
+export async function renameProjectAction(projectId: string, newName: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) throw new Error("User not found");
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new Error("Project not found");
+
+    if (user.role !== 'ADMIN' && project.ownerId !== user.id) {
+        throw new Error("Unauthorized");
+    }
+
+    await prisma.project.update({
+        where: { id: projectId },
+        data: { name: newName }
+    });
+    revalidatePath('/dashboard');
+}
+
+export async function deleteBotAction(botId: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) throw new Error("User not found");
+
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: { project: true }
+    });
+    if (!bot) throw new Error("Bot not found");
+
+    const isOwner = bot.project.ownerId === user.id;
+    if (user.role !== 'ADMIN' && !isOwner) {
+        throw new Error("Unauthorized");
+    }
+
+    await prisma.bot.delete({ where: { id: botId } });
+    revalidatePath('/dashboard');
+}
+
 export async function updateBotAction(botId: string, formData: FormData) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
@@ -239,10 +294,10 @@ export async function generateBotAnalyticsAction(botId: string) {
     // We'll concatenate the last few user messages from each conversation or a summary.
     // For MVP, perform a "Global Analysis" on the dataset.
 
-    // Simplification: Take map of texts
+    // Simplification: Take map of texts, prefixed with Conversation ID for citation
     const transcripts = bot.conversations.map(c =>
-        `Conv ${c.id.slice(-4)}: ` + c.messages.map(m => m.content).join(" | ")
-    ).join("\n\n");
+        `[ConvID:${c.id}] Message Log:\n` + c.messages.map(m => `User: "${m.content}"`).join("\n")
+    ).join("\n\n----------------\n\n");
 
     const openai = createOpenAI({ apiKey });
 
@@ -250,11 +305,25 @@ export async function generateBotAnalyticsAction(botId: string) {
         themes: z.array(z.object({
             name: z.string(),
             description: z.string(),
-            count: z.number()
+            count: z.number(),
+            citations: z.array(z.object({
+                quote: z.string(),
+                conversationId: z.string()
+            })).describe("Direct quotes supporting this theme, with their source Conversation ID")
         })),
-        insights: z.array(z.string()).describe("Strategic observations or actionable suggestions"),
+        insights: z.array(z.object({
+            content: z.string(),
+            citations: z.array(z.object({
+                quote: z.string(),
+                conversationId: z.string()
+            })).describe("Evidence quotes for this insight")
+        })).describe("Strategic observations or actionable suggestions"),
         sentimentScore: z.number().describe("Overall sentiment score from 0 to 100"),
-        goldenQuotes: z.array(z.string()).describe("3-5 most impactful or representative direct quotes from users")
+        goldenQuotes: z.array(z.object({
+            quote: z.string(),
+            conversationId: z.string(),
+            context: z.string().optional()
+        })).describe("3-5 most impactful or representative direct quotes from users with their exact source")
     });
 
     const result = await generateObject({
@@ -264,10 +333,13 @@ export async function generateBotAnalyticsAction(botId: string) {
         Identify recurring themes, key user feedback patterns, and strategic insights.
         Also determine an overall sentiment score (0-100) and extract 'Golden Quotes' that perfectly capture the user experience or feedback.
         
-        Transcripts:
-        ${transcripts.substring(0, 50000)} // Context limit safety
+        IMPORTANT: For every theme, insight, and quote, you MUST provide "citations". 
+        A citation consists of the exact "quote" from the user and the "conversationId" where it was found (look for [ConvID:...] in the text).
         
-        Output meaningful themes with counts, actionable insights, a sentiment score, and direct quotes.`,
+        Transcripts:
+        ${transcripts.substring(0, 80000)} // Increased context limit
+        
+        Output meaningful themes with counts and evidence, actionable insights with evidence, a sentiment score, and direct quotes with sources.`,
     });
 
     // Save to DB
@@ -285,26 +357,14 @@ export async function generateBotAnalyticsAction(botId: string) {
                 name: t.name,
                 description: t.description,
                 occurrences: {
-                    create: Array(t.count).fill(0).map(() => ({
-                        // We can't link to exact conversation easily without per-conversation analysis.
-                        // For MVP global analysis, we just create themes. 
-                        // To make "occurrences" logic work, we really should analyze per conversation.
-                        // But that's expensive/slow for "Run Analysis" button.
-                        // I will create dummy occurrences or just skip relation if possible?
-                        // Schema says `occurrences ThemeOccurrence[]`.
-                        // I will just create the Theme entity. The UI displays occurrences.length.
-                        // So I must create Mock occurrences or correct my schema usage.
-                        // Let's just create N mock occurrences attached to the first conversation found?
-                        // Better: Just store the count in description or ignore "occurrences" visual for now if empty.
-                        // Actually, I can create N occurrences using the first conversation as a placeholder, 
-                        // or ideally I'd have identified which conversation it came from.
-                        // For now, I'll Skip creating occurrences and just create the Theme.
-                        // But the UI I designed shows "X occurrences". I'll use t.count and maybe store it in description?
-                        // Or create dummy occurrences.
-                        conversationId: bot.conversations[0]?.id || "unknown",
-                        strengthScore: 1
-                    }))
+                    create: t.citations.map(cit => ({
+                        conversationId: cit.conversationId.replace('ConvID:', '').trim(), // Ensure ID is clean if AI kept prefix
+                        strengthScore: 1, // Default
+                        snippet: cit.quote
+                    })).slice(0, t.count) // ensure we match count roughly or just take all citations
                 }
+                // If AI returns fewer citations than "count", that's fine. 
+                // We rely on citation array length for actual relations.
             }
         });
     }
@@ -312,16 +372,29 @@ export async function generateBotAnalyticsAction(botId: string) {
     // Create Insights
     for (const i of data.insights) {
         await prisma.insight.create({
-            data: { botId, content: i, type: 'STRATEGIC' }
+            data: {
+                botId,
+                content: i.content,
+                type: 'STRATEGIC',
+                citations: i.citations as any // Save JSON
+            }
         });
     }
 
     // Create Golden Quotes
     for (const q of data.goldenQuotes) {
         await prisma.insight.create({
-            data: { botId, content: q, type: 'QUOTE' }
+            data: {
+                botId,
+                content: q.quote,
+                type: 'QUOTE',
+                // Store metadata link in citations too or a new field? 
+                // Using 'citations' field to store the single source is consistent.
+                citations: [{ quote: q.quote, conversationId: q.conversationId, context: q.context }] as any
+            }
         });
     }
+
 
     // Update Bot Metadata (Sentiment)
     await prisma.bot.update({

@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import ProjectCard from '@/components/project-card';
 
 export default async function DashboardPage() {
     const session = await auth();
@@ -65,20 +66,12 @@ export default async function DashboardPage() {
             ) : (
                 <div className="grid gap-6">
                     {projects.map((project: any) => (
-                        <div key={project.id} className="border p-6 rounded-lg bg-white shadow-sm">
-                            <h2 className="font-semibold text-lg text-gray-800 mb-4">{project.name}</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {project.bots.map((bot: any) => (
-                                    <Link key={bot.id} href={`/dashboard/bots/${bot.id}`} className="block border p-4 rounded hover:border-blue-500 hover:shadow-md transition">
-                                        <div className="font-medium">{bot.name}</div>
-                                        <div className="text-sm text-gray-500 mt-1 truncate">{bot.description || 'No description'}</div>
-                                    </Link>
-                                ))}
-                                <Link href={`/dashboard/projects/${project.id}/bots/new`} className="flex items-center justify-center border-2 border-dashed p-4 rounded text-gray-500 hover:text-blue-600 hover:border-blue-300 transition">
-                                    + Create Bot
-                                </Link>
-                            </div>
-                        </div>
+                        <ProjectCard
+                            key={project.id}
+                            project={project}
+                            userId={userQuery.id}
+                            isAdmin={userQuery.role === 'ADMIN'}
+                        />
                     ))}
                 </div>
             )}

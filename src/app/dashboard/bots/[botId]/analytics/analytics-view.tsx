@@ -1,9 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { generateBotAnalyticsAction } from '@/app/actions';
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Download, Quote, TrendingUp, Sparkles, MessageSquare, BrainCircuit } from 'lucide-react';
+import { Download, Quote, TrendingUp, Sparkles, MessageSquare, BrainCircuit, ExternalLink, ChevronDown } from 'lucide-react';
 
 export default function AnalyticsView({ bot, themes, insights }: any) {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -172,12 +173,25 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                         <p className="text-gray-400 text-sm">No quotes extracted yet.</p>
                     ) : (
                         <div className="space-y-4">
-                            {goldenQuotes.map((q: any) => (
-                                <div key={q.id} className="relative italic text-gray-700 bg-amber-50 p-4 rounded-lg border border-amber-100 text-sm">
-                                    <span className="absolute top-2 left-2 text-amber-200 text-2xl font-serif">“</span>
-                                    <span className="relative z-10 px-2">{q.content}</span>
-                                </div>
-                            ))}
+                            {goldenQuotes.map((q: any) => {
+                                const citation = q.citations?.[0]; // Access first citation
+                                return (
+                                    <div key={q.id} className="relative italic text-gray-700 bg-amber-50 p-4 rounded-lg border border-amber-100 text-sm group">
+                                        <span className="absolute top-2 left-2 text-amber-200 text-2xl font-serif">“</span>
+                                        <span className="relative z-10 px-2 block mb-2">{q.content}</span>
+                                        {citation?.conversationId && (
+                                            <div className="flex justify-end mt-2">
+                                                <Link
+                                                    href={`/dashboard/bots/${bot.id}/conversations/${citation.conversationId}`}
+                                                    className="inline-flex items-center text-xs text-amber-600 hover:text-amber-800 font-medium opacity-80 hover:opacity-100 transition-opacity"
+                                                >
+                                                    View Context <ExternalLink className="w-3 h-3 ml-1" />
+                                                </Link>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -193,15 +207,37 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                     ) : (
                         <div className="space-y-4">
                             {themes.map((theme: any) => (
-                                <div key={theme.id} className="border-b pb-3 last:border-0 border-gray-100">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="font-medium text-gray-800 text-sm">{theme.name}</span>
-                                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
-                                            {theme.occurrences.length}x
-                                        </span>
+                                <details key={theme.id} className="border-b last:border-0 border-gray-100 group">
+                                    <summary className="cursor-pointer list-none py-3 flex justify-between items-start outline-none">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="font-medium text-gray-800 text-sm">{theme.name}</span>
+                                                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
+                                                    {theme.occurrences.length}x
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 leading-relaxed">{theme.description}</p>
+                                        </div>
+                                        <ChevronDown className="w-4 h-4 text-gray-400 transform group-open:rotate-180 transition-transform mt-1" />
+                                    </summary>
+
+                                    <div className="pl-4 pb-3 space-y-2 mt-1 border-l-2 border-purple-100 bg-gray-50/50 p-3 rounded-r text-xs">
+                                        <p className="font-semibold text-gray-500 text-xs uppercase tracking-wide">Evidence:</p>
+                                        {theme.occurrences.map((occ: any, idx: number) => (
+                                            <div key={idx} className="bg-white p-2 rounded border border-gray-100 shadow-sm relative">
+                                                <p className="italic text-gray-600 mb-1">"{occ.snippet}"</p>
+                                                {occ.conversationId !== 'unknown' && (
+                                                    <Link
+                                                        href={`/dashboard/bots/${bot.id}/conversations/${occ.conversationId}`}
+                                                        className="text-purple-600 hover:underline inline-flex items-center gap-1 mt-1"
+                                                    >
+                                                        Review source <ExternalLink className="w-3 h-3" />
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p className="text-xs text-gray-500 leading-relaxed">{theme.description}</p>
-                                </div>
+                                </details>
                             ))}
                         </div>
                     )}
@@ -218,9 +254,41 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                     ) : (
                         <ul className="space-y-3">
                             {strategicInsights.map((insight: any) => (
-                                <li key={insight.id} className="text-sm text-gray-700 p-3 bg-blue-50 rounded border border-blue-100">
-                                    {insight.content}
-                                </li>
+                                {
+                                    strategicInsights.map((insight: any) => {
+                                        const citations = insight.citations as any[];
+                                        return (
+                                            <details key={insight.id} className="text-sm text-gray-700 bg-blue-50 rounded border border-blue-100 group">
+                                                <summary className="p-3 cursor-pointer list-none flex justify-between items-start gap-2 outline-none">
+                                                    <span>{insight.content}</span>
+                                                    {citations && citations.length > 0 && (
+                                                        <ChevronDown className="w-4 h-4 text-blue-400 transform group-open:rotate-180 transition-transform flex-shrink-0 mt-0.5" />
+                                                    )}
+                                                </summary>
+                                                {citations && citations.length > 0 && (
+                                                    <div className="px-3 pb-3 pt-0 border-t border-blue-100/50 mt-2">
+                                                        <p className="font-semibold text-blue-800/60 text-xs uppercase tracking-wide mt-2 mb-1">Basis:</p>
+                                                        <ul className="space-y-2">
+                                                            {citations.map((c: any, idx: number) => (
+                                                                <li key={idx} className="text-xs bg-white/60 p-2 rounded">
+                                                                    <span className="italic">"{c.quote}"</span>
+                                                                    {c.conversationId && (
+                                                                        <Link
+                                                                            href={`/dashboard/bots/${bot.id}/conversations/${c.conversationId}`}
+                                                                            className="block text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
+                                                                        >
+                                                                            View in context <ExternalLink className="w-3 h-3" />
+                                                                        </Link>
+                                                                    )}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </details>
+                                        );
+                                    })
+                                }
                             ))}
                         </ul>
                     )}

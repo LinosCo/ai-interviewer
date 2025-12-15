@@ -117,25 +117,28 @@ ${methodologyKnowledge}
 - **Current Status**: ${remainingMinutes < 2 ? 'CLOSING SOON' : 'IN PROGRESS'}
 ${rewardContext}
 
-## Circular Flow Strategy & Overtime Protocol
-1. **Phase 1 (Survey)**: Ask main question for EACH topic. NO follow-ups per topic. Speed is key.
-2. **Phase 2 (Deep Dive)**: Revisit interesting answers for depth.
+## Circular Flow Strategy
+1. **Phase 1 (Survey)**: Ask main question for EACH topic.
+   - If time is abundant (> 5 mins remaining): Ask 1 follow-up for interesting answers.
+   - If time is tight (< 5 mins remaining): No follow-ups, move to next topic.
+2. **Phase 2 (Deep Dive)**: If all topics covered and time remains, revisit interesting answers.
 
 **CRITICAL - TIME EXPIRATION PROTOCOL**:
-If \`Remaining Time\` <= 0 AND you haven't negotiated overtime yet:
+If \`Remaining Time\` <= 1 AND you haven't negotiated overtime yet:
    - STOP regular questions.
    - **Translate the following sentiment into ${bot.language || 'the user\'s language'}**:
      "The scheduled time is up. You have earned your reward (${bot.rewardConfig?.displayText || 'mystery reward'}). However, your answers about [mention specific interesting point] were truly insightful. To help us really improve ${bot.name}, would you be open to answering a few more deep-dive questions? No pressure."
    - **Rules**:
      - Replace [mention specific interesting point] with actual topic from chat.
      - Replace ${bot.name} with the project name.
-     - Do NOT output internal notes like "(Note: User has earned...)". speak naturally.
+     - Do NOT output internal notes. speak naturally.
 
 **IF user says YES to overtime**:
    - Continue with Phase 2 (Deep Dive) and ignore weight of time limits.
-**IF user says NO to overtime**:
+**IF user says NO to overtime OR if you have finished all topics**:
    - Thank them warmly in ${bot.language}.
    - **Crucial**: Provide the Reward Claim Link: [Claim Reward](${claimLink})
+   - Say "INTERVIEW_COMPLETED" at the very end.
 
 ## Research Topics (Your Agenda)
 ${topicsList}
@@ -154,17 +157,23 @@ ${botKnowledge}
 3. **One Question Rule**: Ask ONE question at a time.
 4. **No Pedantry**: Do not be annoying.
 
-**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye and provide the Reward Claim Link: ${claimLink} (if reward is active).`.trim();
+**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye, provide the Reward Claim Link: ${claimLink} (if reward is active), and append "INTERVIEW_COMPLETED" to signify the end.`.trim();
 
-        // Get API keys - use bot-specific first, then platform defaults
+        // Get API keys - Hierarchy: Bot Specific -> Global Config (DB) -> Env Var
         let apiKey: string | undefined;
+        let globalConfig: any = null;
+
+        // Fetch Global Config for fallback
+        try {
+            globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        } catch (e) {
+            console.warn("Failed to fetch global config", e);
+        }
 
         if (bot.modelProvider === 'anthropic') {
-            // Try bot key first, then platform default
-            apiKey = bot.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+            apiKey = bot.anthropicApiKey || globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
         } else {
-            // Try bot key first, then platform default
-            apiKey = bot.openaiApiKey || process.env.OPENAI_API_KEY;
+            apiKey = bot.openaiApiKey || globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
         }
 
         if (!apiKey) {

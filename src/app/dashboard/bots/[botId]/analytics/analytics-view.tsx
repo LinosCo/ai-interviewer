@@ -290,6 +290,59 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                     )}
                 </div>
             </div>
+
+            {/* Topic Deep Dive - Word Clouds */}
+            <div className="bg-white p-6 rounded shadow">
+                <h3 className="font-semibold mb-6 flex items-center gap-2 text-gray-800">
+                    <BrainCircuit className="w-5 h-5 text-indigo-600" />
+                    Topic Analysis & Word Clouds
+                </h3>
+
+                {!bot.topics || bot.topics.length === 0 ? (
+                    <p className="text-gray-400 text-sm">No topic analysis available.</p>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {bot.topics.map((topic: any) => (
+                            <div key={topic.id} className="border border-gray-100 rounded-lg p-4 bg-gray-50/50">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h4 className="font-medium text-gray-800">{topic.label}</h4>
+                                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{topic.description}</p>
+                                    </div>
+                                    <span className="text-xs font-mono bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
+                                        #{topic.orderIndex + 1}
+                                    </span>
+                                </div>
+
+                                <div className="bg-white rounded border border-gray-100 p-4 min-h-[120px] flex flex-wrap gap-2 items-center content-start">
+                                    {topic.keywords && Array.isArray(topic.keywords) && topic.keywords.length > 0 ? (
+                                        topic.keywords.map((kw: any, idx: number) => {
+                                            // Simple size scaling based on count relative to max count in this set
+                                            const maxCount = Math.max(...topic.keywords.map((k: any) => k.count || 1));
+                                            const sizeClass =
+                                                kw.count === maxCount ? "text-lg font-bold text-indigo-700" :
+                                                    kw.count > maxCount * 0.6 ? "text-base font-semibold text-indigo-600" :
+                                                        "text-xs text-gray-500";
+
+                                            return (
+                                                <span key={idx} className={`${sizeClass} px-2 py-1 bg-gray-50 rounded-full border border-gray-100`}>
+                                                    {kw.word}
+                                                    <span className="ml-1 text-[10px] opacity-50">{kw.count}</span>
+                                                </span>
+                                            );
+                                        })
+                                    ) : (
+                                        <p className="text-xs text-gray-400 italic w-full text-center py-4">
+                                            No keywords extracted yet. Run analysis to populate.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
         </div>
     );
 }

@@ -193,9 +193,7 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                                     </>
                                 ) : (
                                     <>
-                                        <option value="claude-4.5-sonnet">Claude 4.5 Sonnet (Future)</option>
-                                        <option value="claude-4.5-opus">Claude 4.5 Opus</option>
-                                        <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
+                                        <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (New)</option>
                                         <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
                                         <option value="claude-3-opus-latest">Claude 3 Opus</option>
                                     </>
@@ -231,6 +229,6 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                     Save Changes
                 </button>
             </div>
-        </form>
+        </form >
     );
 }

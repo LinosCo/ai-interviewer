@@ -18,7 +18,8 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ botI
                 include: { messages: true }
             },
             themes: { include: { occurrences: true } },
-            insights: true
+            insights: true,
+            topics: { orderBy: { orderIndex: 'asc' } }
         }
     });
 

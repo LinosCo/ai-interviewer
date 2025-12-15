@@ -280,7 +280,8 @@ export async function generateBotAnalyticsAction(botId: string) {
             conversations: {
                 where: { messages: { some: { role: 'user' } } },
                 include: { messages: { where: { role: 'user' } } }
-            }
+            },
+            topics: { orderBy: { orderIndex: 'asc' } }
         }
     });
 
@@ -323,7 +324,15 @@ export async function generateBotAnalyticsAction(botId: string) {
             quote: z.string(),
             conversationId: z.string(),
             context: z.string().optional()
-        })).describe("3-5 most impactful or representative direct quotes from users with their exact source")
+        })).describe("3-5 most impactful or representative direct quotes from users with their exact source"),
+        topicAnalysis: z.array(z.object({
+            topicLabel: z.string(),
+            keywords: z.array(z.object({
+                word: z.string(),
+                count: z.number(),
+                sentiment: z.enum(['POSITIVE', 'NEUTRAL', 'NEGATIVE']).optional()
+            })).describe("Key terms or concepts mentioned by users regarding this topic")
+        })).optional()
     });
 
     const result = await generateObject({
@@ -333,13 +342,18 @@ export async function generateBotAnalyticsAction(botId: string) {
         Identify recurring themes, key user feedback patterns, and strategic insights.
         Also determine an overall sentiment score (0-100) and extract 'Golden Quotes' that perfectly capture the user experience or feedback.
         
+        Additionally, analyze the responses for EACH of the following defined topics:
+        ${bot.topics.map(t => `- ${t.label}: ${t.description}`).join('\n')}
+
+        For each topic, extract the most frequent keywords or concepts (Word Cloud data) and their frequency.
+
         IMPORTANT: For every theme, insight, and quote, you MUST provide "citations". 
         A citation consists of the exact "quote" from the user and the "conversationId" where it was found (look for [ConvID:...] in the text).
         
         Transcripts:
         ${transcripts.substring(0, 80000)} // Increased context limit
         
-        Output meaningful themes with counts and evidence, actionable insights with evidence, a sentiment score, and direct quotes with sources.`,
+        Output meaningful themes with counts and evidence, actionable insights with evidence, a sentiment score, directed quotes, and topic-specific keyword analysis.`,
     });
 
     // Save to DB
@@ -395,6 +409,21 @@ export async function generateBotAnalyticsAction(botId: string) {
         });
     }
 
+    // Update Topic Keywords
+    if (data.topicAnalysis) {
+        for (const topicData of data.topicAnalysis) {
+            // Find matching topic by label (approximate match or exact?)
+            // We sent the labels, so AI should return them.
+            const topic = bot.topics.find(t => t.label === topicData.topicLabel);
+            if (topic) {
+                await prisma.topicBlock.update({
+                    where: { id: topic.id },
+                    data: { keywords: topicData.keywords as any }
+                });
+            }
+        }
+    }
+
 
     // Update Bot Metadata (Sentiment)
     await prisma.bot.update({
@@ -407,7 +436,7 @@ export async function generateBotAnalyticsAction(botId: string) {
         }
     });
 
-    revalidatePath(`/ dashboard / bots / ${botId}/analytics`);
+    revalidatePath(`/dashboard/bots/${botId}/analytics`);
 }
 
 export async function addTopicAction(botId: string, orderIndex: number) {

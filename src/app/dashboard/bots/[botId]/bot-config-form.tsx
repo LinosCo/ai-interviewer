@@ -184,6 +184,8 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                                 {provider === 'openai' ? (
                                     <>
                                         <option value="gpt-5.2">GPT-5.2 (Future/Preview)</option>
+                                        <option value="o1-preview">o1-preview (Reasoning)</option>
+                                        <option value="o1-mini">o1-mini (Fast Reasoning)</option>
                                         <option value="gpt-4o">GPT-4o (Recommended)</option>
                                         <option value="gpt-4o-mini">GPT-4o Mini</option>
                                         <option value="gpt-4-turbo">GPT-4 Turbo</option>

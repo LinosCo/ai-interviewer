@@ -208,7 +208,13 @@ export async function generateBotAnalyticsAction(botId: string) {
         where: { id: botId },
         include: {
             conversations: {
-                where: { status: 'COMPLETED' },
+                // Analyzes all conversations that have at least one user response, 
+                // regardless of whether they "completed" the full flow.
+                where: {
+                    messages: {
+                        some: { role: 'user' }
+                    }
+                },
                 include: { messages: { where: { role: 'user' } } }
             }
         }

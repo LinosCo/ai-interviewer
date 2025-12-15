@@ -72,7 +72,7 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ botI
                                     {c.durationSeconds ? `${Math.floor(c.durationSeconds / 60)}m` : '-'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:underline">
-                                    <Link href={`#`}>View Transcript</Link>
+                                    <Link href={`/dashboard/bots/${bot.id}/conversations/${c.id}`}>View Transcript</Link>
                                 </td>
                             </tr>
                         ))}

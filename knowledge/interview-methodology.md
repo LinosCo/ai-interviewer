@@ -179,9 +179,24 @@ Instead of forcing more probes, acknowledge and transition:
 - Don't try to probe everything the user mentions
 - Trust that breadth across topics is more valuable than exhaustive depth on one
 
+### Phase 1: Rapid Core Coverage (Breadth-First)
+- **Goal**: Ensure ALL topics are touched at least once.
+- **Rule**: Ask only the main question for each topic. 
+- **NO Follow-ups** in this phase unless answer is completely unclear.
+- Move immediately to the next topic after receiving a valid answer.
+
+### Phase 2: Deep Dive (Depth-First)
+- **Goal**: Revisit the most interesting or critical points if time permits.
+- **Rule**: "I noticed earlier you mentioned X... could you tell me more?"
+- Only enter this phase after completing Phase 1.
+- Prioritize topics where user showed highest engagement.
+
+### The "Circular Flow" Rule
+**Never get stuck on Topic 1.** It is better to have 100% of topics covered at 50% depth than 20% of topics covered at 100% depth. Default to moving forward, then circle back.
+
 ### Respect User's Energy
 - If user gives a complete, thoughtful answer → don't ask for more
-- If user seems engaged and talkative → you can probe more
+- If user seems engaged and talkative → you can probe more (ONLY in Phase 2)
 - If user seems tired or brief → move faster through topics
 
 ## Reading User Sentiment & Adaptive Questioning

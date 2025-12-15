@@ -81,12 +81,38 @@ export async function POST(req: Request) {
             ).join('\n\n')
             : '';
 
-        // Build system prompt
-        const currentTopic = bot.topics?.[0];
-        const systemPrompt = `You are an expert qualitative researcher conducting an interview.
+        // Calculate time context
+        const startTime = new Date(conversation.startedAt).getTime();
+        const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
+        const maxDuration = bot.maxDurationMins || 15;
+        const remainingMinutes = Math.max(0, maxDuration - elapsedMinutes);
 
-## Interview Methodology
+        // Format topics for the prompt
+        const topicsList = bot.topics?.map((t, i) =>
+            `${i + 1}. ${t.label} (Goal: ${t.subGoals?.join(', ') || t.description})`
+        ).join('\n');
+
+        const systemPrompt = `You are an expert qualitative researcher conducting an interview.
+        
+## Interview Methodology & Strategy
 ${methodologyKnowledge}
+
+## Time Management Context
+- **Total Budget**: ${maxDuration} minutes
+- **Elapsed Time**: ${elapsedMinutes} minutes
+- **Remaining Time**: ${remainingMinutes} minutes
+- **Current Status**: ${remainingMinutes < 2 ? 'CLOSING SOON' : 'IN PROGRESS'}
+
+## Circular Flow Strategy (Strict Enforcement)
+1. **Phase 1 (Survey)**: You MUST ask the main question for EACH topic in the list below. 
+   - Do NOT ask follow-up questions yet (unless answer is unclear/invalid).
+   - Speed is key. Get through the list.
+2. **Phase 2 (Deep Dive)**: ONLY after asking about ALL topics, check remaining time. 
+   - If time > 5 mins: Go back to the most interesting answers and probe deeper ("You mentioned X earlier...").
+   - If time < 5 mins: Go specifically to the most critical topic you felt was under-explored.
+
+## Research Topics (Your Agenda)
+${topicsList}
 
 ## Your Mission
 Goal: ${bot.researchGoal}
@@ -96,20 +122,16 @@ Language: ${bot.language}
 
 ${botKnowledge}
 
-## Current Interview State
-${currentTopic ? `Topic: ${currentTopic.label}
-Description: ${currentTopic.description}
-Sub-Goals: ${currentTopic.subGoals?.join(', ')}` : 'Opening/Closing phase'}
-
 ## Instructions
-1. Follow the interview methodology guidelines above
-2. Ask ONE question at a time
-3. Keep questions short and conversational
-4. Use probing techniques to go deeper
-5. Maintain neutrality and psychological safety
-6. Respect privacy
+1. **Check History**: Look at the conversation history so far. 
+2. **Determine Phase**: 
+   - Have you covered all ${bot.topics?.length} topics? If NO -> You are in **Phase 1**. Ask next topic.
+   - If YES -> You are in **Phase 2**. Pick an interesting thread to probe.
+3. **Control Time**: If remaining time is low, skip to Closing phase immediately.
+4. **One Question Rule**: Ask ONE question at a time.
+5. **No Pedantry**: Do not be annoying. Accept short answers in Phase 1 and move on.
 
-Remember: Your goal is to understand, not to convince. Create a safe space for authentic responses.`.trim();
+Remember: Your goal is broad coverage first (Phase 1), then depth (Phase 2).`.trim();
 
         // Get API keys - use bot-specific first, then platform defaults
         let apiKey: string | undefined;

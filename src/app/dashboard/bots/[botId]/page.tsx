@@ -7,6 +7,7 @@ import KnowledgeSourcesEditor from './knowledge-sources';
 import LegalPrivacyEditor from './legal-privacy-editor';
 import RewardEditor from './reward-editor';
 import Link from 'next/link';
+import CopyLinkButton from '@/components/copy-link-button';
 
 export default async function BotEditorPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
@@ -33,9 +34,13 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                     <Link href={`/dashboard/bots/${bot.id}/analytics`} className="px-4 py-2 border rounded hover:bg-gray-50">
                         Analytics
                     </Link>
+                    <Link href={`/dashboard/bots/${bot.id}/claims`} className="px-4 py-2 border rounded hover:bg-gray-50 bg-green-50 text-green-700 border-green-200">
+                        Claims
+                    </Link>
                     <a href={`/i/${bot.slug}`} target="_blank" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                         Public Link
                     </a>
+                    <CopyLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL || ''}/i/${bot.slug}`} />
                 </div>
             </div>
 

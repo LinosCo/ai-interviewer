@@ -253,43 +253,41 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                         <p className="text-gray-400 text-sm">No insights generated yet.</p>
                     ) : (
                         <ul className="space-y-3">
-                            {strategicInsights.map((insight: any) => (
-                                {
-                                    strategicInsights.map((insight: any) => {
+                            {strategicInsights.map((insight: any) => {
+                                const citations = insight.citations as any[];
+                                return (
                                         const citations = insight.citations as any[];
-                                        return (
-                                            <details key={insight.id} className="text-sm text-gray-700 bg-blue-50 rounded border border-blue-100 group">
-                                                <summary className="p-3 cursor-pointer list-none flex justify-between items-start gap-2 outline-none">
-                                                    <span>{insight.content}</span>
-                                                    {citations && citations.length > 0 && (
-                                                        <ChevronDown className="w-4 h-4 text-blue-400 transform group-open:rotate-180 transition-transform flex-shrink-0 mt-0.5" />
-                                                    )}
-                                                </summary>
-                                                {citations && citations.length > 0 && (
-                                                    <div className="px-3 pb-3 pt-0 border-t border-blue-100/50 mt-2">
-                                                        <p className="font-semibold text-blue-800/60 text-xs uppercase tracking-wide mt-2 mb-1">Basis:</p>
-                                                        <ul className="space-y-2">
-                                                            {citations.map((c: any, idx: number) => (
-                                                                <li key={idx} className="text-xs bg-white/60 p-2 rounded">
-                                                                    <span className="italic">"{c.quote}"</span>
-                                                                    {c.conversationId && (
-                                                                        <Link
-                                                                            href={`/dashboard/bots/${bot.id}/conversations/${c.conversationId}`}
-                                                                            className="block text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
-                                                                        >
-                                                                            View in context <ExternalLink className="w-3 h-3" />
-                                                                        </Link>
-                                                                    )}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
-                                            </details>
-                                        );
-                                    })
-                                }
-                            ))}
+                                return (
+                                    <details key={insight.id} className="text-sm text-gray-700 bg-blue-50 rounded border border-blue-100 group">
+                                        <summary className="p-3 cursor-pointer list-none flex justify-between items-start gap-2 outline-none">
+                                            <span>{insight.content}</span>
+                                            {citations && citations.length > 0 && (
+                                                <ChevronDown className="w-4 h-4 text-blue-400 transform group-open:rotate-180 transition-transform flex-shrink-0 mt-0.5" />
+                                            )}
+                                        </summary>
+                                        {citations && citations.length > 0 && (
+                                            <div className="px-3 pb-3 pt-0 border-t border-blue-100/50 mt-2">
+                                                <p className="font-semibold text-blue-800/60 text-xs uppercase tracking-wide mt-2 mb-1">Basis:</p>
+                                                <ul className="space-y-2">
+                                                    {citations.map((c: any, idx: number) => (
+                                                        <li key={idx} className="text-xs bg-white/60 p-2 rounded">
+                                                            <span className="italic">"{c.quote}"</span>
+                                                            {c.conversationId && (
+                                                                <Link
+                                                                    href={`/dashboard/bots/${bot.id}/conversations/${c.conversationId}`}
+                                                                    className="block text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
+                                                                >
+                                                                    View in context <ExternalLink className="w-3 h-3" />
+                                                                </Link>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </details>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>

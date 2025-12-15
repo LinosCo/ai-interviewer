@@ -328,6 +328,19 @@ export default function InterviewChat({
                                             em: ({ children }) => (
                                                 <em className="italic">{children}</em>
                                             ),
+                                            a: ({ href, children }) => (
+                                                <a
+                                                    href={href}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 underline hover:text-blue-800 break-all"
+                                                >
+                                                    {children}
+                                                </a>
+                                            ),
+                                            em: ({ children }) => (
+                                                <em className="italic">{children}</em>
+                                            ),
                                         }}
                                     >
                                         {currentQuestion.content}

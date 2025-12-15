@@ -308,6 +308,8 @@ model RewardGrant {
   
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user           User?    @relation(fields: [userId], references: [id])
+  guestEmail     String?
+  guestName      String?
 }
 
 // --- Analytics & Insights Models ---

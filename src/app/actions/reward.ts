@@ -44,10 +44,10 @@ export async function claimReward(conversationId: string, email: string, name?: 
     const grant = await prisma.rewardGrant.create({
         data: {
             conversationId,
-            code: conversation.bot.rewardConfig.payload, // Storing payload as code/reference
+            code: conversation.bot.rewardConfig.payload,
             userId: user?.id,
-            // We could store the collected email/name in a separate Participant model if we had one,
-            // or implicitly just log the grant
+            guestEmail: email,
+            guestName: name
         }
     });
 

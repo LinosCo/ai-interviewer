@@ -16,6 +16,10 @@ export default async function PlatformSettingsPage() {
         include: { platformSettings: true }
     });
 
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: "default" }
+    });
+
     if (!user) {
         redirect('/login');
     }
@@ -45,10 +49,21 @@ export default async function PlatformSettingsPage() {
                     {/* Platform Settings Form - includes API keys and methodology */}
                     <PlatformSettingsForm
                         userId={user.id}
+                        isAdmin={user.role === 'ADMIN'}
                         currentKnowledge={currentKnowledge}
                         settingsId={user.platformSettings?.id}
-                        platformOpenaiApiKey={user.platformOpenaiApiKey || ''}
-                        platformAnthropicApiKey={user.platformAnthropicApiKey || ''}
+                        // For Admins, populate with Global Config. 
+                        // For Users, populate with personal override IF it exists, otherwise empty (masked later)
+                        platformOpenaiApiKey={
+                            user.role === 'ADMIN'
+                                ? (globalConfig?.openaiApiKey || '')
+                                : (user.platformOpenaiApiKey || '')
+                        }
+                        platformAnthropicApiKey={
+                            user.role === 'ADMIN'
+                                ? (globalConfig?.anthropicApiKey || '')
+                                : (user.platformAnthropicApiKey || '')
+                        }
                     />
                 </div>
             </div>

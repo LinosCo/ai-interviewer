@@ -20,6 +20,24 @@ const BotSchema = z.object({
     introMessage: z.string().optional(),
 })
 
+async function getEffectiveApiKey(user: any, botSpecificKey?: string | null) {
+    // 1. Bot-specific key always wins
+    if (botSpecificKey) return botSpecificKey;
+
+    // 2. If User has their own personal platform key set, use it (Legacy/Personal)
+    if (user.platformOpenaiApiKey) return user.platformOpenaiApiKey;
+
+    // 3. ADMIN Logic: Fallback to Global/Env allowed
+    if (user.role === 'ADMIN') {
+        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        if (globalConfig?.openaiApiKey) return globalConfig.openaiApiKey;
+        return process.env.OPENAI_API_KEY;
+    }
+
+    // 4. Regular User Logic: No fallback to Global/Env allowed
+    return null;
+}
+
 export async function startInterviewAction(botId: string) {
     // Generate anonymous participant ID or use session if present (but session is admin usually)
     const participantId = `anon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -160,9 +178,9 @@ export async function generateBotConfigAction(prompt: string) {
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) throw new Error("User not found");
 
-    // Use platform key or fallback to env
-    const apiKey = (user as any).platformOpenaiApiKey || process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("No OpenAI API Key configured in Settings.");
+    // Use platform key or fallback to global/env
+    const apiKey = await getEffectiveApiKey(user);
+    if (!apiKey) throw new Error("No OpenAI API Key configured. As a user, you must configure your own API key in Settings.");
 
     const openai = createOpenAI({ apiKey });
 
@@ -199,28 +217,23 @@ export async function generateBotAnalyticsAction(botId: string) {
 
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) throw new Error("User not found");
-    // Use platform key or fallback to env
-    const apiKey = (user as any).platformOpenaiApiKey || process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("No OpenAI API Key configured.");
 
     // Fetch conversations
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
         include: {
             conversations: {
-                // Analyzes all conversations that have at least one user response, 
-                // regardless of whether they "completed" the full flow.
-                where: {
-                    messages: {
-                        some: { role: 'user' }
-                    }
-                },
+                where: { messages: { some: { role: 'user' } } },
                 include: { messages: { where: { role: 'user' } } }
             }
         }
     });
 
-    if (!bot || bot.conversations.length === 0) return; // Nothing to analyze
+    if (!bot || bot.conversations.length === 0) return;
+
+    // Resolve API Key
+    const apiKey = await getEffectiveApiKey(user, bot.openaiApiKey);
+    if (!apiKey) throw new Error("No OpenAI API Key configured for this bot or user.");
 
     // Prepare text for analysis
     // We'll concatenate the last few user messages from each conversation or a summary.
@@ -408,13 +421,57 @@ export async function updateSettingsAction(userId: string, formData: FormData) {
     const openaiKey = formData.get('platformOpenaiApiKey') as string;
     const anthropicKey = formData.get('platformAnthropicApiKey') as string;
 
-    await prisma.user.update({
-        where: { id: userId },
-        data: {
-            platformOpenaiApiKey: openaiKey || null,
-            platformAnthropicApiKey: anthropicKey || null,
-        }
+    // If Admin, update Global Config
+    if (currentUser.role === 'ADMIN') {
+        await prisma.globalConfig.upsert({
+            where: { id: "default" },
+            update: {
+                openaiApiKey: openaiKey || null,
+                anthropicApiKey: anthropicKey || null,
+            },
+            create: {
+                id: "default",
+                openaiApiKey: openaiKey || null,
+                anthropicApiKey: anthropicKey || null,
+            }
+        });
+    }
+
+    // Always update User Platform Settings linked to user (for methodology etc, but maybe remove API keys from user?)
+    // For now, we update the user entity too if we want to keep "Personal" keys support.
+    // BUT the prompt implies "general keys available for all".
+    // If I leave user keys update here, the Admin might overwrite their own personal key while intending to set Global.
+    // Let's decided:
+    // - Admin sets GLOBAL keys via this form.
+    // - Non-Admin CANNOT set keys via this form (UI will disable it).
+    // So if Admin, we update Global.
+    // If Non-Admin, we technically shouldn't be receiving keys to update if UI is disabled.
+    // But if we do, should we let them set personal keys?
+    // "impostabili solo dall'admin" -> "Set ONLY by admin".
+    // This implies ONLY Global keys exist or matter for this UI.
+    // So I will only update GlobalConfig if Admin.
+    // I will NOT update User keys anymore.
+
+    // Update methodology if needed (which is on User's PlatformSettings currently or should be migrated?)
+    // Methodology is seemingly per-user in current schema model PlatformSettings?
+    // Let's just keep API Key logic here.
+
+    // Update User settings (Methodology, etc.) but SKIP api keys if we are moving to global.
+    // Only update methodology here?
+    // The form sends all data.
+
+    // Let's separate concerns.
+    const methodologyKnowledge = formData.get('methodologyKnowledge') as string;
+
+    // Update linked PlatformSettings (Methodology)
+    await prisma.platformSettings.upsert({
+        where: { userId },
+        update: { methodologyKnowledge },
+        create: { userId, methodologyKnowledge }
     });
+
+    // We do NOT update user.platformOpenaiApiKey anymore to enforce "Global Only" or "Admin Managed".
+    // Effectively ignoring personal key inputs.
 
     revalidatePath('/dashboard/settings');
 }
@@ -425,8 +482,9 @@ export async function refineTextAction(currentText: string, fieldName: string, c
 
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) throw new Error("User not found");
-    const apiKey = (user as any).platformOpenaiApiKey || process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("No OpenAI API Key configured.");
+    // Refine text doesn't have a bot context usually, so it relies on User keys.
+    const apiKey = await getEffectiveApiKey(user);
+    if (!apiKey) throw new Error("No OpenAI API Key configured. Please add one in Settings.");
 
     const openai = createOpenAI({ apiKey });
 

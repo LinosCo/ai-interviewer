@@ -107,6 +107,13 @@ model PlatformSettings {
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model GlobalConfig {
+  id              String   @id @default("default")
+  openaiApiKey    String?
+  anthropicApiKey String?
+  updatedAt       DateTime @updatedAt
+}
+
 // --- Core Entities ---
 
 model Organization {

@@ -239,7 +239,9 @@ export async function generateBotAnalyticsAction(botId: string) {
             description: z.string(),
             count: z.number()
         })),
-        insights: z.array(z.string()).describe("Strategic observations or actionable suggestions")
+        insights: z.array(z.string()).describe("Strategic observations or actionable suggestions"),
+        sentimentScore: z.number().describe("Overall sentiment score from 0 to 100"),
+        goldenQuotes: z.array(z.string()).describe("3-5 most impactful or representative direct quotes from users")
     });
 
     const result = await generateObject({
@@ -247,11 +249,12 @@ export async function generateBotAnalyticsAction(botId: string) {
         schema,
         prompt: `Analyze the following interview transcripts for the bot "${bot.name}".
         Identify recurring themes, key user feedback patterns, and strategic insights.
+        Also determine an overall sentiment score (0-100) and extract 'Golden Quotes' that perfectly capture the user experience or feedback.
         
         Transcripts:
         ${transcripts.substring(0, 50000)} // Context limit safety
         
-        Output meaningful themes with counts and actionable insights.`,
+        Output meaningful themes with counts, actionable insights, a sentiment score, and direct quotes.`,
     });
 
     // Save to DB
@@ -296,11 +299,29 @@ export async function generateBotAnalyticsAction(botId: string) {
     // Create Insights
     for (const i of data.insights) {
         await prisma.insight.create({
-            data: { botId, content: i }
+            data: { botId, content: i, type: 'STRATEGIC' }
         });
     }
 
-    revalidatePath(`/dashboard/bots/${botId}/analytics`);
+    // Create Golden Quotes
+    for (const q of data.goldenQuotes) {
+        await prisma.insight.create({
+            data: { botId, content: q, type: 'QUOTE' }
+        });
+    }
+
+    // Update Bot Metadata (Sentiment)
+    await prisma.bot.update({
+        where: { id: botId },
+        data: {
+            analyticsMetadata: {
+                sentimentScore: data.sentimentScore,
+                lastAnalyzed: new Date().toISOString()
+            }
+        }
+    });
+
+    revalidatePath(`/ dashboard / bots / ${botId}/analytics`);
 }
 
 export async function addTopicAction(botId: string, orderIndex: number) {

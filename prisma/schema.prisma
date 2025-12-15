@@ -209,6 +209,9 @@ model Bot {
   insights       Insight[]
   hotIdeas       HotIdea[]
   reports        Report[]
+
+  // Analytics aggregates
+  analyticsMetadata Json?  // { sentimentScore: 75, engagementScore: 80, ... }
 }
 
 model KnowledgeSource {
@@ -348,6 +351,7 @@ model ThemeOccurrence {
 model Insight {
   id      String   @id @default(cuid())
   botId   String
+  type    String   @default("STRATEGIC") // STRATEGIC, QUOTE
   content String   @db.Text
   
   bot     Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)

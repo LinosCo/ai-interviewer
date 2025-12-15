@@ -338,9 +338,7 @@ export default function InterviewChat({
                                                     {children}
                                                 </a>
                                             ),
-                                            em: ({ children }) => (
-                                                <em className="italic">{children}</em>
-                                            ),
+
                                         }}
                                     >
                                         {currentQuestion.content}

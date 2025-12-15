@@ -44,7 +44,10 @@ export async function POST(req: Request) {
 
         const bot = await prisma.bot.findUnique({
             where: { id: botId },
-            include: { topics: { orderBy: { orderIndex: 'asc' } } }
+            include: {
+                topics: { orderBy: { orderIndex: 'asc' } },
+                rewardConfig: true
+            }
         });
 
         if (!bot) {
@@ -55,7 +58,8 @@ export async function POST(req: Request) {
         console.log('Bot loaded:', {
             id: bot.id,
             name: bot.name,
-            topicsCount: bot.topics?.length
+            topicsCount: bot.topics?.length,
+            hasReward: !!bot.rewardConfig?.enabled
         });
 
         // Load system-wide interview methodology knowledge
@@ -85,15 +89,20 @@ export async function POST(req: Request) {
         const startTime = new Date(conversation.startedAt).getTime();
         const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
         const maxDuration = bot.maxDurationMins || 15;
-        const remainingMinutes = Math.max(0, maxDuration - elapsedMinutes);
+        const remainingMinutes = maxDuration - elapsedMinutes;
 
         // Format topics for the prompt
         const topicsList = bot.topics?.map((t, i) =>
             `${i + 1}. ${t.label} (Goal: ${t.subGoals?.join(', ') || t.description})`
         ).join('\n');
 
+        // Reward context string
+        const rewardContext = bot.rewardConfig?.enabled
+            ? `(Note: User has earned their reward: ${bot.rewardConfig.displayText || 'the reward'})`
+            : '';
+
         const systemPrompt = `You are an expert qualitative researcher conducting an interview.
-        
+
 ## Interview Methodology & Strategy
 ${methodologyKnowledge}
 
@@ -101,15 +110,22 @@ ${methodologyKnowledge}
 - **Total Budget**: ${maxDuration} minutes
 - **Elapsed Time**: ${elapsedMinutes} minutes
 - **Remaining Time**: ${remainingMinutes} minutes
-- **Current Status**: ${remainingMinutes < 2 ? 'CLOSING SOON' : 'IN PROGRESS'}
+- **Reward Status**: ${bot.rewardConfig?.enabled ? 'Active' : 'None'}
 
-## Circular Flow Strategy (Strict Enforcement)
-1. **Phase 1 (Survey)**: You MUST ask the main question for EACH topic in the list below. 
-   - Do NOT ask follow-up questions yet (unless answer is unclear/invalid).
-   - Speed is key. Get through the list.
-2. **Phase 2 (Deep Dive)**: ONLY after asking about ALL topics, check remaining time. 
-   - If time > 5 mins: Go back to the most interesting answers and probe deeper ("You mentioned X earlier...").
-   - If time < 5 mins: Go specifically to the most critical topic you felt was under-explored.
+## Circular Flow Strategy & Overtime Protocol
+1. **Phase 1 (Survey)**: Ask main question for EACH topic. NO follow-ups per topic. Speed is key.
+2. **Phase 2 (Deep Dive)**: Revisit interesting answers for depth.
+
+**CRITICAL - TIME EXPIRATION PROTOCOL**:
+If \`Remaining Time\` <= 0 AND you haven't negotiated overtime yet:
+   - STOP regular questions.
+   - **Say exactly this sentiment**: "The scheduled time is up. Thank you for your time ${rewardContext}. However, your answers about [mention specific interesting point] were truly insightful. To help us really improve [Product/Service], would you be open to answering a few more deep-dive questions? No pressure."
+   - **Leverage Pride**: Make them feel their specific feedback is uniquely valuable.
+
+**IF user says YES to overtime**:
+   - Continue with Phase 2 (Deep Div) and ignore weight of time limits.
+**IF user says NO to overtime**:
+   - Thank them warmly and conclude.
 
 ## Research Topics (Your Agenda)
 ${topicsList}
@@ -123,13 +139,10 @@ Language: ${bot.language}
 ${botKnowledge}
 
 ## Instructions
-1. **Check History**: Look at the conversation history so far. 
-2. **Determine Phase**: 
-   - Have you covered all ${bot.topics?.length} topics? If NO -> You are in **Phase 1**. Ask next topic.
-   - If YES -> You are in **Phase 2**. Pick an interesting thread to probe.
-3. **Control Time**: If remaining time is low, skip to Closing phase immediately.
-4. **One Question Rule**: Ask ONE question at a time.
-5. **No Pedantry**: Do not be annoying. Accept short answers in Phase 1 and move on.
+1. **Check History**: Have you already asked for overtime? If user said Yes, keep going.
+2. **Determine Phase**: Phase 1 (Coverage) -> Phase 2 (Depth).
+3. **One Question Rule**: Ask ONE question at a time.
+4. **No Pedantry**: Do not be annoying.
 
 Remember: Your goal is broad coverage first (Phase 1), then depth (Phase 2).`.trim();
 

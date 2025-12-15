@@ -47,10 +47,7 @@ export default async function DashboardPage() {
         });
     }
 
-    if (!user) {
-        // Handle edge case where session exists but user DB record missing (e.g. wiped DB)
-        return <div>User not found in database.</div>;
-    }
+
 
     return (
         <div>

@@ -22,8 +22,9 @@ export default function PlatformSettingsForm({
     isAdmin
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
-    const [openaiKey, setOpenaiKey] = useState(platformOpenaiApiKey);
-    const [anthropicKey, setAnthropicKey] = useState(platformAnthropicApiKey);
+    // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
+    const [openaiKey, setOpenaiKey] = useState('');
+    const [anthropicKey, setAnthropicKey] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const router = useRouter();
 
@@ -37,8 +38,17 @@ export default function PlatformSettingsForm({
                     userId,
                     settingsId,
                     methodologyKnowledge: knowledge,
-                    platformOpenaiApiKey: openaiKey,
-                    platformAnthropicApiKey: anthropicKey
+                    // If empty string, don't send updates unless we want to clear it?
+                    // Actually, if user leaves empty, we assume they don't want to change it.
+                    // But if they want to clear it? Hard to say. 
+                    // For now, let's send what we have. API should handle partials? 
+                    // No, upsert replaces.
+                    // But we init with empty. So valid update requires typing.
+                    // If empty, pass the original prop value so it doesn't get cleared?
+                    // Better: Send only if changed. But this is a simple form.
+                    // Let's rely on backend: we send current input. If input is empty, backend should probably ignore OR we send the ORIGINAL if input is empty.
+                    platformOpenaiApiKey: openaiKey || platformOpenaiApiKey,
+                    platformAnthropicApiKey: anthropicKey || platformAnthropicApiKey
                 })
             });
 
@@ -78,25 +88,27 @@ export default function PlatformSettingsForm({
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 OpenAI API Key
+                                {platformOpenaiApiKey && <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">● Configured</span>}
                             </label>
                             <input
                                 type="password"
                                 value={openaiKey}
                                 onChange={(e) => setOpenaiKey(e.target.value)}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                                placeholder="sk-..."
+                                placeholder={platformOpenaiApiKey ? "•••••••••••••••• (Enter new to replace)" : "sk-..."}
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Anthropic API Key
+                                {platformAnthropicApiKey && <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">● Configured</span>}
                             </label>
                             <input
                                 type="password"
                                 value={anthropicKey}
                                 onChange={(e) => setAnthropicKey(e.target.value)}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                                placeholder="sk-ant-..."
+                                placeholder={platformAnthropicApiKey ? "•••••••••••••••• (Enter new to replace)" : "sk-ant-..."}
                             />
                         </div>
                     </div>

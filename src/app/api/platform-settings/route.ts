@@ -20,17 +20,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Update user's API keys
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
-                platformOpenaiApiKey,
-                platformAnthropicApiKey
-            }
-        });
-
-        // Upsert platform settings
-        const settings = await prisma.platformSettings.upsert({
+        // Update user's methodology (PlatformSettings)
+        await prisma.platformSettings.upsert({
             where: { userId },
             update: { methodologyKnowledge },
             create: {
@@ -38,6 +29,25 @@ export async function POST(req: NextRequest) {
                 methodologyKnowledge
             }
         });
+
+        // If Admin, update Global Config API Keys
+        if (user.role === 'ADMIN') {
+            await prisma.globalConfig.upsert({
+                where: { id: "default" },
+                update: {
+                    openaiApiKey: platformOpenaiApiKey || null,
+                    anthropicApiKey: platformAnthropicApiKey || null,
+                },
+                create: {
+                    id: "default",
+                    openaiApiKey: platformOpenaiApiKey || null,
+                    anthropicApiKey: platformAnthropicApiKey || null,
+                }
+            });
+        }
+
+        // Note: We are NO LONGER updating user.platformOpenaiApiKey to avoid confusion.
+        // Personal keys are deprecated in favor of Bot-specific or Global keys.
 
         return NextResponse.json(settings);
     } catch (error) {

@@ -21,9 +21,7 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center bg-gray-100">
             <div className="w-full max-w-md bg-white p-8 rounded shadow-md">
                 <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
-                <p className="text-center text-gray-500 mb-4 text-sm">
-                    Use seeded credentials: admin@example.com / password123
-                </p>
+
                 <form action={dispatch} className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Email</label>

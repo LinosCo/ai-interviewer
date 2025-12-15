@@ -256,8 +256,6 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                             {strategicInsights.map((insight: any) => {
                                 const citations = insight.citations as any[];
                                 return (
-                                        const citations = insight.citations as any[];
-                                return (
                                     <details key={insight.id} className="text-sm text-gray-700 bg-blue-50 rounded border border-blue-100 group">
                                         <summary className="p-3 cursor-pointer list-none flex justify-between items-start gap-2 outline-none">
                                             <span>{insight.content}</span>

@@ -13,7 +13,10 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ botI
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
         include: {
-            conversations: { orderBy: { startedAt: 'desc' } },
+            conversations: {
+                orderBy: { startedAt: 'desc' },
+                include: { messages: true }
+            },
             themes: { include: { occurrences: true } },
             insights: true
         }
@@ -50,32 +53,53 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ botI
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Msgs</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detail</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {bot.conversations.map(c => (
-                            <tr key={c.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {new Date(c.startedAt).toLocaleDateString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                        {c.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {c.durationSeconds ? `${Math.floor(c.durationSeconds / 60)}m` : '-'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:underline">
-                                    <Link href={`/dashboard/bots/${bot.id}/conversations/${c.id}`}>View Transcript</Link>
-                                </td>
-                            </tr>
-                        ))}
+                        {bot.conversations.map(c => {
+                            const userMsgCount = c.messages.filter(m => m.role === 'user').length;
+
+                            // Calculate duration fallback
+                            let duration = c.durationSeconds;
+                            if (!duration && c.messages.length > 0) {
+                                const lastMsg = c.messages[c.messages.length - 1];
+                                const start = new Date(c.startedAt).getTime();
+                                const end = new Date(lastMsg.createdAt).getTime();
+                                duration = Math.floor((end - start) / 1000);
+                            }
+
+                            return (
+                                <tr key={c.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-600">
+                                        #{c.id.slice(-6)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {new Date(c.startedAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                            }`}>
+                                            {c.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        {userMsgCount}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {duration ? `${Math.floor(duration / 60)}m ${duration % 60}s` : '-'}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:underline">
+                                        <Link href={`/dashboard/bots/${bot.id}/conversations/${c.id}`}>View Transcript</Link>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

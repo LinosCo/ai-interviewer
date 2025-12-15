@@ -193,9 +193,9 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                                     </>
                                 ) : (
                                     <>
-                                        <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (New)</option>
-                                        <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
-                                        <option value="claude-3-opus-latest">Claude 3 Opus</option>
+                                        <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (New)</option>
+                                        <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                                        <option value="claude-3-opus-20240229">Claude 3 Opus</option>
                                     </>
                                 )}
                             </select>

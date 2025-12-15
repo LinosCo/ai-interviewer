@@ -171,7 +171,11 @@ export async function deleteBotAction(botId: string) {
     if (!bot) throw new Error("Bot not found");
 
     const isOwner = bot.project.ownerId === user.id;
+
+    console.log(`Delete Bot Attempt: BotId=${botId}, User=${user.email}, Role=${user.role}, ProjectOwner=${bot.project.ownerId}, IsOwner=${isOwner}`);
+
     if (user.role !== 'ADMIN' && !isOwner) {
+        console.error("Delete Bot Unauthorized");
         throw new Error("Unauthorized");
     }
 

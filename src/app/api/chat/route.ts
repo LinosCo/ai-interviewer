@@ -105,6 +105,10 @@ export async function POST(req: Request) {
             ? `\n- **Reward Active**: User gets "${bot.rewardConfig.displayText}".\n- **Claim Link**: ${claimLink} (ONLY provide this when interview ends)`
             : '';
 
+        const closingInstruction = bot.rewardConfig?.enabled
+            ? `**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye, provide the Reward Claim Link: ${claimLink}, and append "INTERVIEW_COMPLETED" to signify the end.`
+            : `**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye, DO NOT mention the reward claim link, and append "INTERVIEW_COMPLETED" to signify the end.`;
+
         const systemPrompt = `You are an expert qualitative researcher conducting an interview.
         
 ## Interview Methodology & Strategy
@@ -157,7 +161,7 @@ ${botKnowledge}
 3. **One Question Rule**: Ask ONE question at a time.
 4. **No Pedantry**: Do not be annoying.
 
-**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye, provide the Reward Claim Link: ${claimLink} (if reward is active), and append "INTERVIEW_COMPLETED" to signify the end.`.trim();
+${closingInstruction}`.trim();
 
         // Get API keys - Hierarchy: Bot Specific -> Global Config (DB) -> Env Var
         let apiKey: string | undefined;
@@ -274,6 +278,16 @@ ${botKnowledge}
             }
 
             responseText = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
+
+            // Check for completion signal
+            if (responseText.includes("INTERVIEW_COMPLETED") || (bot.rewardConfig?.enabled && responseText.includes(claimLink))) {
+                await prisma.conversation.update({
+                    where: { id: conversationId },
+                    data: { status: 'COMPLETED', completedAt: new Date() }
+                });
+                // Clean up the output so user doesn't see the raw flag
+                responseText = responseText.replace(/INTERVIEW_COMPLETED/g, "").trim();
+            }
         }
 
         // Save assistant response

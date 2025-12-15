@@ -1,11 +1,23 @@
 import Link from 'next/link';
-import { signOut } from '@/auth';
+import { signOut, auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const session = await auth();
+    let isAdmin = false;
+
+    if (session?.user?.email) {
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            select: { role: true }
+        });
+        isAdmin = user?.role === 'ADMIN';
+    }
+
     return (
         <div className="flex h-screen flex-col md:flex-row md:overflow-hidden">
             <div className="w-full flex-none md:w-64 bg-gray-900 text-white p-4">
@@ -14,6 +26,11 @@ export default function DashboardLayout({
                     <Link href="/dashboard" className="p-2 hover:bg-gray-800 rounded">
                         Projects
                     </Link>
+                    {isAdmin && (
+                        <Link href="/dashboard/admin/users" className="p-2 hover:bg-gray-800 rounded text-purple-300 hover:text-purple-200">
+                            User Management
+                        </Link>
+                    )}
                     <Link href="/dashboard/settings" className="p-2 hover:bg-gray-800 rounded">
                         Settings
                     </Link>

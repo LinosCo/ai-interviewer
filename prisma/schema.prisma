@@ -32,6 +32,28 @@ model User {
   platformOpenaiApiKey    String?
   platformAnthropicApiKey String?
   platformSettings        PlatformSettings?
+
+  // User Management
+  role          UserRole        @default(USER)
+  projectAccess ProjectAccess[]
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model ProjectAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
 }
 
 model Account {
@@ -129,6 +151,7 @@ model Project {
   organization   Organization? @relation(fields: [organizationId], references: [id])
   owner          User?         @relation(fields: [ownerId], references: [id])
   bots           Bot[]
+  accessList     ProjectAccess[]
 }
 
 // --- Bot & Interview Configuration ---

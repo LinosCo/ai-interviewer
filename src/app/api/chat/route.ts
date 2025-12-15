@@ -96,13 +96,17 @@ export async function POST(req: Request) {
             `${i + 1}. ${t.label} (Goal: ${t.subGoals?.join(', ') || t.description})`
         ).join('\n');
 
-        // Reward context string
+        // Reward context string and Link
+        const headerHost = req.headers.get('host') || 'localhost:3000';
+        const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+        const claimLink = `${protocol}://${headerHost}/claim/${conversationId}`;
+
         const rewardContext = bot.rewardConfig?.enabled
-            ? `(Note: User has earned their reward: ${bot.rewardConfig.displayText || 'the reward'})`
+            ? `\n- **Reward Active**: User gets "${bot.rewardConfig.displayText}".\n- **Claim Link**: ${claimLink} (ONLY provide this when interview ends)`
             : '';
 
         const systemPrompt = `You are an expert qualitative researcher conducting an interview.
-
+        
 ## Interview Methodology & Strategy
 ${methodologyKnowledge}
 
@@ -110,7 +114,8 @@ ${methodologyKnowledge}
 - **Total Budget**: ${maxDuration} minutes
 - **Elapsed Time**: ${elapsedMinutes} minutes
 - **Remaining Time**: ${remainingMinutes} minutes
-- **Reward Status**: ${bot.rewardConfig?.enabled ? 'Active' : 'None'}
+- **Current Status**: ${remainingMinutes < 2 ? 'CLOSING SOON' : 'IN PROGRESS'}
+${rewardContext}
 
 ## Circular Flow Strategy & Overtime Protocol
 1. **Phase 1 (Survey)**: Ask main question for EACH topic. NO follow-ups per topic. Speed is key.
@@ -119,13 +124,18 @@ ${methodologyKnowledge}
 **CRITICAL - TIME EXPIRATION PROTOCOL**:
 If \`Remaining Time\` <= 0 AND you haven't negotiated overtime yet:
    - STOP regular questions.
-   - **Say exactly this sentiment**: "The scheduled time is up. Thank you for your time ${rewardContext}. However, your answers about [mention specific interesting point] were truly insightful. To help us really improve [Product/Service], would you be open to answering a few more deep-dive questions? No pressure."
-   - **Leverage Pride**: Make them feel their specific feedback is uniquely valuable.
+   - **Translate the following sentiment into ${bot.language || 'the user\'s language'}**:
+     "The scheduled time is up. You have earned your reward (${bot.rewardConfig?.displayText || 'mystery reward'}). However, your answers about [mention specific interesting point] were truly insightful. To help us really improve ${bot.name}, would you be open to answering a few more deep-dive questions? No pressure."
+   - **Rules**:
+     - Replace [mention specific interesting point] with actual topic from chat.
+     - Replace ${bot.name} with the project name.
+     - Do NOT output internal notes like "(Note: User has earned...)". speak naturally.
 
 **IF user says YES to overtime**:
-   - Continue with Phase 2 (Deep Div) and ignore weight of time limits.
+   - Continue with Phase 2 (Deep Dive) and ignore weight of time limits.
 **IF user says NO to overtime**:
-   - Thank them warmly and conclude.
+   - Thank them warmly in ${bot.language}.
+   - **Crucial**: Provide the Reward Claim Link: [Claim Reward](${claimLink})
 
 ## Research Topics (Your Agenda)
 ${topicsList}
@@ -144,7 +154,7 @@ ${botKnowledge}
 3. **One Question Rule**: Ask ONE question at a time.
 4. **No Pedantry**: Do not be annoying.
 
-Remember: Your goal is broad coverage first (Phase 1), then depth (Phase 2).`.trim();
+**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye and provide the Reward Claim Link: ${claimLink} (if reward is active).`.trim();
 
         // Get API keys - use bot-specific first, then platform defaults
         let apiKey: string | undefined;

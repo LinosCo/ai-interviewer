@@ -7,7 +7,8 @@ export default function CopyLinkButton({ url }: { url: string }) {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(url);
+        const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+        navigator.clipboard.writeText(fullUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };

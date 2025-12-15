@@ -230,7 +230,7 @@ model KnowledgeSource {
   
   createdAt DateTime @default(now())
   
-  bot       Bot      @relation(fields: [botId], references: [id])
+  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 model TopicBlock {
@@ -241,6 +241,7 @@ model TopicBlock {
   description String?  @db.Text
   subGoals    String[] 
   maxTurns    Int      @default(5)
+  keywords    Json?    // [{ text: "word", value: 10 }]
   
   bot         Bot      @relation(fields: [botId], references: [id])
   

@@ -302,15 +302,18 @@ ${closingInstruction}`.trim();
 
             responseText = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
 
-            // Check for completion signal
-            if (responseText.includes("INTERVIEW_COMPLETED") || (bot.rewardConfig?.enabled && responseText.includes(claimLink))) {
-                await prisma.conversation.update({
-                    where: { id: conversationId },
-                    data: { status: 'COMPLETED', completedAt: new Date() }
-                });
-                // Clean up the output so user doesn't see the raw flag
-                responseText = responseText.replace(/INTERVIEW_COMPLETED/g, "").trim();
-            }
+            responseText = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
+        }
+
+        // Check for completion signal (Unified for ALL providers)
+        if (responseText.includes("INTERVIEW_COMPLETED") || (bot.rewardConfig?.enabled && responseText.includes(claimLink))) {
+            console.log("Completion signal detected. Marking conversation as COMPLETED.");
+            await prisma.conversation.update({
+                where: { id: conversationId },
+                data: { status: 'COMPLETED', completedAt: new Date() }
+            });
+            // Clean up the output so user doesn't see the raw flag
+            responseText = responseText.replace(/INTERVIEW_COMPLETED/g, "").trim();
         }
 
         // Save assistant response

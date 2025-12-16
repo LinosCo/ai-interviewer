@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Interviewer Platform",
-  description: "Conduct AI-powered user research interviews",
+  title: "voler.AI Interviewer Platform",
+  description: "Automated qualitative research interviews powered by AI",
 };
 
 export default function RootLayout({

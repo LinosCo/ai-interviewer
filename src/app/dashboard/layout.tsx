@@ -21,7 +21,7 @@ export default async function DashboardLayout({
     return (
         <div className="flex h-screen flex-col md:flex-row md:overflow-hidden">
             <div className="w-full flex-none md:w-64 bg-gray-900 text-white p-4">
-                <div className="mb-8 font-bold text-xl">AI Interviewer</div>
+                <div className="mb-8 font-bold text-xl">voler.AI Interviewer Platform</div>
                 <nav className="flex flex-col gap-2">
                     <Link href="/dashboard" className="p-2 hover:bg-gray-800 rounded">
                         Projects

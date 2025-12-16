@@ -30,7 +30,41 @@ interface InterviewChatProps {
     dataUsageInfo?: string | null;
     showAnonymityInfo?: boolean;
     showDataUsageInfo?: boolean;
+    language?: string;
 }
+
+const TRANSLATIONS: Record<string, any> = {
+    it: {
+        duration: 'Durata',
+        reward: 'Ricompensa',
+        start: 'Inizia Intervista',
+        privacy: 'Privacy Policy',
+        skip: 'Puoi saltare qualsiasi domanda',
+        typePlaceholder: 'Scrivi la tua risposta...',
+        pressEnter: 'Premi Invio per inviare • Shift+Invio per a capo',
+        question: 'Domanda',
+        loading: 'Caricamento domanda...',
+        aiNotice: 'Avviso AI: Stai interagendo con un sistema di intelligenza artificiale automatizzato.',
+        yourAnswer: 'La tua risposta:',
+        consent: 'Ho letto la Privacy Policy e acconsento al trattamento dei miei dati per finalità di ricerca.',
+        pleaseConsent: 'Devi acconsentire per continuare'
+    },
+    en: {
+        duration: 'Duration',
+        reward: 'Reward',
+        start: 'Start Interview',
+        privacy: 'Privacy Policy',
+        skip: 'You can skip any question',
+        typePlaceholder: 'Type your answer...',
+        pressEnter: 'Press Enter to send • Shift+Enter for new line',
+        question: 'Question',
+        loading: 'Loading question...',
+        aiNotice: 'AI Notice: You are interacting with an automated AI system.',
+        yourAnswer: 'Your answer:',
+        consent: 'I have read the Privacy Policy and consent to the processing of my data for research purposes.',
+        pleaseConsent: 'You must consent to continue'
+    }
+};
 
 export default function InterviewChat({
     conversationId,
@@ -47,7 +81,9 @@ export default function InterviewChat({
     dataUsageInfo,
     showAnonymityInfo = true,
     showDataUsageInfo = true,
+    language = 'en',
 }: InterviewChatProps) {
+    const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +92,7 @@ export default function InterviewChat({
     const [startTime, setStartTime] = useState<number | null>(null);
     const [hasStarted, setHasStarted] = useState(false);
     const [showLanding, setShowLanding] = useState(true);
+    const [consentGiven, setConsentGiven] = useState(false);
 
     // Effective Time Tracking
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
@@ -228,7 +265,7 @@ export default function InterviewChat({
                         {estimatedDuration && (
                             <div className="bg-blue-50 rounded-lg p-4 mb-6">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-blue-900">Duration</span>
+                                    <span className="text-sm font-medium text-blue-900">{t.duration}</span>
                                     <span className="text-sm text-blue-700">{estimatedDuration}</span>
                                 </div>
                             </div>
@@ -244,7 +281,7 @@ export default function InterviewChat({
                                         </svg>
                                     </div>
                                     <div className="flex-1">
-                                        <div className="text-sm font-semibold text-green-900 mb-1">Reward</div>
+                                        <div className="text-sm font-semibold text-green-900 mb-1">{t.reward}</div>
                                         <div className="text-sm text-green-700">{rewardConfig.displayText}</div>
                                     </div>
                                 </div>
@@ -274,18 +311,47 @@ export default function InterviewChat({
                             )}
                         </div>
 
+                        {/* AI Act Compliance Notice */}
+                        <div className="text-xs text-gray-500 flex items-start gap-2 mt-4 bg-gray-50 p-2 rounded border border-gray-100">
+                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            <span>{t.aiNotice}</span>
+                        </div>
+
+                        {/* GDPR Active Consent Checkbox */}
+                        <div className="mb-6 flex items-start gap-3">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="consent-checkbox"
+                                    type="checkbox"
+                                    checked={consentGiven}
+                                    onChange={(e) => setConsentGiven(e.target.checked)}
+                                    className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                                />
+                            </div>
+                            <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer">
+                                {t.consent}
+                            </label>
+                        </div>
+
                         <button
                             onClick={handleStart}
-                            className="w-full py-4 px-6 rounded-xl font-semibold text-white text-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg"
+                            disabled={!consentGiven}
+                            className={`w-full py-4 px-6 rounded-xl font-semibold text-white text-lg transition-all shadow-lg ${consentGiven
+                                    ? 'hover:scale-105 active:scale-95'
+                                    : 'opacity-50 cursor-not-allowed'
+                                }`}
                             style={{ backgroundColor: primaryColor || '#6366f1' }}
+                            title={!consentGiven ? t.pleaseConsent : ''}
                         >
                             Start Interview →
                         </button>
 
                         <div className="mt-6 text-center text-xs text-gray-500">
-                            <a href="/privacy" className="hover:underline">Privacy Policy</a>
+                            <a href="/privacy" className="hover:underline">{t.privacy}</a>
                             {' • '}
-                            <span>You can skip any question</span>
+                            <span>{t.skip}</span>
                         </div>
                     </div>
                 </motion.div>
@@ -397,7 +463,7 @@ export default function InterviewChat({
                                         animate={{ opacity: 1 }}
                                         className="mt-8 p-4 rounded-xl bg-white/50 border border-gray-200"
                                     >
-                                        <div className="text-xs text-gray-500 mb-2">Your answer:</div>
+                                        <div className="text-xs text-gray-500 mb-2">{t.yourAnswer}</div>
                                         <div className="text-gray-700">
                                             {messages[messages.length - 2].content}
                                         </div>
@@ -417,7 +483,7 @@ export default function InterviewChat({
                                     <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                                     <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                 </div>
-                                <p className="text-gray-500 text-sm">Loading question...</p>
+                                <p className="text-gray-500 text-sm">{t.loading}</p>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -441,7 +507,7 @@ export default function InterviewChat({
                             }}
                             onKeyDown={handleKeyDown}
                             disabled={isLoading}
-                            placeholder="Type your answer..."
+                            placeholder={t.typePlaceholder}
                             rows={1}
                             className="w-full resize-none rounded-2xl border-2 border-gray-300 px-6 py-4 pr-14 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-lg transition-all"
                             style={{
@@ -467,8 +533,8 @@ export default function InterviewChat({
                         </button>
                     </form>
                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                        <span>Press Enter to send • Shift+Enter for new line</span>
-                        <span>Question {totalQuestions}</span>
+                        <span>{t.pressEnter}</span>
+                        <span>{t.question} {totalQuestions}</span>
                     </div>
                 </div>
             </div>

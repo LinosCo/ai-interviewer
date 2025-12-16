@@ -43,6 +43,7 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             dataUsageInfo={bot.dataUsageInfo}
             showAnonymityInfo={bot.showAnonymityInfo}
             showDataUsageInfo={bot.showDataUsageInfo}
+            language={bot.language}
         />
     );
 }

@@ -19,8 +19,7 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  endedAt           DateTime?
-  effectiveDuration Int       @default(0) // Effective active time in seconds (typing + thinking + reading)
+
 
   accounts      Account[]
   sessions      Session[]
@@ -278,6 +277,7 @@ model Conversation {
   startedAt       DateTime @default(now())
   completedAt     DateTime?
   durationSeconds Int?
+  effectiveDuration Int       @default(0) // Effective active time in seconds (typing + thinking + reading)
   
   sentimentScore  Float?
   tags            String[]

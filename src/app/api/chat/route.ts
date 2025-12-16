@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         console.log('Request body:', JSON.stringify(body, null, 2));
-        const { messages, conversationId, botId } = body;
+        const { messages, conversationId, botId, effectiveDuration } = body;
 
         // Validate messages
         if (!messages || !Array.isArray(messages)) {

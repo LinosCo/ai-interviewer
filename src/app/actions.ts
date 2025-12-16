@@ -255,15 +255,28 @@ export async function generateBotConfigAction(prompt: string) {
         })).describe("3-5 main topics to cover")
     });
 
+    // Load methodology for context
+    const fs = require('fs');
+    const path = require('path');
+    let methodology = '';
+    try {
+        methodology = fs.readFileSync(path.join(process.cwd(), 'knowledge', 'interview-methodology.md'), 'utf-8');
+    } catch (e) { console.error("Failed to load methodology", e); }
+
     const result = await generateObject({
         model: openai('gpt-4o'),
         schema,
-        prompt: `You are an expert user researcher. Design an interview guide based on this concept: "${prompt}".
+        prompt: `You are an expert user researcher designing an interview guide.
         
-        Create a researched-backed structure with:
-        1. A clear research goal.
-        2. Defined target audience.
-        3. A logical flow of topics (Introduction -> Warm up -> Core Questions -> Wrap up).
+        Using the following INTERVIEW METHODOLOGY as your strict guide:
+        ${methodology.substring(0, 2000)}...
+
+        Design an interview guide based on this concept: "${prompt}".
+        
+        Create a structure that applies these principles:
+        1. **Conversational & Natural**: Avoid stiff, corporate, or academic language.
+        2. **Neutrality**: Questions must not differ judgement.
+        3. **Flow**: logical flow of topics (Introduction -> Warm up -> Core Questions -> Wrap up).
         `,
     });
 
@@ -594,15 +607,31 @@ export async function refineTextAction(currentText: string, fieldName: string, c
 
     const openai = createOpenAI({ apiKey });
 
+    // Load methodology for context
+    const fs = require('fs');
+    const path = require('path');
+    let methodology = '';
+    try {
+        methodology = fs.readFileSync(path.join(process.cwd(), 'knowledge', 'interview-methodology.md'), 'utf-8');
+    } catch (e) { console.error("Failed to load methodology", e); }
+
     const { object } = await generateObject({
         model: openai('gpt-4o'),
         schema: z.object({ text: z.string() }),
         prompt: `Refine the following text for the field "${fieldName}" in a user research bot configuration.
         Context: The bot is named or about: "${context}".
         
+        Refer to this INTERVIEW METHODOLOGY for tone and style:
+        ${methodology.substring(0, 1500)}...
+
         Current Text: "${currentText}"
         
-        Improve clarity, tone, and professionalism. Keep the meaning but make it better.
+        GOAL: Improve clarity and IMPACT, but ensure the tone is **NATURAL, CONVERSATIONAL, and AUTHENTIC**.
+        - AVOID: "Corporate speak", overly formal language, rigid academic phrasing.
+        - PREFER: Warm, engaging, spoken-like language. 
+        - If it's a Goal description, make it actionable.
+        - If it's a Topic label or specific question, make it sound like a human asking.
+
         IMPORTANT: If the Current Text is in Italian, the refined text MUST be in Italian.
         If the Current Text is in English, keep it in English. detect the language and stick to it.`,
     });

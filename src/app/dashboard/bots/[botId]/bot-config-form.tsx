@@ -194,15 +194,7 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                                         <optgroup label="Legacy">
                                             <option value="gpt-4-turbo">GPT-4 Turbo</option>
                                         </optgroup>
-                                    </>
-                                        <optgroup label="GPT-5">
-                                            <option value="gpt-5">GPT-5</option>
-                                        </optgroup>
-                                        <optgroup label="Legacy / Standard">
-                                            <option value="o1-preview">o1-preview</option>
-                                            <option value="gpt-4o">GPT-4o</option>
-                                            <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                        </optgroup>
+
                                     </>
                                 ) : (
                                     <>

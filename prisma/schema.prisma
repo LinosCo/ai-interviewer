@@ -19,6 +19,8 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  endedAt           DateTime?
+  effectiveDuration Int       @default(0) // Effective active time in seconds (typing + thinking + reading)
 
   accounts      Account[]
   sessions      Session[]

@@ -183,16 +183,18 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                             <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
                                 {provider === 'openai' ? (
                                     <>
-                                        <optgroup label="GPT-5.2 (Latest)">
-                                            <option value="gpt-5.2-pro">GPT-5.2 Pro (Flagship)</option>
-                                            <option value="gpt-5.2-thinking">GPT-5.2 Thinking (Reasoning)</option>
-                                            <option value="gpt-5.2-instant">GPT-5.2 Instant (Fast)</option>
+                                        <optgroup label="GPT-4o (Flagship)">
+                                            <option value="gpt-4o">GPT-4o (Best Overall)</option>
+                                            <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
                                         </optgroup>
-                                        <optgroup label="GPT-5.1">
-                                            <option value="gpt-5.1-pro">GPT-5.1 Pro</option>
-                                            <option value="gpt-5.1-thinking">GPT-5.1 Thinking</option>
-                                            <option value="gpt-5.1-codex-max">GPT-5.1 Codex Max (Coding)</option>
+                                        <optgroup label="Reasoning Models">
+                                            <option value="o1-preview">o1 Preview (Deep Reasoning)</option>
+                                            <option value="o1-mini">o1 Mini (Fast Reasoning)</option>
                                         </optgroup>
+                                        <optgroup label="Legacy">
+                                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                        </optgroup>
+                                    </>
                                         <optgroup label="GPT-5">
                                             <option value="gpt-5">GPT-5</option>
                                         </optgroup>
@@ -204,19 +206,13 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                                     </>
                                 ) : (
                                     <>
-                                        <optgroup label="Claude 4.5 (Latest)">
-                                            <option value="claude-opus-4.5">Claude 4.5 Opus (Flagship)</option>
-                                            <option value="claude-sonnet-4.5">Claude 4.5 Sonnet</option>
-                                            <option value="claude-haiku-4.5">Claude 4.5 Haiku (Fast)</option>
+                                        <optgroup label="Claude 4.5 (New)">
+                                            <option value="claude-sonnet-4-5-20250929">Claude 4.5 Sonnet (2025-09-29)</option>
                                         </optgroup>
-                                        <optgroup label="Claude 4">
-                                            <option value="claude-opus-4-1">Claude 4.1 Opus</option>
-                                            <option value="claude-sonnet-4">Claude 4 Sonnet</option>
-                                        </optgroup>
-                                        <optgroup label="Claude 3.5 / Legacy">
-                                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
-                                            <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
-                                            <option value="claude-3-opus-latest">Claude 3 Opus</option>
+                                        <optgroup label="Claude 3.5 (Stable)">
+                                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Latest)</option>
+                                            <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (Fast)</option>
+                                            <option value="claude-3-opus-latest">Claude 3 Opus (Legacy)</option>
                                         </optgroup>
                                     </>
                                 )}

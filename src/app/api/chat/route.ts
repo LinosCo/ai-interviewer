@@ -18,13 +18,25 @@ export async function POST(req: Request) {
             );
         }
 
-        // Verify conversation
+        // Validate conversation ownership/existence
         const conversation = await prisma.conversation.findUnique({
             where: { id: conversationId },
-            include: { messages: true }
+            include: { bot: true }
         });
 
-        if (!conversation || conversation.botId !== botId) {
+        if (!conversation) {
+            return new Response(JSON.stringify({ error: 'Conversation not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        // Update effective duration if provided (cumulative from frontend)
+        if (effectiveDuration !== undefined) {
+            await prisma.conversation.update({
+                where: { id: conversationId },
+                data: { effectiveDuration: Number(effectiveDuration) }
+            });
+        }
+
+        if (conversation.botId !== botId) {
             console.error('Unauthorized: conversation not found or botId mismatch');
             return new Response("Unauthorized", { status: 401 });
         }
@@ -86,8 +98,13 @@ export async function POST(req: Request) {
             : '';
 
         // Calculate time context
-        const startTime = new Date(conversation.startedAt).getTime();
-        const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
+        // Calculate time context (Use Effective Time if available, fallback to Wall Clock)
+        // effectiveDuration is in seconds.
+        const effectiveMinutes = effectiveDuration !== undefined
+            ? Math.floor(effectiveDuration / 60)
+            : Math.floor((Date.now() - new Date(conversation.startedAt).getTime()) / 60000);
+
+        const elapsedMinutes = effectiveMinutes;
         const maxDuration = bot.maxDurationMins || 15;
         const remainingMinutes = maxDuration - elapsedMinutes;
 

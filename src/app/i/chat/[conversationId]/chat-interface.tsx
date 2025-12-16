@@ -12,6 +12,9 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
     const [messages, setMessages] = useState<Message[]>(initialMessages || []);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [effectiveSeconds, setEffectiveSeconds] = useState(0);
+    const [isTyping, setIsTyping] = useState(false);
+    const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -29,6 +32,17 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
         }
     }, []);
 
+    // Effective Time Timer
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isTyping || isLoading) {
+            interval = setInterval(() => {
+                setEffectiveSeconds(prev => prev + 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isTyping, isLoading]);
+
     const handleSendMessage = async (messageContent: string) => {
         if (!messageContent.trim() || isLoading) return;
 
@@ -40,6 +54,13 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
         setMessages(prev => [...prev, userMessage]);
         setInput('');
+        // Thinking Time Start (implicitly tracked by isLoading if we had an interval, 
+        // but for simplicity we can track diff or just let isTyping handle user side.
+        // Wait, thinking time IS "user waiting time" which counts as engagement? 
+        // Usually engagement is USER action. 
+        // User said: "misurato in base al tempo di risposta del chatbot" -> so YES, thinking time counts.
+
+        // Let's add interval for Thinking Time
         setIsLoading(true);
 
         try {
@@ -49,7 +70,8 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                 body: JSON.stringify({
                     messages: [...messages, userMessage],
                     conversationId,
-                    botId
+                    botId,
+                    effectiveDuration: Math.floor(effectiveSeconds)
                 })
             });
 
@@ -59,6 +81,11 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
             // Read plain text response
             const assistantText = await response.text();
+
+            // Calculate Reading Time: ~225 words per minute
+            const wordCount = assistantText.split(/\s+/).length;
+            const readingTimeSeconds = Math.ceil((wordCount / 225) * 60);
+            setEffectiveSeconds(prev => prev + readingTimeSeconds);
 
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
@@ -128,7 +155,15 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                         <input
                             type="text"
                             value={input}
-                            onChange={(e) => setInput(e.target.value)}
+                            onChange={(e) => {
+                                setInput(e.target.value);
+                                if (!isTyping) {
+                                    setIsTyping(true);
+                                }
+                                // Reset typing cooldown
+                                if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+                                typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000); // 2s cooldown
+                            }}
                             disabled={isLoading}
                             placeholder="Type your answer..."
                             className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"

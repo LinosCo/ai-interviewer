@@ -126,6 +126,31 @@ export async function POST(req: Request) {
             ? `**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye, provide the Reward Claim Link: ${claimLink}, and append "INTERVIEW_COMPLETED" to signify the end.`
             : `**Closing Instruction**: When the interview ends (for any reason), ALWAYS say goodbye, DO NOT mention the reward claim link, and append "INTERVIEW_COMPLETED" to signify the end.`;
 
+        const timeExpirationProtocol = `
+**CRITICAL - TIME EXPIRATION PROTOCOL**:
+If \`Remaining Time\` <= 0 AND you haven't negotiated overtime yet:
+   - STOP regular questions.
+   - **First**: Briefly acknowledge/validate the user's last response to close the topic naturally.
+   - **Then, Output EXACTLY this structure (translated to ${bot.language || 'the user\'s language'})**:
+     1. [Transition]: "However, I see that the time available to us is up. Thank you for your availability."
+     ${bot.rewardConfig?.enabled ? `2. "You can obtain your reward by clicking here: [Claim Reward](${claimLink})"` : ''}
+     ${bot.rewardConfig?.enabled ? '3' : '2'}. "Your answers about [mention specific interesting point from their last few messages] were very interesting."
+     ${bot.rewardConfig?.enabled ? '4' : '3'}. "If you are available, I would likely to deepen these topics to improve our products and services. Shall we continue for a few more minutes?"
+
+**IF user says YES to overtime**:
+   - Acknowledge their kindness.
+   - **Explicitly state (in ${bot.language || 'user language'})**: "Perfect. Since you've already earned the reward, feel free to stop this conversation whenever you want."
+   - Continue with Phase 2 (Deep Dive) and ignore time limits.
+   - Focus on the topics you mentioned as interesting.
+
+**IF user says NO to overtime**:
+   - Thank them warmly.
+   - Say "INTERVIEW_COMPLETED" at the very end.
+
+**IF user has NOT answered the overtime question yet**:
+   - Do NOT say "INTERVIEW_COMPLETED" yet. Wait for their Yes/No.
+`;
+
         const systemPrompt = `You are an expert qualitative researcher conducting an interview.
         
 ## Interview Methodology & Strategy
@@ -144,47 +169,26 @@ ${rewardContext}
    - If time is tight (< 5 mins remaining): No follow-ups, move to next topic.
 2. **Phase 2 (Deep Dive)**: If all topics covered and time remains, revisit interesting answers.
 
-**CRITICAL - TIME EXPIRATION PROTOCOL**:
-If \`Remaining Time\` <= 0 AND you haven't negotiated overtime yet:
-   - STOP regular questions.
-   - **First**: Briefly acknowledge/validate the user's last response to close the topic naturally.
-   - **Then, Output EXACTLY this structure (translated to ${bot.language || 'the user\'s language'})**:
-     1. [Transition]: "However, I see that the time available to us is up. Thank you for your availability."
-     2. "You can obtain your reward by clicking here: [Claim Reward](${claimLink})" (ONLY if reward is active).
-     3. "Your answers about [mention specific interesting point from their last few messages] were very interesting."
-     4. "If you are available, I would likely to deepen these topics to improve our products and services. Shall we continue for a few more minutes?"
+${timeExpirationProtocol}
 
-**IF user says YES to overtime**:
-   - Acknowledge their kindness.
-   - **Explicitly state (in ${bot.language || 'user language'})**: "Perfect. Since you've already earned the reward, feel free to stop this conversation whenever you want."
-   - Continue with Phase 2 (Deep Dive) and ignore time limits.
-   - Focus on the topics you mentioned as interesting.
-
-**IF user says NO to overtime**:
-   - Thank them warmly.
-   - Say "INTERVIEW_COMPLETED" at the very end.
-
-**IF user has NOT answered the overtime question yet**:
-   - Do NOT say "INTERVIEW_COMPLETED" yet. Wait for their Yes/No.
-
-## Research Topics (Your Agenda)
+## Research Topics(Your Agenda)
 ${topicsList}
 
 ## Your Mission
-Goal: ${bot.researchGoal}
-Audience: ${bot.targetAudience}
-Tone: ${bot.tone || 'Friendly and professional'}
-Language: ${bot.language}
+        Goal: ${bot.researchGoal}
+        Audience: ${bot.targetAudience}
+        Tone: ${bot.tone || 'Friendly and professional'}
+        Language: ${bot.language}
 
 ${botKnowledge}
 
 ## Instructions
-1. **Check History**: Have you already asked for overtime? If user said Yes, keep going.
-2. **Determine Phase**: Phase 1 (Coverage) -> Phase 2 (Depth).
-3. **One Question Rule**: Ask ONE question at a time.
-4. **No Pedantry**: Do not be annoying.
+        1. ** Check History **: Have you already asked for overtime ? If user said Yes, keep going.
+2. ** Determine Phase **: Phase 1(Coverage) -> Phase 2(Depth).
+3. ** One Question Rule **: Ask ONE question at a time.
+4. ** No Pedantry **: Do not be annoying.
 
-${closingInstruction}`.trim();
+            ${closingInstruction} `.trim();
 
         // Get API keys - Hierarchy: Bot Specific -> Global Config (DB) -> Env Var
         let apiKey: string | undefined;
@@ -204,7 +208,7 @@ ${closingInstruction}`.trim();
         }
 
         if (!apiKey) {
-            const errorMsg = `No API key configured for ${bot.modelProvider}. Please add your ${bot.modelProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key in the dashboard settings (Settings → API Keys).`;
+            const errorMsg = `No API key configured for ${bot.modelProvider}.Please add your ${bot.modelProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key in the dashboard settings(Settings → API Keys).`;
             console.error(errorMsg);
             return new Response(
                 errorMsg,
@@ -212,7 +216,7 @@ ${closingInstruction}`.trim();
             );
         }
 
-        console.log(`Using ${bot.modelProvider} API key from ${bot.anthropicApiKey || bot.openaiApiKey ? 'bot settings' : 'platform defaults'}`);
+        console.log(`Using ${bot.modelProvider} API key from ${bot.anthropicApiKey || bot.openaiApiKey ? 'bot settings' : 'platform defaults'} `);
 
         let responseText = '';
 
@@ -264,7 +268,7 @@ ${closingInstruction}`.trim();
             console.log('Anthropic response:', JSON.stringify(data, null, 2));
 
             if (data.error) {
-                throw new Error(`Anthropic API error: ${JSON.stringify(data.error)}`);
+                throw new Error(`Anthropic API error: ${JSON.stringify(data.error)} `);
             }
 
             responseText = data.content?.[0]?.text || 'Sorry, I could not generate a response.';
@@ -279,7 +283,7 @@ ${closingInstruction}`.trim();
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': `Bearer ${apiKey} `
                 },
                 body: JSON.stringify({
                     model: bot.modelName || 'gpt-4o',
@@ -297,7 +301,7 @@ ${closingInstruction}`.trim();
             console.log('OpenAI response:', data);
 
             if (data.error) {
-                throw new Error(`OpenAI API error: ${data.error.message}`);
+                throw new Error(`OpenAI API error: ${data.error.message} `);
             }
 
             responseText = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';

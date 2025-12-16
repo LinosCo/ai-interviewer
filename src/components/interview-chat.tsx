@@ -46,7 +46,9 @@ const TRANSLATIONS: Record<string, any> = {
         loading: 'Caricamento domanda...',
         aiNotice: 'Avviso AI: Stai interagendo con un sistema di intelligenza artificiale automatizzato.',
         yourAnswer: 'La tua risposta:',
-        consent: 'Ho letto la Privacy Policy e acconsento al trattamento dei miei dati per finalità di ricerca.',
+        consentPrefix: 'Ho letto la ',
+        consentLinkText: 'Privacy Policy',
+        consentSuffix: ' e acconsento al trattamento dei miei dati per finalità di ricerca.',
         pleaseConsent: 'Devi acconsentire per continuare'
     },
     en: {
@@ -61,7 +63,9 @@ const TRANSLATIONS: Record<string, any> = {
         loading: 'Loading question...',
         aiNotice: 'AI Notice: You are interacting with an automated AI system.',
         yourAnswer: 'Your answer:',
-        consent: 'I have read the Privacy Policy and consent to the processing of my data for research purposes.',
+        consentPrefix: 'I have read the ',
+        consentLinkText: 'Privacy Policy',
+        consentSuffix: ' and consent to the processing of my data for research purposes.',
         pleaseConsent: 'You must consent to continue'
     }
 };
@@ -331,7 +335,17 @@ export default function InterviewChat({
                                 />
                             </div>
                             <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer">
-                                {t.consent}
+                                {t.consentPrefix}
+                                <a
+                                    href={`/privacy?lang=${language === 'it' ? 'it' : 'en'}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {t.consentLinkText}
+                                </a>
+                                {t.consentSuffix}
                             </label>
                         </div>
 
@@ -339,8 +353,8 @@ export default function InterviewChat({
                             onClick={handleStart}
                             disabled={!consentGiven}
                             className={`w-full py-4 px-6 rounded-xl font-semibold text-white text-lg transition-all shadow-lg ${consentGiven
-                                    ? 'hover:scale-105 active:scale-95'
-                                    : 'opacity-50 cursor-not-allowed'
+                                ? 'hover:scale-105 active:scale-95'
+                                : 'opacity-50 cursor-not-allowed'
                                 }`}
                             style={{ backgroundColor: primaryColor || '#6366f1' }}
                             title={!consentGiven ? t.pleaseConsent : ''}
@@ -416,9 +430,18 @@ export default function InterviewChat({
                                     <ReactMarkdown
                                         components={{
                                             p: ({ children }) => {
-                                                // Calculate text size based on content length
-                                                const textContent = String(children);
-                                                const length = textContent.length;
+                                                // Helper to extract text length recursively
+                                                const getTextLength = (node: React.ReactNode): number => {
+                                                    if (typeof node === 'string') return node.length;
+                                                    if (typeof node === 'number') return String(node).length;
+                                                    if (Array.isArray(node)) return node.reduce((acc, child) => acc + getTextLength(child), 0);
+                                                    if (node && typeof node === 'object' && 'props' in node && (node as any).props?.children) {
+                                                        return getTextLength((node as any).props.children);
+                                                    }
+                                                    return 0;
+                                                };
+
+                                                const length = getTextLength(children);
                                                 let textSizeClass = 'text-2xl md:text-3xl'; // Default
 
                                                 if (length > 300) {

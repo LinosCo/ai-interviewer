@@ -183,23 +183,44 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                             <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
                                 {provider === 'openai' ? (
                                     <>
-                                        <option value="gpt-5.2">GPT-5.2 (Future/Preview)</option>
-                                        <option value="o1-preview">o1-preview (Reasoning)</option>
-                                        <option value="o1-mini">o1-mini (Fast Reasoning)</option>
-                                        <option value="gpt-4o">GPT-4o (Recommended)</option>
-                                        <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                        <optgroup label="GPT-5.2 (Latest)">
+                                            <option value="gpt-5.2-pro">GPT-5.2 Pro (Flagship)</option>
+                                            <option value="gpt-5.2-thinking">GPT-5.2 Thinking (Reasoning)</option>
+                                            <option value="gpt-5.2-instant">GPT-5.2 Instant (Fast)</option>
+                                        </optgroup>
+                                        <optgroup label="GPT-5.1">
+                                            <option value="gpt-5.1-pro">GPT-5.1 Pro</option>
+                                            <option value="gpt-5.1-thinking">GPT-5.1 Thinking</option>
+                                            <option value="gpt-5.1-codex-max">GPT-5.1 Codex Max (Coding)</option>
+                                        </optgroup>
+                                        <optgroup label="GPT-5">
+                                            <option value="gpt-5">GPT-5</option>
+                                        </optgroup>
+                                        <optgroup label="Legacy / Standard">
+                                            <option value="o1-preview">o1-preview</option>
+                                            <option value="gpt-4o">GPT-4o</option>
+                                            <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                        </optgroup>
                                     </>
                                 ) : (
                                     <>
-                                        <>
-                                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (New)</option>
+                                        <optgroup label="Claude 4.5 (Latest)">
+                                            <option value="claude-opus-4.5">Claude 4.5 Opus (Flagship)</option>
+                                            <option value="claude-sonnet-4.5">Claude 4.5 Sonnet</option>
+                                            <option value="claude-haiku-4.5">Claude 4.5 Haiku (Fast)</option>
+                                        </optgroup>
+                                        <optgroup label="Claude 4">
+                                            <option value="claude-opus-4-1">Claude 4.1 Opus</option>
+                                            <option value="claude-sonnet-4">Claude 4 Sonnet</option>
+                                        </optgroup>
+                                        <optgroup label="Claude 3.5 / Legacy">
+                                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet</option>
                                             <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku</option>
                                             <option value="claude-3-opus-latest">Claude 3 Opus</option>
-                                        </>
+                                        </optgroup>
+                                    </>
                                 )}
-                                    </select>
+                            </select>
                         </div>
                     </div>
                     <div>

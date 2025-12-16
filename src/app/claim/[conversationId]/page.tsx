@@ -78,25 +78,41 @@ export default function ClaimRewardPage({ params }: { params: Promise<{ conversa
         );
     }
 
+    const branding = rewardData.branding || {
+        primaryColor: '#4f46e5', // Indigo-600
+        backgroundColor: '#ffffff',
+        textColor: '#1f2937'
+    };
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div
+            className="min-h-screen flex items-center justify-center p-4"
+            style={{ backgroundColor: branding.backgroundColor === '#ffffff' ? '#f3f4f6' : branding.backgroundColor }}
+        >
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
             >
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-8 text-white text-center">
-                    <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                        <Gift size={32} className="text-white" />
+                <div
+                    className="p-8 text-white text-center"
+                    style={{ backgroundColor: branding.primaryColor, color: '#ffffff' }}
+                >
+                    <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm overflow-hidden">
+                        {branding.logoUrl ? (
+                            <img src={branding.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                        ) : (
+                            <Gift size={32} className="text-white" />
+                        )}
                     </div>
                     <h1 className="text-2xl font-bold mb-2">Claim Your Reward</h1>
-                    <p className="text-indigo-100">Thank you for participating in the interview with {rewardData.botName}!</p>
+                    <p className="opacity-90">Thank you for participating in the interview with {rewardData.botName}!</p>
                 </div>
 
                 <div className="p-8">
                     {claimedCode ? (
                         <div className="text-center space-y-6">
-                            <div className="flex flex-col items-center justify-center text-green-600 mb-4">
+                            <div className="flex flex-col items-center justify-center mb-4" style={{ color: branding.primaryColor }}>
                                 <CheckCircle size={48} className="mb-2" />
                                 <span className="font-semibold text-lg">Reward Unlocked!</span>
                             </div>
@@ -121,7 +137,8 @@ export default function ClaimRewardPage({ params }: { params: Promise<{ conversa
                                     href={claimedCode}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="block w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition flex items-center justify-center gap-2"
+                                    className="block w-full text-white py-3 rounded-lg font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+                                    style={{ backgroundColor: branding.primaryColor }}
                                 >
                                     Go to Reward <ArrowRight size={18} />
                                 </a>
@@ -144,7 +161,8 @@ export default function ClaimRewardPage({ params }: { params: Promise<{ conversa
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2"
+                                    style={{ '--tw-ring-color': branding.primaryColor } as any}
                                     placeholder="Your Name"
                                 />
                             </div>
@@ -155,7 +173,8 @@ export default function ClaimRewardPage({ params }: { params: Promise<{ conversa
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    className="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2"
+                                    style={{ '--tw-ring-color': branding.primaryColor } as any}
                                     placeholder="you@example.com"
                                     required
                                 />
@@ -165,7 +184,8 @@ export default function ClaimRewardPage({ params }: { params: Promise<{ conversa
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:opacity-70 flex items-center justify-center"
+                                className="w-full text-white py-3 rounded-lg font-semibold hover:opacity-90 transition disabled:opacity-70 flex items-center justify-center"
+                                style={{ backgroundColor: branding.primaryColor }}
                             >
                                 {isSubmitting ? 'Unlocking...' : 'Unlock Reward'}
                             </button>

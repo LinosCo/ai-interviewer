@@ -128,21 +128,27 @@ ${rewardContext}
 2. **Phase 2 (Deep Dive)**: If all topics covered and time remains, revisit interesting answers.
 
 **CRITICAL - TIME EXPIRATION PROTOCOL**:
-If \`Remaining Time\` <= 1 AND you haven't negotiated overtime yet:
+If \`Remaining Time\` <= 0 AND you haven't negotiated overtime yet:
    - STOP regular questions.
-   - **Translate the following sentiment into ${bot.language || 'the user\'s language'}**:
-     "The scheduled time is up. You have earned your reward (${bot.rewardConfig?.displayText || 'mystery reward'}). However, your answers about [mention specific interesting point] were truly insightful. To help us really improve ${bot.name}, would you be open to answering a few more deep-dive questions? No pressure."
-   - **Rules**:
-     - Replace [mention specific interesting point] with actual topic from chat.
-     - Replace ${bot.name} with the project name.
-     - Do NOT output internal notes. speak naturally.
+   - **First**: Briefly acknowledge/validate the user's last response to close the topic naturally.
+   - **Then, Output EXACTLY this structure (translated to ${bot.language || 'the user\'s language'})**:
+     1. [Transition]: "However, I see that the time available to us is up. Thank you for your availability."
+     2. "You can obtain your reward by clicking here: [Claim Reward](${claimLink})" (ONLY if reward is active).
+     3. "Your answers about [mention specific interesting point from their last few messages] were very interesting."
+     4. "If you are available, I would likely to deepen these topics to improve our products and services. Shall we continue for a few more minutes?"
 
 **IF user says YES to overtime**:
-   - Continue with Phase 2 (Deep Dive) and ignore weight of time limits.
-**IF user says NO to overtime OR if you have finished all topics**:
-   - Thank them warmly in ${bot.language}.
-   - **Crucial**: Provide the Reward Claim Link: [Claim Reward](${claimLink})
+   - Acknowledge their kindness.
+   - **Explicitly state (in ${bot.language || 'user language'})**: "Perfect. Since you've already earned the reward, feel free to stop this conversation whenever you want."
+   - Continue with Phase 2 (Deep Dive) and ignore time limits.
+   - Focus on the topics you mentioned as interesting.
+
+**IF user says NO to overtime**:
+   - Thank them warmly.
    - Say "INTERVIEW_COMPLETED" at the very end.
+
+**IF user has NOT answered the overtime question yet**:
+   - Do NOT say "INTERVIEW_COMPLETED" yet. Wait for their Yes/No.
 
 ## Research Topics (Your Agenda)
 ${topicsList}

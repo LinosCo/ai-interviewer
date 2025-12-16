@@ -79,6 +79,12 @@ export async function getRewardDetails(conversationId: string) {
         rewardText: conversation.bot.rewardConfig.displayText,
         rewardType: conversation.bot.rewardConfig.type,
         isClaimed: !!conversation.rewardGrant,
-        claimedCode: conversation.rewardGrant?.code
+        claimedCode: conversation.rewardGrant?.code,
+        branding: {
+            logoUrl: conversation.bot.logoUrl,
+            primaryColor: conversation.bot.primaryColor,
+            backgroundColor: conversation.bot.backgroundColor,
+            textColor: conversation.bot.textColor
+        }
     };
 }

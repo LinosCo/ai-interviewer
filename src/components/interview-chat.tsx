@@ -57,7 +57,21 @@ export default function InterviewChat({
     const [hasStarted, setHasStarted] = useState(false);
     const [showLanding, setShowLanding] = useState(true);
 
-    // Start interview when user clicks button
+    // Effective Time Tracking
+    const [effectiveSeconds, setEffectiveSeconds] = useState(0);
+    const [isTyping, setIsTyping] = useState(false);
+    const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Active Timer
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if ((isTyping || isLoading) && hasStarted) {
+            interval = setInterval(() => {
+                setEffectiveSeconds(prev => prev + 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isTyping, isLoading, hasStarted]);
     const handleStart = async () => {
         setShowLanding(false);
         setHasStarted(true);
@@ -95,7 +109,8 @@ export default function InterviewChat({
                 body: JSON.stringify({
                     messages: isInitial ? [] : [...messages, userMessage],
                     conversationId,
-                    botId
+                    botId,
+                    effectiveDuration: Math.floor(effectiveSeconds)
                 })
             });
 
@@ -105,6 +120,11 @@ export default function InterviewChat({
             }
 
             const assistantText = await response.text();
+
+            // Calculate Reading Time: ~225 words per minute
+            const wordCount = assistantText.split(/\s+/).length;
+            const readingTimeSeconds = Math.ceil((wordCount / 225) * 60);
+            setEffectiveSeconds(prev => prev + readingTimeSeconds);
 
             const assistantMessage: Message = {
                 id: Date.now().toString(),
@@ -126,6 +146,30 @@ export default function InterviewChat({
         }
     };
 
+    // Check for completion token whenever messages change
+    useEffect(() => {
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage?.role === 'assistant' && lastMessage.content.includes('INTERVIEW_COMPLETED')) {
+            // Strip the token for display
+            const cleanContent = lastMessage.content.replace('INTERVIEW_COMPLETED', '').trim();
+
+            setMessages(prev => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                    ...lastMessage,
+                    content: cleanContent
+                };
+                return newMessages;
+            });
+
+            // Redirect to claim page or show completion UI
+            // For now, we rely on the link in the message, but we could auto-redirect
+            if (cleanContent === '') {
+                // If the message was ONLY the token, maybe show a generic "Interview Completed" or redirect immediately
+            }
+        }
+    }, [messages]);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         handleSendMessage(input);
@@ -142,7 +186,8 @@ export default function InterviewChat({
     const assistantMessages = messages.filter(m => m.role === 'assistant');
     const currentQuestion = assistantMessages[assistantMessages.length - 1];
     const totalQuestions = assistantMessages.length;
-    const elapsedMinutes = startTime ? Math.floor((Date.now() - startTime) / 60000) : 0;
+    // Use effective time for display
+    const elapsedMinutes = Math.floor(effectiveSeconds / 60);
 
     // Calculate progress (rough estimate based on estimated duration)
     const estimatedMinutes = parseInt(estimatedDuration?.replace(/\D/g, '') || '10');
@@ -386,7 +431,14 @@ export default function InterviewChat({
                         <textarea
                             ref={inputRef}
                             value={input}
-                            onChange={(e) => setInput(e.target.value)}
+                            onChange={(e) => {
+                                setInput(e.target.value);
+                                if (!isTyping) {
+                                    setIsTyping(true);
+                                }
+                                if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+                                typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
+                            }}
                             onKeyDown={handleKeyDown}
                             disabled={isLoading}
                             placeholder="Type your answer..."

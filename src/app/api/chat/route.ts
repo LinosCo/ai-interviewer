@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { generateText, tool, CoreMessage, jsonSchema } from 'ai';
+import { generateText, CoreMessage } from 'ai';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { generateConversationInsightAction } from '@/app/actions';
 import { recordInterviewCompleted } from '@/lib/usage';
@@ -9,7 +9,7 @@ import { recordInterviewCompleted } from '@/lib/usage';
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-    console.log('=== Chat API POST (Refactored) ===');
+    console.log('=== Chat API POST (No-Tools Version) ===');
     try {
         const body = await req.json();
         const { messages, conversationId, botId, effectiveDuration } = body;
@@ -50,9 +50,6 @@ export async function POST(req: Request) {
         // 2. Save User Message (if new)
         const lastMessage = messages[messages.length - 1];
         if (lastMessage && lastMessage.role === 'user') {
-            // Check if already saved (idempotency check ideal, but simple check for now)
-            // Actually, frontend sends optimistic updates. We should save only if not exists or blindly save?
-            // Existing logic saved it. Let's stick to it.
             await prisma.message.create({
                 data: {
                     conversationId,
@@ -80,9 +77,7 @@ export async function POST(req: Request) {
             model = openai(bot.modelName || 'gpt-4o');
         }
 
-        // 4. Build System Prompt via Service
-        // Load Methodology
-        // Optimization: Cache methodology in memory or DB? For now, read file (fast enough).
+        // 4. Build System Prompt
         const fs = require('fs');
         const path = require('path');
         let methodology = '';
@@ -91,14 +86,17 @@ export async function POST(req: Request) {
         } catch (e) { console.warn("Methodology missing", e); }
 
         // Determine Current Topic
-        let currentTopic = bot.topics.find(t => t.id === conversation.currentTopicId) || bot.topics[0];
+        let currentTopic = bot.topics.find((t: any) => t.id === conversation.currentTopicId) || bot.topics[0];
+        const currentTopicIndex = bot.topics.findIndex((t: any) => t.id === currentTopic?.id);
+        const nextTopic = bot.topics[currentTopicIndex + 1];
 
         // Calculate Time
         const currentEffectiveDuration = effectiveDuration !== undefined
             ? Number(effectiveDuration)
             : Math.floor((Date.now() - new Date(conversation.startedAt).getTime()) / 1000);
 
-        const systemPrompt = PromptBuilder.build(
+        // Build base system prompt
+        let systemPrompt = PromptBuilder.build(
             bot,
             conversation,
             currentTopic || null,
@@ -106,15 +104,29 @@ export async function POST(req: Request) {
             currentEffectiveDuration
         );
 
-        console.log("System Prompt Generated (Snapshot):", systemPrompt.substring(0, 200));
+        // Add transition instructions to the system prompt
+        systemPrompt += `
 
-        // 4.5 Topic Manager Evaluation (Adaptive Probing)
-        // Only run if we are in a topic (not closing) and using OpenAI (until we support Anthropic schema in TopicManager widely)
+## TRANSITION CONTROL
+When you determine that the current topic has been sufficiently covered, include this EXACT marker at the END of your response (after your message to the user):
+[TRANSITION_TO_NEXT_TOPIC]
+
+When the interview is complete (all topics covered OR time is up), include this EXACT marker at the END of your response:
+[CONCLUDE_INTERVIEW]
+
+IMPORTANT: 
+- Only include ONE marker per response, and only when appropriate
+- The marker must be on its own line at the very end
+- Do NOT include these markers in your conversational text - they are control signals only
+- Continue the conversation naturally before adding any marker
+`;
+
+        console.log("System Prompt Generated (Snapshot):", systemPrompt.substring(0, 300));
+
+        // 4.5 Topic Manager Evaluation (Adaptive Probing) - Only for OpenAI
         let topicInstruction = null;
         if (currentTopic && bot.modelProvider === 'openai' && messages.length > 2) {
             try {
-                // Determine if we should evaluate. Evaluate every turn? Or every other? 
-                // Every turn is safest for "Smart Flow".
                 const { TopicManager } = require('@/lib/llm/topic-manager');
                 const evaluation = await TopicManager.evaluateTopicProgress(
                     messages,
@@ -128,12 +140,15 @@ export async function POST(req: Request) {
                 if (evaluation.status === 'TRANSITION') {
                     topicInstruction = {
                         role: 'system',
-                        content: `[SUPERVISOR INTERVENTION]: The user has SUFFICIENTLY COVERED the current topic ("${currentTopic.label}"). \nINSTRUCTION: Do NOT ask more questions about this topic. \nACTION: Use the 'transitionToNextTopic' tool immediately.`
+                        content: `[SUPERVISOR INTERVENTION]: The user has SUFFICIENTLY COVERED the current topic ("${currentTopic.label}"). 
+INSTRUCTION: Do NOT ask more questions about this topic. 
+ACTION: Provide a brief acknowledgment and add [TRANSITION_TO_NEXT_TOPIC] at the end of your response.`
                     };
                 } else if (evaluation.missingPoints && evaluation.missingPoints.length > 0) {
                     topicInstruction = {
                         role: 'system',
-                        content: `[SUPERVISOR INTERVENTION]: The user has NOT yet covered the following sub-goals: ${evaluation.missingPoints.join(', ')}. \nINSTRUCTION: Ask a specific question to cover these missing points.`
+                        content: `[SUPERVISOR INTERVENTION]: The user has NOT yet covered the following sub-goals: ${evaluation.missingPoints.join(', ')}. 
+INSTRUCTION: Ask a specific question to cover these missing points.`
                     };
                 }
             } catch (err) {
@@ -142,7 +157,6 @@ export async function POST(req: Request) {
         }
 
         // 4.6 Engagement Monitor (Quality Gate)
-        // Check for 3 consecutive short answers
         const userMessages = messages.filter((m: any) => m.role === 'user');
         const last3UserMessages = userMessages.slice(-3);
         if (last3UserMessages.length === 3) {
@@ -150,21 +164,20 @@ export async function POST(req: Request) {
             if (isDisengaged) {
                 const encouragement = {
                     role: 'system',
-                    content: `[SUPERVISOR INTERVENTION]: The user seems disengaged (consistently short answers). \nINSTRUCTION: Adopt a more encouraging tone or ask a stimulating question to motivate them to elaborate.`
+                    content: `[SUPERVISOR INTERVENTION]: The user seems disengaged (consistently short answers). 
+INSTRUCTION: Adopt a more encouraging tone or ask a stimulating question to motivate them to elaborate.`
                 };
                 if (!topicInstruction) {
-                    topicInstruction = encouragement; // Use encouragement if no topic instruction
+                    topicInstruction = encouragement;
                 } else {
-                    // Combine them if both exist
                     topicInstruction.content += `\n\nALSO: ${encouragement.content}`;
                 }
             }
         }
 
-        // 5. Generate Response with Tools
+        // 5. Generate Response (NO TOOLS)
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }) as CoreMessage);
 
-        // Fix: Vercel AI SDK throws if messages is empty. Inject start signal.
         if (messagesForAI.length === 0) {
             messagesForAI.push({ role: 'user', content: "I am ready to start." });
         }
@@ -177,83 +190,64 @@ export async function POST(req: Request) {
             model,
             system: systemPrompt,
             messages: messagesForAI,
-            maxSteps: 5,
-            tools: {
-                transitionToNextTopic: tool({
-                    description: 'Move to the next topic when the current one is sufficiently covered.',
-                    parameters: jsonSchema({
-                        type: 'object',
-                        properties: {
-                            reason: { type: 'string', description: 'Why we are moving on (e.g. "User covered all sub-goals")' }
-                        },
-                        required: ['reason']
-                    }),
-                    execute: async ({ reason }: { reason: string }) => {
-                        console.log(`Tool: transitionToNextTopic triggered. Reason: ${reason}`);
-
-                        // Find next topic
-                        const currentIndex = bot.topics.findIndex((t: any) => t.id === currentTopic?.id);
-                        const nextTopic = bot.topics[currentIndex + 1];
-
-                        if (nextTopic) {
-                            await prisma.conversation.update({
-                                where: { id: conversationId },
-                                data: { currentTopicId: nextTopic.id }
-                            });
-                            return `TRANSITION_COMPLETE: Moving to topic "${nextTopic.label}".`;
-                        } else {
-                            return "NO_MORE_TOPICS: You are at the end. Proceed to closing.";
-                        }
-                    },
-                } as any),
-                concludeInterview: tool({
-                    description: 'End the interview when time is up or all topics are covered.',
-                    parameters: jsonSchema({
-                        type: 'object',
-                        properties: {
-                            finalMessage: { type: 'string', description: 'The final closing statement to the user' }
-                        },
-                        required: ['finalMessage']
-                    }),
-                    execute: async ({ finalMessage }: { finalMessage: string }) => {
-                        console.log("Tool: concludeInterview triggered.");
-                        await prisma.conversation.update({
-                            where: { id: conversationId },
-                            data: { status: 'COMPLETED', completedAt: new Date() }
-                        });
-
-                        // Record usage for subscription tracking
-                        try {
-                            const project = await prisma.project.findUnique({
-                                where: { id: bot.projectId },
-                                select: { organizationId: true }
-                            });
-                            if (project?.organizationId) {
-                                await recordInterviewCompleted(project.organizationId, conversationId);
-                            }
-                        } catch (e) {
-                            console.error("Failed to record usage", e);
-                        }
-
-                        // Trigger Incremental Analysis
-                        try {
-                            await generateConversationInsightAction(conversationId);
-                        } catch (e) {
-                            console.error("Failed to trigger analysis", e);
-                        }
-
-                        return "INTERVIEW_MARKED_COMPLETED";
-                    }
-                } as any),
-            }
-        } as any);
+        });
 
         let responseText = result.text;
 
+        // 6. Parse markers and execute actions
+        let transitioned = false;
+        let concluded = false;
+
+        // Check for TRANSITION marker
+        if (responseText.includes('[TRANSITION_TO_NEXT_TOPIC]')) {
+            responseText = responseText.replace('[TRANSITION_TO_NEXT_TOPIC]', '').trim();
+
+            if (nextTopic) {
+                await prisma.conversation.update({
+                    where: { id: conversationId },
+                    data: { currentTopicId: nextTopic.id }
+                });
+                console.log(`Transitioned to topic: ${nextTopic.label}`);
+                transitioned = true;
+            } else {
+                // No more topics, conclude
+                concluded = true;
+            }
+        }
+
+        // Check for CONCLUDE marker
+        if (responseText.includes('[CONCLUDE_INTERVIEW]') || concluded) {
+            responseText = responseText.replace('[CONCLUDE_INTERVIEW]', '').trim();
+
+            await prisma.conversation.update({
+                where: { id: conversationId },
+                data: { status: 'COMPLETED', completedAt: new Date() }
+            });
+
+            // Record usage for subscription tracking
+            try {
+                const project = await prisma.project.findUnique({
+                    where: { id: bot.projectId },
+                    select: { organizationId: true }
+                });
+                if (project?.organizationId) {
+                    await recordInterviewCompleted(project.organizationId, conversationId);
+                }
+            } catch (e) {
+                console.error("Failed to record usage", e);
+            }
+
+            // Trigger Incremental Analysis
+            try {
+                await generateConversationInsightAction(conversationId);
+            } catch (e) {
+                console.error("Failed to trigger analysis", e);
+            }
+
+            concluded = true;
+        }
+
         // Post-processing for frontend signals
-        // If the tool `concludeInterview` was called, we might want to ensure the token is present for frontend handling
-        // The previous frontend depended on "INTERVIEW_COMPLETED" string.
-        // Let's re-inject it if the status is completed, just in case the model didn't say it in text.
         const refreshedConv = await prisma.conversation.findUnique({
             where: { id: conversationId },
             select: { status: true }
@@ -263,15 +257,15 @@ export async function POST(req: Request) {
             responseText += " INTERVIEW_COMPLETED";
         }
 
-        // Inject Claim Link if needed (Fallback if model forgot, though context prompt asks for it)
+        // Inject Claim Link if needed
         if (bot.rewardConfig?.enabled && refreshedConv?.status === 'COMPLETED') {
-            const claimLink = `/claim/${conversationId}`; // Relative link is fine for frontend
+            const claimLink = `/claim/${conversationId}`;
             if (!responseText.includes('claim')) {
                 responseText += `\n\n[Claim Reward](${claimLink})`;
             }
         }
 
-        // 6. Save Assistant Message
+        // 7. Save Assistant Message
         await prisma.message.create({
             data: {
                 conversationId,

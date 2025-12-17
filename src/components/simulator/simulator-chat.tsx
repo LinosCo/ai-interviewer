@@ -147,11 +147,12 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
     const progress = Math.min((effectiveDuration / 60 / (config.maxDurationMins || 10)) * 100, 95);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative">
+        <div className="flex flex-col h-full bg-slate-50 relative" style={{ background: 'linear-gradient(135deg, #FFFBEB 0%, #FFF 100%)' }}>
             {/* Progress bar */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 z-10">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100 z-10">
                 <motion.div
-                    className="h-full bg-purple-600"
+                    className="h-full bg-amber-500"
+                    style={{ background: 'linear-gradient(90deg, #FBBF24, #F59E0B)' }}
                     initial={{ width: '0%' }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.5 }}
@@ -159,12 +160,12 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
             </div>
 
             {/* Header */}
-            <div className="p-4 bg-white border-b border-gray-200 flex justify-between items-center shadow-sm z-10 relative">
+            <div className="p-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex justify-between items-center shadow-sm z-10 relative">
                 <div className="flex items-center gap-3">
                     <div>
                         <h3 className="font-semibold text-gray-900">{config.name || 'Anteprima Intervista'}</h3>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                            <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
                                 Topic {currentTopicIndex + 1}/{config.topics.length}
                             </span>
                             <span>{Math.floor(effectiveDuration / 60)} min</span>
@@ -172,7 +173,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                     </div>
                 </div>
                 {onClose && (
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600">
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 )}
@@ -192,7 +193,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                 className="space-y-6 mt-8"
                             >
                                 {/* Question number */}
-                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
                                     <span>Domanda {totalQuestions}</span>
                                     <span>→</span>
                                 </div>
@@ -202,10 +203,10 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                     <motion.div
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        className="mb-8 p-6 rounded-2xl bg-white border border-gray-200 shadow-sm"
+                                        className="mb-8 p-6 rounded-2xl bg-white/60 backdrop-blur-sm border border-orange-100 shadow-sm"
                                     >
-                                        <div className="text-xs text-purple-600 font-semibold mb-2 uppercase tracking-wide">La tua risposta</div>
-                                        <div className="text-gray-700 text-lg leading-relaxed">
+                                        <div className="text-xs text-amber-600 font-bold mb-2 uppercase tracking-wide">La tua risposta</div>
+                                        <div className="text-gray-700 text-lg leading-relaxed font-serif">
                                             "{messages[messages.length - 2].content}"
                                         </div>
                                     </motion.div>
@@ -222,7 +223,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                                 else if (length > 200) textSizeClass = 'text-xl md:text-2xl';
 
                                                 return (
-                                                    <p className={`${textSizeClass} font-medium text-gray-900 leading-relaxed mb-4`}>
+                                                    <p className={`${textSizeClass} font-medium text-gray-900 leading-relaxed mb-4 tracking-tight`}>
                                                         {children}
                                                     </p>
                                                 );
@@ -243,11 +244,11 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                 className="flex flex-col items-center gap-4 mt-12"
                             >
                                 <div className="flex space-x-2">
-                                    <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                    <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                    <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                 </div>
-                                <p className="text-gray-500 text-sm">L'IA sta pensando...</p>
+                                <p className="text-gray-400 text-sm font-medium">L'IA sta pensando...</p>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -256,9 +257,10 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
             </div>
 
             {/* Input Area - FIXED BOTTOM */}
-            <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 p-4 md:p-6 z-20">
-                <div className="max-w-3xl mx-auto">
-                    <form onSubmit={handleSubmit} className="relative">
+            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-12 z-20">
+                <div className="max-w-3xl mx-auto relative">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-amber-300 to-orange-400 rounded-[20px] blur opacity-20 transition-opacity duration-500" />
+                    <form onSubmit={handleSubmit} className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden transition-all ring-1 ring-black/5 focus-within:ring-amber-500/50">
                         <textarea
                             ref={inputRef}
                             value={input}
@@ -272,29 +274,29 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                             disabled={isLoading}
                             placeholder="Scrivi la tua risposta..."
                             rows={1}
-                            className="w-full resize-none rounded-2xl border-2 border-gray-300 px-6 py-4 pr-14 focus:outline-none focus:border-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-lg transition-all shadow-sm"
+                            className="w-full resize-none border-none bg-transparent px-6 py-5 pr-16 text-lg text-gray-900 placeholder-gray-400 focus:ring-0"
                             style={{
-                                minHeight: '60px',
+                                minHeight: '72px',
                                 maxHeight: '200px',
-                                borderColor: isLoading ? '#d1d5db' : '#9333ea', // purple-600
                             }}
                         />
                         <button
                             type="submit"
                             disabled={!input.trim() || isLoading}
-                            className="absolute right-3 bottom-3 w-12 h-12 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-110 active:scale-95 shadow-lg bg-purple-600"
+                            className="absolute right-3 bottom-3 w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-md"
+                            style={{ background: 'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)' }}
                         >
                             {isLoading ? (
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             ) : (
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
                             )}
                         </button>
                     </form>
-                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                        <span>Premi Invio per inviare</span>
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-400 font-medium px-2">
+                        <span>Premi <strong>Invio</strong> per inviare</span>
                         <span>Domanda {totalQuestions}</span>
                     </div>
                 </div>

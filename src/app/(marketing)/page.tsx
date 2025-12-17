@@ -1,597 +1,356 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useState } from 'react';
-
-const USE_CASES = [
-    {
-        id: 'b2b',
-        title: 'Clienti B2B',
-        icon: '🏢',
-        description: 'Capire perché i clienti non riordinano, cosa pensano del servizio, come migliorare la relazione.',
-        examples: ['Post-vendita', 'Churn analysis', 'NPS qualitativo', 'Win/Loss analysis']
-    },
-    {
-        id: 'b2c',
-        title: 'Clienti B2C',
-        icon: '🛒',
-        description: 'Raccogliere feedback su prodotti, esperienza d\'acquisto, aspettative e frustrazioni.',
-        examples: ['Product feedback', 'Customer journey', 'Concept testing', 'Brand perception']
-    },
-    {
-        id: 'hr',
-        title: 'Risorse Umane',
-        icon: '👥',
-        description: 'Ascoltare dipendenti e collaboratori senza il filtro dell\'ufficio HR.',
-        examples: ['Exit interview', 'Clima aziendale', 'Onboarding check', 'Pulse survey']
-    },
-    {
-        id: 'operations',
-        title: 'Operations',
-        icon: '⚙️',
-        description: 'Feedback da fornitori, partner e stakeholder per migliorare processi e relazioni.',
-        examples: ['Supplier feedback', 'Partner satisfaction', 'Process improvement', 'Post-progetto']
-    }
-];
-
-const STEPS = [
-    {
-        number: '01',
-        title: 'Descrivi l\'obiettivo',
-        description: 'Scrivi cosa vuoi capire, in linguaggio naturale. "Voglio sapere perché i clienti non riordinano" oppure "Capire come si trovano i nuovi assunti dopo 3 mesi".'
-    },
-    {
-        number: '02',
-        title: 'L\'AI prepara l\'intervista',
-        description: 'In pochi secondi Business Tuner genera una conversazione strutturata con le domande giuste, basata su metodologie di ricerca qualitativa.'
-    },
-    {
-        number: '03',
-        title: 'Condividi il link',
-        description: 'Manda il link via email, WhatsApp o qualsiasi canale. Chi risponde parla con l\'AI per 10-15 minuti, quando vuole.'
-    },
-    {
-        number: '04',
-        title: 'Ricevi gli insight',
-        description: 'Temi ricorrenti, citazioni significative, sentiment. Tutto quello che serve per decidere, senza leggere trascrizioni infinite.'
-    }
-];
-
-const TESTIMONIALS = [
-    {
-        quote: "Prima facevamo un sondaggio all'anno con 15% di risposte. Ora raccogliamo feedback continui con il 70% di completamento.",
-        author: "Responsabile Qualità",
-        company: "Azienda manifatturiera, 120 dipendenti"
-    },
-    {
-        quote: "Le exit interview le faceva l'HR, e nessuno diceva la verità. Con Business Tuner finalmente capiamo perché le persone se ne vanno.",
-        author: "HR Manager",
-        company: "Azienda servizi, 80 dipendenti"
-    },
-    {
-        quote: "Ho lanciato un'indagine sui clienti inattivi in 10 minuti. In una settimana avevo insight che avrebbero richiesto mesi di consulenza.",
-        author: "Titolare",
-        company: "PMI commerciale, 25 dipendenti"
-    }
-];
-
-const PRICING = [
-    {
-        name: 'Starter',
-        price: '49',
-        period: '/mese',
-        description: 'Per iniziare a raccogliere feedback',
-        features: [
-            'Fino a 50 interviste/mese',
-            '3 progetti attivi',
-            'Analisi AI base',
-            'Export PDF',
-            'Supporto email'
-        ],
-        cta: 'Inizia gratis',
-        highlighted: false
-    },
-    {
-        name: 'Professional',
-        price: '149',
-        period: '/mese',
-        description: 'Per team e aziende strutturate',
-        features: [
-            'Fino a 200 interviste/mese',
-            'Progetti illimitati',
-            'Analisi AI avanzata',
-            'Branding personalizzato',
-            '3 utenti inclusi',
-            'Supporto prioritario'
-        ],
-        cta: 'Prova gratis 14 giorni',
-        highlighted: true
-    },
-    {
-        name: 'Enterprise',
-        price: 'Custom',
-        period: '',
-        description: 'Per grandi organizzazioni',
-        features: [
-            'Volume personalizzato',
-            'SSO e sicurezza avanzata',
-            'Integrazioni custom',
-            'Utenti illimitati',
-            'Account manager dedicato',
-            'SLA garantito'
-        ],
-        cta: 'Contattaci',
-        highlighted: false
-    }
-];
+import { colors, gradients } from '@/lib/design-system';
+import { Button } from '@/components/ui/business-tuner/Button';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 
 export default function LandingPage() {
-    const [activeUseCase, setActiveUseCase] = useState('b2b');
-    const [openFaq, setOpenFaq] = useState<number | null>(null);
+    const [mounted, setMounted] = useState(false);
+    const [scrollY, setScrollY] = useState(0);
 
-    const currentUseCase = USE_CASES.find(uc => uc.id === activeUseCase)!;
+    useEffect(() => {
+        setMounted(true);
+        const handleScroll = () => setScrollY(window.scrollY);
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Soft Wave Separator Component
+    const SoftWaveSeparator = ({ accentColor = colors.amber, height = 300, id = 'wave1' }) => (
+        <div style={{
+            width: '100%',
+            height: `${height}px`,
+            position: 'relative',
+            overflow: 'hidden',
+            background: `linear-gradient(180deg, ${colors.white} 0%, transparent 12%, transparent 88%, ${colors.white} 100%)`
+        }}>
+            <svg
+                style={{ position: 'absolute', width: '200%', left: '-50%', top: 0, height: '100%' }}
+                viewBox={`0 0 2880 ${height}`}
+                preserveAspectRatio="none"
+            >
+                <defs>
+                    <linearGradient id={`softFade${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="white" stopOpacity="0" />
+                        <stop offset="15%" stopColor="white" stopOpacity="1" />
+                        <stop offset="85%" stopColor="white" stopOpacity="1" />
+                        <stop offset="100%" stopColor="white" stopOpacity="0" />
+                    </linearGradient>
+                    <mask id={`fadeMask${id}`}>
+                        <rect width="100%" height="100%" fill={`url(#softFade${id})`} />
+                    </mask>
+                </defs>
+
+                <g mask={`url(#fadeMask${id})`}>
+                    <path
+                        d={`M0 ${height / 2} C480 ${height * 0.25} 960 ${height * 0.75} 1440 ${height / 2} C1920 ${height * 0.25} 2400 ${height * 0.75} 2880 ${height / 2}`}
+                        fill="none" stroke={accentColor} strokeWidth="100" opacity="0.05" strokeLinecap="round"
+                    >
+                        <animate attributeName="d" dur="14s" repeatCount="indefinite" values={`
+                M0 ${height / 2} C480 ${height * 0.25} 960 ${height * 0.75} 1440 ${height / 2} C1920 ${height * 0.25} 2400 ${height * 0.75} 2880 ${height / 2};
+                M0 ${height / 2} C480 ${height * 0.75} 960 ${height * 0.25} 1440 ${height / 2} C1920 ${height * 0.75} 2400 ${height * 0.25} 2880 ${height / 2};
+                M0 ${height / 2} C480 ${height * 0.25} 960 ${height * 0.75} 1440 ${height / 2} C1920 ${height * 0.25} 2400 ${height * 0.75} 2880 ${height / 2}
+              `} />
+                    </path>
+                </g>
+            </svg>
+        </div>
+    );
+
+    // Soft Chart Separator
+    const SoftChartSeparator = ({ color = colors.amber, height = 280, id = 'chart1' }) => (
+        <div style={{
+            width: '100%', height: `${height}px`, position: 'relative', overflow: 'hidden',
+            background: `linear-gradient(180deg, ${colors.white} 0%, transparent 12%, transparent 88%, ${colors.white} 100%)`
+        }}>
+            <svg style={{ width: '100%', height: '100%' }} viewBox={`0 0 1440 ${height}`} preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id={`chartFade${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor={color} stopOpacity="0" />
+                        <stop offset="20%" stopColor={color} stopOpacity="1" />
+                        <stop offset="80%" stopColor={color} stopOpacity="1" />
+                        <stop offset="100%" stopColor={color} stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                {Array.from({ length: 55 }).map((_, i) => {
+                    const x = i * 26 + 8;
+                    const baseH = 60 + Math.sin(i * 0.28) * 35 + Math.cos(i * 0.45) * 25;
+                    return (
+                        <rect key={i} x={x} y={height / 2 - baseH / 2} width="16" height={baseH} rx="6" fill={`url(#chartFade${id})`} opacity={0.05 + Math.sin(i * 0.18) * 0.025}>
+                            <animate attributeName="height" values={`${baseH};${baseH * 0.55};${baseH * 1.15};${baseH}`} dur={`${2.8 + (i % 8) * 0.25}s`} repeatCount="indefinite" />
+                        </rect>
+                    );
+                })}
+            </svg>
+        </div>
+    );
+
+    // Orange Transition Component
+    const OrangeTransition = ({ toOrange = true, height = 200 }) => (
+        <div style={{
+            width: '100%', height: `${height}px`, position: 'relative', overflow: 'hidden',
+            background: toOrange
+                ? `linear-gradient(180deg, ${colors.white} 0%, ${colors.peach} 30%, ${colors.apricot} 60%, rgba(251, 191, 36, 0.95) 100%)`
+                : `linear-gradient(180deg, rgba(251, 191, 36, 0.95) 0%, ${colors.apricot} 40%, ${colors.peach} 70%, ${colors.white} 100%)`
+        }} />
+    );
 
     return (
-        <div className="overflow-hidden">
+        <div style={{ minHeight: '100vh', fontFamily: "'Inter', sans-serif", background: colors.white, position: 'relative', overflowX: 'hidden' }}>
+
+            {/* Dynamic Background */}
+            <div style={{
+                position: 'fixed', inset: 0, pointerEvents: 'none',
+                background: `
+          radial-gradient(ellipse 80% 50% at 50% -20%, ${colors.peach}50 0%, transparent 50%),
+          radial-gradient(ellipse 60% 40% at 100% 30%, ${colors.rose}30 0%, transparent 40%),
+          radial-gradient(ellipse 50% 30% at 0% 60%, ${colors.lavender}25 0%, transparent 35%),
+          ${colors.white}
+        `
+            }} />
+
+            {/* Global Styles for Keyframes */}
+            <style jsx global>{`
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.3); } 50% { box-shadow: 0 0 40px rgba(251, 191, 36, 0.5); } }
+        @keyframes waveTyping { 0%, 100% { transform: scaleY(0.4); opacity: 0.5; } 50% { transform: scaleY(1); opacity: 1; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      `}</style>
+
+            {/* Navigation */}
+            <nav style={{
+                position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, padding: '1rem 3rem',
+                background: scrollY > 50 ? 'rgba(255,255,255,0.9)' : 'transparent',
+                backdropFilter: scrollY > 50 ? 'blur(20px)' : 'none',
+                transition: 'all 0.3s ease'
+            }}>
+                <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <Icons.Logo size={36} />
+                        <span style={{ fontSize: '1.125rem', fontWeight: '600', color: colors.text }}>Business Tuner</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                        <Link href="#how-it-works" style={{ color: colors.muted, textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}>Come funziona</Link>
+                        <Link href="#pricing" style={{ color: colors.muted, textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}>Prezzi</Link>
+                        <Link href="/login" style={{ color: colors.muted, textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}>Accedi</Link>
+                        <Link href="/register">
+                            <Button size="sm" variant="primary">Prova gratis</Button>
+                        </Link>
+                    </div>
+                </div>
+            </nav>
+
             {/* Hero Section */}
-            <section className="relative min-h-[90vh] flex items-center">
-                {/* Background decoration */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-20 right-0 w-[600px] h-[600px] bg-gradient-to-br from-amber-100/40 to-orange-100/40 rounded-full blur-3xl" />
-                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-stone-100 to-stone-200/50 rounded-full blur-3xl" />
-                </div>
+            <section style={{ position: 'relative', zIndex: 10, minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: '80px' }}>
+                <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '4rem 3rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
 
-                <div className="relative max-w-6xl mx-auto px-6 py-24">
-                    <div className="grid lg:grid-cols-2 gap-16 items-center">
-                        <div>
-                            {/* Badge */}
-                            <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200/50 rounded-full px-4 py-1.5 mb-8">
-                                <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-                                <span className="text-amber-800 text-sm font-medium">Interviste qualitative con AI</span>
-                            </div>
-
-                            {/* Headline */}
-                            <h1 className="text-5xl md:text-6xl font-bold text-stone-900 leading-[1.1] tracking-tight mb-6">
-                                Ascolta il mercato.
-                                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600">
-                                    Decidi meglio.
-                                </span>
-                            </h1>
-
-                            {/* Subheadline */}
-                            <p className="text-xl text-stone-600 leading-relaxed mb-8 max-w-lg">
-                                Raccogli feedback qualitativi da clienti, dipendenti e stakeholder.
-                                Senza interviste manuali, senza consulenti, senza sondaggi ignorati.
-                            </p>
-
-                            {/* CTA */}
-                            <div className="flex flex-col sm:flex-row gap-4">
-                                <Link
-                                    href="/onboarding"
-                                    className="inline-flex items-center justify-center gap-2 bg-stone-900 text-white px-8 py-4 rounded-full font-medium hover:bg-stone-800 transition-all hover:scale-105 shadow-lg shadow-stone-900/20"
-                                >
-                                    Prova la Demo
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </Link>
-                                <Link
-                                    href="/register"
-                                    className="inline-flex items-center justify-center gap-2 bg-white text-stone-700 px-8 py-4 rounded-full font-medium border border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-all"
-                                >
-                                    Inizia prova gratuita
-                                </Link>
-                            </div>
-
-
-                            {/* Social proof */}
-                            <div className="mt-12 pt-8 border-t border-stone-200">
-                                <p className="text-sm text-stone-500 mb-3">Usato da team di prodotto, HR e direzione in</p>
-                                <div className="flex items-center gap-6 text-stone-400">
-                                    <span className="text-sm font-medium">PMI</span>
-                                    <span className="w-1 h-1 bg-stone-300 rounded-full" />
-                                    <span className="text-sm font-medium">Mid-market</span>
-                                    <span className="w-1 h-1 bg-stone-300 rounded-full" />
-                                    <span className="text-sm font-medium">Enterprise</span>
-                                </div>
-                            </div>
+                    {/* Hero Content */}
+                    <div style={{ opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(40px)', transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '100px', marginBottom: '1.5rem' }}>
+                            <div style={{ width: '8px', height: '8px', background: `linear-gradient(135deg, ${colors.gold}, ${colors.amber})`, borderRadius: '50%', animation: 'glow 2s ease-in-out infinite' }} />
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, background: `linear-gradient(90deg, ${colors.amberDark}, ${colors.amber}, ${colors.amberDark})`, backgroundSize: '200% 100%', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite' }}>
+                                Interviste qualitative con AI
+                            </span>
                         </div>
 
-                        {/* Hero Visual */}
-                        <div className="relative hidden lg:block">
-                            <div className="relative bg-white rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/50 overflow-hidden">
-                                {/* Mock chat interface */}
-                                <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                            </svg>
-                                        </div>
-                                        <div>
-                                            <div className="text-white font-medium">Feedback Clienti Q4</div>
-                                            <div className="text-white/70 text-sm">12 risposte · 3 in corso</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="p-6 space-y-4">
-                                    <div className="flex gap-3">
-                                        <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                            <span className="text-amber-600 text-sm">🎯</span>
-                                        </div>
-                                        <div className="bg-stone-100 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[280px]">
-                                            <p className="text-stone-700 text-sm">Cosa ti ha portato a scegliere il nostro servizio rispetto ad altri?</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-3 justify-end">
-                                        <div className="bg-amber-500 text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[280px]">
-                                            <p className="text-sm">Cercavo qualcosa di più flessibile. I competitor avevano contratti troppo rigidi per noi...</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                            <span className="text-amber-600 text-sm">🎯</span>
-                                        </div>
-                                        <div className="bg-stone-100 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[280px]">
-                                            <p className="text-stone-700 text-sm">Interessante. Puoi farmi un esempio concreto di questa flessibilità?</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                {/* Typing indicator */}
-                                <div className="px-6 pb-6">
-                                    <div className="flex items-center gap-2 text-stone-400 text-sm">
-                                        <div className="flex gap-1">
-                                            <span className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                            <span className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                            <span className="w-2 h-2 bg-stone-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                        </div>
-                                        <span>Marco sta scrivendo...</span>
-                                    </div>
-                                </div>
-                            </div>
+                        <h1 style={{ fontSize: '4rem', fontWeight: 600, color: colors.text, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '1.5rem' }}>
+                            Ascolta il mercato.
+                            <br />
+                            <span style={{ background: gradients.brand, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                Decidi meglio.
+                            </span>
+                        </h1>
 
-                            {/* Floating insight card */}
-                            <div className="absolute -bottom-6 -left-6 bg-white rounded-xl shadow-lg border border-stone-200 p-4 max-w-[220px]">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                                        <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                        </svg>
-                                    </div>
-                                    <span className="text-sm font-medium text-stone-900">Tema emergente</span>
-                                </div>
-                                <p className="text-sm text-stone-600">"Flessibilità contrattuale" citata dal 67% dei rispondenti</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Problem/Solution Section */}
-            <section className="py-24 bg-stone-900 text-white">
-                <div className="max-w-6xl mx-auto px-6">
-                    <div className="grid md:grid-cols-2 gap-16">
-                        <div>
-                            <span className="text-amber-400 text-sm font-medium uppercase tracking-wider">Il problema</span>
-                            <h2 className="text-3xl font-bold mt-4 mb-6">Le decisioni si prendono al buio</h2>
-                            <ul className="space-y-4 text-stone-400">
-                                <li className="flex items-start gap-3">
-                                    <span className="text-red-400 mt-1">✗</span>
-                                    <span>I commerciali filtrano il feedback, arriva solo quello che vogliono far sapere</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="text-red-400 mt-1">✗</span>
-                                    <span>I sondaggi hanno tassi di risposta del 10-15%, e risposte superficiali</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="text-red-400 mt-1">✗</span>
-                                    <span>Le interviste manuali richiedono tempo, competenze, budget per consulenti</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="text-red-400 mt-1">✗</span>
-                                    <span>I dipendenti non dicono la verità all'HR, i clienti non la dicono ai venditori</span>
-                                </li>
-                            </ul>
-                        </div>
-                        <div>
-                            <span className="text-amber-400 text-sm font-medium uppercase tracking-wider">La soluzione</span>
-                            <h2 className="text-3xl font-bold mt-4 mb-6">Un intervistatore che lavora per te</h2>
-                            <ul className="space-y-4 text-stone-300">
-                                <li className="flex items-start gap-3">
-                                    <span className="text-green-400 mt-1">✓</span>
-                                    <span>Conversazioni vere che vanno in profondità, non checkbox da spuntare</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="text-green-400 mt-1">✓</span>
-                                    <span>Tassi di completamento del 70%+, perché rispondere è facile e naturale</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="text-green-400 mt-1">✓</span>
-                                    <span>Pronto in 10 minuti, senza competenze tecniche o metodologiche</span>
-                                </li>
-                                <li className="flex items-start gap-3">
-                                    <span className="text-green-400 mt-1">✓</span>
-                                    <span>Le persone sono più oneste con un AI: niente giudizio, niente imbarazzo</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* How it Works Section */}
-            <section id="come-funziona" className="py-24">
-                <div className="max-w-6xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-amber-600 text-sm font-medium uppercase tracking-wider">Come funziona</span>
-                        <h2 className="text-4xl font-bold text-stone-900 mt-4">Da zero a insight in 4 passi</h2>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {STEPS.map((step, index) => (
-                            <div key={step.number} className="relative">
-                                {index < STEPS.length - 1 && (
-                                    <div className="hidden lg:block absolute top-8 left-full w-full h-px bg-gradient-to-r from-amber-300 to-transparent z-0" />
-                                )}
-                                <div className="relative z-10">
-                                    <div className="w-16 h-16 bg-gradient-to-br from-amber-100 to-orange-100 rounded-2xl flex items-center justify-center mb-6">
-                                        <span className="text-2xl font-bold text-amber-600">{step.number}</span>
-                                    </div>
-                                    <h3 className="text-xl font-semibold text-stone-900 mb-3">{step.title}</h3>
-                                    <p className="text-stone-600 leading-relaxed">{step.description}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* Use Cases Section */}
-            <section id="casi-uso" className="py-24 bg-stone-50">
-                <div className="max-w-6xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-amber-600 text-sm font-medium uppercase tracking-wider">Casi d'uso</span>
-                        <h2 className="text-4xl font-bold text-stone-900 mt-4">Per ogni tipo di feedback</h2>
-                        <p className="text-stone-600 mt-4 max-w-2xl mx-auto">
-                            Che tu voglia capire i clienti, ascoltare i dipendenti o migliorare i processi,
-                            Business Tuner si adatta alle tue esigenze.
+                        <p style={{ fontSize: '1.25rem', color: colors.muted, lineHeight: 1.7, marginBottom: '2.5rem', maxWidth: '480px' }}>
+                            Raccogli feedback qualitativi da clienti, dipendenti e stakeholder. Senza interviste manuali. Senza consulenti.
                         </p>
+
+                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '3rem' }}>
+                            <Link href="/register">
+                                <Button size="lg" withShimmer>
+                                    Inizia gratis <Icons.ArrowRight size={18} />
+                                </Button>
+                            </Link>
+                            <Link href="/onboarding">
+                                <Button variant="secondary" size="lg">
+                                    <Icons.Play size={18} /> Guarda demo
+                                </Button>
+                            </Link>
+                        </div>
+
+                        {/* Trust Badges */}
+                        <div style={{ display: 'flex', gap: '0.625rem' }}>
+                            {[{ icon: Icons.Building, label: 'B2B' }, { icon: Icons.Cart, label: 'B2C' }, { icon: Icons.Users, label: 'HR' }].map((uc, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '100px', color: colors.subtle, fontSize: '0.8125rem', fontWeight: 500 }}>
+                                    <uc.icon size={16} /> {uc.label}
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
-                    {/* Tab selector */}
-                    <div className="flex flex-wrap justify-center gap-3 mb-12">
-                        {USE_CASES.map((uc) => (
-                            <button
-                                key={uc.id}
-                                onClick={() => setActiveUseCase(uc.id)}
-                                className={`px-6 py-3 rounded-full font-medium transition-all ${activeUseCase === uc.id
-                                    ? 'bg-stone-900 text-white shadow-lg'
-                                    : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
-                                    }`}
-                            >
-                                <span className="mr-2">{uc.icon}</span>
-                                {uc.title}
-                            </button>
-                        ))}
-                    </div>
+                    {/* Hero Visual (Floating Card) */}
+                    <div style={{ position: 'relative', opacity: mounted ? 1 : 0, transform: mounted ? 'translateX(0)' : 'translateX(50px)', transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s' }}>
+                        {/* Abstract Blur blobs */}
+                        <div style={{ position: 'absolute', top: '5%', left: '5%', right: '5%', bottom: '5%', background: `radial-gradient(ellipse, ${colors.gold}25 0%, transparent 60%)`, filter: 'blur(40px)' }} />
 
-                    {/* Active use case content */}
-                    <div className="bg-white rounded-3xl shadow-xl border border-stone-200 overflow-hidden">
-                        <div className="grid md:grid-cols-2">
-                            <div className="p-10">
-                                <div className="text-4xl mb-4">{currentUseCase.icon}</div>
-                                <h3 className="text-2xl font-bold text-stone-900 mb-4">{currentUseCase.title}</h3>
-                                <p className="text-stone-600 mb-8">{currentUseCase.description}</p>
-                                <div className="space-y-2">
-                                    <p className="text-sm font-medium text-stone-500 uppercase tracking-wider">Template pronti:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {currentUseCase.examples.map((example) => (
-                                            <span key={example} className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm">
-                                                {example}
-                                            </span>
+                        <div style={{ position: 'relative', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderRadius: '28px', boxShadow: `0 30px 60px -10px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.8)`, overflow: 'hidden', animation: 'float 6s ease-in-out infinite' }}>
+                            {/* Chat Header */}
+                            <div style={{ background: `linear-gradient(135deg, ${colors.gold} 0%, ${colors.amber} 50%, ${colors.coral}90 100%)`, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+                                <div style={{ width: '44px', height: '44px', background: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(10px)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Icons.Chat size={22} color="white" />
+                                </div>
+                                <div>
+                                    <div style={{ color: 'white', fontWeight: 600, fontSize: '1rem' }}>Feedback Clienti Q4</div>
+                                    <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem' }}>12 risposte · 3 in corso</div>
+                                </div>
+                            </div>
+
+                            {/* Chat Body */}
+                            <div style={{ padding: '1.5rem' }}>
+                                <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                                    <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icons.Logo size={20} /></div>
+                                    <div style={{ background: 'rgba(255,255,255,0.9)', padding: '0.875rem 1rem', borderRadius: '18px', borderTopLeftRadius: '6px', maxWidth: '85%' }}>
+                                        <p style={{ fontSize: '0.9375rem', color: colors.text, margin: 0 }}>Cosa ti ha portato a scegliere il nostro servizio?</p>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
+                                    <div style={{ background: gradients.primary, padding: '0.875rem 1rem', borderRadius: '18px', borderTopRightRadius: '6px', maxWidth: '85%', boxShadow: `0 4px 15px ${colors.amber}30` }}>
+                                        <p style={{ fontSize: '0.9375rem', color: 'white', margin: 0 }}>Cercavo più flessibilità. I competitor avevano contratti rigidi...</p>
+                                    </div>
+                                </div>
+
+                                {/* Typing Indicator */}
+                                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                                    <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icons.Logo size={20} /></div>
+                                    <div style={{ background: 'rgba(255,255,255,0.9)', padding: '0.875rem 1rem', borderRadius: '18px', borderTopLeftRadius: '6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        {[0, 1, 2, 3, 4].map(i => (
+                                            <div key={i} style={{ width: '3px', height: '14px', background: `linear-gradient(to top, ${colors.amber}, ${colors.gold})`, borderRadius: '2px', animation: 'waveTyping 0.8s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
                                         ))}
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-10 flex items-center justify-center">
-                                <div className="text-center">
-                                    <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-6">
-                                        <span className="text-4xl">{currentUseCase.icon}</span>
-                                    </div>
-                                    <p className="text-stone-600 mb-4">Prova un template {currentUseCase.title}</p>
-                                    <Link
-                                        href="/onboarding"
-                                        className="inline-flex items-center gap-2 bg-stone-900 text-white px-6 py-3 rounded-full font-medium hover:bg-stone-800 transition-all"
-                                    >
-                                        Inizia ora
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </Link>
-                                </div>
+                        </div>
+
+                        {/* Floating Insights */}
+                        <div style={{ position: 'absolute', bottom: '-30px', left: '-50px', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderRadius: '18px', padding: '1rem 1.25rem', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', maxWidth: '200px', transform: `translateY(${scrollY * 0.015}px)` }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <div style={{ width: '26px', height: '26px', background: 'linear-gradient(135deg, #DCFCE7, #BBF7D0)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}><Icons.Zap size={14} /></div>
+                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.text }}>Tema emergente</span>
                             </div>
+                            <p style={{ fontSize: '0.875rem', color: colors.muted, margin: 0 }}>"Flessibilità" citata dal <strong style={{ color: colors.amber }}>67%</strong></p>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* Testimonials */}
-            <section className="py-24">
-                <div className="max-w-6xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-amber-600 text-sm font-medium uppercase tracking-wider">Testimonianze</span>
-                        <h2 className="text-4xl font-bold text-stone-900 mt-4">Chi lo usa, lo consiglia</h2>
-                    </div>
+            <SoftWaveSeparator accentColor={colors.amber} height={320} id="sep1" />
 
-                    <div className="grid md:grid-cols-3 gap-8">
-                        {TESTIMONIALS.map((testimonial, index) => (
-                            <div key={index} className="bg-white rounded-2xl p-8 shadow-lg border border-stone-100">
-                                <div className="flex gap-1 mb-4">
-                                    {[...Array(5)].map((_, i) => (
-                                        <svg key={i} className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                        </svg>
-                                    ))}
-                                </div>
-                                <blockquote className="text-stone-700 mb-6 leading-relaxed">
-                                    "{testimonial.quote}"
-                                </blockquote>
-                                <div>
-                                    <div className="font-medium text-stone-900">{testimonial.author}</div>
-                                    <div className="text-sm text-stone-500">{testimonial.company}</div>
-                                </div>
+            {/* Stats Section */}
+            <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem' }}>
+                <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', justifyContent: 'center', gap: '6rem' }}>
+                    {[{ value: '70%+', label: 'Tasso completamento' }, { value: '10 min', label: 'Setup intervista' }, { value: '1/10', label: 'Costo vs consulente' }].map((stat, i) => (
+                        <div key={i} style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '3rem', fontWeight: 600, background: `linear-gradient(135deg, ${colors.amberDark}, ${colors.gold})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{stat.value}</div>
+                            <div style={{ fontSize: '0.9375rem', color: colors.subtle }}>{stat.label}</div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
+            <SoftChartSeparator color={colors.amber} height={300} id="sep2" />
+
+            {/* How it works */}
+            <section id="how-it-works" style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem 4rem' }}>
+                <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
+                    <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: colors.amberDark, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(251,191,36,0.1)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Come funziona</span>
+                    <h2 style={{ fontSize: '3rem', fontWeight: 600, color: colors.text, letterSpacing: '-0.02em', marginBottom: '4rem' }}>
+                        Da zero a insight in <span style={{ color: colors.amber }}>4 passi</span>
+                    </h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
+                        {[{ num: '01', title: 'Descrivi l\'obiettivo', desc: 'Scrivi cosa vuoi capire' }, { num: '02', title: 'L\'AI prepara tutto', desc: 'Domande generate in secondi' }, { num: '03', title: 'Condividi il link', desc: 'Via email, WhatsApp, etc' }, { num: '04', title: 'Ricevi gli insight', desc: 'Temi, citazioni, sentiment' }].map((step, i) => (
+                            <div key={i} style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(15px)', borderRadius: '24px', padding: '2rem 1.5rem', boxShadow: '0 15px 40px rgba(0,0,0,0.04)', border: '1px solid rgba(255,255,255,0.8)' }}>
+                                <div style={{ width: '56px', height: '56px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: '1.125rem', fontWeight: 700, color: colors.amberDark }}>{step.num}</div>
+                                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>{step.title}</h3>
+                                <p style={{ fontSize: '0.875rem', color: colors.muted, lineHeight: 1.5, margin: 0 }}>{step.desc}</p>
                             </div>
                         ))}
                     </div>
                 </div>
             </section>
+
+            <OrangeTransition toOrange={true} height={200} />
 
             {/* Pricing Section */}
-            <section id="prezzi" className="py-24 bg-stone-50">
-                <div className="max-w-6xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-amber-600 text-sm font-medium uppercase tracking-wider">Prezzi</span>
-                        <h2 className="text-4xl font-bold text-stone-900 mt-4">Scegli il piano giusto per te</h2>
-                        <p className="text-stone-600 mt-4">Inizia gratis, scala quando serve.</p>
+            <section id="pricing" style={{ position: 'relative', zIndex: 10, background: gradients.sectionOrange, padding: '3rem 2rem 4rem', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse 120% 60% at 50% -10%, rgba(255,255,255,0.4) 0%, transparent 50%), radial-gradient(ellipse 100% 40% at 50% 110%, rgba(255,255,255,0.2) 0%, transparent 40%)` }} />
+
+                <div style={{ maxWidth: '1100px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
+                    <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
+                        <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: 'white', textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Prezzi semplici</span>
+                        <h2 style={{ fontSize: '3rem', fontWeight: 600, color: 'white', letterSpacing: '-0.02em', marginBottom: '1rem', textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>Scegli il piano giusto per te</h2>
+                        <p style={{ fontSize: '1.125rem', color: 'rgba(255,255,255,0.9)', maxWidth: '500px', margin: '0 auto' }}>Inizia gratis, scala quando cresci. Nessun costo nascosto.</p>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-                        {PRICING.map((plan) => (
-                            <div
-                                key={plan.name}
-                                className={`rounded-2xl p-8 ${plan.highlighted
-                                    ? 'bg-stone-900 text-white ring-4 ring-amber-400 shadow-2xl scale-105'
-                                    : 'bg-white border border-stone-200 shadow-lg'
-                                    }`}
-                            >
-                                {plan.highlighted && (
-                                    <div className="inline-block bg-amber-400 text-stone-900 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
-                                        Più popolare
-                                    </div>
-                                )}
-                                <h3 className={`text-xl font-bold mb-2 ${plan.highlighted ? 'text-white' : 'text-stone-900'}`}>
-                                    {plan.name}
-                                </h3>
-                                <p className={`text-sm mb-6 ${plan.highlighted ? 'text-stone-400' : 'text-stone-500'}`}>
-                                    {plan.description}
-                                </p>
-                                <div className="mb-6">
-                                    <span className={`text-4xl font-bold ${plan.highlighted ? 'text-white' : 'text-stone-900'}`}>
-                                        {plan.price === 'Custom' ? '' : '€'}{plan.price}
-                                    </span>
-                                    <span className={plan.highlighted ? 'text-stone-400' : 'text-stone-500'}>
-                                        {plan.period}
-                                    </span>
-                                </div>
-                                <ul className="space-y-3 mb-8">
-                                    {plan.features.map((feature) => (
-                                        <li key={feature} className="flex items-start gap-3">
-                                            <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${plan.highlighted ? 'text-amber-400' : 'text-amber-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            <span className={`text-sm ${plan.highlighted ? 'text-stone-300' : 'text-stone-600'}`}>
-                                                {feature}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <Link
-                                    href={plan.name === 'Enterprise' ? 'mailto:sales@businesstuner.it' : `/register?plan=${plan.name.toUpperCase()}`}
-                                    className={`block text-center py-3 rounded-full font-medium transition-all ${plan.highlighted
-                                        ? 'bg-amber-400 text-stone-900 hover:bg-amber-300'
-                                        : 'bg-stone-900 text-white hover:bg-stone-800'
-                                        }`}
-                                >
-                                    {plan.cta}
-                                </Link>
-                            </div>
-                        ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', alignItems: 'stretch' }}>
+                        {/* Starter */}
+                        <div style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Starter</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per iniziare a esplorare</p></div>
+                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€49</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['3 interviste attive', '100 risposte/mese', 'Analisi base', 'Export PDF'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
+                            <Link href="/register?plan=STARTER" className="w-full">
+                                <Button fullWidth variant="ghost" style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', color: 'white' }}>Inizia gratis</Button>
+                            </Link>
+                        </div>
+
+                        {/* Professional */}
+                        <div style={{ background: 'white', borderRadius: '28px', padding: '2.5rem 2rem', boxShadow: '0 30px 60px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', transform: 'scale(1.05)', position: 'relative', zIndex: 2 }}>
+                            <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: gradients.primary, padding: '0.375rem 1rem', borderRadius: '100px', fontSize: '0.6875rem', fontWeight: 700, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Più popolare</div>
+                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>Professional</h3><p style={{ fontSize: '0.875rem', color: colors.muted, margin: 0 }}>Per team in crescita</p></div>
+                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: colors.text }}>€149</span><span style={{ fontSize: '1rem', color: colors.muted }}>/mese</span></div>
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['10 interviste attive', '500 risposte/mese', 'Analisi avanzata AI', 'Temi e sentiment', 'Integrazione CRM', 'Supporto prioritario'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: colors.text, fontSize: '0.9375rem' }}><div style={{ color: colors.amber }}><Icons.Check size={18} /></div>{f}</li>))}</ul>
+                            <Link href="/register?plan=PRO" className="w-full">
+                                <Button fullWidth>Inizia ora →</Button>
+                            </Link>
+                        </div>
+
+                        {/* Enterprise */}
+                        <div style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Enterprise</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per grandi organizzazioni</p></div>
+                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>Custom</span></div>
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['Interviste illimitate', 'Risposte illimitate', 'White-label', 'API access', 'SSO & compliance', 'Account manager'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
+                            <Link href="mailto:sales@businesstuner.it" className="w-full">
+                                <Button fullWidth variant="ghost" style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', color: 'white' }}>Contattaci</Button>
+                            </Link>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            {/* FAQ Section */}
-            <section className="py-24">
-                <div className="max-w-3xl mx-auto px-6">
-                    <div className="text-center mb-16">
-                        <span className="text-amber-600 text-sm font-medium uppercase tracking-wider">FAQ</span>
-                        <h2 className="text-4xl font-bold text-stone-900 mt-4">Domande frequenti</h2>
-                    </div>
+            <OrangeTransition toOrange={false} height={200} />
 
-                    <div className="space-y-4">
-                        {[
-                            {
-                                q: 'I miei clienti/dipendenti risponderanno davvero a un bot?',
-                                a: 'Sì, e più volentieri di quanto pensi. Le persone sono più oneste con un sistema automatico: niente imbarazzo, niente giudizio. I nostri tassi di completamento superano il 70%, contro il 10-15% dei sondaggi tradizionali.'
-                            },
-                            {
-                                q: 'Quanto tempo serve per creare un\'intervista?',
-                                a: 'Meno di 10 minuti. Descrivi l\'obiettivo in linguaggio naturale, Business Tuner genera automaticamente la struttura. Puoi modificarla se vuoi, oppure pubblicare subito.'
-                            },
-                            {
-                                q: 'I dati sono al sicuro? GDPR?',
-                                a: 'Assolutamente. I dati sono criptati, conservati in Europa, e trattati secondo il GDPR. Ogni intervista include l\'informativa privacy e la raccolta del consenso.'
-                            },
-                            {
-                                q: 'Posso personalizzare l\'aspetto dell\'intervista?',
-                                a: 'Sì, dal piano Professional in su puoi inserire il tuo logo, i colori del brand, e personalizzare i messaggi. L\'intervista sembrerà parte della tua comunicazione.'
-                            },
-                            {
-                                q: 'In che lingue funziona?',
-                                a: 'Italiano e inglese sono completamente supportati. Altre lingue europee su richiesta per i piani Professional ed Enterprise.'
-                            },
-                            {
-                                q: 'Posso provare prima di pagare?',
-                                a: 'Certo. Il piano Starter include 14 giorni di prova gratuita. Nessuna carta di credito richiesta per iniziare.'
-                            }
-                        ].map((faq, index) => (
-                            <div key={index} className="border border-stone-200 rounded-xl overflow-hidden">
-                                <button
-                                    onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                                    className="w-full flex items-center justify-between p-6 text-left bg-white hover:bg-stone-50 transition-colors"
-                                >
-                                    <span className="font-medium text-stone-900 pr-4">{faq.q}</span>
-                                    <svg
-                                        className={`w-5 h-5 text-stone-400 flex-shrink-0 transition-transform ${openFaq === index ? 'rotate-180' : ''}`}
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-                                {openFaq === index && (
-                                    <div className="px-6 pb-6 text-stone-600 leading-relaxed">
-                                        {faq.a}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+            {/* Testimonials */}
+            <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem 4rem' }}>
+                <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
+                    <div style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderRadius: '32px', padding: '3rem', boxShadow: '0 25px 60px rgba(0,0,0,0.06)', border: '1px solid rgba(255,255,255,0.9)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.25rem', marginBottom: '1.5rem' }}>{[0, 1, 2, 3, 4].map(i => <div key={i} style={{ color: colors.gold }}><Icons.Star size={20} /></div>)}</div>
+                        <p style={{ fontSize: '1.375rem', color: colors.text, lineHeight: 1.7, marginBottom: '1.5rem', fontStyle: 'italic' }}>"Abbiamo raccolto più insight in una settimana che in sei mesi di survey tradizionali. I clienti rispondono perché sembra una conversazione vera."</p>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+                            <div style={{ width: '48px', height: '48px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', fontWeight: 600, color: colors.amberDark }}>MR</div>
+                            <div style={{ textAlign: 'left' }}><div style={{ fontWeight: 600, color: colors.text }}>Marco Rossi</div><div style={{ fontSize: '0.875rem', color: colors.subtle }}>Head of CX, TechCorp Italia</div></div>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            {/* Final CTA */}
-            <section className="py-24 bg-gradient-to-br from-stone-900 to-stone-800">
-                <div className="max-w-4xl mx-auto px-6 text-center">
-                    <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                        Pronto ad ascoltare davvero?
-                    </h2>
-                    <p className="text-xl text-stone-400 mb-10 max-w-2xl mx-auto">
-                        Crea la tua prima intervista in 10 minuti. Gratis, senza carta di credito.
-                    </p>
-                    <Link
-                        href="/onboarding"
-                        className="inline-flex items-center gap-3 bg-amber-400 text-stone-900 px-10 py-5 rounded-full text-lg font-semibold hover:bg-amber-300 transition-all hover:scale-105 shadow-2xl"
-                    >
-                        Inizia ora
-                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                        </svg>
-                    </Link>
-                </div>
-            </section>
+            {/* Footer */}
+            <footer style={{ position: 'relative', zIndex: 10, padding: '2rem 3rem', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}><Icons.Logo size={28} /><span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>Business Tuner</span></div>
+                <p style={{ fontSize: '0.75rem', color: colors.subtle }}>© 2025 Business Tuner. Tutti i diritti riservati.</p>
+            </footer>
+
         </div>
     );
 }

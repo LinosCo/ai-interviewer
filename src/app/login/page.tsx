@@ -3,63 +3,104 @@
 import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticate } from './actions';
+import Link from 'next/link';
+import { colors, gradients, shadows } from '@/lib/design-system';
+import { Icons } from '@/components/ui/business-tuner/Icons';
+import { Button } from '@/components/ui/business-tuner/Button';
+import { Input } from '@/components/ui/business-tuner/Input';
+import { Card } from '@/components/ui/business-tuner/Card';
 
 export default function LoginPage() {
     const router = useRouter();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
 
-    // Redirect to dashboard if login successful (errorMessage is null and not pending)
     useEffect(() => {
-        // After form submission, if no error and not pending, redirect
         if (!isPending && errorMessage === null) {
-            console.log('Login successful, redirecting to dashboard...');
             router.push('/dashboard');
         }
     }, [errorMessage, isPending, router]);
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100">
-            <div className="w-full max-w-md bg-white p-8 rounded shadow-md">
-                <h2 className="text-2xl font-bold mb-6 text-center">Login to Business Tuner</h2>
+        <div style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: gradients.mesh,
+            fontFamily: "'Inter', sans-serif",
+            padding: '1rem',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            {/* Decorative Elements */}
+            <div style={{ position: 'absolute', top: '10%', right: '10%', width: '300px', height: '300px', background: `radial-gradient(circle, ${colors.amberLight} 0%, transparent 70%)`, opacity: 0.4, filter: 'blur(40px)' }} />
+            <div style={{ position: 'absolute', bottom: '10%', left: '10%', width: '400px', height: '400px', background: `radial-gradient(circle, ${colors.peach} 0%, transparent 70%)`, opacity: 0.5, filter: 'blur(60px)' }} />
 
-                <form action={dispatch} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            required
+            <div style={{ width: '100%', maxWidth: '440px', position: 'relative', zIndex: 10 }}>
+                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                    <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', textDecoration: 'none', marginBottom: '1.5rem' }}>
+                        <Icons.Logo size={40} />
+                    </Link>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: 700, color: colors.text, marginBottom: '0.5rem' }}>Bentornato</h1>
+                    <p style={{ color: colors.muted }}>Accedi per gestire le tue interviste</p>
+                </div>
+
+                <Card variant="glass" padding="2.5rem">
+                    <form action={dispatch}>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <Input
+                                label="Email"
+                                type="email"
+                                name="email"
+                                required
+                                placeholder="nome@azienda.com"
+                                disabled={isPending}
+                                icon={<Icons.Users size={18} />}
+                            />
+                        </div>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                            <Input
+                                label="Password"
+                                type="password"
+                                name="password"
+                                required
+                                placeholder="••••••••"
+                                disabled={isPending}
+                                icon={<div style={{ width: '18px' }}>🔒</div>} // Placeholder icon if Lock not available
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+                            <Link href="#" style={{ fontSize: '0.875rem', color: colors.amber, textDecoration: 'none', fontWeight: 500 }}>
+                                Password dimenticata?
+                            </Link>
+                        </div>
+
+                        {errorMessage && (
+                            <div style={{ padding: '0.75rem', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '8px', color: '#DC2626', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                                {errorMessage}
+                            </div>
+                        )}
+
+                        <Button
+                            type="submit"
+                            fullWidth
                             disabled={isPending}
-                            className="mt-1 block w-full rounded border-gray-300 shadow-sm p-2 border disabled:opacity-50"
-                            placeholder="user@example.com"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Password</label>
-                        <input
-                            type="password"
-                            name="password"
-                            required
-                            disabled={isPending}
-                            className="mt-1 block w-full rounded border-gray-300 shadow-sm p-2 border disabled:opacity-50"
-                            placeholder="******"
-                        />
-                    </div>
-                    <div className="text-red-500 text-sm h-4">
-                        {errorMessage && <p>{errorMessage}</p>}
-                    </div>
-                    <button
-                        type="submit"
-                        disabled={isPending}
-                        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-                    >
-                        {isPending ? 'Signing in...' : 'Sign In'}
-                    </button>
-                    {/* Manual fallback link */}
-                    <div className="text-center text-xs text-gray-500 mt-4">
-                        Already logged in? <a href="/dashboard" className="text-blue-600 hover:underline">Go to Dashboard</a>
-                    </div>
-                </form>
+                            withShimmer={!isPending}
+                        >
+                            {isPending ? 'Accesso in corso...' : 'Accedi'}
+                        </Button>
+                    </form>
+                </Card>
+
+                <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+                    <p style={{ fontSize: '0.875rem', color: colors.muted }}>
+                        Non hai un account?{' '}
+                        <Link href="/register" style={{ color: colors.amber, fontWeight: 600, textDecoration: 'none' }}>
+                            Inizia la prova gratuita
+                        </Link>
+                    </p>
+                </div>
             </div>
         </div>
     );

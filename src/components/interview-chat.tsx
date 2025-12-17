@@ -2,10 +2,10 @@
 
 import { saveBotMessageAction } from '@/app/actions';
 import { useState, useEffect, useRef } from 'react';
-
-
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
+import { colors, gradients, shadows, radius } from '@/lib/design-system';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 
 interface Message {
     id: string;
@@ -83,8 +83,8 @@ export default function InterviewChat({
     estimatedDuration,
     privacyLevel,
     logoUrl,
-    primaryColor = '#6366f1',
-    backgroundColor = '#f9fafb',
+    primaryColor = colors.amber, // Default to brand color if not set
+    backgroundColor,
     rewardConfig,
     privacyNotice,
     dataUsageInfo,
@@ -218,9 +218,7 @@ export default function InterviewChat({
     useEffect(() => {
         const lastMessage = messages[messages.length - 1];
         if (lastMessage?.role === 'assistant' && lastMessage.content.includes('INTERVIEW_COMPLETED')) {
-            // Strip the token for display
             const cleanContent = lastMessage.content.replace('INTERVIEW_COMPLETED', '').trim();
-
             setMessages(prev => {
                 const newMessages = [...prev];
                 newMessages[newMessages.length - 1] = {
@@ -229,12 +227,6 @@ export default function InterviewChat({
                 };
                 return newMessages;
             });
-
-            // Redirect to claim page or show completion UI
-            // For now, we rely on the link in the message, but we could auto-redirect
-            if (cleanContent === '') {
-                // If the message was ONLY the token, maybe show a generic "Interview Completed" or redirect immediately
-            }
         }
     }, [messages]);
 
@@ -254,78 +246,77 @@ export default function InterviewChat({
     const assistantMessages = messages.filter(m => m.role === 'assistant');
     const currentQuestion = assistantMessages[assistantMessages.length - 1];
     const totalQuestions = assistantMessages.length;
-    // Use effective time for display
     const elapsedMinutes = Math.floor(effectiveSeconds / 60);
-
-    // Calculate progress (rough estimate based on estimated duration)
     const estimatedMinutes = parseInt(estimatedDuration?.replace(/\D/g, '') || '10');
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
+
+    // Dynamic Background logic
+    const mainBackground = backgroundColor || gradients.mesh;
 
     // Show landing page first
     if (showLanding) {
         return (
             <div
-                className="min-h-screen flex items-center justify-center p-4"
+                className="min-h-screen flex items-center justify-center p-4 relative"
                 style={{
-                    background: `linear-gradient(135deg, ${primaryColor || '#6366f1'}15 0%, ${primaryColor || '#6366f1'}05 100%)`,
+                    background: mainBackground,
+                    fontFamily: "'Inter', sans-serif"
                 }}
             >
+                {/* Decorative Elements */}
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.5, pointerEvents: 'none', background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.8) 0%, transparent 70%)' }} />
+
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="max-w-2xl w-full"
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="w-full max-w-2xl relative z-10"
                 >
-                    <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12">
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.75)',
+                        backdropFilter: 'blur(20px)',
+                        WebkitBackdropFilter: 'blur(20px)',
+                        border: '1px solid rgba(255, 255, 255, 0.8)',
+                        borderRadius: radius['3xl'],
+                        boxShadow: shadows.lg,
+                        padding: '3rem'
+                    }}>
                         {logoUrl && (
-                            <div className="flex justify-center mb-6">
-                                <img src={logoUrl} alt={botName} className="h-16 object-contain" />
+                            <div className="flex justify-center mb-8">
+                                <img src={logoUrl} alt={botName} className="h-20 object-contain drop-shadow-sm" />
                             </div>
                         )}
 
-                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-4">
+                        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 text-center mb-4 tracking-tight">
                             {botName}
                         </h1>
 
                         {botDescription && (
-                            <p className="text-lg text-gray-600 text-center mb-8">
+                            <p className="text-lg text-gray-600 text-center mb-10 leading-relaxed">
                                 {botDescription}
                             </p>
                         )}
 
-                        {/* Duration */}
-                        {estimatedDuration && (
-                            <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-blue-900">{t.duration}</span>
-                                    <span className="text-sm text-blue-700">{estimatedDuration}</span>
+                        {/* Info Pills */}
+                        <div className="flex flex-wrap justify-center gap-4 mb-10">
+                            {estimatedDuration && (
+                                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-full border border-amber-100 text-amber-800 text-sm font-medium">
+                                    <Icons.Play size={16} /> {estimatedDuration}
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Reward Info */}
-                        {rewardConfig?.enabled && rewardConfig.showOnLanding && rewardConfig.displayText && (
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                                <div className="flex items-start gap-3">
-                                    <div className="flex-shrink-0 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                                        </svg>
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-sm font-semibold text-green-900 mb-1">{t.reward}</div>
-                                        <div className="text-sm text-green-700">{rewardConfig.displayText}</div>
-                                    </div>
+                            {rewardConfig?.enabled && rewardConfig.showOnLanding && rewardConfig.displayText && (
+                                <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-full border border-emerald-100 text-emerald-800 text-sm font-medium">
+                                    <Icons.Gift size={16} /> {rewardConfig.displayText}
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
 
                         {/* Privacy & Legal Info */}
-                        <div className="space-y-3 mb-8">
+                        <div className="space-y-4 mb-8 p-6 bg-white/50 rounded-2xl border border-white/50">
                             {showAnonymityInfo && (
-                                <div className="text-sm text-gray-600 flex items-start gap-2">
-                                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
+                                <div className="text-sm text-gray-600 flex items-start gap-3">
+                                    <Icons.Shield size={18} className="text-gray-400 mt-0.5" />
                                     <span>
                                         {privacyNotice || `Your responses are ${privacyLevel} and will be used for research purposes.`}
                                     </span>
@@ -333,41 +324,35 @@ export default function InterviewChat({
                             )}
 
                             {showDataUsageInfo && dataUsageInfo && (
-                                <div className="text-sm text-gray-600 flex items-start gap-2">
-                                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                <div className="text-sm text-gray-600 flex items-start gap-3">
+                                    <Icons.Database size={18} className="text-gray-400 mt-0.5" />
                                     <span>{dataUsageInfo}</span>
                                 </div>
                             )}
-                        </div>
 
-                        {/* AI Act Compliance Notice */}
-                        <div className="text-xs text-gray-500 flex items-start gap-2 mt-4 bg-gray-50 p-2 rounded border border-gray-100">
-                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            <span>{t.aiNotice}</span>
+                            <div className="text-xs text-gray-500 flex items-start gap-3 pt-2 border-t border-gray-100/50">
+                                <Icons.Zap size={16} className="text-amber-400 mt-0.5" />
+                                <span>{t.aiNotice}</span>
+                            </div>
                         </div>
 
                         {/* GDPR Active Consent Checkbox */}
-                        <div className="mb-6 flex items-start gap-3">
-                            <div className="flex items-center h-5">
-                                <input
-                                    id="consent-checkbox"
-                                    type="checkbox"
-                                    checked={consentGiven}
-                                    onChange={(e) => setConsentGiven(e.target.checked)}
-                                    className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                />
-                            </div>
-                            <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer">
+                        <div className="mb-8 flex items-start gap-3 p-2">
+                            <input
+                                id="consent-checkbox"
+                                type="checkbox"
+                                checked={consentGiven}
+                                onChange={(e) => setConsentGiven(e.target.checked)}
+                                style={{ accentColor: colors.amber }}
+                                className="w-5 h-5 mt-0.5 cursor-pointer rounded border-gray-300 focus:ring-amber-500"
+                            />
+                            <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer leading-normal">
                                 {t.consentPrefix}
                                 <a
                                     href={`/privacy?lang=${language === 'it' ? 'it' : 'en'}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-600 hover:underline"
+                                    className="font-medium hover:underline text-amber-600"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     {t.consentLinkText}
@@ -379,19 +364,23 @@ export default function InterviewChat({
                         <button
                             onClick={handleStart}
                             disabled={!consentGiven}
-                            className={`w-full py-4 px-6 rounded-xl font-semibold text-white text-lg transition-all shadow-lg ${consentGiven
-                                ? 'hover:scale-105 active:scale-95'
-                                : 'opacity-50 cursor-not-allowed'
-                                }`}
-                            style={{ backgroundColor: primaryColor || '#6366f1' }}
+                            className={`w-full py-4 px-8 rounded-full font-bold text-white text-lg transition-all shadow-xl relative overflow-hidden group ${!consentGiven ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-amber-500/30 hover:scale-[1.02]'}`}
+                            style={{
+                                background: consentGiven ? gradients.primary : '#ccc',
+                            }}
                             title={!consentGiven ? t.pleaseConsent : ''}
                         >
-                            Start Interview →
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                {t.start} <Icons.ArrowRight size={20} />
+                            </span>
+                            {consentGiven && (
+                                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                            )}
                         </button>
 
-                        <div className="mt-6 text-center text-xs text-gray-500">
-                            <a href="/privacy" className="hover:underline">{t.privacy}</a>
-                            {' • '}
+                        <div className="mt-8 text-center text-xs text-gray-400 font-medium">
+                            <a href="/privacy" className="hover:text-amber-600 transition-colors">{t.privacy}</a>
+                            <span className="mx-2">•</span>
                             <span>{t.skip}</span>
                         </div>
                     </div>
@@ -402,189 +391,186 @@ export default function InterviewChat({
 
     return (
         <div
-            className="min-h-screen flex flex-col"
+            className="min-h-screen flex flex-col font-sans relative overflow-hidden"
             style={{
-                background: `linear-gradient(135deg, ${primaryColor || '#6366f1'}08 0%, ${backgroundColor || '#f9fafb'} 100%)`,
+                background: mainBackground,
+                color: colors.text
             }}
         >
+            {/* Dynamic Background Elements */}
+            <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: 'radial-gradient(circle at 80% 90%, rgba(251,191,36,0.15) 0%, transparent 40%)' }} />
+
             {/* Progress bar */}
-            <div className="fixed top-0 left-0 right-0 h-1 bg-gray-200 z-50">
+            <div className="fixed top-0 left-0 right-0 h-1.5 bg-gray-100/50 z-50 backdrop-blur-sm">
                 <motion.div
-                    className="h-full"
-                    style={{ backgroundColor: primaryColor || '#6366f1' }}
+                    className="h-full relative overflow-hidden"
+                    style={{ background: gradients.primary }}
                     initial={{ width: '0%' }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.5 }}
-                />
+                >
+                    <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" style={{ transform: 'skewX(-20deg)' }} />
+                </motion.div>
             </div>
 
-            {/* Header - minimal */}
-            <header className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    {logoUrl && (
-                        <img src={logoUrl} alt={botName} className="h-8 object-contain" />
+            {/* Header */}
+            <header className="fixed top-0 left-0 right-0 z-40 p-6 flex items-center justify-between pointer-events-none">
+                <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md p-2 pl-3 pr-4 rounded-full border border-white shadow-sm pointer-events-auto transition-all hover:shadow-md">
+                    {logoUrl ? (
+                        <img src={logoUrl} alt={botName} className="h-6 w-6 object-contain" />
+                    ) : (
+                        <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                            <Icons.Chat size={14} />
+                        </div>
                     )}
-                    <div>
-                        <h1 className="font-semibold text-gray-900">{botName}</h1>
-                    </div>
+                    <span className="font-semibold text-sm text-gray-800 tracking-tight truncate max-w-[150px]">{botName}</span>
                 </div>
-                <div className="text-sm text-gray-500">
-                    {elapsedMinutes} / ~{estimatedMinutes} min
+
+                <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white shadow-sm text-xs font-medium text-gray-500">
+                    {elapsedMinutes}m / ~{estimatedMinutes}m
                 </div>
             </header>
 
-            {/* Question area - centered, one at a time */}
-            <div className="flex-1 flex items-center justify-center p-4 pb-32">
-                <div className="max-w-3xl w-full">
-                    <AnimatePresence mode="wait">
-                        {currentQuestion && (
-                            <motion.div
-                                key={currentQuestion.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{ duration: 0.4 }}
-                                className="space-y-6"
-                            >
-                                {/* Question number */}
-                                <div className="flex items-center gap-2 text-sm text-gray-500">
-                                    <span>{totalQuestions}</span>
-                                    <span>→</span>
-                                </div>
-
-                                {/* Show user's last answer if exists (Rendered ABOVE current question for natural flow) */}
-                                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="mb-8 p-4 rounded-xl bg-white/50 border border-gray-200"
-                                    >
-                                        <div className="text-xs text-gray-500 mb-2">{t.yourAnswer}</div>
-                                        <div className="text-gray-700 italic">
+            {/* Chat Area */}
+            <div className="flex-1 flex flex-col items-center justify-center p-4 pb-32 w-full max-w-4xl mx-auto relative z-10">
+                <AnimatePresence mode="wait">
+                    {currentQuestion && (
+                        <motion.div
+                            key={currentQuestion.id}
+                            initial={{ opacity: 0, y: 30, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -20, scale: 0.98 }}
+                            transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+                            className="w-full max-w-2xl"
+                        >
+                            {/* Previous Answer Context */}
+                            {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="mb-8 ml-auto max-w-[85%]"
+                                >
+                                    <div className="bg-white/40 backdrop-blur-md border border-white/60 p-4 rounded-2xl rounded-tr-sm shadow-sm text-right">
+                                        <div className="text-xs font-semibold text-amber-600 mb-1 uppercase tracking-wider">{t.yourAnswer}</div>
+                                        <div className="text-gray-700 font-medium leading-relaxed">
                                             "{messages[messages.length - 2].content}"
                                         </div>
-                                    </motion.div>
-                                )}
+                                    </div>
+                                </motion.div>
+                            )}
 
-                                {/* Question text */}
-                                <div className="prose prose-lg max-w-none">
-                                    <ReactMarkdown
-                                        components={{
-                                            p: ({ children }) => {
-                                                // Helper to extract text length recursively
-                                                const getTextLength = (node: React.ReactNode): number => {
-                                                    if (typeof node === 'string') return node.length;
-                                                    if (typeof node === 'number') return String(node).length;
-                                                    if (Array.isArray(node)) return node.reduce((acc, child) => acc + getTextLength(child), 0);
-                                                    if (node && typeof node === 'object' && 'props' in node && (node as any).props?.children) {
-                                                        return getTextLength((node as any).props.children);
-                                                    }
-                                                    return 0;
-                                                };
-
-                                                const length = getTextLength(children);
-                                                let textSizeClass = 'text-2xl md:text-3xl'; // Default
-
-                                                if (length > 300) {
-                                                    textSizeClass = 'text-lg md:text-xl';
-                                                } else if (length > 200) {
-                                                    textSizeClass = 'text-xl md:text-2xl';
-                                                }
-
-                                                return (
-                                                    <p className={`${textSizeClass} font-medium text-gray-900 leading-relaxed mb-4`}>
-                                                        {children}
-                                                    </p>
-                                                );
-                                            },
-                                            strong: ({ children }) => (
-                                                <strong className="font-bold text-gray-900">{children}</strong>
-                                            ),
-                                            em: ({ children }) => (
-                                                <em className="italic">{children}</em>
-                                            ),
-                                            a: ({ href, children }) => (
-                                                <a
-                                                    href={href}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-blue-600 underline hover:text-blue-800 break-all"
-                                                >
-                                                    {children}
-                                                </a>
-                                            ),
-
-                                        }}
-                                    >
-                                        {currentQuestion.content}
-                                    </ReactMarkdown>
+                            {/* Bot Question Card */}
+                            <div className="relative">
+                                {/* Decor */}
+                                <div className="absolute -left-12 top-0 text-amber-200 hidden md:block">
+                                    <Icons.Chat size={32} />
                                 </div>
-                            </motion.div>
-                        )}
 
-                        {isLoading && !currentQuestion && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="flex flex-col items-center gap-4"
-                            >
-                                <div className="flex space-x-2">
-                                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                    <div className="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                <div className="space-y-6">
+                                    {/* Question Index */}
+                                    <div className="flex items-center gap-2 text-amber-600 font-bold text-sm uppercase tracking-widest">
+                                        <span>{t.question} {totalQuestions}</span>
+                                        <div className="h-px bg-amber-200 w-12" />
+                                    </div>
+
+                                    {/* Question Text */}
+                                    <div className="prose prose-lg max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:text-amber-600">
+                                        <ReactMarkdown
+                                            components={{
+                                                p: ({ children }) => {
+                                                    const text = String(children);
+                                                    const isShort = text.length < 80;
+                                                    const isLong = text.length > 200;
+
+                                                    return (
+                                                        <p className={`
+                                                            ${isShort ? 'text-3xl md:text-4xl font-bold tracking-tight text-gray-900' : ''} 
+                                                            ${!isShort && !isLong ? 'text-2xl md:text-3xl font-semibold text-gray-900' : ''}
+                                                            ${isLong ? 'text-xl md:text-2xl font-medium text-gray-800' : ''}
+                                                            leading-tight mb-6
+                                                        `} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                                            {children}
+                                                        </p>
+                                                    );
+                                                },
+                                                strong: ({ children }) => <span className="text-amber-600">{children}</span>
+                                            }}
+                                        >
+                                            {currentQuestion.content}
+                                        </ReactMarkdown>
+                                    </div>
                                 </div>
-                                <p className="text-gray-500 text-sm">{t.loading}</p>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {isLoading && !currentQuestion && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex flex-col items-center gap-6 mt-12"
+                        >
+                            <div className="relative w-16 h-16">
+                                <div className="absolute inset-0 rounded-full border-4 border-amber-100"></div>
+                                <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-t-transparent animate-spin"></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <Icons.Logo size={24} />
+                                </div>
+                            </div>
+                            <p className="text-gray-400 font-medium tracking-wide text-sm uppercase animate-pulse">{t.loading}</p>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
-            {/* Input area - ALWAYS fixed at bottom */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 p-4 md:p-6">
-                <div className="max-w-3xl mx-auto">
-                    <form onSubmit={handleSubmit} className="relative">
-                        <textarea
-                            ref={inputRef}
-                            value={input}
-                            onChange={(e) => {
-                                setInput(e.target.value);
-                                if (!isTyping) {
-                                    setIsTyping(true);
-                                }
-                                if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
-                                typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
-                            }}
-                            onKeyDown={handleKeyDown}
-                            disabled={isLoading}
-                            placeholder={t.typePlaceholder}
-                            rows={1}
-                            className="w-full resize-none rounded-2xl border-2 border-gray-300 px-6 py-4 pr-14 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-lg transition-all"
-                            style={{
-                                minHeight: '60px',
-                                maxHeight: '200px',
-                                borderColor: isLoading ? '#d1d5db' : (primaryColor || '#6366f1'),
-                            }}
-                        />
-                        <button
-                            type="submit"
-                            disabled={!input.trim() || isLoading}
-                            className="absolute right-3 bottom-3 w-12 h-12 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-110 active:scale-95 shadow-lg"
-                            style={{ backgroundColor: primaryColor || '#6366f1' }}
-                            aria-label="Send answer"
-                        >
-                            {isLoading ? (
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                            )}
-                        </button>
+            {/* Input Area */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-12">
+                <div className="max-w-3xl mx-auto w-full relative">
+                    <form onSubmit={handleSubmit} className="relative group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-[20px] blur opacity-20 group-focus-within:opacity-40 transition-opacity duration-500" />
+
+                        <div className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden transition-all ring-1 ring-black/5 group-focus-within:ring-amber-500/50">
+                            <textarea
+                                ref={inputRef}
+                                value={input}
+                                onChange={(e) => {
+                                    setInput(e.target.value);
+                                    if (!isTyping) { setIsTyping(true); }
+                                    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+                                    typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
+                                }}
+                                onKeyDown={handleKeyDown}
+                                disabled={isLoading}
+                                placeholder={t.typePlaceholder}
+                                rows={1}
+                                className="w-full resize-none border-none bg-transparent px-6 py-5 pr-16 text-lg text-gray-900 placeholder-gray-400 focus:ring-0 max-h-[200px]"
+                                style={{ minHeight: '72px' }}
+                            />
+
+                            <div className="pb-3 pr-3">
+                                <button
+                                    type="submit"
+                                    disabled={!input.trim() || isLoading}
+                                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95 hover:shadow-amber-500/25"
+                                    style={{ background: gradients.primary }}
+                                    aria-label="Send answer"
+                                >
+                                    {isLoading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <Icons.ArrowRight size={24} />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
                     </form>
-                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                        <span>{t.pressEnter}</span>
-                        <span>{t.question} {totalQuestions}</span>
+
+                    <div className="mt-4 flex items-center justify-between px-2 opacity-60 text-xs font-medium text-gray-500">
+                        <span className="hidden md:inline-block">{t.pressEnter}</span>
+                        <div className="flex items-center gap-1.5 ml-auto">
+                            <div className={`w-2 h-2 rounded-full ${isTyping ? 'bg-amber-500 animate-pulse' : 'bg-gray-300'}`} />
+                            <span>{isTyping ? 'Typing...' : 'Ready'}</span>
+                        </div>
                     </div>
                 </div>
             </div>

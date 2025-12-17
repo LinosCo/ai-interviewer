@@ -1,8 +1,7 @@
 
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { generateText, tool, CoreMessage } from 'ai';
-import { z } from 'zod';
+import { generateText, tool, CoreMessage, jsonSchema } from 'ai';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
 import fs from 'fs';
@@ -110,8 +109,12 @@ export async function POST(req: Request) {
             tools: {
                 transitionToNextTopic: tool({
                     description: 'Move to the next topic when the current one is sufficiently covered.',
-                    parameters: z.object({
-                        reason: z.string()
+                    parameters: jsonSchema({
+                        type: 'object',
+                        properties: {
+                            reason: { type: 'string', description: 'Why we are moving on' }
+                        },
+                        required: ['reason']
                     }),
                     execute: async ({ reason }: { reason: string }) => {
                         console.log(`[Sim] Transition to next topic: ${reason}`);
@@ -128,8 +131,12 @@ export async function POST(req: Request) {
                 } as any),
                 concludeInterview: tool({
                     description: 'End the interview.',
-                    parameters: z.object({
-                        finalMessage: z.string()
+                    parameters: jsonSchema({
+                        type: 'object',
+                        properties: {
+                            finalMessage: { type: 'string' }
+                        },
+                        required: ['finalMessage']
                     }),
                     execute: async ({ finalMessage }: { finalMessage: string }) => {
                         console.log(`[Sim] Conclude interview`);
@@ -137,7 +144,7 @@ export async function POST(req: Request) {
                         return "INTERVIEW_MARKED_COMPLETED";
                     }
                 } as any)
-            },
+            }
         } as any);
 
         return new Response(JSON.stringify({

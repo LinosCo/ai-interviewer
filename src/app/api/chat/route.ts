@@ -1,8 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { generateText, tool, CoreMessage } from 'ai';
-import { z } from 'zod';
+import { generateText, tool, CoreMessage, jsonSchema } from 'ai';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { generateConversationInsightAction } from '@/app/actions';
 import { recordInterviewCompleted } from '@/lib/usage';
@@ -178,18 +177,22 @@ export async function POST(req: Request) {
             model,
             system: systemPrompt,
             messages: messagesForAI,
-            maxSteps: 5, // Allow tool usage loop
+            maxSteps: 5,
             tools: {
                 transitionToNextTopic: tool({
                     description: 'Move to the next topic when the current one is sufficiently covered.',
-                    parameters: z.object({
-                        reason: z.string()
+                    parameters: jsonSchema({
+                        type: 'object',
+                        properties: {
+                            reason: { type: 'string', description: 'Why we are moving on (e.g. "User covered all sub-goals")' }
+                        },
+                        required: ['reason']
                     }),
                     execute: async ({ reason }: { reason: string }) => {
                         console.log(`Tool: transitionToNextTopic triggered. Reason: ${reason}`);
 
                         // Find next topic
-                        const currentIndex = bot.topics.findIndex(t => t.id === currentTopic?.id);
+                        const currentIndex = bot.topics.findIndex((t: any) => t.id === currentTopic?.id);
                         const nextTopic = bot.topics[currentIndex + 1];
 
                         if (nextTopic) {
@@ -205,8 +208,12 @@ export async function POST(req: Request) {
                 } as any),
                 concludeInterview: tool({
                     description: 'End the interview when time is up or all topics are covered.',
-                    parameters: z.object({
-                        finalMessage: z.string()
+                    parameters: jsonSchema({
+                        type: 'object',
+                        properties: {
+                            finalMessage: { type: 'string', description: 'The final closing statement to the user' }
+                        },
+                        required: ['finalMessage']
                     }),
                     execute: async ({ finalMessage }: { finalMessage: string }) => {
                         console.log("Tool: concludeInterview triggered.");
@@ -238,9 +245,8 @@ export async function POST(req: Request) {
                         return "INTERVIEW_MARKED_COMPLETED";
                     }
                 } as any),
-                // We could add logInsight tool here later for incremental analytics!
             }
-        } as any); // Cast to any because maxSteps might allow wider types or TS definition is lagging
+        } as any);
 
         let responseText = result.text;
 

@@ -6,10 +6,10 @@ import { templates, Template } from '@/lib/templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
 
 const examplePrompts = [
-    'Voglio capire perché i miei clienti abbandonano il carrello',
-    'Voglio raccogliere feedback sul nuovo processo di onboarding',
-    'Voglio capire cosa pensano i dipendenti del nuovo tool',
-    'Voglio validare un\'idea di prodotto prima di svilupparla',
+    'Vorrei capire perché i miei clienti abbandonano il carrello e-commerce',
+    'Voglio raccogliere feedback sul nuovo processo di onboarding dei dipendenti',
+    'Devo fare una exit interview per capire perché i talenti lasciano l\'azienda',
+    'Voglio validare l\'interesse per un nuovo servizio di consulenza finanziaria',
 ];
 
 export default function OnboardingPage() {

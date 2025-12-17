@@ -10,14 +10,14 @@
     "postinstall": "prisma generate && prisma db push && prisma db seed"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.55",
-    "@ai-sdk/openai": "^2.0.81",
-    "@ai-sdk/react": "^2.0.113",
+    "@ai-sdk/anthropic": "^2.0.56",
+    "@ai-sdk/openai": "^2.0.88",
+    "@ai-sdk/react": "^2.0.117",
     "@auth/prisma-adapter": "^2.11.1",
     "@prisma/client": "^5.22.0",
     "@stripe/stripe-js": "^8.6.0",
     "@types/bcryptjs": "^2.4.6",
-    "ai": "^5.0.111",
+    "ai": "^5.0.115",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -33,7 +33,7 @@
     "recharts": "^3.5.1",
     "stripe": "^20.1.0",
     "tailwind-merge": "^3.4.0",
-    "zod": "^4.1.13"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

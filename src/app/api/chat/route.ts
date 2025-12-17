@@ -164,6 +164,12 @@ export async function POST(req: Request) {
 
         // 5. Generate Response with Tools
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }) as CoreMessage);
+
+        // Fix: Vercel AI SDK throws if messages is empty. Inject start signal.
+        if (messagesForAI.length === 0) {
+            messagesForAI.push({ role: 'user', content: "I am ready to start." });
+        }
+
         if (topicInstruction) {
             messagesForAI.push(topicInstruction as CoreMessage);
         }

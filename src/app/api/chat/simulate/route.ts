@@ -95,10 +95,17 @@ export async function POST(req: Request) {
         let transitionReason = null;
         let isCompleted = false;
 
+        const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
+
+        // Fix: Vercel AI SDK throws if messages is empty
+        if (messagesForAI.length === 0) {
+            messagesForAI.push({ role: 'user', content: "I am ready to start." });
+        }
+
         const result = await generateText({
             model,
             system: systemPrompt,
-            messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
+            messages: messagesForAI,
             maxSteps: 5,
             tools: {
                 transitionToNextTopic: tool({

@@ -19,6 +19,8 @@ import {
     Trash2,
     X
 } from 'lucide-react';
+import SimulatorChat from '@/components/simulator/simulator-chat';
+import { checkUserSession } from '@/app/actions/session';
 
 interface TopicConfig {
     label: string;
@@ -129,8 +131,20 @@ export default function PreviewPage() {
         setExpandedTopics(newExpanded);
     };
 
+    const [showAuthModal, setShowAuthModal] = useState(false);
+
+    // Initial check (optional, or just do it on action)
+
     const handlePublish = async () => {
         if (!config) return;
+
+        // 1. Check Auth
+        const isLoggedIn = await checkUserSession();
+        if (!isLoggedIn) {
+            setShowAuthModal(true);
+            return;
+        }
+
         setIsPublishing(true);
 
         try {
@@ -141,6 +155,10 @@ export default function PreviewPage() {
             });
 
             if (!response.ok) {
+                if (response.status === 401) {
+                    setShowAuthModal(true);
+                    return;
+                }
                 throw new Error('Errore nella pubblicazione');
             }
 
@@ -315,7 +333,7 @@ export default function PreviewPage() {
                                 onClick={() => setEditingIntro(false)}
                                 className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg flex items-center gap-1"
                             >
-                                <Save className="w-3 h-3" /> Salva
+                                <Save className="w-3 h-3" /> Fatto
                             </button>
                         </div>
                     ) : (
@@ -490,39 +508,48 @@ export default function PreviewPage() {
 
             {/* Simulator Modal */}
             {showSimulator && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="w-full max-w-4xl h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col relative">
+                        <button
+                            onClick={() => setShowSimulator(false)}
+                            className="absolute top-4 right-4 z-50 p-2 bg-white/80 hover:bg-white rounded-full text-gray-600 hover:text-gray-900 transition-colors shadow-sm"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                        <SimulatorChat config={config} onClose={() => setShowSimulator(false)} />
+                    </div>
+                </div>
+            )}
+
+            {/* Auth Modal */}
+            {showAuthModal && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 z-50">
-                    <div className="max-w-lg w-full bg-slate-800 rounded-2xl overflow-hidden">
-                        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Eye className="w-5 h-5 text-purple-400" />
-                                <span className="text-white font-medium">Anteprima intervista</span>
-                            </div>
-                            <button
-                                onClick={() => setShowSimulator(false)}
-                                className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                            >
-                                <X className="w-5 h-5 text-slate-400" />
-                            </button>
+                    <div className="max-w-md w-full bg-slate-800 rounded-2xl overflow-hidden p-8 text-center space-y-6 border border-slate-700">
+                        <div className="mx-auto w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
+                            <Sparkles className="w-8 h-8 text-purple-400" />
                         </div>
-                        <div className="p-8 text-center text-slate-400">
-                            <p>Il simulatore sarà disponibile a breve.</p>
-                            <p className="mt-2 text-sm">Per ora, puoi pubblicare l'intervista e testarla direttamente.</p>
+                        <div>
+                            <h3 className="2xl font-bold text-white mb-2">Quasi fatto!</h3>
+                            <p className="text-slate-300">
+                                Per salvare e pubblicare la tua intervista, devi creare un account gratuito.
+                                La tua configurazione verrà salvata automaticamente.
+                            </p>
                         </div>
-                        <div className="p-4 border-t border-slate-700 flex justify-end gap-3">
-                            <button
-                                onClick={() => setShowSimulator(false)}
-                                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-                            >
-                                Chiudi
-                            </button>
+                        <div className="flex flex-col gap-3">
                             <button
                                 onClick={() => {
-                                    setShowSimulator(false);
-                                    handlePublish();
+                                    // Use standard next-auth signin path with callback
+                                    window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
                                 }}
-                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                                className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
                             >
-                                Pubblica direttamente
+                                Registrati o Accedi
+                            </button>
+                            <button
+                                onClick={() => setShowAuthModal(false)}
+                                className="w-full px-6 py-3 text-slate-400 hover:text-white transition-colors"
+                            >
+                                Annulla
                             </button>
                         </div>
                     </div>

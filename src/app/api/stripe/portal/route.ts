@@ -1,13 +1,17 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { getStripe } from '@/lib/stripe';
+import { getStripeClient } from '@/lib/stripe';
+import { NextResponse } from 'next/server'; // Added this import for NextResponse
 
-export async function POST() {
+export async function POST(req: Request) {
     try {
         const session = await auth();
+
         if (!session?.user?.email) {
-            return new Response('Unauthorized', { status: 401 });
+            return new NextResponse('Unauthorized', { status: 401 });
         }
+
+        const stripe = await getStripeClient();
 
         // Get user's organization subscription
         const user = await prisma.user.findUnique({
@@ -31,7 +35,7 @@ export async function POST() {
         }
 
         // Create portal session
-        const portalSession = await getStripe().billingPortal.sessions.create({
+        const portalSession = await stripe.billingPortal.sessions.create({
             customer: subscription.stripeCustomerId,
             return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/billing`
         });

@@ -11,6 +11,13 @@ interface PlatformSettingsFormProps {
     platformOpenaiApiKey: string;
     platformAnthropicApiKey: string;
     isAdmin: boolean;
+
+    // Stripe Config (Admin only)
+    stripeSecretKey?: string;
+    stripeWebhookSecret?: string;
+    stripePriceStarter?: string;
+    stripePricePro?: string;
+    stripePriceBusiness?: string;
 }
 
 export default function PlatformSettingsForm({
@@ -19,12 +26,36 @@ export default function PlatformSettingsForm({
     settingsId,
     platformOpenaiApiKey,
     platformAnthropicApiKey,
-    isAdmin
+    isAdmin,
+    stripeSecretKey = '',
+    stripeWebhookSecret = '',
+    stripePriceStarter = '',
+    stripePricePro = '',
+    stripePriceBusiness = ''
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
     const [openaiKey, setOpenaiKey] = useState('');
     const [anthropicKey, setAnthropicKey] = useState('');
+
+    // Stripe State
+    const [sSecretKey, setSSecretKey] = useState('');
+    const [sWebhookSecret, setSWebhookSecret] = useState('');
+    const [sPriceStarter, setSPriceStarter] = useState(stripePriceStarter);
+    const [sPricePro, setSPricePro] = useState(stripePricePro);
+    const [sPriceBusiness, setSPriceBusiness] = useState(stripePriceBusiness);
+
+    const isDirty = (
+        (openaiKey && openaiKey !== platformOpenaiApiKey) ||
+        (anthropicKey && anthropicKey !== platformAnthropicApiKey) ||
+        (sSecretKey && sSecretKey !== stripeSecretKey) ||
+        (sWebhookSecret && sWebhookSecret !== stripeWebhookSecret) ||
+        sPriceStarter !== stripePriceStarter ||
+        sPricePro !== stripePricePro ||
+        sPriceBusiness !== stripePriceBusiness ||
+        knowledge !== currentKnowledge
+    );
+
     const [isSaving, setIsSaving] = useState(false);
     const router = useRouter();
 
@@ -47,8 +78,15 @@ export default function PlatformSettingsForm({
                     // If empty, pass the original prop value so it doesn't get cleared?
                     // Better: Send only if changed. But this is a simple form.
                     // Let's rely on backend: we send current input. If input is empty, backend should probably ignore OR we send the ORIGINAL if input is empty.
-                    platformOpenaiApiKey: openaiKey || platformOpenaiApiKey,
-                    platformAnthropicApiKey: anthropicKey || platformAnthropicApiKey
+                    platformOpenaiApiKey: openaiKey || undefined, // undefined to not overwrite if empty ? No, backend logic handles specific field update.
+                    platformAnthropicApiKey: anthropicKey || undefined,
+
+                    // Stripe
+                    stripeSecretKey: sSecretKey || undefined,
+                    stripeWebhookSecret: sWebhookSecret || undefined,
+                    stripePriceStarter: sPriceStarter, // Prices can be updated directly as strings
+                    stripePricePro: sPricePro,
+                    stripePriceBusiness: sPriceBusiness
                 })
             });
 
@@ -131,8 +169,82 @@ export default function PlatformSettingsForm({
                 />
             </div>
 
+            {/* Admin Only: Stripe Configuration */}
+            {isAdmin && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                        Stripe Configuration (Admin Only)
+                    </h2>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Stripe Secret Key
+                            </label>
+                            <input
+                                type="password"
+                                value={sSecretKey}
+                                onChange={(e) => setSSecretKey(e.target.value)}
+                                placeholder="sk_live_..."
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Stripe Webhook Secret
+                            </label>
+                            <input
+                                type="password"
+                                value={sWebhookSecret}
+                                onChange={(e) => setSWebhookSecret(e.target.value)}
+                                placeholder="whsec_..."
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Starter Price ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceStarter}
+                                    onChange={(e) => setSPriceStarter(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Pro Price ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPricePro}
+                                    onChange={(e) => setSPricePro(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Business Price ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceBusiness}
+                                    onChange={(e) => setSPriceBusiness(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Save Buttons */}
-            <div className="flex gap-3">
+            <div className="flex justify-end">
                 <button
                     onClick={handleSave}
                     disabled={isSaving}

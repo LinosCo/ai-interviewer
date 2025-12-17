@@ -1,4 +1,4 @@
-// Template registry for Voler.AI
+// Template registry for Business Tuner
 
 export type { Template } from './types';
 import { Template } from './types';

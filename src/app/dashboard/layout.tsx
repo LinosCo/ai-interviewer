@@ -23,7 +23,7 @@ export default async function DashboardLayout({
         <div className="flex h-screen flex-col md:flex-row md:overflow-hidden">
             <div className="w-full flex-none md:w-64 bg-gray-900 text-white p-4 flex flex-col">
                 <Link href="/dashboard" className="mb-6 font-bold text-xl text-purple-400">
-                    voler.AI
+                    Business Tuner
                 </Link>
 
                 {/* Quick Create Button */}

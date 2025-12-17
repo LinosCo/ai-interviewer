@@ -10,14 +10,14 @@ function PrivacyContent() {
     const content = {
         it: {
             title: "Informativa sulla Privacy (GDPR)",
-            intro: "La presente informativa descrive le modalità di trattamento dei dati personali raccolti attraverso la piattaforma 'voler.AI Interviewer'. La piattaforma facilita interviste di ricerca qualitativa automatizzate mediate da Intelligenza Artificiale.",
+            intro: "La presente informativa descrive le modalità di trattamento dei dati personali raccolti attraverso la piattaforma 'Business Tuner Interviewer'. La piattaforma facilita interviste di ricerca qualitativa automatizzate mediate da Intelligenza Artificiale.",
             roles_title: "1. Titolare e Responsabile del Trattamento",
             roles_text: (
                 <>
                     <p className="mb-2">Ai sensi del Regolamento UE 2016/679 (GDPR):</p>
                     <ul className="list-disc pl-5 space-y-1">
                         <li><strong>Titolare del Trattamento (Data Controller):</strong> È l'organizzazione o il ricercatore che ha creato e distribuito questo specifico chatbot. Essi definiscono le finalità e i mezzi del trattamento dei tuoi dati.</li>
-                        <li><strong>Responsabile del Trattamento (Data Processor):</strong> È <strong>voler.AI</strong>, che fornisce l'infrastruttura tecnologica sicura per condurre l'intervista per conto del Titolare.</li>
+                        <li><strong>Responsabile del Trattamento (Data Processor):</strong> È <strong>Business Tuner</strong>, che fornisce l'infrastruttura tecnologica sicura per condurre l'intervista per conto del Titolare.</li>
                     </ul>
                 </>
             ),
@@ -46,20 +46,20 @@ function PrivacyContent() {
                         <li>Limitare il trattamento o opporti allo stesso.</li>
                         <li>Richiedere la portabilità dei dati.</li>
                     </ul>
-                    <p className="mt-2">Per esercitare questi diritti, contatta direttamente l'organizzazione che ti ha invitato. Se non disponi dei loro contatti, scrivi a <a href="mailto:privacy@voler.ai" className="text-blue-600 hover:underline">privacy@voler.ai</a> e inoltreremo la richiesta al Titolare competente.</p>
+                    <p className="mt-2">Per esercitare questi diritti, contatta direttamente l'organizzazione che ti ha invitato. Se non disponi dei loro contatti, scrivi a <a href="mailto:privacy@businesstuner.ai" className="text-blue-600 hover:underline">privacy@businesstuner.ai</a> e inoltreremo la richiesta al Titolare competente.</p>
                 </>
             )
         },
         en: {
             title: "Privacy Policy (GDPR)",
-            intro: "This policy describes how personal data collected through the 'voler.AI Interviewer' platform is processed. The platform facilitates automated qualitative research interviews mediated by Artificial Intelligence.",
+            intro: "This policy describes how personal data collected through the 'Business Tuner Interviewer' platform is processed. The platform facilitates automated qualitative research interviews mediated by Artificial Intelligence.",
             roles_title: "1. Data Controller & Processor",
             roles_text: (
                 <>
                     <p className="mb-2">Under EU Regulation 2016/679 (GDPR):</p>
                     <ul className="list-disc pl-5 space-y-1">
                         <li><strong>Data Controller:</strong> The organization or researcher who created and distributed this specific chatbot. They determine the purposes and means of processing your data.</li>
-                        <li><strong>Data Processor:</strong> <strong>voler.AI</strong>, providing the secure technological infrastructure to conduct the interview on behalf of the Controller.</li>
+                        <li><strong>Data Processor:</strong> <strong>Business Tuner</strong>, providing the secure technological infrastructure to conduct the interview on behalf of the Controller.</li>
                     </ul>
                 </>
             ),
@@ -88,7 +88,7 @@ function PrivacyContent() {
                         <li>Restrict or object to processing.</li>
                         <li>Request data portability.</li>
                     </ul>
-                    <p className="mt-2">To exercise these rights, please contact the organization that invited you directly. If you do not have their contact details, write to <a href="mailto:privacy@voler.ai" className="text-blue-600 hover:underline">privacy@voler.ai</a>, and we will forward your request to the relevant Controller.</p>
+                    <p className="mt-2">To exercise these rights, please contact the organization that invited you directly. If you do not have their contact details, write to <a href="mailto:privacy@businesstuner.ai" className="text-blue-600 hover:underline">privacy@businesstuner.ai</a>, and we will forward your request to the relevant Controller.</p>
                 </>
             )
         }

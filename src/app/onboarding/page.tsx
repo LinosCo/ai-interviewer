@@ -34,7 +34,7 @@ export default function OnboardingPage() {
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col">
             {/* Header */}
             <header className="p-6">
-                <h1 className="text-2xl font-bold text-white">voler.AI</h1>
+                <h1 className="text-2xl font-bold text-white">Business Tuner</h1>
             </header>
 
             {/* Main Content */}

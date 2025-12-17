@@ -1,4 +1,4 @@
-// Template type definitions for Voler.AI
+// Template type definitions for Business Tuner
 
 export interface Template {
     id: string;

@@ -1,26 +1,29 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { getStripe, PRICING_PLANS, PlanKey } from '@/lib/stripe';
+import { getStripeClient, getPricingPlans, PlanKey } from '@/lib/stripe';
 import { getOrCreateSubscription } from '@/lib/usage';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) { // Changed NextRequest to Request
     try {
+        const { tier, successUrl, cancelUrl } = await req.json(); // Moved up and kept successUrl/cancelUrl
         const session = await auth();
-        if (!session?.user?.email) {
-            return new Response('Unauthorized', { status: 401 });
-        }
 
-        const { tier, successUrl, cancelUrl } = await req.json();
+        if (!session?.user?.email) {
+            return new NextResponse('Unauthorized', { status: 401 }); // Changed Response to NextResponse
+        }
 
         // Validate tier
         if (!tier || !['STARTER', 'PRO', 'BUSINESS'].includes(tier)) {
-            return new Response('Invalid tier', { status: 400 });
+            return new NextResponse('Invalid tier', { status: 400 }); // Changed Response to NextResponse
         }
 
-        const plan = PRICING_PLANS[tier as PlanKey];
-        if (!plan.priceId) {
-            return new Response('Price not configured', { status: 500 });
+        const stripe = await getStripeClient(); // New
+        const plans = await getPricingPlans(); // New
+        const plan = plans[tier as PlanKey]; // Use plans from getPricingPlans
+
+        if (!plan || !plan.priceId) { // Combined plan existence and priceId check
+            return new NextResponse('Price not configured or invalid plan', { status: 500 }); // Changed Response to NextResponse
         }
 
         // Get user and organization
@@ -60,9 +63,10 @@ export async function POST(req: NextRequest) {
         const subscription = await getOrCreateSubscription(organization.id);
 
         // Create or get Stripe customer
-        let customerId = subscription.stripeCustomerId;
+        let customerId = subscription?.stripeCustomerId;
+
         if (!customerId) {
-            const customer = await getStripe().customers.create({
+            const customer = await stripe.customers.create({
                 email: user.email,
                 name: user.name || undefined,
                 metadata: {
@@ -80,13 +84,13 @@ export async function POST(req: NextRequest) {
         }
 
         // Create checkout session
-        const checkoutSession = await getStripe().checkout.sessions.create({
+        const checkoutSession = await stripe.checkout.sessions.create({
             customer: customerId,
             mode: 'subscription',
             payment_method_types: ['card'],
             line_items: [
                 {
-                    price: plan.priceId,
+                    price: plan.priceId!,
                     quantity: 1
                 }
             ],

@@ -14,8 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "voler.AI Interviewer Platform",
-  description: "Automated qualitative research interviews powered by AI",
+  title: {
+    default: "Business Tuner - Ascolta il mercato. Decidi meglio.",
+    template: "%s | Business Tuner",
+  },
+  description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({

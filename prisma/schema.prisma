@@ -112,6 +112,14 @@ model GlobalConfig {
   id              String   @id @default("default")
   openaiApiKey    String?
   anthropicApiKey String?
+  
+  // Stripe Configuration (Admin managed)
+  stripeSecretKey      String?
+  stripeWebhookSecret  String?
+  stripePriceStarter   String?
+  stripePricePro       String?
+  stripePriceBusiness  String?
+  
   updatedAt       DateTime @updatedAt
 }
 

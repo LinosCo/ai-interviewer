@@ -9,7 +9,19 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { userId, settingsId, methodologyKnowledge, platformOpenaiApiKey, platformAnthropicApiKey } = await req.json();
+        const {
+            userId,
+            settingsId,
+            methodologyKnowledge,
+            platformOpenaiApiKey,
+            platformAnthropicApiKey,
+            // Stripe fields
+            stripeSecretKey,
+            stripeWebhookSecret,
+            stripePriceStarter,
+            stripePricePro,
+            stripePriceBusiness
+        } = await req.json();
 
         // Verify user owns these settings
         const user = await prisma.user.findUnique({
@@ -30,24 +42,31 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        // If Admin, update Global Config API Keys
+        // If Admin, update Global Config API Keys and Stripe Config
         if (user.role === 'ADMIN') {
             await prisma.globalConfig.upsert({
                 where: { id: "default" },
                 update: {
                     openaiApiKey: platformOpenaiApiKey || null,
                     anthropicApiKey: platformAnthropicApiKey || null,
+                    stripeSecretKey: stripeSecretKey || undefined, // Only update if provided? Or null?
+                    stripeWebhookSecret: stripeWebhookSecret || undefined,
+                    stripePriceStarter: stripePriceStarter || undefined,
+                    stripePricePro: stripePricePro || undefined,
+                    stripePriceBusiness: stripePriceBusiness || undefined
                 },
                 create: {
                     id: "default",
                     openaiApiKey: platformOpenaiApiKey || null,
                     anthropicApiKey: platformAnthropicApiKey || null,
+                    stripeSecretKey,
+                    stripeWebhookSecret,
+                    stripePriceStarter,
+                    stripePricePro,
+                    stripePriceBusiness
                 }
             });
         }
-
-        // Note: We are NO LONGER updating user.platformOpenaiApiKey to avoid confusion.
-        // Personal keys are deprecated in favor of Bot-specific or Global keys.
 
         return NextResponse.json(settings);
     } catch (error) {

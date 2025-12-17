@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { SubscriptionTier } from '@prisma/client';
-import { PRICING_PLANS, PlanKey } from './stripe';
+import { getPricingPlans, PlanKey } from './stripe';
 
 // Get or create subscription for an organization
 export async function getOrCreateSubscription(organizationId: string) {
@@ -12,15 +12,16 @@ export async function getOrCreateSubscription(organizationId: string) {
         // Create default free subscription
         const now = new Date();
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const plans = await getPricingPlans();
 
         subscription = await prisma.subscription.create({
             data: {
                 organizationId,
                 tier: 'FREE',
                 status: 'ACTIVE',
-                maxActiveBots: PRICING_PLANS.FREE.features.maxActiveBots,
-                maxInterviewsPerMonth: PRICING_PLANS.FREE.features.maxInterviewsPerMonth,
-                maxUsers: PRICING_PLANS.FREE.features.maxUsers,
+                maxActiveBots: plans.FREE.features.maxActiveBots,
+                maxInterviewsPerMonth: plans.FREE.features.maxInterviewsPerMonth,
+                maxUsers: plans.FREE.features.maxUsers,
                 currentPeriodStart: now,
                 currentPeriodEnd: endOfMonth,
             }
@@ -168,7 +169,8 @@ export async function upgradeSubscription(
     newTier: PlanKey,
     stripeData?: { customerId: string; subscriptionId: string; priceId: string }
 ) {
-    const limits = PRICING_PLANS[newTier].features;
+    const plans = await getPricingPlans();
+    const limits = plans[newTier].features;
 
     await prisma.subscription.update({
         where: { organizationId },

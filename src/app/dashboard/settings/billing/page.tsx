@@ -2,7 +2,8 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import { getUsageStats } from '@/lib/usage';
-import { PRICING_PLANS } from '@/lib/stripe';
+import { getPricingPlans } from '@/lib/stripe';
+
 import Link from 'next/link';
 import { CreditCard, ArrowUpRight, FileText, AlertCircle } from 'lucide-react';
 
@@ -57,8 +58,13 @@ export default async function BillingPage() {
         );
     }
 
+
+
+    // ... imports ...
+
     const usage = await getUsageStats(organization.id);
-    const currentPlan = PRICING_PLANS[subscription.tier as keyof typeof PRICING_PLANS];
+    const plans = await getPricingPlans(); // Fetch plans
+    const currentPlan = plans[subscription.tier as keyof typeof plans]; // Access plan
 
     return (
         <div className="space-y-8">
@@ -163,8 +169,8 @@ export default async function BillingPage() {
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <span className={`px-2 py-1 text-xs rounded-full ${invoice.status === 'paid'
-                                            ? 'bg-green-100 text-green-700'
-                                            : 'bg-yellow-100 text-yellow-700'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-yellow-100 text-yellow-700'
                                         }`}>
                                         {invoice.status === 'paid' ? 'Pagata' : invoice.status}
                                     </span>

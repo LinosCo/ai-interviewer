@@ -10,10 +10,13 @@ import {
     Edit2,
     Eye,
     Link2,
+    Plus,
     Play,
     QrCode,
+    Save,
     Share2,
     Sparkles,
+    Trash2,
     X
 } from 'lucide-react';
 
@@ -40,6 +43,9 @@ export default function PreviewPage() {
     const router = useRouter();
     const [config, setConfig] = useState<GeneratedConfig | null>(null);
     const [editingName, setEditingName] = useState(false);
+    const [editingGoal, setEditingGoal] = useState(false);
+    const [editingIntro, setEditingIntro] = useState(false);
+    const [editingTopicIndex, setEditingTopicIndex] = useState<number | null>(null);
     const [expandedTopics, setExpandedTopics] = useState<Set<number>>(new Set([0]));
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
@@ -54,6 +60,64 @@ export default function PreviewPage() {
             router.push('/onboarding');
         }
     }, [router]);
+
+    const updateConfig = (updates: Partial<GeneratedConfig>) => {
+        if (!config) return;
+        const newConfig = { ...config, ...updates };
+        setConfig(newConfig);
+        sessionStorage.setItem('generatedConfig', JSON.stringify(newConfig));
+    };
+
+    const updateTopic = (index: number, updates: Partial<TopicConfig>) => {
+        if (!config) return;
+        const newTopics = [...config.topics];
+        newTopics[index] = { ...newTopics[index], ...updates };
+        updateConfig({ topics: newTopics });
+    };
+
+    const addTopic = () => {
+        if (!config) return;
+        const newTopic: TopicConfig = {
+            label: 'Nuovo topic',
+            description: 'Descrizione del topic',
+            subGoals: ['Sotto-obiettivo 1'],
+            maxTurns: 4
+        };
+        const newTopics = [...config.topics, newTopic];
+        updateConfig({ topics: newTopics });
+        setExpandedTopics(new Set([...expandedTopics, newTopics.length - 1]));
+        setEditingTopicIndex(newTopics.length - 1);
+    };
+
+    const removeTopic = (index: number) => {
+        if (!config || config.topics.length <= 1) return;
+        const newTopics = config.topics.filter((_, i) => i !== index);
+        updateConfig({ topics: newTopics });
+        setEditingTopicIndex(null);
+    };
+
+    const addSubGoal = (topicIndex: number) => {
+        if (!config) return;
+        const topic = config.topics[topicIndex];
+        const newSubGoals = [...topic.subGoals, 'Nuovo sotto-obiettivo'];
+        updateTopic(topicIndex, { subGoals: newSubGoals });
+    };
+
+    const updateSubGoal = (topicIndex: number, goalIndex: number, value: string) => {
+        if (!config) return;
+        const topic = config.topics[topicIndex];
+        const newSubGoals = [...topic.subGoals];
+        newSubGoals[goalIndex] = value;
+        updateTopic(topicIndex, { subGoals: newSubGoals });
+    };
+
+    const removeSubGoal = (topicIndex: number, goalIndex: number) => {
+        if (!config) return;
+        const topic = config.topics[topicIndex];
+        if (topic.subGoals.length <= 1) return;
+        const newSubGoals = topic.subGoals.filter((_, i) => i !== goalIndex);
+        updateTopic(topicIndex, { subGoals: newSubGoals });
+    };
 
     const toggleTopic = (index: number) => {
         const newExpanded = new Set(expandedTopics);
@@ -123,7 +187,6 @@ export default function PreviewPage() {
                         <p className="text-slate-300">La tua intervista è pronta. Condividi il link per iniziare a raccogliere risposte.</p>
                     </div>
 
-                    {/* Link Copy */}
                     <div className="bg-white/5 rounded-xl p-4 flex items-center gap-3">
                         <Link2 className="w-5 h-5 text-slate-400 flex-shrink-0" />
                         <span className="text-white truncate flex-1 text-left">{interviewLink}</span>
@@ -136,17 +199,6 @@ export default function PreviewPage() {
                         </button>
                     </div>
 
-                    {/* Share Options */}
-                    <div className="flex justify-center gap-4">
-                        <button className="p-4 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group">
-                            <QrCode className="w-6 h-6 text-slate-400 group-hover:text-white" />
-                        </button>
-                        <button className="p-4 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group">
-                            <Share2 className="w-6 h-6 text-slate-400 group-hover:text-white" />
-                        </button>
-                    </div>
-
-                    {/* Actions */}
                     <div className="flex gap-4">
                         <button
                             onClick={() => router.push('/dashboard')}
@@ -161,10 +213,6 @@ export default function PreviewPage() {
                             Crea un'altra
                         </button>
                     </div>
-
-                    <p className="text-sm text-slate-400">
-                        Riceverai una notifica quando arrivano le prime risposte 📬
-                    </p>
                 </div>
             </div>
         );
@@ -173,9 +221,8 @@ export default function PreviewPage() {
     // Preview & Edit View
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-            {/* Header */}
             <header className="p-6 flex items-center justify-between border-b border-white/10">
-                <h1 className="text-2xl font-bold text-white">voler.AI</h1>
+                <h1 className="text-2xl font-bold text-white">Business Tuner</h1>
                 <button
                     onClick={() => router.push('/onboarding')}
                     className="text-slate-400 hover:text-white transition-colors"
@@ -185,15 +232,15 @@ export default function PreviewPage() {
             </header>
 
             <main className="max-w-3xl mx-auto p-6 space-y-8">
-                {/* Name */}
+                {/* Name - Editable */}
                 <div className="space-y-2">
                     {editingName ? (
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
                                 value={config.name || 'La mia intervista'}
-                                onChange={(e) => setConfig({ ...config, name: e.target.value })}
-                                className="text-3xl font-bold bg-transparent text-white border-b-2 border-purple-500 focus:outline-none"
+                                onChange={(e) => updateConfig({ name: e.target.value })}
+                                className="text-3xl font-bold bg-transparent text-white border-b-2 border-purple-500 focus:outline-none w-full"
                                 autoFocus
                                 onBlur={() => setEditingName(false)}
                                 onKeyDown={(e) => e.key === 'Enter' && setEditingName(false)}
@@ -205,29 +252,89 @@ export default function PreviewPage() {
                             className="text-3xl font-bold text-white flex items-center gap-2 hover:text-purple-300 transition-colors"
                         >
                             {config.name || 'La mia intervista'}
-                            <Edit2 className="w-5 h-5" />
+                            <Edit2 className="w-5 h-5 opacity-50" />
                         </button>
+                    )}
+                    <p className="text-sm text-slate-400">Clicca per modificare nome, obiettivo o topic</p>
+                </div>
+
+                {/* Research Goal - Editable */}
+                <div className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-purple-400">
+                            <Sparkles className="w-5 h-5" />
+                            <span className="font-medium">Obiettivo della ricerca</span>
+                        </div>
+                        {!editingGoal && (
+                            <button onClick={() => setEditingGoal(true)} className="text-slate-400 hover:text-white">
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                    {editingGoal ? (
+                        <div className="space-y-2">
+                            <textarea
+                                value={config.researchGoal}
+                                onChange={(e) => updateConfig({ researchGoal: e.target.value })}
+                                className="w-full bg-white/10 text-white rounded-lg p-3 border border-white/20 focus:outline-none focus:border-purple-500 resize-none"
+                                rows={3}
+                                autoFocus
+                            />
+                            <button
+                                onClick={() => setEditingGoal(false)}
+                                className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg flex items-center gap-1"
+                            >
+                                <Save className="w-3 h-3" /> Salva
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="text-white">{config.researchGoal}</p>
                     )}
                 </div>
 
-                {/* Research Goal */}
+                {/* Intro Message - Editable */}
                 <div className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-3">
-                    <div className="flex items-center gap-2 text-purple-400">
-                        <Sparkles className="w-5 h-5" />
-                        <span className="font-medium">Obiettivo della ricerca</span>
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-400">Messaggio di benvenuto</span>
+                        {!editingIntro && (
+                            <button onClick={() => setEditingIntro(true)} className="text-slate-400 hover:text-white">
+                                <Edit2 className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
-                    <p className="text-white">{config.researchGoal}</p>
+                    {editingIntro ? (
+                        <div className="space-y-2">
+                            <textarea
+                                value={config.introMessage}
+                                onChange={(e) => updateConfig({ introMessage: e.target.value })}
+                                className="w-full bg-white/10 text-white rounded-lg p-3 border border-white/20 focus:outline-none focus:border-purple-500 resize-none"
+                                rows={3}
+                                autoFocus
+                            />
+                            <button
+                                onClick={() => setEditingIntro(false)}
+                                className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg flex items-center gap-1"
+                            >
+                                <Save className="w-3 h-3" /> Salva
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="text-slate-300 italic">"{config.introMessage}"</p>
+                    )}
                 </div>
 
-                {/* Intro Message */}
-                <div className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-3">
-                    <span className="text-sm text-slate-400">Messaggio di benvenuto</span>
-                    <p className="text-slate-300 italic">"{config.introMessage}"</p>
-                </div>
-
-                {/* Topics */}
+                {/* Topics - Fully Editable */}
                 <div className="space-y-4">
-                    <h3 className="text-xl font-semibold text-white">Topic dell'intervista</h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-semibold text-white">Topic dell'intervista</h3>
+                        <button
+                            onClick={addTopic}
+                            className="px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 text-sm rounded-lg flex items-center gap-1 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" /> Aggiungi topic
+                        </button>
+                    </div>
+
                     {config.topics.map((topic, index) => (
                         <div
                             key={index}
@@ -241,28 +348,111 @@ export default function PreviewPage() {
                                     <span className="w-8 h-8 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 text-sm font-medium">
                                         {index + 1}
                                     </span>
-                                    <span className="text-white font-medium">{topic.label}</span>
+                                    {editingTopicIndex === index ? (
+                                        <input
+                                            type="text"
+                                            value={topic.label}
+                                            onChange={(e) => updateTopic(index, { label: e.target.value })}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="bg-transparent text-white font-medium border-b border-purple-500 focus:outline-none"
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <span className="text-white font-medium">{topic.label}</span>
+                                    )}
                                 </div>
-                                {expandedTopics.has(index) ? (
-                                    <ChevronUp className="w-5 h-5 text-slate-400" />
-                                ) : (
-                                    <ChevronDown className="w-5 h-5 text-slate-400" />
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {editingTopicIndex !== index && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setEditingTopicIndex(index); setExpandedTopics(new Set([...expandedTopics, index])); }}
+                                            className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    {config.topics.length > 1 && (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); removeTopic(index); }}
+                                            className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    {expandedTopics.has(index) ? (
+                                        <ChevronUp className="w-5 h-5 text-slate-400" />
+                                    ) : (
+                                        <ChevronDown className="w-5 h-5 text-slate-400" />
+                                    )}
+                                </div>
                             </button>
+
                             {expandedTopics.has(index) && (
-                                <div className="px-4 pb-4 space-y-3 border-t border-white/5 pt-3">
-                                    <p className="text-slate-400 text-sm">{topic.description}</p>
+                                <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-3">
+                                    {/* Description */}
+                                    <div>
+                                        <label className="text-xs text-slate-500 uppercase tracking-wide block mb-1">Descrizione</label>
+                                        {editingTopicIndex === index ? (
+                                            <textarea
+                                                value={topic.description}
+                                                onChange={(e) => updateTopic(index, { description: e.target.value })}
+                                                className="w-full bg-white/10 text-slate-300 rounded-lg p-2 text-sm border border-white/10 focus:outline-none focus:border-purple-500 resize-none"
+                                                rows={2}
+                                            />
+                                        ) : (
+                                            <p className="text-slate-400 text-sm">{topic.description}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Sub-goals */}
                                     <div className="space-y-2">
-                                        <span className="text-xs text-slate-500 uppercase tracking-wide">Sub-goals</span>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-slate-500 uppercase tracking-wide">Sotto-obiettivi</span>
+                                            {editingTopicIndex === index && (
+                                                <button
+                                                    onClick={() => addSubGoal(index)}
+                                                    className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                                                >
+                                                    <Plus className="w-3 h-3" /> Aggiungi
+                                                </button>
+                                            )}
+                                        </div>
                                         <ul className="space-y-1">
                                             {topic.subGoals.map((goal, i) => (
-                                                <li key={i} className="text-slate-300 text-sm flex items-start gap-2">
-                                                    <span className="text-purple-400">•</span>
-                                                    {goal}
+                                                <li key={i} className="flex items-start gap-2">
+                                                    <span className="text-purple-400 mt-1">•</span>
+                                                    {editingTopicIndex === index ? (
+                                                        <div className="flex-1 flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={goal}
+                                                                onChange={(e) => updateSubGoal(index, i, e.target.value)}
+                                                                className="flex-1 bg-white/10 text-slate-300 rounded px-2 py-1 text-sm border border-white/10 focus:outline-none focus:border-purple-500"
+                                                            />
+                                                            {topic.subGoals.length > 1 && (
+                                                                <button
+                                                                    onClick={() => removeSubGoal(index, i)}
+                                                                    className="text-slate-500 hover:text-red-400"
+                                                                >
+                                                                    <X className="w-3 h-3" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-300 text-sm">{goal}</span>
+                                                    )}
                                                 </li>
                                             ))}
                                         </ul>
                                     </div>
+
+                                    {editingTopicIndex === index && (
+                                        <button
+                                            onClick={() => setEditingTopicIndex(null)}
+                                            className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg flex items-center gap-1"
+                                        >
+                                            <Save className="w-3 h-3" /> Fatto
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -298,7 +488,7 @@ export default function PreviewPage() {
                 </div>
             </main>
 
-            {/* Simulator Modal Placeholder */}
+            {/* Simulator Modal */}
             {showSimulator && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 z-50">
                     <div className="max-w-lg w-full bg-slate-800 rounded-2xl overflow-hidden">

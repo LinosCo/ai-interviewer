@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Check, X, Sparkles, Zap, Building, Crown } from 'lucide-react';
 
 export const metadata = {
-    title: 'Pricing | voler.AI',
+    title: 'Pricing | Business Tuner',
     description: 'Prezzi semplici e trasparenti. Inizia gratis, scala quando cresci.',
 };
 
@@ -136,8 +136,8 @@ export default function PricingPage() {
                             <div
                                 key={plan.name}
                                 className={`relative bg-white/5 backdrop-blur-sm rounded-2xl p-6 border transition-all ${plan.popular
-                                        ? 'border-purple-500 ring-2 ring-purple-500/20'
-                                        : 'border-white/10 hover:border-white/20'
+                                    ? 'border-purple-500 ring-2 ring-purple-500/20'
+                                    : 'border-white/10 hover:border-white/20'
                                     }`}
                             >
                                 {plan.popular && (
@@ -178,8 +178,8 @@ export default function PricingPage() {
                                 <Link
                                     href={plan.href}
                                     className={`block w-full py-3 rounded-lg text-center font-medium transition-colors ${plan.popular
-                                            ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                                            : 'bg-white/10 hover:bg-white/20 text-white'
+                                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                                        : 'bg-white/10 hover:bg-white/20 text-white'
                                         }`}
                                 >
                                     {plan.cta}

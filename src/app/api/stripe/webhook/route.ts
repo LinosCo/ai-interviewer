@@ -1,29 +1,31 @@
 import { prisma } from '@/lib/prisma';
-import { getStripe, PRICING_PLANS, PlanKey } from '@/lib/stripe';
+import { getStripeClient, getPricingPlans, PlanKey } from '@/lib/stripe';
+import { upgradeSubscription } from '@/lib/usage';
 import { SubscriptionTier, SubscriptionStatus } from '@prisma/client';
 import { headers } from 'next/headers';
-import type Stripe from 'stripe';
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 
 export async function POST(req: Request) {
     const body = await req.text();
-    const headersList = await headers();
-    const signature = headersList.get('stripe-signature');
+    const signature = headers().get('Stripe-Signature');
 
     if (!signature) {
-        return new Response('Missing signature', { status: 400 });
+        return new NextResponse('Missing signature', { status: 400 });
     }
 
+    const stripe = await getStripeClient();
     let event: Stripe.Event;
 
     try {
-        event = getStripe().webhooks.constructEvent(
+        event = stripe.webhooks.constructEvent(
             body,
             signature,
             process.env.STRIPE_WEBHOOK_SECRET!
         );
     } catch (err: any) {
         console.error('Webhook signature verification failed:', err.message);
-        return new Response(`Webhook Error: ${err.message}`, { status: 400 });
+        return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
     }
 
     console.log('Stripe webhook received:', event.type);
@@ -179,21 +181,46 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-    const limits = PRICING_PLANS.FREE.features;
+    const organizationId = subscription.metadata.organizationId; // Need to ensure metadata is on subscription too
 
-    await prisma.subscription.updateMany({
-        where: { stripeSubscriptionId: subscription.id },
-        data: {
-            tier: 'FREE',
-            status: 'CANCELED',
-            canceledAt: new Date(),
-            stripeSubscriptionId: null,
-            stripePriceId: null,
-            maxActiveBots: limits.maxActiveBots,
-            maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
-            maxUsers: limits.maxUsers
-        }
-    });
+    if (organizationId) {
+        const plans = await getPricingPlans();
+        const limits = plans.FREE.features;
 
-    console.log(`Subscription ${subscription.id} canceled, reverted to FREE`);
+        // Downgrade to free
+        await prisma.subscription.update({
+            where: { organizationId },
+            data: {
+                tier: 'FREE',
+                status: 'CANCELED',
+                maxActiveBots: limits.maxActiveBots,
+                maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
+                maxUsers: limits.maxUsers,
+                canceledAt: new Date(),
+                stripeSubscriptionId: null,
+                stripePriceId: null,
+            }
+        });
+        console.log(`Subscription ${subscription.id} canceled, reverted to FREE for organization ${organizationId}`);
+    } else {
+        // Fallback for subscriptions without organizationId in metadata
+        const plans = await getPricingPlans();
+        const limits = plans.FREE.features;
+
+        await prisma.subscription.updateMany({
+            where: { stripeSubscriptionId: subscription.id },
+            data: {
+                tier: 'FREE',
+                status: 'CANCELED',
+                canceledAt: new Date(),
+                stripeSubscriptionId: null,
+                stripePriceId: null,
+                maxActiveBots: limits.maxActiveBots,
+                maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
+                maxUsers: limits.maxUsers
+            }
+        });
+        console.log(`Subscription ${subscription.id} canceled, reverted to FREE`);
+    }
 }
+

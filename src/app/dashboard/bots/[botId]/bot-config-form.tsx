@@ -168,80 +168,89 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                 </div>
             </section>
 
-            <section>
-                <h2 className="text-lg font-semibold mb-4 border-b pb-2">Model & API Configuration</h2>
-                <div className="space-y-4">
-                    <div className="bg-yellow-50 p-4 rounded text-sm text-yellow-800">
-                        Leave keys empty to use the platform defaults (if configured).
-                        Keys provided here override environment variables for this bot.
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Model Provider</label>
-                            <select
-                                name="modelProvider"
-                                value={provider}
-                                onChange={(e) => setProvider(e.target.value)}
-                                className="w-full border p-2 rounded"
-                            >
-                                <option value="openai">OpenAI (ChatGPT)</option>
-                                <option value="anthropic">Anthropic (Claude)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Model Name</label>
-                            <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
-                                {provider === 'openai' ? (
-                                    <>
-                                        <optgroup label="GPT-4o (Flagship)">
-                                            <option value="gpt-4o">GPT-4o (Best Overall)</option>
-                                            <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
-                                        </optgroup>
-                                        <optgroup label="Reasoning Models">
-                                            <option value="o1-preview">o1 Preview (Deep Reasoning)</option>
-                                            <option value="o1-mini">o1 Mini (Fast Reasoning)</option>
-                                        </optgroup>
-                                        <optgroup label="Legacy">
-                                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                                        </optgroup>
+            <section className="bg-gray-50 rounded-lg p-4 border">
+                <details className="group">
+                    <summary className="flex justify-between items-center font-medium cursor-pointer list-none text-gray-700">
+                        <span className="flex items-center gap-2">
+                            Advanced Settings (Model & API)
+                        </span>
+                        <span className="transition group-open:rotate-180">
+                            <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                        </span>
+                    </summary>
+                    <div className="text-neutral-600 mt-4 group-open:animate-fadeIn">
+                        <div className="space-y-4">
+                            <div className="bg-yellow-50 p-4 rounded text-sm text-yellow-800 border border-yellow-100">
+                                These settings are for advanced users. By default, the platform handles model selection and API keys.
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Model Provider</label>
+                                    <select
+                                        name="modelProvider"
+                                        value={provider}
+                                        onChange={(e) => setProvider(e.target.value)}
+                                        className="w-full border p-2 rounded"
+                                    >
+                                        <option value="openai">OpenAI (ChatGPT)</option>
+                                        <option value="anthropic">Anthropic (Claude)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Model Name</label>
+                                    <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
+                                        {provider === 'openai' ? (
+                                            <>
+                                                <optgroup label="GPT-4o (Flagship)">
+                                                    <option value="gpt-4o">GPT-4o (Best Overall)</option>
+                                                    <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                                                </optgroup>
+                                                <optgroup label="Reasoning Models">
+                                                    <option value="o1-preview">o1 Preview (Deep Reasoning)</option>
+                                                    <option value="o1-mini">o1 Mini (Fast Reasoning)</option>
+                                                </optgroup>
+                                                <optgroup label="Legacy">
+                                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                                </optgroup>
 
-                                    </>
-                                ) : (
-                                    <>
-                                        <optgroup label="Claude 4.5 (New)">
-                                            <option value="claude-sonnet-4-5-20250929">Claude 4.5 Sonnet (2025-09-29)</option>
-                                        </optgroup>
-                                        <optgroup label="Claude 3.5 (Stable)">
-                                            <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Latest)</option>
-                                            <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (Fast)</option>
-                                            <option value="claude-3-opus-latest">Claude 3 Opus (Legacy)</option>
-                                        </optgroup>
-                                    </>
-                                )}
-                            </select>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <optgroup label="Claude 4.5 (New)">
+                                                    <option value="claude-sonnet-4-5-20250929">Claude 4.5 Sonnet (2025-09-29)</option>
+                                                </optgroup>
+                                                <optgroup label="Claude 3.5 (Stable)">
+                                                    <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Latest)</option>
+                                                    <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (Fast)</option>
+                                                </optgroup>
+                                            </>
+                                        )}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">OpenAI API Key (Override)</label>
+                                <input
+                                    type="password"
+                                    name="openaiApiKey"
+                                    defaultValue={bot.openaiApiKey || ''}
+                                    placeholder="sk-..."
+                                    className="w-full border p-2 rounded font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Anthropic API Key (Override)</label>
+                                <input
+                                    type="password"
+                                    name="anthropicApiKey"
+                                    defaultValue={bot.anthropicApiKey || ''}
+                                    placeholder="sk-ant-..."
+                                    className="w-full border p-2 rounded font-mono"
+                                />
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">OpenAI API Key (Optional)</label>
-                        <input
-                            type="password"
-                            name="openaiApiKey"
-                            defaultValue={bot.openaiApiKey || ''}
-                            placeholder="sk-..."
-                            className="w-full border p-2 rounded font-mono"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Anthropic API Key (Optional)</label>
-                        <input
-                            type="password"
-                            name="anthropicApiKey"
-                            defaultValue={bot.anthropicApiKey || ''}
-                            placeholder="sk-ant-..."
-                            className="w-full border p-2 rounded font-mono"
-                        />
-                    </div>
-                </div>
+                </details>
             </section>
 
             <div className="pt-4 align-right">

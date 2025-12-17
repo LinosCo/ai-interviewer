@@ -64,6 +64,11 @@ export default async function PlatformSettingsPage() {
                                 ? (globalConfig?.anthropicApiKey || '')
                                 : (user.platformAnthropicApiKey || '')
                         }
+                        stripeSecretKey={globalConfig?.stripeSecretKey || ''}
+                        stripeWebhookSecret={globalConfig?.stripeWebhookSecret || ''}
+                        stripePriceStarter={globalConfig?.stripePriceStarter || ''}
+                        stripePricePro={globalConfig?.stripePricePro || ''}
+                        stripePriceBusiness={globalConfig?.stripePriceBusiness || ''}
                     />
                 </div>
             </div>

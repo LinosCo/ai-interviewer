@@ -8,7 +8,7 @@ import Stripe from 'stripe';
 
 export async function POST(req: Request) {
     const body = await req.text();
-    const signature = headers().get('Stripe-Signature');
+    const signature = (await headers()).get('Stripe-Signature');
 
     if (!signature) {
         return new NextResponse('Missing signature', { status: 400 });
@@ -83,15 +83,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         return;
     }
 
-    const limits = PRICING_PLANS[tier].features;
+    const plans = await getPricingPlans();
+    const limits = plans[tier].features;
 
     await prisma.subscription.update({
         where: { organizationId },
         data: {
-            tier: tier as SubscriptionTier,
+            tier: tier, // Assuming SubscriptionTier enum matches PlanKey strings or cast is valid
             status: 'ACTIVE',
             stripeSubscriptionId: session.subscription as string,
-            stripePriceId: PRICING_PLANS[tier].priceId || undefined,
+            stripePriceId: plans[tier].priceId || undefined,
             maxActiveBots: limits.maxActiveBots,
             maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
             maxUsers: limits.maxUsers
@@ -181,34 +182,18 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-    const organizationId = subscription.metadata.organizationId; // Need to ensure metadata is on subscription too
+    const plans = await getPricingPlans();
 
-    if (organizationId) {
-        const plans = await getPricingPlans();
+    // We need to find which org this subscription belonged to
+    const dbSubscription = await prisma.subscription.findFirst({
+        where: { stripeSubscriptionId: subscription.id }
+    });
+
+    if (dbSubscription) {
         const limits = plans.FREE.features;
 
-        // Downgrade to free
         await prisma.subscription.update({
-            where: { organizationId },
-            data: {
-                tier: 'FREE',
-                status: 'CANCELED',
-                maxActiveBots: limits.maxActiveBots,
-                maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
-                maxUsers: limits.maxUsers,
-                canceledAt: new Date(),
-                stripeSubscriptionId: null,
-                stripePriceId: null,
-            }
-        });
-        console.log(`Subscription ${subscription.id} canceled, reverted to FREE for organization ${organizationId}`);
-    } else {
-        // Fallback for subscriptions without organizationId in metadata
-        const plans = await getPricingPlans();
-        const limits = plans.FREE.features;
-
-        await prisma.subscription.updateMany({
-            where: { stripeSubscriptionId: subscription.id },
+            where: { id: dbSubscription.id },
             data: {
                 tier: 'FREE',
                 status: 'CANCELED',
@@ -221,6 +206,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
             }
         });
         console.log(`Subscription ${subscription.id} canceled, reverted to FREE`);
+    } else {
+        console.log(`Subscription ${subscription.id} deleted but not found in DB`);
     }
 }
-

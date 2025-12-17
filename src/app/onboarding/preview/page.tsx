@@ -538,12 +538,12 @@ export default function PreviewPage() {
                         <div className="flex flex-col gap-3">
                             <button
                                 onClick={() => {
-                                    // Use standard next-auth signin path with callback
-                                    window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
+                                    // Redirect to register, preserving current path as callback
+                                    window.location.href = `/register?callbackUrl=${encodeURIComponent(window.location.pathname)}`;
                                 }}
                                 className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
                             >
-                                Registrati o Accedi
+                                Registrati per salvare
                             </button>
                             <button
                                 onClick={() => setShowAuthModal(false)}

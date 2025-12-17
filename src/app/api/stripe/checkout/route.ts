@@ -101,6 +101,7 @@ export async function POST(req: Request) { // Changed NextRequest to Request
                 tier
             },
             subscription_data: {
+                trial_period_days: 14,
                 metadata: {
                     organizationId: organization.id,
                     tier

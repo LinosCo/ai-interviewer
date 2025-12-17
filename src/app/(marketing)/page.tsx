@@ -160,7 +160,7 @@ export default function LandingPage() {
 
                             {/* Subheadline */}
                             <p className="text-xl text-stone-600 leading-relaxed mb-8 max-w-lg">
-                                Raccogli feedback qualitativi da clienti, dipendenti e stakeholder. 
+                                Raccogli feedback qualitativi da clienti, dipendenti e stakeholder.
                                 Senza interviste manuali, senza consulenti, senza sondaggi ignorati.
                             </p>
 
@@ -170,18 +170,20 @@ export default function LandingPage() {
                                     href="/onboarding"
                                     className="inline-flex items-center justify-center gap-2 bg-stone-900 text-white px-8 py-4 rounded-full font-medium hover:bg-stone-800 transition-all hover:scale-105 shadow-lg shadow-stone-900/20"
                                 >
-                                    Crea la tua prima intervista
+                                    Prova la Demo
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </Link>
                                 <Link
-                                    href="#come-funziona"
+                                    href="/register"
                                     className="inline-flex items-center justify-center gap-2 bg-white text-stone-700 px-8 py-4 rounded-full font-medium border border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-all"
                                 >
-                                    Guarda come funziona
+                                    Inizia prova gratuita
                                 </Link>
                             </div>
+
 
                             {/* Social proof */}
                             <div className="mt-12 pt-8 border-t border-stone-200">
@@ -352,7 +354,7 @@ export default function LandingPage() {
                         <span className="text-amber-600 text-sm font-medium uppercase tracking-wider">Casi d'uso</span>
                         <h2 className="text-4xl font-bold text-stone-900 mt-4">Per ogni tipo di feedback</h2>
                         <p className="text-stone-600 mt-4 max-w-2xl mx-auto">
-                            Che tu voglia capire i clienti, ascoltare i dipendenti o migliorare i processi, 
+                            Che tu voglia capire i clienti, ascoltare i dipendenti o migliorare i processi,
                             Business Tuner si adatta alle tue esigenze.
                         </p>
                     </div>
@@ -363,11 +365,10 @@ export default function LandingPage() {
                             <button
                                 key={uc.id}
                                 onClick={() => setActiveUseCase(uc.id)}
-                                className={`px-6 py-3 rounded-full font-medium transition-all ${
-                                    activeUseCase === uc.id
-                                        ? 'bg-stone-900 text-white shadow-lg'
-                                        : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
-                                }`}
+                                className={`px-6 py-3 rounded-full font-medium transition-all ${activeUseCase === uc.id
+                                    ? 'bg-stone-900 text-white shadow-lg'
+                                    : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+                                    }`}
                             >
                                 <span className="mr-2">{uc.icon}</span>
                                 {uc.title}
@@ -459,11 +460,10 @@ export default function LandingPage() {
                         {PRICING.map((plan) => (
                             <div
                                 key={plan.name}
-                                className={`rounded-2xl p-8 ${
-                                    plan.highlighted
-                                        ? 'bg-stone-900 text-white ring-4 ring-amber-400 shadow-2xl scale-105'
-                                        : 'bg-white border border-stone-200 shadow-lg'
-                                }`}
+                                className={`rounded-2xl p-8 ${plan.highlighted
+                                    ? 'bg-stone-900 text-white ring-4 ring-amber-400 shadow-2xl scale-105'
+                                    : 'bg-white border border-stone-200 shadow-lg'
+                                    }`}
                             >
                                 {plan.highlighted && (
                                     <div className="inline-block bg-amber-400 text-stone-900 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">
@@ -497,12 +497,11 @@ export default function LandingPage() {
                                     ))}
                                 </ul>
                                 <Link
-                                    href={plan.name === 'Enterprise' ? 'mailto:sales@businesstuner.it' : '/onboarding'}
-                                    className={`block text-center py-3 rounded-full font-medium transition-all ${
-                                        plan.highlighted
-                                            ? 'bg-amber-400 text-stone-900 hover:bg-amber-300'
-                                            : 'bg-stone-900 text-white hover:bg-stone-800'
-                                    }`}
+                                    href={plan.name === 'Enterprise' ? 'mailto:sales@businesstuner.it' : `/register?plan=${plan.name.toUpperCase()}`}
+                                    className={`block text-center py-3 rounded-full font-medium transition-all ${plan.highlighted
+                                        ? 'bg-amber-400 text-stone-900 hover:bg-amber-300'
+                                        : 'bg-stone-900 text-white hover:bg-stone-800'
+                                        }`}
                                 >
                                     {plan.cta}
                                 </Link>

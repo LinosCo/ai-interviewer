@@ -124,8 +124,107 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members   Membership[]
-  projects  Project[]
+  // Enterprise flag for custom API keys
+  allowCustomApiKeys Boolean @default(false)
+
+  members      Membership[]
+  projects     Project[]
+  subscription Subscription?
+}
+
+// --- Subscription & Billing ---
+
+model Subscription {
+  id              String   @id @default(cuid())
+  
+  // Relation with Organization
+  organizationId  String   @unique
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  
+  // Plan
+  tier            SubscriptionTier @default(FREE)
+  status          SubscriptionStatus @default(ACTIVE)
+  
+  // Stripe IDs
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  stripePriceId         String?
+  
+  // Limits (copied from plan for performance)
+  maxActiveBots         Int @default(1)
+  maxInterviewsPerMonth Int @default(30)
+  maxUsers              Int @default(1)
+  
+  // Usage tracking
+  currentPeriodStart    DateTime @default(now())
+  currentPeriodEnd      DateTime
+  interviewsUsedThisMonth Int @default(0)
+  
+  // Billing info
+  billingEmail          String?
+  billingName           String?
+  vatNumber             String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  canceledAt      DateTime?
+  
+  invoices        Invoice[]
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PRO
+  BUSINESS
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
+  
+  stripeInvoiceId String   @unique
+  amountPaid      Int      // in cents
+  currency        String   @default("eur")
+  status          String
+  pdfUrl          String?
+  
+  createdAt       DateTime @default(now())
+}
+
+model UsageEvent {
+  id              String   @id @default(cuid())
+  organizationId  String
+  eventType       UsageEventType
+  resourceId      String?  // botId or conversationId
+  metadata        Json?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([organizationId, createdAt])
+}
+
+enum UsageEventType {
+  INTERVIEW_COMPLETED
+  BOT_PUBLISHED
+  BOT_UNPUBLISHED
+  USER_INVITED
+}
+
+enum BotStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  ARCHIVED
 }
 
 enum Role {
@@ -170,6 +269,7 @@ model Bot {
   slug           String   @unique
   name           String
   description    String?
+  status         BotStatus @default(DRAFT)
   
   // Research Context
   researchGoal   String?  @db.Text

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, CheckCircle, Loader2 } from 'lucide-react';
-import { getTemplateBySlug, Template } from '@/lib/templates';
+import { getTemplateBySlug } from '@/lib/templates';
 
 const loadingMessages = [
     { text: 'Sto analizzando il tuo obiettivo...', icon: '🔍' },
@@ -13,7 +13,7 @@ const loadingMessages = [
     { text: 'Preparo la tua intervista...', icon: '🎯' },
 ];
 
-export default function GeneratePage() {
+function GenerateContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [currentStep, setCurrentStep] = useState(0);
@@ -112,8 +112,8 @@ export default function GeneratePage() {
                         <div
                             key={index}
                             className={`flex items-center gap-3 transition-all duration-500 ${index <= currentStep
-                                    ? 'opacity-100 translate-y-0'
-                                    : 'opacity-0 translate-y-4'
+                                ? 'opacity-100 translate-y-0'
+                                : 'opacity-0 translate-y-4'
                                 }`}
                         >
                             {index < currentStep ? (
@@ -139,5 +139,23 @@ export default function GeneratePage() {
                 )}
             </div>
         </div>
+    );
+}
+
+function LoadingFallback() {
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+            <div className="w-24 h-24 bg-purple-500/20 rounded-full flex items-center justify-center">
+                <Sparkles className="w-12 h-12 text-purple-400 animate-pulse" />
+            </div>
+        </div>
+    );
+}
+
+export default function GeneratePage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <GenerateContent />
+        </Suspense>
     );
 }

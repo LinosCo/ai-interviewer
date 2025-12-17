@@ -183,7 +183,7 @@ export async function POST(req: Request) {
                 transitionToNextTopic: tool({
                     description: 'Move to the next topic when the current one is sufficiently covered.',
                     parameters: z.object({
-                        reason: z.string().describe('Why we are moving on (e.g. "User covered all sub-goals")')
+                        reason: z.string()
                     }),
                     execute: async ({ reason }: { reason: string }) => {
                         console.log(`Tool: transitionToNextTopic triggered. Reason: ${reason}`);
@@ -206,7 +206,7 @@ export async function POST(req: Request) {
                 concludeInterview: tool({
                     description: 'End the interview when time is up or all topics are covered.',
                     parameters: z.object({
-                        finalMessage: z.string().describe('The final closing statement to the user')
+                        finalMessage: z.string()
                     }),
                     execute: async ({ finalMessage }: { finalMessage: string }) => {
                         console.log("Tool: concludeInterview triggered.");

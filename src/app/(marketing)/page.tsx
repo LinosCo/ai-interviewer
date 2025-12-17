@@ -17,14 +17,14 @@ export default function LandingPage() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Soft Wave Separator Component
+    // Soft Wave Separator Component (Double Line)
     const SoftWaveSeparator = ({ accentColor = colors.amber, height = 300, id = 'wave1' }) => (
         <div style={{
             width: '100%',
             height: `${height}px`,
             position: 'relative',
             overflow: 'hidden',
-            background: `linear-gradient(180deg, ${colors.white} 0%, transparent 12%, transparent 88%, ${colors.white} 100%)`
+            background: `linear-gradient(180deg, ${colors.white} 0%, transparent 100%)`
         }}>
             <svg
                 style={{ position: 'absolute', width: '200%', left: '-50%', top: 0, height: '100%' }}
@@ -34,8 +34,8 @@ export default function LandingPage() {
                 <defs>
                     <linearGradient id={`softFade${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stopColor="white" stopOpacity="0" />
-                        <stop offset="15%" stopColor="white" stopOpacity="1" />
-                        <stop offset="85%" stopColor="white" stopOpacity="1" />
+                        <stop offset="30%" stopColor="white" stopOpacity="1" />
+                        <stop offset="70%" stopColor="white" stopOpacity="1" />
                         <stop offset="100%" stopColor="white" stopOpacity="0" />
                     </linearGradient>
                     <mask id={`fadeMask${id}`}>
@@ -44,14 +44,26 @@ export default function LandingPage() {
                 </defs>
 
                 <g mask={`url(#fadeMask${id})`}>
+                    {/* Line 1 */}
                     <path
-                        d={`M0 ${height / 2} C480 ${height * 0.25} 960 ${height * 0.75} 1440 ${height / 2} C1920 ${height * 0.25} 2400 ${height * 0.75} 2880 ${height / 2}`}
-                        fill="none" stroke={accentColor} strokeWidth="100" opacity="0.05" strokeLinecap="round"
+                        d={`M0 ${height / 2} Q 720 ${height * 0.4} 1440 ${height / 2} T 2880 ${height / 2}`}
+                        fill="none" stroke={accentColor} strokeWidth="1.5" opacity="0.4" strokeLinecap="round"
                     >
-                        <animate attributeName="d" dur="14s" repeatCount="indefinite" values={`
-                M0 ${height / 2} C480 ${height * 0.25} 960 ${height * 0.75} 1440 ${height / 2} C1920 ${height * 0.25} 2400 ${height * 0.75} 2880 ${height / 2};
-                M0 ${height / 2} C480 ${height * 0.75} 960 ${height * 0.25} 1440 ${height / 2} C1920 ${height * 0.75} 2400 ${height * 0.25} 2880 ${height / 2};
-                M0 ${height / 2} C480 ${height * 0.25} 960 ${height * 0.75} 1440 ${height / 2} C1920 ${height * 0.25} 2400 ${height * 0.75} 2880 ${height / 2}
+                        <animate attributeName="d" dur="20s" repeatCount="indefinite" values={`
+                M0 ${height / 2} Q 720 ${height * 0.4} 1440 ${height / 2} T 2880 ${height / 2};
+                M0 ${height / 2} Q 720 ${height * 0.6} 1440 ${height / 2} T 2880 ${height / 2};
+                M0 ${height / 2} Q 720 ${height * 0.4} 1440 ${height / 2} T 2880 ${height / 2}
+              `} />
+                    </path>
+                    {/* Line 2 (Offset) */}
+                    <path
+                        d={`M0 ${height / 2 + 20} Q 720 ${height * 0.6 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20}`}
+                        fill="none" stroke={accentColor} strokeWidth="1.5" opacity="0.2" strokeLinecap="round"
+                    >
+                        <animate attributeName="d" dur="25s" repeatCount="indefinite" values={`
+                M0 ${height / 2 + 20} Q 720 ${height * 0.6 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20};
+                M0 ${height / 2 + 20} Q 720 ${height * 0.4 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20};
+                M0 ${height / 2 + 20} Q 720 ${height * 0.6 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20}
               `} />
                     </path>
                 </g>
@@ -87,13 +99,13 @@ export default function LandingPage() {
         </div>
     );
 
-    // Orange Transition Component
+    // Orange Transition Component (Smoother)
     const OrangeTransition = ({ toOrange = true, height = 200 }) => (
         <div style={{
             width: '100%', height: `${height}px`, position: 'relative', overflow: 'hidden',
             background: toOrange
-                ? `linear-gradient(180deg, ${colors.white} 0%, ${colors.peach} 30%, ${colors.apricot} 60%, rgba(251, 191, 36, 0.95) 100%)`
-                : `linear-gradient(180deg, rgba(251, 191, 36, 0.95) 0%, ${colors.apricot} 40%, ${colors.peach} 70%, ${colors.white} 100%)`
+                ? `linear-gradient(to bottom, ${colors.white} 0%, #FFF8E1 40%, #FFEDD5 70%, #F59E0B 100%)`
+                : `linear-gradient(to bottom, #F59E0B 0%, #FFEDD5 30%, #FFF8E1 60%, ${colors.white} 100%)`
         }} />
     );
 
@@ -119,28 +131,7 @@ export default function LandingPage() {
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
       `}</style>
 
-            {/* Navigation */}
-            <nav style={{
-                position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, padding: '1rem 3rem',
-                background: scrollY > 50 ? 'rgba(255,255,255,0.9)' : 'transparent',
-                backdropFilter: scrollY > 50 ? 'blur(20px)' : 'none',
-                transition: 'all 0.3s ease'
-            }}>
-                <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <Icons.Logo size={36} />
-                        <span style={{ fontSize: '1.125rem', fontWeight: '600', color: colors.text }}>Business Tuner</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                        <Link href="#how-it-works" style={{ color: colors.muted, textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}>Come funziona</Link>
-                        <Link href="#pricing" style={{ color: colors.muted, textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}>Prezzi</Link>
-                        <Link href="/login" style={{ color: colors.muted, textDecoration: 'none', fontSize: '0.875rem', fontWeight: 500 }}>Accedi</Link>
-                        <Link href="/register">
-                            <Button size="sm" variant="primary">Prova gratis</Button>
-                        </Link>
-                    </div>
-                </div>
-            </nav>
+            {/* Nav and Footer removed from here to fix double menu issue, they are in layout.tsx */}
 
             {/* Hero Section */}
             <section style={{ position: 'relative', zIndex: 10, minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: '80px' }}>
@@ -284,7 +275,7 @@ export default function LandingPage() {
             <OrangeTransition toOrange={true} height={200} />
 
             {/* Pricing Section */}
-            <section id="pricing" style={{ position: 'relative', zIndex: 10, background: gradients.sectionOrange, padding: '3rem 2rem 4rem', overflow: 'hidden' }}>
+            <section id="pricing" style={{ position: 'relative', zIndex: 10, background: '#F59E0B', padding: '3rem 2rem 4rem', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse 120% 60% at 50% -10%, rgba(255,255,255,0.4) 0%, transparent 50%), radial-gradient(ellipse 100% 40% at 50% 110%, rgba(255,255,255,0.2) 0%, transparent 40%)` }} />
 
                 <div style={{ maxWidth: '1100px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
@@ -301,7 +292,7 @@ export default function LandingPage() {
                             <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€49</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
                             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['3 interviste attive', '100 risposte/mese', 'Analisi base', 'Export PDF'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
                             <Link href="/register?plan=STARTER" className="w-full">
-                                <Button fullWidth variant="ghost" style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', color: 'white' }}>Inizia gratis</Button>
+                                <Button fullWidth variant="ghost" style={{ background: 'white', color: colors.amberDark }}>Inizia gratis</Button>
                             </Link>
                         </div>
 
@@ -322,7 +313,7 @@ export default function LandingPage() {
                             <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>Custom</span></div>
                             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['Interviste illimitate', 'Risposte illimitate', 'White-label', 'API access', 'SSO & compliance', 'Account manager'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
                             <Link href="mailto:sales@businesstuner.it" className="w-full">
-                                <Button fullWidth variant="ghost" style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', color: 'white' }}>Contattaci</Button>
+                                <Button fullWidth variant="ghost" style={{ background: 'white', color: colors.amberDark }}>Contattaci</Button>
                             </Link>
                         </div>
                     </div>
@@ -344,13 +335,6 @@ export default function LandingPage() {
                     </div>
                 </div>
             </section>
-
-            {/* Footer */}
-            <footer style={{ position: 'relative', zIndex: 10, padding: '2rem 3rem', borderTop: '1px solid rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}><Icons.Logo size={28} /><span style={{ fontSize: '0.9375rem', fontWeight: 600, color: colors.text }}>Business Tuner</span></div>
-                <p style={{ fontSize: '0.75rem', color: colors.subtle }}>© 2025 Business Tuner. Tutti i diritti riservati.</p>
-            </footer>
-
         </div>
     );
 }

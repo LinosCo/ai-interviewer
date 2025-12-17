@@ -1,9 +1,27 @@
 import Stripe from 'stripe';
 
-// Stripe client - initialized with secret key from environment
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-    typescript: true,
-});
+// Lazy Stripe client - only initialized when actually needed (not at build time)
+let _stripe: Stripe | null = null;
+
+export function getStripe(): Stripe {
+    if (!_stripe) {
+        const key = process.env.STRIPE_SECRET_KEY;
+        if (!key) {
+            throw new Error('STRIPE_SECRET_KEY is not configured');
+        }
+        _stripe = new Stripe(key, { typescript: true });
+    }
+    return _stripe;
+}
+
+// For backwards compatibility - use getStripe() in API routes
+export const stripe = {
+    get customers() { return getStripe().customers; },
+    get subscriptions() { return getStripe().subscriptions; },
+    get checkout() { return getStripe().checkout; },
+    get billingPortal() { return getStripe().billingPortal; },
+    get webhooks() { return getStripe().webhooks; },
+};
 
 // Pricing configuration
 export const PRICING_PLANS = {

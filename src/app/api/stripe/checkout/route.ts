@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe, PRICING_PLANS, PlanKey } from '@/lib/stripe';
+import { getStripe, PRICING_PLANS, PlanKey } from '@/lib/stripe';
 import { getOrCreateSubscription } from '@/lib/usage';
 import { NextRequest } from 'next/server';
 
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
         // Create or get Stripe customer
         let customerId = subscription.stripeCustomerId;
         if (!customerId) {
-            const customer = await stripe.customers.create({
+            const customer = await getStripe().customers.create({
                 email: user.email,
                 name: user.name || undefined,
                 metadata: {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Create checkout session
-        const checkoutSession = await stripe.checkout.sessions.create({
+        const checkoutSession = await getStripe().checkout.sessions.create({
             customer: customerId,
             mode: 'subscription',
             payment_method_types: ['card'],

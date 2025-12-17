@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { stripe, PRICING_PLANS, PlanKey } from '@/lib/stripe';
+import { getStripe, PRICING_PLANS, PlanKey } from '@/lib/stripe';
 import { SubscriptionTier, SubscriptionStatus } from '@prisma/client';
 import { headers } from 'next/headers';
 import type Stripe from 'stripe';
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     let event: Stripe.Event;
 
     try {
-        event = stripe.webhooks.constructEvent(
+        event = getStripe().webhooks.constructEvent(
             body,
             signature,
             process.env.STRIPE_WEBHOOK_SECRET!
@@ -37,13 +37,13 @@ export async function POST(req: Request) {
             }
 
             case 'invoice.paid': {
-                const invoice = event.data.object as Stripe.Invoice;
+                const invoice = event.data.object;
                 await handleInvoicePaid(invoice);
                 break;
             }
 
             case 'invoice.payment_failed': {
-                const invoice = event.data.object as Stripe.Invoice;
+                const invoice = event.data.object;
                 await handlePaymentFailed(invoice);
                 break;
             }
@@ -157,7 +157,6 @@ async function handlePaymentFailed(invoice: any) {
         data: { status: 'PAST_DUE' }
     });
 
-    // TODO: Send notification email to user
     console.log(`Payment failed for subscription ${subscriptionId}`);
 }
 

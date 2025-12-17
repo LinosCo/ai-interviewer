@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe } from '@/lib/stripe';
+import { getStripe } from '@/lib/stripe';
 
 export async function POST() {
     try {
@@ -31,7 +31,7 @@ export async function POST() {
         }
 
         // Create portal session
-        const portalSession = await stripe.billingPortal.sessions.create({
+        const portalSession = await getStripe().billingPortal.sessions.create({
             customer: subscription.stripeCustomerId,
             return_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/billing`
         });

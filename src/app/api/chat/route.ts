@@ -5,6 +5,7 @@ import { generateText, tool, CoreMessage } from 'ai';
 import { z } from 'zod';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { generateConversationInsightAction } from '@/app/actions';
+import { recordInterviewCompleted } from '@/lib/usage';
 
 export const maxDuration = 60;
 
@@ -208,8 +209,20 @@ export async function POST(req: Request) {
                             data: { status: 'COMPLETED', completedAt: new Date() }
                         });
 
+                        // Record usage for subscription tracking
+                        try {
+                            const project = await prisma.project.findUnique({
+                                where: { id: bot.projectId },
+                                select: { organizationId: true }
+                            });
+                            if (project?.organizationId) {
+                                await recordInterviewCompleted(project.organizationId, conversationId);
+                            }
+                        } catch (e) {
+                            console.error("Failed to record usage", e);
+                        }
+
                         // Trigger Incremental Analysis
-                        // We await it to ensure it runs, but catching errors so we don't fail the user interaction
                         try {
                             await generateConversationInsightAction(conversationId);
                         } catch (e) {

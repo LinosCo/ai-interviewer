@@ -17,7 +17,7 @@ export default function LandingPage() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Soft Wave Separator Component (Double Line)
+    // Soft Wave Separator (Redesigned: Noise + Harmonization)
     const SoftWaveSeparator = ({ accentColor = colors.amber, height = 300, id = 'wave1' }) => (
         <div style={{
             width: '100%',
@@ -44,27 +44,40 @@ export default function LandingPage() {
                 </defs>
 
                 <g mask={`url(#fadeMask${id})`}>
-                    {/* Line 1 */}
+                    {/* Line 1: Background Noise (Irregular) */}
                     <path
-                        d={`M0 ${height / 2} Q 720 ${height * 0.4} 1440 ${height / 2} T 2880 ${height / 2}`}
-                        fill="none" stroke={accentColor} strokeWidth="1.5" opacity="0.4" strokeLinecap="round"
+                        d={`M0 ${height / 2} C 400 ${height * 0.3} 800 ${height * 0.7} 1440 ${height / 2} C 2000 ${height * 0.3} 2400 ${height * 0.6} 2880 ${height / 2}`}
+                        fill="none" stroke={accentColor} strokeWidth="1" opacity="0.3" strokeLinecap="round"
+                    >
+                        <animate attributeName="d" dur="15s" repeatCount="indefinite" values={`
+                            M0 ${height / 2} C 400 ${height * 0.3} 800 ${height * 0.7} 1440 ${height / 2} C 2000 ${height * 0.3} 2400 ${height * 0.6} 2880 ${height / 2};
+                            M0 ${height / 2} C 400 ${height * 0.6} 800 ${height * 0.4} 1440 ${height / 2} C 2000 ${height * 0.7} 2400 ${height * 0.3} 2880 ${height / 2};
+                            M0 ${height / 2} C 400 ${height * 0.3} 800 ${height * 0.7} 1440 ${height / 2} C 2000 ${height * 0.3} 2400 ${height * 0.6} 2880 ${height / 2}
+                        `} />
+                    </path>
+
+                    {/* Line 2: Background Noise (Irregular, Offset) */}
+                    <path
+                        d={`M0 ${height / 2 + 30} C 300 ${height * 0.6} 900 ${height * 0.4} 1440 ${height / 2 + 30} C 1900 ${height * 0.7} 2500 ${height * 0.3} 2880 ${height / 2 + 30}`}
+                        fill="none" stroke={accentColor} strokeWidth="1" opacity="0.2" strokeLinecap="round"
                     >
                         <animate attributeName="d" dur="20s" repeatCount="indefinite" values={`
-                M0 ${height / 2} Q 720 ${height * 0.4} 1440 ${height / 2} T 2880 ${height / 2};
-                M0 ${height / 2} Q 720 ${height * 0.6} 1440 ${height / 2} T 2880 ${height / 2};
-                M0 ${height / 2} Q 720 ${height * 0.4} 1440 ${height / 2} T 2880 ${height / 2}
-              `} />
+                            M0 ${height / 2 + 30} C 300 ${height * 0.6} 900 ${height * 0.4} 1440 ${height / 2 + 30} C 1900 ${height * 0.7} 2500 ${height * 0.3} 2880 ${height / 2 + 30};
+                            M0 ${height / 2 + 30} C 300 ${height * 0.4} 900 ${height * 0.6} 1440 ${height / 2 + 30} C 1900 ${height * 0.3} 2500 ${height * 0.7} 2880 ${height / 2 + 30};
+                            M0 ${height / 2 + 30} C 300 ${height * 0.6} 900 ${height * 0.4} 1440 ${height / 2 + 30} C 1900 ${height * 0.7} 2500 ${height * 0.3} 2880 ${height / 2 + 30}
+                        `} />
                     </path>
-                    {/* Line 2 (Offset) */}
+
+                    {/* Line 3: Harmonization (Thicker, Rhythmic) */}
                     <path
-                        d={`M0 ${height / 2 + 20} Q 720 ${height * 0.6 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20}`}
-                        fill="none" stroke={accentColor} strokeWidth="1.5" opacity="0.2" strokeLinecap="round"
+                        d={`M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2}`}
+                        fill="none" stroke={accentColor} strokeWidth="3" opacity="0.8" strokeLinecap="round"
                     >
-                        <animate attributeName="d" dur="25s" repeatCount="indefinite" values={`
-                M0 ${height / 2 + 20} Q 720 ${height * 0.6 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20};
-                M0 ${height / 2 + 20} Q 720 ${height * 0.4 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20};
-                M0 ${height / 2 + 20} Q 720 ${height * 0.6 + 20} 1440 ${height / 2 + 20} T 2880 ${height / 2 + 20}
-              `} />
+                        <animate attributeName="d" dur="10s" repeatCount="indefinite" values={`
+                             M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2};
+                             M0 ${height / 2} Q 360 ${height * 0.65} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2};
+                             M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2}
+                        `} />
                     </path>
                 </g>
             </svg>
@@ -99,13 +112,23 @@ export default function LandingPage() {
         </div>
     );
 
-    // Orange Transition Component (Smoother)
-    const OrangeTransition = ({ toOrange = true, height = 200 }) => (
+    // Orange Transition Component (Improved Smoothing)
+    const OrangeTransition = ({ toOrange = true, height = 300 }) => (
         <div style={{
             width: '100%', height: `${height}px`, position: 'relative', overflow: 'hidden',
             background: toOrange
-                ? `linear-gradient(to bottom, ${colors.white} 0%, #FFF8E1 40%, #FFEDD5 70%, #F59E0B 100%)`
-                : `linear-gradient(to bottom, #F59E0B 0%, #FFEDD5 30%, #FFF8E1 60%, ${colors.white} 100%)`
+                ? `linear-gradient(to bottom, 
+                    ${colors.white} 0%, 
+                    #FFFBF0 20%, 
+                    #FFECC0 50%, 
+                    #FFDB90 80%,
+                    #F59E0B 100%)`
+                : `linear-gradient(to bottom, 
+                    #F59E0B 0%, 
+                    #FFDB90 20%,
+                    #FFECC0 50%, 
+                    #FFFBF0 80%, 
+                    ${colors.white} 100%)`
         }} />
     );
 
@@ -131,8 +154,6 @@ export default function LandingPage() {
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
       `}</style>
 
-            {/* Nav and Footer removed from here to fix double menu issue, they are in layout.tsx */}
-
             {/* Hero Section */}
             <section style={{ position: 'relative', zIndex: 10, minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: '80px' }}>
                 <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '4rem 3rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
@@ -155,7 +176,7 @@ export default function LandingPage() {
                         </h1>
 
                         <p style={{ fontSize: '1.25rem', color: colors.muted, lineHeight: 1.7, marginBottom: '2.5rem', maxWidth: '480px' }}>
-                            Raccogli feedback qualitativi da clienti, dipendenti e stakeholder. Senza interviste manuali. Senza consulenti.
+                            Crea interviste intelligenti in 10 minuti. Raccogli feedback veri da clienti, dipendenti e partner.
                         </p>
 
                         <div style={{ display: 'flex', gap: '1rem', marginBottom: '3rem' }}>
@@ -166,14 +187,14 @@ export default function LandingPage() {
                             </Link>
                             <Link href="/onboarding">
                                 <Button variant="secondary" size="lg">
-                                    <Icons.Play size={18} /> Guarda demo
+                                    <Icons.Play size={18} /> Guarda come funziona
                                 </Button>
                             </Link>
                         </div>
 
                         {/* Trust Badges */}
-                        <div style={{ display: 'flex', gap: '0.625rem' }}>
-                            {[{ icon: Icons.Building, label: 'B2B' }, { icon: Icons.Cart, label: 'B2C' }, { icon: Icons.Users, label: 'HR' }].map((uc, i) => (
+                        <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+                            {[{ icon: Icons.Building, label: 'B2B' }, { icon: Icons.Cart, label: 'B2C' }, { icon: Icons.Users, label: 'HR' }, { icon: Icons.Settings, label: 'Ops' }].map((uc, i) => (
                                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '100px', color: colors.subtle, fontSize: '0.8125rem', fontWeight: 500 }}>
                                     <uc.icon size={16} /> {uc.label}
                                 </div>
@@ -242,7 +263,7 @@ export default function LandingPage() {
             {/* Stats Section */}
             <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem' }}>
                 <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', justifyContent: 'center', gap: '6rem' }}>
-                    {[{ value: '70%+', label: 'Tasso completamento' }, { value: '10 min', label: 'Setup intervista' }, { value: '1/10', label: 'Costo vs consulente' }].map((stat, i) => (
+                    {[{ value: '70%+', label: 'Completion rate medio' }, { value: '10 min', label: "Per creare un'intervista" }, { value: '1/10', label: 'Del costo ricerca tradizionale' }].map((stat, i) => (
                         <div key={i} style={{ textAlign: 'center' }}>
                             <div style={{ fontSize: '3rem', fontWeight: 600, background: `linear-gradient(135deg, ${colors.amberDark}, ${colors.gold})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{stat.value}</div>
                             <div style={{ fontSize: '0.9375rem', color: colors.subtle }}>{stat.label}</div>
@@ -261,7 +282,7 @@ export default function LandingPage() {
                         Da zero a insight in <span style={{ color: colors.amber }}>4 passi</span>
                     </h2>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
-                        {[{ num: '01', title: 'Descrivi l\'obiettivo', desc: 'Scrivi cosa vuoi capire' }, { num: '02', title: 'L\'AI prepara tutto', desc: 'Domande generate in secondi' }, { num: '03', title: 'Condividi il link', desc: 'Via email, WhatsApp, etc' }, { num: '04', title: 'Ricevi gli insight', desc: 'Temi, citazioni, sentiment' }].map((step, i) => (
+                        {[{ num: '01', title: 'Descrivi cosa vuoi sapere', desc: 'Scrivi il tuo obiettivo in linguaggio naturale.' }, { num: '02', title: 'L\'AI costruisce l\'intervista', desc: 'Domande e flusso generati in secondi.' }, { num: '03', title: 'Condividi e raccogli', desc: 'Un link. Risposte da mobile o desktop.' }, { num: '04', title: 'Leggi gli insight', desc: 'Temi, sentiment e citazioni estratti automaticamente.' }].map((step, i) => (
                             <div key={i} style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(15px)', borderRadius: '24px', padding: '2rem 1.5rem', boxShadow: '0 15px 40px rgba(0,0,0,0.04)', border: '1px solid rgba(255,255,255,0.8)' }}>
                                 <div style={{ width: '56px', height: '56px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: '1.125rem', fontWeight: 700, color: colors.amberDark }}>{step.num}</div>
                                 <h3 style={{ fontSize: '1rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>{step.title}</h3>
@@ -272,7 +293,7 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            <OrangeTransition toOrange={true} height={200} />
+            <OrangeTransition toOrange={true} height={300} />
 
             {/* Pricing Section */}
             <section id="pricing" style={{ position: 'relative', zIndex: 10, background: '#F59E0B', padding: '3rem 2rem 4rem', overflow: 'hidden' }}>
@@ -282,45 +303,49 @@ export default function LandingPage() {
                     <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
                         <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: 'white', textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Prezzi semplici</span>
                         <h2 style={{ fontSize: '3rem', fontWeight: 600, color: 'white', letterSpacing: '-0.02em', marginBottom: '1rem', textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>Scegli il piano giusto per te</h2>
-                        <p style={{ fontSize: '1.125rem', color: 'rgba(255,255,255,0.9)', maxWidth: '500px', margin: '0 auto' }}>Inizia gratis, scala quando cresci. Nessun costo nascosto.</p>
+                        <p style={{ fontSize: '1.125rem', color: 'rgba(255,255,255,0.9)', maxWidth: '500px', margin: '0 auto' }}>Inizia gratis, scala quando serve. Nessun vincolo.</p>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', alignItems: 'stretch' }}>
                         {/* Starter */}
                         <div style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Starter</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per iniziare a esplorare</p></div>
-                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€49</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['3 interviste attive', '100 risposte/mese', 'Analisi base', 'Export PDF'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
+                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Starter</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per il professionista</p></div>
+                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€39</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['3 interviste attive', '100 risposte/mese', 'Analytics completi', 'Export PDF'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
                             <Link href="/register?plan=STARTER" className="w-full">
-                                <Button fullWidth variant="ghost" style={{ background: 'white', color: colors.amberDark }}>Inizia gratis</Button>
+                                <Button fullWidth style={{ background: 'white', color: colors.amberDark, fontWeight: 600, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+                                    Prova 14 giorni gratis
+                                </Button>
                             </Link>
                         </div>
 
                         {/* Professional */}
                         <div style={{ background: 'white', borderRadius: '28px', padding: '2.5rem 2rem', boxShadow: '0 30px 60px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', transform: 'scale(1.05)', position: 'relative', zIndex: 2 }}>
                             <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: gradients.primary, padding: '0.375rem 1rem', borderRadius: '100px', fontSize: '0.6875rem', fontWeight: 700, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Più popolare</div>
-                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>Professional</h3><p style={{ fontSize: '0.875rem', color: colors.muted, margin: 0 }}>Per team in crescita</p></div>
-                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: colors.text }}>€149</span><span style={{ fontSize: '1rem', color: colors.muted }}>/mese</span></div>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['10 interviste attive', '500 risposte/mese', 'Analisi avanzata AI', 'Temi e sentiment', 'Integrazione CRM', 'Supporto prioritario'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: colors.text, fontSize: '0.9375rem' }}><div style={{ color: colors.amber }}><Icons.Check size={18} /></div>{f}</li>))}</ul>
+                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>Pro</h3><p style={{ fontSize: '0.875rem', color: colors.muted, margin: 0 }}>Per la PMI</p></div>
+                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: colors.text }}>€99</span><span style={{ fontSize: '1rem', color: colors.muted }}>/mese</span></div>
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['10 interviste attive', '300 risposte/mese', 'Knowledge Base AI', 'Logica condizionale', 'Trend & Confronti', 'Export CSV + Webhook'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: colors.text, fontSize: '0.9375rem' }}><div style={{ color: colors.amber }}><Icons.Check size={18} /></div>{f}</li>))}</ul>
                             <Link href="/register?plan=PRO" className="w-full">
-                                <Button fullWidth>Inizia ora →</Button>
+                                <Button fullWidth>Prova 14 giorni gratis →</Button>
                             </Link>
                         </div>
 
-                        {/* Enterprise */}
+                        {/* Business */}
                         <div style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Enterprise</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per grandi organizzazioni</p></div>
-                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>Custom</span></div>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['Interviste illimitate', 'Risposte illimitate', 'White-label', 'API access', 'SSO & compliance', 'Account manager'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
+                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Business</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per l'azienda strutturata</p></div>
+                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€249</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
+                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['Interviste illimitate', '1.000 risposte/mese', 'White label completo', 'Dominio personalizzato', 'API REST + Zapier', 'Onboarding dedicato'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
                             <Link href="mailto:sales@businesstuner.it" className="w-full">
-                                <Button fullWidth variant="ghost" style={{ background: 'white', color: colors.amberDark }}>Contattaci</Button>
+                                <Button fullWidth style={{ background: 'white', color: colors.amberDark, fontWeight: 600, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
+                                    Contattaci
+                                </Button>
                             </Link>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <OrangeTransition toOrange={false} height={200} />
+            <OrangeTransition toOrange={false} height={300} />
 
             {/* Testimonials */}
             <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem 4rem' }}>

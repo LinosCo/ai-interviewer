@@ -26,7 +26,7 @@ export const colors = {
     subtle: '#737373',      // Testo terziario, labels
     light: '#E5E5E5',       // Bordi, divisori
     white: '#FFFFFF',       // Background principale
-    bg: '#FAFAFA',          // Sfondo pagina default
+    bg: '#FFFBEB',          // Sfondo pagina default (Amber 50)
 
     // Semantici
     success: '#16A34A',

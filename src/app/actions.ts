@@ -284,6 +284,7 @@ export async function generateBotConfigAction(prompt: string) {
     return result.object;
 }
 
+
 export async function generateBotAnalyticsAction(botId: string) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
@@ -291,13 +292,13 @@ export async function generateBotAnalyticsAction(botId: string) {
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) throw new Error("User not found");
 
-    // Fetch conversations
+    // Fetch conversations WITH analysis
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
         include: {
             conversations: {
-                where: { messages: { some: { role: 'user' } } },
-                include: { messages: { where: { role: 'user' } } }
+                where: { status: 'COMPLETED' }, // Only analyze completed ones? Or all with analysis? 
+                include: { analysis: true }
             },
             topics: { orderBy: { orderIndex: 'asc' } }
         }
@@ -305,18 +306,29 @@ export async function generateBotAnalyticsAction(botId: string) {
 
     if (!bot || bot.conversations.length === 0) return;
 
+    // Filter only conversations that HAVE analysis
+    const analyzedConversations = bot.conversations.filter(c => c.analysis);
+
+    if (analyzedConversations.length === 0) {
+        // Fallback? Or maybe trigger analysis for old ones?
+        // For now, return or throw warning.
+        console.log("No analyzed conversations found. Run individual analysis first.");
+        return;
+    }
+
     // Resolve API Key
     const apiKey = await getEffectiveApiKey(user, bot.openaiApiKey);
-    if (!apiKey) throw new Error("No OpenAI API Key configured for this bot or user.");
+    if (!apiKey) throw new Error("No OpenAI API Key configured.");
 
-    // Prepare text for analysis
-    // We'll concatenate the last few user messages from each conversation or a summary.
-    // For MVP, perform a "Global Analysis" on the dataset.
-
-    // Simplification: Take map of texts, prefixed with Conversation ID for citation
-    const transcripts = bot.conversations.map(c =>
-        `[ConvID:${c.id}] Message Log:\n` + c.messages.map(m => `User: "${m.content}"`).join("\n")
-    ).join("\n\n----------------\n\n");
+    // Prepare Aggregated Input for Global LLM
+    // Instead of raw text, we send Summaries and Key Quotes from each convo.
+    const aggregatedInput = analyzedConversations.map(c => {
+        const a = c.analysis!; // Verified by filter
+        // Extract metadata summary if available, or just use quotes
+        const summary = (a.metadata as any)?.summary || "No summary available.";
+        const quotes = (a.keyQuotes as string[])?.join(' | ') || "";
+        return `[ConvID:${c.id}] Summary: ${summary}\nKey Quotes: ${quotes}\nSentiment: ${a.sentimentScore}`;
+    }).join("\n\n----------------\n\n");
 
     const openai = createOpenAI({ apiKey });
 
@@ -328,54 +340,49 @@ export async function generateBotAnalyticsAction(botId: string) {
             citations: z.array(z.object({
                 quote: z.string(),
                 conversationId: z.string()
-            })).describe("Direct quotes supporting this theme, with their source Conversation ID")
+            }))
         })),
         insights: z.array(z.object({
             content: z.string(),
             citations: z.array(z.object({
                 quote: z.string(),
                 conversationId: z.string()
-            })).describe("Evidence quotes for this insight")
-        })).describe("Strategic observations or actionable suggestions"),
-        sentimentScore: z.number().describe("Overall sentiment score from 0 to 100"),
+            }))
+        })),
+        sentimentScore: z.number(),
         goldenQuotes: z.array(z.object({
             quote: z.string(),
-            conversationId: z.string(),
-            context: z.string().optional()
-        })).describe("3-5 most impactful or representative direct quotes from users with their exact source"),
+            conversationId: z.string()
+        })),
         topicAnalysis: z.array(z.object({
             topicLabel: z.string(),
             keywords: z.array(z.object({
                 word: z.string(),
                 count: z.number(),
                 sentiment: z.enum(['POSITIVE', 'NEUTRAL', 'NEGATIVE']).optional()
-            })).describe("Key terms or concepts mentioned by users regarding this topic")
+            }))
         })).optional()
     });
 
     const result = await generateObject({
         model: openai('gpt-4o'),
         schema,
-        prompt: `Analyze the following interview transcripts for the bot "${bot.name}".
-        Identify recurring themes, key user feedback patterns, and strategic insights.
-        Also determine an overall sentiment score (0-100) and extract 'Golden Quotes' that perfectly capture the user experience or feedback.
+        prompt: `Conduct a Global Meta-Analysis for the bot "${bot.name}" based on these pre-analyzed interview summaries.
         
-        Additionally, analyze the responses for EACH of the following defined topics:
-        ${bot.topics.map(t => `- ${t.label}: ${t.description}`).join('\n')}
+        Input Data (Aggregated Summaries):
+        ${aggregatedInput.substring(0, 100000)} 
+        
+        Task:
+        1. Identify recurring themes across multiple interviews.
+        2. Synthesize strategic insights.
+        3. Calculate a weighted average sentiment score.
+        4. Select the absolute best 'Golden Quotes' from the provided key quotes.
+        5. Analyze topic trends based on the summaries.
 
-        For each topic, extract the most frequent keywords or concepts (Word Cloud data) and their frequency.
-
-        IMPORTANT: For every theme, insight, and quote, you MUST provide "citations". 
-        A citation consists of the exact "quote" from the user and the "conversationId" where it was found (look for [ConvID:...] in the text).
-        
-        Transcripts:
-        ${transcripts.substring(0, 80000)} // Increased context limit
-        
-        Output meaningful themes with counts and evidence, actionable insights with evidence, a sentiment score, directed quotes, and topic-specific keyword analysis.`,
+        IMPORTANT: Use the [ConvID:...] from the input to strictly cite your sources.`
     });
 
-    // Save to DB
-    // Clear old themes/insights? Maybe yes for this MVP sync.
+    // Save to DB (Clear old and rewrite)
     await prisma.theme.deleteMany({ where: { botId } });
     await prisma.insight.deleteMany({ where: { botId } });
 
@@ -390,13 +397,11 @@ export async function generateBotAnalyticsAction(botId: string) {
                 description: t.description,
                 occurrences: {
                     create: t.citations.map(cit => ({
-                        conversationId: cit.conversationId.replace('ConvID:', '').trim(), // Ensure ID is clean if AI kept prefix
-                        strengthScore: 1, // Default
+                        conversationId: cit.conversationId.replace('ConvID:', '').trim(),
+                        strengthScore: 1,
                         snippet: cit.quote
-                    })).slice(0, t.count) // ensure we match count roughly or just take all citations
+                    })).slice(0, t.count)
                 }
-                // If AI returns fewer citations than "count", that's fine. 
-                // We rely on citation array length for actual relations.
             }
         });
     }
@@ -408,7 +413,7 @@ export async function generateBotAnalyticsAction(botId: string) {
                 botId,
                 content: i.content,
                 type: 'STRATEGIC',
-                citations: i.citations as any // Save JSON
+                citations: i.citations as any
             }
         });
     }
@@ -420,18 +425,14 @@ export async function generateBotAnalyticsAction(botId: string) {
                 botId,
                 content: q.quote,
                 type: 'QUOTE',
-                // Store metadata link in citations too or a new field? 
-                // Using 'citations' field to store the single source is consistent.
-                citations: [{ quote: q.quote, conversationId: q.conversationId, context: q.context }] as any
+                citations: [{ quote: q.quote, conversationId: q.conversationId }] as any
             }
         });
     }
 
-    // Update Topic Keywords
+    // Create Topic Analysis (Update keywords)
     if (data.topicAnalysis) {
         for (const topicData of data.topicAnalysis) {
-            // Find matching topic by label (approximate match or exact?)
-            // We sent the labels, so AI should return them.
             const topic = bot.topics.find(t => t.label === topicData.topicLabel);
             if (topic) {
                 await prisma.topicBlock.update({
@@ -442,8 +443,7 @@ export async function generateBotAnalyticsAction(botId: string) {
         }
     }
 
-
-    // Update Bot Metadata (Sentiment)
+    // Update Bot Metadata
     await prisma.bot.update({
         where: { id: botId },
         data: {
@@ -456,6 +456,7 @@ export async function generateBotAnalyticsAction(botId: string) {
 
     revalidatePath(`/dashboard/bots/${botId}/analytics`);
 }
+
 
 export async function addTopicAction(botId: string, orderIndex: number) {
     const session = await auth();
@@ -674,4 +675,88 @@ export async function saveBotMessageAction(conversationId: string, content: stri
             content
         }
     });
+}
+
+export async function generateConversationInsightAction(conversationId: string) {
+    // 1. Fetch Data
+    const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+            messages: true,
+            bot: true
+        }
+    });
+
+    if (!conversation) throw new Error("Conversation not found");
+    // Ensure we have enough messages to analyze
+    if (conversation.messages.length < 4) {
+        console.log("Conversation too short for analysis:", conversationId);
+        return;
+    }
+
+    // 2. Resolve Key (Use Bot key or fallback)
+    let apiKey = conversation.bot.openaiApiKey;
+    if (!apiKey) {
+        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || null;
+    }
+
+    if (!apiKey) {
+        console.error("No API key for analysis");
+        return;
+    }
+
+    const openai = createOpenAI({ apiKey });
+
+    // 3. Prepare Transcript
+    const transcript = conversation.messages.map(m => `${m.role}: "${m.content}"`).join("\n");
+
+    // 4. Analyze
+    const schema = z.object({
+        summary: z.string().describe("Brief summary of the main points discussed"),
+        topicCoverage: z.number().describe("0 to 1 score of how well goals were met"),
+        sentimentScore: z.number().describe("-1 (Negative) to 1 (Positive)"),
+        keyQuotes: z.array(z.string()).describe("3-5 exact, meaningful quotes from the user")
+    });
+
+    try {
+        const { object } = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: `Analyze this interview transcript based on the Research Goal: "${conversation.bot.researchGoal}".
+            
+            Transcript:
+            ${transcript.substring(0, 50000)}
+            
+            Task:
+            1. Summarize the user's main feedback.
+            2. Estimate Topic Coverage (did they answer all questions?).
+            3. Sentiment Analysis.
+            4. Extract the most valuable quotes.`
+        });
+
+        // 5. Save to DB
+        await prisma.conversationAnalysis.upsert({
+            where: { conversationId },
+            update: {
+                topicCoverage: object.topicCoverage,
+                sentimentScore: object.sentimentScore,
+                keyQuotes: object.keyQuotes as any,
+                metadata: { summary: object.summary } as any
+            },
+            create: {
+                conversationId,
+                topicCoverage: object.topicCoverage,
+                sentimentScore: object.sentimentScore,
+                keyQuotes: object.keyQuotes as any,
+                metadata: { summary: object.summary } as any
+            }
+        });
+
+        revalidatePath(`/dashboard/bots/${conversation.botId}/analytics`);
+        console.log("Analysis Saved for:", conversationId);
+
+    } catch (e) {
+        console.error("Analysis Failed", e);
+    }
 }

@@ -289,6 +289,20 @@ model Conversation {
   
   themeOccurrences ThemeOccurrence[]
   answers         StructuredAnswer[]
+  analysis        ConversationAnalysis?
+}
+
+model ConversationAnalysis {
+  id              String       @id @default(cuid())
+  conversationId  String       @unique
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  topicCoverage   Float        // 0-1 score
+  sentimentScore  Float        // -1 to 1
+  keyQuotes       Json         // Array of strings
+  metadata        Json?        // Flexible field for other stats
+  
+  createdAt       DateTime     @default(now())
 }
 
 model Message {

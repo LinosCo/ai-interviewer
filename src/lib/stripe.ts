@@ -82,7 +82,7 @@ export async function getStripeClient(): Promise<Stripe> {
 
 export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
     const config = await getStripeConfig();
-    const prices = config?.prices || {};
+    const prices = config?.prices || { STARTER: null, PRO: null, BUSINESS: null };
 
     return {
         FREE: {

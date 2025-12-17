@@ -1,4 +1,4 @@
-
+import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { generateText, CoreMessage } from 'ai';
@@ -82,8 +82,15 @@ export async function POST(req: Request) {
 
         // 4. Initialize LLM
         // Use environment key directly since we are in simulator (admin/creator usage)
-        const apiKey = process.env.OPENAI_API_KEY;
-        if (!apiKey) throw new Error("OpenAI API Key missing for simulator");
+        let apiKey = process.env.OPENAI_API_KEY;
+
+        // Fallback to Global Settings if env var is missing
+        if (!apiKey) {
+            const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } }).catch(() => null);
+            apiKey = globalConfig?.openaiApiKey || undefined;
+        }
+
+        if (!apiKey) throw new Error("OpenAI API Key missing for simulator (Check Global Settings or Env Vars)");
 
         const openai = createOpenAI({ apiKey });
         const model = openai('gpt-4o');

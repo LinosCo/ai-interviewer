@@ -45,6 +45,16 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                     <label className="block text-sm font-medium mb-1">Tone & Persona</label>
                     <input name="tone" defaultValue={bot.tone || ''} placeholder="e.g. Professional, Empathetic, Casual" className="w-full border p-2 rounded" />
                 </div>
+                <div className="mt-4">
+                    <label className="block text-sm font-medium mb-1">Welcome Message (First interaction)</label>
+                    <textarea
+                        name="introMessage"
+                        defaultValue={bot.introMessage || ''}
+                        placeholder="Hi! I'm here to interview you about..."
+                        className="w-full border p-2 rounded h-20"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">If set, the bot will start the conversation with this exact message.</p>
+                </div>
             </section>
 
             <section>

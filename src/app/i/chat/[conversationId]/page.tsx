@@ -44,6 +44,12 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             showAnonymityInfo={bot.showAnonymityInfo}
             showDataUsageInfo={bot.showDataUsageInfo}
             language={bot.language}
+            introMessage={bot.introMessage}
+            initialMessages={conversation.messages.map(m => ({
+                id: m.id,
+                role: m.role as any,
+                content: m.content
+            }))}
         />
     );
 }

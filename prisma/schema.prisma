@@ -176,6 +176,7 @@ model Bot {
   targetAudience String?  @db.Text
   language       String   @default("en")
   tone           String?  // e.g. friendly, neutral
+  introMessage   String?  @db.Text // Custom first message
   
   // Limits
   maxDurationMins Int     @default(10)
@@ -282,7 +283,7 @@ model Conversation {
   sentimentScore  Float?
   tags            String[]
   
-  bot             Bot      @relation(fields: [botId], references: [id])
+  bot             Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
   messages        Message[]
   rewardGrant     RewardGrant?
   

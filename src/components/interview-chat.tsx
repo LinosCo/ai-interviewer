@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { saveBotMessageAction } from '@/app/actions';
+
+
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 
@@ -31,6 +33,8 @@ interface InterviewChatProps {
     showAnonymityInfo?: boolean;
     showDataUsageInfo?: boolean;
     language?: string;
+    introMessage?: string | null;
+    initialMessages?: Message[];
 }
 
 const TRANSLATIONS: Record<string, any> = {
@@ -86,16 +90,18 @@ export default function InterviewChat({
     showAnonymityInfo = true,
     showDataUsageInfo = true,
     language = 'en',
+    introMessage,
+    initialMessages = []
 }: InterviewChatProps) {
     const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const [startTime, setStartTime] = useState<number | null>(null);
-    const [hasStarted, setHasStarted] = useState(false);
-    const [showLanding, setShowLanding] = useState(true);
+    const [hasStarted, setHasStarted] = useState(initialMessages.length > 0);
+    const [showLanding, setShowLanding] = useState(initialMessages.length === 0);
     const [consentGiven, setConsentGiven] = useState(false);
 
     // Effective Time Tracking
@@ -113,11 +119,31 @@ export default function InterviewChat({
         }
         return () => clearInterval(interval);
     }, [isTyping, isLoading, hasStarted]);
+
     const handleStart = async () => {
         setShowLanding(false);
         setHasStarted(true);
         setStartTime(Date.now());
-        await handleSendMessage("I'm ready to start the interview.", true);
+
+        // If we have a custom intro message, use it immediately as the assistant's first message
+        if (introMessage) {
+            const assistantMessage: Message = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: introMessage
+            };
+            setMessages([assistantMessage]);
+
+            // Persist the intro message to DB so history is preserved
+            try {
+                await saveBotMessageAction(conversationId, introMessage);
+            } catch (err) {
+                console.error("Failed to save intro message", err);
+            }
+        } else {
+            // Default behavior: trigger the AI to start
+            await handleSendMessage("I'm ready to start the interview.", true);
+        }
     };
 
     // Auto-focus input when question changes
@@ -425,6 +451,20 @@ export default function InterviewChat({
                                     <span>→</span>
                                 </div>
 
+                                {/* Show user's last answer if exists (Rendered ABOVE current question for natural flow) */}
+                                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="mb-8 p-4 rounded-xl bg-white/50 border border-gray-200"
+                                    >
+                                        <div className="text-xs text-gray-500 mb-2">{t.yourAnswer}</div>
+                                        <div className="text-gray-700 italic">
+                                            "{messages[messages.length - 2].content}"
+                                        </div>
+                                    </motion.div>
+                                )}
+
                                 {/* Question text */}
                                 <div className="prose prose-lg max-w-none">
                                     <ReactMarkdown
@@ -478,20 +518,6 @@ export default function InterviewChat({
                                         {currentQuestion.content}
                                     </ReactMarkdown>
                                 </div>
-
-                                {/* Show user's last answer if exists */}
-                                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="mt-8 p-4 rounded-xl bg-white/50 border border-gray-200"
-                                    >
-                                        <div className="text-xs text-gray-500 mb-2">{t.yourAnswer}</div>
-                                        <div className="text-gray-700">
-                                            {messages[messages.length - 2].content}
-                                        </div>
-                                    </motion.div>
-                                )}
                             </motion.div>
                         )}
 

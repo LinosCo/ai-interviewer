@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { templates, Template } from '@/lib/templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
 import { colors, gradients } from '@/lib/design-system';
+import { Header } from '@/components/Header';
 
 const examplePrompts = [
     'B2B: Vorrei capire perché i miei clienti SaaS non rinnovano il contratto dopo il primo anno',
@@ -50,25 +51,7 @@ export default function OnboardingPage() {
             }} />
 
             {/* Header */}
-            <header style={{ padding: '1.5rem 2rem', position: 'relative', zIndex: 10 }}>
-                <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{
-                        width: '40px',
-                        height: '40px',
-                        background: gradients.primary,
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
-                    }}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
-                        </svg>
-                    </div>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.text }}>Business Tuner</h1>
-                </div>
-            </header>
+            <Header />
 
             {/* Main Content */}
             <main style={{

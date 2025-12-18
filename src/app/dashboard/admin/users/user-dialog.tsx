@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createUser, updateUser } from '@/app/actions/admin';
 import { UserRole } from '@prisma/client';
 import { X } from 'lucide-react';
@@ -34,6 +35,7 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
         user?.projectAccess.map(p => p.projectId) || []
     );
     const [isLoading, setIsLoading] = useState(false);
+    const router = useRouter();
 
     if (!isOpen) return null;
 
@@ -58,6 +60,8 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                     projectIds: selectedProjectIds
                 });
             }
+            alert(`User ${user ? 'updated' : 'created'} successfully!`);
+            router.refresh();
             onClose();
         } catch (error) {
             console.error(error);

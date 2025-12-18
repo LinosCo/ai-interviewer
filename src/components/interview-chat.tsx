@@ -354,18 +354,18 @@ export default function InterviewChat({
     if (showWarmup) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ background: mainBackground }}>
-                <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: `radial-gradient(circle at 50% 50%, ${brandColor}10 0%, transparent` }} />
+                <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: `radial-gradient(circle at 50% 50%, ${brandColor}15 0%, transparent 70%)` }} />
                 <WarmupQuestion
-                    warmupStyle={bot.warmupStyle}
-                    warmupChoices={bot.warmupChoices}
-                    warmupIcebreaker={bot.warmupIcebreaker}
-                    warmupContextPrompt={bot.warmupContextPrompt}
+                    warmupStyle={warmupStyle}
+                    warmupChoices={warmupChoices}
+                    warmupIcebreaker={warmupIcebreaker}
+                    warmupContextPrompt={warmupContextPrompt}
                     onAnswer={(answer) => {
                         handleStartWithWarmup(answer);
                     }}
                     onSkip={handleStart}
                     brandColor={brandColor}
-                    language={bot.language || 'it'}
+                    language={language || 'it'}
                 />
             </div>
         );
@@ -572,26 +572,45 @@ export default function InterviewChat({
                 </div>
             )}
 
-            {/* Header */}
-            <header className="fixed top-24 left-0 right-0 z-50 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
-                <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md p-2.5 pl-3.5 pr-5 rounded-full border border-stone-200 shadow-lg pointer-events-auto transition-all hover:shadow-xl hover:scale-105">
+            {/* Header - Moved lower to avoid overlap with progress bar labels */}
+            <header className="fixed top-28 left-0 right-0 z-50 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
+                <div className="flex items-center gap-3 bg-white border border-stone-200 p-2.5 pl-3.5 pr-5 rounded-full shadow-xl pointer-events-auto transition-all hover:shadow-2xl hover:scale-105">
                     {logoUrl ? (
-                        <div className="h-7 w-7 rounded-full overflow-hidden border border-stone-100 flex-shrink-0">
-                            <img src={logoUrl} alt={botName} className="h-full w-full object-cover" />
+                        <div className="h-8 w-8 rounded-full overflow-hidden border border-stone-100 flex-shrink-0 bg-stone-50">
+                            <img
+                                src={logoUrl}
+                                alt={botName}
+                                className="h-full w-full object-cover"
+                                onError={(e) => {
+                                    // Fallback if image fails to load
+                                    (e.target as any).style.display = 'none';
+                                    (e.target as any).parentElement.innerHTML = `<div class="w-full h-full rounded-full flex items-center justify-center text-white" style="background: ${brandColor}">?</div>`;
+                                }}
+                            />
                         </div>
                     ) : (
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0" style={{ background: brandColor }}>
-                            <Icons.Chat size={16} />
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-sm" style={{ background: brandColor }}>
+                            <Icons.Chat size={18} />
                         </div>
                     )}
-                    <div className="flex flex-col">
-                        <span className="font-bold text-xs text-gray-400 uppercase tracking-widest leading-none mb-0.5">Intervista AI</span>
-                        <span className="font-semibold text-sm text-gray-800 tracking-tight truncate max-w-[180px]">{botName}</span>
+                    <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-[10px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">Sessione Live</span>
+                        <span className="font-bold text-sm text-gray-900 tracking-tight truncate max-w-[200px]">{botName}</span>
                     </div>
                 </div>
 
-                <div className="bg-white/95 backdrop-blur-md px-4 py-2 rounded-full border border-stone-200 shadow-md text-xs font-bold text-gray-600">
-                    {elapsedMinutes}m <span className="text-gray-300 mx-1">/</span> ~{estimatedMinutes}m
+                <div className="flex flex-col items-end gap-1">
+                    <div className="bg-white/95 backdrop-blur-md px-4 py-2 rounded-full border border-stone-200 shadow-md text-[11px] font-bold text-gray-600 flex items-center gap-1.5">
+                        <Icons.Clock size={12} className="text-gray-400" />
+                        <span>{elapsedMinutes}m</span>
+                        <span className="text-gray-300">/</span>
+                        <span className="text-gray-400 font-medium">~{estimatedMinutes}m</span>
+                    </div>
+                    {privacyLevel === 'anonymous' && (
+                        <div className="bg-green-50 text-[10px] font-bold text-green-600 px-3 py-1 rounded-full border border-green-100 uppercase tracking-wide">
+                            Anonimo
+                        </div>
+                    )}
                 </div>
             </header>
 

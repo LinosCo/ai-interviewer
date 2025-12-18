@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UserRole } from '@prisma/client';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import UserDialog from './user-dialog';
@@ -39,10 +40,14 @@ export default function UsersView({ users, projects }: UsersViewProps) {
         setIsDialogOpen(true);
     };
 
+    const router = useRouter();
+
     const handleDelete = async (userId: string) => {
         if (confirm('Are you sure you want to delete this user?')) {
             try {
                 await deleteUser(userId);
+                alert('User deleted successfully');
+                router.refresh();
             } catch (error) {
                 alert('Failed to delete user');
             }

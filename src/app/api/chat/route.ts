@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { MemoryManager } from '@/lib/memory/memory-manager';
 import { generateText, CoreMessage } from 'ai';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { recordInterviewCompleted, checkInterviewStatus, markInterviewAsCompleted } from '@/lib/usage';
@@ -77,7 +78,36 @@ export async function POST(req: Request) {
             updatedEffectiveDuration
         );
 
+        // --- BUSINESS TUNER MEMORY INTEGRATION ---
+        // 1. Update memory with new user message (if applicable)
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && lastMessage.role === 'user') {
+            const apiKey = process.env.OPENAI_API_KEY || '';
+            const currentTopicLabel = currentTopic?.label || 'Generale';
+
+            // Non-blocking memory update (fire and forget to not slow down response too much, 
+            // or await if we want to ensure consistency)
+            // Awaiting is safer for the prototype to avoid race conditions on next turn
+            await MemoryManager.updateAfterUserResponse(
+                conversationId,
+                lastMessage.content,
+                currentTopic?.id || '',
+                currentTopicLabel,
+                apiKey
+            );
+        }
+
+        // 2. Get formatted memory context
+        const memory = await MemoryManager.get(conversationId);
+        const memoryContext = memory ? MemoryManager.formatForPrompt(memory) : '';
+
+        // 3. Inject into prompt
+        // We inject it before the control section
+        // -----------------------------------------
+
         systemPrompt += `
+
+${memoryContext}
 
 ## TRANSITION & COMPLETION CONTROL
 When topic is covered, add: [TRANSITION_TO_NEXT_TOPIC]

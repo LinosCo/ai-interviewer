@@ -46,6 +46,23 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             showDataUsageInfo={bot.showDataUsageInfo}
             language={bot.language}
             introMessage={bot.introMessage}
+
+            // Onboarding
+            welcomeTitle={bot.welcomeTitle}
+            welcomeSubtitle={bot.welcomeSubtitle}
+            formatExplanation={bot.formatExplanation}
+            showProgressBar={bot.showProgressBar}
+            progressBarStyle={bot.progressBarStyle}
+            showTopicPreview={bot.showTopicPreview}
+
+            // Context
+            topics={conversation.bot.topics.map((t: any) => ({
+                id: t.id,
+                label: t.label,
+                orderIndex: t.orderIndex
+            }))}
+            currentTopicId={conversation.currentTopicId}
+
             initialMessages={conversation.messages.map(m => ({
                 id: m.id,
                 role: m.role as any,

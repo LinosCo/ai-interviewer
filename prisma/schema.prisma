@@ -354,6 +354,23 @@ model Bot {
   showAnonymityInfo  Boolean @default(true)
   showDataUsageInfo  Boolean @default(true)
 
+  // Onboarding & Interface Configuration
+  showProgressBar        Boolean  @default(true)
+  progressBarStyle       String   @default("semantic") // "semantic" | "numeric" | "minimal" | "hidden"
+  showTopicPreview       Boolean  @default(false)      // Show topics as "stages"
+  
+  // Customizable messages
+  welcomeTitle           String?  // Override welcome title
+  welcomeSubtitle        String?  // Explanatory subtitle
+  formatExplanation      String?  // Explanation of conversational format
+
+  // Warm-up Configuration
+  warmupStyle          String   @default("open")  // "open" | "choice" | "icebreaker" | "context"
+  warmupChoices        Json?    // Options for "choice" style
+  warmupIcebreaker     String?  // Custom icebreaker question
+  warmupContextPrompt  String?  // Prompt for contextual question
+  warmupFollowup       Boolean  @default(true)  // Whether to follow up on warm-up answer
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -445,6 +462,35 @@ model Conversation {
   themeOccurrences ThemeOccurrence[]
   answers          StructuredAnswer[]
   analysis         ConversationAnalysis?
+  memory           ConversationMemory?
+}
+
+model ConversationMemory {
+  id              String   @id @default(cuid())
+  conversationId  String   @unique
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  // Fatti raccolti (JSON array di CollectedFact)
+  factsCollected  Json     @default("[]")
+  
+  // Temi già esplorati (JSON array di ExploredTopic)
+  topicsExplored  Json     @default("[]")
+  
+  // Aree ancora da esplorare (JSON array di UnansweredArea)
+  unansweredAreas Json     @default("[]")
+  
+  // Segnali di fatica utente (0-1)
+  userFatigueScore Float   @default(0)
+  
+  // Stile comunicativo rilevato
+  detectedTone    String?  // "formal" | "casual" | "brief" | "verbose"
+  avgResponseLength Int    @default(0)
+  usesEmoji       Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([conversationId])
 }
 
 model ConversationAnalysis {

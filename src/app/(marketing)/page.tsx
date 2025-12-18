@@ -6,6 +6,46 @@ import { colors, gradients } from '@/lib/design-system';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
+// --- Components ---
+
+const WaveSeparator = ({
+    position = 'bottom',
+    color = '#FFFBEB', // amber-50
+    height = 60
+}: {
+    position?: 'top' | 'bottom',
+    color?: string,
+    height?: number
+}) => (
+    <div style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        zIndex: 20,
+        height: `${height}px`,
+        [position]: 0,
+        transform: position === 'top' ? 'rotate(180deg)' : 'none'
+    }}>
+        <svg
+            viewBox="0 0 1440 320"
+            style={{ width: '100%', height: '100%' }}
+            preserveAspectRatio="none"
+        >
+            <path
+                fill={color}
+                fillOpacity="1"
+                d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+            />
+        </svg>
+    </div>
+);
+
+const SectionLabel = ({ text, color = colors.amberDark, bg = 'rgba(251,191,36,0.1)' }: { text: string, color?: string, bg?: string }) => (
+    <span className="inline-block text-xs font-bold uppercase tracking-widest py-2 px-4 rounded-full mb-6" style={{ color, background: bg }}>
+        {text}
+    </span>
+);
+
 export default function LandingPage() {
     const [mounted, setMounted] = useState(false);
     const [scrollY, setScrollY] = useState(0);
@@ -17,500 +57,371 @@ export default function LandingPage() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
-    // Soft Wave Separator (Redesigned: Noise + Harmonization)
-    const SoftWaveSeparator = ({ accentColor = colors.amber, height = 300, id = 'wave1' }) => (
-        <div style={{
-            width: '100%',
-            height: `${height}px`,
-            position: 'relative',
-            overflow: 'hidden',
-            background: `linear-gradient(180deg, ${colors.white} 0%, transparent 100%)`
-        }}>
-            <svg
-                style={{ position: 'absolute', width: '200%', left: '-50%', top: 0, height: '100%' }}
-                viewBox={`0 0 2880 ${height}`}
-                preserveAspectRatio="none"
-            >
-                <defs>
-                    <linearGradient id={`softFade${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="white" stopOpacity="0" />
-                        <stop offset="30%" stopColor="white" stopOpacity="1" />
-                        <stop offset="70%" stopColor="white" stopOpacity="1" />
-                        <stop offset="100%" stopColor="white" stopOpacity="0" />
-                    </linearGradient>
-                    <mask id={`fadeMask${id}`}>
-                        <rect width="100%" height="100%" fill={`url(#softFade${id})`} />
-                    </mask>
-                </defs>
-
-                <g mask={`url(#fadeMask${id})`}>
-                    {/* Line 1: Background Noise (Chaotic, High Frequency) */}
-                    <path
-                        d={`M0 ${height / 2} C 200 ${height * 0.25} 400 ${height * 0.75} 600 ${height * 0.35} C 800 ${height * 0.65} 1000 ${height * 0.3} 1200 ${height * 0.7} C 1400 ${height * 0.4} 1600 ${height * 0.6} 1800 ${height / 2} C 2000 ${height * 0.35} 2200 ${height * 0.65} 2400 ${height * 0.45} C 2600 ${height * 0.55} 2800 ${height * 0.4} 2880 ${height / 2}`}
-                        fill="none" stroke={accentColor} strokeWidth="0.8" opacity="0.25" strokeLinecap="round"
-                    >
-                        <animate attributeName="d" dur="8s" repeatCount="indefinite" values={`
-                            M0 ${height / 2} C 200 ${height * 0.25} 400 ${height * 0.75} 600 ${height * 0.35} C 800 ${height * 0.65} 1000 ${height * 0.3} 1200 ${height * 0.7} C 1400 ${height * 0.4} 1600 ${height * 0.6} 1800 ${height / 2} C 2000 ${height * 0.35} 2200 ${height * 0.65} 2400 ${height * 0.45} C 2600 ${height * 0.55} 2800 ${height * 0.4} 2880 ${height / 2};
-                            M0 ${height / 2} C 200 ${height * 0.7} 400 ${height * 0.3} 600 ${height * 0.65} C 800 ${height * 0.35} 1000 ${height * 0.75} 1200 ${height * 0.25} C 1400 ${height * 0.6} 1600 ${height * 0.4} 1800 ${height / 2} C 2000 ${height * 0.7} 2200 ${height * 0.3} 2400 ${height * 0.6} C 2600 ${height * 0.4} 2800 ${height * 0.65} 2880 ${height / 2};
-                            M0 ${height / 2} C 200 ${height * 0.25} 400 ${height * 0.75} 600 ${height * 0.35} C 800 ${height * 0.65} 1000 ${height * 0.3} 1200 ${height * 0.7} C 1400 ${height * 0.4} 1600 ${height * 0.6} 1800 ${height / 2} C 2000 ${height * 0.35} 2200 ${height * 0.65} 2400 ${height * 0.45} C 2600 ${height * 0.55} 2800 ${height * 0.4} 2880 ${height / 2}
-                        `} />
-                    </path>
-
-                    {/* Line 2: Background Noise (Chaotic, Offset, Different Frequency) */}
-                    <path
-                        d={`M0 ${height / 2 + 20} C 150 ${height * 0.65} 350 ${height * 0.35} 550 ${height * 0.7} C 750 ${height * 0.3} 950 ${height * 0.6} 1150 ${height * 0.4} C 1350 ${height * 0.75} 1550 ${height * 0.25} 1750 ${height / 2 + 20} C 1950 ${height * 0.6} 2150 ${height * 0.4} 2350 ${height * 0.7} C 2550 ${height * 0.3} 2750 ${height * 0.55} 2880 ${height / 2 + 20}`}
-                        fill="none" stroke={accentColor} strokeWidth="0.8" opacity="0.18" strokeLinecap="round"
-                    >
-                        <animate attributeName="d" dur="11s" repeatCount="indefinite" values={`
-                            M0 ${height / 2 + 20} C 150 ${height * 0.65} 350 ${height * 0.35} 550 ${height * 0.7} C 750 ${height * 0.3} 950 ${height * 0.6} 1150 ${height * 0.4} C 1350 ${height * 0.75} 1550 ${height * 0.25} 1750 ${height / 2 + 20} C 1950 ${height * 0.6} 2150 ${height * 0.4} 2350 ${height * 0.7} C 2550 ${height * 0.3} 2750 ${height * 0.55} 2880 ${height / 2 + 20};
-                            M0 ${height / 2 + 20} C 150 ${height * 0.3} 350 ${height * 0.7} 550 ${height * 0.25} C 750 ${height * 0.75} 950 ${height * 0.35} 1150 ${height * 0.65} C 1350 ${height * 0.3} 1550 ${height * 0.7} 1750 ${height / 2 + 20} C 1950 ${height * 0.35} 2150 ${height * 0.65} 2350 ${height * 0.3} C 2550 ${height * 0.7} 2750 ${height * 0.4} 2880 ${height / 2 + 20};
-                            M0 ${height / 2 + 20} C 150 ${height * 0.65} 350 ${height * 0.35} 550 ${height * 0.7} C 750 ${height * 0.3} 950 ${height * 0.6} 1150 ${height * 0.4} C 1350 ${height * 0.75} 1550 ${height * 0.25} 1750 ${height / 2 + 20} C 1950 ${height * 0.6} 2150 ${height * 0.4} 2350 ${height * 0.7} C 2550 ${height * 0.3} 2750 ${height * 0.55} 2880 ${height / 2 + 20}
-                        `} />
-                    </path>
-
-                    {/* Line 3: Harmonization (Thicker, Smooth, Rhythmic) */}
-                    <path
-                        d={`M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2}`}
-                        fill="none" stroke={accentColor} strokeWidth="3.5" opacity="0.85" strokeLinecap="round"
-                    >
-                        <animate attributeName="d" dur="10s" repeatCount="indefinite" values={`
-                             M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2};
-                             M0 ${height / 2} Q 360 ${height * 0.65} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2};
-                             M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2}
-                        `} />
-                    </path>
-                </g>
-            </svg>
-        </div>
-    );
-
-    // Soft Chart Separator
-    const SoftChartSeparator = ({ color = colors.amber, height = 280, id = 'chart1' }) => (
-        <div style={{
-            width: '100%', height: `${height}px`, position: 'relative', overflow: 'hidden',
-            background: `linear-gradient(180deg, ${colors.white} 0%, transparent 12%, transparent 88%, ${colors.white} 100%)`
-        }}>
-            <svg style={{ width: '100%', height: '100%' }} viewBox={`0 0 1440 ${height}`} preserveAspectRatio="none">
-                <defs>
-                    <linearGradient id={`chartFade${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor={color} stopOpacity="0" />
-                        <stop offset="20%" stopColor={color} stopOpacity="1" />
-                        <stop offset="80%" stopColor={color} stopOpacity="1" />
-                        <stop offset="100%" stopColor={color} stopOpacity="0" />
-                    </linearGradient>
-                </defs>
-                {Array.from({ length: 55 }).map((_, i) => {
-                    const x = i * 26 + 8;
-                    const baseH = 60 + Math.sin(i * 0.28) * 35 + Math.cos(i * 0.45) * 25;
-                    return (
-                        <rect key={i} x={x} y={height / 2 - baseH / 2} width="16" height={baseH} rx="6" fill={`url(#chartFade${id})`} opacity={0.05 + Math.sin(i * 0.18) * 0.025}>
-                            <animate attributeName="height" values={`${baseH};${baseH * 0.55};${baseH * 1.15};${baseH}`} dur={`${2.8 + (i % 8) * 0.25}s`} repeatCount="indefinite" />
-                        </rect>
-                    );
-                })}
-            </svg>
-        </div>
-    );
-
-    // Orange Transition Component (Improved Smoothing)
-    const OrangeTransition = ({ toOrange = true, height = 300 }) => (
-        <div style={{
-            width: '100%', height: `${height}px`, position: 'relative', overflow: 'hidden',
-            background: toOrange
-                ? `linear-gradient(to bottom, 
-                    ${colors.white} 0%, 
-                    #FFFBF0 20%, 
-                    #FFECC0 50%, 
-                    #FFDB90 80%,
-                    #F59E0B 100%)`
-                : `linear-gradient(to bottom, 
-                    #F59E0B 0%, 
-                    #FFDB90 20%,
-                    #FFECC0 50%, 
-                    #FFFBF0 80%, 
-                    ${colors.white} 100%)`
-        }} />
-    );
-
     return (
-        <div style={{ minHeight: '100vh', fontFamily: "'Inter', sans-serif", background: colors.white, position: 'relative', overflowX: 'hidden' }}>
+        <div className="min-h-screen font-sans bg-white overflow-x-hidden">
 
-            {/* Dynamic Background */}
-            <div style={{
-                position: 'fixed', inset: 0, pointerEvents: 'none',
-                background: `
-          radial-gradient(ellipse 80% 50% at 50% -20%, ${colors.peach}50 0%, transparent 50%),
-          radial-gradient(ellipse 60% 40% at 100% 30%, ${colors.rose}30 0%, transparent 40%),
-          radial-gradient(ellipse 50% 30% at 0% 60%, ${colors.lavender}25 0%, transparent 35%),
-          ${colors.white}
-        `
-            }} />
-
-            {/* Global Styles for Keyframes */}
+            {/* Styles for animation */}
             <style jsx global>{`
-        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-        @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.3); } 50% { box-shadow: 0 0 40px rgba(251, 191, 36, 0.5); } }
-        @keyframes waveTyping { 0%, 100% { transform: scaleY(0.4); opacity: 0.5; } 50% { transform: scaleY(1); opacity: 1; } }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-      `}</style>
+                @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+                @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+                @keyframes waveTyping { 0%, 100% { transform: scaleY(0.4); opacity: 0.5; } 50% { transform: scaleY(1); opacity: 1; } }
+            `}</style>
 
-            {/* Hero Section */}
-            <section style={{ position: 'relative', zIndex: 10, minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: '80px' }}>
-                <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '4rem 3rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center' }}>
+            {/* --- HERO SECTION (White) --- */}
+            <section className="relative z-10 pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+                {/* Background Mesh (Subtle) */}
+                <div
+                    className="absolute inset-0 pointer-events-none opacity-60"
+                    style={{
+                        background: `
+                            radial-gradient(ellipse 80% 50% at 50% -20%, ${colors.peach}40 0%, transparent 50%),
+                            radial-gradient(ellipse 60% 40% at 100% 30%, ${colors.rose}20 0%, transparent 40%)
+                        `
+                    }}
+                />
 
-                    {/* Hero Content */}
-                    <div style={{ opacity: mounted ? 1 : 0, transform: mounted ? 'translateY(0)' : 'translateY(40px)', transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(10px)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '100px', marginBottom: '1.5rem' }}>
-                            <div style={{ width: '8px', height: '8px', background: `linear-gradient(135deg, ${colors.gold}, ${colors.amber})`, borderRadius: '50%', animation: 'glow 2s ease-in-out infinite' }} />
-                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, background: `linear-gradient(90deg, ${colors.amberDark}, ${colors.amber}, ${colors.amberDark})`, backgroundSize: '200% 100%', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', animation: 'shimmer 3s linear infinite' }}>
-                                Interviste qualitative con AI
-                            </span>
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+                        {/* Content */}
+                        <div
+                            className={`transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+                        >
+                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-amber-500/30 rounded-full mb-8 shadow-sm">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-sm font-semibold text-amber-900 tracking-tight">
+                                    Interviste qualitative con AI
+                                </span>
+                            </div>
+
+                            <h1 className="text-5xl lg:text-7xl font-bold text-stone-900 tracking-tight leading-[1.1] mb-8">
+                                Ascolta il mercato.<br />
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600">
+                                    Decidi meglio.
+                                </span>
+                            </h1>
+
+                            <p className="text-xl text-stone-600 leading-relaxed mb-10 max-w-lg">
+                                Crea interviste intelligenti in 10 minuti. Raccogli feedback profondi da clienti, dipendenti e partner, scalando la ricerca qualitativa.
+                            </p>
+
+                            <div className="flex flex-col sm:flex-row gap-4 mb-12">
+                                <Link href="/register">
+                                    <Button withShimmer className="w-full sm:w-auto text-lg px-8 py-6 h-auto">
+                                        Inizia gratis <Icons.ArrowRight className="ml-2" size={20} />
+                                    </Button>
+                                </Link>
+                                <Link href="/onboarding/preview">
+                                    <Button variant="secondary" className="w-full sm:w-auto text-lg px-8 py-6 h-auto bg-stone-100 hover:bg-stone-200 text-stone-800 border-transparent">
+                                        <Icons.Play className="mr-2" size={20} /> Guarda demo
+                                    </Button>
+                                </Link>
+                            </div>
+
+                            {/* Use Cases Pills */}
+                            <div className="flex flex-wrap gap-3">
+                                {[
+                                    'Customer Feedback', 'Exit Interview', 'Clima Aziendale', 'NPS Qualitativo', 'Win/Loss Analysis'
+                                ].map((label, i) => (
+                                    <span key={i} className="px-4 py-2 bg-stone-100 text-stone-600 rounded-full text-sm font-medium hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-default border border-transparent hover:border-amber-200">
+                                        {label}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
 
-                        <h1 style={{ fontSize: '4rem', fontWeight: 600, color: colors.text, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: '1.5rem' }}>
-                            Ascolta il mercato.
-                            <br />
-                            <span style={{ background: gradients.brand, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                                Decidi meglio.
-                            </span>
-                        </h1>
+                        {/* Visual */}
+                        <div
+                            className={`relative hidden lg:block transition-all duration-1000 delay-200 ease-out ${mounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'}`}
+                        >
+                            <div className="relative z-10 bg-white/60 backdrop-blur-xl rounded-[2.5rem] p-4 shadow-2xl border border-white/50 animate-[float_6s_ease-in-out_infinite]">
+                                <div className="bg-white rounded-[2rem] overflow-hidden shadow-inner border border-stone-100">
+                                    {/* Chat Header */}
+                                    <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-6 flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white">
+                                            <Icons.Chat size={24} />
+                                        </div>
+                                        <div>
+                                            <div className="text-white font-bold text-lg">Feedback Clienti Q4</div>
+                                            <div className="text-white/80 text-sm">Target: Clienti Premium</div>
+                                        </div>
+                                    </div>
 
-                        <p style={{ fontSize: '1.25rem', color: colors.muted, lineHeight: 1.7, marginBottom: '2.5rem', maxWidth: '480px' }}>
-                            Crea interviste intelligenti in 10 minuti. Raccogli feedback veri da clienti, dipendenti e partner.
+                                    {/* Chat Messages */}
+                                    <div className="p-8 space-y-6 bg-stone-50/50">
+                                        <div className="flex gap-4">
+                                            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0 text-amber-600">
+                                                <Icons.Logo size={20} />
+                                            </div>
+                                            <div className="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm border border-stone-100 text-stone-800 max-w-[85%]">
+                                                <p>Cosa ti ha portato a scegliere il nostro servizio rispetto ai competitor?</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-4 flex-row-reverse">
+                                            <div className="bg-amber-500 text-white p-4 rounded-2xl rounded-tr-none shadow-lg shadow-amber-500/20 max-w-[85%]">
+                                                <p>Cercavo più flessibilità. I competitor avevano contratti rigidi che non si adattavano alla stagionalità del mio business.</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Typing Indicator */}
+                                        <div className="flex gap-4 items-center">
+                                            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0 text-amber-600">
+                                                <Icons.Logo size={20} />
+                                            </div>
+                                            <div className="bg-white px-4 py-3 rounded-2xl rounded-tl-none shadow-sm border border-stone-100 flex gap-1">
+                                                {[0, 1, 2].map(i => (
+                                                    <div key={i} className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.1}s` }} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Floating Insight Card */}
+                            <div
+                                className="absolute -bottom-8 -left-8 bg-white/90 backdrop-blur-xl p-5 rounded-2xl shadow-xl border border-white/50 max-w-xs z-20"
+                                style={{ transform: `translateY(${scrollY * 0.05}px)` }}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center">
+                                        <Icons.Zap size={16} />
+                                    </div>
+                                    <span className="font-bold text-stone-800 text-sm">Insight Trovato</span>
+                                </div>
+                                <p className="text-stone-600 text-sm">
+                                    Il <strong className="text-amber-600">67%</strong> dei clienti cita la "flessibilità contrattuale" come driver d'acquisto.
+                                </p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <WaveSeparator color="#FFFBEB" height={80} />
+            </section>
+
+            {/* --- STATS & HOW IT WORKS (Light Warm Background) --- */}
+            <section className="relative z-10 bg-[#FFFBEB] py-24 lg:py-32">
+
+                {/* Stats */}
+                <div className="container mx-auto px-6 max-w-7xl mb-32">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center divide-y md:divide-y-0 md:divide-x divide-amber-500/10">
+                        {[
+                            { value: '70%+', label: 'Rate di completamento' },
+                            { value: '10x', label: 'Più economico e veloce' },
+                            { value: '∞', label: 'Scalabilità immediata' }
+                        ].map((stat, i) => (
+                            <div key={i} className="pt-8 md:pt-0 px-4">
+                                <div className="text-5xl lg:text-6xl font-bold text-amber-500 mb-2 font-display tracking-tight">
+                                    {stat.value}
+                                </div>
+                                <div className="text-stone-600 font-medium uppercase tracking-wide text-sm">{stat.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* How it works */}
+                <div id="how-it-works" className="container mx-auto px-6 max-w-7xl">
+                    <div className="text-center max-w-3xl mx-auto mb-20">
+                        <SectionLabel text="Come Funziona" />
+                        <h2 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-6 tracking-tight">
+                            Da zero a insight in <span className="text-amber-600">4 passi</span>
+                        </h2>
+                        <p className="text-xl text-stone-600">
+                            Non servono competenze tecniche. Tu metti l'obiettivo, l'AI fa il resto.
                         </p>
+                    </div>
 
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '3rem' }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                        {[
+                            { num: '01', title: 'Definisci l\'obiettivo', desc: 'Descrivi cosa vuoi scoprire in linguaggio naturale.' },
+                            { num: '02', title: 'L\'AI crea l\'intervista', desc: 'Generazione automatica di domande, tono e logica.' },
+                            { num: '03', title: 'Condividi il link', desc: 'Invia via email, social o incorpora nel tuo sito.' },
+                            { num: '04', title: 'Ottieni insight', desc: 'Analisi automatica di temi, sentiment e pattern.' }
+                        ].map((step, i) => (
+                            <div key={i} className="bg-white rounded-3xl p-8 shadow-xl shadow-amber-900/5 border border-amber-900/5 relative group hover:-translate-y-1 transition-transform duration-300">
+                                <div className="text-6xl font-bold text-amber-100 mb-6 font-display absolute top-4 right-6 select-none group-hover:text-amber-200 transition-colors">
+                                    {step.num}
+                                </div>
+                                <div className="relative z-10">
+                                    <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 mb-6 group-hover:scale-110 transition-transform duration-300">
+                                        <Icons.ArrowRight size={24} className={i === 3 ? '' : '-rotate-45'} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-stone-900 mb-3">{step.title}</h3>
+                                    <p className="text-stone-600 leading-relaxed">{step.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <WaveSeparator color="#FFFFFF" height={80} />
+            </section>
+
+            {/* --- USE CASES (White) --- */}
+            <section id="use-cases" className="relative z-10 bg-white py-24 lg:py-32">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="flex flex-col md:flex-row gap-16 items-start">
+
+                        <div className="md:w-1/3 sticky top-32">
+                            <SectionLabel text="Casi d'uso" />
+                            <h2 className="text-4xl font-bold text-stone-900 mb-6 tracking-tight">Per chi è Business Tuner?</h2>
+                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                La flessibilità dell'intervistatore AI si adatta a ogni esigenza di ricerca qualitativa, dal prodotto alle risorse umane.
+                            </p>
                             <Link href="/register">
-                                <Button withShimmer>
-                                    Inizia gratis <Icons.ArrowRight size={16} />
-                                </Button>
-                            </Link>
-                            <Link href="/onboarding/preview">
-                                <Button variant="secondary">
-                                    <Icons.Play size={16} /> Guarda demo
+                                <Button variant="secondary" className="border-stone-200">
+                                    Esplora tutti i casi <Icons.ArrowRight size={16} className="ml-2" />
                                 </Button>
                             </Link>
                         </div>
 
-                        {/* Use Case Pills */}
-                        <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+                        <div className="md:w-2/3 grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {[
-                                { label: 'Customer Feedback' },
-                                { label: 'Exit Interview' },
-                                { label: 'Clima Aziendale' },
-                                { label: 'NPS Qualitativo' },
-                                { label: 'Win/Loss Analysis' }
+                                { icon: Icons.Building, title: 'B2B & SaaS', desc: 'Indaga churn, valida feature e capisci i decision maker.' },
+                                { icon: Icons.Cart, title: 'E-commerce', desc: 'Feedback post-acquisto, test pricing e packaging.' },
+                                { icon: Icons.Users, title: 'HR & Interne', desc: 'Exit interview anonime, clima aziendale e feedback sui manager.' },
+                                { icon: Icons.Settings, title: 'Operations', desc: 'Qualifica fornitori, audit di sicurezza e incident reporting.' }
                             ].map((uc, i) => (
-                                <div key={i} style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '100px', color: colors.subtle, fontSize: '0.8125rem', fontWeight: 500 }}>
-                                    {uc.label}
+                                <div key={i} className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:bg-amber-50/50 hover:border-amber-100 transition-colors duration-300">
+                                    <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-stone-900 mb-6">
+                                        <uc.icon size={24} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-stone-900 mb-3">{uc.title}</h3>
+                                    <p className="text-stone-600 text-sm leading-relaxed">{uc.desc}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
-
-                    {/* Hero Visual (Floating Card) */}
-                    <div style={{ position: 'relative', opacity: mounted ? 1 : 0, transform: mounted ? 'translateX(0)' : 'translateX(50px)', transition: 'all 1s cubic-bezier(0.16, 1, 0.3, 1) 0.2s' }}>
-                        {/* Abstract Blur blobs */}
-                        <div style={{ position: 'absolute', top: '5%', left: '5%', right: '5%', bottom: '5%', background: `radial-gradient(ellipse, ${colors.gold}25 0%, transparent 60%)`, filter: 'blur(40px)' }} />
-
-                        <div style={{ position: 'relative', background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(20px)', borderRadius: '28px', boxShadow: `0 30px 60px -10px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.8)`, overflow: 'hidden', animation: 'float 6s ease-in-out infinite' }}>
-                            {/* Chat Header */}
-                            <div style={{ background: `linear-gradient(135deg, ${colors.gold} 0%, ${colors.amber} 50%, ${colors.coral}90 100%)`, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-                                <div style={{ width: '44px', height: '44px', background: 'rgba(255,255,255,0.25)', backdropFilter: 'blur(10px)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Icons.Chat size={22} color="white" />
-                                </div>
-                                <div>
-                                    <div style={{ color: 'white', fontWeight: 600, fontSize: '1rem' }}>Feedback Clienti Q4</div>
-                                    <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem' }}>12 risposte · 3 in corso</div>
-                                </div>
-                            </div>
-
-                            {/* Chat Body */}
-                            <div style={{ padding: '1.5rem' }}>
-                                <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                                    <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icons.Logo size={20} /></div>
-                                    <div style={{ background: 'rgba(255,255,255,0.9)', padding: '0.875rem 1rem', borderRadius: '18px', borderTopLeftRadius: '6px', maxWidth: '85%' }}>
-                                        <p style={{ fontSize: '0.9375rem', color: colors.text, margin: 0 }}>Cosa ti ha portato a scegliere il nostro servizio?</p>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
-                                    <div style={{ background: gradients.primary, padding: '0.875rem 1rem', borderRadius: '18px', borderTopRightRadius: '6px', maxWidth: '85%', boxShadow: `0 4px 15px ${colors.amber}30` }}>
-                                        <p style={{ fontSize: '0.9375rem', color: 'white', margin: 0 }}>Cercavo più flessibilità. I competitor avevano contratti rigidi...</p>
-                                    </div>
-                                </div>
-
-                                {/* Typing Indicator */}
-                                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                                    <div style={{ width: '36px', height: '36px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icons.Logo size={20} /></div>
-                                    <div style={{ background: 'rgba(255,255,255,0.9)', padding: '0.875rem 1rem', borderRadius: '18px', borderTopLeftRadius: '6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                        {[0, 1, 2, 3, 4].map(i => (
-                                            <div key={i} style={{ width: '3px', height: '14px', background: `linear-gradient(to top, ${colors.amber}, ${colors.gold})`, borderRadius: '2px', animation: 'waveTyping 0.8s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Floating Insights */}
-                        <div style={{ position: 'absolute', bottom: '-30px', left: '-50px', background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderRadius: '18px', padding: '1rem 1.25rem', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', maxWidth: '200px', transform: `translateY(${scrollY * 0.015}px)` }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                                <div style={{ width: '26px', height: '26px', background: 'linear-gradient(135deg, #DCFCE7, #BBF7D0)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}><Icons.Zap size={14} /></div>
-                                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: colors.text }}>Tema emergente</span>
-                            </div>
-                            <p style={{ fontSize: '0.875rem', color: colors.muted, margin: 0 }}>"Flessibilità" citata dal <strong style={{ color: colors.amber }}>67%</strong></p>
-                        </div>
-                    </div>
                 </div>
+
+                <WaveSeparator color="#F59E0B" height={60} />
             </section>
 
-            <SoftWaveSeparator accentColor={colors.amber} height={320} id="sep1" />
+            {/* --- PRICING (Bold Amber) --- */}
+            <section id="pricing" className="relative z-10 bg-[#F59E0B] py-24 lg:py-32 text-white overflow-hidden">
+                {/* Background Pattern */}
+                <div className="absolute inset-0 opacity-10"
+                    style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}
+                />
 
-            {/* Stats Section */}
-            <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem' }}>
-                <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', justifyContent: 'center', gap: '6rem' }}>
-                    {[{ value: '70%+', label: 'Completion rate medio' }, { value: '10 min', label: "Per creare un'intervista" }, { value: '1/10', label: 'Del costo ricerca tradizionale' }].map((stat, i) => (
-                        <div key={i} style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: '3rem', fontWeight: 600, background: `linear-gradient(135deg, ${colors.amberDark}, ${colors.gold})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{stat.value}</div>
-                            <div style={{ fontSize: '0.9375rem', color: colors.subtle }}>{stat.label}</div>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            <SoftChartSeparator color={colors.amber} height={300} id="sep2" />
-
-            {/* How it works */}
-            <section id="how-it-works" style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem 4rem' }}>
-                <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
-                    <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: colors.amberDark, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(251,191,36,0.1)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Come funziona</span>
-                    <h2 style={{ fontSize: '3rem', fontWeight: 600, color: colors.text, letterSpacing: '-0.02em', marginBottom: '4rem' }}>
-                        Da zero a insight in <span style={{ color: colors.amber }}>4 passi</span>
-                    </h2>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
-                        {[{ num: '01', title: 'Descrivi cosa vuoi sapere', desc: 'Scrivi il tuo obiettivo in linguaggio naturale.' }, { num: '02', title: 'L\'AI costruisce l\'intervista', desc: 'Domande e flusso generati in secondi.' }, { num: '03', title: 'Condividi e raccogli', desc: 'Un link. Risposte da mobile o desktop.' }, { num: '04', title: 'Leggi gli insight', desc: 'Temi, sentiment e citazioni estratti automaticamente.' }].map((step, i) => (
-                            <div key={i} style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(15px)', borderRadius: '24px', padding: '2rem 1.5rem', boxShadow: '0 15px 40px rgba(0,0,0,0.04)', border: '1px solid rgba(255,255,255,0.8)' }}>
-                                <div style={{ width: '56px', height: '56px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', fontSize: '1.125rem', fontWeight: 700, color: colors.amberDark }}>{step.num}</div>
-                                <h3 style={{ fontSize: '1rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>{step.title}</h3>
-                                <p style={{ fontSize: '0.875rem', color: colors.muted, lineHeight: 1.5, margin: 0 }}>{step.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            <SoftWaveSeparator accentColor={colors.amber} height={200} id="sep3" />
-
-            {/* Use Cases Section */}
-            <section id="use-cases" style={{ position: 'relative', zIndex: 10, padding: '4rem 2rem 6rem' }}>
-                <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
-                        <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: colors.amberDark, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(251,191,36,0.1)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Casi d'uso</span>
-                        <h2 style={{ fontSize: '3rem', fontWeight: 600, color: colors.text, marginBottom: '1.5rem' }}>Per chi è Business Tuner?</h2>
-                        <p style={{ fontSize: '1.125rem', color: colors.muted, maxWidth: '600px', margin: '0 auto' }}>
-                            La flessibilità dell'AI conversazionale si adatta a ogni esigenza di ricerca.
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="text-center max-w-3xl mx-auto mb-20">
+                        <span className="inline-block text-xs font-bold uppercase tracking-widest py-2 px-4 rounded-full mb-6 bg-white/20 text-white">
+                            Prezzi Semplici
+                        </span>
+                        <h2 className="text-4xl lg:text-5xl font-bold mb-6 tracking-tight">
+                            Investi nella qualità dei dati
+                        </h2>
+                        <p className="text-xl text-amber-100">
+                            Piani trasparenti. Scala quando vuoi. Disdici quando vuoi.
                         </p>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
-                        {[
-                            { icon: Icons.Building, title: 'B2B & SaaS', desc: 'Capisci perché i clienti non rinnovano, valida nuove feature e analizza il churn con interviste profonde.', color: colors.amber },
-                            { icon: Icons.Cart, title: 'B2C & E-commerce', desc: 'Testa nuovi packaging, prezzi o campagne. Raccogli feedback "a caldo" dopo l\'acquisto.', color: colors.apricot },
-                            { icon: Icons.Users, title: 'HR & People', desc: 'Exit interview automatizzate, survey sul clima aziendale e feedback sui processi interni.', color: colors.peach },
-                            { icon: Icons.Settings, title: 'Operations', desc: 'Feedback fornitori, audit interni, raccolta segnalazioni.', color: colors.lavender }
-                        ].map((uc, i) => (
-                            <div key={i} style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.03)', transition: 'transform 0.3s ease' }}>
-                                <div style={{ width: '48px', height: '48px', background: `linear-gradient(135deg, ${uc.color}, ${colors.white})`, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', color: colors.text }}>
-                                    <uc.icon size={24} />
-                                </div>
-                                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.75rem' }}>{uc.title}</h3>
-                                <p style={{ fontSize: '0.9375rem', color: colors.muted, lineHeight: 1.6 }}>{uc.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            <SoftWaveSeparator accentColor={colors.amber} height={200} id="sep4" />
-
-            {/* Why it Works Section */}
-            <section id="why-it-works" style={{ position: 'relative', zIndex: 10, padding: '4rem 2rem 6rem' }}>
-                <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
-                        <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: colors.amberDark, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(251,191,36,0.1)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Perché funziona</span>
-                        <h2 style={{ fontSize: '3rem', fontWeight: 600, color: colors.text, marginBottom: '1.5rem' }}>Perché funziona meglio di un form</h2>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
-                        {[
-                            { title: 'Conversazione, non caselle', desc: 'Le persone rispondono meglio a domande che si adattano a quello che dicono.' },
-                            { title: '70% di completamento', desc: 'I form si abbandonano. Le conversazioni si finiscono.' },
-                            { title: 'Pronto in 10 minuti', desc: 'Niente settimane di progettazione. Descrivi l\'obiettivo, il resto lo fa l\'AI.' },
-                            { title: '1/10 del costo', desc: 'Niente consulenti, niente software enterprise. Solo risposte.' }
-                        ].map((item, i) => (
-                            <div key={i} style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(15px)', borderRadius: '24px', padding: '2rem 1.5rem', boxShadow: '0 15px 40px rgba(0,0,0,0.04)', border: '1px solid rgba(255,255,255,0.8)' }}>
-                                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '0.75rem' }}>{item.title}</h3>
-                                <p style={{ fontSize: '0.9375rem', color: colors.muted, lineHeight: 1.6, margin: 0 }}>{item.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            <OrangeTransition toOrange={true} height={200} />
-
-            {/* Pricing Section */}
-            <section id="pricing" style={{ position: 'relative', zIndex: 10, background: '#F59E0B', padding: '4rem 2rem 6rem', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse 120% 60% at 50% -10%, rgba(255,255,255,0.4) 0%, transparent 50%), radial-gradient(ellipse 100% 40% at 50% 110%, rgba(255,255,255,0.2) 0%, transparent 40%)` }} />
-
-                <div style={{ maxWidth: '1100px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
-                    <div style={{ textAlign: 'center', marginBottom: '3.5rem' }}>
-                        <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: 'white', textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(10px)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Prezzi semplici</span>
-                        <h2 style={{ fontSize: '3rem', fontWeight: 600, color: 'white', letterSpacing: '-0.02em', marginBottom: '1rem', textShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>Scegli il piano giusto per te</h2>
-                        <p style={{ fontSize: '1.125rem', color: 'rgba(255,255,255,0.9)', maxWidth: '500px', margin: '0 auto' }}>Inizia gratis, scala quando serve. Nessun vincolo.</p>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', alignItems: 'stretch' }}>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center max-w-6xl mx-auto">
                         {/* Starter */}
-                        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Starter</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per il professionista</p></div>
-                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€39</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['3 interviste attive', '100 risposte/mese', 'Analytics completi', 'Export PDF'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
-                            <Link href="/register?plan=STARTER" className="w-full">
-                                <Button fullWidth style={{ background: 'white', color: colors.amberDark, fontWeight: 600, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
-                                    Prova 14 giorni gratis
-                                </Button>
+                        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
+                            <h3 className="text-xl font-bold mb-2">Starter</h3>
+                            <p className="text-amber-100 text-sm mb-6">Per professionisti e freelance</p>
+                            <div className="mb-6"><span className="text-4xl font-bold">€39</span><span className="text-amber-200">/mese</span></div>
+                            <ul className="space-y-4 mb-8 text-sm">
+                                {['3 interviste attive', '100 risposte/mese', 'Analytics base', 'Export PDF'].map((f, i) => (
+                                    <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
+                                ))}
+                            </ul>
+                            <Link href="/register?plan=STARTER">
+                                <Button fullWidth variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-transparent">Inizia gratis</Button>
                             </Link>
                         </div>
 
-                        {/* Professional */}
-                        <div style={{ background: 'white', borderRadius: '28px', padding: '2.5rem 2rem', boxShadow: '0 30px 60px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', transform: 'scale(1.05)', position: 'relative', zIndex: 2 }}>
-                            <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#78350F', padding: '0.375rem 1rem', borderRadius: '100px', fontSize: '0.6875rem', fontWeight: 700, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Più popolare</div>
-                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>Pro</h3><p style={{ fontSize: '0.875rem', color: colors.muted, margin: 0 }}>Per la PMI</p></div>
-                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: colors.text }}>€99</span><span style={{ fontSize: '1rem', color: colors.muted }}>/mese</span></div>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['10 interviste attive', '300 risposte/mese', 'Knowledge Base AI', 'Logica condizionale', 'Trend & Confronti', 'Export CSV + Webhook'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: colors.text, fontSize: '0.9375rem' }}><div style={{ color: colors.amber }}><Icons.Check size={18} /></div>{f}</li>))}</ul>
-                            <Link href="/register?plan=PRO" className="w-full">
-                                <Button fullWidth variant="primary" style={{ boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.4)' }}>Prova 14 giorni gratis →</Button>
+                        {/* Pro (Highlighted) */}
+                        <div className="bg-white rounded-[2rem] p-8 shadow-2xl transform lg:scale-105 relative">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-stone-900 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider">
+                                Consigliato
+                            </div>
+                            <h3 className="text-xl font-bold text-stone-900 mb-2">Pro</h3>
+                            <p className="text-stone-500 text-sm mb-6">Per PMI e agenzie</p>
+                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€99</span><span className="text-stone-500">/mese</span></div>
+                            <ul className="space-y-4 mb-8 text-sm text-stone-700">
+                                {['10 interviste attive', '300 risposte/mese', 'AI Analysis Avanzata', 'Logica condizionale', 'Export CSV + Webhook'].map((f, i) => (
+                                    <li key={i} className="flex items-center gap-3"><span className="text-amber-500"><Icons.Check size={18} /></span> {f}</li>
+                                ))}
+                            </ul>
+                            <Link href="/register?plan=PRO">
+                                <Button fullWidth className="bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/30">Prova 14 giorni gratis</Button>
                             </Link>
                         </div>
 
                         {/* Business */}
-                        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Business</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per l'azienda strutturata</p></div>
-                            <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€249</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['Interviste illimitate', '1.000 risposte/mese', 'White label completo', 'Dominio personalizzato', 'API REST + Zapier', 'Onboarding dedicato'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
-                            <Link href="mailto:sales@businesstuner.it" className="w-full">
-                                <Button fullWidth style={{ background: 'white', color: colors.amberDark, fontWeight: 600, border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
-                                    Contattaci
-                                </Button>
+                        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
+                            <h3 className="text-xl font-bold mb-2">Business</h3>
+                            <p className="text-amber-100 text-sm mb-6">Per grandi aziende</p>
+                            <div className="mb-6"><span className="text-4xl font-bold">€249</span><span className="text-amber-200">/mese</span></div>
+                            <ul className="space-y-4 mb-8 text-sm">
+                                {['Illimitate interviste', '1.000+ risposte/mese', 'API Access', 'White Label', 'Supporto Prioritario'].map((f, i) => (
+                                    <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
+                                ))}
+                            </ul>
+                            <Link href="mailto:sales@businesstuner.ai">
+                                <Button fullWidth variant="secondary" className="bg-white text-amber-600 border-transparent hover:bg-amber-50">Contattaci</Button>
                             </Link>
                         </div>
                     </div>
                 </div>
 
-                    {/* Comparison Table */}
-                    <div style={{ marginTop: '5rem' }}>
-                        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-                            <h3 style={{ fontSize: '2rem', fontWeight: 600, color: 'white', marginBottom: '1rem' }}>Confronto completo</h3>
-                            <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.9)' }}>Tutte le funzionalità a confronto</p>
+                <WaveSeparator color="#FFFFFF" height={80} />
+            </section>
+
+            {/* --- TESTIMONIALS & FINAL CTA (White) --- */}
+            <section className="relative z-10 bg-white py-24 lg:py-32">
+                <div className="container mx-auto px-6 max-w-4xl text-center">
+
+                    {/* Testimonial */}
+                    <div className="mb-24">
+                        <div className="flex justify-center gap-1 mb-6 text-amber-400">
+                            {[0, 1, 2, 3, 4].map(i => <Icons.Star key={i} size={24} fill="currentColor" />)}
                         </div>
-
-                        <div style={{ background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(20px)', borderRadius: '24px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '1rem', padding: '1.5rem 2rem', background: 'rgba(245,158,11,0.1)', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.875rem' }}>Funzionalità</div>
-                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.875rem', textAlign: 'center' }}>Starter</div>
-                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.875rem', textAlign: 'center' }}>Pro</div>
-                                <div style={{ fontWeight: 600, color: colors.text, fontSize: '0.875rem', textAlign: 'center' }}>Business</div>
+                        <blockquote className="text-2xl md:text-3xl font-medium text-stone-900 leading-normal mb-8">
+                            "Abbiamo raccolto più insight qualitativi in una settimana con Business Tuner che in sei mesi di survey tradizionali."
+                        </blockquote>
+                        <div className="flex items-center justify-center gap-4">
+                            <div className="w-12 h-12 bg-stone-200 rounded-full overflow-hidden">
+                                {/* Check if image exists or use initials */}
+                                <div className="w-full h-full flex items-center justify-center bg-stone-800 text-white font-bold">MR</div>
                             </div>
-
-                            <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontWeight: 600, color: colors.amberDark, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Branding</div>
-                                {[
-                                    { feature: 'Senza watermark', starter: false, pro: true, business: true },
-                                    { feature: 'Colore personalizzato', starter: true, pro: true, business: true },
-                                    { feature: 'Logo aziendale', starter: false, pro: true, business: true },
-                                    { feature: 'White label', starter: false, pro: false, business: true }
-                                ].map((row, i) => (
-                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '1rem', padding: '0.75rem 0', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '0.875rem', color: colors.text }}>{row.feature}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.starter ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.pro ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.business ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div style={{ padding: '1.5rem 2rem', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontWeight: 600, color: colors.amberDark, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Analytics</div>
-                                {[
-                                    { feature: 'Sentiment analysis', starter: true, pro: true, business: true },
-                                    { feature: 'Estrazione temi', starter: true, pro: true, business: true },
-                                    { feature: 'Trend nel tempo', starter: false, pro: true, business: true },
-                                    { feature: 'Confronto interviste', starter: false, pro: true, business: true }
-                                ].map((row, i) => (
-                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '1rem', padding: '0.75rem 0', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '0.875rem', color: colors.text }}>{row.feature}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.starter ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.pro ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.business ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div style={{ padding: '1.5rem 2rem' }}>
-                                <div style={{ fontWeight: 600, color: colors.amberDark, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Export</div>
-                                {[
-                                    { feature: 'PDF', starter: true, pro: true, business: true },
-                                    { feature: 'CSV', starter: false, pro: true, business: true },
-                                    { feature: 'Webhook', starter: false, pro: true, business: true },
-                                    { feature: 'API + Zapier', starter: false, pro: false, business: true }
-                                ].map((row, i) => (
-                                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '1rem', padding: '0.75rem 0', alignItems: 'center' }}>
-                                        <div style={{ fontSize: '0.875rem', color: colors.text }}>{row.feature}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.starter ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.pro ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                        <div style={{ textAlign: 'center' }}>{row.business ? <Icons.Check size={18} color={colors.amber} /> : <span style={{ color: colors.muted, fontSize: '1.25rem' }}>—</span>}</div>
-                                    </div>
-                                ))}
+                            <div className="text-left">
+                                <div className="font-bold text-stone-900">Marco Rossi</div>
+                                <div className="text-sm text-stone-500">Head of Product, TechCorp</div>
                             </div>
                         </div>
                     </div>
-            </section>
 
-            <OrangeTransition toOrange={false} height={200} />
+                    {/* CTA */}
+                    <div className="bg-stone-900 rounded-[2.5rem] p-12 md:p-20 relative overflow-hidden text-center text-white">
+                        <div className="absolute inset-0 bg-gradient-to-br from-stone-800 to-black z-0" />
+                        <div className="absolute top-0 right-0 p-12 opacity-10">
+                            <Icons.Logo size={200} />
+                        </div>
 
-            {/* Final CTA Section */}
-            <section id="final-cta" style={{ position: 'relative', zIndex: 10, padding: '6rem 2rem', textAlign: 'center' }}>
-                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                    <h2 style={{ fontSize: '3.5rem', fontWeight: 600, color: colors.text, letterSpacing: '-0.02em', marginBottom: '1.5rem' }}>
-                        Inizia ad ascoltare. <span style={{ background: gradients.brand, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>È gratis.</span>
-                    </h2>
-                    <p style={{ fontSize: '1.25rem', color: colors.muted, marginBottom: '3rem', lineHeight: 1.7 }}>
-                        Crea la tua prima intervista in 10 minuti. Nessuna carta di credito richiesta.
-                    </p>
-                    <Link href="/register">
-                        <Button size="lg" withShimmer style={{ fontSize: '1.125rem', padding: '1.25rem 3rem' }}>
-                            Inizia ora <Icons.ArrowRight size={20} />
-                        </Button>
-                    </Link>
-                </div>
-            </section>
-
-            <SoftChartSeparator color={colors.amber} height={280} id="sep5" />
-
-            {/* Testimonials */}
-            <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem 4rem' }}>
-                <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-                    <div style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(20px)', borderRadius: '32px', padding: '3rem', boxShadow: '0 25px 60px rgba(0,0,0,0.06)', border: '1px solid rgba(255,255,255,0.9)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.25rem', marginBottom: '1.5rem' }}>{[0, 1, 2, 3, 4].map(i => <div key={i} style={{ color: colors.gold }}><Icons.Star size={20} /></div>)}</div>
-                        <p style={{ fontSize: '1.375rem', color: colors.text, lineHeight: 1.7, marginBottom: '1.5rem', fontStyle: 'italic' }}>"Abbiamo raccolto più insight in una settimana che in sei mesi di survey tradizionali. I clienti rispondono perché sembra una conversazione vera."</p>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-                            <div style={{ width: '48px', height: '48px', background: `linear-gradient(135deg, ${colors.peach}, ${colors.apricot})`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.125rem', fontWeight: 600, color: colors.amberDark }}>MR</div>
-                            <div style={{ textAlign: 'left' }}><div style={{ fontWeight: 600, color: colors.text }}>Marco Rossi</div><div style={{ fontSize: '0.875rem', color: colors.subtle }}>Head of CX, TechCorp Italia</div></div>
+                        <div className="relative z-10 max-w-2xl mx-auto">
+                            <h2 className="text-4xl md:text-5xl font-bold mb-6">Pronto a sintonizzarti?</h2>
+                            <p className="text-lg text-stone-400 mb-10">
+                                Inizia la tua prova gratuita di 14 giorni. Nessuna carta di credito richiesta.
+                            </p>
+                            <Link href="/register">
+                                <Button size="lg" className="bg-white text-stone-900 hover:bg-stone-100 border-none px-10 py-6 text-lg h-auto">
+                                    Inizia ora <Icons.ArrowRight className="ml-2" />
+                                </Button>
+                            </Link>
                         </div>
                     </div>
+
                 </div>
             </section>
+
         </div>
     );
 }

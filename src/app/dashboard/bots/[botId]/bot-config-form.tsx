@@ -4,6 +4,7 @@ import { updateBotAction } from '@/app/actions';
 import { Bot, TopicBlock, KnowledgeSource } from '@prisma/client';
 import { useState } from 'react';
 import { showToast } from '@/components/toast';
+import { colors } from '@/lib/design-system';
 
 type BotWithRelations = Bot & {
     topics: TopicBlock[];

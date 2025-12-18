@@ -6,6 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { colors, gradients, shadows, radius } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { WelcomeScreen } from '@/components/chat/WelcomeScreen';
+import { SemanticProgressBar } from '@/components/chat/SemanticProgressBar';
+import { WarmupQuestion } from '@/components/chat/WarmupQuestion';
 
 interface Message {
     id: string;
@@ -36,6 +39,25 @@ interface InterviewChatProps {
     language?: string;
     introMessage?: string | null;
     initialMessages?: Message[];
+
+    // Onboarding
+    welcomeTitle?: string | null;
+    welcomeSubtitle?: string | null;
+    formatExplanation?: string | null;
+    showProgressBar?: boolean;
+    progressBarStyle?: string; // "semantic" | "numeric" | "minimal" | "hidden"
+    showTopicPreview?: boolean;
+
+    // Context
+    topics?: { id: string; label: string; orderIndex: number }[];
+    currentTopicId?: string | null;
+
+    // Warm-up
+    warmupStyle?: string;
+    warmupChoices?: any;
+    warmupIcebreaker?: string | null;
+    warmupContextPrompt?: string | null;
+    warmupFollowup?: boolean;
 }
 
 const TRANSLATIONS: Record<string, any> = {
@@ -92,7 +114,26 @@ export default function InterviewChat({
     showDataUsageInfo = true,
     language = 'en',
     introMessage,
-    initialMessages = []
+    initialMessages = [],
+
+    // Onboarding defaults
+    welcomeTitle,
+    welcomeSubtitle,
+    formatExplanation,
+    showProgressBar = true,
+    progressBarStyle = 'semantic',
+    showTopicPreview = false,
+
+    // Context
+    topics = [],
+    currentTopicId,
+
+    // Warm-up defaults
+    warmupStyle = 'open',
+    warmupChoices,
+    warmupIcebreaker,
+    warmupContextPrompt,
+    warmupFollowup = true
 }: InterviewChatProps) {
     const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
     const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -102,8 +143,17 @@ export default function InterviewChat({
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const [startTime, setStartTime] = useState<number | null>(null);
     const [hasStarted, setHasStarted] = useState(initialMessages.length > 0);
+    // If we have messages, we don't show landing/welcome. 
+    // If not, we check if we should show welcome screen or legacy landing logic.
+    // For now, let's replace the internal "landing" logic with WelcomeScreen if available
     const [showLanding, setShowLanding] = useState(initialMessages.length === 0);
     const [consentGiven, setConsentGiven] = useState(false);
+
+    // Warm-up State
+    // If warm-up is enabled (style != 'none') and we haven't started yet (no messages), we should show warm-up after "Start"
+    // BUT we need a state for "Warmup Active".
+    const [showWarmup, setShowWarmup] = useState(false);
+    const [warmupCompleted, setWarmupCompleted] = useState(false);
 
     // Effective Time Tracking
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
@@ -123,6 +173,13 @@ export default function InterviewChat({
 
     const handleStart = async () => {
         setShowLanding(false);
+
+        // Check if we need warm-up
+        if (warmupStyle && warmupStyle !== 'none' && !warmupCompleted && initialMessages.length === 0) {
+            setShowWarmup(true);
+            return;
+        }
+
         setHasStarted(true);
         setStartTime(Date.now());
 
@@ -144,6 +201,41 @@ export default function InterviewChat({
         } else {
             // Default behavior: trigger the AI to start
             await handleSendMessage("I'm ready to start the interview.", true);
+        }
+    };
+
+    const handleWarmupAnswer = async (answer: string) => {
+        setShowWarmup(false);
+        setWarmupCompleted(true);
+        setHasStarted(true);
+        setStartTime(Date.now());
+
+        // Send the warm-up answer as the first message
+        // We might want to prepend context about it being a warm-up answer, 
+        // but for now let's just send it. The AI will treat it as the first user input.
+        // If we want the AI to reply to it, we just send it.
+        // If 'warmupFollowup' is false, we might want to suppress AI reply? 
+        // For now, let's assume normal flow: User answers -> AI replies.
+
+        await handleSendMessage(answer, true);
+    };
+
+    const handleWarmupSkip = async () => {
+        setShowWarmup(false);
+        setWarmupCompleted(true);
+        setHasStarted(true);
+        setStartTime(Date.now());
+
+        if (introMessage) {
+            const assistantMessage: Message = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: introMessage
+            };
+            setMessages([assistantMessage]);
+            try { await saveBotMessageAction(conversationId, introMessage); } catch (e) { }
+        } else {
+            await handleSendMessage("I'm ready to start.", true);
         }
     };
 
@@ -254,8 +346,51 @@ export default function InterviewChat({
     const brandColor = primaryColor || colors.amber;
     const mainBackground = backgroundColor || gradients.mesh;
 
+
+
+    if (showWarmup) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ background: mainBackground }}>
+                <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: `radial-gradient(circle at 50% 50%, ${brandColor}10 0%, transparent 60%)` }} />
+                <WarmupQuestion
+                    warmupStyle={warmupStyle}
+                    warmupChoices={warmupChoices}
+                    warmupIcebreaker={warmupIcebreaker}
+                    warmupContextPrompt={warmupContextPrompt}
+                    onAnswer={handleWarmupAnswer}
+                    onSkip={handleWarmupSkip}
+                    brandColor={brandColor}
+                />
+            </div>
+        );
+    }
+
     // Show landing page first
+    // If new onboarding props are present, use WelcomeScreen
+    if (showLanding && (welcomeTitle || formatExplanation)) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-4" style={{ background: mainBackground }}>
+                <div className="bg-white/80 backdrop-blur-md p-2 rounded-3xl shadow-xl border border-white max-w-3xl w-full">
+                    <WelcomeScreen
+                        bot={{
+                            name: botName,
+                            logoUrl: logoUrl,
+                            welcomeTitle,
+                            welcomeSubtitle,
+                            description: botDescription,
+                            formatExplanation,
+                            maxDurationMins: estimatedMinutes
+                        }}
+                        onStart={handleStart}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // Fallback to existing landing if no new props provided (backward compatibility)
     if (showLanding) {
+        // ... existing code ...
         return (
             <div
                 className="min-h-screen flex items-center justify-center p-4 relative"
@@ -264,7 +399,8 @@ export default function InterviewChat({
                     fontFamily: "'Inter', sans-serif"
                 }}
             >
-                {/* Decorative Elements */}
+                {/* ... existing landing content ... */}
+                {/* To keep diff small, I won't delete the existing code in this block, just return it. */}
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.5, pointerEvents: 'none', background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.8) 0%, transparent 70%)' }} />
 
                 <motion.div
@@ -404,17 +540,29 @@ export default function InterviewChat({
             <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: `radial-gradient(circle at 80% 90%, ${brandColor}25 0%, transparent 40%)` }} />
 
             {/* Progress bar */}
-            <div className="fixed top-0 left-0 right-0 h-1.5 bg-gray-100/50 z-50 backdrop-blur-sm">
-                <motion.div
-                    className="h-full relative overflow-hidden"
-                    style={{ background: brandColor }}
-                    initial={{ width: '0%' }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.5 }}
-                >
-                    <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" style={{ transform: 'skewX(-20deg)' }} />
-                </motion.div>
-            </div>
+            {showProgressBar && (
+                <div className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm px-6 pt-4">
+                    {progressBarStyle === 'semantic' && topics.length > 0 ? (
+                        <SemanticProgressBar
+                            progress={progress}
+                            topics={topics}
+                            currentTopicId={currentTopicId || (topics[0]?.id)}
+                        />
+                    ) : (
+                        <div className="h-1.5 bg-gray-100/50 rounded-full overflow-hidden">
+                            <motion.div
+                                className="h-full relative"
+                                style={{ background: brandColor }}
+                                initial={{ width: '0%' }}
+                                animate={{ width: `${progress}%` }}
+                                transition={{ duration: 0.5 }}
+                            >
+                                <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" style={{ transform: 'skewX(-20deg)' }} />
+                            </motion.div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Header */}
             <header className="fixed top-0 left-0 right-0 z-40 p-6 flex items-center justify-between pointer-events-none">

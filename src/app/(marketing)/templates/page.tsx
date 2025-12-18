@@ -1,4 +1,4 @@
-import { TEMPLATES } from '@/lib/templates';
+import { TEMPLATES } from '@/lib/onboarding-templates';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import Link from 'next/link';
 

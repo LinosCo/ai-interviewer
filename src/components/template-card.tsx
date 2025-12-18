@@ -1,6 +1,6 @@
 'use client';
 
-import { Template } from '@/lib/templates';
+import { Template } from '@/lib/onboarding-templates';
 import { ArrowRight } from 'lucide-react';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 

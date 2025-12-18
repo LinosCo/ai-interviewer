@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { TEMPLATES, Template } from '@/lib/templates';
+import { TEMPLATES, Template } from '@/lib/onboarding-templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
 import { colors, gradients } from '@/lib/design-system';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 
 const examplePrompts = [
     'B2B: Vorrei capire perché i miei clienti SaaS non rinnovano il contratto dopo il primo anno',

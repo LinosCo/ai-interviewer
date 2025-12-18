@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
-import { getTemplateBySlug } from '@/lib/templates';
+import { getTemplateBySlug } from '@/lib/onboarding-templates';
 import { colors, gradients } from '@/lib/design-system';
 
 const loadingMessages = [

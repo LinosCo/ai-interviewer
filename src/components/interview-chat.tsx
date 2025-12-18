@@ -578,7 +578,7 @@ export default function InterviewChat({
                         <span className="hidden md:inline-block">{t.pressEnter}</span>
                         <div className="flex items-center gap-1.5 ml-auto">
                             <div className={`w-2 h-2 rounded-full ${isTyping ? 'animate-pulse' : 'bg-gray-300'}`}
-                                style={isTyping ? { background: primaryColor } : undefined} />
+                                style={isTyping ? { background: brandColor } : undefined} />
                             <span>{isTyping ? 'Typing...' : 'Ready'}</span>
                         </div>
                     </div>

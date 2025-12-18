@@ -99,22 +99,22 @@ export default function LandingPage() {
             `}</style>
 
             {/* --- MOVING EQUALIZER SEPARATOR --- */}
-            <div className="absolute top-0 left-0 right-0 h-1 z-30 flex items-end justify-center gap-[2px] opacity-20 pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 h-1 z-30 flex items-end justify-center gap-[2px] opacity-10 pointer-events-none">
                 {Array.from({ length: 120 }).map((_, i) => (
                     <div
                         key={i}
                         className="w-[2px] bg-amber-500 rounded-t-full"
                         style={{
-                            height: `${Math.random() * 100}%`,
-                            animation: `equalizer ${1 + Math.random() * 2}s ease-in-out infinite`,
-                            animationDelay: `${Math.random() * 2}s`
+                            height: `${40 + Math.random() * 60}%`,
+                            animation: `equalizer ${4 + Math.random() * 6}s ease-in-out infinite`,
+                            animationDelay: `${Math.random() * 5}s`
                         }}
                     />
                 ))}
             </div>
 
             {/* --- HERO SECTION (White) --- */}
-            <section className="relative z-10 pt-32 pb-40 lg:pt-48 lg:pb-64 overflow-hidden">
+            <section className="relative z-10 pt-32 pb-48 lg:pt-48 lg:pb-72 overflow-hidden">
                 {/* Background Mesh (Subtle) */}
                 <div
                     className="absolute inset-0 pointer-events-none opacity-60"
@@ -249,15 +249,15 @@ export default function LandingPage() {
 
 
                 <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
-                    <div className="flex items-end justify-center gap-[4px] h-20 opacity-30 px-4">
+                    <div className="flex items-end justify-center gap-[4px] h-32 opacity-20 px-4">
                         {Array.from({ length: 150 }).map((_, i) => (
                             <div
                                 key={i}
-                                className="w-[3px] bg-amber-400 rounded-full"
+                                className="w-[3px] bg-amber-400 rounded-lg"
                                 style={{
-                                    height: `${20 + Math.random() * 80}%`,
-                                    animation: `equalizer ${0.5 + Math.random() * 1.5}s ease-in-out infinite`,
-                                    animationDelay: `${Math.random() * 1.5}s`
+                                    height: `${10 + Math.sin(i / 10) * 40 + Math.random() * 30}%`,
+                                    animation: `equalizer ${5 + Math.random() * 8}s ease-in-out infinite`,
+                                    animationDelay: `${Math.random() * 8}s`
                                 }}
                             />
                         ))}

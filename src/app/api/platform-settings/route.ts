@@ -44,26 +44,27 @@ export async function POST(req: NextRequest) {
 
         // If Admin, update Global Config API Keys and Stripe Config
         if (user.role === 'ADMIN') {
+            const updateData: any = {};
+            if (platformOpenaiApiKey) updateData.openaiApiKey = platformOpenaiApiKey;
+            if (platformAnthropicApiKey) updateData.anthropicApiKey = platformAnthropicApiKey;
+            if (stripeSecretKey) updateData.stripeSecretKey = stripeSecretKey;
+            if (stripeWebhookSecret) updateData.stripeWebhookSecret = stripeWebhookSecret;
+            if (stripePriceStarter) updateData.stripePriceStarter = stripePriceStarter;
+            if (stripePricePro) updateData.stripePricePro = stripePricePro;
+            if (stripePriceBusiness) updateData.stripePriceBusiness = stripePriceBusiness;
+
             await prisma.globalConfig.upsert({
                 where: { id: "default" },
-                update: {
-                    openaiApiKey: platformOpenaiApiKey || null,
-                    anthropicApiKey: platformAnthropicApiKey || null,
-                    stripeSecretKey: stripeSecretKey || undefined, // Only update if provided? Or null?
-                    stripeWebhookSecret: stripeWebhookSecret || undefined,
-                    stripePriceStarter: stripePriceStarter || undefined,
-                    stripePricePro: stripePricePro || undefined,
-                    stripePriceBusiness: stripePriceBusiness || undefined
-                },
+                update: updateData,
                 create: {
                     id: "default",
                     openaiApiKey: platformOpenaiApiKey || null,
                     anthropicApiKey: platformAnthropicApiKey || null,
-                    stripeSecretKey,
-                    stripeWebhookSecret,
-                    stripePriceStarter,
-                    stripePricePro,
-                    stripePriceBusiness
+                    stripeSecretKey: stripeSecretKey || '',
+                    stripeWebhookSecret: stripeWebhookSecret || '',
+                    stripePriceStarter: stripePriceStarter || '',
+                    stripePricePro: stripePricePro || '',
+                    stripePriceBusiness: stripePriceBusiness || ''
                 }
             });
         }

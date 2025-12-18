@@ -59,8 +59,8 @@ export function Footer() {
                         <h4 style={{ fontWeight: 600, marginBottom: '1.5rem', color: colors.text }}>Risorse</h4>
                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <li><Link href="/faq" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>FAQ</Link></li>
-                            <li><Link href="/blog" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Blog</Link></li>
-                            <li><Link href="/guides" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Guide</Link></li>
+                            <li><span style={{ color: colors.muted, opacity: 0.5 }}>Blog (Prossimamente)</span></li>
+                            <li><span style={{ color: colors.muted, opacity: 0.5 }}>Guide (Prossimamente)</span></li>
                         </ul>
                     </div>
 

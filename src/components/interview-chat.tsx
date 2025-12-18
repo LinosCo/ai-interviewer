@@ -360,10 +360,8 @@ export default function InterviewChat({
                     warmupChoices={warmupChoices}
                     warmupIcebreaker={warmupIcebreaker}
                     warmupContextPrompt={warmupContextPrompt}
-                    onAnswer={(answer) => {
-                        handleStartWithWarmup(answer);
-                    }}
-                    onSkip={handleStart}
+                    onAnswer={handleWarmupAnswer}
+                    onSkip={handleWarmupSkip}
                     brandColor={brandColor}
                     language={language || 'it'}
                 />

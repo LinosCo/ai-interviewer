@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { templates, Template } from '@/lib/templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
+import { colors, gradients } from '@/lib/design-system';
 
 const examplePrompts = [
     'B2B: Vorrei capire perché i miei clienti SaaS non rinnovano il contratto dopo il primo anno',
@@ -19,61 +20,159 @@ export default function OnboardingPage() {
 
     const handleGenerate = () => {
         if (!goal.trim()) return;
-        // Encode the goal and navigate to generate page
         const encoded = encodeURIComponent(goal);
         router.push(`/onboarding/generate?goal=${encoded}`);
     };
 
     const handleTemplateSelect = (template: Template) => {
-        // Pre-fill with template and go to generate with template flag
         const encoded = encodeURIComponent(template.slug);
         router.push(`/onboarding/generate?template=${encoded}`);
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col">
+        <div style={{
+            minHeight: '100vh',
+            background: `linear-gradient(135deg, #FFFBEB 0%, #FFF 50%, #FEF3C7 100%)`,
+            fontFamily: "'Inter', sans-serif",
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            {/* Decorative Background Elements */}
+            <div style={{
+                position: 'fixed',
+                inset: 0,
+                pointerEvents: 'none',
+                background: `
+                    radial-gradient(ellipse 80% 50% at 50% -20%, ${colors.peach}40 0%, transparent 50%),
+                    radial-gradient(ellipse 60% 40% at 100% 30%, ${colors.rose}25 0%, transparent 40%),
+                    radial-gradient(ellipse 50% 30% at 0% 60%, ${colors.lavender}20 0%, transparent 35%)
+                `
+            }} />
+
             {/* Header */}
-            <header className="p-6">
-                <h1 className="text-2xl font-bold text-white">Business Tuner</h1>
+            <header style={{ padding: '1.5rem 2rem', position: 'relative', zIndex: 10 }}>
+                <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{
+                        width: '40px',
+                        height: '40px',
+                        background: gradients.primary,
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)'
+                    }}>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
+                        </svg>
+                    </div>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: colors.text }}>Business Tuner</h1>
+                </div>
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 flex items-center justify-center p-6">
-                <div className="max-w-2xl w-full">
+            <main style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '3rem 1.5rem',
+                position: 'relative',
+                zIndex: 10
+            }}>
+                <div style={{ maxWidth: '800px', width: '100%' }}>
                     {!showTemplates ? (
-                        <div className="space-y-8">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                             {/* Title */}
-                            <div className="text-center space-y-3">
-                                <h2 className="text-4xl font-bold text-white">
+                            <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                                <h2 style={{
+                                    fontSize: '3.5rem',
+                                    fontWeight: 700,
+                                    color: colors.text,
+                                    marginBottom: '1rem',
+                                    letterSpacing: '-0.02em'
+                                }}>
                                     Cosa vuoi capire?
                                 </h2>
-                                <p className="text-lg text-slate-300">
+                                <p style={{ fontSize: '1.25rem', color: colors.muted, lineHeight: 1.6 }}>
                                     Descrivi il tuo obiettivo di ricerca e genereremo l'intervista perfetta per te
                                 </p>
                             </div>
 
                             {/* Goal Input */}
-                            <div className="relative">
+                            <div style={{ position: 'relative' }}>
+                                <div style={{
+                                    position: 'absolute',
+                                    inset: '-2px',
+                                    background: gradients.primary,
+                                    borderRadius: '24px',
+                                    opacity: 0.1,
+                                    filter: 'blur(8px)'
+                                }} />
                                 <textarea
                                     value={goal}
                                     onChange={(e) => setGoal(e.target.value)}
                                     placeholder="Es: Voglio capire perché i miei clienti non completano l'acquisto..."
-                                    className="w-full h-40 p-6 text-lg bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                                    style={{
+                                        position: 'relative',
+                                        width: '100%',
+                                        height: '180px',
+                                        padding: '1.5rem',
+                                        fontSize: '1.125rem',
+                                        background: 'rgba(255,255,255,0.9)',
+                                        backdropFilter: 'blur(20px)',
+                                        border: '1px solid rgba(245, 158, 11, 0.2)',
+                                        borderRadius: '20px',
+                                        color: colors.text,
+                                        resize: 'none',
+                                        outline: 'none',
+                                        boxShadow: '0 10px 40px rgba(0,0,0,0.05)',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                    onFocus={(e) => {
+                                        e.target.style.borderColor = colors.amber;
+                                        e.target.style.boxShadow = `0 0 0 3px ${colors.amber}20, 0 10px 40px rgba(0,0,0,0.08)`;
+                                    }}
+                                    onBlur={(e) => {
+                                        e.target.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+                                        e.target.style.boxShadow = '0 10px 40px rgba(0,0,0,0.05)';
+                                    }}
                                 />
-                                <div className="absolute bottom-4 right-4">
-                                    <Sparkles className="w-5 h-5 text-purple-400" />
+                                <div style={{ position: 'absolute', bottom: '1rem', right: '1rem' }}>
+                                    <Sparkles style={{ width: '20px', height: '20px', color: colors.amber }} />
                                 </div>
                             </div>
 
                             {/* Example Chips */}
-                            <div className="space-y-3">
-                                <p className="text-sm text-slate-400 text-center">Prova con:</p>
-                                <div className="flex flex-wrap gap-2 justify-center">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <p style={{ fontSize: '0.875rem', color: colors.subtle, textAlign: 'center', fontWeight: 500 }}>Prova con:</p>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center' }}>
                                     {examplePrompts.map((prompt, i) => (
                                         <button
                                             key={i}
                                             onClick={() => setGoal(prompt)}
-                                            className="px-4 py-2 text-sm bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-slate-300 transition-colors"
+                                            style={{
+                                                padding: '0.625rem 1rem',
+                                                fontSize: '0.875rem',
+                                                background: 'rgba(255,255,255,0.8)',
+                                                backdropFilter: 'blur(10px)',
+                                                border: '1px solid rgba(245, 158, 11, 0.15)',
+                                                borderRadius: '100px',
+                                                color: colors.text,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                fontWeight: 500
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)';
+                                                e.currentTarget.style.borderColor = colors.amber;
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
+                                                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.15)';
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                            }}
                                         >
                                             {prompt}
                                         </button>
@@ -82,58 +181,150 @@ export default function OnboardingPage() {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingTop: '1rem', alignItems: 'center' }}>
                                 <button
                                     onClick={handleGenerate}
                                     disabled={!goal.trim()}
-                                    className="px-8 py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                                    style={{
+                                        padding: '1rem 2.5rem',
+                                        background: goal.trim() ? gradients.primary : colors.muted,
+                                        color: 'white',
+                                        fontWeight: 600,
+                                        fontSize: '1.0625rem',
+                                        borderRadius: '14px',
+                                        border: 'none',
+                                        cursor: goal.trim() ? 'pointer' : 'not-allowed',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        transition: 'all 0.3s ease',
+                                        boxShadow: goal.trim() ? '0 10px 25px rgba(245, 158, 11, 0.3)' : 'none',
+                                        opacity: goal.trim() ? 1 : 0.5
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (goal.trim()) {
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                            e.currentTarget.style.boxShadow = '0 15px 35px rgba(245, 158, 11, 0.4)';
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = goal.trim() ? '0 10px 25px rgba(245, 158, 11, 0.3)' : 'none';
+                                    }}
                                 >
                                     Genera la mia intervista
-                                    <ArrowRight className="w-5 h-5" />
+                                    <ArrowRight style={{ width: '20px', height: '20px' }} />
                                 </button>
                                 <button
                                     onClick={() => setShowTemplates(true)}
-                                    className="px-8 py-4 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                                    style={{
+                                        padding: '1rem 2.5rem',
+                                        background: 'rgba(255,255,255,0.8)',
+                                        backdropFilter: 'blur(10px)',
+                                        color: colors.text,
+                                        fontWeight: 600,
+                                        fontSize: '1.0625rem',
+                                        borderRadius: '14px',
+                                        border: `1px solid ${colors.amber}40`,
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        transition: 'all 0.3s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)';
+                                        e.currentTarget.style.borderColor = colors.amber;
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
+                                        e.currentTarget.style.borderColor = `${colors.amber}40`;
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                    }}
                                 >
-                                    <LayoutTemplate className="w-5 h-5" />
+                                    <LayoutTemplate style={{ width: '20px', height: '20px' }} />
                                     Usa un template
                                 </button>
                             </div>
                         </div>
                     ) : (
                         /* Template Selection */
-                        <div className="space-y-8">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-3xl font-bold text-white">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <h2 style={{ fontSize: '2.5rem', fontWeight: 700, color: colors.text }}>
                                     Scegli un template
                                 </h2>
                                 <button
                                     onClick={() => setShowTemplates(false)}
-                                    className="text-slate-400 hover:text-white transition-colors"
+                                    style={{
+                                        color: colors.subtle,
+                                        background: 'none',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        fontSize: '1rem',
+                                        fontWeight: 500,
+                                        transition: 'color 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.color = colors.text}
+                                    onMouseLeave={(e) => e.currentTarget.style.color = colors.subtle}
                                 >
                                     ← Torna indietro
                                 </button>
                             </div>
 
-                            <div className="grid gap-4">
+                            <div style={{ display: 'grid', gap: '1rem' }}>
                                 {templates.map((template) => (
                                     <button
                                         key={template.id}
                                         onClick={() => handleTemplateSelect(template)}
-                                        className="p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-left transition-all hover:border-purple-500/50 group"
+                                        style={{
+                                            padding: '1.5rem',
+                                            background: 'rgba(255,255,255,0.8)',
+                                            backdropFilter: 'blur(20px)',
+                                            border: '1px solid rgba(245, 158, 11, 0.15)',
+                                            borderRadius: '20px',
+                                            textAlign: 'left',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease',
+                                            boxShadow: '0 4px 15px rgba(0,0,0,0.04)'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
+                                            e.currentTarget.style.borderColor = colors.amber;
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                            e.currentTarget.style.boxShadow = '0 8px 25px rgba(245, 158, 11, 0.15)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
+                                            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.15)';
+                                            e.currentTarget.style.transform = 'translateY(0)';
+                                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.04)';
+                                        }}
                                     >
-                                        <div className="flex items-start gap-4">
-                                            <span className="text-3xl">{template.icon}</span>
-                                            <div className="flex-1">
-                                                <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors">
+                                        <div style={{ display: 'flex', alignItems: 'start', gap: '1rem' }}>
+                                            <span style={{ fontSize: '2.5rem' }}>{template.icon}</span>
+                                            <div style={{ flex: 1 }}>
+                                                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
                                                     {template.name}
                                                 </h3>
-                                                <p className="text-slate-400 mt-1">{template.description}</p>
-                                                <span className="inline-block mt-2 px-2 py-1 text-xs bg-white/10 rounded text-slate-300 capitalize">
+                                                <p style={{ color: colors.muted, fontSize: '0.9375rem', marginBottom: '0.75rem' }}>
+                                                    {template.description}
+                                                </p>
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    padding: '0.25rem 0.75rem',
+                                                    fontSize: '0.75rem',
+                                                    background: 'rgba(245, 158, 11, 0.1)',
+                                                    borderRadius: '100px',
+                                                    color: colors.amberDark,
+                                                    fontWeight: 600,
+                                                    textTransform: 'capitalize'
+                                                }}>
                                                     {template.category}
                                                 </span>
                                             </div>
-                                            <ArrowRight className="w-5 h-5 text-slate-500 group-hover:text-purple-400 transition-colors" />
+                                            <ArrowRight style={{ width: '20px', height: '20px', color: colors.amber, flexShrink: 0 }} />
                                         </div>
                                     </button>
                                 ))}

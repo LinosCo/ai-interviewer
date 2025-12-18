@@ -30,6 +30,7 @@ export const colors = {
 
     // Semantici
     success: '#16A34A',
+    successLight: '#DCFCE7', // Added for matching design system usage
     error: '#DC2626',
     warning: '#F59E0B',
     info: '#0EA5E9',

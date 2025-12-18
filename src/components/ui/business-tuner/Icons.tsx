@@ -165,4 +165,15 @@ export const Icons = {
             <line x1="9" y1="21" x2="9" y2="9" />
         </svg>
     ),
+    X: ({ size = 20, color = 'currentColor', ...props }: IconProps) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+    ),
+    Sparkles: ({ size = 20, color = 'currentColor', ...props }: IconProps) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M5.6 18.4L18.4 5.6" />
+        </svg>
+    ),
 };

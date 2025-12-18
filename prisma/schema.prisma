@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,7 +19,6 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-
   accounts      Account[]
   sessions      Session[]
   memberships   Membership[]
@@ -37,20 +35,25 @@ model User {
   // User Management
   role          UserRole        @default(USER)
   projectAccess ProjectAccess[]
+
+  // Custom API Keys (ADMIN only - enforced via middleware)
+  customApiKeys Json? // { openai?: string, anthropic?: string, google?: string }
 }
 
 enum UserRole {
   ADMIN
-  USER
+  MEMBER
+  VIEWER
+  USER // Legacy, kept for compatibility
 }
 
 model ProjectAccess {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   userId    String
   projectId String
-  
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -69,12 +72,12 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
- 
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
- 
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
   @@id([provider, providerAccountId])
 }
 
@@ -83,7 +86,7 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -92,35 +95,35 @@ model VerificationToken {
   identifier String
   token      String
   expires    DateTime
- 
+
   @@id([identifier, token])
 }
 
 // Platform-wide settings
 model PlatformSettings {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  methodologyKnowledge  String   @db.Text // Editable interview methodology
-  
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String @id @default(cuid())
+  userId               String @unique
+  methodologyKnowledge String @db.Text // Editable interview methodology
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GlobalConfig {
-  id              String   @id @default("default")
+  id              String  @id @default("default")
   openaiApiKey    String?
   anthropicApiKey String?
-  
+
   // Stripe Configuration (Admin managed)
-  stripeSecretKey      String?
-  stripeWebhookSecret  String?
-  stripePriceStarter   String?
-  stripePricePro       String?
-  stripePriceBusiness  String?
-  
-  updatedAt       DateTime @updatedAt
+  stripeSecretKey     String?
+  stripeWebhookSecret String?
+  stripePriceStarter  String?
+  stripePricePro      String?
+  stripePriceBusiness String?
+
+  updatedAt DateTime @updatedAt
 }
 
 // --- Core Entities ---
@@ -135,51 +138,75 @@ model Organization {
   // Enterprise flag for custom API keys
   allowCustomApiKeys Boolean @default(false)
 
+  // Business Tuner Plan System
+  plan         PlanType     @default(TRIAL)
+  billingCycle BillingCycle @default(MONTHLY)
+  customLimits Json? // Override limits for enterprise
+
+  // Usage Tracking
+  responsesUsedThisMonth Int      @default(0)
+  monthlyResetDate       DateTime @default(now())
+
   members      Membership[]
   projects     Project[]
   subscription Subscription?
+  usageLogs    UsageLog[]
 }
 
 // --- Subscription & Billing ---
 
 model Subscription {
-  id              String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Relation with Organization
-  organizationId  String   @unique
-  organization    Organization @relation(fields: [organizationId], references: [id])
-  
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
   // Plan
-  tier            SubscriptionTier @default(FREE)
-  status          SubscriptionStatus @default(ACTIVE)
-  
+  tier   SubscriptionTier   @default(FREE)
+  status SubscriptionStatus @default(ACTIVE)
+
   // Stripe IDs
-  stripeCustomerId      String?
-  stripeSubscriptionId  String?
-  stripePriceId         String?
-  
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+
   // Limits (copied from plan for performance)
   maxActiveBots         Int @default(1)
   maxInterviewsPerMonth Int @default(30)
   maxUsers              Int @default(1)
-  
+
   // Usage tracking
-  currentPeriodStart    DateTime @default(now())
-  currentPeriodEnd      DateTime
-  interviewsUsedThisMonth Int @default(0)
-  
+  currentPeriodStart      DateTime @default(now())
+  currentPeriodEnd        DateTime
+  interviewsUsedThisMonth Int      @default(0)
+
   // Billing info
-  billingEmail          String?
-  billingName           String?
-  vatNumber             String?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  canceledAt      DateTime?
-  
-  invoices        Invoice[]
+  billingEmail String?
+  billingName  String?
+  vatNumber    String?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  canceledAt DateTime?
+
+  invoices Invoice[]
 }
 
+// Business Tuner Plan Types
+enum PlanType {
+  TRIAL
+  STARTER
+  PRO
+  BUSINESS
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+// Legacy Subscription Tiers (kept for compatibility)
 enum SubscriptionTier {
   FREE
   STARTER
@@ -196,28 +223,28 @@ enum SubscriptionStatus {
 }
 
 model Invoice {
-  id              String   @id @default(cuid())
-  subscriptionId  String
-  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
-  
-  stripeInvoiceId String   @unique
-  amountPaid      Int      // in cents
-  currency        String   @default("eur")
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+
+  stripeInvoiceId String  @unique
+  amountPaid      Int // in cents
+  currency        String  @default("eur")
   status          String
   pdfUrl          String?
-  
-  createdAt       DateTime @default(now())
+
+  createdAt DateTime @default(now())
 }
 
 model UsageEvent {
-  id              String   @id @default(cuid())
-  organizationId  String
-  eventType       UsageEventType
-  resourceId      String?  // botId or conversationId
-  metadata        Json?
-  
-  createdAt       DateTime @default(now())
-  
+  id             String         @id @default(cuid())
+  organizationId String
+  eventType      UsageEventType
+  resourceId     String? // botId or conversationId
+  metadata       Json?
+
+  createdAt DateTime @default(now())
+
   @@index([organizationId, createdAt])
 }
 
@@ -226,6 +253,22 @@ enum UsageEventType {
   BOT_PUBLISHED
   BOT_UNPUBLISHED
   USER_INVITED
+}
+
+// Business Tuner Usage Types
+enum UsageType {
+  RESPONSE_COMPLETED
+  SIMULATION
+  AI_REGENERATION
+  API_CALL
+  TOKEN_USAGE
+}
+
+enum ResponseStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  LIMIT_REACHED
 }
 
 enum BotStatus {
@@ -243,104 +286,104 @@ enum Role {
 }
 
 model Membership {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   userId         String
   organizationId String
-  role           Role         @default(MEMBER)
-  
-  user           User         @relation(fields: [userId], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  role           Role   @default(MEMBER)
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([userId, organizationId])
 }
 
 model Project {
-  id             String       @id @default(cuid())
+  id             String  @id @default(cuid())
   name           String
   organizationId String?
   ownerId        String?
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  owner          User?         @relation(fields: [ownerId], references: [id])
-  bots           Bot[]
-  accessList     ProjectAccess[]
+  organization Organization?   @relation(fields: [organizationId], references: [id])
+  owner        User?           @relation(fields: [ownerId], references: [id])
+  bots         Bot[]
+  accessList   ProjectAccess[]
 }
 
 // --- Bot & Interview Configuration ---
 
 model Bot {
-  id             String   @id @default(cuid())
-  projectId      String
-  slug           String   @unique
-  name           String
-  description    String?
-  status         BotStatus @default(DRAFT)
-  
+  id          String    @id @default(cuid())
+  projectId   String
+  slug        String    @unique
+  name        String
+  description String?
+  status      BotStatus @default(DRAFT)
+
   // Research Context
-  researchGoal   String?  @db.Text
-  targetAudience String?  @db.Text
-  language       String   @default("en")
-  tone           String?  // e.g. friendly, neutral
-  introMessage   String?  @db.Text // Custom first message
-  
+  researchGoal   String? @db.Text
+  targetAudience String? @db.Text
+  language       String  @default("en")
+  tone           String? // e.g. friendly, neutral
+  introMessage   String? @db.Text // Custom first message
+
   // Limits
-  maxDurationMins Int     @default(10)
-  maxTurns        Int     @default(20)
-  maxOpenQuestions Int    @default(5)
-  
+  maxDurationMins  Int @default(10)
+  maxTurns         Int @default(20)
+  maxOpenQuestions Int @default(5)
+
   // Model Config
-  modelProvider  String   @default("openai")
-  modelName      String   @default("gpt-4o")
-  openaiApiKey   String?
+  modelProvider   String  @default("openai")
+  modelName       String  @default("gpt-4o")
+  openaiApiKey    String?
   anthropicApiKey String?
-  
+
   // Branding & Customization
-  logoUrl        String?  @db.Text // Base64 encoded image or URL
-  primaryColor   String   @default("#6366f1") // Indigo-500
+  logoUrl         String? @db.Text // Base64 encoded image or URL
+  primaryColor    String  @default("#6366f1") // Indigo-500
   backgroundColor String  @default("#ffffff")
-  textColor      String   @default("#1f2937") // Gray-800
-  
+  textColor       String  @default("#1f2937") // Gray-800
+
   // Privacy & Legal
-  anonymizationLevel String @default("partial")
+  anonymizationLevel String  @default("partial")
   privacyNotice      String? @db.Text // Custom privacy notice
   dataUsageInfo      String? @db.Text // How data will be used
   consentText        String? @db.Text // Custom consent text
   showAnonymityInfo  Boolean @default(true)
   showDataUsageInfo  Boolean @default(true)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  project        Project          @relation(fields: [projectId], references: [id])
+  project          Project           @relation(fields: [projectId], references: [id])
   knowledgeSources KnowledgeSource[]
-  topics         TopicBlock[]
-  conversations  Conversation[]
-  rewardConfig   RewardConfig?
-  
+  topics           TopicBlock[]
+  conversations    Conversation[]
+  rewardConfig     RewardConfig?
+
   // Structured definitions
   questionDefinitions QuestionDefinition[]
-  themes         Theme[]
-  insights       Insight[]
-  hotIdeas       HotIdea[]
-  reports        Report[]
+  themes              Theme[]
+  insights            Insight[]
+  hotIdeas            HotIdea[]
+  reports             Report[]
 
   // Analytics aggregates
-  analyticsMetadata Json?  // { sentimentScore: 75, engagementScore: 80, ... }
+  analyticsMetadata Json? // { sentimentScore: 75, engagementScore: 80, ... }
 }
 
 model KnowledgeSource {
-  id        String   @id @default(cuid())
-  botId     String
-  type      String   // text, url
-  title     String?
-  content   String   @db.Text
-  
+  id      String  @id @default(cuid())
+  botId   String
+  type    String // text, url
+  title   String?
+  content String  @db.Text
+
   createdAt DateTime @default(now())
-  
-  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 model TopicBlock {
@@ -349,80 +392,88 @@ model TopicBlock {
   orderIndex  Int
   label       String
   description String?  @db.Text
-  subGoals    String[] 
+  subGoals    String[]
   maxTurns    Int      @default(5)
-  keywords    Json?    // [{ text: "word", value: 10 }]
-  
-  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  
+  keywords    Json? // [{ text: "word", value: 10 }]
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
   @@index([botId, orderIndex])
 }
 
 model RewardConfig {
-  id          String   @id @default(cuid())
-  botId       String   @unique
-  enabled     Boolean  @default(false)
-  type        String   // coupon, redirect, gift_card, raffle
-  payload     String   // Coupon code, URL, or reward details
-  
+  id      String  @id @default(cuid())
+  botId   String  @unique
+  enabled Boolean @default(false)
+  type    String // coupon, redirect, gift_card, raffle
+  payload String // Coupon code, URL, or reward details
+
   // Display on landing page
-  displayText String?  // e.g., "Get a 10% discount coupon"
+  displayText   String? // e.g., "Get a 10% discount coupon"
   showOnLanding Boolean @default(true)
-  
-  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 // --- Participant Data ---
 
 model Conversation {
-  id              String   @id @default(cuid())
-  botId           String
-  participantId   String
-  
-  status          String   // STARTED, IN_PROGRESS, COMPLETED, ABANDONED
-  fatigueScore    Int      @default(0)
-  currentTopicId  String?
-  
-  startedAt       DateTime @default(now())
-  completedAt     DateTime?
-  durationSeconds Int?
+  id            String @id @default(cuid())
+  botId         String
+  participantId String
+
+  status         String // STARTED, IN_PROGRESS, COMPLETED, ABANDONED
+  fatigueScore   Int     @default(0)
+  currentTopicId String?
+
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  durationSeconds   Int?
   effectiveDuration Int       @default(0) // Effective active time in seconds (typing + thinking + reading)
-  
-  sentimentScore  Float?
-  tags            String[]
-  
-  bot             Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  messages        Message[]
-  rewardGrant     RewardGrant?
-  
+
+  sentimentScore Float?
+  tags           String[]
+
+  // Business Tuner: Hidden Limits Tracking
+  exchangeCount Int @default(0) // Number of message exchanges
+  totalTokens   Int @default(0) // Total tokens used in conversation
+
+  bot         Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  rewardGrant RewardGrant?
+
   themeOccurrences ThemeOccurrence[]
-  answers         StructuredAnswer[]
-  analysis        ConversationAnalysis?
+  answers          StructuredAnswer[]
+  analysis         ConversationAnalysis?
 }
 
 model ConversationAnalysis {
-  id              String       @id @default(cuid())
-  conversationId  String       @unique
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
-  topicCoverage   Float        // 0-1 score
-  sentimentScore  Float        // -1 to 1
-  keyQuotes       Json         // Array of strings
-  metadata        Json?        // Flexible field for other stats
-  
-  createdAt       DateTime     @default(now())
+  id             String       @id @default(cuid())
+  conversationId String       @unique
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  topicCoverage  Float // 0-1 score
+  sentimentScore Float // -1 to 1
+  keyQuotes      Json // Array of strings
+  metadata       Json? // Flexible field for other stats
+
+  // Business Tuner: Advanced Analytics (plan-gated)
+  themes    Json? // Extracted themes
+  sentiment Json? // Detailed sentiment analysis
+
+  createdAt DateTime @default(now())
 }
 
 model Message {
-  id             String   @id @default(cuid())
+  id             String @id @default(cuid())
   conversationId String
-  role           String   // sub-models: system, assistant, user
-  content        String   @db.Text
-  
-  createdAt      DateTime @default(now())
-  metadata       Json?    // e.g. { "skipped": true, "tokens": 120 }
-  
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // sub-models: system, assistant, user
+  content        String @db.Text
+
+  createdAt DateTime @default(now())
+  metadata  Json? // e.g. { "skipped": true, "tokens": 120 }
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
 model RewardGrant {
@@ -431,74 +482,74 @@ model RewardGrant {
   userId         String?
   code           String?
   claimedAt      DateTime @default(now())
-  
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           User?    @relation(fields: [userId], references: [id])
-  guestEmail     String?
-  guestName      String?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+  guestEmail   String?
+  guestName    String?
 }
 
 // --- Analytics & Insights Models ---
 
 model QuestionDefinition {
-  id        String   @id @default(cuid())
-  botId     String
-  type      String   // LIKERT, SELECT, MULTI_SELECT
-  text      String
-  options   Json?    // e.g. ["Option A", "Option B"]
-  
-  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  answers   StructuredAnswer[]
+  id      String @id @default(cuid())
+  botId   String
+  type    String // LIKERT, SELECT, MULTI_SELECT
+  text    String
+  options Json? // e.g. ["Option A", "Option B"]
+
+  bot     Bot                @relation(fields: [botId], references: [id], onDelete: Cascade)
+  answers StructuredAnswer[]
 }
 
 model StructuredAnswer {
-  id             String   @id @default(cuid())
+  id             String @id @default(cuid())
   conversationId String
   questionId     String
   value          String
-  
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  question       QuestionDefinition @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  conversation Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  question     QuestionDefinition @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model Theme {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   botId       String
   name        String
   category    String?
   description String?
-  
-  bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  bot         Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   occurrences ThemeOccurrence[]
 }
 
 model ThemeOccurrence {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   themeId        String
   conversationId String
   strengthScore  Float
-  snippet        String?  @db.Text
-  
-  theme          Theme    @relation(fields: [themeId], references: [id], onDelete: Cascade)
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  snippet        String? @db.Text
+
+  theme        Theme        @relation(fields: [themeId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
 model Insight {
-  id      String   @id @default(cuid())
-  botId   String
-  type    String   @default("STRATEGIC") // STRATEGIC, QUOTE
-  content String   @db.Text
+  id        String @id @default(cuid())
+  botId     String
+  type      String @default("STRATEGIC") // STRATEGIC, QUOTE
+  content   String @db.Text
   citations Json?
-  
-  bot     Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 model HotIdea {
-  id      String   @id @default(cuid())
+  id      String @id @default(cuid())
   botId   String
-  content String   @db.Text
-  
-  bot     Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  content String @db.Text
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 model Report {
@@ -509,8 +560,8 @@ model Report {
   content   String   @db.Text
   createdAt DateTime @default(now())
 
-  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
+  bot  Bot  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
 }
 
 model MetricSummary {
@@ -518,4 +569,29 @@ model MetricSummary {
   key       String   @unique // composite key identifier
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
+}
+
+// Business Tuner: Usage Tracking for Billing and Limits
+model UsageLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  type  UsageType
+  count Int       @default(1)
+
+  // Token tracking (hidden from users)
+  tokensInput  Int?
+  tokensOutput Int?
+  model        String? // LLM model used
+  task         String? // LLM task type
+
+  // Resource references
+  resourceId String? // botId, conversationId, etc.
+  metadata   Json?
+
+  timestamp DateTime @default(now())
+
+  @@index([organizationId, timestamp])
+  @@index([organizationId, type, timestamp])
 }

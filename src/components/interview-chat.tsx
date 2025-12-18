@@ -306,6 +306,8 @@ export default function InterviewChat({
         }
     };
 
+    const [isCompleted, setIsCompleted] = useState(false);
+
     // Check for completion token whenever messages change
     useEffect(() => {
         const lastMessage = messages[messages.length - 1];
@@ -319,6 +321,7 @@ export default function InterviewChat({
                 };
                 return newMessages;
             });
+            setIsCompleted(true);
         }
     }, [messages]);
 
@@ -382,6 +385,7 @@ export default function InterviewChat({
                             maxDurationMins: estimatedMinutes
                         }}
                         onStart={handleStart}
+                        brandColor={brandColor}
                     />
                 </div>
             </div>
@@ -547,6 +551,7 @@ export default function InterviewChat({
                             progress={progress}
                             topics={topics}
                             currentTopicId={currentTopicId || (topics[0]?.id)}
+                            brandColor={brandColor}
                         />
                     ) : (
                         <div className="h-1.5 bg-gray-100/50 rounded-full overflow-hidden">
@@ -565,7 +570,7 @@ export default function InterviewChat({
             )}
 
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-40 p-6 flex items-center justify-between pointer-events-none">
+            <header className="fixed top-14 left-0 right-0 z-40 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
                 <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md p-2 pl-3 pr-4 rounded-full border border-white shadow-sm pointer-events-auto transition-all hover:shadow-md">
                     {logoUrl ? (
                         <img src={logoUrl} alt={botName} className="h-6 w-6 object-contain" />
@@ -675,61 +680,80 @@ export default function InterviewChat({
                 </AnimatePresence>
             </div>
 
-            {/* Input Area */}
+            {/* Input Area or Completion Screen */}
             <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-12">
                 <div className="max-w-3xl mx-auto w-full relative">
-                    <form onSubmit={handleSubmit} className="relative group">
-                        <div className="absolute -inset-1 rounded-[20px] blur opacity-20 group-focus-within:opacity-40 transition-opacity duration-500"
-                            style={{ background: `linear-gradient(to right, ${brandColor}, ${brandColor}90)` }} />
+                    {isCompleted ? (
+                        <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">
+                            <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">
+                                <Icons.Check size={32} />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Intervista Completata!</h2>
+                            <p className="text-gray-600 mb-6">Grazie per il tuo prezioso contributo.</p>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="px-6 py-2 rounded-full text-white font-medium hover:opacity-90 transition-opacity"
+                                style={{ background: brandColor }}
+                            >
+                                Nuova Intervista
+                            </button>
+                        </div>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="relative group">
+                            <div className="absolute -inset-1 rounded-[20px] blur opacity-20 group-focus-within:opacity-40 transition-opacity duration-500"
+                                style={{ background: `linear-gradient(to right, ${brandColor}, ${brandColor}90)` }} />
 
-                        <div className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden transition-all ring-1 ring-black/5 group-focus-within:ring-2"
-                            style={{ '--tw-ring-color': `${brandColor}50` } as any}>
-                            <textarea
-                                ref={inputRef}
-                                value={input}
-                                onChange={(e) => {
-                                    setInput(e.target.value);
-                                    if (!isTyping) { setIsTyping(true); }
-                                    if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
-                                    typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
-                                }}
-                                onKeyDown={handleKeyDown}
-                                disabled={isLoading}
-                                placeholder={t.typePlaceholder}
-                                rows={1}
-                                className="w-full resize-none border-none bg-transparent px-6 py-5 pr-16 text-lg text-gray-900 placeholder-gray-400 focus:ring-0 max-h-[200px]"
-                                style={{ minHeight: '72px' }}
-                            />
-
-                            <div className="pb-3 pr-3">
-                                <button
-                                    type="submit"
-                                    disabled={!input.trim() || isLoading}
-                                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95"
-                                    style={{
-                                        background: brandColor,
-                                        boxShadow: `0 4px 14px 0 ${brandColor}50`
+                            <div className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden transition-all ring-1 ring-black/5 group-focus-within:ring-2"
+                                style={{ '--tw-ring-color': `${brandColor}50` } as any}>
+                                <textarea
+                                    ref={inputRef}
+                                    value={input}
+                                    onChange={(e) => {
+                                        setInput(e.target.value);
+                                        if (!isTyping) { setIsTyping(true); }
+                                        if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+                                        typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
                                     }}
-                                    aria-label="Send answer"
-                                >
-                                    {isLoading ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <Icons.ArrowRight size={24} />
-                                    )}
-                                </button>
+                                    onKeyDown={handleKeyDown}
+                                    disabled={isLoading}
+                                    placeholder={t.typePlaceholder}
+                                    rows={1}
+                                    className="w-full resize-none border-none bg-transparent px-6 py-5 pr-16 text-lg text-gray-900 placeholder-gray-400 focus:ring-0 max-h-[200px]"
+                                    style={{ minHeight: '72px' }}
+                                />
+
+                                <div className="pb-3 pr-3">
+                                    <button
+                                        type="submit"
+                                        disabled={!input.trim() || isLoading}
+                                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95"
+                                        style={{
+                                            background: brandColor,
+                                            boxShadow: `0 4px 14px 0 ${brandColor}50`
+                                        }}
+                                        aria-label="Send answer"
+                                    >
+                                        {isLoading ? (
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <Icons.ArrowRight size={24} />
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    )}
+
+                    {!isCompleted && (
+                        <div className="mt-4 flex items-center justify-between px-2 opacity-60 text-xs font-medium text-gray-500">
+                            <span className="hidden md:inline-block">{t.pressEnter}</span>
+                            <div className="flex items-center gap-1.5 ml-auto">
+                                <div className={`w-2 h-2 rounded-full ${isTyping ? 'animate-pulse' : 'bg-gray-300'}`}
+                                    style={isTyping ? { background: brandColor } : undefined} />
+                                <span>{isTyping ? 'Typing...' : 'Ready'}</span>
                             </div>
                         </div>
-                    </form>
-
-                    <div className="mt-4 flex items-center justify-between px-2 opacity-60 text-xs font-medium text-gray-500">
-                        <span className="hidden md:inline-block">{t.pressEnter}</span>
-                        <div className="flex items-center gap-1.5 ml-auto">
-                            <div className={`w-2 h-2 rounded-full ${isTyping ? 'animate-pulse' : 'bg-gray-300'}`}
-                                style={isTyping ? { background: brandColor } : undefined} />
-                            <span>{isTyping ? 'Typing...' : 'Ready'}</span>
-                        </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>

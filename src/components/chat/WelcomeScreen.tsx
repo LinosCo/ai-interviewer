@@ -6,9 +6,10 @@ interface WelcomeScreenProps {
     bot: any; // We can use a more specific type if available, e.g. defined in types
     onStart: () => void;
     onCancel?: () => void;
+    brandColor?: string;
 }
 
-export function WelcomeScreen({ bot, onStart, onCancel }: WelcomeScreenProps) {
+export function WelcomeScreen({ bot, onStart, onCancel, brandColor = '#4f46e5' }: WelcomeScreenProps) {
     const title = bot.welcomeTitle || `Benvenuto in ${bot.name}`;
     const subtitle = bot.welcomeSubtitle || bot.description || "Partecipa a questa sessione interattiva.";
 
@@ -24,11 +25,11 @@ Le tue risposte ci aiuteranno a raccogliere feedback preziosi.
         <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-2xl mx-auto p-6 text-center animate-in fade-in duration-500">
 
             {/* Logo or Icon */}
-            <div className="mb-8 p-4 bg-indigo-50 rounded-full">
+            <div className="mb-8 p-4 rounded-full" style={{ backgroundColor: `${brandColor}10` }}>
                 {bot.logoUrl ? (
                     <img src={bot.logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
                 ) : (
-                    <Bot className="w-16 h-16 text-indigo-600" />
+                    <Bot className="w-16 h-16" style={{ color: brandColor }} />
                 )}
             </div>
 
@@ -52,7 +53,8 @@ Le tue risposte ci aiuteranno a raccogliere feedback preziosi.
                 <Button
                     onClick={onStart}
                     size="lg"
-                    className="w-full sm:w-auto px-8 py-6 text-lg bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all hover:scale-105"
+                    className="w-full sm:w-auto px-8 py-6 text-lg text-white shadow-lg transition-all hover:scale-105"
+                    style={{ backgroundColor: brandColor, boxShadow: `0 10px 15px -3px ${brandColor}40` }}
                 >
                     <Play className="w-5 h-5 mr-2 fill-current" />
                     Inizia l'Intervista

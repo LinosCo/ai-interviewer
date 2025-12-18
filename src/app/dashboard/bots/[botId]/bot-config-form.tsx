@@ -5,6 +5,7 @@ import { Bot, TopicBlock, KnowledgeSource } from '@prisma/client';
 import { useState } from 'react';
 import { showToast } from '@/components/toast';
 import { colors } from '@/lib/design-system';
+import RefineInput from '@/components/RefineInput';
 
 type BotWithRelations = Bot & {
     topics: TopicBlock[];
@@ -47,28 +48,41 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                     <input name="tone" defaultValue={bot.tone || ''} placeholder="e.g. Professional, Empathetic, Casual" className="w-full border p-2 rounded" />
                 </div>
                 <div className="mt-4">
-                    <label className="block text-sm font-medium mb-1">Welcome Message (First interaction)</label>
-                    <textarea
+                    <RefineInput
                         name="introMessage"
+                        label="Welcome Message (First interaction)"
                         defaultValue={bot.introMessage || ''}
+                        fieldType="intro"
+                        rows={3}
                         placeholder="Hi! I'm here to interview you about..."
-                        className="w-full border p-2 rounded h-20"
                     />
                     <p className="text-xs text-gray-500 mt-1">If set, the bot will start the conversation with this exact message.</p>
                 </div>
             </section>
 
+            import RefineInput from '@/components/RefineInput'; // Ensure import at the top
+
+            // ... inside the component ...
+
             <section>
                 <h2 className="text-lg font-semibold mb-4 border-b pb-2">Research Context</h2>
                 <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Research Goal</label>
-                        <textarea name="researchGoal" defaultValue={bot.researchGoal || ''} className="w-full border p-2 rounded h-24" placeholder="What do you want to learn from users?" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Target Audience</label>
-                        <textarea name="targetAudience" defaultValue={bot.targetAudience || ''} className="w-full border p-2 rounded h-16" placeholder="Who are you interviewing?" />
-                    </div>
+                    <RefineInput
+                        name="researchGoal"
+                        label="Research Goal"
+                        defaultValue={bot.researchGoal || ''}
+                        fieldType="goal"
+                        rows={4}
+                        placeholder="What do you want to learn from users?"
+                    />
+                    <RefineInput
+                        name="targetAudience"
+                        label="Target Audience"
+                        defaultValue={bot.targetAudience || ''}
+                        fieldType="target"
+                        rows={2}
+                        placeholder="Who are you interviewing?"
+                    />
                 </div>
             </section>
 

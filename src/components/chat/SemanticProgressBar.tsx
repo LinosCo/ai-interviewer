@@ -4,16 +4,17 @@ interface SemanticProgressBarProps {
     currentTopicId: string;
     topics: { id: string; label: string; orderIndex: number }[];
     progress: number; // 0-100 numeric fallback
+    brandColor?: string;
 }
 
-export function SemanticProgressBar({ currentTopicId, topics, progress }: SemanticProgressBarProps) {
+export function SemanticProgressBar({ currentTopicId, topics, progress, brandColor = '#4f46e5' }: SemanticProgressBarProps) {
     // If no topics, verify numeric progress
     if (!topics || topics.length === 0) {
         return (
             <div className="w-full bg-gray-100 rounded-full h-1.5 mb-6">
                 <div
-                    className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500"
-                    style={{ width: `${progress}%` }}
+                    className="h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${progress}%`, backgroundColor: brandColor }}
                 />
             </div>
         );
@@ -39,22 +40,26 @@ export function SemanticProgressBar({ currentTopicId, topics, progress }: Semant
                                 {/* Dot */}
                                 <div
                                     className={`
-                    w-3 h-3 rounded-full border-2 transition-all duration-300
-                    ${isCompleted
-                                            ? 'bg-indigo-600 border-indigo-600 scale-100'
-                                            : isCurrent
-                                                ? 'bg-white border-indigo-600 scale-125 shadow-sm shadow-indigo-200'
-                                                : 'bg-white border-gray-300'
-                                        }
-                  `}
+                                        w-3 h-3 rounded-full border-2 transition-all duration-300
+                                        ${isCurrent ? 'scale-125 shadow-sm' : ''}
+                                        ${!isCompleted && !isCurrent ? 'bg-white border-gray-300' : ''}
+                                    `}
+                                    style={{
+                                        backgroundColor: isCompleted ? brandColor : (isCurrent ? 'white' : undefined),
+                                        borderColor: (isCompleted || isCurrent) ? brandColor : undefined,
+                                        boxShadow: isCurrent ? `0 0 10px ${brandColor}40` : undefined
+                                    }}
                                 />
 
                                 {/* Label (only for current or if space permits, improved logic) */}
                                 <span
                                     className={`
-                    absolute top-6 text-xs whitespace-nowrap transition-all duration-300 -translate-x-1/2 left-1/2
-                    ${isCurrent ? 'font-medium text-indigo-700 opacity-100' : 'text-gray-400 opacity-0 group-hover:opacity-100'}
-                  `}
+                                        absolute top-6 text-xs whitespace-nowrap transition-all duration-300 -translate-x-1/2 left-1/2
+                                        ${isCurrent ? 'font-medium opacity-100' : 'text-gray-400 opacity-0 group-hover:opacity-100'}
+                                    `}
+                                    style={{
+                                        color: isCurrent ? brandColor : undefined
+                                    }}
                                 >
                                     {topic.label}
                                 </span>

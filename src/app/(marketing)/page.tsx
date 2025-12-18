@@ -230,6 +230,57 @@ export default function LandingPage() {
                 <WaveSeparator color="#FFFBEB" height={80} />
             </section>
 
+            {/* --- WHAT IS (Light Warm Background) --- */}
+            <section className="relative z-10 bg-[#FFFBEB] py-24 lg:py-32 overflow-hidden">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="grid lg:grid-cols-2 gap-16 items-center">
+                        <div>
+                            <SectionLabel text="Cos'è Business Tuner" />
+                            <h2 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-8 tracking-tight">
+                                Un nuovo modo di <span className="text-amber-600">raccogliere feedback</span>
+                            </h2>
+                            <p className="text-xl text-stone-600 leading-relaxed mb-8">
+                                Business Tuner non è un questionario e non è un'intervista tradizionale.
+                            </p>
+                            <p className="text-lg text-stone-600 leading-relaxed mb-8">
+                                È una <strong className="text-amber-900 font-bold underline decoration-amber-500/30 decoration-4 underline-offset-4">conversazione guidata</strong> che si adatta a chi risponde: fa domande aperte, approfondisce quando serve, e ti restituisce insight organizzati.
+                            </p>
+                            <p className="text-lg text-stone-600 leading-relaxed">
+                                Funziona come un collaboratore che fa le domande giuste al posto tuo, senza i costi e i tempi di una ricerca tradizionale.
+                            </p>
+                            <div className="mt-10">
+                                <Link href="/methodology">
+                                    <button className="flex items-center gap-2 text-amber-700 font-bold hover:gap-3 transition-all underline decoration-amber-500/30 decoration-2 underline-offset-4">
+                                        Scopri la nostra metodologia <Icons.ArrowRight size={20} />
+                                    </button>
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div className="relative">
+                            <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-amber-100 relative z-10">
+                                <div className="space-y-6">
+                                    {[
+                                        { q: "Qual è il tuo obiettivo?", a: "Voglio capire perché i clienti abbandonano il checkout." },
+                                        { q: "L'AI genera l'intervista...", a: "Ok, indagherò i punti di attrito nel processo di pagamento." },
+                                        { q: "L'utente risponde...", a: "Il form è troppo lungo." },
+                                        { q: "L'AI approfondisce...", a: "Quale campo specifico ti è sembrato più superfluo?" }
+                                    ].map((chat, i) => (
+                                        <div key={i} className={`flex ${i % 2 !== 0 ? 'justify-end' : ''}`}>
+                                            <div className={`max-w-[80%] p-4 rounded-2xl ${i % 2 !== 0 ? 'bg-amber-100 text-amber-900 rounded-tr-none' : 'bg-stone-100 text-stone-900 rounded-tl-none'}`}>
+                                                <p className="text-sm">{i % 2 === 0 ? chat.q : chat.a}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* Decorative background element */}
+                            <div className="absolute -inset-4 bg-amber-500/10 rounded-[4rem] blur-3xl -z-10 animate-pulse" />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* --- STATS & HOW IT WORKS (Light Warm Background) --- */}
             <section className="relative z-10 bg-[#FFFBEB] py-24 lg:py-32">
 
@@ -403,22 +454,25 @@ export default function LandingPage() {
                         {/* Analytics Feature */}
                         <div className="grid lg:grid-cols-2 gap-16 items-center">
                             <div>
-                                <h3 className="text-3xl font-bold text-stone-900 mb-6">Insight azionabili, non rumore</h3>
+                                <h3 className="text-3xl font-bold text-stone-900 mb-6">Risultati, non dati grezzi</h3>
                                 <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                    Non perdere tempo a leggere centinaia di trascrizioni. La nostra AI identifica automaticamente i temi ricorrenti, estrae le citazioni più significative e calcola il sentiment.
+                                    Non perdere tempo a leggere centinaia di trascrizioni. La nostra AI identifica automaticamente i temi ricorrenti e trasforma il rumore in insight azionabili.
                                 </p>
                                 <ul className="space-y-4">
                                     {[
-                                        'Analisi Tematica Automatica',
-                                        'Sentiment Analysis evoluta',
-                                        'Citazioni Chiave evidenziate',
-                                        'Report generati cliccando un tasto'
+                                        { t: 'Temi ricorrenti', d: 'Identifica pattern e raggruppa le risposte per tema.' },
+                                        { t: 'Citazioni chiave', d: 'Le frasi più significative, già estratte e categorizzate.' },
+                                        { t: 'Sentiment analysis', d: 'Capisci l\'umore generale e le aree critiche.' },
+                                        { t: 'Export flessibile', d: 'CSV per i numeri, report PDF per la presentazione.' }
                                     ].map((item, i) => (
-                                        <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
-                                            <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center">
+                                        <li key={i} className="flex items-start gap-3 text-stone-700">
+                                            <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
                                                 <Icons.Check size={14} />
                                             </div>
-                                            {item}
+                                            <div>
+                                                <div className="font-bold">{item.t}</div>
+                                                <div className="text-sm text-stone-500">{item.d}</div>
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
@@ -463,7 +517,8 @@ export default function LandingPage() {
                                     {[
                                         { title: 'Hai bisogno di capire il "perché"', desc: 'I numeri dicono cosa succede, non perché. Business Tuner raccoglie le motivazioni, le frustrazioni e i suggerimenti.' },
                                         { title: 'I form non bastano più', desc: 'Le risposte a crocette non ti danno abbastanza profondità. Ma non hai budget per interviste uno-a-uno.' },
-                                        { title: 'Vuoi scalare senza perdere qualità', desc: 'Devi parlare con 50, 100 o 500 persone. Impossibile farlo manualmente, deprimente farlo con un form standard.' }
+                                        { title: 'Vuoi scalare senza perdere qualità', desc: 'Devi parlare con 50, 100 o 500 persone. Impossibile farlo manualmente, deprimente farlo con un form standard.' },
+                                        { title: 'Il tempo è poco', desc: 'Lanci un\'intervista in 10 minuti. I risultati arrivano in giorni, non settimane.' }
                                     ].map((item, i) => (
                                         <div key={i}>
                                             <h4 className="text-xl font-bold text-stone-900 mb-2">{item.title}</h4>
@@ -482,15 +537,15 @@ export default function LandingPage() {
                             </p>
                             <div className="space-y-8">
                                 {[
-                                    { title: 'Non sostituisce interviste professionali', desc: 'Per ricerche che richiedono sensibilità culturale o approfondimenti etnografici complessi, serve un ricercatore qualificato.' },
+                                    { title: 'Non sostituisce interviste professionali', desc: 'Per ricerche che richiedono rapport umano, sensibilità culturale o approfondimenti etnografici complessi, serve un ricercatore qualificato.' },
                                     { title: 'Non produce campioni statistici', desc: 'I risultati sono qualitativi. Se cerchi significatività statistica decimale, usa strumenti quantitativi.' },
-                                    { title: 'Non legge la mente', desc: 'L\'AI fa domande intelligenti, ma la qualità degli insight dipende da chi riceve l\'intervista.' }
+                                    { title: 'Non legge la mente', desc: 'L\'AI fa domande intelligenti, ma la qualità degli insight dipende da come progetti l\'intervista e da chi la riceve.' }
                                 ].map((item, i) => (
                                     <div key={i} className="flex gap-4">
                                         <div className="mt-1"><Icons.X size={20} className="text-red-500" /></div>
                                         <div>
                                             <h4 className="text-lg font-bold text-stone-900 mb-1">{item.title}</h4>
-                                            <p className="text-stone-600 text-sm">{item.desc}</p>
+                                            <p className="text-stone-600 text-sm leading-relaxed">{item.desc}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -514,7 +569,10 @@ export default function LandingPage() {
                             { q: "Qual è la differenza rispetto a un Typeform o Google Form?", a: "In un form le domande sono fisse. Con Business Tuner, se un utente dice 'Il prodotto è difficile da usare', l'AI chiederà 'In quale parte specifica hai trovato difficoltà?'. Questo permette di raccogliere dettagli che andrebbero persi." },
                             { q: "Posso esportare i dati?", a: "Certamente. Puoi esportare le trascrizioni complete, i temi estratti in CSV o generare un report PDF pronto da presentare agli stakeholder." },
                             { q: "L'AI è sicura e rispetta la privacy?", a: "Sì. Implementiamo livelli di anonimizzazione configurabili e i dati vengono utilizzati esclusivamente per generare i tuoi report. Non vendiamo dati a terzi." },
-                            { q: "Quanto tempo serve per creare un bot?", a: "Meno di 10 minuti. Puoi descrivere il tuo obiettivo in linguaggio naturale e l'AI genererà per te l'intero flusso di domande e argomenti." }
+                            { q: "Quanto tempo serve per creare un bot?", a: "Meno di 10 minuti. Puoi descrivere il tuo obiettivo in linguaggio naturale e l'AI genererà per te l'intero flusso di domande e argomenti." },
+                            { q: "Come faccio a fidarmi delle risposte?", a: "La qualità degli insight dipende da tre fattori: come progetti l'intervista, chi la riceve, e come la presenti. Ti forniamo template collaudati e strumenti per calibrare tono e domande, ma come ogni ricerca qualitativa, il contesto è fondamentale." },
+                            { q: "È statisticamente significativo?", a: "No, e non deve esserlo. Business Tuner raccoglie insight qualitativi: il 'perché', non il 'quanto'. Se ti serve sapere che il 73% dei clienti preferisce un'opzione, usa un survey quantitativo. Se vuoi capire perché lo preferiscono, usa Business Tuner." },
+                            { q: "L'AI può davvero capire le risposte?", a: "L'AI è molto brava a identificare pattern, estrarre temi ricorrenti e riconoscere sentiment. Per sfumature culturali o emozioni complesse, puoi sempre leggere le trascrizioni originali e complete fornite nei report." }
                         ].map((faq, i) => (
                             <details key={i} className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm">
                                 <summary className="flex items-center justify-between p-6 cursor-pointer list-none">

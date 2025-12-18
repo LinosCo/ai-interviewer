@@ -4,6 +4,7 @@ import { deleteBotAction } from '@/app/actions';
 import { Trash2, MessageSquare, Edit } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { MethodologyBadge } from '@/components/ui/MethodologyBadge';
 
 interface BotCardProps {
     bot: any;
@@ -49,9 +50,8 @@ export default function BotCard({ bot, canDelete }: BotCardProps) {
                     </button>
                 )}
             </div>
-            <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
-                <MessageSquare className="w-3 h-3" />
-                <span>Chatbot</span>
+            <div className="mt-3 flex items-center gap-2">
+                <MethodologyBadge />
             </div>
         </Link>
     );

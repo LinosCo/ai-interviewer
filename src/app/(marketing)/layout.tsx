@@ -1,3 +1,7 @@
+import Link from 'next/link';
+import { Icons } from '@/components/ui/business-tuner/Icons';
+import { Footer } from '@/components/Footer';
+import { gradients, shadows } from '@/lib/design-system';
 import { auth } from '@/auth';
 
 export default async function MarketingLayout({

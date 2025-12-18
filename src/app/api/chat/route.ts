@@ -4,6 +4,9 @@ import { generateText, CoreMessage } from 'ai';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { recordInterviewCompleted, checkInterviewStatus, markInterviewAsCompleted } from '@/lib/usage';
 import { LLMService } from '@/services/llmService';
+import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
+import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
+import { analyzeForProactiveSuggestions } from '@/lib/proactive/proactive-suggestions';
 
 export const maxDuration = 60;
 
@@ -103,11 +106,32 @@ export async function POST(req: Request) {
 
         // 3. Inject into prompt
         // We inject it before the control section
+
+        // --- PHASE 4: TONE ADAPTATION ---
+        const toneAnalyzer = new ToneAnalyzer(process.env.OPENAI_API_KEY || '');
+        // Analyze recent memory or messages
+        // We can use the memory's detectedTone or re-analyze last messages if needed.
+        // For simplicity, let's use the memory's detected tone if available, or analyze recent.
+
+        let toneInstructions = "";
+        if (memory?.detectedTone) {
+            // Simplified adaptation based on single label
+            toneInstructions = memory.detectedTone === 'formal' ? "Mantieni un tono professionale." :
+                memory.detectedTone === 'casual' ? "Usa un tono colloquiale." : "";
+        } else {
+            // Deeper analysis
+            const lastMessages = messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content }));
+            const toneProfile = await toneAnalyzer.analyzeTone(lastMessages);
+            toneInstructions = buildToneAdaptationPrompt(toneProfile);
+        }
+
         // -----------------------------------------
 
         systemPrompt += `
 
 ${memoryContext}
+
+${toneInstructions}
 
 ## TRANSITION & COMPLETION CONTROL
 When topic is covered, add: [TRANSITION_TO_NEXT_TOPIC]
@@ -129,6 +153,31 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
         let responseText = result.text;
 
         // 7. Post-Processing (Markers & Status)
+
+        // --- PHASE 4: PROACTIVE SUGGESTIONS ---
+        // If the user's last answer was short/vague, we might want to append suggestions.
+        // We check this AFTER generating the AI response, but we might also append it as metadata/structured data.
+        // For now, let's append it to the text if the AI didn't already handle it well, 
+        // OR better: return it as a structured part of the response if we were using a JSON API.
+        // Since we return text/stream, we'll append it visually or handle it client-side.
+        // Here, we'll try to detect if we need it.
+
+        if (lastMessage && lastMessage.role === 'user' && lastMessage.content.length < 50) {
+            const suggestions = await analyzeForProactiveSuggestions(
+                lastMessage.content,
+                currentTopic?.label || '',
+                null,
+                process.env.OPENAI_API_KEY || ''
+            );
+
+            if (suggestions) {
+                // Append suggestions as a special block for the client to parse?
+                // Or just append text. Let's append text for now.
+                const suggestionsText = suggestions.suggestions.map(s => `• ${s}`).join('\n');
+                responseText += `\n\n(Suggerimenti: \n${suggestionsText})`;
+            }
+        }
+
         if (responseText.includes('[CONCLUDE_INTERVIEW]')) {
             responseText = responseText.replace('[CONCLUDE_INTERVIEW]', '').trim();
             await markInterviewAsCompleted(conversationId);

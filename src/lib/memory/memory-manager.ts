@@ -106,7 +106,7 @@ export class MemoryManager {
             ...memory!,
             factsCollected: updatedFacts,
             userFatigueScore: newFatigueScore,
-            detectedTone: extraction.detectedTone || memory!.detectedTone,
+            detectedTone: (extraction.detectedTone || memory!.detectedTone) as ConversationMemoryData['detectedTone'],
             avgResponseLength: newAvg,
             usesEmoji: memory!.usesEmoji || hasEmoji
         };

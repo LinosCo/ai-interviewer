@@ -8,10 +8,16 @@ export default function TermsPage() {
 
             <div className="prose prose-stone max-w-none space-y-8 text-gray-700 leading-relaxed">
                 <section>
-                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">1. Accettazione dei Termini</h2>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">1. Il Servizio</h2>
                     <p>
-                        Utilizzando Business Tuner ("il Servizio"), l'utente accetta di essere vincolato dai presenti Termini di Servizio.
-                        Se non accetti questi termini, ti preghiamo di non utilizzare il Servizio.
+                        Business Tuner ("il Servizio") è un prodotto di [RAGIONE SOCIALE], con sede in [INDIRIZZO], P.IVA [P.IVA], C.F. [C.F.], Iscritta al Registro Imprese di [PROVINCIA], REA [NUMERO], Capitale Sociale Euro [AMMONTARE] i.v.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">2. Condizioni di Vendita</h2>
+                    <p>
+                        L'acquisto di abbonamenti e servizi tramite la piattaforma è regolato dalle nostre <a href="/sales-terms" className="text-amber-600 hover:underline">Condizioni Generali di Vendita</a>, che integrano i presenti Termini.
                     </p>
                 </section>
 

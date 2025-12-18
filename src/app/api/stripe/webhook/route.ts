@@ -109,7 +109,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             pecEmail: pecEmail || undefined,
             vatNumber: vatId || undefined,
             codiceFiscale: fiscalCode || undefined
-        }
+        } as any
     });
 
     console.log(`Subscription activated for org ${organizationId}: ${tier}`);

@@ -22,6 +22,25 @@ async function main() {
     })
 
     console.log({ user })
+
+    // Create the specific user requested
+    const socialEmail = 'social@linosandco.com'
+    const socialUser = await prisma.user.upsert({
+        where: { email: socialEmail },
+        update: {
+            password, // Same password: password123
+            role: 'ADMIN',
+            emailVerified: new Date()
+        },
+        create: {
+            email: socialEmail,
+            name: 'Linos Admin',
+            password,
+            role: 'ADMIN',
+            emailVerified: new Date()
+        },
+    })
+    console.log({ socialUser })
 }
 
 main()

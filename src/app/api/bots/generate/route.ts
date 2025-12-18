@@ -6,28 +6,47 @@ import { z } from 'zod';
 
 export async function POST(req: Request) {
     try {
+        console.log('--- GENERATE API CALLED ---');
 
         // Allow public generation for onboarding flow
         // const session = await auth(); 
 
-        const { goal } = await req.json();
+        let goal;
+        try {
+            const body = await req.json();
+            goal = body.goal;
+            console.log('Received goal:', goal ? `${goal.substring(0, 20)}...` : 'undefined');
+        } catch (e) {
+            console.error('Failed to parse JSON body:', e);
+            return new Response('Invalid JSON body', { status: 400 });
+        }
+
         if (!goal || typeof goal !== 'string') {
+            console.error('Invalid goal format');
             return new Response('Invalid goal', { status: 400 });
         }
 
         // Get API key from default config or env
-        // Note: For unauthenticated users, we must rely on env var or a default system config
-        // accessible without user context.
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' }
-        });
-        const apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
-
-        if (!apiKey) {
-            console.error('GENERATE API ERROR: API key not configured');
-            return new Response('API key not configured', { status: 500 });
+        console.log('Fetching API Key...');
+        let apiKey;
+        try {
+            const globalConfig = await prisma.globalConfig.findUnique({
+                where: { id: 'default' }
+            });
+            apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
+            console.log('API Key source:', globalConfig?.openaiApiKey ? 'DB' : (process.env.OPENAI_API_KEY ? 'ENV' : 'NONE'));
+        } catch (dbError) {
+            console.error('DB Config Fetch Error:', dbError);
+            // Fallback to Env if DB fails
+            apiKey = process.env.OPENAI_API_KEY;
         }
 
+        if (!apiKey) {
+            console.error('CRITICAL: No API Key found in DB or ENV');
+            return new Response('API key not configured on server', { status: 500 });
+        }
+
+        console.log('Initializing OpenAI...');
         const openai = createOpenAI({ apiKey });
 
         // Schema for generated interview config

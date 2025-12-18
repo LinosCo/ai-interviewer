@@ -35,9 +35,9 @@ export class MemoryManager {
         if (!memory) return null;
 
         return {
-            factsCollected: memory.factsCollected as CollectedFact[],
-            topicsExplored: memory.topicsExplored as ExploredTopic[],
-            unansweredAreas: memory.unansweredAreas as UnansweredArea[],
+            factsCollected: memory.factsCollected as unknown as CollectedFact[],
+            topicsExplored: memory.topicsExplored as unknown as ExploredTopic[],
+            unansweredAreas: memory.unansweredAreas as unknown as UnansweredArea[],
             userFatigueScore: memory.userFatigueScore,
             detectedTone: memory.detectedTone as ConversationMemoryData['detectedTone'],
             avgResponseLength: memory.avgResponseLength,

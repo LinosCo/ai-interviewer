@@ -24,6 +24,7 @@ export async function POST(req: Request) {
         const apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
 
         if (!apiKey) {
+            console.error('GENERATE API ERROR: API key not configured');
             return new Response('API key not configured', { status: 500 });
         }
 
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
         });
 
         const result = await generateObject({
-            model: openai('gpt-4o'),
+            model: openai('gpt-4o-mini'),
             schema: configSchema,
             prompt: `Sei "Business Tuner AI", un esperto stratega di ricerca qualitativa. 
 L'utente vuole lanciare un'indagine con questo obiettivo grezzo:

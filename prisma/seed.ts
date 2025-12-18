@@ -41,6 +41,20 @@ async function main() {
         },
     })
     console.log({ socialUser })
+
+    // Initialize Global Config
+    const config = await prisma.globalConfig.upsert({
+        where: { id: 'default' },
+        update: {},
+        create: {
+            id: 'default',
+            // We don't hardcode the key here for security, expecting the user to set it via Admin UI 
+            // or rely on env vars. But creating the record ensures the app doesn't crash on null.
+            openaiApiKey: process.env.OPENAI_API_KEY || null,
+        },
+    })
+    console.log({ config })
+
 }
 
 main()

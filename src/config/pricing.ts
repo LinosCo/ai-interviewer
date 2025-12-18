@@ -24,7 +24,7 @@ export const PRICING_PAGE = {
         {
             id: 'starter',
             name: 'Starter',
-            price: '€39',
+            price: '€49',
             period: '/mese',
             description: 'Per il professionista',
             cta: 'Prova 14 giorni gratis',
@@ -42,7 +42,7 @@ export const PRICING_PAGE = {
         {
             id: 'pro',
             name: 'Pro',
-            price: '€99',
+            price: '€149',
             period: '/mese',
             description: 'Per la PMI',
             cta: 'Prova 14 giorni gratis',
@@ -64,7 +64,7 @@ export const PRICING_PAGE = {
         {
             id: 'business',
             name: 'Business',
-            price: '€249',
+            price: '€299',
             period: '/mese',
             description: 'Per l\'azienda strutturata',
             cta: 'Contattaci',

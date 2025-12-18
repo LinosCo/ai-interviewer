@@ -652,7 +652,7 @@ export default function LandingPage() {
                         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
                             <h3 className="text-xl font-bold mb-2">Starter</h3>
                             <p className="text-amber-100 text-sm mb-6">Per professionisti e freelance</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€39</span><span className="text-amber-200">/mese</span></div>
+                            <div className="mb-6"><span className="text-4xl font-bold">€49</span><span className="text-amber-200">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm">
                                 {['3 interviste attive', '100 risposte/mese', 'Analytics base', 'Export PDF'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
@@ -670,7 +670,7 @@ export default function LandingPage() {
                             </div>
                             <h3 className="text-xl font-bold text-stone-900 mb-2">Pro</h3>
                             <p className="text-stone-500 text-sm mb-6">Per PMI e agenzie</p>
-                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€99</span><span className="text-stone-500">/mese</span></div>
+                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€149</span><span className="text-stone-500">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm text-stone-700">
                                 {['10 interviste attive', '300 risposte/mese', 'AI Analysis Avanzata', 'Logica condizionale', 'Export CSV + Webhook'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><span className="text-amber-500"><Icons.Check size={18} /></span> {f}</li>
@@ -685,7 +685,7 @@ export default function LandingPage() {
                         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
                             <h3 className="text-xl font-bold mb-2">Business</h3>
                             <p className="text-amber-100 text-sm mb-6">Per grandi aziende</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€249</span><span className="text-amber-200">/mese</span></div>
+                            <div className="mb-6"><span className="text-4xl font-bold">€299</span><span className="text-amber-200">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm">
                                 {['Illimitate interviste', '1.000+ risposte/mese', 'API Access', 'White Label', 'Supporto Prioritario'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>

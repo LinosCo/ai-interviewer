@@ -39,14 +39,3 @@ export default async function DashboardLayout({
     );
 }
 
-// Helper Component for Links
-function DashboardLink({ href, icon, label, isAdmin = false }: { href: string, icon: React.ReactNode, label: string, isAdmin?: boolean }) {
-    return (
-        <Link href={href} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${isAdmin ? 'text-amber-700 hover:bg-amber-50' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 hover:shadow-sm'}`}>
-            <span className={isAdmin ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-500 transition-colors'}>
-                {icon}
-            </span>
-            <span className="font-medium">{label}</span>
-        </Link>
-    );
-}

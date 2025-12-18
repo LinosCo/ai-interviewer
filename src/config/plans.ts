@@ -151,8 +151,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.STARTER]: {
         id: PlanType.STARTER,
         name: 'Starter',
-        price: 39,
-        priceYearly: 31,  // -20%
+        price: 49,
+        priceYearly: 39,  // -20%
 
         responsesPerMonth: 100,
         activeInterviews: 3,
@@ -214,8 +214,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.PRO]: {
         id: PlanType.PRO,
         name: 'Pro',
-        price: 99,
-        priceYearly: 79,  // -20%
+        price: 149,
+        priceYearly: 119,  // -20%
 
         responsesPerMonth: 300,
         activeInterviews: 10,
@@ -277,8 +277,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.BUSINESS]: {
         id: PlanType.BUSINESS,
         name: 'Business',
-        price: 249,
-        priceYearly: 199,  // -20%
+        price: 299,
+        priceYearly: 239,  // -20%
 
         responsesPerMonth: 1000,
         activeInterviews: -1,  // Illimitate

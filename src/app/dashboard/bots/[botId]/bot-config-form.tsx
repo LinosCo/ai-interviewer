@@ -108,10 +108,10 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                                 <input
                                     type="color"
                                     name="primaryColor"
-                                    defaultValue={bot.primaryColor || '#6366f1'}
+                                    defaultValue={bot.primaryColor || colors.amber}
                                     className="h-10 w-20 border rounded cursor-pointer"
                                 />
-                                <span className="text-xs text-gray-500">{bot.primaryColor || '#6366f1'}</span>
+                                <span className="text-xs text-gray-500">{bot.primaryColor || colors.amber}</span>
                             </div>
                         </div>
                         <div>

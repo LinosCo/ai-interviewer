@@ -1,48 +1,69 @@
+import { colors } from '@/lib/design-system';
+
 export default function TermsPage() {
     return (
-        <div className="max-w-3xl mx-auto px-6 py-12">
-            <h1 className="text-3xl font-bold mb-6">Termini di Servizio</h1>
-            <p className="mb-4">Ultimo aggiornamento: Dicembre 2025</p>
-            <div className="prose prose-stone">
-                <p>
-                    Benvenuto su Business Tuner. Utilizzando il nostro servizio, accetti di essere vincolato dai seguenti termini e condizioni. Ti invitiamo a leggerli attentamente prima di utilizzare la piattaforma.
-                </p>
-                <h2 className="text-xl font-semibold mt-8 mb-4">1. Accettazione dei Termini</h2>
-                <p>
-                    Accedendo o utilizzando il nostro servizio, dichiari di aver letto, compreso e accettato di essere vincolato da questi Termini. Se non accetti parte dei termini, non puoi accedere al servizio.
-                </p>
-                <h2 className="text-xl font-semibold mt-8 mb-4">2. Licenza d'Uso</h2>
-                <p>
-                    Ti viene concessa una licenza limitata, non esclusiva e non trasferibile per accedere e utilizzare Business Tuner esclusivamente per i tuoi scopi professionali o di ricerca, in conformità con il piano di abbonamento scelto.
-                </p>
-                <h2 className="text-xl font-semibold mt-8 mb-4">3. Account Utente</h2>
-                <p>
-                    Sei responsabile della protezione della tua password e di tutte le attività svolte tramite il tuo account. Devi informarci immediatamente di qualsiasi violazione della sicurezza o utilizzo non autorizzato del tuo account.
-                </p>
-                <h2 className="text-xl font-semibold mt-8 mb-4">4. Restrizioni</h2>
-                <p className="mb-4">Accetti di non:</p>
-                <ul className="list-disc pl-6 space-y-2 mb-4">
-                    <li>Utilizzare il servizio per scopi illegali o non autorizzati.</li>
-                    <li>Tentare di decodificare o estrarre il codice sorgente della piattaforma.</li>
-                    <li>Utilizzare il servizio per generare spam, contenuti dannosi o discriminatori.</li>
-                    <li>Superare i limiti previsti dal proprio piano senza autorizzazione.</li>
-                </ul>
-                <h2 className="text-xl font-semibold mt-8 mb-4">5. Abbonamenti e Pagamenti</h2>
-                <p>
-                    Alcune parti del servizio sono fatturate su base di abbonamento. Ti verrà addebitato in anticipo su base ricorrente e periodica (mensile o annuale). In caso di mancato pagamento, l'accesso alle funzionalità premium potrebbe essere sospeso.
-                </p>
-                <h2 className="text-xl font-semibold mt-8 mb-4">6. Proprietà dei Contenuti</h2>
-                <p>
-                    Mantiene la proprietà di tutti i dati e i parametri inseriti nella piattaforma. Business Tuner detiene la proprietà del software, del design e degli algoritmi proprietari.
-                </p>
-                <h2 className="text-xl font-semibold mt-8 mb-4">7. Limitazione di Responsabilità</h2>
-                <p>
-                    Business Tuner è fornito "così com'è". Pur impegnandoci per il massimo della qualità, non garantiamo che il servizio sia privo di errori o interruzioni e non siamo responsabili per decisioni aziendali basate sull'analisi AI.
-                </p>
-                <h2 className="text-xl font-semibold mt-8 mb-4">8. Legge Applicabile</h2>
-                <p>
-                    Questi termini sono regolati dalle leggi dello Stato Italiano. Qualsiasi controversia sarà soggetta alla giurisdizione esclusiva dei tribunali di competenza del titolare.
-                </p>
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '4rem 2rem' }}>
+            <h1 className="text-4xl font-bold mb-8" style={{ color: colors.text }}>Termini di Servizio</h1>
+            <p className="text-gray-500 mb-8">Ultimo aggiornamento: {new Date().toLocaleDateString('it-IT')}</p>
+
+            <div className="prose prose-stone max-w-none space-y-8 text-gray-700 leading-relaxed">
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">1. Accettazione dei Termini</h2>
+                    <p>
+                        Utilizzando Business Tuner ("il Servizio"), l'utente accetta di essere vincolato dai presenti Termini di Servizio.
+                        Se non accetti questi termini, ti preghiamo di non utilizzare il Servizio.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">2. Descrizione del Servizio</h2>
+                    <p>
+                        Business Tuner fornisce una piattaforma basata su intelligenza artificiale per la conduzione e l'analisi di interviste qualitative.
+                        Ci riserviamo il diritto di modificare, sospendere o interrompere il Servizio in qualsiasi momento.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">3. Account Utente</h2>
+                    <p>
+                        Per accedere ad alcune funzionalità del Servizio, è necessario creare un account. L'utente è responsabile della sicurezza
+                        delle proprie credenziali e di tutte le attività che avvengono sotto il proprio account.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">4. Proprietà dei Dati</h2>
+                    <p>
+                        L'utente mantiene la piena proprietà dei dati inseriti e generati tramite il Servizio. Business Tuner non rivendica alcun diritto di proprietà
+                        sui tuoi contenuti. Tuttavia, concedi a Business Tuner una licenza limitata per utilizzare i tuoi contenuti al solo fine di fornire e migliorare il Servizio.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">5. Uso Accettabile</h2>
+                    <p>
+                        Non è consentito utilizzare il Servizio per scopi illegali o non autorizzati. L'utente si impegna a non utilizzare il Servizio per:
+                        <ul className="list-disc pl-6 mt-2">
+                            <li>Violare leggi o regolamenti vigenti.</li>
+                            <li>Inviare spam o messaggi non richiesti.</li>
+                            <li>Tenta di compromettere l'integrità o la sicurezza del sistema.</li>
+                        </ul>
+                    </p>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">6. Limitazione di Responsabilità</h2>
+                    <p>
+                        In nessun caso Business Tuner sarà responsabile per danni indiretti, incidentali, speciali o consequenziali derivanti dall'uso del Servizio.
+                    </p>
+                </section>
+
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">7. Contatti</h2>
+                    <p>
+                        Per qualsiasi domanda sui presenti Termini, contattaci all'indirizzo: legal@businesstuner.ai
+                    </p>
+                </section>
             </div>
         </div>
     );

@@ -6,6 +6,7 @@ import { templates, Template } from '@/lib/templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
 import { colors, gradients } from '@/lib/design-system';
 import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
 
 const examplePrompts = [
     'B2B: Vorrei capire perché i miei clienti SaaS non rinnovano il contratto dopo il primo anno',
@@ -36,7 +37,9 @@ export default function OnboardingPage() {
             background: `linear-gradient(135deg, #FFFBEB 0%, #FFF 50%, #FEF3C7 100%)`,
             fontFamily: "'Inter', sans-serif",
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column'
         }}>
             {/* Decorative Background Elements */}
             <div style={{
@@ -316,6 +319,8 @@ export default function OnboardingPage() {
                     )}
                 </div>
             </main>
+
+            <Footer />
         </div>
     );
 }

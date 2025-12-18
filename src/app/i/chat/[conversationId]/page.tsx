@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import InterviewChat from '@/components/interview-chat';
+import { colors } from '@/lib/design-system';
 
 export default async function ChatPage({ params }: { params: Promise<{ conversationId: string }> }) {
     const { conversationId } = await params;
@@ -36,7 +37,7 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             estimatedDuration={estimatedDuration}
             privacyLevel={bot.anonymizationLevel || 'partial'}
             logoUrl={bot.logoUrl || null}
-            primaryColor={bot.primaryColor || '#6366f1'}
+            primaryColor={bot.primaryColor || colors.amber}
             backgroundColor={bot.backgroundColor || '#f9fafb'}
             rewardConfig={bot.rewardConfig}
             privacyNotice={bot.privacyNotice}

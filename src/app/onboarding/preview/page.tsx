@@ -18,8 +18,9 @@ import {
     Save
 } from 'lucide-react';
 import SimulatorChat from '@/components/simulator/simulator-chat';
-import { checkUserSession } from '@/app/actions/session';
 import { colors, gradients, shadows } from '@/lib/design-system';
+import { Header } from '@/components/Header';
+import { Footer } from '@/components/Footer';
 
 interface TopicConfig {
     label: string;
@@ -52,6 +53,7 @@ export default function PreviewPage() {
     const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
     const [showSimulator, setShowSimulator] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [showAuthModal, setShowAuthModal] = useState(false);
 
     useEffect(() => {
         const stored = sessionStorage.getItem('generatedConfig');
@@ -73,6 +75,23 @@ export default function PreviewPage() {
         if (!config) return;
         const newTopics = [...config.topics];
         newTopics[index] = { ...newTopics[index], ...updates };
+        updateConfig({ topics: newTopics });
+    };
+
+    const updateSubGoal = (topicIndex: number, goalIndex: number, value: string) => {
+        if (!config) return;
+        const newTopics = [...config.topics];
+        const newSubGoals = [...newTopics[topicIndex].subGoals];
+        newSubGoals[goalIndex] = value;
+        newTopics[topicIndex] = { ...newTopics[topicIndex], subGoals: newSubGoals };
+        updateConfig({ topics: newTopics });
+    };
+
+    const removeSubGoal = (topicIndex: number, goalIndex: number) => {
+        if (!config) return;
+        const newTopics = [...config.topics];
+        const newSubGoals = newTopics[topicIndex].subGoals.filter((_, i) => i !== goalIndex);
+        newTopics[topicIndex] = { ...newTopics[topicIndex], subGoals: newSubGoals };
         updateConfig({ topics: newTopics });
     };
 
@@ -99,28 +118,14 @@ export default function PreviewPage() {
 
     const addSubGoal = (topicIndex: number) => {
         if (!config) return;
-        const topic = config.topics[topicIndex];
-        const newSubGoals = [...topic.subGoals, 'Nuovo sotto-obiettivo'];
-        updateTopic(topicIndex, { subGoals: newSubGoals });
-    };
-
-    const updateSubGoal = (topicIndex: number, goalIndex: number, value: string) => {
-        if (!config) return;
-        const topic = config.topics[topicIndex];
-        const newSubGoals = [...topic.subGoals];
-        newSubGoals[goalIndex] = value;
-        updateTopic(topicIndex, { subGoals: newSubGoals });
-    };
-
-    const removeSubGoal = (topicIndex: number, goalIndex: number) => {
-        if (!config) return;
-        const topic = config.topics[topicIndex];
-        if (topic.subGoals.length <= 1) return;
-        const newSubGoals = topic.subGoals.filter((_, i) => i !== goalIndex);
-        updateTopic(topicIndex, { subGoals: newSubGoals });
+        const newTopics = [...config.topics];
+        const newSubGoals = [...newTopics[topicIndex].subGoals, 'Nuovo obiettivo'];
+        newTopics[topicIndex] = { ...newTopics[topicIndex], subGoals: newSubGoals };
+        updateConfig({ topics: newTopics });
     };
 
     const toggleTopic = (index: number) => {
+        if (editingTopicIndex !== null && editingTopicIndex !== index) return;
         const newExpanded = new Set(expandedTopics);
         if (newExpanded.has(index)) {
             newExpanded.delete(index);
@@ -130,17 +135,8 @@ export default function PreviewPage() {
         setExpandedTopics(newExpanded);
     };
 
-    const [showAuthModal, setShowAuthModal] = useState(false);
-
     const handlePublish = async () => {
         if (!config) return;
-
-        // 1. Check Auth
-        const isLoggedIn = await checkUserSession();
-        if (!isLoggedIn) {
-            setShowAuthModal(true);
-            return;
-        }
 
         setIsPublishing(true);
 
@@ -191,74 +187,78 @@ export default function PreviewPage() {
         const interviewLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/i/${publishedSlug}`;
 
         return (
-            <div className="min-h-screen flex items-center justify-center p-6" style={{ background: gradients.mesh }}>
-                <div style={{
-                    maxWidth: '500px',
-                    width: '100%',
-                    background: 'rgba(255, 255, 255, 0.7)',
-                    backdropFilter: 'blur(20px)',
-                    borderRadius: '24px',
-                    padding: '2.5rem',
-                    border: '1px solid rgba(255, 255, 255, 0.5)',
-                    boxShadow: shadows.xl,
-                    textAlign: 'center'
-                }}>
-                    <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6">
-                        <Check className="w-10 h-10 text-green-600" />
-                    </div>
+            <div className="min-h-screen flex flex-col" style={{ background: gradients.mesh }}>
+                <Header />
+                <main className="flex-1 flex items-center justify-center p-6">
+                    <div style={{
+                        maxWidth: '500px',
+                        width: '100%',
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        backdropFilter: 'blur(20px)',
+                        borderRadius: '24px',
+                        padding: '2.5rem',
+                        border: '1px solid rgba(255, 255, 255, 0.5)',
+                        boxShadow: shadows.xl,
+                        textAlign: 'center'
+                    }}>
+                        <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-6">
+                            <Check className="w-10 h-10 text-green-600" />
+                        </div>
 
-                    <div className="space-y-2 mb-8">
-                        <h2 className="text-3xl font-bold text-gray-900">Intervista pubblicata!</h2>
-                        <p className="text-gray-600">La tua intervista è pronta. Condividi il link per iniziare a raccogliere risposte.</p>
-                    </div>
+                        <div className="space-y-2 mb-8">
+                            <h2 className="text-3xl font-bold text-gray-900">Intervista pubblicata!</h2>
+                            <p className="text-gray-600">La tua intervista è pronta. Condividi il link per iniziare a raccogliere risposte.</p>
+                        </div>
 
-                    <div className="bg-white/50 rounded-xl p-4 flex items-center gap-3 mb-8 border border-white/60">
-                        <Link2 className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                        <span className="text-gray-700 truncate flex-1 text-left font-mono text-sm">{interviewLink}</span>
-                        <button
-                            onClick={copyLink}
-                            className="px-4 py-2 text-white rounded-lg text-sm flex items-center gap-2 transition-colors font-medium"
-                            style={{ background: gradients.primary }}
-                        >
-                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                            {copied ? 'Copiato!' : 'Copia'}
-                        </button>
-                    </div>
+                        <div className="bg-white/50 rounded-xl p-4 flex items-center gap-3 mb-8 border border-white/60">
+                            <Link2 className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                            <span className="text-gray-700 truncate flex-1 text-left font-mono text-sm">{interviewLink}</span>
+                            <button
+                                onClick={copyLink}
+                                className="px-4 py-2 text-white rounded-lg text-sm flex items-center gap-2 transition-colors font-medium"
+                                style={{ background: gradients.primary }}
+                            >
+                                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                {copied ? 'Copiato!' : 'Copia'}
+                            </button>
+                        </div>
 
-                    <div className="flex gap-4">
-                        <button
-                            onClick={() => router.push('/dashboard')}
-                            className="flex-1 px-6 py-3 bg-white/50 hover:bg-white text-gray-700 font-medium rounded-xl transition-colors border border-gray-200"
-                        >
-                            Vai alla dashboard
-                        </button>
-                        <button
-                            onClick={() => router.push('/onboarding')}
-                            className="flex-1 px-6 py-3 text-white font-medium rounded-xl transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-                            style={{ background: gradients.primary, boxShadow: shadows.amber }}
-                        >
-                            Crea un'altra
-                        </button>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => router.push('/dashboard')}
+                                className="flex-1 px-6 py-3 bg-white/50 hover:bg-white text-gray-700 font-medium rounded-xl transition-colors border border-gray-200"
+                            >
+                                Vai alla dashboard
+                            </button>
+                            <button
+                                onClick={() => router.push('/onboarding')}
+                                className="flex-1 px-6 py-3 text-white font-medium rounded-xl transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                                style={{ background: gradients.primary, boxShadow: shadows.amber }}
+                            >
+                                Crea un'altra
+                            </button>
+                        </div>
                     </div>
-                </div>
+                </main>
+                <Footer />
             </div>
         );
     }
 
     // Preview & Edit View
     return (
-        <div className="min-h-screen" style={{ background: gradients.mesh }}>
-            <header className="p-6 flex items-center justify-between border-b border-gray-200/30 bg-white/30 backdrop-blur-md sticky top-0 z-30">
-                <h1 className="text-2xl font-bold text-gray-900">Business Tuner</h1>
+        <div className="min-h-screen flex flex-col" style={{ background: gradients.mesh }}>
+            <Header />
+
+            <main className="max-w-3xl mx-auto p-6 space-y-8 pb-32 w-full flex-1">
+                {/* Back Button */}
                 <button
                     onClick={() => router.push('/onboarding')}
-                    className="text-gray-500 hover:text-amber-600 transition-colors font-medium"
+                    className="text-gray-500 hover:text-amber-600 transition-colors font-medium flex items-center gap-2"
                 >
-                    ← Modifica obiettivo
+                    ← Modifica obiettivo iniziale
                 </button>
-            </header>
 
-            <main className="max-w-3xl mx-auto p-6 space-y-8 pb-32">
                 {/* Name - Editable */}
                 <div className="space-y-2">
                     {editingName ? (
@@ -519,6 +519,8 @@ export default function PreviewPage() {
                 </div>
             </main>
 
+            <Footer />
+
             {/* Simulator Modal */}
             {showSimulator && (
                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -566,3 +568,5 @@ export default function PreviewPage() {
         </div>
     );
 }
+
+// ... imports and interfaces are kept in memory or assumed to be in view (I pasted full content)

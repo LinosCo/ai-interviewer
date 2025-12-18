@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 
 export default function MarketingLayout({
     children,
@@ -12,22 +13,18 @@ export default function MarketingLayout({
                 <div className="max-w-6xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <Link href="/" className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
-                                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                                </svg>
-                            </div>
+                            <Icons.Logo size={32} />
                             <span className="text-xl font-semibold text-stone-900 tracking-tight">Business Tuner</span>
                         </Link>
 
                         <div className="hidden md:flex items-center gap-8">
-                            <Link href="#come-funziona" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
+                            <Link href="/#how-it-works" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
                                 Come funziona
                             </Link>
-                            <Link href="#casi-uso" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
+                            <Link href="/#use-cases" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
                                 Casi d'uso
                             </Link>
-                            <Link href="#prezzi" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
+                            <Link href="/#pricing" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
                                 Prezzi
                             </Link>
                         </div>
@@ -61,11 +58,7 @@ export default function MarketingLayout({
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
                         <div className="md:col-span-2">
                             <div className="flex items-center gap-2 mb-4">
-                                <div className="w-8 h-8 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
-                                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-                                    </svg>
-                                </div>
+                                <Icons.Logo size={32} />
                                 <span className="text-xl font-semibold text-white tracking-tight">Business Tuner</span>
                             </div>
                             <p className="text-stone-500 text-sm leading-relaxed max-w-sm">
@@ -77,9 +70,9 @@ export default function MarketingLayout({
                         <div>
                             <h4 className="text-white font-medium mb-4 text-sm">Prodotto</h4>
                             <ul className="space-y-2 text-sm">
-                                <li><Link href="#come-funziona" className="hover:text-white transition-colors">Come funziona</Link></li>
-                                <li><Link href="#casi-uso" className="hover:text-white transition-colors">Casi d'uso</Link></li>
-                                <li><Link href="#prezzi" className="hover:text-white transition-colors">Prezzi</Link></li>
+                                <li><Link href="/#how-it-works" className="hover:text-white transition-colors">Come funziona</Link></li>
+                                <li><Link href="/#use-cases" className="hover:text-white transition-colors">Casi d'uso</Link></li>
+                                <li><Link href="/#pricing" className="hover:text-white transition-colors">Prezzi</Link></li>
                                 <li><Link href="/templates" className="hover:text-white transition-colors">Template</Link></li>
                             </ul>
                         </div>

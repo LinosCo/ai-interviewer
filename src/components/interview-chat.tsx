@@ -251,6 +251,7 @@ export default function InterviewChat({
     const progress = Math.min((elapsedMinutes / estimatedMinutes) * 100, 95);
 
     // Dynamic Background logic
+    const brandColor = primaryColor || colors.amber;
     const mainBackground = backgroundColor || gradients.mesh;
 
     // Show landing page first
@@ -300,7 +301,7 @@ export default function InterviewChat({
                         {/* Info Pills */}
                         <div className="flex flex-wrap justify-center gap-4 mb-10">
                             {estimatedDuration && (
-                                <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-full border border-amber-100 text-amber-800 text-sm font-medium">
+                                <div className="flex items-center gap-2 px-4 py-2 bg-stone-50 rounded-full border border-stone-100 text-stone-800 text-sm font-medium">
                                     <Icons.Play size={16} /> {estimatedDuration}
                                 </div>
                             )}
@@ -331,7 +332,7 @@ export default function InterviewChat({
                             )}
 
                             <div className="text-xs text-gray-500 flex items-start gap-3 pt-2 border-t border-gray-100/50">
-                                <Icons.Zap size={16} className="text-amber-400 mt-0.5" />
+                                <Icons.Zap size={16} style={{ color: brandColor }} className="mt-0.5" />
                                 <span>{t.aiNotice}</span>
                             </div>
                         </div>
@@ -343,8 +344,8 @@ export default function InterviewChat({
                                 type="checkbox"
                                 checked={consentGiven}
                                 onChange={(e) => setConsentGiven(e.target.checked)}
-                                style={{ accentColor: colors.amber }}
-                                className="w-5 h-5 mt-0.5 cursor-pointer rounded border-gray-300 focus:ring-amber-500"
+                                style={{ accentColor: brandColor }}
+                                className="w-5 h-5 mt-0.5 cursor-pointer rounded border-gray-300"
                             />
                             <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer leading-normal">
                                 {t.consentPrefix}
@@ -352,7 +353,8 @@ export default function InterviewChat({
                                     href={`/privacy?lang=${language === 'it' ? 'it' : 'en'}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="font-medium hover:underline text-amber-600"
+                                    style={{ color: brandColor }}
+                                    className="font-medium hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     {t.consentLinkText}
@@ -364,9 +366,10 @@ export default function InterviewChat({
                         <button
                             onClick={handleStart}
                             disabled={!consentGiven}
-                            className={`w-full py-4 px-8 rounded-full font-bold text-white text-lg transition-all shadow-xl relative overflow-hidden group ${!consentGiven ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-amber-500/30 hover:scale-[1.02]'}`}
+                            className={`w-full py-4 px-8 rounded-full font-bold text-white text-lg transition-all shadow-xl relative overflow-hidden group ${!consentGiven ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'}`}
                             style={{
-                                background: consentGiven ? gradients.primary : '#ccc',
+                                background: consentGiven ? brandColor : '#ccc',
+                                boxShadow: consentGiven ? `0 10px 30px -10px ${brandColor}60` : undefined
                             }}
                             title={!consentGiven ? t.pleaseConsent : ''}
                         >
@@ -379,7 +382,7 @@ export default function InterviewChat({
                         </button>
 
                         <div className="mt-8 text-center text-xs text-gray-400 font-medium">
-                            <a href="/privacy" className="hover:text-amber-600 transition-colors">{t.privacy}</a>
+                            <a href="/privacy" className="hover:text-stone-900 transition-colors">{t.privacy}</a>
                             <span className="mx-2">•</span>
                             <span>{t.skip}</span>
                         </div>
@@ -398,13 +401,13 @@ export default function InterviewChat({
             }}
         >
             {/* Dynamic Background Elements */}
-            <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: 'radial-gradient(circle at 80% 90%, rgba(251,191,36,0.15) 0%, transparent 40%)' }} />
+            <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: `radial-gradient(circle at 80% 90%, ${brandColor}25 0%, transparent 40%)` }} />
 
             {/* Progress bar */}
             <div className="fixed top-0 left-0 right-0 h-1.5 bg-gray-100/50 z-50 backdrop-blur-sm">
                 <motion.div
                     className="h-full relative overflow-hidden"
-                    style={{ background: gradients.primary }}
+                    style={{ background: brandColor }}
                     initial={{ width: '0%' }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.5 }}
@@ -419,7 +422,7 @@ export default function InterviewChat({
                     {logoUrl ? (
                         <img src={logoUrl} alt={botName} className="h-6 w-6 object-contain" />
                     ) : (
-                        <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: brandColor }}>
                             <Icons.Chat size={14} />
                         </div>
                     )}
@@ -451,7 +454,7 @@ export default function InterviewChat({
                                     className="mb-8 ml-auto max-w-[85%]"
                                 >
                                     <div className="bg-white/40 backdrop-blur-md border border-white/60 p-4 rounded-2xl rounded-tr-sm shadow-sm text-right">
-                                        <div className="text-xs font-semibold text-amber-600 mb-1 uppercase tracking-wider">{t.yourAnswer}</div>
+                                        <div className="text-xs font-semibold mb-1 uppercase tracking-wider" style={{ color: brandColor }}>{t.yourAnswer}</div>
                                         <div className="text-gray-700 font-medium leading-relaxed">
                                             "{messages[messages.length - 2].content}"
                                         </div>
@@ -462,19 +465,19 @@ export default function InterviewChat({
                             {/* Bot Question Card */}
                             <div className="relative">
                                 {/* Decor */}
-                                <div className="absolute -left-12 top-0 text-amber-200 hidden md:block">
+                                <div className="absolute -left-12 top-0 hidden md:block" style={{ color: brandColor, opacity: 0.3 }}>
                                     <Icons.Chat size={32} />
                                 </div>
 
                                 <div className="space-y-6">
                                     {/* Question Index */}
-                                    <div className="flex items-center gap-2 text-amber-600 font-bold text-sm uppercase tracking-widest">
+                                    <div className="flex items-center gap-2 font-bold text-sm uppercase tracking-widest" style={{ color: brandColor }}>
                                         <span>{t.question} {totalQuestions}</span>
-                                        <div className="h-px bg-amber-200 w-12" />
+                                        <div className="h-px w-12" style={{ background: brandColor, opacity: 0.4 }} />
                                     </div>
 
                                     {/* Question Text */}
-                                    <div className="prose prose-lg max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:text-amber-600">
+                                    <div className="prose prose-lg max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold">
                                         <ReactMarkdown
                                             components={{
                                                 p: ({ children }) => {
@@ -493,7 +496,8 @@ export default function InterviewChat({
                                                         </p>
                                                     );
                                                 },
-                                                strong: ({ children }) => <span className="text-amber-600">{children}</span>
+                                                strong: ({ children }) => <span style={{ color: brandColor }}>{children}</span>,
+                                                a: ({ href, children }) => <a href={href} style={{ color: brandColor }}>{children}</a>
                                             }}
                                         >
                                             {currentQuestion.content}
@@ -511,8 +515,8 @@ export default function InterviewChat({
                             className="flex flex-col items-center gap-6 mt-12"
                         >
                             <div className="relative w-16 h-16">
-                                <div className="absolute inset-0 rounded-full border-4 border-amber-100"></div>
-                                <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-t-transparent animate-spin"></div>
+                                <div className="absolute inset-0 rounded-full border-4" style={{ borderColor: `${brandColor}20` }}></div>
+                                <div className="absolute inset-0 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: brandColor, borderTopColor: 'transparent' }}></div>
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <Icons.Logo size={24} />
                                 </div>
@@ -527,9 +531,11 @@ export default function InterviewChat({
             <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-12">
                 <div className="max-w-3xl mx-auto w-full relative">
                     <form onSubmit={handleSubmit} className="relative group">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-[20px] blur opacity-20 group-focus-within:opacity-40 transition-opacity duration-500" />
+                        <div className="absolute -inset-1 rounded-[20px] blur opacity-20 group-focus-within:opacity-40 transition-opacity duration-500"
+                            style={{ background: `linear-gradient(to right, ${brandColor}, ${brandColor}90)` }} />
 
-                        <div className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden transition-all ring-1 ring-black/5 group-focus-within:ring-amber-500/50">
+                        <div className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden transition-all ring-1 ring-black/5 group-focus-within:ring-2"
+                            style={{ '--tw-ring-color': `${brandColor}50` } as any}>
                             <textarea
                                 ref={inputRef}
                                 value={input}
@@ -551,8 +557,11 @@ export default function InterviewChat({
                                 <button
                                     type="submit"
                                     disabled={!input.trim() || isLoading}
-                                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95 hover:shadow-amber-500/25"
-                                    style={{ background: gradients.primary }}
+                                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95"
+                                    style={{
+                                        background: brandColor,
+                                        boxShadow: `0 4px 14px 0 ${brandColor}50`
+                                    }}
                                     aria-label="Send answer"
                                 >
                                     {isLoading ? (
@@ -568,7 +577,8 @@ export default function InterviewChat({
                     <div className="mt-4 flex items-center justify-between px-2 opacity-60 text-xs font-medium text-gray-500">
                         <span className="hidden md:inline-block">{t.pressEnter}</span>
                         <div className="flex items-center gap-1.5 ml-auto">
-                            <div className={`w-2 h-2 rounded-full ${isTyping ? 'bg-amber-500 animate-pulse' : 'bg-gray-300'}`} />
+                            <div className={`w-2 h-2 rounded-full ${isTyping ? 'animate-pulse' : 'bg-gray-300'}`}
+                                style={isTyping ? { background: primaryColor } : undefined} />
                             <span>{isTyping ? 'Typing...' : 'Ready'}</span>
                         </div>
                     </div>

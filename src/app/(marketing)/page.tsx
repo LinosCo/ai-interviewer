@@ -185,9 +185,9 @@ export default function LandingPage() {
                                     Inizia gratis <Icons.ArrowRight size={18} />
                                 </Button>
                             </Link>
-                            <Link href="/onboarding">
+                            <Link href="/onboarding/preview">
                                 <Button variant="secondary" size="lg">
-                                    <Icons.Play size={18} /> Guarda come funziona
+                                    <Icons.Play size={18} /> Prova la Demo
                                 </Button>
                             </Link>
                         </div>
@@ -293,10 +293,41 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            <OrangeTransition toOrange={true} height={300} />
+            <SoftWaveSeparator accentColor={colors.amber} height={200} id="sep3" />
+
+            {/* Use Cases Section */}
+            <section id="use-cases" style={{ position: 'relative', zIndex: 10, padding: '4rem 2rem 6rem' }}>
+                <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+                        <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: colors.amberDark, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(251,191,36,0.1)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Casi d'uso</span>
+                        <h2 style={{ fontSize: '3rem', fontWeight: 600, color: colors.text, marginBottom: '1.5rem' }}>Per chi è Business Tuner?</h2>
+                        <p style={{ fontSize: '1.125rem', color: colors.muted, maxWidth: '600px', margin: '0 auto' }}>
+                            La flessibilità dell'AI conversazionale si adatta a ogni esigenza di ricerca.
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
+                        {[
+                            { icon: Icons.Building, title: 'B2B & SaaS', desc: 'Capisci perché i clienti non rinnovano, valida nuove feature e analizza il churn con interviste profonde.', color: colors.amber },
+                            { icon: Icons.Cart, title: 'B2C & E-commerce', desc: 'Testa nuovi packaging, prezzi o campagne. Raccogli feedback "a caldo" dopo l\'acquisto.', color: colors.apricot },
+                            { icon: Icons.Users, title: 'HR & People', desc: 'Exit interview automatizzate, survey sul clima aziendale e feedback sui processi interni.', color: colors.peach }
+                        ].map((uc, i) => (
+                            <div key={i} style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.03)', transition: 'transform 0.3s ease' }}>
+                                <div style={{ width: '48px', height: '48px', background: `linear-gradient(135deg, ${uc.color}, ${colors.white})`, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', color: colors.text }}>
+                                    <uc.icon size={24} />
+                                </div>
+                                <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.75rem' }}>{uc.title}</h3>
+                                <p style={{ fontSize: '0.9375rem', color: colors.muted, lineHeight: 1.6 }}>{uc.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <OrangeTransition toOrange={true} height={200} />
 
             {/* Pricing Section */}
-            <section id="pricing" style={{ position: 'relative', zIndex: 10, background: '#F59E0B', padding: '3rem 2rem 4rem', overflow: 'hidden' }}>
+            <section id="pricing" style={{ position: 'relative', zIndex: 10, background: '#F59E0B', padding: '4rem 2rem 6rem', overflow: 'hidden' }}>
                 <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: `radial-gradient(ellipse 120% 60% at 50% -10%, rgba(255,255,255,0.4) 0%, transparent 50%), radial-gradient(ellipse 100% 40% at 50% 110%, rgba(255,255,255,0.2) 0%, transparent 40%)` }} />
 
                 <div style={{ maxWidth: '1100px', margin: '0 auto', position: 'relative', zIndex: 5 }}>
@@ -308,7 +339,7 @@ export default function LandingPage() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', alignItems: 'stretch' }}>
                         {/* Starter */}
-                        <div style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Starter</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per il professionista</p></div>
                             <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€39</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
                             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['3 interviste attive', '100 risposte/mese', 'Analytics completi', 'Export PDF'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
@@ -321,17 +352,17 @@ export default function LandingPage() {
 
                         {/* Professional */}
                         <div style={{ background: 'white', borderRadius: '28px', padding: '2.5rem 2rem', boxShadow: '0 30px 60px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', transform: 'scale(1.05)', position: 'relative', zIndex: 2 }}>
-                            <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: gradients.primary, padding: '0.375rem 1rem', borderRadius: '100px', fontSize: '0.6875rem', fontWeight: 700, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Più popolare</div>
+                            <div style={{ position: 'absolute', top: '-12px', left: '50%', transform: 'translateX(-50%)', background: '#78350F', padding: '0.375rem 1rem', borderRadius: '100px', fontSize: '0.6875rem', fontWeight: 700, color: 'white', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Più popolare</div>
                             <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>Pro</h3><p style={{ fontSize: '0.875rem', color: colors.muted, margin: 0 }}>Per la PMI</p></div>
                             <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: colors.text }}>€99</span><span style={{ fontSize: '1rem', color: colors.muted }}>/mese</span></div>
                             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['10 interviste attive', '300 risposte/mese', 'Knowledge Base AI', 'Logica condizionale', 'Trend & Confronti', 'Export CSV + Webhook'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: colors.text, fontSize: '0.9375rem' }}><div style={{ color: colors.amber }}><Icons.Check size={18} /></div>{f}</li>))}</ul>
                             <Link href="/register?plan=PRO" className="w-full">
-                                <Button fullWidth>Prova 14 giorni gratis →</Button>
+                                <Button fullWidth variant="primary" style={{ boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.4)' }}>Prova 14 giorni gratis →</Button>
                             </Link>
                         </div>
 
                         {/* Business */}
-                        <div style={{ background: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.3)', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(20px)', borderRadius: '28px', padding: '2.5rem 2rem', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ marginBottom: '2rem' }}><h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'white', marginBottom: '0.5rem' }}>Business</h3><p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.8)', margin: 0 }}>Per l'azienda strutturata</p></div>
                             <div style={{ marginBottom: '2rem' }}><span style={{ fontSize: '3rem', fontWeight: 700, color: 'white' }}>€249</span><span style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.8)' }}>/mese</span></div>
                             <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', flex: 1 }}>{['Interviste illimitate', '1.000 risposte/mese', 'White label completo', 'Dominio personalizzato', 'API REST + Zapier', 'Onboarding dedicato'].map((f, i) => (<li key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.875rem', color: 'white', fontSize: '0.9375rem' }}><Icons.Check size={18} />{f}</li>))}</ul>
@@ -345,7 +376,7 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            <OrangeTransition toOrange={false} height={300} />
+            <OrangeTransition toOrange={false} height={200} />
 
             {/* Testimonials */}
             <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem 4rem' }}>

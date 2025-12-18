@@ -2,15 +2,16 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles, CheckCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/business-tuner/Button';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 import { getTemplateBySlug } from '@/lib/templates';
 
 const loadingMessages = [
-    { text: 'Sto analizzando il tuo obiettivo...', icon: '🔍' },
-    { text: 'Definisco le domande giuste...', icon: '💡' },
-    { text: 'Applico le best practice di ricerca qualitativa...', icon: '📚' },
-    { text: 'Ottimizzo il flusso conversazionale...', icon: '✨' },
-    { text: 'Preparo la tua intervista...', icon: '🎯' },
+    { text: 'Sto analizzando il tuo obiettivo...', icon: <Icons.Search size={20} /> },
+    { text: 'Definisco le domande giuste...', icon: <Icons.BrainCircuit size={20} /> },
+    { text: 'Applico le best practice di ricerca qualitativa...', icon: <Icons.BookOpen size={20} /> },
+    { text: 'Ottimizzo il flusso conversazionale...', icon: <Icons.Sparkles size={20} /> },
+    { text: 'Preparo la tua intervista...', icon: <Icons.Target size={20} /> },
 ];
 
 function GenerateContent() {
@@ -79,62 +80,72 @@ function GenerateContent() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
+            <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6">
                 <div className="text-center space-y-6">
-                    <div className="text-6xl">😕</div>
+                    <div className="text-6xl text-amber-500">😕</div>
                     <h2 className="text-2xl font-bold text-white">Qualcosa è andato storto</h2>
-                    <p className="text-slate-300">{error}</p>
-                    <button
+                    <p className="text-stone-400">{error}</p>
+                    <Button
                         onClick={() => router.push('/onboarding')}
-                        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors"
+                        variant="primary"
                     >
                         Riprova
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-6">
-            <div className="max-w-md w-full text-center space-y-12">
+        <div className="min-h-screen bg-stone-950 flex items-center justify-center p-6 relative overflow-hidden">
+            {/* Ambient Background */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-amber-600/10 blur-[100px]" />
+                <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full bg-orange-600/10 blur-[100px]" />
+            </div>
+
+            <div className="max-w-md w-full text-center space-y-12 relative z-10">
                 {/* Animated Loader */}
                 <div className="relative">
-                    <div className="w-24 h-24 mx-auto bg-purple-500/20 rounded-full flex items-center justify-center">
-                        <Sparkles className="w-12 h-12 text-purple-400 animate-pulse" />
+                    <div className="w-24 h-24 mx-auto bg-amber-500/10 rounded-full flex items-center justify-center relative">
+                        <div className="absolute inset-0 border-t-2 border-amber-500/30 rounded-full animate-spin"></div>
+                        <Icons.Sparkles className="w-10 h-10 text-amber-500 animate-pulse" />
                     </div>
-                    <div className="absolute inset-0 border-4 border-transparent border-t-purple-500 rounded-full animate-spin"></div>
                 </div>
 
                 {/* Loading Messages */}
-                <div className="space-y-4">
+                <div className="space-y-6">
                     {loadingMessages.map((msg, index) => (
                         <div
                             key={index}
-                            className={`flex items-center gap-3 transition-all duration-500 ${index <= currentStep
+                            className={`flex items-center gap-4 transition-all duration-500 ${index <= currentStep
                                 ? 'opacity-100 translate-y-0'
                                 : 'opacity-0 translate-y-4'
                                 }`}
                         >
                             {index < currentStep ? (
-                                <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                                <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center border border-green-500/30">
+                                    <Icons.Check className="w-4 h-4 text-green-500" />
+                                </div>
                             ) : index === currentStep ? (
-                                <Loader2 className="w-5 h-5 text-purple-400 animate-spin flex-shrink-0" />
+                                <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/30 animate-pulse">
+                                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                                </div>
                             ) : (
-                                <div className="w-5 h-5 rounded-full border border-slate-600 flex-shrink-0" />
+                                <div className="w-8 h-8 rounded-full border border-stone-800 flex-shrink-0" />
                             )}
-                            <span className={`text-left ${index <= currentStep ? 'text-white' : 'text-slate-500'}`}>
-                                {msg.icon} {msg.text}
-                            </span>
+                            <div className={`text-left flex-1 ${index <= currentStep ? 'text-stone-200' : 'text-stone-600'}`}>
+                                <p className="font-medium text-sm">{msg.text}</p>
+                            </div>
                         </div>
                     ))}
                 </div>
 
                 {/* Goal Preview */}
                 {goal && (
-                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                        <p className="text-sm text-slate-400 mb-2">Il tuo obiettivo:</p>
-                        <p className="text-white">{goal}</p>
+                    <div className="p-6 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
+                        <p className="text-xs text-stone-500 mb-2 uppercase tracking-wide font-semibold">Il tuo obiettivo</p>
+                        <p className="text-white font-medium">{goal}</p>
                     </div>
                 )}
             </div>
@@ -144,9 +155,9 @@ function GenerateContent() {
 
 function LoadingFallback() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-            <div className="w-24 h-24 bg-purple-500/20 rounded-full flex items-center justify-center">
-                <Sparkles className="w-12 h-12 text-purple-400 animate-pulse" />
+        <div className="min-h-screen bg-stone-950 flex items-center justify-center">
+            <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center animate-pulse">
+                <Icons.Sparkles className="w-10 h-10 text-amber-500" />
             </div>
         </div>
     );

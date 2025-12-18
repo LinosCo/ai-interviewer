@@ -2,6 +2,7 @@
 
 import { Template } from '@/lib/templates';
 import { ArrowRight } from 'lucide-react';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 
 interface TemplateCardProps {
     template: Template;
@@ -10,13 +11,17 @@ interface TemplateCardProps {
 }
 
 export default function TemplateCard({ template, onClick, showDetails = false }: TemplateCardProps) {
+    const Icon = Icons[template.icon as keyof typeof Icons] || Icons.FileText;
+
     return (
         <button
             onClick={onClick}
             className="group w-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-purple-500/50 rounded-xl p-5 text-left transition-all"
         >
             <div className="flex items-start gap-4">
-                <span className="text-3xl flex-shrink-0">{template.icon}</span>
+                <div className="text-white bg-white/10 p-2 rounded-lg flex-shrink-0 group-hover:bg-purple-500/20 transition-colors">
+                    <Icon size={24} />
+                </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                         <h3 className="text-lg font-semibold text-white group-hover:text-purple-300 transition-colors">

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { templates, Template } from '@/lib/templates';
+import { TEMPLATES, Template } from '@/lib/templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
 import { colors, gradients } from '@/lib/design-system';
 import { Header } from '@/components/Header';
@@ -27,7 +27,7 @@ export default function OnboardingPage() {
     };
 
     const handleTemplateSelect = (template: Template) => {
-        const encoded = encodeURIComponent(template.slug);
+        const encoded = encodeURIComponent(template.id);
         router.push(`/onboarding/generate?template=${encoded}`);
     };
 
@@ -260,60 +260,71 @@ export default function OnboardingPage() {
                             </div>
 
                             <div style={{ display: 'grid', gap: '1rem' }}>
-                                {templates.map((template) => (
-                                    <button
-                                        key={template.id}
-                                        onClick={() => handleTemplateSelect(template)}
-                                        style={{
-                                            padding: '1.5rem',
-                                            background: 'rgba(255,255,255,0.8)',
-                                            backdropFilter: 'blur(20px)',
-                                            border: '1px solid rgba(245, 158, 11, 0.15)',
-                                            borderRadius: '20px',
-                                            textAlign: 'left',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.3s ease',
-                                            boxShadow: '0 4px 15px rgba(0,0,0,0.04)'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
-                                            e.currentTarget.style.borderColor = colors.amber;
-                                            e.currentTarget.style.transform = 'translateY(-2px)';
-                                            e.currentTarget.style.boxShadow = '0 8px 25px rgba(245, 158, 11, 0.15)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
-                                            e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.15)';
-                                            e.currentTarget.style.transform = 'translateY(0)';
-                                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.04)';
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'start', gap: '1rem' }}>
-                                            <span style={{ fontSize: '2.5rem' }}>{template.icon}</span>
-                                            <div style={{ flex: 1 }}>
-                                                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
-                                                    {template.name}
-                                                </h3>
-                                                <p style={{ color: colors.muted, fontSize: '0.9375rem', marginBottom: '0.75rem' }}>
-                                                    {template.description}
-                                                </p>
-                                                <span style={{
-                                                    display: 'inline-block',
-                                                    padding: '0.25rem 0.75rem',
-                                                    fontSize: '0.75rem',
+                                {TEMPLATES.map((template) => {
+                                    const Icon = Icons[template.icon as keyof typeof Icons] || Icons.FileText;
+                                    return (
+                                        <button
+                                            key={template.id}
+                                            onClick={() => handleTemplateSelect(template)}
+                                            style={{
+                                                padding: '1.5rem',
+                                                background: 'rgba(255,255,255,0.8)',
+                                                backdropFilter: 'blur(20px)',
+                                                border: '1px solid rgba(245, 158, 11, 0.15)',
+                                                borderRadius: '20px',
+                                                textAlign: 'left',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s ease',
+                                                boxShadow: '0 4px 15px rgba(0,0,0,0.04)'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = 'rgba(255,255,255,0.95)';
+                                                e.currentTarget.style.borderColor = colors.amber;
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                e.currentTarget.style.boxShadow = '0 8px 25px rgba(245, 158, 11, 0.15)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = 'rgba(255,255,255,0.8)';
+                                                e.currentTarget.style.borderColor = 'rgba(245, 158, 11, 0.15)';
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.04)';
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'start', gap: '1rem' }}>
+                                                <div style={{
+                                                    padding: '0.75rem',
                                                     background: 'rgba(245, 158, 11, 0.1)',
-                                                    borderRadius: '100px',
-                                                    color: colors.amberDark,
-                                                    fontWeight: 600,
-                                                    textTransform: 'capitalize'
+                                                    borderRadius: '12px',
+                                                    color: colors.amber,
+                                                    flexShrink: 0
                                                 }}>
-                                                    {template.category}
-                                                </span>
+                                                    <Icon size={24} />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '0.5rem' }}>
+                                                        {template.name}
+                                                    </h3>
+                                                    <p style={{ color: colors.muted, fontSize: '0.9375rem', marginBottom: '0.75rem' }}>
+                                                        {template.description}
+                                                    </p>
+                                                    <span style={{
+                                                        display: 'inline-block',
+                                                        padding: '0.25rem 0.75rem',
+                                                        fontSize: '0.75rem',
+                                                        background: 'rgba(245, 158, 11, 0.1)',
+                                                        borderRadius: '100px',
+                                                        color: colors.amberDark,
+                                                        fontWeight: 600,
+                                                        textTransform: 'capitalize'
+                                                    }}>
+                                                        {template.category}
+                                                    </span>
+                                                </div>
+                                                <ArrowRight style={{ width: '20px', height: '20px', color: colors.amber, flexShrink: 0 }} />
                                             </div>
-                                            <ArrowRight style={{ width: '20px', height: '20px', color: colors.amber, flexShrink: 0 }} />
-                                        </div>
-                                    </button>
-                                ))}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

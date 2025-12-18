@@ -44,15 +44,16 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
         }
     }, [messages.length]);
 
-    // Timer
+    // Timer for active tracking
     useEffect(() => {
-        const interval = setInterval(() => {
-            if (messages.length > 0) {
+        let interval: NodeJS.Timeout;
+        if ((isTyping || isLoading) && messages.length > 0) {
+            interval = setInterval(() => {
                 setEffectiveDuration(prev => prev + 1);
-            }
-        }, 1000);
+            }, 1000);
+        }
         return () => clearInterval(interval);
-    }, [messages.length]);
+    }, [isTyping, isLoading, messages.length]);
 
     // Auto-focus logic
     useEffect(() => {
@@ -90,10 +91,17 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
             if (!response.ok) throw new Error('Simulation failed');
 
             const data = await response.json();
+            const assistantText = data.content;
+
+            // Calculate Reading Time: ~225 words per minute
+            const wordCount = assistantText.split(/\s+/).length;
+            const readingTimeSeconds = Math.ceil((wordCount / 225) * 60);
+            setEffectiveDuration(prev => prev + readingTimeSeconds);
+
             const assistantMessage: Message = {
                 id: Date.now().toString(),
                 role: 'assistant',
-                content: data.content
+                content: assistantText
             };
 
             setMessages(prev => [...prev, assistantMessage]);
@@ -163,7 +171,12 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
             <div className="p-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex justify-between items-center shadow-sm z-10 relative">
                 <div className="flex items-center gap-3">
                     <div>
-                        <h3 className="font-semibold text-gray-900">{config.name || 'Anteprima Intervista'}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-gray-900">{config.name || 'Anteprima Intervista'}</h3>
+                            <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium text-xs">
+                                Modalità Simulatore
+                            </span>
+                        </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                             <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
                                 Topic {currentTopicIndex + 1}/{config.topics.length}
@@ -298,6 +311,19 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                     <div className="mt-3 flex items-center justify-between text-xs text-gray-400 font-medium px-2">
                         <span>Premi <strong>Invio</strong> per inviare</span>
                         <span>Domanda {totalQuestions}</span>
+                    </div>
+
+                    {/* Footer - Business Tuner Branding */}
+                    <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+                        <span>Powered by</span>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-4 h-4 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                                <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
+                                </svg>
+                            </div>
+                            <span className="font-semibold text-gray-600">Business Tuner</span>
+                        </div>
                     </div>
                 </div>
             </div>

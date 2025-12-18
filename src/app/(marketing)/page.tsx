@@ -44,34 +44,34 @@ export default function LandingPage() {
                 </defs>
 
                 <g mask={`url(#fadeMask${id})`}>
-                    {/* Line 1: Background Noise (Irregular) */}
+                    {/* Line 1: Background Noise (Chaotic, High Frequency) */}
                     <path
-                        d={`M0 ${height / 2} C 400 ${height * 0.3} 800 ${height * 0.7} 1440 ${height / 2} C 2000 ${height * 0.3} 2400 ${height * 0.6} 2880 ${height / 2}`}
-                        fill="none" stroke={accentColor} strokeWidth="1" opacity="0.3" strokeLinecap="round"
+                        d={`M0 ${height / 2} C 200 ${height * 0.25} 400 ${height * 0.75} 600 ${height * 0.35} C 800 ${height * 0.65} 1000 ${height * 0.3} 1200 ${height * 0.7} C 1400 ${height * 0.4} 1600 ${height * 0.6} 1800 ${height / 2} C 2000 ${height * 0.35} 2200 ${height * 0.65} 2400 ${height * 0.45} C 2600 ${height * 0.55} 2800 ${height * 0.4} 2880 ${height / 2}`}
+                        fill="none" stroke={accentColor} strokeWidth="0.8" opacity="0.25" strokeLinecap="round"
                     >
-                        <animate attributeName="d" dur="15s" repeatCount="indefinite" values={`
-                            M0 ${height / 2} C 400 ${height * 0.3} 800 ${height * 0.7} 1440 ${height / 2} C 2000 ${height * 0.3} 2400 ${height * 0.6} 2880 ${height / 2};
-                            M0 ${height / 2} C 400 ${height * 0.6} 800 ${height * 0.4} 1440 ${height / 2} C 2000 ${height * 0.7} 2400 ${height * 0.3} 2880 ${height / 2};
-                            M0 ${height / 2} C 400 ${height * 0.3} 800 ${height * 0.7} 1440 ${height / 2} C 2000 ${height * 0.3} 2400 ${height * 0.6} 2880 ${height / 2}
+                        <animate attributeName="d" dur="8s" repeatCount="indefinite" values={`
+                            M0 ${height / 2} C 200 ${height * 0.25} 400 ${height * 0.75} 600 ${height * 0.35} C 800 ${height * 0.65} 1000 ${height * 0.3} 1200 ${height * 0.7} C 1400 ${height * 0.4} 1600 ${height * 0.6} 1800 ${height / 2} C 2000 ${height * 0.35} 2200 ${height * 0.65} 2400 ${height * 0.45} C 2600 ${height * 0.55} 2800 ${height * 0.4} 2880 ${height / 2};
+                            M0 ${height / 2} C 200 ${height * 0.7} 400 ${height * 0.3} 600 ${height * 0.65} C 800 ${height * 0.35} 1000 ${height * 0.75} 1200 ${height * 0.25} C 1400 ${height * 0.6} 1600 ${height * 0.4} 1800 ${height / 2} C 2000 ${height * 0.7} 2200 ${height * 0.3} 2400 ${height * 0.6} C 2600 ${height * 0.4} 2800 ${height * 0.65} 2880 ${height / 2};
+                            M0 ${height / 2} C 200 ${height * 0.25} 400 ${height * 0.75} 600 ${height * 0.35} C 800 ${height * 0.65} 1000 ${height * 0.3} 1200 ${height * 0.7} C 1400 ${height * 0.4} 1600 ${height * 0.6} 1800 ${height / 2} C 2000 ${height * 0.35} 2200 ${height * 0.65} 2400 ${height * 0.45} C 2600 ${height * 0.55} 2800 ${height * 0.4} 2880 ${height / 2}
                         `} />
                     </path>
 
-                    {/* Line 2: Background Noise (Irregular, Offset) */}
+                    {/* Line 2: Background Noise (Chaotic, Offset, Different Frequency) */}
                     <path
-                        d={`M0 ${height / 2 + 30} C 300 ${height * 0.6} 900 ${height * 0.4} 1440 ${height / 2 + 30} C 1900 ${height * 0.7} 2500 ${height * 0.3} 2880 ${height / 2 + 30}`}
-                        fill="none" stroke={accentColor} strokeWidth="1" opacity="0.2" strokeLinecap="round"
+                        d={`M0 ${height / 2 + 20} C 150 ${height * 0.65} 350 ${height * 0.35} 550 ${height * 0.7} C 750 ${height * 0.3} 950 ${height * 0.6} 1150 ${height * 0.4} C 1350 ${height * 0.75} 1550 ${height * 0.25} 1750 ${height / 2 + 20} C 1950 ${height * 0.6} 2150 ${height * 0.4} 2350 ${height * 0.7} C 2550 ${height * 0.3} 2750 ${height * 0.55} 2880 ${height / 2 + 20}`}
+                        fill="none" stroke={accentColor} strokeWidth="0.8" opacity="0.18" strokeLinecap="round"
                     >
-                        <animate attributeName="d" dur="20s" repeatCount="indefinite" values={`
-                            M0 ${height / 2 + 30} C 300 ${height * 0.6} 900 ${height * 0.4} 1440 ${height / 2 + 30} C 1900 ${height * 0.7} 2500 ${height * 0.3} 2880 ${height / 2 + 30};
-                            M0 ${height / 2 + 30} C 300 ${height * 0.4} 900 ${height * 0.6} 1440 ${height / 2 + 30} C 1900 ${height * 0.3} 2500 ${height * 0.7} 2880 ${height / 2 + 30};
-                            M0 ${height / 2 + 30} C 300 ${height * 0.6} 900 ${height * 0.4} 1440 ${height / 2 + 30} C 1900 ${height * 0.7} 2500 ${height * 0.3} 2880 ${height / 2 + 30}
+                        <animate attributeName="d" dur="11s" repeatCount="indefinite" values={`
+                            M0 ${height / 2 + 20} C 150 ${height * 0.65} 350 ${height * 0.35} 550 ${height * 0.7} C 750 ${height * 0.3} 950 ${height * 0.6} 1150 ${height * 0.4} C 1350 ${height * 0.75} 1550 ${height * 0.25} 1750 ${height / 2 + 20} C 1950 ${height * 0.6} 2150 ${height * 0.4} 2350 ${height * 0.7} C 2550 ${height * 0.3} 2750 ${height * 0.55} 2880 ${height / 2 + 20};
+                            M0 ${height / 2 + 20} C 150 ${height * 0.3} 350 ${height * 0.7} 550 ${height * 0.25} C 750 ${height * 0.75} 950 ${height * 0.35} 1150 ${height * 0.65} C 1350 ${height * 0.3} 1550 ${height * 0.7} 1750 ${height / 2 + 20} C 1950 ${height * 0.35} 2150 ${height * 0.65} 2350 ${height * 0.3} C 2550 ${height * 0.7} 2750 ${height * 0.4} 2880 ${height / 2 + 20};
+                            M0 ${height / 2 + 20} C 150 ${height * 0.65} 350 ${height * 0.35} 550 ${height * 0.7} C 750 ${height * 0.3} 950 ${height * 0.6} 1150 ${height * 0.4} C 1350 ${height * 0.75} 1550 ${height * 0.25} 1750 ${height / 2 + 20} C 1950 ${height * 0.6} 2150 ${height * 0.4} 2350 ${height * 0.7} C 2550 ${height * 0.3} 2750 ${height * 0.55} 2880 ${height / 2 + 20}
                         `} />
                     </path>
 
-                    {/* Line 3: Harmonization (Thicker, Rhythmic) */}
+                    {/* Line 3: Harmonization (Thicker, Smooth, Rhythmic) */}
                     <path
                         d={`M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2}`}
-                        fill="none" stroke={accentColor} strokeWidth="3" opacity="0.8" strokeLinecap="round"
+                        fill="none" stroke={accentColor} strokeWidth="3.5" opacity="0.85" strokeLinecap="round"
                     >
                         <animate attributeName="d" dur="10s" repeatCount="indefinite" values={`
                              M0 ${height / 2} Q 360 ${height * 0.35} 720 ${height / 2} T 1440 ${height / 2} T 2160 ${height / 2} T 2880 ${height / 2};
@@ -187,16 +187,22 @@ export default function LandingPage() {
                             </Link>
                             <Link href="/onboarding/preview">
                                 <Button variant="secondary" size="lg">
-                                    <Icons.Play size={18} /> Prova la Demo
+                                    <Icons.Play size={18} /> Guarda come funziona (2 min)
                                 </Button>
                             </Link>
                         </div>
 
-                        {/* Trust Badges */}
+                        {/* Use Case Pills */}
                         <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
-                            {[{ icon: Icons.Building, label: 'B2B' }, { icon: Icons.Cart, label: 'B2C' }, { icon: Icons.Users, label: 'HR' }, { icon: Icons.Settings, label: 'Ops' }].map((uc, i) => (
-                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '100px', color: colors.subtle, fontSize: '0.8125rem', fontWeight: 500 }}>
-                                    <uc.icon size={16} /> {uc.label}
+                            {[
+                                { label: 'Customer Feedback' },
+                                { label: 'Exit Interview' },
+                                { label: 'Clima Aziendale' },
+                                { label: 'NPS Qualitativo' },
+                                { label: 'Win/Loss Analysis' }
+                            ].map((uc, i) => (
+                                <div key={i} style={{ padding: '0.5rem 1rem', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', border: '1px solid rgba(0,0,0,0.05)', borderRadius: '100px', color: colors.subtle, fontSize: '0.8125rem', fontWeight: 500 }}>
+                                    {uc.label}
                                 </div>
                             ))}
                         </div>
@@ -306,11 +312,12 @@ export default function LandingPage() {
                         </p>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
                         {[
                             { icon: Icons.Building, title: 'B2B & SaaS', desc: 'Capisci perché i clienti non rinnovano, valida nuove feature e analizza il churn con interviste profonde.', color: colors.amber },
                             { icon: Icons.Cart, title: 'B2C & E-commerce', desc: 'Testa nuovi packaging, prezzi o campagne. Raccogli feedback "a caldo" dopo l\'acquisto.', color: colors.apricot },
-                            { icon: Icons.Users, title: 'HR & People', desc: 'Exit interview automatizzate, survey sul clima aziendale e feedback sui processi interni.', color: colors.peach }
+                            { icon: Icons.Users, title: 'HR & People', desc: 'Exit interview automatizzate, survey sul clima aziendale e feedback sui processi interni.', color: colors.peach },
+                            { icon: Icons.Settings, title: 'Operations', desc: 'Feedback fornitori, audit interni, raccolta segnalazioni.', color: colors.lavender }
                         ].map((uc, i) => (
                             <div key={i} style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.08)', border: '1px solid rgba(0,0,0,0.03)', transition: 'transform 0.3s ease' }}>
                                 <div style={{ width: '48px', height: '48px', background: `linear-gradient(135deg, ${uc.color}, ${colors.white})`, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem', color: colors.text }}>
@@ -318,6 +325,32 @@ export default function LandingPage() {
                                 </div>
                                 <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: colors.text, marginBottom: '0.75rem' }}>{uc.title}</h3>
                                 <p style={{ fontSize: '0.9375rem', color: colors.muted, lineHeight: 1.6 }}>{uc.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <SoftWaveSeparator accentColor={colors.amber} height={200} id="sep4" />
+
+            {/* Why it Works Section */}
+            <section id="why-it-works" style={{ position: 'relative', zIndex: 10, padding: '4rem 2rem 6rem' }}>
+                <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '4rem' }}>
+                        <span style={{ display: 'inline-block', fontSize: '0.75rem', fontWeight: 600, color: colors.amberDark, textTransform: 'uppercase', letterSpacing: '0.1em', background: 'rgba(251,191,36,0.1)', padding: '0.5rem 1rem', borderRadius: '100px', marginBottom: '1.5rem' }}>Perché funziona</span>
+                        <h2 style={{ fontSize: '3rem', fontWeight: 600, color: colors.text, marginBottom: '1.5rem' }}>Perché funziona meglio di un form</h2>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2rem' }}>
+                        {[
+                            { title: 'Conversazione, non caselle', desc: 'Le persone rispondono meglio a domande che si adattano a quello che dicono.' },
+                            { title: '70% di completamento', desc: 'I form si abbandonano. Le conversazioni si finiscono.' },
+                            { title: 'Pronto in 10 minuti', desc: 'Niente settimane di progettazione. Descrivi l\'obiettivo, il resto lo fa l\'AI.' },
+                            { title: '1/10 del costo', desc: 'Niente consulenti, niente software enterprise. Solo risposte.' }
+                        ].map((item, i) => (
+                            <div key={i} style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(15px)', borderRadius: '24px', padding: '2rem 1.5rem', boxShadow: '0 15px 40px rgba(0,0,0,0.04)', border: '1px solid rgba(255,255,255,0.8)' }}>
+                                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: colors.text, marginBottom: '0.75rem' }}>{item.title}</h3>
+                                <p style={{ fontSize: '0.9375rem', color: colors.muted, lineHeight: 1.6, margin: 0 }}>{item.desc}</p>
                             </div>
                         ))}
                     </div>
@@ -377,6 +410,25 @@ export default function LandingPage() {
             </section>
 
             <OrangeTransition toOrange={false} height={200} />
+
+            {/* Final CTA Section */}
+            <section id="final-cta" style={{ position: 'relative', zIndex: 10, padding: '6rem 2rem', textAlign: 'center' }}>
+                <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                    <h2 style={{ fontSize: '3.5rem', fontWeight: 600, color: colors.text, letterSpacing: '-0.02em', marginBottom: '1.5rem' }}>
+                        Inizia ad ascoltare. <span style={{ background: gradients.brand, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>È gratis.</span>
+                    </h2>
+                    <p style={{ fontSize: '1.25rem', color: colors.muted, marginBottom: '3rem', lineHeight: 1.7 }}>
+                        Crea la tua prima intervista in 10 minuti. Nessuna carta di credito richiesta.
+                    </p>
+                    <Link href="/register">
+                        <Button size="lg" withShimmer style={{ fontSize: '1.125rem', padding: '1.25rem 3rem' }}>
+                            Inizia ora <Icons.ArrowRight size={20} />
+                        </Button>
+                    </Link>
+                </div>
+            </section>
+
+            <SoftChartSeparator color={colors.amber} height={280} id="sep5" />
 
             {/* Testimonials */}
             <section style={{ position: 'relative', zIndex: 10, padding: '3rem 2rem 4rem' }}>

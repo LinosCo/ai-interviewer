@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { isFeatureEnabled } from '@/lib/usage'
 
 const BotSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -217,6 +218,16 @@ export async function updateBotAction(botId: string, formData: FormData) {
     // If changed to empty, it sends empty string.
     // We should probably convert empty string to null.
 
+    // Feature Gating
+    const bot = await prisma.bot.findUnique({ where: { id: botId }, include: { project: true } });
+    if (bot?.project?.organizationId) {
+        const canBrand = await isFeatureEnabled(bot.project.organizationId, 'customBranding');
+        if (!canBrand && (data.logoUrl || data.primaryColor || data.backgroundColor || data.textColor)) {
+            // Revert branding to default or ignore? Throwing is better for UX to trigger upgrade
+            throw new Error("Branding personalizzato disponibile solo nei piani PRO e superiori.");
+        }
+    }
+
     if (data.openaiApiKey === '') data.openaiApiKey = null as any;
     if (data.anthropicApiKey === '') data.anthropicApiKey = null as any;
     if (data.logoUrl === '') data.logoUrl = null;
@@ -271,7 +282,7 @@ export async function generateBotConfigAction(prompt: string) {
         
         Using the following INTERVIEW METHODOLOGY as your strict guide:
         ${methodology.substring(0, 2000)}...
-
+ 
         Design an interview guide based on this concept: "${prompt}".
         
         Create a structure that applies these principles:
@@ -300,14 +311,23 @@ export async function generateBotAnalyticsAction(botId: string) {
                 where: { status: 'COMPLETED' }, // Only analyze completed ones? Or all with analysis? 
                 include: { analysis: true }
             },
-            topics: { orderBy: { orderIndex: 'asc' } }
+            topics: { orderBy: { orderIndex: 'asc' } },
+            project: true
         }
     });
 
     if (!bot || bot.conversations.length === 0) return;
 
+    // Feature Gating
+    if (bot.project?.organizationId) {
+        const canAnalyze = await isFeatureEnabled(bot.project.organizationId, 'advancedAnalytics');
+        if (!canAnalyze) {
+            throw new Error("Analytics avanzate disponibili solo nei piani PRO e superiori.");
+        }
+    }
+
     // Filter only conversations that HAVE analysis
-    const analyzedConversations = bot.conversations.filter(c => c.analysis);
+    const analyzedConversations = bot.conversations.filter((c: any) => c.analysis);
 
     if (analyzedConversations.length === 0) {
         // Fallback? Or maybe trigger analysis for old ones?
@@ -322,7 +342,7 @@ export async function generateBotAnalyticsAction(botId: string) {
 
     // Prepare Aggregated Input for Global LLM
     // Instead of raw text, we send Summaries and Key Quotes from each convo.
-    const aggregatedInput = analyzedConversations.map(c => {
+    const aggregatedInput = analyzedConversations.map((c: any) => {
         const a = c.analysis!; // Verified by filter
         // Extract metadata summary if available, or just use quotes
         const summary = (a.metadata as any)?.summary || "No summary available.";
@@ -433,7 +453,7 @@ export async function generateBotAnalyticsAction(botId: string) {
     // Create Topic Analysis (Update keywords)
     if (data.topicAnalysis) {
         for (const topicData of data.topicAnalysis) {
-            const topic = bot.topics.find(t => t.label === topicData.topicLabel);
+            const topic = bot.topics.find((t: any) => t.label === topicData.topicLabel);
             if (topic) {
                 await prisma.topicBlock.update({
                     where: { id: topic.id },
@@ -709,7 +729,7 @@ export async function generateConversationInsightAction(conversationId: string) 
     const openai = createOpenAI({ apiKey });
 
     // 3. Prepare Transcript
-    const transcript = conversation.messages.map(m => `${m.role}: "${m.content}"`).join("\n");
+    const transcript = conversation.messages.map((m: any) => `${m.role}: "${m.content}"`).join("\n");
 
     // 4. Analyze
     const schema = z.object({

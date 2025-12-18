@@ -58,7 +58,7 @@ export async function canPublishBot(organizationId: string): Promise<{ allowed: 
 }
 
 // Check if an interview can be completed (usage limit)
-export async function canCompleteInterview(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
+export async function canStartInterview(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);
 
     // Unlimited for Enterprise
@@ -69,7 +69,7 @@ export async function canCompleteInterview(organizationId: string): Promise<{ al
     if (subscription.interviewsUsedThisMonth >= subscription.maxInterviewsPerMonth) {
         return {
             allowed: false,
-            reason: `Hai raggiunto il limite di ${subscription.maxInterviewsPerMonth} risposte per questo mese. Effettua l'upgrade per continuare.`
+            reason: `Hai raggiunto il limite di ${subscription.maxInterviewsPerMonth} interviste per questo mese. Effettua l'upgrade per continuare.`
         };
     }
 
@@ -78,6 +78,14 @@ export async function canCompleteInterview(organizationId: string): Promise<{ al
 
 // Record an interview completion
 export async function recordInterviewCompleted(organizationId: string, conversationId: string) {
+    // Check if already completed to avoid double counting
+    const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { status: true }
+    });
+
+    if (conversation?.status === 'COMPLETED') return;
+
     await prisma.$transaction([
         prisma.subscription.update({
             where: { organizationId },
@@ -89,8 +97,69 @@ export async function recordInterviewCompleted(organizationId: string, conversat
                 eventType: 'INTERVIEW_COMPLETED',
                 resourceId: conversationId
             }
+        }),
+        prisma.conversation.update({
+            where: { id: conversationId },
+            data: {
+                status: 'COMPLETED',
+                completedAt: new Date()
+            }
         })
     ]);
+}
+
+// Robust completion helper
+export async function markInterviewAsCompleted(conversationId: string) {
+    const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { bot: { include: { project: true } } }
+    });
+
+    if (!conversation || conversation.status === 'COMPLETED') return;
+
+    const organizationId = conversation.bot.project.organizationId;
+    if (organizationId) {
+        await recordInterviewCompleted(organizationId, conversationId);
+
+        // Trigger Analysis if not already done
+        try {
+            const { generateConversationInsightAction } = require('@/app/actions');
+            await generateConversationInsightAction(conversationId);
+        } catch (e) {
+            console.error("Auto-analysis failed during completion", e);
+        }
+    }
+}
+
+// Check if an interview should be concluded based on limits
+export async function checkInterviewStatus(conversationId: string): Promise<{ shouldConclude: boolean; reason?: 'TIME' | 'TURNS' }> {
+    const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+            bot: true,
+            messages: { where: { role: 'assistant' } }
+        }
+    });
+
+    if (!conversation) return { shouldConclude: false };
+    if (conversation.status === 'COMPLETED') return { shouldConclude: true };
+
+    const { bot, effectiveDuration, messages } = conversation;
+
+    // 1. Time Limit (Effective Duration)
+    const maxDurationSeconds = (bot.maxDurationMins || 10) * 60;
+    if (effectiveDuration && effectiveDuration >= maxDurationSeconds) {
+        return { shouldConclude: true, reason: 'TIME' };
+    }
+
+    // 2. Turn Limit (Fair Usage)
+    // Use hidden limits or a safe default
+    const maxTurns = 20; // Default fair usage
+    if (messages.length >= maxTurns) {
+        return { shouldConclude: true, reason: 'TURNS' };
+    }
+
+    return { shouldConclude: false };
 }
 
 // Record bot publish event
@@ -186,4 +255,16 @@ export async function upgradeSubscription(
             })
         }
     });
+}
+// Check if a specific feature is enabled for an organization
+export async function isFeatureEnabled(organizationId: string, featureKey: string): Promise<boolean> {
+    const subscription = await getOrCreateSubscription(organizationId);
+
+    // Enterprise/Business has everything
+    if (subscription.tier === 'BUSINESS' || subscription.tier === 'ENTERPRISE') return true;
+
+    const plans = await getPricingPlans();
+    const planFeatures = (plans[subscription.tier as PlanKey] as any)?.features || {};
+
+    return !!planFeatures[featureKey];
 }

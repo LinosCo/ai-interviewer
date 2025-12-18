@@ -49,6 +49,12 @@ const SectionLabel = ({ text, color = colors.amberDark, bg = 'rgba(251,191,36,0.
 export default function LandingPage() {
     const [mounted, setMounted] = useState(false);
     const [scrollY, setScrollY] = useState(0);
+    const [typewriterText, setTypewriterText] = useState('');
+    const [typewriterIndex, setTypewriterIndex] = useState(0);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const words = ["il mercato", "la filiera", "i reparti", "i dipendenti", "gli stakeholder"];
+    const speed = isDeleting ? 50 : 150;
 
     useEffect(() => {
         setMounted(true);
@@ -56,6 +62,27 @@ export default function LandingPage() {
         window.addEventListener('scroll', handleScroll, { passive: true });
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    useEffect(() => {
+        const handleTyping = () => {
+            const currentWord = words[typewriterIndex % words.length];
+            if (!isDeleting) {
+                setTypewriterText(currentWord.substring(0, typewriterText.length + 1));
+                if (typewriterText === currentWord) {
+                    setTimeout(() => setIsDeleting(true), 1500);
+                }
+            } else {
+                setTypewriterText(currentWord.substring(0, typewriterText.length - 1));
+                if (typewriterText === '') {
+                    setIsDeleting(false);
+                    setTypewriterIndex(typewriterIndex + 1);
+                }
+            }
+        };
+
+        const timer = setTimeout(handleTyping, speed);
+        return () => clearTimeout(timer);
+    }, [typewriterText, isDeleting, typewriterIndex]);
 
     return (
         <div className="min-h-screen font-sans bg-white overflow-x-hidden">
@@ -94,15 +121,16 @@ export default function LandingPage() {
                                 </span>
                             </div>
 
-                            <h1 className="text-5xl lg:text-7xl font-bold text-stone-900 tracking-tight leading-[1.1] mb-8">
-                                Ascolta il mercato.<br />
-                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600">
-                                    Decidi meglio.
+                            <h1 className="text-5xl lg:text-7xl font-bold text-stone-900 tracking-tight leading-[1.1] mb-8 min-h-[160px]">
+                                Ascolta <br />
+                                <span className="text-amber-600 inline-block min-w-[300px]">
+                                    {typewriterText}
+                                    <span className="animate-pulse">|</span>
                                 </span>
                             </h1>
 
                             <p className="text-xl text-stone-600 leading-relaxed mb-10 max-w-lg">
-                                Crea interviste intelligenti in 10 minuti. Raccogli feedback profondi da clienti, dipendenti e partner, scalando la ricerca qualitativa.
+                                Raccogli feedback dai tuoi stakeholder con conversazioni guidate dall'AI. Più profondo di un form. Più scalabile di un'intervista.
                             </p>
 
                             <div className="flex flex-col sm:flex-row gap-4 mb-12">
@@ -301,6 +329,209 @@ export default function LandingPage() {
                 <WaveSeparator color="#F59E0B" height={60} />
             </section>
 
+            {/* --- DASHBOARD & ANALYTICS PREVIEW (Amber-50) --- */}
+            <section className="relative z-10 bg-amber-50 py-24 lg:py-32 overflow-hidden">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="text-center max-w-3xl mx-auto mb-20">
+                        <SectionLabel text="Potenza Lab" />
+                        <h2 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-6 tracking-tight">
+                            Una dashboard per <span className="text-amber-600">tutto il team</span>
+                        </h2>
+                        <p className="text-xl text-stone-600">
+                            Gestisci i tuoi bot, analizza i risultati in tempo reale e trasforma i dati in decisioni.
+                        </p>
+                    </div>
+
+                    <div className="space-y-32">
+                        {/* Dashboard Feature */}
+                        <div className="grid lg:grid-cols-2 gap-16 items-center">
+                            <div className="order-2 lg:order-1">
+                                <div className="bg-white rounded-3xl p-4 shadow-2xl border border-amber-100 transform -rotate-2">
+                                    <div className="bg-stone-50 rounded-2xl overflow-hidden border border-stone-100 aspect-[16/10] relative">
+                                        {/* Mockup Dashboard Content */}
+                                        <div className="p-6 bg-white border-b border-stone-100 flex items-center justify-between">
+                                            <div className="flex gap-4">
+                                                <div className="w-3 h-3 rounded-full bg-red-400" />
+                                                <div className="w-3 h-3 rounded-full bg-amber-400" />
+                                                <div className="w-3 h-3 rounded-full bg-green-400" />
+                                            </div>
+                                            <div className="h-6 w-40 bg-stone-100 rounded-full" />
+                                        </div>
+                                        <div className="p-8 grid grid-cols-2 gap-6">
+                                            <div className="space-y-6">
+                                                <div className="h-32 bg-amber-50 rounded-2xl border border-amber-100 p-6 flex flex-col justify-end">
+                                                    <div className="text-amber-800 font-bold text-2xl">42</div>
+                                                    <div className="text-amber-600 text-sm">Interviste Attive</div>
+                                                </div>
+                                                <div className="h-32 bg-stone-100 rounded-2xl p-6" />
+                                            </div>
+                                            <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
+                                                <div className="h-4 w-1/2 bg-stone-100 rounded mb-4" />
+                                                <div className="space-y-3">
+                                                    {[1, 2, 3, 4].map(i => (
+                                                        <div key={i} className="h-3 bg-stone-50 rounded" />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="order-1 lg:order-2">
+                                <h3 className="text-3xl font-bold text-stone-900 mb-6">Centralizza la tua ricerca</h3>
+                                <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                    Crea progetti dedicati per diversi reparti o obiettivi. Invita i colleghi, monitora i progressi e gestisci la libreria dei tuoi bot da un unico posto.
+                                </p>
+                                <ul className="space-y-4">
+                                    {[
+                                        'Gestione progetti granulare',
+                                        'Accesso multi-utente',
+                                        'Template personalizzati',
+                                        'Webhook & Integrazioni'
+                                    ].map((item, i) => (
+                                        <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
+                                            <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center">
+                                                <Icons.Check size={14} />
+                                            </div>
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* Analytics Feature */}
+                        <div className="grid lg:grid-cols-2 gap-16 items-center">
+                            <div>
+                                <h3 className="text-3xl font-bold text-stone-900 mb-6">Insight azionabili, non rumore</h3>
+                                <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                    Non perdere tempo a leggere centinaia di trascrizioni. La nostra AI identifica automaticamente i temi ricorrenti, estrae le citazioni più significative e calcola il sentiment.
+                                </p>
+                                <ul className="space-y-4">
+                                    {[
+                                        'Analisi Tematica Automatica',
+                                        'Sentiment Analysis evoluta',
+                                        'Citazioni Chiave evidenziate',
+                                        'Report generati cliccando un tasto'
+                                    ].map((item, i) => (
+                                        <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
+                                            <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center">
+                                                <Icons.Check size={14} />
+                                            </div>
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div>
+                                <div className="bg-white rounded-3xl p-4 shadow-2xl border border-amber-100 transform rotate-2">
+                                    <div className="bg-stone-50 rounded-2xl overflow-hidden border border-stone-100 p-8 aspect-[16/10] relative">
+                                        <div className="flex justify-between items-end h-full gap-4">
+                                            {[40, 70, 45, 90, 65, 80, 55].map((h, i) => (
+                                                <div key={i} className="w-full bg-amber-200 rounded-t-lg transition-all duration-1000" style={{ height: `${h}%` }} />
+                                            ))}
+                                        </div>
+                                        <div className="absolute top-8 left-8 right-8">
+                                            <div className="flex items-center gap-3 mb-6">
+                                                <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white">
+                                                    <Icons.Zap size={20} />
+                                                </div>
+                                                <div className="font-bold text-stone-800">Insight Extraction</div>
+                                            </div>
+                                            <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-100">
+                                                <div className="text-xs text-amber-600 font-black uppercase mb-1">Punto Critico</div>
+                                                <div className="text-sm text-stone-800 italic">"Il processo di checkout richiede troppi passaggi inutili."</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* --- POSITIONING DETAILS (White) --- */}
+            <section className="relative z-10 bg-white py-24 lg:py-32">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="grid md:grid-cols-2 gap-16">
+                        {/* Per chi è */}
+                        <div className="space-y-12">
+                            <div>
+                                <h2 className="text-4xl font-bold text-stone-900 mb-8 tracking-tight">Perfetto quando...</h2>
+                                <div className="space-y-8">
+                                    {[
+                                        { title: 'Hai bisogno di capire il "perché"', desc: 'I numeri dicono cosa succede, non perché. Business Tuner raccoglie le motivazioni, le frustrazioni e i suggerimenti.' },
+                                        { title: 'I form non bastano più', desc: 'Le risposte a crocette non ti danno abbastanza profondità. Ma non hai budget per interviste uno-a-uno.' },
+                                        { title: 'Vuoi scalare senza perdere qualità', desc: 'Devi parlare con 50, 100 o 500 persone. Impossibile farlo manualmente, deprimente farlo con un form standard.' }
+                                    ].map((item, i) => (
+                                        <div key={i}>
+                                            <h4 className="text-xl font-bold text-stone-900 mb-2">{item.title}</h4>
+                                            <p className="text-stone-600 leading-relaxed text-lg">{item.desc}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Cosa non è */}
+                        <div className="bg-stone-50 rounded-[3rem] p-12 lg:p-16 border border-stone-100">
+                            <h2 className="text-4xl font-bold text-stone-900 mb-8 tracking-tight">Trasparenza prima di tutto</h2>
+                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                Business Tuner è uno strumento potente, ma non sostituisce tutto. Ecco cosa <strong>non</strong> può fare:
+                            </p>
+                            <div className="space-y-8">
+                                {[
+                                    { title: 'Non sostituisce interviste professionali', desc: 'Per ricerche che richiedono sensibilità culturale o approfondimenti etnografici complessi, serve un ricercatore qualificato.' },
+                                    { title: 'Non produce campioni statistici', desc: 'I risultati sono qualitativi. Se cerchi significatività statistica decimale, usa strumenti quantitativi.' },
+                                    { title: 'Non legge la mente', desc: 'L\'AI fa domande intelligenti, ma la qualità degli insight dipende da chi riceve l\'intervista.' }
+                                ].map((item, i) => (
+                                    <div key={i} className="flex gap-4">
+                                        <div className="mt-1"><Icons.X size={20} className="text-red-500" /></div>
+                                        <div>
+                                            <h4 className="text-lg font-bold text-stone-900 mb-1">{item.title}</h4>
+                                            <p className="text-stone-600 text-sm">{item.desc}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* --- FAQ SECTION (Amber-50) --- */}
+            <section className="relative z-10 bg-amber-50 py-24 lg:py-32">
+                <div className="container mx-auto px-6 max-w-4xl">
+                    <div className="text-center mb-16">
+                        <SectionLabel text="Domande Frequenti" />
+                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight">Hai dubbi? Abbiamo risposte.</h2>
+                    </div>
+
+                    <div className="space-y-6">
+                        {[
+                            { q: "Cos'è esattamente il feedback conversazionale?", a: "È un approccio ibrido che usa l'AI per condurre interviste strutturate ma flessibili. L'AI capisce la risposta dell'utente e, se necessario, pone domande di approfondimento per chiarire i concetti." },
+                            { q: "Qual è la differenza rispetto a un Typeform o Google Form?", a: "In un form le domande sono fisse. Con Business Tuner, se un utente dice 'Il prodotto è difficile da usare', l'AI chiederà 'In quale parte specifica hai trovato difficoltà?'. Questo permette di raccogliere dettagli che andrebbero persi." },
+                            { q: "Posso esportare i dati?", a: "Certamente. Puoi esportare le trascrizioni complete, i temi estratti in CSV o generare un report PDF pronto da presentare agli stakeholder." },
+                            { q: "L'AI è sicura e rispetta la privacy?", a: "Sì. Implementiamo livelli di anonimizzazione configurabili e i dati vengono utilizzati esclusivamente per generare i tuoi report. Non vendiamo dati a terzi." },
+                            { q: "Quanto tempo serve per creare un bot?", a: "Meno di 10 minuti. Puoi descrivere il tuo obiettivo in linguaggio naturale e l'AI genererà per te l'intero flusso di domande e argomenti." }
+                        ].map((faq, i) => (
+                            <details key={i} className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm">
+                                <summary className="flex items-center justify-between p-6 cursor-pointer list-none">
+                                    <h4 className="font-bold text-stone-900 pr-4">{faq.q}</h4>
+                                    <Icons.ArrowRight size={20} className="text-amber-500 transform group-open:rotate-90 transition-transform duration-300" />
+                                </summary>
+                                <div className="px-6 pb-6 text-stone-600 leading-relaxed border-t border-stone-50 pt-4">
+                                    {faq.a}
+                                </div>
+                            </details>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <WaveSeparator color="#F59E0B" height={60} />
+
             {/* --- PRICING (Bold Amber) --- */}
             <section id="pricing" className="relative z-10 bg-[#F59E0B] py-24 lg:py-32 text-white overflow-hidden">
                 {/* Background Pattern */}
@@ -422,6 +653,6 @@ export default function LandingPage() {
                 </div>
             </section>
 
-        </div>
+        </div >
     );
 }

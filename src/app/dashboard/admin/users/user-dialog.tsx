@@ -175,7 +175,7 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                            className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                         >
                             {isLoading ? 'Saving...' : 'Save User'}
                         </button>

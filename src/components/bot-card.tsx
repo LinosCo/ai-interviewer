@@ -33,7 +33,7 @@ export default function BotCard({ bot, canDelete }: BotCardProps) {
     }
 
     return (
-        <Link href={`/dashboard/bots/${bot.id}`} className="block border p-4 rounded hover:border-blue-500 hover:shadow-md transition bg-white relative group">
+        <Link href={`/dashboard/bots/${bot.id}`} className="block border p-4 rounded hover:border-amber-500 hover:shadow-md transition bg-white relative group">
             <div className="flex justify-between items-start">
                 <div>
                     <div className="font-medium text-gray-800">{bot.name}</div>

@@ -10,6 +10,7 @@ import RefineInput from '@/components/RefineInput';
 type BotWithRelations = Bot & {
     topics: TopicBlock[];
     knowledgeSources: KnowledgeSource[];
+    useWarmup?: boolean;
 };
 
 export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
@@ -179,6 +180,19 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                     <div>
                         <label className="block text-sm font-medium mb-1">Max Duration (Minutes)</label>
                         <input type="number" name="maxDurationMins" defaultValue={bot.maxDurationMins} className="w-full border p-2 rounded" />
+                    </div>
+                    <div className="flex items-center gap-3 pt-6">
+                        <input
+                            type="checkbox"
+                            name="useWarmup"
+                            id="useWarmup"
+                            defaultChecked={bot.useWarmup ?? true}
+                            className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <div>
+                            <label htmlFor="useWarmup" className="block text-sm font-medium text-gray-700">Abilita "Let's warm up"</label>
+                            <p className="text-xs text-gray-500">Se disabilitato, l'intervista passerà direttamente alle domande principali dopo l'introduzione.</p>
+                        </div>
                     </div>
                 </div>
             </section>

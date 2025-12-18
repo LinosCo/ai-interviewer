@@ -57,7 +57,7 @@ Business Tuner è un sistema di raccolta feedback che usa l'intelligenza artific
 ### Hero Section
 
 ```markdown
-# Ascolta davvero. A scala.
+# Ascolta (parole che si compongono con type effect "il mercato", "la filiera", "la rete commerciale", "i reparti", "i dipendenti", "gli stakeholder" )
 
 Raccogli feedback dai tuoi stakeholder con conversazioni guidate dall'AI.
 Più profondo di un form. Più scalabile di un'intervista.

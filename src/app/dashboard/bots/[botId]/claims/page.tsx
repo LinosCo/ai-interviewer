@@ -37,7 +37,7 @@ export default async function ClaimsPage({ params }: { params: Promise<{ botId: 
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Gift className="w-6 h-6 text-purple-600" />
+                        <Gift className="w-6 h-6 text-amber-600" />
                         Reward Claims: {bot.name}
                     </h1>
                     <p className="text-sm text-gray-500">
@@ -78,10 +78,10 @@ export default async function ClaimsPage({ params }: { params: Promise<{ botId: 
                                         <div className="font-medium">{claim.userName}</div>
                                         <div className="text-gray-500 text-xs">{claim.userEmail}</div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-purple-600">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-amber-600">
                                         {claim.code || 'N/A'}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:underline">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-amber-600 hover:underline">
                                         <Link href={`/dashboard/bots/${bot.id}/conversations/${claim.conversationId}`}>
                                             View Transcript
                                         </Link>

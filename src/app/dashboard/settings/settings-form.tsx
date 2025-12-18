@@ -116,7 +116,7 @@ export default function PlatformSettingsForm({
             {/* API Keys Section - Visible only to Admins */}
             {isAdmin && (
                 <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-xl font-semibold mb-4 text-purple-700">Global API Keys (Admin Only)</h2>
+                    <h2 className="text-xl font-semibold mb-4 text-amber-600">Global API Keys (Admin Only)</h2>
                     <p className="text-sm text-gray-600 mb-4">
                         These keys are used as a fallback for all chatbots created by administrators.
                         <br />
@@ -185,7 +185,7 @@ export default function PlatformSettingsForm({
                                 value={sSecretKey}
                                 onChange={(e) => setSSecretKey(e.target.value)}
                                 placeholder="sk_live_..."
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
                             />
                         </div>
                         <div>
@@ -248,7 +248,7 @@ export default function PlatformSettingsForm({
                 <button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isSaving ? 'Saving...' : 'Save All Settings'}
                 </button>

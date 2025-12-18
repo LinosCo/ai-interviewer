@@ -66,8 +66,8 @@ export default async function DashboardPage() {
             <div className="grid md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                            <MessageSquare className="w-5 h-5 text-purple-600" />
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                            <MessageSquare className="w-5 h-5 text-amber-600" />
                         </div>
                         <div>
                             <p className="text-2xl font-bold text-gray-900">{totalInterviews}</p>
@@ -88,8 +88,8 @@ export default async function DashboardPage() {
                 </div>
                 <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
-                            <TrendingUp className="w-5 h-5 text-blue-600" />
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                            <TrendingUp className="w-5 h-5 text-amber-600" />
                         </div>
                         <div>
                             <p className="text-2xl font-bold text-gray-900">{activeInterviews.length}</p>
@@ -108,7 +108,7 @@ export default async function DashboardPage() {
                             <Bell className="w-4 h-4 text-gray-400" />
                             Risposte recenti
                         </h2>
-                        <Link href="/dashboard/interviews" className="text-sm text-purple-600 hover:text-purple-700">
+                        <Link href="/dashboard/interviews" className="text-sm text-amber-600 hover:text-amber-700">
                             Vedi tutte →
                         </Link>
                     </div>
@@ -150,7 +150,7 @@ export default async function DashboardPage() {
                 <div className="space-y-4">
                     <Link
                         href="/onboarding"
-                        className="block bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white hover:shadow-lg transition-shadow"
+                        className="block bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white hover:shadow-lg transition-shadow"
                     >
                         <div className="flex items-start justify-between">
                             <div>
@@ -159,7 +159,7 @@ export default async function DashboardPage() {
                                     Descrivi il tuo obiettivo e l'AI genererà l'intervista perfetta in pochi secondi
                                 </p>
                             </div>
-                            <Sparkles className="w-8 h-8 text-purple-200" />
+                            <Sparkles className="w-8 h-8 text-amber-200" />
                         </div>
                     </Link>
 
@@ -181,7 +181,7 @@ export default async function DashboardPage() {
                     {allBots.length > 0 && (
                         <Link
                             href="/dashboard/interviews"
-                            className="block bg-white rounded-xl p-6 border border-gray-200 hover:border-purple-300 transition-colors"
+                            className="block bg-white rounded-xl p-6 border border-gray-200 hover:border-amber-300 transition-colors"
                         >
                             <div className="flex items-center justify-between">
                                 <div>

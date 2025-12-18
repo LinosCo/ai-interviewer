@@ -71,6 +71,7 @@ export async function createUser(data: { name: string; email: string; password?:
 export async function updateUser(userId: string, data: { name?: string; email?: string; password?: string; role?: UserRole; projectIds?: string[] }) {
     await requireAdmin();
 
+    console.log(`Update User Attempt: userId=${userId}, data=${JSON.stringify({ ...data, password: data.password ? '[HIDDEN]' : undefined })}`);
     const { name, email, password, role, projectIds } = data;
     const updateData: any = {};
 
@@ -97,6 +98,7 @@ export async function updateUser(userId: string, data: { name?: string; email?: 
     });
 
     revalidatePath('/dashboard/admin/users');
+    console.log(`Update User Success: userId=${userId}`);
     return user;
 }
 
@@ -104,6 +106,8 @@ export async function deleteUser(userId: string) {
     const admin = await requireAdmin();
     if (admin.id === userId) throw new Error('Cannot delete yourself');
 
+    console.log(`Delete User Attempt: userId=${userId} by admin=${admin.email}`);
     await prisma.user.delete({ where: { id: userId } });
+    console.log(`Delete User Success: userId=${userId}`);
     revalidatePath('/dashboard/admin/users');
 }

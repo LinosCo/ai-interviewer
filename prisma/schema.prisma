@@ -291,7 +291,7 @@ model Membership {
   organizationId String
   role           Role   @default(MEMBER)
 
-  user         User         @relation(fields: [userId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([userId, organizationId])
@@ -307,7 +307,7 @@ model Project {
   updatedAt DateTime @updatedAt
 
   organization Organization?   @relation(fields: [organizationId], references: [id])
-  owner        User?           @relation(fields: [ownerId], references: [id])
+  owner        User?           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   bots         Bot[]
   accessList   ProjectAccess[]
 }
@@ -328,6 +328,7 @@ model Bot {
   language       String  @default("en")
   tone           String? // e.g. friendly, neutral
   introMessage   String? @db.Text // Custom first message
+  useWarmup      Boolean @default(true)
 
   // Limits
   maxDurationMins  Int @default(10)
@@ -530,7 +531,7 @@ model RewardGrant {
   claimedAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User?        @relation(fields: [userId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   guestEmail   String?
   guestName    String?
 }
@@ -607,7 +608,7 @@ model Report {
   createdAt DateTime @default(now())
 
   bot  Bot  @relation(fields: [botId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model MetricSummary {

@@ -9,7 +9,7 @@ interface WelcomeScreenProps {
     brandColor?: string;
 }
 
-export function WelcomeScreen({ bot, onStart, onCancel, brandColor = '#4f46e5' }: WelcomeScreenProps) {
+export function WelcomeScreen({ bot, onStart, onCancel, brandColor = '#F59E0B' }: WelcomeScreenProps) {
     const title = bot.welcomeTitle || `Benvenuto in ${bot.name}`;
     const subtitle = bot.welcomeSubtitle || bot.description || "Partecipa a questa sessione interattiva.";
 

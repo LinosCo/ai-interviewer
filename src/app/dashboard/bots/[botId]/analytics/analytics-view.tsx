@@ -72,7 +72,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded shadow gap-4">
                 <div>
                     <h2 className="text-lg font-bold flex items-center gap-2">
-                        <BrainCircuit className="w-5 h-5 text-purple-600" />
+                        <BrainCircuit className="w-5 h-5 text-amber-600" />
                         AI Deep Insights
                     </h2>
                     <p className="text-sm text-gray-500">
@@ -92,7 +92,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                     <button
                         onClick={handleRunAnalysis}
                         disabled={isAnalyzing}
-                        className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 text-sm"
+                        className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2 text-sm"
                     >
                         {isAnalyzing ? (
                             <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
@@ -154,7 +154,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                 <Tooltip
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                                 />
-                                <Bar dataKey="messages" name="Messages" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="messages" name="Messages" fill="#F59E0B" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -198,7 +198,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
 
                 {/* Key Themes */}
                 <div className="bg-white p-6 rounded shadow lg:col-span-1">
-                    <h3 className="font-semibold mb-4 text-purple-800 flex items-center gap-2">
+                    <h3 className="font-semibold mb-4 text-amber-800 flex items-center gap-2">
                         <MessageSquare className="w-5 h-5" />
                         Key Themes
                     </h3>
@@ -212,7 +212,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="font-medium text-gray-800 text-sm">{theme.name}</span>
-                                                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
+                                                <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
                                                     {theme.occurrences.length}x
                                                 </span>
                                             </div>
@@ -221,7 +221,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                         <ChevronDown className="w-4 h-4 text-gray-400 transform group-open:rotate-180 transition-transform mt-1" />
                                     </summary>
 
-                                    <div className="pl-4 pb-3 space-y-2 mt-1 border-l-2 border-purple-100 bg-gray-50/50 p-3 rounded-r text-xs">
+                                    <div className="pl-4 pb-3 space-y-2 mt-1 border-l-2 border-amber-100 bg-gray-50/50 p-3 rounded-r text-xs">
                                         <p className="font-semibold text-gray-500 text-xs uppercase tracking-wide">Evidence:</p>
                                         {theme.occurrences.map((occ: any, idx: number) => (
                                             <div key={idx} className="bg-white p-2 rounded border border-gray-100 shadow-sm relative">
@@ -229,7 +229,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                                 {occ.conversationId !== 'unknown' && (
                                                     <Link
                                                         href={`/dashboard/bots/${bot.id}/conversations/${occ.conversationId}`}
-                                                        className="text-purple-600 hover:underline inline-flex items-center gap-1 mt-1"
+                                                        className="text-amber-600 hover:underline inline-flex items-center gap-1 mt-1"
                                                     >
                                                         Review source <ExternalLink className="w-3 h-3" />
                                                     </Link>
@@ -245,7 +245,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
 
                 {/* Strategic Insights */}
                 <div className="bg-white p-6 rounded shadow lg:col-span-1">
-                    <h3 className="font-semibold mb-4 text-blue-800 flex items-center gap-2">
+                    <h3 className="font-semibold mb-4 text-amber-800 flex items-center gap-2">
                         <Sparkles className="w-5 h-5" />
                         Strategic Suggestions
                     </h3>
@@ -256,16 +256,16 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                             {strategicInsights.map((insight: any) => {
                                 const citations = insight.citations as any[];
                                 return (
-                                    <details key={insight.id} className="text-sm text-gray-700 bg-blue-50 rounded border border-blue-100 group">
+                                    <details key={insight.id} className="text-sm text-gray-700 bg-amber-50 rounded border border-amber-100 group">
                                         <summary className="p-3 cursor-pointer list-none flex justify-between items-start gap-2 outline-none">
                                             <span>{insight.content}</span>
                                             {citations && citations.length > 0 && (
-                                                <ChevronDown className="w-4 h-4 text-blue-400 transform group-open:rotate-180 transition-transform flex-shrink-0 mt-0.5" />
+                                                <ChevronDown className="w-4 h-4 text-amber-400 transform group-open:rotate-180 transition-transform flex-shrink-0 mt-0.5" />
                                             )}
                                         </summary>
                                         {citations && citations.length > 0 && (
-                                            <div className="px-3 pb-3 pt-0 border-t border-blue-100/50 mt-2">
-                                                <p className="font-semibold text-blue-800/60 text-xs uppercase tracking-wide mt-2 mb-1">Basis:</p>
+                                            <div className="px-3 pb-3 pt-0 border-t border-amber-100/50 mt-2">
+                                                <p className="font-semibold text-amber-800/60 text-xs uppercase tracking-wide mt-2 mb-1">Basis:</p>
                                                 <ul className="space-y-2">
                                                     {citations.map((c: any, idx: number) => (
                                                         <li key={idx} className="text-xs bg-white/60 p-2 rounded">
@@ -273,7 +273,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                                             {c.conversationId && (
                                                                 <Link
                                                                     href={`/dashboard/bots/${bot.id}/conversations/${c.conversationId}`}
-                                                                    className="block text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
+                                                                    className="block text-amber-600 hover:text-amber-800 mt-1 flex items-center gap-1"
                                                                 >
                                                                     View in context <ExternalLink className="w-3 h-3" />
                                                                 </Link>
@@ -292,57 +292,59 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
             </div>
 
             {/* Topic Deep Dive - Word Clouds */}
-            <div className="bg-white p-6 rounded shadow">
+            < div className="bg-white p-6 rounded shadow" >
                 <h3 className="font-semibold mb-6 flex items-center gap-2 text-gray-800">
-                    <BrainCircuit className="w-5 h-5 text-indigo-600" />
+                    <BrainCircuit className="w-5 h-5 text-amber-600" />
                     Topic Analysis & Word Clouds
                 </h3>
 
-                {!bot.topics || bot.topics.length === 0 ? (
-                    <p className="text-gray-400 text-sm">No topic analysis available.</p>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        {bot.topics.map((topic: any) => (
-                            <div key={topic.id} className="border border-gray-100 rounded-lg p-4 bg-gray-50/50">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 className="font-medium text-gray-800">{topic.label}</h4>
-                                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{topic.description}</p>
+                {
+                    !bot.topics || bot.topics.length === 0 ? (
+                        <p className="text-gray-400 text-sm">No topic analysis available.</p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {bot.topics.map((topic: any) => (
+                                <div key={topic.id} className="border border-gray-100 rounded-lg p-4 bg-gray-50/50">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h4 className="font-medium text-gray-800">{topic.label}</h4>
+                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{topic.description}</p>
+                                        </div>
+                                        <span className="text-xs font-mono bg-amber-50 text-amber-700 px-2 py-1 rounded">
+                                            #{topic.orderIndex + 1}
+                                        </span>
                                     </div>
-                                    <span className="text-xs font-mono bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
-                                        #{topic.orderIndex + 1}
-                                    </span>
+
+                                    <div className="bg-white rounded border border-gray-100 p-4 min-h-[120px] flex flex-wrap gap-2 items-center content-start">
+                                        {topic.keywords && Array.isArray(topic.keywords) && topic.keywords.length > 0 ? (
+                                            topic.keywords.map((kw: any, idx: number) => {
+                                                // Simple size scaling based on count relative to max count in this set
+                                                const maxCount = Math.max(...topic.keywords.map((k: any) => k.count || 1));
+                                                const sizeClass =
+                                                    kw.count === maxCount ? "text-lg font-bold text-amber-700" :
+                                                        kw.count > maxCount * 0.6 ? "text-base font-semibold text-amber-600" :
+                                                            "text-xs text-gray-500";
+
+                                                return (
+                                                    <span key={idx} className={`${sizeClass} px-2 py-1 bg-gray-50 rounded-full border border-gray-100`}>
+                                                        {kw.word}
+                                                        <span className="ml-1 text-[10px] opacity-50">{kw.count}</span>
+                                                    </span>
+                                                );
+                                            })
+                                        ) : (
+                                            <p className="text-xs text-gray-400 italic w-full text-center py-4">
+                                                No keywords extracted yet. Run analysis to populate.
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
+                            ))}
+                        </div>
+                    )
+                }
+            </div >
 
-                                <div className="bg-white rounded border border-gray-100 p-4 min-h-[120px] flex flex-wrap gap-2 items-center content-start">
-                                    {topic.keywords && Array.isArray(topic.keywords) && topic.keywords.length > 0 ? (
-                                        topic.keywords.map((kw: any, idx: number) => {
-                                            // Simple size scaling based on count relative to max count in this set
-                                            const maxCount = Math.max(...topic.keywords.map((k: any) => k.count || 1));
-                                            const sizeClass =
-                                                kw.count === maxCount ? "text-lg font-bold text-indigo-700" :
-                                                    kw.count > maxCount * 0.6 ? "text-base font-semibold text-indigo-600" :
-                                                        "text-xs text-gray-500";
-
-                                            return (
-                                                <span key={idx} className={`${sizeClass} px-2 py-1 bg-gray-50 rounded-full border border-gray-100`}>
-                                                    {kw.word}
-                                                    <span className="ml-1 text-[10px] opacity-50">{kw.count}</span>
-                                                </span>
-                                            );
-                                        })
-                                    ) : (
-                                        <p className="text-xs text-gray-400 italic w-full text-center py-4">
-                                            No keywords extracted yet. Run analysis to populate.
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-
-        </div>
+        </div >
     );
 }

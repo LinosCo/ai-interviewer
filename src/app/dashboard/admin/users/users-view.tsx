@@ -60,7 +60,7 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                 <h1 className="text-2xl font-bold">User Management</h1>
                 <button
                     onClick={handleCreate}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    className="flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700"
                 >
                     <Plus size={20} />
                     Add User
@@ -88,7 +88,7 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                                     <div className="text-sm text-gray-500">{user.email}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'ADMIN' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
                                         }`}>
                                         {user.role}
                                     </span>
@@ -113,7 +113,7 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button
                                         onClick={() => handleEdit(user)}
-                                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                                        className="text-amber-600 hover:text-amber-900 mr-4"
                                     >
                                         <Pencil size={18} />
                                     </button>

@@ -68,6 +68,14 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
                 role: m.role as any,
                 content: m.content
             }))}
+
+            // Warm-up
+            useWarmup={bot.useWarmup}
+            warmupStyle={bot.warmupStyle}
+            warmupChoices={bot.warmupChoices}
+            warmupIcebreaker={bot.warmupIcebreaker}
+            warmupContextPrompt={bot.warmupContextPrompt}
+            warmupFollowup={bot.warmupFollowup}
         />
     );
 }

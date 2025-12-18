@@ -53,6 +53,7 @@ interface InterviewChatProps {
     currentTopicId?: string | null;
 
     // Warm-up
+    useWarmup?: boolean;
     warmupStyle?: string;
     warmupChoices?: any;
     warmupIcebreaker?: string | null;
@@ -129,6 +130,7 @@ export default function InterviewChat({
     currentTopicId,
 
     // Warm-up defaults
+    useWarmup = true,
     warmupStyle = 'open',
     warmupChoices,
     warmupIcebreaker,
@@ -175,7 +177,7 @@ export default function InterviewChat({
         setShowLanding(false);
 
         // Check if we need warm-up
-        if (warmupStyle && warmupStyle !== 'none' && !warmupCompleted && initialMessages.length === 0) {
+        if (useWarmup && warmupStyle && warmupStyle !== 'none' && !warmupCompleted && initialMessages.length === 0) {
             setShowWarmup(true);
             return;
         }
@@ -546,7 +548,7 @@ export default function InterviewChat({
 
             {/* Progress bar */}
             {showProgressBar && (
-                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm px-6 pt-4">
+                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm px-6 pt-10 pb-2">
                     {progressBarStyle === 'semantic' && topics.length > 0 ? (
                         <SemanticProgressBar
                             progress={progress}

@@ -36,13 +36,13 @@ export default function TemplatesPage() {
                                 <div className="space-y-4 pt-6 border-t border-stone-100">
                                     <h4 className="text-sm font-semibold text-stone-900 uppercase tracking-wider">Cosa scoprirai:</h4>
                                     <ul className="space-y-2">
-                                        {template.topics.slice(0, 3).map((topic, i) => (
+                                        {template.defaultConfig.topics.slice(0, 3).map((topic, i) => (
                                             <li key={i} className="flex items-center gap-2 text-sm text-stone-500">
                                                 <Icons.Check size={14} className="text-amber-500" />
                                                 {topic.label}
                                             </li>
                                         ))}
-                                        {template.topics.length > 3 && (
+                                        {template.defaultConfig.topics.length > 3 && (
                                             <li className="text-xs text-stone-400 italic">...e molto altro</li>
                                         )}
                                     </ul>

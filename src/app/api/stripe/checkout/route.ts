@@ -113,7 +113,27 @@ export async function GET(req: NextRequest) {
             },
             allow_promotion_codes: true,
             billing_address_collection: 'required',
-            tax_id_collection: { enabled: true }
+            tax_id_collection: { enabled: true },
+            custom_fields: [
+                {
+                    key: 'sdi_code',
+                    label: {
+                        type: 'custom',
+                        custom: 'Codice SDI (Facoltativo)',
+                    },
+                    type: 'text',
+                    optional: true,
+                },
+                {
+                    key: 'pec_email',
+                    label: {
+                        type: 'custom',
+                        custom: 'Email PEC (Facoltativa)',
+                    },
+                    type: 'text',
+                    optional: true,
+                },
+            ],
         });
 
         // Redirect for GET requests
@@ -234,7 +254,27 @@ export async function POST(req: Request) { // Changed NextRequest to Request
             },
             allow_promotion_codes: true,
             billing_address_collection: 'required',
-            tax_id_collection: { enabled: true }
+            tax_id_collection: { enabled: true },
+            custom_fields: [
+                {
+                    key: 'sdi_code',
+                    label: {
+                        type: 'custom',
+                        custom: 'Codice SDI (Facoltativo)',
+                    },
+                    type: 'text',
+                    optional: true,
+                },
+                {
+                    key: 'pec_email',
+                    label: {
+                        type: 'custom',
+                        custom: 'Email PEC (Facoltativa)',
+                    },
+                    type: 'text',
+                    optional: true,
+                },
+            ],
         });
 
         return Response.json({ url: checkoutSession.url });

@@ -86,16 +86,29 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const plans = await getPricingPlans();
     const limits = plans[tier].features;
 
+    // Extract custom fields
+    const sdiCode = session.custom_fields?.find(f => f.key === 'sdi_code')?.text?.value;
+    const pecEmail = session.custom_fields?.find(f => f.key === 'pec_email')?.text?.value;
+
+    // Extract Tax ID (VAT / Codice Fiscale)
+    const taxIds = session.customer_details?.tax_ids || [];
+    const vatId = taxIds.find(t => (t.type as string) === 'it_vat')?.value;
+    const fiscalCode = taxIds.find(t => (t.type as string) === 'it_fiscal_code')?.value;
+
     await prisma.subscription.update({
         where: { organizationId },
         data: {
-            tier: tier, // Assuming SubscriptionTier enum matches PlanKey strings or cast is valid
+            tier: tier,
             status: 'ACTIVE',
             stripeSubscriptionId: session.subscription as string,
             stripePriceId: plans[tier].priceId || undefined,
             maxActiveBots: limits.maxActiveBots,
             maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
-            maxUsers: limits.maxUsers
+            maxUsers: limits.maxUsers,
+            sdiCode: sdiCode || undefined,
+            pecEmail: pecEmail || undefined,
+            vatNumber: vatId || undefined,
+            codiceFiscale: fiscalCode || undefined
         }
     });
 

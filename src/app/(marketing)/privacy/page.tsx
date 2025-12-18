@@ -17,6 +17,7 @@ export default function PrivacyPage() {
                 <p className="mb-4">Raccogliamo le seguenti tipologie di informazioni:</p>
                 <ul className="list-disc pl-6 space-y-2 mb-4">
                     <li><strong>Dati dell'Account:</strong> Indirizzo email, nome e cognome forniti durante la registrazione.</li>
+                    <li><strong>Dati Fiscali:</strong> Ragione sociale, P.IVA, Codice Fiscale, indirizzo di fatturazione, Codice SDI e PEC per l'adempimento degli obblighi di legge (Fatturazione Elettronica).</li>
                     <li><strong>Dati di Utilizzo:</strong> Informazioni su come interagisci con la piattaforma, inclusi indirizzi IP, tipo di browser e pagine visitate.</li>
                     <li><strong>Dati delle Interviste:</strong> Trascrizioni delle interviste, risposte fornite dagli utenti e analisi generate dall'AI.</li>
                 </ul>

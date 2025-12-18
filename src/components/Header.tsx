@@ -45,8 +45,8 @@ export function Header() {
                     <span style={{ fontSize: '1.25rem', fontWeight: 700, color: colors.text }}>Business Tuner</span>
                 </Link>
 
-                {/* Navigation */}
-                <nav style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                {/* Navigation (Hidden on Mobile) */}
+                <nav className="hidden lg:flex items-center gap-8">
                     <Link href="/#how-it-works" style={{ color: colors.muted, textDecoration: 'none', fontSize: '0.9375rem', fontWeight: 500, transition: 'color 0.2s' }}>
                         Come funziona
                     </Link>
@@ -79,6 +79,24 @@ export function Header() {
                         </Link>
                     </div>
                 </nav>
+
+                {/* Mobile Demo Button (Only on Mobile) */}
+                <div className="lg:hidden">
+                    <Link href="/onboarding/preview" style={{ textDecoration: 'none' }}>
+                        <button style={{
+                            padding: '0.5rem 1rem',
+                            background: gradients.primary,
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                        }}>
+                            Demo
+                        </button>
+                    </Link>
+                </div>
             </div>
         </header>
     );

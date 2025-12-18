@@ -28,16 +28,16 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
                 <h1 className="text-2xl font-bold">Edit Bot: {bot.name}</h1>
-                <div className="flex gap-4">
-                    <Link href={`/dashboard/bots/${bot.id}/analytics`} className="px-4 py-2 border rounded hover:bg-gray-50">
+                <div className="flex flex-wrap gap-2 sm:gap-4">
+                    <Link href={`/dashboard/bots/${bot.id}/analytics`} className="px-3 py-2 sm:px-4 sm:py-2 border rounded hover:bg-gray-50 text-sm sm:text-base">
                         Analytics
                     </Link>
-                    <Link href={`/dashboard/bots/${bot.id}/claims`} className="px-4 py-2 border rounded hover:bg-gray-50 bg-green-50 text-green-700 border-green-200">
+                    <Link href={`/dashboard/bots/${bot.id}/claims`} className="px-3 py-2 sm:px-4 sm:py-2 border rounded hover:bg-gray-50 bg-green-50 text-green-700 border-green-200 text-sm sm:text-base">
                         Claims
                     </Link>
-                    <a href={`/i/${bot.slug}`} target="_blank" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    <a href={`/i/${bot.slug}`} target="_blank" className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm sm:text-base">
                         Public Link
                     </a>
                     <CopyLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL || ''}/i/${bot.slug}`} />

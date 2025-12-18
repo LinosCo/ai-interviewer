@@ -1,13 +1,12 @@
-import Link from 'next/link';
-import { Icons } from '@/components/ui/business-tuner/Icons';
-import { Footer } from '@/components/Footer';
-import { gradients, shadows } from '@/lib/design-system';
+import { auth } from '@/auth';
 
-export default function MarketingLayout({
+export default async function MarketingLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const session = await auth();
+
     return (
         <div className="min-h-screen bg-[#FAFAF8] flex flex-col">
             {/* Navigation */}
@@ -32,18 +31,27 @@ export default function MarketingLayout({
                         </div>
 
                         <div className="flex items-center gap-3">
+                            {session ? (
+                                <Link
+                                    href="/dashboard"
+                                    className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors"
+                                >
+                                    Dashboard
+                                </Link>
+                            ) : (
+                                <Link
+                                    href="/login"
+                                    className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors"
+                                >
+                                    Accedi
+                                </Link>
+                            )}
                             <Link
-                                href="/login"
-                                className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors"
-                            >
-                                Accedi
-                            </Link>
-                            <Link
-                                href="/onboarding/preview"
+                                href={session ? "/dashboard" : "/onboarding/preview"}
                                 className="text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-lg hover:-translate-y-0.5"
                                 style={{ background: gradients.primary, boxShadow: shadows.amber }}
                             >
-                                Guarda Demo
+                                {session ? "Vai alla console" : "Guarda Demo"}
                             </Link>
                         </div>
                     </div>

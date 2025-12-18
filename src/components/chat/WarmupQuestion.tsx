@@ -11,6 +11,7 @@ interface WarmupQuestionProps {
     onAnswer: (answer: string) => void;
     onSkip: () => void;
     brandColor?: string;
+    language?: string;
 }
 
 export function WarmupQuestion({
@@ -20,24 +21,41 @@ export function WarmupQuestion({
     warmupContextPrompt,
     onAnswer,
     onSkip,
-    brandColor = '#f59e0b'
+    brandColor = '#f59e0b',
+    language = 'it'
 }: WarmupQuestionProps) {
     const [inputValue, setInputValue] = useState('');
     const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
+
+    const isIt = language === 'it';
+    const t = {
+        title: isIt ? "Riscaldiamoci un po'" : "Let's warm up",
+        skip: isIt ? "Salta riscaldamento" : "Skip warm-up",
+        continue: isIt ? "Continua" : "Continue",
+        placeholder: isIt ? "Scrivi qui la tua risposta..." : "Type your answer here...",
+    };
 
     // Provide default questions if not configured
     const getQuestionText = () => {
         switch (warmupStyle) {
             case 'open':
-                return "Before we begin, what's the main thing you'd like to share today?";
+                return isIt
+                    ? "Prima di iniziare, qual è la cosa principale che vorresti condividere oggi?"
+                    : "Before we begin, what's the main thing you'd like to share today?";
             case 'icebreaker':
-                return warmupIcebreaker || "If you could change one thing about your work, what would it be?";
+                return warmupIcebreaker || (isIt
+                    ? "Se potessi cambiare una cosa del tuo lavoro, quale sarebbe?"
+                    : "If you could change one thing about your work, what would it be?");
             case 'context':
-                return warmupContextPrompt || "To give me better context, what is your current role?";
+                return warmupContextPrompt || (isIt
+                    ? "Per darmi un contesto migliore, qual è il tuo ruolo attuale?"
+                    : "To give me better context, what is your current role?");
             case 'choice':
-                return "To start, which of these best describes your situation?";
+                return isIt
+                    ? "Per iniziare, quale di queste descrive meglio la tua situazione?"
+                    : "To start, which of these best describes your situation?";
             default:
-                return "Ready to get started?";
+                return isIt ? "Pronto per iniziare?" : "Ready to get started?";
         }
     };
 
@@ -66,7 +84,7 @@ export function WarmupQuestion({
                 </div>
                 <div>
                     <h3 className="text-xl font-bold text-gray-900 mb-1">
-                        Let's warm up
+                        {t.title}
                     </h3>
                     <p className="text-gray-600 text-lg leading-relaxed">
                         {getQuestionText()}
@@ -83,8 +101,8 @@ export function WarmupQuestion({
                                 key={idx}
                                 onClick={() => setSelectedChoice(choice)}
                                 className={`p-4 rounded-xl border-2 text-left transition-all hover:bg-stone-50 ${selectedChoice === choice
-                                        ? 'border-current bg-stone-50 shadow-sm'
-                                        : 'border-transparent bg-white shadow-sm hover:border-gray-200'
+                                    ? 'border-current bg-stone-50 shadow-sm'
+                                    : 'border-transparent bg-white shadow-sm hover:border-gray-200'
                                     }`}
                                 style={{ borderColor: selectedChoice === choice ? brandColor : undefined }}
                             >
@@ -97,7 +115,7 @@ export function WarmupQuestion({
                         <textarea
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Type your answer here..."
+                            placeholder={t.placeholder}
                             className="w-full p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-opacity-50 focus:outline-none resize-none bg-white/50 text-gray-900 placeholder-gray-400"
                             style={{ '--tw-ring-color': brandColor } as React.CSSProperties}
                             rows={3}
@@ -112,7 +130,7 @@ export function WarmupQuestion({
                     onClick={onSkip}
                     className="text-sm font-medium text-gray-500 hover:text-gray-800 transition-colors px-2 py-1"
                 >
-                    Skip warm-up
+                    {t.skip}
                 </button>
 
                 <Button
@@ -121,7 +139,7 @@ export function WarmupQuestion({
                     style={{ backgroundColor: brandColor }}
                     className="text-white shadow-md hover:shadow-lg hover:brightness-105 transition-all"
                 >
-                    Continue <Icons.ArrowRight size={16} className="ml-2" />
+                    {t.continue} <Icons.ArrowRight size={16} className="ml-2" />
                 </Button>
             </div>
         </motion.div>

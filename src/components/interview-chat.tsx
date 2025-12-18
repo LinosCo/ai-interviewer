@@ -354,15 +354,18 @@ export default function InterviewChat({
     if (showWarmup) {
         return (
             <div className="min-h-screen flex items-center justify-center p-4 relative" style={{ background: mainBackground }}>
-                <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: `radial-gradient(circle at 50% 50%, ${brandColor}10 0%, transparent 60%)` }} />
+                <div style={{ position: 'absolute', inset: 0, opacity: 0.6, pointerEvents: 'none', background: `radial-gradient(circle at 50% 50%, ${brandColor}10 0%, transparent` }} />
                 <WarmupQuestion
-                    warmupStyle={warmupStyle}
-                    warmupChoices={warmupChoices}
-                    warmupIcebreaker={warmupIcebreaker}
-                    warmupContextPrompt={warmupContextPrompt}
-                    onAnswer={handleWarmupAnswer}
-                    onSkip={handleWarmupSkip}
+                    warmupStyle={bot.warmupStyle}
+                    warmupChoices={bot.warmupChoices}
+                    warmupIcebreaker={bot.warmupIcebreaker}
+                    warmupContextPrompt={bot.warmupContextPrompt}
+                    onAnswer={(answer) => {
+                        handleStartWithWarmup(answer);
+                    }}
+                    onSkip={handleStart}
                     brandColor={brandColor}
+                    language={bot.language || 'it'}
                 />
             </div>
         );
@@ -545,7 +548,7 @@ export default function InterviewChat({
 
             {/* Progress bar */}
             {showProgressBar && (
-                <div className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm px-6 pt-4">
+                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm px-6 pt-4">
                     {progressBarStyle === 'semantic' && topics.length > 0 ? (
                         <SemanticProgressBar
                             progress={progress}
@@ -570,20 +573,25 @@ export default function InterviewChat({
             )}
 
             {/* Header */}
-            <header className="fixed top-14 left-0 right-0 z-40 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
-                <div className="flex items-center gap-3 bg-white/80 backdrop-blur-md p-2 pl-3 pr-4 rounded-full border border-white shadow-sm pointer-events-auto transition-all hover:shadow-md">
+            <header className="fixed top-24 left-0 right-0 z-50 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
+                <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md p-2.5 pl-3.5 pr-5 rounded-full border border-stone-200 shadow-lg pointer-events-auto transition-all hover:shadow-xl hover:scale-105">
                     {logoUrl ? (
-                        <img src={logoUrl} alt={botName} className="h-6 w-6 object-contain" />
+                        <div className="h-7 w-7 rounded-full overflow-hidden border border-stone-100 flex-shrink-0">
+                            <img src={logoUrl} alt={botName} className="h-full w-full object-cover" />
+                        </div>
                     ) : (
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: brandColor }}>
-                            <Icons.Chat size={14} />
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0" style={{ background: brandColor }}>
+                            <Icons.Chat size={16} />
                         </div>
                     )}
-                    <span className="font-semibold text-sm text-gray-800 tracking-tight truncate max-w-[150px]">{botName}</span>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-xs text-gray-400 uppercase tracking-widest leading-none mb-0.5">Intervista AI</span>
+                        <span className="font-semibold text-sm text-gray-800 tracking-tight truncate max-w-[180px]">{botName}</span>
+                    </div>
                 </div>
 
-                <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white shadow-sm text-xs font-medium text-gray-500">
-                    {elapsedMinutes}m / ~{estimatedMinutes}m
+                <div className="bg-white/95 backdrop-blur-md px-4 py-2 rounded-full border border-stone-200 shadow-md text-xs font-bold text-gray-600">
+                    {elapsedMinutes}m <span className="text-gray-300 mx-1">/</span> ~{estimatedMinutes}m
                 </div>
             </header>
 

@@ -9,10 +9,7 @@ async function main() {
 
     const user = await prisma.user.upsert({
         where: { email },
-        update: {
-            password,
-            role: 'ADMIN'
-        },
+        update: {}, // Don't overwrite existing admin data
         create: {
             email,
             name: 'Admin User',
@@ -27,11 +24,7 @@ async function main() {
     const socialEmail = 'social@linosandco.com'
     const socialUser = await prisma.user.upsert({
         where: { email: socialEmail },
-        update: {
-            password, // Same password: password123
-            role: 'ADMIN',
-            emailVerified: new Date()
-        },
+        update: {}, // Don't overwrite existing user data
         create: {
             email: socialEmail,
             name: 'Linos Admin',

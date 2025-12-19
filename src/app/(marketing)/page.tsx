@@ -114,7 +114,7 @@ export default function LandingPage() {
             </div>
 
             {/* --- HERO SECTION (White) --- */}
-            <section className="relative z-10 pt-32 pb-64 lg:pt-48 lg:pb-96 overflow-hidden bg-gradient-to-b from-white to-amber-50/30">
+            <section className="relative z-10 pt-32 pb-64 lg:pt-48 lg:pb-96 min-h-screen flex flex-col justify-center overflow-hidden bg-gradient-to-b from-white to-amber-50/30">
                 {/* Background Mesh (Subtle) */}
                 <div
                     className="absolute inset-0 pointer-events-none opacity-60"

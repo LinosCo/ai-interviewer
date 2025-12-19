@@ -1,6 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+// ...
+// Note: The UserDialog component needs useEffect to update functionality
+// I will address this in the UserDialog file directly.
+
 import { useRouter } from 'next/navigation';
 import { createUser, updateUser } from '@/app/actions/admin';
 import { UserRole } from '@prisma/client';
@@ -27,15 +31,28 @@ interface UserDialogProps {
 }
 
 export default function UserDialog({ isOpen, onClose, user, projects }: UserDialogProps) {
-    const [name, setName] = useState(user?.name || '');
-    const [email, setEmail] = useState(user?.email || '');
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<UserRole>(user?.role || 'USER');
-    const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(
-        user?.projectAccess.map(p => p.projectId) || []
-    );
+    const [role, setRole] = useState<UserRole>('USER');
+    const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        if (user && isOpen) {
+            setName(user.name || '');
+            setEmail(user.email || '');
+            setRole(user.role);
+            setSelectedProjectIds(user.projectAccess.map(p => p.projectId));
+        } else if (!user && isOpen) {
+            setName('');
+            setEmail('');
+            setPassword('');
+            setRole('USER');
+            setSelectedProjectIds([]);
+        }
+    }, [user, isOpen]);
 
     if (!isOpen) return null;
 

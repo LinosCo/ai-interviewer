@@ -151,3 +151,24 @@ export async function deleteUser(userId: string) {
     console.log(`Delete User Success: userId=${userId}`);
     revalidatePath('/dashboard/admin/users');
 }
+
+export async function createProject(name: string, ownerId: string) {
+    await requireAdmin();
+    console.log(`[AdminAction] Create Project: name=${name} ownerId=${ownerId}`);
+
+    const project = await prisma.project.create({
+        data: {
+            name,
+            ownerId,
+            // Also add owner to access list for clarity
+            accessList: {
+                create: {
+                    userId: ownerId
+                }
+            }
+        }
+    });
+
+    revalidatePath('/dashboard/admin/projects');
+    return project;
+}

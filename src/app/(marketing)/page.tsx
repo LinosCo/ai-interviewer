@@ -11,35 +11,51 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 const WaveSeparator = ({
     position = 'bottom',
     color = '#FFFBEB', // amber-50
-    height = 60
+    height = 60,
+    className = '',
+    style = {}
 }: {
-    position?: 'top' | 'bottom',
+    position?: 'top' | 'bottom' | 'relative',
     color?: string,
-    height?: number
-}) => (
-    <div style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 0,
-        height: `${height}px`,
-        [position]: 0,
-        transform: position === 'top' ? 'rotate(180deg)' : 'none',
-        pointerEvents: 'none', // Ensure it doesn't block clicks
-    }}>
-        <svg
-            viewBox="0 0 1440 320"
-            style={{ width: '100%', height: '100%' }}
-            preserveAspectRatio="none"
+    height?: number,
+    className?: string,
+    style?: React.CSSProperties
+}) => {
+    const isAbsolute = position !== 'relative';
+    return (
+        <div
+            className={className}
+            style={{
+                ...(isAbsolute ? {
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    [position]: 0,
+                } : {
+                    position: 'relative',
+                    width: '100%',
+                }),
+                height: `${height}px`,
+                zIndex: isAbsolute ? 0 : undefined,
+                transform: position === 'top' ? 'rotate(180deg)' : 'none',
+                pointerEvents: 'none',
+                ...style
+            }}
         >
-            <path
-                fill={color}
-                fillOpacity="1"
-                d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-            />
-        </svg>
-    </div>
-);
+            <svg
+                viewBox="0 0 1440 320"
+                style={{ width: '100%', height: '100%' }}
+                preserveAspectRatio="none"
+            >
+                <path
+                    fill={color}
+                    fillOpacity="1"
+                    d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+                />
+            </svg>
+        </div>
+    );
+};
 
 const SectionLabel = ({ text, color = colors.amberDark, bg = 'rgba(251,191,36,0.1)' }: { text: string, color?: string, bg?: string }) => (
     <span className="inline-block text-xs font-bold uppercase tracking-widest py-2 px-4 rounded-full mb-6" style={{ color, background: bg }}>
@@ -264,9 +280,15 @@ export default function LandingPage() {
                         ))}
                     </div>
                 </div>
-
-                <WaveSeparator color="#FFFBEB" height={100} />
             </section>
+
+            <WaveSeparator
+                position="relative"
+                color="#FFFBEB"
+                height={300}
+                className="relative z-0"
+                style={{ marginTop: '-150px' }}
+            />
 
             {/* --- WHAT IS (Light Warm Background) --- */}
             <section className="relative z-20 bg-[#FFFBEB] py-24 lg:py-32 overflow-hidden">

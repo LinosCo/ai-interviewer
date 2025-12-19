@@ -56,11 +56,22 @@ function GenerateContent() {
                         body: JSON.stringify({ goal }),
                     });
 
-                    if (!response.ok) {
-                        throw new Error('Errore nella generazione');
+                    let errorData;
+                    try {
+                        errorData = await response.json();
+                    } catch (e) {
+                        // Fallback if not JSON
                     }
 
-                    configToUse = await response.json();
+                    if (response.status === 401 && errorData?.error === 'API_KEY_MISSING') {
+                        throw new Error(errorData.message);
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(errorData?.message || errorData?.error || 'Errore nella generazione');
+                    }
+
+                    configToUse = errorData; // Since we parsed it above
                 } else {
                     throw new Error('Nessun obiettivo specificato');
                 }

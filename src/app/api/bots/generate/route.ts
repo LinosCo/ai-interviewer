@@ -43,7 +43,10 @@ export async function POST(req: Request) {
 
         if (!apiKey) {
             console.error('CRITICAL: No API Key found in DB or ENV');
-            return new Response('API key not configured on server', { status: 500 });
+            return Response.json({
+                error: 'API_KEY_MISSING',
+                message: 'Chiave API OpenAI mancante. Configurala nelle impostazioni.'
+            }, { status: 401 });
         }
 
         console.log('Initializing OpenAI...');

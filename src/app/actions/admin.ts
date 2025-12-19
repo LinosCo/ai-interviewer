@@ -71,13 +71,22 @@ export async function createUser(data: { name: string; email: string; password?:
 export async function updateUser(userId: string, data: { name?: string; email?: string; password?: string; role?: UserRole; projectIds?: string[] }) {
     await requireAdmin();
 
-    console.log(`Update User Attempt: userId=${userId}, data=${JSON.stringify({ ...data, password: data.password ? '[HIDDEN]' : undefined })}`);
+    console.log(`[AdminAction] Update User Attempt: userId=${userId}`);
+    console.log(`[AdminAction] Data received:`, {
+        ...data,
+        password: data.password ? `[PRESENT length=${data.password.length}]` : '[UNDEFINED/EMPTY]'
+    });
     const { name, email, password, role, projectIds } = data;
     const updateData: any = {};
 
     if (name) updateData.name = name;
     if (email) updateData.email = email;
-    if (password) updateData.password = await bcrypt.hash(password, 10);
+    if (password) {
+        console.log('[AdminAction] Hashing new password...');
+        updateData.password = await bcrypt.hash(password, 10);
+    } else {
+        console.log('[AdminAction] No password provided, skipping update.');
+    }
     if (role) updateData.role = role;
 
     // Handle Project Access Update

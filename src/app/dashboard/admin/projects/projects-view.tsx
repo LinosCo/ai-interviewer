@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { transferProject, createProject } from '@/app/actions/admin';
 import { Icons } from '@/components/ui/business-tuner/Icons';

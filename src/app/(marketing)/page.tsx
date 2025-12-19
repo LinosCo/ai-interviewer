@@ -21,10 +21,11 @@ const WaveSeparator = ({
         position: 'absolute',
         left: 0,
         right: 0,
-        zIndex: 20,
+        zIndex: 0,
         height: `${height}px`,
         [position]: 0,
-        transform: position === 'top' ? 'rotate(180deg)' : 'none'
+        transform: position === 'top' ? 'rotate(180deg)' : 'none',
+        pointerEvents: 'none', // Ensure it doesn't block clicks
     }}>
         <svg
             viewBox="0 0 1440 320"
@@ -114,7 +115,7 @@ export default function LandingPage() {
             </div>
 
             {/* --- HERO SECTION (White) --- */}
-            <section className="relative z-10 pt-32 pb-64 lg:pt-48 lg:pb-96 min-h-screen flex flex-col bg-gradient-to-b from-white to-amber-50/30">
+            <section className="relative z-10 pt-20 pb-32 lg:pt-32 lg:pb-64 min-h-screen flex flex-col bg-gradient-to-b from-white to-amber-50/30">
                 {/* Background Mesh (Subtle) */}
                 <div
                     className="absolute inset-0 pointer-events-none opacity-60"
@@ -126,7 +127,7 @@ export default function LandingPage() {
                     }}
                 />
 
-                <div className="container mx-auto px-6 max-w-7xl relative z-30">
+                <div className="container mx-auto px-6 max-w-7xl relative z-50">
                     <div className="grid lg:grid-cols-2 gap-16 items-center">
 
                         {/* Content */}
@@ -268,7 +269,7 @@ export default function LandingPage() {
             </section>
 
             {/* --- WHAT IS (Light Warm Background) --- */}
-            <section className="relative z-10 bg-[#FFFBEB] py-24 lg:py-32 overflow-hidden">
+            <section className="relative z-20 bg-[#FFFBEB] py-24 lg:py-32 overflow-hidden">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="grid lg:grid-cols-2 gap-16 items-center">
                         <div>
@@ -319,7 +320,7 @@ export default function LandingPage() {
             </section>
 
             {/* --- STATS & HOW IT WORKS (Light Warm Background) --- */}
-            <section className="relative z-10 bg-[#FFFBEB] py-24 lg:py-32">
+            <section className="relative z-20 bg-[#FFFBEB] py-24 lg:py-32">
 
                 {/* Stats */}
                 <div className="container mx-auto px-6 max-w-7xl mb-32">
@@ -378,7 +379,7 @@ export default function LandingPage() {
             </section>
 
             {/* --- USE CASES (White) --- */}
-            <section id="use-cases" className="relative z-10 bg-white py-24 lg:py-32">
+            <section id="use-cases" className="relative z-20 bg-white py-24 lg:py-32">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="flex flex-col md:flex-row gap-16 items-start">
 
@@ -418,7 +419,7 @@ export default function LandingPage() {
             </section>
 
             {/* --- DASHBOARD & ANALYTICS PREVIEW (Amber-50) --- */}
-            <section className="relative z-10 bg-amber-50 py-24 lg:py-32 overflow-hidden">
+            <section className="relative z-20 bg-amber-50 py-24 lg:py-32 overflow-hidden">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="text-center max-w-3xl mx-auto mb-20">
                         <SectionLabel text="Potenza Lab" />
@@ -543,7 +544,7 @@ export default function LandingPage() {
             </section>
 
             {/* --- POSITIONING DETAILS (White) --- */}
-            <section className="relative z-10 bg-white py-24 lg:py-32">
+            <section className="relative z-20 bg-white py-24 lg:py-32">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="grid md:grid-cols-2 gap-16">
                         {/* Per chi è */}
@@ -593,7 +594,7 @@ export default function LandingPage() {
             </section>
 
             {/* --- FAQ SECTION (Amber-50) --- */}
-            <section className="relative z-10 bg-amber-50 py-24 lg:py-32">
+            <section className="relative z-20 bg-amber-50 py-24 lg:py-32">
                 <div className="container mx-auto px-6 max-w-4xl">
                     <div className="text-center mb-16">
                         <SectionLabel text="Domande Frequenti" />
@@ -628,7 +629,7 @@ export default function LandingPage() {
             <WaveSeparator color="#F59E0B" height={60} />
 
             {/* --- PRICING (Bold Amber) --- */}
-            <section id="pricing" className="relative z-10 bg-[#F59E0B] py-24 lg:py-32 text-white overflow-hidden">
+            <section id="pricing" className="relative z-20 bg-[#F59E0B] py-24 lg:py-32 text-white overflow-hidden">
                 {/* Background Pattern */}
                 <div className="absolute inset-0 opacity-10"
                     style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}
@@ -702,7 +703,7 @@ export default function LandingPage() {
             </section>
 
             {/* --- TESTIMONIALS & FINAL CTA (White) --- */}
-            <section className="relative z-10 bg-white py-24 lg:py-32">
+            <section className="relative z-20 bg-white py-24 lg:py-32">
                 <div className="container mx-auto px-6 max-w-4xl text-center">
 
                     {/* Testimonial */}

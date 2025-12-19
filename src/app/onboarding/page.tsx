@@ -54,8 +54,55 @@ export default function OnboardingPage() {
                 `
             }} />
 
-            {/* Header */}
-            <Header />
+            {/* Dashboard-style Header */}
+            <header style={{
+                padding: '1rem 2rem',
+                borderBottom: '1px solid rgba(0,0,0,0.05)',
+                background: 'rgba(255,255,255,0.6)',
+                backdropFilter: 'blur(10px)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                position: 'relative',
+                zIndex: 20
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{
+                        width: '32px',
+                        height: '32px',
+                        background: gradients.primary,
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white'
+                    }}>
+                        <Icons.Logo size={20} />
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: '1.125rem', color: colors.text }}>Business Tuner</span>
+                </div>
+                <button
+                    onClick={() => router.push('/dashboard')}
+                    style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '8px',
+                        background: 'white',
+                        border: '1px solid rgba(0,0,0,0.1)',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        color: colors.text,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}
+                >
+                    <LayoutTemplate size={16} /> Dashboard
+                </button>
+            </header>
 
             {/* Main Content */}
             <main style={{
@@ -125,8 +172,29 @@ export default function OnboardingPage() {
                                         e.target.style.boxShadow = '0 10px 40px rgba(0,0,0,0.05)';
                                     }}
                                 />
-                                <div style={{ position: 'absolute', bottom: '1rem', right: '1rem' }}>
-                                    <Sparkles style={{ width: '20px', height: '20px', color: colors.amber }} />
+                                <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', display: 'flex', gap: '0.5rem' }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            // Mock AI Refine
+                                            alert("L'AI ti aiuterà a raffinare questo obiettivo in una versione più specifica (mock).");
+                                        }}
+                                        style={{
+                                            background: 'rgba(245, 158, 11, 0.1)',
+                                            color: colors.amberDark,
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            padding: '0.5rem 0.75rem',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.25rem'
+                                        }}
+                                    >
+                                        <Sparkles size={14} /> Refine with AI
+                                    </button>
                                 </div>
                             </div>
 

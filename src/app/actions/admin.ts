@@ -172,3 +172,39 @@ export async function createProject(name: string, ownerId: string) {
     revalidatePath('/dashboard/admin/projects');
     return project;
 }
+
+export async function createBot(projectId: string, name: string, goal: string) {
+    await requireAdmin();
+    console.log(`[AdminAction] Create Bot: projectId=${projectId} name=${name}`);
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
+
+    const bot = await prisma.bot.create({
+        data: {
+            name,
+            slug,
+            researchGoal: goal,
+            description: goal,
+            projectId,
+            status: 'DRAFT'
+        }
+    });
+
+    revalidatePath(`/dashboard/admin/projects/${projectId}`);
+    return bot;
+}
+
+export async function transferBot(botId: string, targetProjectId: string) {
+    await requireAdmin();
+    console.log(`[AdminAction] Transfer Bot: botId=${botId} to projectId=${targetProjectId}`);
+
+    const bot = await prisma.bot.update({
+        where: { id: botId },
+        data: {
+            projectId: targetProjectId
+        }
+    });
+
+    revalidatePath('/dashboard/admin/projects');
+    return bot;
+}

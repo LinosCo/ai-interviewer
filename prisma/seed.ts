@@ -5,6 +5,15 @@ const prisma = new PrismaClient()
 
 async function main() {
     const email = 'admin@example.com'
+    const socialEmail = 'social@linosandco.com'
+
+    // Remove seeded users to prevent conflicts/overwrites if requested
+    await prisma.user.deleteMany({
+        where: {
+            email: { in: [email, socialEmail] }
+        }
+    });
+
     const password = await bcrypt.hash('password123', 10)
 
     // Users are now managed via Admin UI or manual registration.

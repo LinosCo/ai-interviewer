@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { transferProject, createProject } from '@/app/actions/admin';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
@@ -40,6 +41,7 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
     const [createOwnerId, setCreateOwnerId] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
+    const router = useRouter(); // Added router
 
     const filteredProjects = projects.filter(project =>
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -129,7 +131,13 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
                                         <span className="text-red-500 italic">No Owner</span>
                                     )}
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                                    <button
+                                        onClick={() => router.push(`/dashboard/admin/projects/${project.id}`)}
+                                        className="text-gray-600 hover:text-gray-800 font-medium text-xs px-3 py-1 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors border border-gray-200"
+                                    >
+                                        View Details
+                                    </button>
                                     <button
                                         onClick={() => setSelectedProject(project)}
                                         className="text-amber-600 hover:text-amber-800 font-medium text-xs px-3 py-1 bg-amber-50 rounded-full hover:bg-amber-100 transition-colors"

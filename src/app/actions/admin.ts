@@ -1,25 +1,14 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
+import { auth } from '@/auth'; // Keeping auth if referenced elsewhere, but requireAdmin handles it
 import { UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { revalidatePath } from 'next/cache';
+import { requireAdmin } from '@/lib/admin-auth';
 
 // Middleware-like check for admin
-async function requireAdmin() {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Unauthorized');
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email }
-    });
-
-    if (!user || user.role !== 'ADMIN') {
-        throw new Error('Forbidden: Admin access required');
-    }
-    return user;
-}
+// Moved to @/lib/admin-auth
 
 export async function getUsers() {
     await requireAdmin();

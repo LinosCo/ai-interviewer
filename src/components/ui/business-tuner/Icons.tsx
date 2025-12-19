@@ -1,5 +1,6 @@
 import React from 'react';
 import { colors } from '@/lib/design-system';
+import { AlertCircle, FolderKanban } from 'lucide-react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
     size?: number | string;
@@ -244,4 +245,6 @@ export const Icons = {
             <polyline points="12,6 12,12 16,14" />
         </svg>
     ),
+    AlertCircle: (props: IconProps) => <AlertCircle {...props} />,
+    FolderKanban: (props: IconProps) => <FolderKanban {...props} />
 };

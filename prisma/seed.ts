@@ -7,6 +7,9 @@ async function main() {
     const email = 'admin@example.com'
     const password = await bcrypt.hash('password123', 10)
 
+    // Users are now managed via Admin UI or manual registration.
+    // Commenting out seed users to prevent overwrite on deploy.
+    /*
     const user = await prisma.user.upsert({
         where: { email },
         update: {}, // Don't overwrite existing admin data
@@ -17,10 +20,8 @@ async function main() {
             role: 'ADMIN',
         },
     })
-
     console.log({ user })
 
-    // Create the specific user requested
     const socialEmail = 'social@linosandco.com'
     const socialUser = await prisma.user.upsert({
         where: { email: socialEmail },
@@ -34,6 +35,7 @@ async function main() {
         },
     })
     console.log({ socialUser })
+    */
 
     // Initialize Global Config
     const config = await prisma.globalConfig.upsert({

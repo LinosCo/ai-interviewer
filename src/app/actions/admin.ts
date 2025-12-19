@@ -36,8 +36,39 @@ export async function getUsers() {
 export async function getProjects() {
     await requireAdmin();
     return await prisma.project.findMany({
-        orderBy: { name: 'asc' }
+        orderBy: { name: 'asc' },
+        include: {
+            owner: {
+                select: { id: true, name: true, email: true }
+            },
+            _count: {
+                select: { bots: true }
+            }
+        }
     });
+}
+
+export async function transferProject(projectId: string, newOwnerId: string) {
+    await requireAdmin();
+    console.log(`[AdminAction] Transfer Project: projectId=${projectId} to newOwner=${newOwnerId}`);
+
+    const project = await prisma.project.update({
+        where: { id: projectId },
+        data: {
+            ownerId: newOwnerId
+        }
+    });
+
+    // Also update access list to ensure new owner has access? 
+    // Usually owner has implicit access, but we might want to ensure it.
+    // The schema says Project has ownerId.
+    // Let's also ensure the user is in ProjectAccess if that's how we track basic visibility?
+    // Or does ownerId suffice?
+    // Looking at schema: User ownedProjects Project[].
+    // Usually owner implies full access.
+
+    revalidatePath('/dashboard/admin/projects');
+    return project;
 }
 
 export async function createUser(data: { name: string; email: string; password?: string; role: UserRole; projectIds: string[] }) {

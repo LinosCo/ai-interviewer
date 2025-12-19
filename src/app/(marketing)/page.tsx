@@ -99,14 +99,14 @@ export default function LandingPage() {
             `}</style>
 
             {/* --- MOVING EQUALIZER SEPARATOR --- */}
-            <div className="absolute top-0 left-0 right-0 h-1 z-30 flex items-end justify-center gap-[2px] opacity-10 pointer-events-none">
-                {Array.from({ length: 120 }).map((_, i) => (
+            <div className="absolute top-0 left-0 right-0 h-1 z-30 flex items-end justify-center gap-[6px] opacity-15 pointer-events-none">
+                {Array.from({ length: 60 }).map((_, i) => (
                     <div
                         key={i}
-                        className="w-[2px] bg-amber-500 rounded-t-full"
+                        className="w-[6px] bg-amber-400 rounded-t-lg"
                         style={{
-                            height: `${40 + Math.random() * 60}%`,
-                            animation: `equalizer ${4 + Math.random() * 6}s ease-in-out infinite`,
+                            height: `${30 + Math.random() * 40}%`,
+                            animation: `equalizer ${4 + Math.random() * 4}s ease-in-out infinite`,
                             animationDelay: `${Math.random() * 5}s`
                         }}
                     />
@@ -114,7 +114,7 @@ export default function LandingPage() {
             </div>
 
             {/* --- HERO SECTION (White) --- */}
-            <section className="relative z-10 pt-32 pb-48 lg:pt-48 lg:pb-72 overflow-hidden">
+            <section className="relative z-10 pt-32 pb-64 lg:pt-48 lg:pb-96 overflow-hidden bg-gradient-to-b from-white to-amber-50/30">
                 {/* Background Mesh (Subtle) */}
                 <div
                     className="absolute inset-0 pointer-events-none opacity-60"
@@ -249,15 +249,15 @@ export default function LandingPage() {
 
 
                 <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
-                    <div className="flex items-end justify-center gap-[4px] h-32 opacity-20 px-4">
-                        {Array.from({ length: 150 }).map((_, i) => (
+                    <div className="flex items-end justify-center gap-[6px] h-32 opacity-20 px-4">
+                        {Array.from({ length: 60 }).map((_, i) => (
                             <div
                                 key={i}
-                                className="w-[3px] bg-amber-400 rounded-lg"
+                                className="w-[8px] bg-white rounded-t-xl"
                                 style={{
-                                    height: `${10 + Math.sin(i / 10) * 40 + Math.random() * 30}%`,
-                                    animation: `equalizer ${5 + Math.random() * 8}s ease-in-out infinite`,
-                                    animationDelay: `${Math.random() * 8}s`
+                                    height: `${20 + Math.sin(i / 5) * 30 + Math.random() * 30}%`,
+                                    animation: `equalizer ${3 + Math.random() * 5}s ease-in-out infinite`,
+                                    animationDelay: `${Math.random() * 5}s`
                                 }}
                             />
                         ))}

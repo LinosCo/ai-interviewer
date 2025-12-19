@@ -72,6 +72,7 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
                         <div className="mt-6 pt-6 border-t border-gray-200/50">
                             <span className="text-xs text-amber-600 font-bold uppercase tracking-wider px-4 mb-3 block">Admin</span>
                             <DashboardLink href="/dashboard/admin/users" icon={<Icons.Users size={20} />} label="Gestione utenti" isAdmin onClick={() => setIsOpen(false)} />
+                            <DashboardLink href="/dashboard/admin/projects" icon={<Icons.FolderKanban size={20} />} label="Gestione progetti" isAdmin onClick={() => setIsOpen(false)} />
                         </div>
                     )}
                 </nav>

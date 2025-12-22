@@ -163,7 +163,7 @@ export default function LandingPage() {
                                     {typewriterText}
                                     <span className="animate-pulse">|</span>
                                 </span> <br />
-                                <span className="text-stone-900">Decidi meglio.</span>
+                                <span className="text-stone-900">decidi meglio.</span>
                             </h1>
 
                             <p className="text-xl text-stone-600 leading-relaxed mb-10 max-w-lg">
@@ -282,16 +282,8 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            <WaveSeparator
-                position="relative"
-                color="#FFFBEB"
-                height={300}
-                className="relative z-0"
-                style={{ marginTop: '-150px' }}
-            />
-
             {/* --- WHAT IS (Light Warm Background) --- */}
-            <section className="relative z-20 bg-[#FFFBEB] py-24 lg:py-32 overflow-hidden">
+            <section className="relative z-20 bg-[#FFFBEB] py-16 lg:py-24 overflow-hidden">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="grid lg:grid-cols-2 gap-16 items-center">
                         <div>

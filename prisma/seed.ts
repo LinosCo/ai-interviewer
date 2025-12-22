@@ -7,18 +7,13 @@ async function main() {
     const email = 'admin@example.com'
     const socialEmail = 'social@linosandco.com'
 
-    // Remove seeded users to prevent conflicts/overwrites if requested
-    await prisma.user.deleteMany({
-        where: {
-            email: { in: [email, socialEmail] }
-        }
-    });
+    // Ensuring seed users exist. Using upsert to avoid overwriting existing data if present.
+    // NOTE: This ensures login works after a fresh deploy or if users were accidentally deleted.
 
     const password = await bcrypt.hash('password123', 10)
 
     // Users are now managed via Admin UI or manual registration.
     // Commenting out seed users to prevent overwrite on deploy.
-    /*
     const user = await prisma.user.upsert({
         where: { email },
         update: {}, // Don't overwrite existing admin data
@@ -31,7 +26,6 @@ async function main() {
     })
     console.log({ user })
 
-    const socialEmail = 'social@linosandco.com'
     const socialUser = await prisma.user.upsert({
         where: { email: socialEmail },
         update: {}, // Don't overwrite existing user data
@@ -44,7 +38,6 @@ async function main() {
         },
     })
     console.log({ socialUser })
-    */
 
     // Initialize Global Config
     const config = await prisma.globalConfig.upsert({

@@ -1,12 +1,28 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to prevent build errors when API key is not set
+let resend: Resend | null = null;
+
+function getResendClient() {
+    if (!resend && process.env.RESEND_API_KEY) {
+        resend = new Resend(process.env.RESEND_API_KEY);
+    }
+    return resend;
+}
+
 
 export async function sendPasswordResetEmail(email: string, resetToken: string) {
+    const resendClient = getResendClient();
+
+    if (!resendClient) {
+        console.error('Resend API key not configured');
+        return { success: false, error: 'Email service not configured' };
+    }
+
     const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
 
     try {
-        const { data, error } = await resend.emails.send({
+        const { data, error } = await resendClient.emails.send({
             from: process.env.EMAIL_FROM || 'Business Tuner <noreply@businesstuner.ai>',
             to: [email],
             subject: 'Recupera la tua password - Business Tuner',

@@ -14,6 +14,9 @@ async function main() {
 
     // Users are now managed via Admin UI or manual registration.
     // Commenting out seed users to prevent overwrite on deploy.
+    // Users are now managed via Admin UI or manual registration.
+    // Commenting out seed users to prevent overwrite on deploy.
+    /*
     const user = await prisma.user.upsert({
         where: { email },
         update: {}, // Don't overwrite existing admin data
@@ -38,6 +41,7 @@ async function main() {
         },
     })
     console.log({ socialUser })
+    */
 
     // Initialize Global Config
     const config = await prisma.globalConfig.upsert({

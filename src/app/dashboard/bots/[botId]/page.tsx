@@ -6,6 +6,7 @@ import TopicsEditor from './topics-editor';
 import KnowledgeSourcesEditor from './knowledge-sources';
 import LegalPrivacyEditor from './legal-privacy-editor';
 import RewardEditor from './reward-editor';
+import ProjectSelector from './project-selector';
 import Link from 'next/link';
 import CopyLinkButton from '@/components/copy-link-button';
 
@@ -14,6 +15,22 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
     if (!session?.user?.email) redirect('/login');
 
     const { botId } = await params;
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: {
+            ownedProjects: true,
+            projectAccess: { include: { project: true } }
+        }
+    });
+
+    const userProjects = [
+        ...(user?.ownedProjects || []),
+        ...(user?.projectAccess.map(pa => pa.project) || [])
+    ];
+
+    // Unique by ID
+    const projects = Array.from(new Map(userProjects.map(p => [p.id, p])).values());
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
@@ -51,6 +68,12 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                 </div>
 
                 <div className="space-y-8">
+                    <ProjectSelector
+                        botId={bot.id}
+                        currentProjectId={bot.projectId}
+                        projects={projects}
+                    />
+
                     <KnowledgeSourcesEditor botId={bot.id} sources={bot.knowledgeSources} />
 
                     <LegalPrivacyEditor

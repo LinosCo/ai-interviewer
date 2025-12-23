@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Loader2, Check } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { showToast } from '@/components/toast';
+import { refineTextAction } from '@/app/actions';
 
 interface RefineInputProps {
     name: string;
@@ -26,24 +27,12 @@ export default function RefineInput({ name, label, defaultValue, placeholder, fi
 
         setIsRefining(true);
         try {
-            const response = await fetch('/api/bots/refine', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: value,
-                    fieldType,
-                    context
-                })
-            });
-
-            if (!response.ok) throw new Error('Refinement failed');
-
-            const data = await response.json();
-            setValue(data.refinedText);
+            const refined = await refineTextAction(value, label, context || '');
+            setValue(refined);
             showToast('Text refined successfully!', 'success');
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            showToast('Failed to refine text', 'error');
+            showToast('Failed to refine text: ' + error.message, 'error');
         } finally {
             setIsRefining(false);
         }

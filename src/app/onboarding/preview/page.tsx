@@ -15,8 +15,10 @@ import {
     Sparkles,
     Trash2,
     X,
-    Save
+    Save,
+    Folder
 } from 'lucide-react';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 import SimulatorChat from '@/components/simulator/simulator-chat';
 import { colors, gradients, shadows } from '@/lib/design-system';
 import { Header } from '@/components/Header';
@@ -54,6 +56,20 @@ export default function PreviewPage() {
     const [showSimulator, setShowSimulator] = useState(false);
     const [copied, setCopied] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
+    const [projects, setProjects] = useState<{ id: string, name: string }[]>([]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+    const [isRefining, setIsRefining] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Fetch projects if possible
+        fetch('/api/projects')
+            .then(res => res.ok ? res.json() : [])
+            .then(data => {
+                setProjects(data);
+                if (data.length > 0) setSelectedProjectId(data[0].id);
+            })
+            .catch(() => { });
+    }, []);
 
     useEffect(() => {
         const stored = sessionStorage.getItem('generatedConfig');
@@ -135,6 +151,34 @@ export default function PreviewPage() {
         setExpandedTopics(newExpanded);
     };
 
+    const handleRefine = async (fieldType: string, currentText: string, context?: any) => {
+        if (!currentText) return;
+        setIsRefining(fieldType === 'subGoal' ? `subGoal-${context.topicIndex}-${context.goalIndex}` : fieldType);
+        try {
+            const response = await fetch('/api/ai/refine', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: currentText,
+                    fieldType,
+                    context: JSON.stringify(context)
+                }),
+            });
+            if (response.ok) {
+                const { refinedText } = await response.json();
+                if (fieldType === 'researchGoal') updateConfig({ researchGoal: refinedText });
+                if (fieldType === 'introMessage') updateConfig({ introMessage: refinedText });
+                if (fieldType === 'topicLabel') updateTopic(context.index, { label: refinedText });
+                if (fieldType === 'topicDescription') updateTopic(context.index, { description: refinedText });
+                if (fieldType === 'subGoal') updateSubGoal(context.topicIndex, context.goalIndex, refinedText);
+            }
+        } catch (err) {
+            console.error('Refine error:', err);
+        } finally {
+            setIsRefining(null);
+        }
+    };
+
     const handlePublish = async () => {
         if (!config) return;
 
@@ -144,7 +188,10 @@ export default function PreviewPage() {
             const response = await fetch('/api/bots/create-from-config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config),
+                body: JSON.stringify({
+                    ...config,
+                    projectId: selectedProjectId || undefined
+                }),
             });
 
             if (!response.ok) {
@@ -307,13 +354,23 @@ export default function PreviewPage() {
                                 rows={3}
                                 autoFocus
                             />
-                            <button
-                                onClick={() => setEditingGoal(false)}
-                                className="px-3 py-1.5 text-white text-sm rounded-lg flex items-center gap-1 font-medium shadow-sm transition-transform active:scale-95"
-                                style={{ background: gradients.primary }}
-                            >
-                                <Save className="w-3 h-3" /> Salva
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setEditingGoal(false)}
+                                    className="px-3 py-1.5 text-white text-sm rounded-lg flex items-center gap-1 font-medium shadow-sm transition-transform active:scale-95"
+                                    style={{ background: gradients.primary }}
+                                >
+                                    <Save className="w-3 h-3" /> Salva
+                                </button>
+                                <button
+                                    onClick={() => handleRefine('researchGoal', config.researchGoal)}
+                                    disabled={isRefining === 'researchGoal'}
+                                    className="px-3 py-1.5 bg-amber-50 text-amber-700 text-sm rounded-lg flex items-center gap-1 font-medium border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                                >
+                                    <Sparkles className={`w-3 h-3 ${isRefining === 'researchGoal' ? 'animate-spin' : ''}`} />
+                                    {isRefining === 'researchGoal' ? 'Raffinando...' : 'Refine with AI'}
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <p className="text-gray-700 leading-relaxed">{config.researchGoal}</p>
@@ -339,13 +396,23 @@ export default function PreviewPage() {
                                 rows={3}
                                 autoFocus
                             />
-                            <button
-                                onClick={() => setEditingIntro(false)}
-                                className="px-3 py-1.5 text-white text-sm rounded-lg flex items-center gap-1 font-medium shadow-sm transition-transform active:scale-95"
-                                style={{ background: gradients.primary }}
-                            >
-                                <Save className="w-3 h-3" /> Fatto
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setEditingIntro(false)}
+                                    className="px-3 py-1.5 text-white text-sm rounded-lg flex items-center gap-1 font-medium shadow-sm transition-transform active:scale-95"
+                                    style={{ background: gradients.primary }}
+                                >
+                                    <Save className="w-3 h-3" /> Fatto
+                                </button>
+                                <button
+                                    onClick={() => handleRefine('introMessage', config.introMessage)}
+                                    disabled={isRefining === 'introMessage'}
+                                    className="px-3 py-1.5 bg-amber-50 text-amber-700 text-sm rounded-lg flex items-center gap-1 font-medium border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-50"
+                                >
+                                    <Sparkles className={`w-3 h-3 ${isRefining === 'introMessage' ? 'animate-spin' : ''}`} />
+                                    {isRefining === 'introMessage' ? 'Raffinando...' : 'Refine with AI'}
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <p className="text-gray-600 italic">"{config.introMessage}"</p>
@@ -378,14 +445,23 @@ export default function PreviewPage() {
                                         {index + 1}
                                     </span>
                                     {editingTopicIndex === index ? (
-                                        <input
-                                            type="text"
-                                            value={topic.label}
-                                            onChange={(e) => updateTopic(index, { label: e.target.value })}
-                                            onClick={(e) => e.stopPropagation()}
-                                            className="bg-transparent text-gray-900 font-bold border-b border-amber-500 focus:outline-none"
-                                            autoFocus
-                                        />
+                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                                type="text"
+                                                value={topic.label}
+                                                onChange={(e) => updateTopic(index, { label: e.target.value })}
+                                                className="bg-transparent text-gray-900 font-bold border-b border-amber-500 focus:outline-none"
+                                                autoFocus
+                                            />
+                                            <button
+                                                onClick={() => handleRefine('topicLabel', topic.label, { index })}
+                                                disabled={isRefining === 'topicLabel'}
+                                                className="p-1 text-amber-600 hover:bg-amber-50 rounded transition-colors disabled:opacity-50"
+                                                title="Raffina titolo con AI"
+                                            >
+                                                <Sparkles size={14} className={isRefining === 'topicLabel' ? 'animate-spin' : ''} />
+                                            </button>
+                                        </div>
                                     ) : (
                                         <span className="text-gray-900 font-bold">{topic.label}</span>
                                     )}
@@ -419,7 +495,19 @@ export default function PreviewPage() {
                                 <div className="px-4 pb-4 space-y-4 border-t border-gray-100 pt-3 bg-gray-50/50">
                                     {/* Description */}
                                     <div>
-                                        <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1 font-semibold">Descrizione</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Descrizione</label>
+                                            {editingTopicIndex === index && (
+                                                <button
+                                                    onClick={() => handleRefine('topicDescription', topic.description, { index })}
+                                                    disabled={isRefining === 'topicDescription'}
+                                                    className="text-xs text-amber-600 hover:text-amber-700 flex items-center gap-1 font-medium disabled:opacity-50"
+                                                >
+                                                    <Sparkles size={12} className={isRefining === 'topicDescription' ? 'animate-spin' : ''} />
+                                                    Raffina con AI
+                                                </button>
+                                            )}
+                                        </div>
                                         {editingTopicIndex === index ? (
                                             <textarea
                                                 value={topic.description}
@@ -457,6 +545,14 @@ export default function PreviewPage() {
                                                                 onChange={(e) => updateSubGoal(index, i, e.target.value)}
                                                                 className="flex-1 bg-white text-gray-800 rounded px-2 py-1 text-sm border border-gray-200 focus:outline-none focus:border-amber-500"
                                                             />
+                                                            <button
+                                                                onClick={() => handleRefine('subGoal', goal, { topicIndex: index, goalIndex: i })}
+                                                                disabled={isRefining === `subGoal-${index}-${i}`}
+                                                                className="p-1 text-amber-600 hover:bg-amber-100 rounded transition-colors disabled:opacity-50"
+                                                                title="Raffina con AI"
+                                                            >
+                                                                <Sparkles size={12} className={isRefining === `subGoal-${index}-${i}` ? 'animate-spin' : ''} />
+                                                            </button>
                                                             {topic.subGoals.length > 1 && (
                                                                 <button
                                                                     onClick={() => removeSubGoal(index, i)}
@@ -488,6 +584,28 @@ export default function PreviewPage() {
                         </div>
                     ))}
                 </div>
+
+                {/* Project Selector - Shown if projects exist */}
+                {projects.length > 0 && (
+                    <div className="bg-white/40 backdrop-blur-sm rounded-xl p-4 border border-white/60 shadow-sm transition-all hover:bg-white/60">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 text-gray-700">
+                                <Folder className="w-5 h-5 text-amber-500" />
+                                <span className="font-semibold">Associa a un progetto</span>
+                            </div>
+                            <select
+                                value={selectedProjectId}
+                                onChange={(e) => setSelectedProjectId(e.target.value)}
+                                className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 min-w-[200px] shadow-sm cursor-pointer"
+                            >
+                                <option value="">Progetto personale (default)</option>
+                                {projects.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4 pt-6">

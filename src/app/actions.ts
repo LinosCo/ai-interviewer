@@ -242,6 +242,34 @@ export async function updateBotAction(botId: string, formData: FormData) {
     return { success: true };
 }
 
+export async function updateBotProjectAction(botId: string, projectId: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    // Verify access to bot
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: { project: true }
+    });
+    if (!bot) throw new Error("Bot not found");
+
+    // Verify user owns the project or is admin
+    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    if (!user) throw new Error("User not found");
+
+    const newProject = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!newProject) throw new Error("Target project not found");
+
+    await prisma.bot.update({
+        where: { id: botId },
+        data: { projectId }
+    });
+
+    revalidatePath(`/dashboard/bots/${botId}`);
+    revalidatePath('/dashboard');
+    return { success: true };
+}
+
 export async function generateBotConfigAction(prompt: string) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
@@ -624,7 +652,7 @@ export async function refineTextAction(currentText: string, fieldName: string, c
 
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) throw new Error("User not found");
-    // Refine text doesn't have a bot context usually, so it relies on User keys.
+
     const apiKey = await getEffectiveApiKey(user);
     if (!apiKey) throw new Error("No OpenAI API Key configured. Please add one in Settings.");
 
@@ -638,25 +666,36 @@ export async function refineTextAction(currentText: string, fieldName: string, c
         methodology = fs.readFileSync(path.join(process.cwd(), 'knowledge', 'interview-methodology.md'), 'utf-8');
     } catch (e) { console.error("Failed to load methodology", e); }
 
+    let fieldInstructions = "";
+    const lowerFieldName = fieldName.toLowerCase();
+
+    if (lowerFieldName.includes('intro') || lowerFieldName.includes('benvenuto')) {
+        fieldInstructions = "Rendi il messaggio di benvenuto coinvolgente, chiaro e DEVE terminare con una domanda aperta che inviti alla conversazione (es: \"Raccontami...\", \"Cosa ne pensi...\").";
+    } else if (lowerFieldName.includes('goal') || lowerFieldName.includes('obiettivo')) {
+        fieldInstructions = "Trasforma l'obiettivo in una dichiarazione di ricerca ultra-professionale. Focus sul valore di business.";
+    } else if (lowerFieldName.includes('target') || lowerFieldName.includes('pubblico')) {
+        fieldInstructions = "Rendi la descrizione del target precisa e professionale.";
+    }
+
     const { object } = await generateObject({
-        model: openai('gpt-4o'),
+        model: openai('gpt-4o-mini'),
         schema: z.object({ text: z.string() }),
-        prompt: `Refine the following text for the field "${fieldName}" in a user research bot configuration.
-        Context: The bot is named or about: "${context}".
+        prompt: `Sei un esperto di ricerca qualitativa e UX Research. Il tuo compito è raffinare il seguente testo per il campo "${fieldName}".
         
-        Refer to this INTERVIEW METHODOLOGY for tone and style:
+        Context: "${context}".
+        
+        Using the following INTERVIEW METHODOLOGY as context for quality:
         ${methodology.substring(0, 1500)}...
 
-        Current Text: "${currentText}"
+        ${fieldInstructions}
+
+        Current Text to refine: "${currentText}"
         
         GOAL: Improve clarity and IMPACT, but ensure the tone is **NATURAL, CONVERSATIONAL, and AUTHENTIC**.
         - AVOID: "Corporate speak", overly formal language, rigid academic phrasing.
         - PREFER: Warm, engaging, spoken-like language. 
-        - If it's a Goal description, make it actionable.
-        - If it's a Topic label or specific question, make it sound like a human asking.
-
-        IMPORTANT: If the Current Text is in Italian, the refined text MUST be in Italian.
-        If the Current Text is in English, keep it in English. detect the language and stick to it.`,
+        - IMPORTANT: If the Current Text is in Italian, the refined text MUST be in Italian.
+        - Respond ONLY with the refined text, no quotes or additional comments.`,
     });
 
     return object.text;

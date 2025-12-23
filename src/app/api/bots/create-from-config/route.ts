@@ -33,15 +33,30 @@ export async function POST(req: Request) {
 
         const config = await req.json();
 
-        // Get or create default project
-        let project = user.ownedProjects[0];
-        if (!project) {
-            project = await prisma.project.create({
-                data: {
-                    name: 'Il mio workspace',
-                    ownerId: user.id
-                }
-            });
+        // Use provided projectId or get default project
+        let projectId = config.projectId;
+
+        if (!projectId) {
+            let project = user.ownedProjects[0];
+            if (!project) {
+                project = await prisma.project.create({
+                    data: {
+                        name: 'Il mio workspace',
+                        ownerId: user.id
+                    }
+                });
+            }
+            projectId = project.id;
+        } else {
+            // Verify access (basic check: user owns it or has access via ProjectAccess)
+            const hasAccess = user.ownedProjects.some(p => p.id === projectId) ||
+                await prisma.projectAccess.findUnique({
+                    where: { userId_projectId: { userId: user.id, projectId } }
+                });
+
+            if (!hasAccess) {
+                return new Response('Forbidden: Acceduto negato al progetto', { status: 403 });
+            }
         }
 
         // Create the bot with topics
@@ -49,7 +64,7 @@ export async function POST(req: Request) {
 
         const bot = await prisma.bot.create({
             data: {
-                projectId: project.id,
+                projectId,
                 slug,
                 name: config.name || 'Nuova intervista',
                 description: config.researchGoal,

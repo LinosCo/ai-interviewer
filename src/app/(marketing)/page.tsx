@@ -292,6 +292,26 @@ export default function LandingPage() {
 
             <WaveSeparator color="#FFFBEB" height={80} />
 
+            {/* --- STATS (Light Warm Background) --- */}
+            <section className="relative z-20 bg-[#FFFBEB] py-8 lg:py-12">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center divide-y md:divide-y-0 md:divide-x divide-amber-500/10">
+                        {[
+                            { value: '70%+', label: 'Rate di completamento' },
+                            { value: '10x', label: 'Più economico e veloce' },
+                            { value: '∞', label: 'Scalabilità immediata' }
+                        ].map((stat, i) => (
+                            <div key={i} className="pt-8 md:pt-0 px-4">
+                                <div className="text-5xl lg:text-6xl font-bold text-amber-500 mb-2 font-display tracking-tight">
+                                    {stat.value}
+                                </div>
+                                <div className="text-stone-600 font-medium uppercase tracking-wide text-sm">{stat.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* --- WHAT IS (Light Warm Background) --- */}
             <section className="relative z-20 bg-[#FFFBEB] py-16 lg:py-24 overflow-hidden">
                 <div className="container mx-auto px-6 max-w-7xl">
@@ -400,28 +420,9 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* --- STATS & HOW IT WORKS (Light Warm Background) --- */}
+            {/* --- HOW IT WORKS (Light Warm Background) --- */}
             <section className="relative z-20 bg-[#FFFBEB] py-24 lg:py-32">
 
-                {/* Stats */}
-                <div className="container mx-auto px-6 max-w-7xl mb-32">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center divide-y md:divide-y-0 md:divide-x divide-amber-500/10">
-                        {[
-                            { value: '70%+', label: 'Rate di completamento' },
-                            { value: '10x', label: 'Più economico e veloce' },
-                            { value: '∞', label: 'Scalabilità immediata' }
-                        ].map((stat, i) => (
-                            <div key={i} className="pt-8 md:pt-0 px-4">
-                                <div className="text-5xl lg:text-6xl font-bold text-amber-500 mb-2 font-display tracking-tight">
-                                    {stat.value}
-                                </div>
-                                <div className="text-stone-600 font-medium uppercase tracking-wide text-sm">{stat.label}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* How it works */}
                 <div id="how-it-works" className="container mx-auto px-6 max-w-7xl">
                     <div className="text-center max-w-3xl mx-auto mb-20">
                         <SectionLabel text="Come Funziona" />

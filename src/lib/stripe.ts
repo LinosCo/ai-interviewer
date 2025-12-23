@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
+import { PLANS, PlanType } from '@/config/plans';
 
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
@@ -66,9 +67,6 @@ export async function getStripeClient(): Promise<Stripe> {
 
     const config = await getStripeConfig();
     if (!config || !config.secretKey) {
-        // Fallback to empty string to avoid crash during build/init if not needed,
-        // but throw explicit error when used.
-        // Actually, better to throw here if this function is called, it means we NEED stripe.
         throw new Error("Stripe is not configured. Please set env vars or configure in dashboard.");
     }
 
@@ -82,70 +80,73 @@ export async function getStripeClient(): Promise<Stripe> {
 
 export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
     const config = await getStripeConfig();
-    const prices = config?.prices || { STARTER: null, PRO: null, BUSINESS: null };
+    const dbPrices = config?.prices || {};
+
+    const getPriceId = (tier: PlanType) => {
+        const upperTier = tier.toUpperCase() as keyof typeof dbPrices;
+        return dbPrices[upperTier] || PLANS[tier].stripePriceId || null;
+    };
 
     return {
         FREE: {
-            name: 'Free',
-            price: 0,
+            name: PLANS[PlanType.TRIAL].name,
+            price: PLANS[PlanType.TRIAL].price,
             priceId: null,
             features: {
-                maxActiveBots: 1,
-                maxInterviewsPerMonth: 30,
-                maxUsers: 1,
-                watermark: true,
-                customBranding: false,
-                advancedAnalytics: false,
-                apiAccess: false,
+                maxActiveBots: PLANS[PlanType.TRIAL].activeInterviews,
+                maxInterviewsPerMonth: PLANS[PlanType.TRIAL].responsesPerMonth,
+                maxUsers: PLANS[PlanType.TRIAL].users,
+                watermark: PLANS[PlanType.TRIAL].features.watermark,
+                customBranding: PLANS[PlanType.TRIAL].features.customLogo,
+                advancedAnalytics: PLANS[PlanType.TRIAL].features.basicStats,
+                apiAccess: PLANS[PlanType.TRIAL].features.apiAccess,
             },
         },
         STARTER: {
-            name: 'Starter',
-            price: 29,
-            priceId: prices.STARTER || process.env.STRIPE_PRICE_STARTER || null,
+            name: PLANS[PlanType.STARTER].name,
+            price: PLANS[PlanType.STARTER].price,
+            priceId: getPriceId(PlanType.STARTER),
             features: {
-                maxActiveBots: 3,
-                maxInterviewsPerMonth: 150,
-                maxUsers: 1,
-                watermark: false,
-                customBranding: false,
-                advancedAnalytics: false,
-                apiAccess: false,
+                maxActiveBots: PLANS[PlanType.STARTER].activeInterviews,
+                maxInterviewsPerMonth: PLANS[PlanType.STARTER].responsesPerMonth,
+                maxUsers: PLANS[PlanType.STARTER].users,
+                watermark: PLANS[PlanType.STARTER].features.watermark,
+                customBranding: PLANS[PlanType.STARTER].features.customLogo,
+                advancedAnalytics: PLANS[PlanType.STARTER].features.basicStats,
+                apiAccess: PLANS[PlanType.STARTER].features.apiAccess,
             },
         },
         PRO: {
-            name: 'Pro',
-            price: 79,
-            priceId: prices.PRO || process.env.STRIPE_PRICE_PRO || null,
+            name: PLANS[PlanType.PRO].name,
+            price: PLANS[PlanType.PRO].price,
+            priceId: getPriceId(PlanType.PRO),
             features: {
-                maxActiveBots: 10,
-                maxInterviewsPerMonth: 500,
-                maxUsers: 3,
-                watermark: false,
-                customBranding: true,
-                advancedAnalytics: true,
-                apiAccess: true,
+                maxActiveBots: PLANS[PlanType.PRO].activeInterviews,
+                maxInterviewsPerMonth: PLANS[PlanType.PRO].responsesPerMonth,
+                maxUsers: PLANS[PlanType.PRO].users,
+                watermark: PLANS[PlanType.PRO].features.watermark,
+                customBranding: PLANS[PlanType.PRO].features.customLogo,
+                advancedAnalytics: PLANS[PlanType.PRO].features.basicStats,
+                apiAccess: PLANS[PlanType.PRO].features.apiAccess,
             },
         },
         BUSINESS: {
-            name: 'Business',
-            price: 199,
-            priceId: prices.BUSINESS || process.env.STRIPE_PRICE_BUSINESS || null,
+            name: PLANS[PlanType.BUSINESS].name,
+            price: PLANS[PlanType.BUSINESS].price,
+            priceId: getPriceId(PlanType.BUSINESS),
             features: {
-                maxActiveBots: -1, // unlimited
-                maxInterviewsPerMonth: 2000,
-                maxUsers: 10,
-                watermark: false,
-                customBranding: true,
-                advancedAnalytics: true,
-                apiAccess: true,
-                sso: true,
-                prioritySupport: true,
+                maxActiveBots: PLANS[PlanType.BUSINESS].activeInterviews,
+                maxInterviewsPerMonth: PLANS[PlanType.BUSINESS].responsesPerMonth,
+                maxUsers: PLANS[PlanType.BUSINESS].users,
+                watermark: PLANS[PlanType.BUSINESS].features.watermark,
+                customBranding: PLANS[PlanType.BUSINESS].features.customLogo,
+                advancedAnalytics: PLANS[PlanType.BUSINESS].features.basicStats,
+                apiAccess: PLANS[PlanType.BUSINESS].features.apiAccess,
             },
         },
         ENTERPRISE: {
             name: 'Enterprise',
-            price: null, // custom
+            price: null,
             priceId: null,
             features: {
                 maxActiveBots: -1,

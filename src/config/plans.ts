@@ -82,6 +82,10 @@ export interface PlanConfig {
 
     // Limiti nascosti (enforcement)
     limits: PlanLimits;
+
+    // Stripe
+    stripePriceId?: string;
+    stripePriceIdYearly?: string;
 }
 
 export const PLANS: Record<PlanType, PlanConfig> = {
@@ -145,7 +149,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 2,
             messageCooldownSeconds: 3
-        }
+        },
+
+        stripePriceId: undefined, // Free/Trial doesn't have a Stripe price
+        stripePriceIdYearly: undefined
     },
 
     [PlanType.STARTER]: {
@@ -208,7 +215,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 10,
             messageCooldownSeconds: 2
-        }
+        },
+
+        stripePriceId: process.env.STRIPE_PRICE_STARTER,
+        stripePriceIdYearly: process.env.STRIPE_PRICE_STARTER_YEARLY
     },
 
     [PlanType.PRO]: {
@@ -271,7 +281,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 30,
             messageCooldownSeconds: 1
-        }
+        },
+
+        stripePriceId: process.env.STRIPE_PRICE_PRO,
+        stripePriceIdYearly: process.env.STRIPE_PRICE_PRO_YEARLY
     },
 
     [PlanType.BUSINESS]: {
@@ -334,6 +347,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 100,
             messageCooldownSeconds: 0.5
-        }
+        },
+
+        stripePriceId: process.env.STRIPE_PRICE_BUSINESS,
+        stripePriceIdYearly: process.env.STRIPE_PRICE_BUSINESS_YEARLY
     }
 };

@@ -18,13 +18,15 @@ export async function GET(req: NextRequest) {
         }
 
         // Validate tier
-        if (!tier || !['STARTER', 'PRO', 'BUSINESS'].includes(tier)) {
+        const normalizedTier = tier?.toUpperCase();
+        if (!normalizedTier || !['STARTER', 'PRO', 'BUSINESS'].includes(normalizedTier)) {
             return new NextResponse('Invalid tier', { status: 400 });
         }
+        const tierKey = normalizedTier as PlanKey;
 
         const stripe = await getStripeClient();
         const plans = await getPricingPlans();
-        const plan = plans[tier as PlanKey];
+        const plan = plans[tierKey];
 
         if (!plan || !plan.priceId) {
             return new NextResponse('Price not configured or invalid plan', { status: 500 });
@@ -151,24 +153,26 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) { // Changed NextRequest to Request
     try {
-        const { tier, successUrl, cancelUrl } = await req.json(); // Moved up and kept successUrl/cancelUrl
+        const { tier, successUrl, cancelUrl } = await req.json();
         const session = await auth();
 
         if (!session?.user?.email) {
-            return new NextResponse('Unauthorized', { status: 401 }); // Changed Response to NextResponse
+            return new NextResponse('Unauthorized', { status: 401 });
         }
 
         // Validate tier
-        if (!tier || !['STARTER', 'PRO', 'BUSINESS'].includes(tier)) {
-            return new NextResponse('Invalid tier', { status: 400 }); // Changed Response to NextResponse
+        const normalizedTier = tier?.toUpperCase();
+        if (!normalizedTier || !['STARTER', 'PRO', 'BUSINESS'].includes(normalizedTier)) {
+            return new NextResponse('Invalid tier', { status: 400 });
         }
+        const tierKey = normalizedTier as PlanKey;
 
-        const stripe = await getStripeClient(); // New
-        const plans = await getPricingPlans(); // New
-        const plan = plans[tier as PlanKey]; // Use plans from getPricingPlans
+        const stripe = await getStripeClient();
+        const plans = await getPricingPlans();
+        const plan = plans[tierKey];
 
-        if (!plan || !plan.priceId) { // Combined plan existence and priceId check
-            return new NextResponse('Price not configured or invalid plan', { status: 500 }); // Changed Response to NextResponse
+        if (!plan || !plan.priceId) {
+            return new NextResponse('Price not configured or invalid plan', { status: 500 });
         }
 
         // Get user and organization

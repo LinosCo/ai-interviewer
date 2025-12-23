@@ -319,24 +319,82 @@ export default function LandingPage() {
                             </div>
                         </div>
 
+                        {/* Typeform-Style Interview Demo */}
                         <div className="relative">
-                            <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-amber-100 relative z-10">
-                                <div className="space-y-6">
-                                    {[
-                                        { q: "Benvenuto! Raccontami della tua esperienza con il checkout.", a: "Il form è troppo lungo, ho abbandonato a metà." },
-                                        { q: "Capisco. Quale campo ti è sembrato più superfluo?", a: "Mi chiedeva il CAP due volte, una per fatturazione e una per spedizione." },
-                                        { q: "Interessante. C'è stato un momento in cui hai pensato di abbandonare?", a: "Sì, quando mi ha chiesto di creare un account prima di pagare." }
-                                    ].map((chat, i) => (
-                                        <div key={i} className={`flex ${i % 2 !== 0 ? 'justify-end' : ''}`}>
-                                            <div className={`max-w-[80%] p-4 rounded-2xl ${i % 2 !== 0 ? 'bg-amber-100 text-amber-900 rounded-tr-none border border-amber-200' : 'bg-stone-100 text-stone-900 rounded-tl-none border border-stone-100'}`}>
-                                                <p className="text-sm">{i % 2 === 0 ? chat.q : chat.a}</p>
+                            {/* Interview Card */}
+                            <div className="bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-amber-100 relative z-10">
+                                {/* Orange Header */}
+                                <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                            <Icons.MessageSquare size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg">UX Research - Checkout</h3>
+                                            <p className="text-sm text-white/80">Target: E-commerce Users</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Interview Content */}
+                                <div className="p-6 space-y-6">
+                                    {/* Question 1 */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                                <Icons.MessageSquare size={16} className="text-amber-600" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-stone-700 font-medium mb-3">
+                                                    Benvenuto! Raccontami della tua esperienza con il checkout.
+                                                </p>
+                                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
+                                                    <p className="text-amber-900 text-sm">
+                                                        Il form è troppo lungo, ho abbandonato a metà.
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    </div>
+
+                                    {/* Question 2 */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                                <Icons.Users size={16} className="text-stone-600" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-stone-700 font-medium mb-3">
+                                                    Quale campo specifico ti è sembrato più superfluo?
+                                                </p>
+                                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
+                                                    <p className="text-amber-900 text-sm">
+                                                        Mi chiedeva il CAP due volte, una per fatturazione e una per spedizione.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Insight Section */}
+                                    <div className="mt-6 pt-6 border-t border-stone-100">
+                                        <div className="flex items-start gap-3 bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                                            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <Icons.Zap size={16} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-emerald-900 text-sm mb-1">Insight Trovato</p>
+                                                <p className="text-emerald-800 text-sm">
+                                                    Il <span className="font-bold">43%</span> degli utenti abbandona per campi duplicati o ridondanti.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            {/* Decorative background element */}
-                            <div className="absolute -inset-4 bg-amber-500/10 rounded-[4rem] blur-3xl -z-10 animate-pulse" />
+
+                            {/* Decorative glow */}
+                            <div className="absolute -inset-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-[3rem] blur-2xl -z-10" />
                         </div>
                     </div>
                 </div>

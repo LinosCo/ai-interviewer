@@ -59,7 +59,7 @@ export async function POST(req: Request) {
             targetAudience: z.string().describe('Identikit preciso del target audience'),
             tone: z.string().describe('Tono suggerito (es: Curioso e Professionale, Empatico e Aperto)'),
             maxDurationMins: z.number().describe('Durata ottimale (max 15 min per non stancare)'),
-            introMessage: z.string().describe('Hook iniziale che motivi l\'utente a partecipare'),
+            introMessage: z.string().describe('Hook iniziale che motivi l\'utente a partecipare. DEVE terminare con una domanda aperta (es: "Raccontami...", "Cosa ne pensi di...", "Come descriveresti...")'),
             topics: z.array(z.object({
                 label: z.string().describe('Titolo del macro-tema'),
                 description: z.string().describe('Perché è importante esplorare questo tema'),

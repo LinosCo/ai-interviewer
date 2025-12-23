@@ -98,8 +98,8 @@ export async function GET(req: NextRequest) {
                     quantity: 1
                 }
             ],
-            success_url: successUrl || `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?upgrade=success`,
-            cancel_url: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL}/pricing?upgrade=canceled`,
+            success_url: successUrl || `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/dashboard?upgrade=success`,
+            cancel_url: cancelUrl || `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/pricing?upgrade=canceled`,
             metadata: {
                 organizationId: organization.id,
                 tier

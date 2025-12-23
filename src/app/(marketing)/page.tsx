@@ -1,10 +1,59 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { colors, gradients } from '@/lib/design-system';
-import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { Button } from '@/components/ui/business-tuner/Button';
+
+const WaveSeparator = ({
+    position = 'bottom',
+    color = '#FFFBEB',
+    height = 60,
+    className = '',
+    style = {}
+}: {
+    position?: 'top' | 'bottom' | 'relative',
+    color?: string,
+    height?: number,
+    className?: string,
+    style?: React.CSSProperties
+}) => {
+    const isAbsolute = position !== 'relative';
+    return (
+        <div
+            className={className}
+            style={{
+                ...(isAbsolute ? {
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    [position]: 0,
+                } : {
+                    position: 'relative',
+                    width: '100%',
+                }),
+                height: `${height}px`,
+                zIndex: isAbsolute ? 0 : undefined,
+                transform: position === 'top' ? 'rotate(180deg)' : 'none',
+                pointerEvents: 'none',
+                ...style
+            }}
+        >
+            <svg
+                viewBox="0 0 1440 320"
+                style={{ width: '100%', height: '100%' }}
+                preserveAspectRatio="none"
+            >
+                <path
+                    fill={color}
+                    fillOpacity="1"
+                    d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+                />
+            </svg>
+        </div>
+    );
+};
 
 // --- Components ---
 
@@ -146,29 +195,79 @@ export default function LandingPage() {
                             </div>
                         </div>
 
+                        {/* Typeform-Style Interview Demo */}
                         <div
                             className={`relative hidden lg:block transition-all duration-1000 delay-200 ease-out ${mounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'}`}
                         >
-                            <div className="relative z-10 bg-white shadow-2xl rounded-[2rem] p-6 border border-stone-100 animate-[float_6s_ease-in-out_infinite]">
-                                <div className="space-y-6">
-                                    <div className="bg-stone-50 p-4 rounded-2xl rounded-tl-none text-stone-800 text-lg shadow-sm border border-stone-100">
-                                        Qual è il tuo obiettivo?
-                                    </div>
-                                    <div className="flex justify-end">
-                                        <div className="bg-amber-100 text-amber-900 p-4 rounded-2xl rounded-tr-none text-lg shadow-sm border border-amber-200">
-                                            Ok, indagherò i punti di attrito nel processo di pagamento.
+                            {/* Interview Card */}
+                            <div className="relative z-10 bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-stone-100 animate-[float_6s_ease-in-out_infinite]">
+                                {/* Orange Header */}
+                                <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                            <Icons.MessageSquare size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg">Feedback Clienti Q4</h3>
+                                            <p className="text-sm text-white/80">Target: Clienti Premium</p>
                                         </div>
                                     </div>
-                                    <div className="bg-stone-50 p-4 rounded-2xl rounded-tl-none text-stone-800 text-lg shadow-sm border border-stone-100">
-                                        L'utente risponde...
+                                </div>
+
+                                {/* Interview Content */}
+                                <div className="p-6 space-y-6">
+                                    {/* Question 1 */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                                <Icons.MessageSquare size={16} className="text-amber-600" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-stone-700 font-medium mb-3">
+                                                    Cosa ti ha portato a scegliere il nostro servizio rispetto ai competitor?
+                                                </p>
+                                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
+                                                    <p className="text-amber-900 text-sm">
+                                                        Cercavo più flessibilità. I competitor avevano contratti rigidi che non si adattavano alla stagionalità del mio business.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-end">
-                                        <div className="bg-amber-100 text-amber-900 p-4 rounded-2xl rounded-tr-none text-lg shadow-sm border border-amber-200">
-                                            Quale campo specifico ti è sembrato più superfluo?
+
+                                    {/* Question 2 */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                                <Icons.Users size={16} className="text-stone-600" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-stone-700 font-medium">
+                                                    L'utente risponde...
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Insight Section */}
+                                    <div className="mt-6 pt-6 border-t border-stone-100">
+                                        <div className="flex items-start gap-3 bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                                            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <Icons.Zap size={16} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-emerald-900 text-sm mb-1">Insight Trovato</p>
+                                                <p className="text-emerald-800 text-sm">
+                                                    Il <span className="font-bold">67%</span> dei clienti cita la "flessibilità contrattuale" come driver d'acquisto.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Decorative glow */}
+                            <div className="absolute -inset-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-[3rem] blur-2xl -z-10" />
                         </div>
                     </div>
                 </div>
@@ -190,6 +289,8 @@ export default function LandingPage() {
                     </div>
                 </div>
             </section>
+
+            <WaveSeparator color="#FFFBEB" height={80} />
 
             {/* --- WHAT IS (Light Warm Background) --- */}
             <section className="relative z-20 bg-[#FFFBEB] py-16 lg:py-24 overflow-hidden">
@@ -335,9 +436,9 @@ export default function LandingPage() {
                         </div>
                     </div>
                 </div>
-
-
             </section>
+
+            <WaveSeparator color="#FFFFFF" height={80} />
 
             {/* --- DASHBOARD & ANALYTICS PREVIEW (Amber-50) --- */}
             <section className="relative z-20 bg-amber-50 py-24 lg:py-32 overflow-hidden">

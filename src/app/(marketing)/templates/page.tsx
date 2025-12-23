@@ -49,7 +49,7 @@ export default function TemplatesPage() {
                                 </div>
 
                                 <div className="mt-8">
-                                    <Link href={`/register?template=${template.id}`}>
+                                    <Link href={`/onboarding?template=${template.id}`}>
                                         <button className="w-full bg-stone-900 text-white font-bold py-4 rounded-2xl hover:bg-amber-600 transition-colors flex items-center justify-center gap-2">
                                             Usa questo template <Icons.ArrowRight size={18} />
                                         </button>

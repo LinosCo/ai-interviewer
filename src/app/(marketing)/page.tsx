@@ -178,7 +178,7 @@ export default function LandingPage() {
                                 </Link>
                                 <Link href="/onboarding/preview">
                                     <Button variant="secondary" className="w-full sm:w-auto text-lg px-8 py-6 h-auto bg-stone-100 hover:bg-stone-200 text-stone-800 border-transparent">
-                                        <Icons.Play className="mr-2" size={20} /> Guarda demo
+                                        <Icons.Play className="mr-2" size={20} /> Prova la demo
                                     </Button>
                                 </Link>
                             </div>
@@ -741,7 +741,7 @@ export default function LandingPage() {
                                 ))}
                             </ul>
                             <Link href="/register?plan=STARTER">
-                                <Button fullWidth variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-transparent">Inizia gratis</Button>
+                                <Button fullWidth variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-transparent">Prova 14 giorni gratis</Button>
                             </Link>
                         </div>
 

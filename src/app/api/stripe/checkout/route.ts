@@ -75,6 +75,9 @@ export async function GET(req: NextRequest) {
             const customer = await stripe.customers.create({
                 email: user.email,
                 name: user.name || undefined,
+                address: {
+                    country: 'IT',
+                },
                 metadata: {
                     organizationId: organization.id,
                     userId: user.id
@@ -116,6 +119,9 @@ export async function GET(req: NextRequest) {
             allow_promotion_codes: true,
             billing_address_collection: 'required',
             tax_id_collection: { enabled: true },
+            customer_update: {
+                address: 'auto',
+            },
             automatic_tax: { enabled: true },
             custom_fields: [
                 {
@@ -219,6 +225,9 @@ export async function POST(req: Request) { // Changed NextRequest to Request
             const customer = await stripe.customers.create({
                 email: user.email,
                 name: user.name || undefined,
+                address: {
+                    country: 'IT',
+                },
                 metadata: {
                     organizationId: organization.id,
                     userId: user.id
@@ -260,6 +269,9 @@ export async function POST(req: Request) { // Changed NextRequest to Request
             allow_promotion_codes: true,
             billing_address_collection: 'required',
             tax_id_collection: { enabled: true },
+            customer_update: {
+                address: 'auto',
+            },
             automatic_tax: { enabled: true },
             custom_fields: [
                 {

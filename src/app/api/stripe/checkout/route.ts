@@ -116,6 +116,7 @@ export async function GET(req: NextRequest) {
             allow_promotion_codes: true,
             billing_address_collection: 'required',
             tax_id_collection: { enabled: true },
+            automatic_tax: { enabled: true },
             custom_fields: [
                 {
                     key: 'sdi_code',
@@ -259,6 +260,7 @@ export async function POST(req: Request) { // Changed NextRequest to Request
             allow_promotion_codes: true,
             billing_address_collection: 'required',
             tax_id_collection: { enabled: true },
+            automatic_tax: { enabled: true },
             custom_fields: [
                 {
                     key: 'sdi_code',

@@ -19,8 +19,7 @@ export async function POST(req: NextRequest) {
             stripeSecretKey,
             stripeWebhookSecret,
             stripePriceStarter,
-            stripePricePro,
-            stripePriceBusiness
+            stripePricePro
         } = await req.json();
 
         // Verify user owns these settings
@@ -51,7 +50,6 @@ export async function POST(req: NextRequest) {
             if (stripeWebhookSecret) updateData.stripeWebhookSecret = stripeWebhookSecret;
             if (stripePriceStarter) updateData.stripePriceStarter = stripePriceStarter;
             if (stripePricePro) updateData.stripePricePro = stripePricePro;
-            if (stripePriceBusiness) updateData.stripePriceBusiness = stripePriceBusiness;
 
             await prisma.globalConfig.upsert({
                 where: { id: "default" },
@@ -63,8 +61,7 @@ export async function POST(req: NextRequest) {
                     stripeSecretKey: stripeSecretKey || '',
                     stripeWebhookSecret: stripeWebhookSecret || '',
                     stripePriceStarter: stripePriceStarter || '',
-                    stripePricePro: stripePricePro || '',
-                    stripePriceBusiness: stripePriceBusiness || ''
+                    stripePricePro: stripePricePro || ''
                 }
             });
         }

@@ -17,7 +17,6 @@ interface PlatformSettingsFormProps {
     stripeWebhookSecret?: string;
     stripePriceStarter?: string;
     stripePricePro?: string;
-    stripePriceBusiness?: string;
 }
 
 export default function PlatformSettingsForm({
@@ -30,8 +29,7 @@ export default function PlatformSettingsForm({
     stripeSecretKey = '',
     stripeWebhookSecret = '',
     stripePriceStarter = '',
-    stripePricePro = '',
-    stripePriceBusiness = ''
+    stripePricePro = ''
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
@@ -43,7 +41,6 @@ export default function PlatformSettingsForm({
     const [sWebhookSecret, setSWebhookSecret] = useState('');
     const [sPriceStarter, setSPriceStarter] = useState(stripePriceStarter);
     const [sPricePro, setSPricePro] = useState(stripePricePro);
-    const [sPriceBusiness, setSPriceBusiness] = useState(stripePriceBusiness);
 
     const isDirty = (
         (openaiKey && openaiKey !== platformOpenaiApiKey) ||
@@ -52,7 +49,6 @@ export default function PlatformSettingsForm({
         (sWebhookSecret && sWebhookSecret !== stripeWebhookSecret) ||
         sPriceStarter !== stripePriceStarter ||
         sPricePro !== stripePricePro ||
-        sPriceBusiness !== stripePriceBusiness ||
         knowledge !== currentKnowledge
     );
 
@@ -85,8 +81,7 @@ export default function PlatformSettingsForm({
                     stripeSecretKey: sSecretKey || undefined,
                     stripeWebhookSecret: sWebhookSecret || undefined,
                     stripePriceStarter: sPriceStarter, // Prices can be updated directly as strings
-                    stripePricePro: sPricePro,
-                    stripePriceBusiness: sPriceBusiness
+                    stripePricePro: sPricePro
                 })
             });
 
@@ -228,25 +223,13 @@ export default function PlatformSettingsForm({
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Business Price ID
-                                </label>
-                                <input
-                                    type="text"
-                                    value={sPriceBusiness}
-                                    onChange={(e) => setSPriceBusiness(e.target.value)}
-                                    placeholder="price_..."
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
-                                />
-                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* Save Buttons */}
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
                 <button
                     onClick={handleSave}
                     disabled={isSaving}
@@ -261,6 +244,6 @@ export default function PlatformSettingsForm({
                     Reset Methodology to Default
                 </button>
             </div>
-        </div >
+        </div>
     );
 }

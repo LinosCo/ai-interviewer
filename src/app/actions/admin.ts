@@ -17,6 +17,13 @@ export async function getUsers() {
         include: {
             projectAccess: {
                 include: { project: true }
+            },
+            memberships: {
+                include: {
+                    organization: {
+                        include: { subscription: true }
+                    }
+                }
             }
         }
     });
@@ -196,4 +203,51 @@ export async function transferBot(botId: string, targetProjectId: string) {
 
     revalidatePath('/dashboard/admin/projects');
     return bot;
+}
+
+export async function updateUserSubscription(userId: string, tier: any) {
+    await requireAdmin();
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+            memberships: {
+                include: { organization: true },
+                take: 1
+            }
+        }
+    });
+
+    if (!user || user.memberships.length === 0) {
+        throw new Error('User has no organization to update subscription');
+    }
+
+    const organizationId = user.memberships[0].organizationId;
+
+    // Map business tier to valid Enums
+    const subscriptionTier = tier.toUpperCase();
+    const organizationPlan = tier === 'FREE' ? 'TRIAL' : tier.toUpperCase();
+
+    // Update in standard format
+    await prisma.subscription.upsert({
+        where: { organizationId },
+        update: {
+            tier: subscriptionTier as any,
+            status: 'ACTIVE',
+        },
+        create: {
+            organizationId,
+            tier: subscriptionTier as any,
+            status: 'ACTIVE',
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+    });
+
+    // Sync organization plan
+    await prisma.organization.update({
+        where: { id: organizationId },
+        data: { plan: organizationPlan as any }
+    });
+
+    revalidatePath('/dashboard/admin/users');
 }

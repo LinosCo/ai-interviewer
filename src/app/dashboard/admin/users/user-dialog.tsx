@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 // I will address this in the UserDialog file directly.
 
 import { useRouter } from 'next/navigation';
-import { createUser, updateUser } from '@/app/actions/admin';
+import { createUser, updateUser, updateUserSubscription } from '@/app/actions/admin';
 import { UserRole } from '@prisma/client';
 import { X } from 'lucide-react';
 
@@ -21,6 +21,13 @@ interface User {
     email: string;
     role: UserRole;
     projectAccess: { projectId: string }[];
+    memberships?: {
+        organization: {
+            subscription: {
+                tier: string;
+            } | null;
+        };
+    }[];
 }
 
 interface UserDialogProps {
@@ -36,6 +43,7 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<UserRole>('USER');
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+    const [tier, setTier] = useState<string>('FREE');
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
@@ -45,12 +53,14 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
             setEmail(user.email || '');
             setRole(user.role);
             setSelectedProjectIds(user.projectAccess.map(p => p.projectId));
+            setTier(user.memberships?.[0]?.organization?.subscription?.tier || 'FREE');
         } else if (!user && isOpen) {
             setName('');
             setEmail('');
             setPassword('');
             setRole('USER');
             setSelectedProjectIds([]);
+            setTier('FREE');
         }
     }, [user, isOpen]);
 
@@ -77,6 +87,12 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                     projectIds: selectedProjectIds
                 });
             }
+
+            // Update Subscription if edited
+            if (user && tier !== (user.memberships?.[0]?.organization?.subscription?.tier || 'FREE')) {
+                await updateUserSubscription(user.id, tier);
+            }
+
             alert(`User ${user ? 'updated' : 'created'} successfully!`);
             router.refresh();
             onClose();
@@ -158,6 +174,25 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                         </select>
                     </div>
 
+                    {user && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Plan</label>
+                            <select
+                                value={tier}
+                                onChange={(e) => setTier(e.target.value)}
+                                className="w-full border rounded-lg px-3 py-2 bg-amber-50 border-amber-200"
+                            >
+                                <option value="FREE">Free</option>
+                                <option value="STARTER">Starter</option>
+                                <option value="PRO">Pro</option>
+                                <option value="BUSINESS">Business (Enterprise)</option>
+                            </select>
+                            <p className="text-xs text-amber-600 mt-1 italic">
+                                Manual activation for Enterprise clients.
+                            </p>
+                        </div>
+                    )}
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Project Access</label>
                         <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
@@ -198,7 +233,7 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

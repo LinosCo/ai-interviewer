@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
         // Validate tier
         const normalizedTier = tier?.toUpperCase();
-        if (!normalizedTier || !['STARTER', 'PRO', 'BUSINESS'].includes(normalizedTier)) {
+        if (!normalizedTier || !['STARTER', 'PRO'].includes(normalizedTier)) {
             return new NextResponse('Invalid tier', { status: 400 });
         }
         const tierKey = normalizedTier as PlanKey;
@@ -163,7 +163,7 @@ export async function POST(req: Request) { // Changed NextRequest to Request
 
         // Validate tier
         const normalizedTier = tier?.toUpperCase();
-        if (!normalizedTier || !['STARTER', 'PRO', 'BUSINESS'].includes(normalizedTier)) {
+        if (!normalizedTier || !['STARTER', 'PRO'].includes(normalizedTier)) {
             return new NextResponse('Invalid tier', { status: 400 });
         }
         const tierKey = normalizedTier as PlanKey;

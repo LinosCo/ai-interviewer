@@ -70,8 +70,9 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
         e.preventDefault();
         setIsLoading(true);
         try {
+            let res;
             if (user) {
-                await updateUser(user.id, {
+                res = await updateUser(user.id, {
                     name,
                     email,
                     password: password || undefined,
@@ -79,7 +80,7 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                     projectIds: selectedProjectIds
                 });
             } else {
-                await createUser({
+                res = await createUser({
                     name,
                     email,
                     password,
@@ -88,9 +89,11 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                 });
             }
 
-            // Update Subscription if edited
-            if (user && tier !== (user.memberships?.[0]?.organization?.subscription?.tier || 'FREE')) {
-                await updateUserSubscription(user.id, tier);
+            // Update Subscription if edited or for new user (if not FREE)
+            const currentTier = user?.memberships?.[0]?.organization?.subscription?.tier || 'FREE';
+            if (tier !== currentTier) {
+                const targetUserId = user ? user.id : (res as any).id;
+                await updateUserSubscription(targetUserId, tier);
             }
 
             alert(`User ${user ? 'updated' : 'created'} successfully!`);
@@ -174,24 +177,22 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                         </select>
                     </div>
 
-                    {user && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Plan</label>
-                            <select
-                                value={tier}
-                                onChange={(e) => setTier(e.target.value)}
-                                className="w-full border rounded-lg px-3 py-2 bg-amber-50 border-amber-200"
-                            >
-                                <option value="FREE">Free</option>
-                                <option value="STARTER">Starter</option>
-                                <option value="PRO">Pro</option>
-                                <option value="BUSINESS">Business (Enterprise)</option>
-                            </select>
-                            <p className="text-xs text-amber-600 mt-1 italic">
-                                Manual activation for Enterprise clients.
-                            </p>
-                        </div>
-                    )}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Plan</label>
+                        <select
+                            value={tier}
+                            onChange={(e) => setTier(e.target.value)}
+                            className="w-full border rounded-lg px-3 py-2 bg-amber-50 border-amber-200"
+                        >
+                            <option value="FREE">Free</option>
+                            <option value="STARTER">Starter</option>
+                            <option value="PRO">Pro</option>
+                            <option value="BUSINESS">Business (Enterprise)</option>
+                        </select>
+                        <p className="text-xs text-amber-600 mt-1 italic">
+                            Manual activation for Enterprise clients.
+                        </p>
+                    </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Project Access</label>

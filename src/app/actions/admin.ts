@@ -218,11 +218,30 @@ export async function updateUserSubscription(userId: string, tier: any) {
         }
     });
 
-    if (!user || user.memberships.length === 0) {
-        throw new Error('User has no organization to update subscription');
+    if (!user) {
+        throw new Error('User not found');
     }
 
-    const organizationId = user.memberships[0].organizationId;
+    let organizationId: string;
+
+    if (user.memberships.length === 0) {
+        // Create organization if missing
+        const org = await prisma.organization.create({
+            data: {
+                name: `${user.name || user.email}'s Workspace`,
+                slug: `org-${user.id.slice(0, 8)}-${Math.random().toString(36).slice(2, 5)}`,
+                members: {
+                    create: {
+                        userId: user.id,
+                        role: 'OWNER'
+                    }
+                }
+            }
+        });
+        organizationId = org.id;
+    } else {
+        organizationId = user.memberships[0].organizationId;
+    }
 
     // Map business tier to valid Enums
     const subscriptionTier = tier.toUpperCase();

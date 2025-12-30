@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { hash } from 'bcryptjs';
 import { signIn } from '@/auth';
 import { redirect } from 'next/navigation';
+import { sendSystemNotification } from '@/lib/email';
 
 export async function registerUser(prevState: string | undefined, formData: FormData) {
     const email = formData.get('email') as string;
@@ -40,6 +41,12 @@ export async function registerUser(prevState: string | undefined, formData: Form
             password,
             redirect: false,
         });
+
+        await sendSystemNotification(
+            'Nuova Registrazione Utente',
+            `<p>Un nuovo utente si è registrato: <b>${name}</b> (${email}).</p>
+             <p>Piano selezionato: ${plan || 'FREE'}</p>`
+        );
 
     } catch (error) {
         console.error('Registration error:', error);

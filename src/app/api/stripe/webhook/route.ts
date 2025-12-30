@@ -5,6 +5,7 @@ import { SubscriptionTier, SubscriptionStatus } from '@prisma/client';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { sendSystemNotification } from '@/lib/email';
 
 export async function POST(req: Request) {
     const body = await req.text();
@@ -111,6 +112,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             codiceFiscale: fiscalCode || undefined
         } as any
     });
+
+
+    await sendSystemNotification(
+        'Nuovo Abbonamento Attivato',
+        `<p>L'organizzazione <b>${organizationId}</b> ha attivato il piano <b>${tier}</b>.</p>
+         <p>Stripe Subscription ID: ${session.subscription}</p>`
+    );
 
     console.log(`Subscription activated for org ${organizationId}: ${tier}`);
 }

@@ -47,7 +47,7 @@ export default function CookiesPage() {
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">4. Contatti</h2>
                     <p>
                         Per ulteriori informazioni sul trattamento dei tuoi dati personali, ti invitiamo a consultare la nostra Privacy Policy
-                        o a contattarci all'indirizzo email: privacy@businesstuner.ai
+                        Se hai domande sulla nostra Cookie Policy, contattaci a hello@voler.ai.
                     </p>
                 </section>
             </div>

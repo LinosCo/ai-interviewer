@@ -67,7 +67,9 @@ export default async function PlatformSettingsPage() {
                         stripeSecretKey={globalConfig?.stripeSecretKey || ''}
                         stripeWebhookSecret={globalConfig?.stripeWebhookSecret || ''}
                         stripePriceStarter={globalConfig?.stripePriceStarter || ''}
+                        stripePriceStarterYearly={globalConfig?.stripePriceStarterYearly || ''}
                         stripePricePro={globalConfig?.stripePricePro || ''}
+                        stripePriceProYearly={globalConfig?.stripePriceProYearly || ''}
                     />
                 </div>
             </div>

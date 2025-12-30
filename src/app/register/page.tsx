@@ -102,7 +102,7 @@ function RegisterForm() {
                         </Button>
 
                         <p style={{ fontSize: '0.75rem', color: colors.subtle, textAlign: 'center', marginTop: '1rem', lineHeight: 1.5 }}>
-                            Cliccando su "Inizia prova gratuita", accetti i nostri <Link href="#" style={{ color: colors.text, textDecoration: 'underline' }}>Termini di Servizio</Link> e la <Link href="#" style={{ color: colors.text, textDecoration: 'underline' }}>Privacy Policy</Link>.
+                            Cliccando su "Inizia prova gratuita", accetti i nostri <Link href="/terms" style={{ color: colors.text, textDecoration: 'underline' }}>Termini di Servizio</Link> e la <Link href="/privacy" style={{ color: colors.text, textDecoration: 'underline' }}>Privacy Policy</Link>.
                         </p>
                     </form>
                 </Card>

@@ -31,8 +31,8 @@ export default function FAQPage() {
     return (
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '4rem 2rem' }}>
             <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold mb-4" style={{ color: colors.text }}>Domande Frequenti</h1>
-                <p className="text-xl text-gray-500">Tutto quello che devi sapere su Business Tuner</p>
+                <h1 className="text-4xl font-bold text-stone-900 mb-4">Domande Frequenti</h1>
+                <p className="text-lg text-stone-600">Tutto quello che devi sapere su Voler</p>
             </div>
 
             <div className="space-y-6">

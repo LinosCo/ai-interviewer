@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { submitLeadAction } from '@/app/actions/leads';
 
 export default function SalesPage() {
     const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
@@ -11,10 +12,18 @@ export default function SalesPage() {
         e.preventDefault();
         setStatus('submitting');
 
-        // Simulo l'invio del form
-        setTimeout(() => {
-            setStatus('success');
-        }, 1500);
+        const formData = new FormData(e.currentTarget);
+        try {
+            const result = await submitLeadAction(formData);
+            if (result.success) {
+                setStatus('success');
+            } else {
+                setStatus('error');
+            }
+        } catch (error) {
+            console.error('Submission error:', error);
+            setStatus('error');
+        }
     };
 
     if (status === 'success') {
@@ -93,6 +102,7 @@ export default function SalesPage() {
                                 <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Nome</label>
                                 <input
                                     required
+                                    name="name"
                                     className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
                                     placeholder="Es. Mario"
                                 />
@@ -101,6 +111,7 @@ export default function SalesPage() {
                                 <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Cognome</label>
                                 <input
                                     required
+                                    name="surname"
                                     className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
                                     placeholder="Es. Rossi"
                                 />
@@ -111,6 +122,7 @@ export default function SalesPage() {
                             <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Email Aziendale</label>
                             <input
                                 required
+                                name="email"
                                 type="email"
                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
                                 placeholder="mario.rossi@azienda.it"
@@ -121,6 +133,7 @@ export default function SalesPage() {
                             <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Nome Azienda</label>
                             <input
                                 required
+                                name="company"
                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
                                 placeholder="S.p.A, S.r.l..."
                             />
@@ -130,6 +143,7 @@ export default function SalesPage() {
                             <label className="text-xs font-bold text-stone-500 uppercase tracking-wider">Esigenze</label>
                             <textarea
                                 required
+                                name="needs"
                                 rows={4}
                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all resize-none"
                                 placeholder="Dicci di cosa hai bisogno..."

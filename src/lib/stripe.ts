@@ -36,7 +36,9 @@ async function getStripeConfig() {
             secretKey: process.env.STRIPE_SECRET_KEY,
             prices: {
                 STARTER: process.env.STRIPE_PRICE_STARTER,
+                STARTER_YEARLY: process.env.STRIPE_PRICE_STARTER_YEARLY,
                 PRO: process.env.STRIPE_PRICE_PRO,
+                PRO_YEARLY: process.env.STRIPE_PRICE_PRO_YEARLY,
                 BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
             }
         };
@@ -50,7 +52,9 @@ async function getStripeConfig() {
                 secretKey: config.stripeSecretKey,
                 prices: {
                     STARTER: config.stripePriceStarter,
+                    STARTER_YEARLY: config.stripePriceStarterYearly,
                     PRO: config.stripePricePro,
+                    PRO_YEARLY: config.stripePriceProYearly,
                     BUSINESS: config.stripePriceBusiness,
                 }
             };

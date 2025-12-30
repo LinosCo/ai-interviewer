@@ -16,7 +16,9 @@ interface PlatformSettingsFormProps {
     stripeSecretKey?: string;
     stripeWebhookSecret?: string;
     stripePriceStarter?: string;
+    stripePriceStarterYearly?: string;
     stripePricePro?: string;
+    stripePriceProYearly?: string;
 }
 
 export default function PlatformSettingsForm({
@@ -29,7 +31,9 @@ export default function PlatformSettingsForm({
     stripeSecretKey = '',
     stripeWebhookSecret = '',
     stripePriceStarter = '',
-    stripePricePro = ''
+    stripePriceStarterYearly = '',
+    stripePricePro = '',
+    stripePriceProYearly = ''
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
@@ -40,7 +44,9 @@ export default function PlatformSettingsForm({
     const [sSecretKey, setSSecretKey] = useState('');
     const [sWebhookSecret, setSWebhookSecret] = useState('');
     const [sPriceStarter, setSPriceStarter] = useState(stripePriceStarter);
+    const [sPriceStarterYearly, setSPriceStarterYearly] = useState(stripePriceStarterYearly);
     const [sPricePro, setSPricePro] = useState(stripePricePro);
+    const [sPriceProYearly, setSPriceProYearly] = useState(stripePriceProYearly);
 
     const isDirty = (
         (openaiKey && openaiKey !== platformOpenaiApiKey) ||
@@ -48,7 +54,9 @@ export default function PlatformSettingsForm({
         (sSecretKey && sSecretKey !== stripeSecretKey) ||
         (sWebhookSecret && sWebhookSecret !== stripeWebhookSecret) ||
         sPriceStarter !== stripePriceStarter ||
+        sPriceStarterYearly !== stripePriceStarterYearly ||
         sPricePro !== stripePricePro ||
+        sPriceProYearly !== stripePriceProYearly ||
         knowledge !== currentKnowledge
     );
 
@@ -80,8 +88,10 @@ export default function PlatformSettingsForm({
                     // Stripe
                     stripeSecretKey: sSecretKey || undefined,
                     stripeWebhookSecret: sWebhookSecret || undefined,
-                    stripePriceStarter: sPriceStarter, // Prices can be updated directly as strings
-                    stripePricePro: sPricePro
+                    stripePriceStarter: sPriceStarter,
+                    stripePriceStarterYearly: sPriceStarterYearly,
+                    stripePricePro: sPricePro,
+                    stripePriceProYearly: sPriceProYearly
                 })
             });
 
@@ -198,29 +208,53 @@ export default function PlatformSettingsForm({
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Starter Price ID
+                                    Starter Price ID (Monthly)
                                 </label>
                                 <input
                                     type="text"
                                     value={sPriceStarter}
                                     onChange={(e) => setSPriceStarter(e.target.value)}
                                     placeholder="price_..."
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Pro Price ID
+                                    Starter Price ID (Yearly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceStarterYearly}
+                                    onChange={(e) => setSPriceStarterYearly(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Pro Price ID (Monthly)
                                 </label>
                                 <input
                                     type="text"
                                     value={sPricePro}
                                     onChange={(e) => setSPricePro(e.target.value)}
                                     placeholder="price_..."
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all placeholder:text-gray-400"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Pro Price ID (Yearly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceProYearly}
+                                    onChange={(e) => setSPriceProYearly(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition-all placeholder:text-gray-400"
                                 />
                             </div>
                         </div>

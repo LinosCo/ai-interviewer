@@ -19,7 +19,7 @@ export default async function MarketingLayout({
                     <div className="flex items-center justify-between">
                         <Link href="/" className="flex items-center gap-2">
                             <Icons.Logo size={32} />
-                            <span className="text-xl font-semibold text-stone-900 tracking-tight">Business Tuner</span>
+                            <span className="text-xl font-semibold text-stone-900 tracking-tight">Voler</span>
                         </Link>
 
                         <div className="hidden md:flex items-center gap-8">

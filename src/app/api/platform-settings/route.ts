@@ -13,13 +13,14 @@ export async function POST(req: NextRequest) {
             userId,
             settingsId,
             methodologyKnowledge,
-            platformOpenaiApiKey,
-            platformAnthropicApiKey,
-            // Stripe fields
+            openaiApiKey,
+            anthropicApiKey,
             stripeSecretKey,
             stripeWebhookSecret,
             stripePriceStarter,
-            stripePricePro
+            stripePriceStarterYearly,
+            stripePricePro,
+            stripePriceProYearly
         } = await req.json();
 
         // Verify user owns these settings
@@ -43,25 +44,23 @@ export async function POST(req: NextRequest) {
 
         // If Admin, update Global Config API Keys and Stripe Config
         if (user.role === 'ADMIN') {
-            const updateData: any = {};
-            if (platformOpenaiApiKey) updateData.openaiApiKey = platformOpenaiApiKey;
-            if (platformAnthropicApiKey) updateData.anthropicApiKey = platformAnthropicApiKey;
-            if (stripeSecretKey) updateData.stripeSecretKey = stripeSecretKey;
-            if (stripeWebhookSecret) updateData.stripeWebhookSecret = stripeWebhookSecret;
-            if (stripePriceStarter) updateData.stripePriceStarter = stripePriceStarter;
-            if (stripePricePro) updateData.stripePricePro = stripePricePro;
+            const updateData: any = {
+                openaiApiKey: openaiApiKey || null,
+                anthropicApiKey: anthropicApiKey || null,
+                stripeSecretKey: stripeSecretKey || null,
+                stripeWebhookSecret: stripeWebhookSecret || null,
+                stripePriceStarter: stripePriceStarter || null,
+                stripePriceStarterYearly: stripePriceStarterYearly || null,
+                stripePricePro: stripePricePro || null,
+                stripePriceProYearly: stripePriceProYearly || null,
+            };
 
             await prisma.globalConfig.upsert({
                 where: { id: "default" },
                 update: updateData,
                 create: {
                     id: "default",
-                    openaiApiKey: platformOpenaiApiKey || null,
-                    anthropicApiKey: platformAnthropicApiKey || null,
-                    stripeSecretKey: stripeSecretKey || '',
-                    stripeWebhookSecret: stripeWebhookSecret || '',
-                    stripePriceStarter: stripePriceStarter || '',
-                    stripePricePro: stripePricePro || ''
+                    ...updateData
                 }
             });
         }

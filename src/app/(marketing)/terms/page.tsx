@@ -67,7 +67,7 @@ export default function TermsPage() {
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">7. Contatti</h2>
                     <p>
-                        Per qualsiasi domanda relativa a questi Termini, puoi contattarci all'indirizzo hello@voler.ai.
+                        Per qualsiasi domanda sui presenti Termini, contattaci all'indirizzo: hello@voler.ai
                     </p>
                 </section>
             </div>

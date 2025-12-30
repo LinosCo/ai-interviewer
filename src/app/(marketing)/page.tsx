@@ -677,7 +677,7 @@ export default function LandingPage() {
             {/* --- FAQ SECTION (Amber-50) --- */}
             <section className="relative z-20 bg-amber-50 py-24 lg:py-32">
                 <div className="container mx-auto px-6 max-w-4xl">
-                    <title>Voler - Analytics ed Insights qualitativi</title>
+                    <title>Business Tuner - Analytics ed Insights qualitativi</title>
                     <meta name="description" content="La piattaforma AI per interviste qualitative automatizzate" />
                     <div className="text-center mb-16">
                         <SectionLabel text="Domande Frequenti" />

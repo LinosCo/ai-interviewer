@@ -36,7 +36,7 @@ export function Footer() {
                                     <rect x="36" y="20" width="5" height="20" rx="2" opacity="0.7" />
                                 </g>
                             </svg>
-                            <span style={{ fontSize: '1.25rem', fontWeight: 700, color: colors.text }}>Voler</span>
+                            <span style={{ fontSize: '1.25rem', fontWeight: 700, color: colors.text }}>Business Tuner</span>
                         </Link>
                         <p style={{ color: colors.muted, lineHeight: 1.6, maxWidth: '300px' }}>
                             La piattaforma di AI Interviewing per le PMI italiane.
@@ -85,7 +85,7 @@ export function Footer() {
                     color: colors.subtle,
                     fontSize: '0.875rem'
                 }}>
-                    <p>© {new Date().getFullYear()} Voler. Tutti i diritti riservati.</p>
+                    <p>© {new Date().getFullYear()} Business Tuner. Tutti i diritti riservati.</p>
                 </div>
             </div>
         </footer>

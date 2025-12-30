@@ -7,11 +7,11 @@ export default function PrivacyPage() {
             <p className="mb-4">Ultimo aggiornamento: Dicembre 2025</p>
             <div className="prose prose-stone">
                 <p>
-                    Questa Privacy Policy descrive come Voler ("noi", "ci" o "nostro") raccoglie, utilizza e condivide le tue informazioni personali quando utilizzi il nostro servizio. Ci impegniamo a proteggere la tua privacy e a garantire la trasparenza nel trattamento dei dati, in conformità con il Regolamento Generale sulla Protezione dei Dati (GDPR).
+                    Questa Privacy Policy descrive come Business Tuner ("noi", "ci" o "nostro") raccoglie, utilizza e condivide le tue informazioni personali quando utilizzi il nostro servizio. Ci impegniamo a proteggere la tua privacy e a garantire la trasparenza nel trattamento dei dati, in conformità con il Regolamento Generale sulla Protezione dei Dati (GDPR).
                 </p>
                 <h2 className="text-xl font-semibold mt-8 mb-4">1. Titolare del Trattamento</h2>
                 <p>
-                    Il titolare del trattamento dei dati è Voler. Per qualsiasi domanda relativa alla presente Informativa, puoi contattarci all'indirizzo email hello@voler.ai.
+                    Il titolare del trattamento dei dati è Business Tuner. Per qualsiasi domanda relativa alla presente Informativa, puoi contattarci all'indirizzo email hello@voler.ai.
                 </p>
                 <h2 className="text-xl font-semibold mt-8 mb-4">2. Informazioni che raccogliamo</h2>
                 <p className="mb-4">Raccogliamo le seguenti tipologie di informazioni:</p>

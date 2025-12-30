@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const siteConfig = {
-  name: "Voler",
+  name: "Business Tuner",
   description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
-  url: "https://voler.ai",
+  url: "https://businesstuner.voler.ai",
   ogImage: "/og-image.png",
   links: {
     email: "hello@voler.ai",
@@ -28,8 +28,8 @@ export const defaultMetadata: Metadata = {
     "AI interviste",
     "sondaggi intelligenti",
   ],
-  authors: [{ name: "Voler" }],
-  creator: "Voler",
+  authors: [{ name: "Business Tuner" }],
+  creator: "Business Tuner",
   openGraph: {
     type: "website",
     locale: "it_IT",

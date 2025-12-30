@@ -147,7 +147,12 @@ model GlobalConfig {
 
 model Organization {
   id        String   @id @default(cuid())
-  name      String
+  name      String   // Display name or Ragione Sociale
+  vatId     String?  // Partita IVA
+  address   String?  // Indirizzo completo
+  city      String?
+  postalCode String?
+  country   String   @default("IT")
   slug      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -69,6 +69,7 @@ export default function LandingPage() {
     const [typewriterText, setTypewriterText] = useState('');
     const [typewriterIndex, setTypewriterIndex] = useState(0);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isYearly, setIsYearly] = useState(false);
 
     const words = ["il mercato", "la filiera", "i reparti", "i dipendenti", "gli stakeholder"];
     const speed = isDeleting ? 50 : 150;
@@ -717,16 +718,28 @@ export default function LandingPage() {
                 />
 
                 <div className="container mx-auto px-6 max-w-7xl relative z-10">
-                    <div className="text-center max-w-3xl mx-auto mb-20">
+                    <div className="text-center max-w-3xl mx-auto mb-12">
                         <span className="inline-block text-xs font-bold uppercase tracking-widest py-2 px-4 rounded-full mb-6 bg-white/20 text-white">
                             Prezzi Semplici
                         </span>
                         <h2 className="text-4xl lg:text-5xl font-bold mb-6 tracking-tight">
                             Investi nella qualità dei dati
                         </h2>
-                        <p className="text-xl text-amber-100">
+                        <p className="text-xl text-amber-100 mb-10">
                             Piani trasparenti. Scala quando vuoi. Disdici quando vuoi.
                         </p>
+
+                        {/* Billing Toggle */}
+                        <div className="flex items-center justify-center gap-4 mb-8">
+                            <span className={`text-sm font-bold ${isYearly ? 'text-amber-200' : 'text-white'}`}>Mensile</span>
+                            <button
+                                onClick={() => setIsYearly(!isYearly)}
+                                className="w-16 h-8 bg-white/20 rounded-full relative p-1 transition-all"
+                            >
+                                <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-all ${isYearly ? 'translate-x-8' : 'translate-x-0'}`} />
+                            </button>
+                            <span className={`text-sm font-bold ${isYearly ? 'text-white' : 'text-amber-200'}`}>Annuale <span className="text-[10px] bg-white text-amber-600 px-2 py-0.5 rounded-full ml-1">-20%</span></span>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center max-w-6xl mx-auto">
@@ -734,13 +747,13 @@ export default function LandingPage() {
                         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
                             <h3 className="text-xl font-bold mb-2">Starter</h3>
                             <p className="text-amber-100 text-sm mb-6">Per professionisti e freelance</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€49</span><span className="text-amber-200">/mese</span></div>
+                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? '39' : '49'}</span><span className="text-amber-200">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm">
                                 {['3 interviste attive', '100 risposte/mese', 'Analytics base', 'Export PDF'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
                                 ))}
                             </ul>
-                            <Link href="/register?plan=STARTER">
+                            <Link href={`/register?plan=STARTER${isYearly ? '&billing=yearly' : ''}`}>
                                 <Button fullWidth variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-transparent">Prova 14 giorni gratis</Button>
                             </Link>
                         </div>
@@ -752,13 +765,13 @@ export default function LandingPage() {
                             </div>
                             <h3 className="text-xl font-bold text-stone-900 mb-2">Pro</h3>
                             <p className="text-stone-500 text-sm mb-6">Per PMI e agenzie</p>
-                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€149</span><span className="text-stone-500">/mese</span></div>
+                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€{isYearly ? '119' : '149'}</span><span className="text-stone-500">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm text-stone-700">
                                 {['10 interviste attive', '300 risposte/mese', 'AI Analysis Avanzata', 'Logica condizionale', 'Export CSV + Webhook'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><span className="text-amber-500"><Icons.Check size={18} /></span> {f}</li>
                                 ))}
                             </ul>
-                            <Link href="/register?plan=PRO">
+                            <Link href={`/register?plan=PRO${isYearly ? '&billing=yearly' : ''}`}>
                                 <Button fullWidth className="bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/30">Prova 14 giorni gratis</Button>
                             </Link>
                         </div>
@@ -767,7 +780,7 @@ export default function LandingPage() {
                         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
                             <h3 className="text-xl font-bold mb-2">Business</h3>
                             <p className="text-amber-100 text-sm mb-6">Per grandi aziende</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€299</span><span className="text-amber-200">/mese</span></div>
+                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? '239' : '299'}</span><span className="text-amber-200">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm">
                                 {['Illimitate interviste', '1.000+ risposte/mese', 'API Access', 'White Label', 'Supporto Prioritario'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>

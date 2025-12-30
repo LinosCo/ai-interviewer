@@ -15,6 +15,8 @@ interface PriceConfig {
     name: string;
     price: number | null;
     priceId: string | null;
+    priceYearly: number | null;
+    priceIdYearly: string | null;
     features: {
         maxActiveBots: number;
         maxInterviewsPerMonth: number;
@@ -91,11 +93,19 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
         return dbPrices[upperTier] || PLANS[tier].stripePriceId || null;
     };
 
+    const getPriceIdYearly = (tier: PlanType) => {
+        const upperTier = `${tier.toUpperCase()}_YEARLY` as keyof typeof dbPrices;
+        // @ts-ignore
+        return dbPrices[upperTier] || PLANS[tier].stripePriceIdYearly || null;
+    };
+
     return {
         FREE: {
             name: PLANS[PlanType.TRIAL].name,
             price: PLANS[PlanType.TRIAL].price,
             priceId: null,
+            priceYearly: 0,
+            priceIdYearly: null,
             features: {
                 maxActiveBots: PLANS[PlanType.TRIAL].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.TRIAL].responsesPerMonth,
@@ -110,6 +120,8 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
             name: PLANS[PlanType.STARTER].name,
             price: PLANS[PlanType.STARTER].price,
             priceId: getPriceId(PlanType.STARTER),
+            priceYearly: PLANS[PlanType.STARTER].priceYearly,
+            priceIdYearly: getPriceIdYearly(PlanType.STARTER),
             features: {
                 maxActiveBots: PLANS[PlanType.STARTER].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.STARTER].responsesPerMonth,
@@ -124,6 +136,8 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
             name: PLANS[PlanType.PRO].name,
             price: PLANS[PlanType.PRO].price,
             priceId: getPriceId(PlanType.PRO),
+            priceYearly: PLANS[PlanType.PRO].priceYearly,
+            priceIdYearly: getPriceIdYearly(PlanType.PRO),
             features: {
                 maxActiveBots: PLANS[PlanType.PRO].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.PRO].responsesPerMonth,
@@ -138,6 +152,8 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
             name: PLANS[PlanType.BUSINESS].name,
             price: PLANS[PlanType.BUSINESS].price,
             priceId: getPriceId(PlanType.BUSINESS),
+            priceYearly: PLANS[PlanType.BUSINESS].priceYearly,
+            priceIdYearly: getPriceIdYearly(PlanType.BUSINESS),
             features: {
                 maxActiveBots: PLANS[PlanType.BUSINESS].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.BUSINESS].responsesPerMonth,
@@ -152,6 +168,8 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
             name: 'Enterprise',
             price: null,
             priceId: null,
+            priceYearly: null,
+            priceIdYearly: null,
             features: {
                 maxActiveBots: -1,
                 maxInterviewsPerMonth: -1,

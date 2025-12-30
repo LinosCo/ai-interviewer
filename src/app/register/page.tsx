@@ -49,6 +49,7 @@ function RegisterForm() {
                 <Card variant="glass" padding="2.5rem">
                     <form action={dispatch}>
                         <input type="hidden" name="plan" value={plan || ''} />
+                        <input type="hidden" name="billing" value={searchParams.get('billing') || 'monthly'} />
 
                         <div style={{ marginBottom: '1rem' }}>
                             <Input
@@ -73,7 +74,30 @@ function RegisterForm() {
                             />
                         </div>
 
-                        <div style={{ marginBottom: '2rem' }}>
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <Input
+                                label="Ragione Sociale / Nome Azienda"
+                                type="text"
+                                name="companyName"
+                                required
+                                placeholder="Azienda S.r.l."
+                                disabled={isPending}
+                                icon={<Icons.Building size={18} />}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.25rem' }}>
+                            <Input
+                                label="Partita IVA (Opzionale)"
+                                type="text"
+                                name="vatId"
+                                placeholder="IT01234567890"
+                                disabled={isPending}
+                                icon={<div style={{ fontSize: '14px', fontWeight: 'bold', color: colors.muted }}>%</div>}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
                             <Input
                                 label="Password"
                                 type="password"
@@ -82,7 +106,7 @@ function RegisterForm() {
                                 placeholder="Creane una sicura"
                                 minLength={6}
                                 disabled={isPending}
-                                icon={<div style={{ width: '18px' }}>🔒</div>}
+                                icon={<Icons.Check size={18} />} // Using Check as placeholder for "secure" lock icon if lock not available
                             />
                         </div>
 

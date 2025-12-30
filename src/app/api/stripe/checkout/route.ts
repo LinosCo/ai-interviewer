@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
     try {
         const searchParams = req.nextUrl.searchParams;
         const tier = searchParams.get('tier');
+        const billing = searchParams.get('billing'); // 'monthly' or 'yearly'
         const successUrl = searchParams.get('successUrl');
         const cancelUrl = searchParams.get('cancelUrl');
 
@@ -28,7 +29,9 @@ export async function GET(req: NextRequest) {
         const plans = await getPricingPlans();
         const plan = plans[tierKey];
 
-        if (!plan || !plan.priceId) {
+        const priceId = billing === 'yearly' ? plan.priceIdYearly : plan.priceId;
+
+        if (!plan || !priceId) {
             return new NextResponse('Price not configured or invalid plan', { status: 500 });
         }
 
@@ -74,7 +77,7 @@ export async function GET(req: NextRequest) {
         if (!customerId) {
             const customer = await stripe.customers.create({
                 email: user.email,
-                name: user.name || undefined,
+                name: organization.name,
                 address: {
                     country: 'IT',
                 },
@@ -99,7 +102,7 @@ export async function GET(req: NextRequest) {
             payment_method_types: ['card'],
             line_items: [
                 {
-                    price: plan.priceId!,
+                    price: priceId!,
                     quantity: 1
                 }
             ],
@@ -121,6 +124,7 @@ export async function GET(req: NextRequest) {
             tax_id_collection: { enabled: true },
             customer_update: {
                 address: 'auto',
+                name: 'auto',
             },
             automatic_tax: { enabled: true },
             custom_fields: [
@@ -160,7 +164,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: Request) { // Changed NextRequest to Request
     try {
-        const { tier, successUrl, cancelUrl } = await req.json();
+        const { tier, billing, successUrl, cancelUrl } = await req.json();
         const session = await auth();
 
         if (!session?.user?.email) {
@@ -224,7 +228,7 @@ export async function POST(req: Request) { // Changed NextRequest to Request
         if (!customerId) {
             const customer = await stripe.customers.create({
                 email: user.email,
-                name: user.name || undefined,
+                name: organization.name,
                 address: {
                     country: 'IT',
                 },
@@ -271,6 +275,7 @@ export async function POST(req: Request) { // Changed NextRequest to Request
             tax_id_collection: { enabled: true },
             customer_update: {
                 address: 'auto',
+                name: 'auto',
             },
             automatic_tax: { enabled: true },
             custom_fields: [

@@ -83,6 +83,9 @@ export interface PlanConfig {
     // Limiti nascosti (enforcement)
     limits: PlanLimits;
 
+    // Marketing features (visibili nel pricing)
+    marketingFeatures: string[];
+
     // Stripe
     stripePriceId?: string;
     stripePriceIdYearly?: string;
@@ -91,67 +94,74 @@ export interface PlanConfig {
 export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.TRIAL]: {
         id: PlanType.TRIAL,
-        name: 'Trial',
+        name: 'Trial (Partner)',
         price: 0,
         priceYearly: 0,
 
-        responsesPerMonth: 10,
-        activeInterviews: 1,
-        users: 1,
+        responsesPerMonth: -1, // Illimitate per partner
+        activeInterviews: -1,  // Illimitate per partner
+        users: 1,              // Senza gestione altri utenti
 
         features: {
             aiGeneration: true,
             basicTemplates: true,
-            advancedTemplates: false,
-            manualEdit: false,
-            knowledgeBase: false,
-            conditionalLogic: false,
-            customTemplates: false,
+            advancedTemplates: true,
+            manualEdit: true,
+            knowledgeBase: true,
+            conditionalLogic: true,
+            customTemplates: true,
 
-            watermark: true,
-            customColor: false,
-            customLogo: false,
-            customDomain: false,
-            whiteLabel: false,
+            watermark: false,
+            customColor: true,
+            customLogo: true,
+            customDomain: true,
+            whiteLabel: true,
 
             basicStats: true,
             transcripts: true,
-            sentiment: false,
-            themeExtraction: false,
-            keyQuotes: false,
-            trends: false,
-            comparison: false,
-            segmentation: false,
-            customDashboards: false,
+            sentiment: true,
+            themeExtraction: true,
+            keyQuotes: true,
+            trends: true,
+            comparison: true,
+            segmentation: true,
+            customDashboards: true,
 
-            exportPdf: false,
-            exportCsv: false,
-            webhooks: false,
-            apiAccess: false,
-            zapier: false,
-            sso: false,
+            exportPdf: true,
+            exportCsv: true,
+            webhooks: true,
+            apiAccess: true,
+            zapier: true,
+            sso: false, // Potere di gestione utenti disabilitato
 
-            supportLevel: 'community'
+            supportLevel: 'priority'
         },
 
         limits: {
-            maxExchangesPerInterview: 10,
-            maxTokensPerInterview: 30000,
-            maxCharsPerUserMessage: 1000,
-            inactivityTimeoutMinutes: 20,
+            maxExchangesPerInterview: 30,
+            maxTokensPerInterview: 150000,
+            maxCharsPerUserMessage: 5000,
+            inactivityTimeoutMinutes: 60,
 
-            maxQuestionsPerInterview: 6,
-            maxKnowledgeBaseChars: 0,
-            maxKnowledgeBaseFiles: 0,
+            maxQuestionsPerInterview: 20,
+            maxKnowledgeBaseChars: 500000,
+            maxKnowledgeBaseFiles: 20,
 
-            simulationsPerDayPerBot: 2,
-            aiRegenerationsPerDay: 3,
+            simulationsPerDayPerBot: 50,
+            aiRegenerationsPerDay: 100,
 
-            maxParallelInterviews: 2,
-            messageCooldownSeconds: 3
+            maxParallelInterviews: 100,
+            messageCooldownSeconds: 0.5
         },
+        marketingFeatures: [
+            'Partner Full Access',
+            'Illimitate interviste',
+            'Full AI Features',
+            'Solo uso personale',
+            'No multi-user admin'
+        ],
 
-        stripePriceId: undefined, // Free/Trial doesn't have a Stripe price
+        stripePriceId: undefined,
         stripePriceIdYearly: undefined
     },
 
@@ -216,6 +226,13 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 10,
             messageCooldownSeconds: 2
         },
+        marketingFeatures: [
+            '3 interviste attive',
+            '100 risposte/mese',
+            'Analytics base',
+            'Export PDF',
+            '1 utente incluso'
+        ],
 
         stripePriceId: process.env.STRIPE_PRICE_STARTER,
         stripePriceIdYearly: process.env.STRIPE_PRICE_STARTER_YEARLY
@@ -282,6 +299,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 30,
             messageCooldownSeconds: 1
         },
+        marketingFeatures: [
+            '10 interviste attive',
+            '300 risposte/mese',
+            'AI Analysis Avanzata',
+            'Logica condizionale',
+            'Export CSV + Webhook',
+            '5 utenti inclusi'
+        ],
 
         stripePriceId: process.env.STRIPE_PRICE_PRO,
         stripePriceIdYearly: process.env.STRIPE_PRICE_PRO_YEARLY
@@ -348,6 +373,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 100,
             messageCooldownSeconds: 0.5
         },
+        marketingFeatures: [
+            'Illimitate interviste',
+            '1.000+ risposte/mese',
+            'API Access',
+            'White Label',
+            'Supporto Prioritario',
+            '15 utenti inclusi'
+        ],
 
         stripePriceId: process.env.STRIPE_PRICE_BUSINESS,
         stripePriceIdYearly: process.env.STRIPE_PRICE_BUSINESS_YEARLY

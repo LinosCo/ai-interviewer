@@ -37,11 +37,19 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
         include: {
             topics: { orderBy: { orderIndex: 'asc' } },
             knowledgeSources: true,
-            rewardConfig: true
+            rewardConfig: true,
+            project: true
         }
     });
 
     if (!bot) notFound();
+
+    const organizationId = bot.project.organizationId;
+    const { isFeatureEnabled } = require('@/lib/usage');
+
+    const canUseKnowledgeBase = await isFeatureEnabled(organizationId, 'knowledgeBase');
+    const canUseConditionalLogic = await isFeatureEnabled(organizationId, 'conditionalLogic');
+    const canUseBranding = await isFeatureEnabled(organizationId, 'customLogo');
 
     return (
         <div className="space-y-6">
@@ -63,8 +71,8 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                    <BotConfigForm bot={bot} />
-                    <TopicsEditor botId={bot.id} topics={bot.topics} />
+                    <BotConfigForm bot={bot} canUseBranding={canUseBranding} />
+                    <TopicsEditor botId={bot.id} topics={bot.topics} canUseConditionalLogic={canUseConditionalLogic} />
                 </div>
 
                 <div className="space-y-8">
@@ -74,7 +82,11 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                         projects={projects}
                     />
 
-                    <KnowledgeSourcesEditor botId={bot.id} sources={bot.knowledgeSources} />
+                    <KnowledgeSourcesEditor
+                        botId={bot.id}
+                        sources={bot.knowledgeSources}
+                        disabled={!canUseKnowledgeBase}
+                    />
 
                     <LegalPrivacyEditor
                         botId={bot.id}

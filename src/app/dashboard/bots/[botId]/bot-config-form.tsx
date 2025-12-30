@@ -13,7 +13,10 @@ type BotWithRelations = Bot & {
     useWarmup?: boolean;
 };
 
-export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
+import { Icons } from '@/components/ui/business-tuner/Icons';
+import Link from 'next/link';
+
+export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
     const updateAction = updateBotAction.bind(null, bot.id);
     const [provider, setProvider] = useState(bot.modelProvider || 'openai');
 
@@ -61,10 +64,6 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                 </div>
             </section>
 
-            import RefineInput from '@/components/RefineInput'; // Ensure import at the top
-
-            // ... inside the component ...
-
             <section>
                 <h2 className="text-lg font-semibold mb-4 border-b pb-2">Research Context</h2>
                 <div className="space-y-4">
@@ -87,9 +86,24 @@ export default function BotConfigForm({ bot }: { bot: BotWithRelations }) {
                 </div>
             </section>
 
-            <section>
-                <h2 className="text-lg font-semibold mb-4 border-b pb-2">🎨 Branding & Customization</h2>
-                <div className="space-y-4">
+
+            <section className="relative">
+                <h2 className="text-lg font-semibold mb-4 border-b pb-2 flex items-center justify-between">
+                    <span>🎨 Branding & Customization</span>
+                    {!canUseBranding && (
+                        <Link href="/dashboard/billing/plans" className="text-amber-600 text-xs font-bold flex items-center gap-1 hover:underline bg-amber-50 px-2 py-1 rounded">
+                            <Icons.Lock size={12} />
+                            Sblocca con STARTER
+                        </Link>
+                    )}
+                </h2>
+
+                {!canUseBranding && (
+                    <div className="absolute inset-x-0 bottom-0 top-[40px] bg-white/40 backdrop-blur-[1px] z-10 flex items-center justify-center">
+                    </div>
+                )}
+
+                <div className={`space-y-4 ${!canUseBranding ? 'opacity-40 pointer-events-none' : ''}`}>
                     <div>
                         <label className="block text-sm font-medium mb-1">Chat Logo</label>
                         <input

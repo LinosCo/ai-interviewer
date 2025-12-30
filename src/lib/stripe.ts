@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
-import { PLANS, PlanType } from '@/config/plans';
+import { PLANS, PlanType, PlanFeatures } from '@/config/plans';
 
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
@@ -21,14 +21,7 @@ interface PriceConfig {
         maxActiveBots: number;
         maxInterviewsPerMonth: number;
         maxUsers: number;
-        watermark: boolean;
-        customBranding: boolean;
-        advancedAnalytics: boolean;
-        apiAccess: boolean;
-        sso?: boolean;
-        prioritySupport?: boolean;
-        dedicatedSupport?: boolean;
-    };
+    } & PlanFeatures;
 }
 
 async function getStripeConfig() {
@@ -110,12 +103,9 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxActiveBots: PLANS[PlanType.TRIAL].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.TRIAL].responsesPerMonth,
                 maxUsers: PLANS[PlanType.TRIAL].users,
-                watermark: PLANS[PlanType.TRIAL].features.watermark,
-                customBranding: PLANS[PlanType.TRIAL].features.customLogo,
-                advancedAnalytics: PLANS[PlanType.TRIAL].features.basicStats,
-                apiAccess: PLANS[PlanType.TRIAL].features.apiAccess,
+                ...PLANS[PlanType.TRIAL].features,
             },
-        },
+        } as PriceConfig,
         STARTER: {
             name: PLANS[PlanType.STARTER].name,
             price: PLANS[PlanType.STARTER].price,
@@ -126,12 +116,9 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxActiveBots: PLANS[PlanType.STARTER].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.STARTER].responsesPerMonth,
                 maxUsers: PLANS[PlanType.STARTER].users,
-                watermark: PLANS[PlanType.STARTER].features.watermark,
-                customBranding: PLANS[PlanType.STARTER].features.customLogo,
-                advancedAnalytics: PLANS[PlanType.STARTER].features.basicStats,
-                apiAccess: PLANS[PlanType.STARTER].features.apiAccess,
+                ...PLANS[PlanType.STARTER].features,
             },
-        },
+        } as PriceConfig,
         PRO: {
             name: PLANS[PlanType.PRO].name,
             price: PLANS[PlanType.PRO].price,
@@ -142,12 +129,9 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxActiveBots: PLANS[PlanType.PRO].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.PRO].responsesPerMonth,
                 maxUsers: PLANS[PlanType.PRO].users,
-                watermark: PLANS[PlanType.PRO].features.watermark,
-                customBranding: PLANS[PlanType.PRO].features.customLogo,
-                advancedAnalytics: PLANS[PlanType.PRO].features.basicStats,
-                apiAccess: PLANS[PlanType.PRO].features.apiAccess,
+                ...PLANS[PlanType.PRO].features,
             },
-        },
+        } as PriceConfig,
         BUSINESS: {
             name: PLANS[PlanType.BUSINESS].name,
             price: PLANS[PlanType.BUSINESS].price,
@@ -158,12 +142,9 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxActiveBots: PLANS[PlanType.BUSINESS].activeInterviews,
                 maxInterviewsPerMonth: PLANS[PlanType.BUSINESS].responsesPerMonth,
                 maxUsers: PLANS[PlanType.BUSINESS].users,
-                watermark: PLANS[PlanType.BUSINESS].features.watermark,
-                customBranding: PLANS[PlanType.BUSINESS].features.customLogo,
-                advancedAnalytics: PLANS[PlanType.BUSINESS].features.basicStats,
-                apiAccess: PLANS[PlanType.BUSINESS].features.apiAccess,
+                ...PLANS[PlanType.BUSINESS].features,
             },
-        },
+        } as PriceConfig,
         ENTERPRISE: {
             name: 'Enterprise',
             price: null,
@@ -174,14 +155,8 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxActiveBots: -1,
                 maxInterviewsPerMonth: -1,
                 maxUsers: -1,
-                watermark: false,
-                customBranding: true,
-                advancedAnalytics: true,
-                apiAccess: true,
-                sso: true,
-                prioritySupport: true,
-                dedicatedSupport: true,
+                ...PLANS[PlanType.BUSINESS].features, // Fallback to business features for enterprise
             },
-        },
+        } as PriceConfig,
     };
 }

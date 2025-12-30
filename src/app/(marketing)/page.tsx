@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { colors, gradients } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
+import { PLANS, PlanType } from '@/config/plans';
 
 const WaveSeparator = ({
     position = 'bottom',
@@ -747,11 +748,11 @@ export default function LandingPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center max-w-6xl mx-auto">
                         {/* Starter */}
                         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
-                            <h3 className="text-xl font-bold mb-2">Starter</h3>
+                            <h3 className="text-xl font-bold mb-2">{PLANS[PlanType.STARTER].name}</h3>
                             <p className="text-amber-100 text-sm mb-6">Per professionisti e freelance</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? '39' : '49'}</span><span className="text-amber-200">/mese</span></div>
+                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? PLANS[PlanType.STARTER].priceYearly : PLANS[PlanType.STARTER].price}</span><span className="text-amber-200">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm">
-                                {['3 interviste attive', '100 risposte/mese', 'Analytics base', 'Export PDF'].map((f, i) => (
+                                {PLANS[PlanType.STARTER].marketingFeatures.map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
                                 ))}
                             </ul>
@@ -765,11 +766,11 @@ export default function LandingPage() {
                             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-stone-900 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider">
                                 Consigliato
                             </div>
-                            <h3 className="text-xl font-bold text-stone-900 mb-2">Pro</h3>
+                            <h3 className="text-xl font-bold text-stone-900 mb-2">{PLANS[PlanType.PRO].name}</h3>
                             <p className="text-stone-500 text-sm mb-6">Per PMI e agenzie</p>
-                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€{isYearly ? '119' : '149'}</span><span className="text-stone-500">/mese</span></div>
+                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€{isYearly ? PLANS[PlanType.PRO].priceYearly : PLANS[PlanType.PRO].price}</span><span className="text-stone-500">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm text-stone-700">
-                                {['10 interviste attive', '300 risposte/mese', 'AI Analysis Avanzata', 'Logica condizionale', 'Export CSV + Webhook'].map((f, i) => (
+                                {PLANS[PlanType.PRO].marketingFeatures.map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><span className="text-amber-500"><Icons.Check size={18} /></span> {f}</li>
                                 ))}
                             </ul>
@@ -780,15 +781,15 @@ export default function LandingPage() {
 
                         {/* Business */}
                         <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
-                            <h3 className="text-xl font-bold mb-2">Business</h3>
+                            <h3 className="text-xl font-bold mb-2">{PLANS[PlanType.BUSINESS].name}</h3>
                             <p className="text-amber-100 text-sm mb-6">Per grandi aziende</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? '239' : '299'}</span><span className="text-amber-200">/mese</span></div>
+                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? PLANS[PlanType.BUSINESS].priceYearly : PLANS[PlanType.BUSINESS].price}</span><span className="text-amber-200">/mese</span></div>
                             <ul className="space-y-4 mb-8 text-sm">
-                                {['Illimitate interviste', '1.000+ risposte/mese', 'API Access', 'White Label', 'Supporto Prioritario'].map((f, i) => (
+                                {PLANS[PlanType.BUSINESS].marketingFeatures.map((f, i) => (
                                     <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
                                 ))}
                             </ul>
-                            <Link href="mailto:hello@voler.ai">
+                            <Link href={session ? '/dashboard/billing/plans' : '/register?plan=BUSINESS'}>
                                 <Button fullWidth variant="secondary" className="bg-white text-amber-600 border-transparent hover:bg-amber-50">Contattaci</Button>
                             </Link>
                         </div>

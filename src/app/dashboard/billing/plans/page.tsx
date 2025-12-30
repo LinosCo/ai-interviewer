@@ -58,38 +58,26 @@ export default async function PlansPage() {
                             </div>
 
                             <ul className="space-y-4 mb-10 flex-grow">
-                                <li className="flex items-center gap-3 text-sm text-stone-600">
-                                    <Icons.Check size={18} className="text-amber-500 shadow-sm" />
-                                    <span><b>{plan.responsesPerMonth}</b> risposte/mese</span>
-                                </li>
-                                <li className="flex items-center gap-3 text-sm text-stone-600">
-                                    <Icons.Check size={18} className="text-amber-500 shadow-sm" />
-                                    <span><b>{plan.activeInterviews === -1 ? 'Illimitate' : plan.activeInterviews}</b> interviste attive</span>
-                                </li>
-                                <li className="flex items-center gap-3 text-sm text-stone-600">
-                                    <Icons.Check size={18} className="text-amber-500 shadow-sm" />
-                                    <span><b>{plan.users}</b> utenti inclusi</span>
-                                </li>
-                                {plan.features.knowledgeBase && (
-                                    <li className="flex items-center gap-3 text-sm text-stone-600">
+                                {plan.marketingFeatures.map((feature, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-sm text-stone-600">
                                         <Icons.Check size={18} className="text-amber-500 shadow-sm" />
-                                        <span>Knowledge Base & File</span>
+                                        <span>{feature}</span>
                                     </li>
-                                )}
-                                {plan.features.customDomain && (
-                                    <li className="flex items-center gap-3 text-sm text-stone-600">
-                                        <Icons.Check size={18} className="text-amber-500 shadow-sm" />
-                                        <span>Dominio Personalizzato</span>
-                                    </li>
-                                )}
+                                ))}
                             </ul>
 
                             {isCurrent ? (
                                 <button disabled className="w-full bg-stone-100 text-stone-400 font-bold py-4 rounded-2xl cursor-not-allowed">
                                     Piano attuale
                                 </button>
+                            ) : plan.tier === 'BUSINESS' ? (
+                                <Link href="mailto:hello@voler.ai?subject=Richiesta%20Piano%20Business" className="w-full">
+                                    <button className="w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 bg-stone-900 text-white hover:bg-stone-800">
+                                        Contatta Sales <Icons.ArrowRight size={18} />
+                                    </button>
+                                </Link>
                             ) : (
-                                <Link href={`/api/stripe/checkout?tier=${plan.tier}`}>
+                                <Link href={`/api/stripe/checkout?tier=${plan.tier}`} className="w-full">
                                     <button className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${plan.popular ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20' : 'bg-stone-900 text-white hover:bg-stone-800'}`}>
                                         Seleziona piano <Icons.ArrowRight size={18} />
                                     </button>

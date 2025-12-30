@@ -59,6 +59,30 @@ export async function POST(req: Request) {
             }
         }
 
+        // Check usage limits
+        const { canPublishBot } = require('@/lib/usage');
+
+        // Get organizationId from project
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { organizationId: true }
+        });
+
+        if (!project?.organizationId) {
+            return new Response('Organization not found for project', { status: 404 });
+        }
+
+        const publishCheck = await canPublishBot(project.organizationId);
+        if (!publishCheck.allowed) {
+            return new Response(JSON.stringify({
+                error: 'LIMIT_REACHED',
+                message: publishCheck.reason
+            }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
         // Create the bot with topics
         const slug = generateSlug(config.name || 'intervista');
 
@@ -67,6 +91,7 @@ export async function POST(req: Request) {
                 projectId,
                 slug,
                 name: config.name || 'Nuova intervista',
+                status: 'PUBLISHED',
                 description: config.researchGoal,
                 researchGoal: config.researchGoal,
                 targetAudience: config.targetAudience,

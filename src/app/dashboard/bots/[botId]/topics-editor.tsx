@@ -4,7 +4,10 @@ import { TopicBlock } from '@prisma/client';
 import { addTopicAction, deleteTopicAction, updateTopicAction } from '@/app/actions';
 import { useState } from 'react';
 
-export default function TopicsEditor({ botId, topics }: { botId: string, topics: TopicBlock[] }) {
+import { Icons } from '@/components/ui/business-tuner/Icons';
+import Link from 'next/link';
+
+export default function TopicsEditor({ botId, topics, canUseConditionalLogic = false }: { botId: string, topics: TopicBlock[], canUseConditionalLogic?: boolean }) {
     const [editingId, setEditingId] = useState<string | null>(null);
 
     const handleAdd = async () => {
@@ -31,6 +34,7 @@ export default function TopicsEditor({ botId, topics }: { botId: string, topics:
                         isEditing={editingId === topic.id}
                         onEdit={() => setEditingId(topic.id)}
                         onCancel={() => setEditingId(null)}
+                        canUseConditionalLogic={canUseConditionalLogic}
                     />
                 ))}
             </div>
@@ -40,7 +44,7 @@ export default function TopicsEditor({ botId, topics }: { botId: string, topics:
 
 import { RefinableField } from '@/components/refinable-field';
 
-function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel }: any) {
+function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel, canUseConditionalLogic }: any) {
     const updateAction = updateTopicAction.bind(null, topic.id, botId);
 
     if (isEditing) {
@@ -88,6 +92,27 @@ function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel }: any) {
                             multiline
                             className="w-full"
                         />
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-bold uppercase text-gray-500 flex items-center gap-1">
+                                Logica Condizionale
+                                {!canUseConditionalLogic && <Icons.Lock size={12} className="text-amber-500" />}
+                            </label>
+                            {!canUseConditionalLogic && (
+                                <Link href="/dashboard/billing/plans" className="text-[10px] text-amber-600 font-bold hover:underline">
+                                    Sblocca con PRO
+                                </Link>
+                            )}
+                        </div>
+                        <div className={`p-3 rounded border ${canUseConditionalLogic ? 'bg-white' : 'bg-gray-100 opacity-60'}`}>
+                            <p className="text-xs text-gray-500 italic">
+                                {canUseConditionalLogic
+                                    ? "Configura salti o condizioni basate sulle risposte degli utenti (Sviluppo in corso)."
+                                    : "Permette di saltare argomenti o terminare l'intervista in base a criteri specifici."}
+                            </p>
+                        </div>
                     </div>
                     <div className="flex gap-2 justify-end mt-4">
                         <button type="button" onClick={onCancel} className="text-gray-500 text-sm">Cancel</button>

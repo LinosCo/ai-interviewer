@@ -83,7 +83,7 @@ export async function registerUser(prevState: string | undefined, formData: Form
     }
 
     // Redirect logic
-    if (plan && ['STARTER', 'PRO', 'BUSINESS'].includes(plan)) {
+    if (plan && ['STARTER', 'PRO'].includes(plan)) {
         redirect(`/api/stripe/checkout?tier=${plan}${billing ? `&billing=${billing}` : ''}`);
     } else {
         redirect('/dashboard');

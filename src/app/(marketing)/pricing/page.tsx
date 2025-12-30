@@ -99,7 +99,7 @@ export default function PricingPage() {
                                 </ul>
                             </div>
 
-                            <Link href={plan.cta === 'Contattaci' ? 'mailto:sales@businesstuner.it' : `/register?plan=${plan.id.toUpperCase()}&yearly=${isYearly}`}>
+                            <Link href={plan.cta === 'Contattaci' ? '/sales' : `/register?plan=${plan.id.toUpperCase()}&yearly=${isYearly}`}>
                                 <Button
                                     fullWidth
                                     variant={plan.highlighted ? 'primary' : 'outline'}
@@ -164,7 +164,7 @@ export default function PricingPage() {
                         <Link href="/features">
                             <Button variant="outline" size="lg">Veid Feature Matrix</Button>
                         </Link>
-                        <Link href="mailto:sales@businesstuner.it">
+                        <Link href="/sales">
                             <Button variant="ghost" size="lg">Contatta il Sales Team</Button>
                         </Link>
                     </div>

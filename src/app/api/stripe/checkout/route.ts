@@ -182,7 +182,9 @@ export async function POST(req: Request) { // Changed NextRequest to Request
         const plans = await getPricingPlans();
         const plan = plans[tierKey];
 
-        if (!plan || !plan.priceId) {
+        const priceId = billing === 'yearly' ? plan.priceIdYearly : plan.priceId;
+
+        if (!plan || !priceId) {
             return new NextResponse('Price not configured or invalid plan', { status: 500 });
         }
 
@@ -253,7 +255,7 @@ export async function POST(req: Request) { // Changed NextRequest to Request
             payment_method_types: ['card'],
             line_items: [
                 {
-                    price: plan.priceId!,
+                    price: priceId!,
                     quantity: 1
                 }
             ],

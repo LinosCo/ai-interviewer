@@ -37,7 +37,7 @@ export default function BillingClient() {
                 )}
             </button>
             <button
-                onClick={() => window.location.href = '/#pricing'}
+                onClick={() => window.location.href = '/dashboard/billing/plans'}
                 className="flex-1 bg-white text-stone-900 font-bold py-4 px-6 rounded-xl border border-stone-200 hover:bg-stone-50 transition-all flex items-center justify-center gap-2"
             >
                 Cambia piano

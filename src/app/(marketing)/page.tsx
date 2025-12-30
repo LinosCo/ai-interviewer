@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { colors, gradients } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
@@ -64,6 +65,7 @@ const SectionLabel = ({ text, color = colors.amberDark, bg = 'rgba(251,191,36,0.
 );
 
 export default function LandingPage() {
+    const { data: session } = useSession();
     const [mounted, setMounted] = useState(false);
     const [scrollY, setScrollY] = useState(0);
     const [typewriterText, setTypewriterText] = useState('');
@@ -753,7 +755,7 @@ export default function LandingPage() {
                                     <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
                                 ))}
                             </ul>
-                            <Link href={`/register?plan=STARTER${isYearly ? '&billing=yearly' : ''}`}>
+                            <Link href={session ? '/dashboard/billing/plans' : `/register?plan=STARTER${isYearly ? '&billing=yearly' : ''}`}>
                                 <Button fullWidth variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-transparent">Prova 14 giorni gratis</Button>
                             </Link>
                         </div>
@@ -771,7 +773,7 @@ export default function LandingPage() {
                                     <li key={i} className="flex items-center gap-3"><span className="text-amber-500"><Icons.Check size={18} /></span> {f}</li>
                                 ))}
                             </ul>
-                            <Link href={`/register?plan=PRO${isYearly ? '&billing=yearly' : ''}`}>
+                            <Link href={session ? '/dashboard/billing/plans' : `/register?plan=PRO${isYearly ? '&billing=yearly' : ''}`}>
                                 <Button fullWidth className="bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/30">Prova 14 giorni gratis</Button>
                             </Link>
                         </div>
@@ -831,9 +833,9 @@ export default function LandingPage() {
                             <p className="text-lg text-stone-400 mb-10">
                                 Inizia la tua prova gratuita di 14 giorni. Nessuna carta di credito richiesta.
                             </p>
-                            <Link href="/register">
+                            <Link href={session ? '/dashboard' : '/register'}>
                                 <Button size="lg" className="bg-white text-stone-900 hover:bg-stone-100 border-none px-10 py-6 text-lg h-auto">
-                                    Inizia ora <Icons.ArrowRight className="ml-2" />
+                                    {session ? 'Vai alla Dashboard' : 'Inizia ora'} <Icons.ArrowRight className="ml-2" />
                                 </Button>
                             </Link>
                         </div>

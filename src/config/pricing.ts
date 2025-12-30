@@ -5,29 +5,12 @@ export const PRICING_PAGE = {
 
     plans: [
         {
-            id: 'trial',
-            name: 'Trial',
-            price: '€0',
-            period: 'gratis per sempre',
-            description: 'Per provare',
-            cta: 'Inizia gratis',
-            highlighted: false,
-            features: [
-                '1 intervista attiva',
-                '10 risposte/mese',
-                'Template base',
-                'Generazione AI',
-                'Trascrizioni',
-                'Watermark Business Tuner'
-            ]
-        },
-        {
             id: 'starter',
             name: 'Starter',
             price: '€49',
             period: '/mese',
             description: 'Per il professionista',
-            cta: 'Prova 14 giorni gratis',
+            cta: 'Inizia 14 giorni gratis',
             highlighted: false,
             features: [
                 '3 interviste attive',
@@ -45,7 +28,7 @@ export const PRICING_PAGE = {
             price: '€149',
             period: '/mese',
             description: 'Per la PMI',
-            cta: 'Prova 14 giorni gratis',
+            cta: 'Inizia 14 giorni gratis',
             highlighted: true,
             badge: '⭐ Più popolare',
             features: [

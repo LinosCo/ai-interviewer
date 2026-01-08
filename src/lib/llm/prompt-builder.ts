@@ -71,7 +71,9 @@ ${methodologyContent.substring(0, 2000)}
         } else if (remainingMins < 3) {
             statusInstruction = `STATUS: WRAPPING_UP. Time is running out (${remainingMins} mins left). Start converging to the end.`;
         } else {
-            statusInstruction = `STATUS: ON_TRACK. ${remainingMins} minutes remaining. Maintain steady pace.`;
+            statusInstruction = `STATUS: ON_TRACK. ${remainingMins} minutes remaining. 
+            - Maintain steady pace. 
+            - If you feel the interview is ending too quickly, PROPOSE A DEEP DIVE: "We have some time left. Would you like to explore [Specific Topic] in more detail?"`;
         }
 
         return `
@@ -106,7 +108,10 @@ ${currentTopic.subGoals.map(g => `- ${g}`).join('\n')}
 
 INSTRUCTION: 
 Focus YOUR QUESTIONS on these sub-goals. 
-When you have collected enough information for these goals, use the 'transitionToNextTopic' tool.
+- Do NOT rush. Explore each sub-goal deeply.
+- Ask follow-up questions ("Why?", "Can you elaborate?") if the user provides brief answers.
+- Only when you have collected detailed information for ALL sub-goals, use the 'transitionToNextTopic' tool.
+- If you finish early (under 5 turns), ask if there are other aspects they'd like to discuss before moving on.
 `.trim();
     }
 

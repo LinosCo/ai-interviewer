@@ -20,6 +20,7 @@ export default function OnboardingPage() {
     const router = useRouter();
     const [goal, setGoal] = useState('');
     const [showTemplates, setShowTemplates] = useState(false);
+    const [isRefining, setIsRefining] = useState(false);
 
     const handleGenerate = () => {
         if (!goal.trim()) return;
@@ -174,11 +175,27 @@ export default function OnboardingPage() {
                                 />
                                 <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', display: 'flex', gap: '0.5rem' }}>
                                     <button
-                                        onClick={(e) => {
+                                        onClick={async (e) => {
                                             e.preventDefault();
-                                            // Mock AI Refine
-                                            alert("L'AI ti aiuterà a raffinare questo obiettivo in una versione più specifica (mock).");
+                                            if (!goal.trim() || isRefining) return;
+                                            setIsRefining(true);
+                                            try {
+                                                const response = await fetch('/api/ai/refine', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ text: goal, fieldType: 'researchGoal' }),
+                                                });
+                                                if (response.ok) {
+                                                    const { refinedText } = await response.json();
+                                                    setGoal(refinedText);
+                                                }
+                                            } catch (err) {
+                                                console.error(err);
+                                            } finally {
+                                                setIsRefining(false);
+                                            }
                                         }}
+                                        disabled={isRefining}
                                         style={{
                                             background: 'rgba(245, 158, 11, 0.1)',
                                             color: colors.amberDark,
@@ -190,10 +207,12 @@ export default function OnboardingPage() {
                                             cursor: 'pointer',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '0.25rem'
+                                            gap: '0.25rem',
+                                            opacity: isRefining ? 0.7 : 1
                                         }}
                                     >
-                                        <Sparkles size={14} /> Refine with AI
+                                        <Sparkles size={14} className={isRefining ? 'animate-spin' : ''} />
+                                        {isRefining ? 'Refining...' : 'Refine with AI'}
                                     </button>
                                 </div>
                             </div>

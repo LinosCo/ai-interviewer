@@ -135,6 +135,8 @@ export async function POST(req: Request) {
                 tone: config.tone,
                 maxDurationMins: config.maxDurationMins || 10,
                 introMessage: config.introMessage,
+                primaryColor: '#F59E0B', // Force Amber as default instead of Prisma default (Indigo)
+                useWarmup: false,         // Disable warmup by default as requested
                 // Create topics
                 topics: {
                     create: config.topics.map((topic: any, index: number) => ({

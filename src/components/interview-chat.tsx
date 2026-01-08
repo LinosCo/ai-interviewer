@@ -130,7 +130,7 @@ export default function InterviewChat({
     currentTopicId,
 
     // Warm-up defaults
-    useWarmup = true,
+    useWarmup = false,
     warmupStyle = 'open',
     warmupChoices,
     warmupIcebreaker,
@@ -138,6 +138,16 @@ export default function InterviewChat({
     warmupFollowup = true
 }: InterviewChatProps) {
     const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
+    // State for local topic tracking
+    const [activeTopicId, setActiveTopicId] = useState<string | null>(currentTopicId || (topics[0]?.id) || null);
+
+    // Sync activeTopicId if prop changes (though mainly we update it locally)
+    useEffect(() => {
+        if (currentTopicId) setActiveTopicId(currentTopicId);
+    }, [currentTopicId]);
+
+    // ... (rest of the file) ...
+
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -145,15 +155,10 @@ export default function InterviewChat({
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const [startTime, setStartTime] = useState<number | null>(null);
     const [hasStarted, setHasStarted] = useState(initialMessages.length > 0);
-    // If we have messages, we don't show landing/welcome. 
-    // If not, we check if we should show welcome screen or legacy landing logic.
-    // For now, let's replace the internal "landing" logic with WelcomeScreen if available
     const [showLanding, setShowLanding] = useState(initialMessages.length === 0);
     const [consentGiven, setConsentGiven] = useState(false);
 
     // Warm-up State
-    // If warm-up is enabled (style != 'none') and we haven't started yet (no messages), we should show warm-up after "Start"
-    // BUT we need a state for "Warmup Active".
     const [showWarmup, setShowWarmup] = useState(false);
     const [warmupCompleted, setWarmupCompleted] = useState(false);
 
@@ -211,14 +216,6 @@ export default function InterviewChat({
         setWarmupCompleted(true);
         setHasStarted(true);
         setStartTime(Date.now());
-
-        // Send the warm-up answer as the first message
-        // We might want to prepend context about it being a warm-up answer, 
-        // but for now let's just send it. The AI will treat it as the first user input.
-        // If we want the AI to reply to it, we just send it.
-        // If 'warmupFollowup' is false, we might want to suppress AI reply? 
-        // For now, let's assume normal flow: User answers -> AI replies.
-
         await handleSendMessage(answer, true);
     };
 
@@ -281,7 +278,13 @@ export default function InterviewChat({
                 throw new Error(errorText || 'Failed to get response');
             }
 
-            const assistantText = await response.text();
+            const data = await response.json();
+            const assistantText = data.text || '';
+
+            // Update Active Topic
+            if (data.currentTopicId) {
+                setActiveTopicId(data.currentTopicId);
+            }
 
             // Calculate Reading Time: ~225 words per minute
             const wordCount = assistantText.split(/\s+/).length;
@@ -548,12 +551,12 @@ export default function InterviewChat({
 
             {/* Progress bar */}
             {showProgressBar && (
-                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm px-6 pt-10 pb-2">
+                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm px-6 pt-14 pb-2">
                     {progressBarStyle === 'semantic' && topics.length > 0 ? (
                         <SemanticProgressBar
                             progress={progress}
                             topics={topics}
-                            currentTopicId={currentTopicId || (topics[0]?.id)}
+                            currentTopicId={activeTopicId || (topics[0]?.id)}
                             brandColor={brandColor}
                         />
                     ) : (
@@ -615,7 +618,7 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col items-center justify-center p-4 pb-32 w-full max-w-4xl mx-auto relative z-10">
+            <div className="flex-1 flex flex-col items-center justify-center p-4 pb-48 w-full max-w-4xl mx-auto relative z-10">
                 <AnimatePresence mode="wait">
                     {currentQuestion && (
                         <motion.div

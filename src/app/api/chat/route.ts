@@ -148,6 +148,8 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
             model,
             system: systemPrompt,
             messages: messagesForAI,
+            frequencyPenalty: 0.5,
+            presencePenalty: 0.3,
         });
 
         let responseText = result.text;
@@ -212,7 +214,11 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
             }
         });
 
-        return new Response(responseText, { status: 200 });
+        return Response.json({
+            text: responseText,
+            currentTopicId: conversation.currentTopicId, // Updated topic ID if changed
+            isCompleted: responseText.includes('INTERVIEW_COMPLETED')
+        });
 
     } catch (error: any) {
         console.error("Chat API Error:", error);

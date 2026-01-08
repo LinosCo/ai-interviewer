@@ -108,8 +108,7 @@ export async function POST(req: Request) {
         if (topicIndex === 0 && messages.length > 18) {
             console.log("🚨 FORCE TRANSITION: Stuck on Topic 1 for too long.");
             supervisorInsight = {
-                status: 'TRANSITION',
-                missingPoints: []
+                status: 'TRANSITION'
             };
         }
 

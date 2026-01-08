@@ -39,6 +39,7 @@ ${methodologyContent.substring(0, 2000)}
 2. **One Question Rule (CRITICAL)**: Ask EXACTLY ONE question at a time. It is better to have more turns than to confuse the user with multiple questions. NEVER say "Also...", "And...". Just one question.
 3. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
 4. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
+5. **Opening Protocol**: In your FIRST message, briefly explain the format (in Italian): "Faremo un primo giro di domande per avere una panoramica, e poi approfondiremo i punti più interessanti se avremo tempo."
 `.trim();
     }
 
@@ -113,12 +114,12 @@ ${statusInstruction}
     static buildTopicPrompt(
         currentTopic: TopicBlock | null,
         allTopics: TopicBlock[],
-        supervisorInsight?: { status: string; missingPoints: string[] }
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string }
     ): string {
         if (!currentTopic) {
             return `
 ## CURRENT TOPIC: CLOSING / NONE
-The interview is ending or in transition.
+The interview is ending or in transition. 
 Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 `.trim();
         }
@@ -128,21 +129,34 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 
         // Supervisor Injection
         let supervisorInstruction = "";
+        let primaryInstruction = "";
+
         if (supervisorInsight) {
             if (supervisorInsight.status === 'TRANSITION') {
                 supervisorInstruction = `
 > [!IMPORTANT] SUPERVISOR INSTRUCTION:
-> The current topic is considered COMPLETE.
+> The current topic is considered COMPLETE (All phases done).
 > DO NOT ASK MORE QUESTIONS about "${currentTopic.label}".
 > SUMMARIZE briefly and output [TRANSITION_TO_NEXT_TOPIC] immediately.
 `;
-            } else if (supervisorInsight.status === 'CONTINUE' && supervisorInsight.missingPoints.length > 0) {
+            } else if (supervisorInsight.status === 'SCANNING') {
+                const target = supervisorInsight.nextSubGoal || "the next sub-goal";
                 supervisorInstruction = `
-> [!IMPORTANT] SUPERVISOR INSTRUCTION:
-> You are MISSING information on these sub-goals:
-> ${supervisorInsight.missingPoints.map(p => `- ${p}`).join('\n')}
-> PRIORITIZE asking about these missing points in your next question.
+> [!IMPORTANT] PHASE 1: SCANNING
+> Your target is sub-goal: "${target}".
+> Ask EXACTLY ONE question about "${target}".
+> Do NOT ask follow-up questions about previous points yet. Stick to the list.
 `;
+                primaryInstruction = "Focus ONLY on the target sub-goal for this turn.";
+            } else if (supervisorInsight.status === 'DEEPENING') {
+                const focus = supervisorInsight.focusPoint || "their last point";
+                supervisorInstruction = `
+> [!IMPORTANT] PHASE 2: DEEPENING (ZOOM)
+> All core sub-goals are covered. The user showed interest in: "${focus}".
+> Ask ONE insightful follow-up question about "${focus}".
+> This is your chance to dig deeper.
+`;
+                primaryInstruction = "Probe deeply into the focus point.";
             }
         }
 
@@ -155,12 +169,12 @@ ${currentTopic.subGoals.map(g => `- ${g}`).join('\n')}
 ${supervisorInstruction}
 
 INSTRUCTION:
-Focus YOUR QUESTIONS on these sub-goals.
-- **STRICTLY ONE QUESTION AT A TIME**: Do not compound questions (e.g. "How did you do that AND why?"). Pick the most important one.
-- **DEEP DIVES**: Do NOT rush using [TRANSITION_TO_NEXT_TOPIC]. You must obtain at least 2-3 detailed responses per sub-goal.
-- Ask specific follow-up questions ("Could you give me an example?", "How did that make you feel?").
-- **TRANSITION ONLY WITH CONSENSUS**: Use [TRANSITION_TO_NEXT_TOPIC] only when you have fully exhausted the sub-goals AND the user has nothing more to add.
-- If the conversation is moving too fast (short answers), SLOW DOWN and ask for clarification.
+${primaryInstruction}
+- **STRICTLY ONE QUESTION AT A TIME**: Do not compound questions.
+- **NO REPETITION**: Do not repeat phrases like "Is there anything else?" multiple times.
+- If SCANNING: Move to the next point efficiently.
+- If DEEPENING: Show curiosity about the specific focus point.
+- **TRANSITION ONLY WITH CONSENSUS**: If Supervisor says TRANSITION, obey immediately.
 `.trim();
     }
 

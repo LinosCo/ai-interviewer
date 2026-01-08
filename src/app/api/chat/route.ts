@@ -92,11 +92,25 @@ export async function POST(req: Request) {
                 console.log("🔍 Supervisor Verdict:", analysis);
                 supervisorInsight = {
                     status: analysis.status,
-                    missingPoints: analysis.missingPoints
+                    nextSubGoal: analysis.nextSubGoal,
+                    focusPoint: analysis.focusPoint
                 };
             } catch (err) {
                 console.error("Supervisor Failed", err);
             }
+        }
+
+        // --- FAILSAFE: FORCE TRANSITION IF STUCK ON TOPIC 1 ---
+        // User reported "10 questions always on first subtopic".
+        // If we are on the first topic and have excessive history, force move.
+        // Approx 2 messages per turn. 10 turns = 20 messages.
+        const topicIndex = conversation.bot.topics.findIndex((t: any) => t.id === conversation.currentTopicId);
+        if (topicIndex === 0 && messages.length > 18) {
+            console.log("🚨 FORCE TRANSITION: Stuck on Topic 1 for too long.");
+            supervisorInsight = {
+                status: 'TRANSITION',
+                missingPoints: []
+            };
         }
 
         let systemPrompt = PromptBuilder.build(

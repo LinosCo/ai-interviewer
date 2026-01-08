@@ -133,11 +133,17 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 
         if (supervisorInsight) {
             if (supervisorInsight.status === 'TRANSITION') {
+                const nextTopic = allTopics[topicIndex + 1];
+                const transitionMessage = nextTopic
+                    ? `Passiamo ora a "${nextTopic.label}". Sei pronto?`
+                    : "Concludiamo qui l'intervista.";
+
                 supervisorInstruction = `
 > [!IMPORTANT] SUPERVISOR INSTRUCTION:
 > The current topic is considered COMPLETE (All phases done).
 > DO NOT ASK MORE QUESTIONS about "${currentTopic.label}".
-> SUMMARIZE briefly and output [TRANSITION_TO_NEXT_TOPIC] immediately.
+> Say briefly: "Grazie. ${transitionMessage}"
+> Then output [TRANSITION_TO_NEXT_TOPIC].
 `;
             } else if (supervisorInsight.status === 'SCANNING') {
                 const target = supervisorInsight.nextSubGoal || "the next sub-goal";

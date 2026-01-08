@@ -551,27 +551,29 @@ export default function InterviewChat({
 
             {/* Progress bar */}
             {showProgressBar && (
-                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm px-6 pt-14 pb-2">
-                    {progressBarStyle === 'semantic' && topics.length > 0 ? (
-                        <SemanticProgressBar
-                            progress={progress}
-                            topics={topics}
-                            currentTopicId={activeTopicId || (topics[0]?.id)}
-                            brandColor={brandColor}
-                        />
-                    ) : (
-                        <div className="h-1.5 bg-gray-100/50 rounded-full overflow-hidden">
-                            <motion.div
-                                className="h-full relative"
-                                style={{ background: brandColor }}
-                                initial={{ width: '0%' }}
-                                animate={{ width: `${progress}%` }}
-                                transition={{ duration: 0.5 }}
-                            >
-                                <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" style={{ transform: 'skewX(-20deg)' }} />
-                            </motion.div>
-                        </div>
-                    )}
+                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm pt-14 pb-2">
+                    <div className="max-w-7xl mx-auto px-8 md:px-12">
+                        {progressBarStyle === 'semantic' && topics.length > 0 ? (
+                            <SemanticProgressBar
+                                progress={progress}
+                                topics={topics}
+                                currentTopicId={activeTopicId || (topics[0]?.id)}
+                                brandColor={brandColor}
+                            />
+                        ) : (
+                            <div className="h-1.5 bg-gray-100/50 rounded-full overflow-hidden">
+                                <motion.div
+                                    className="h-full relative"
+                                    style={{ background: brandColor }}
+                                    initial={{ width: '0%' }}
+                                    animate={{ width: `${progress}%` }}
+                                    transition={{ duration: 0.5 }}
+                                >
+                                    <div className="absolute inset-0 bg-white/30 w-full animate-[shimmer_2s_infinite]" style={{ transform: 'skewX(-20deg)' }} />
+                                </motion.div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 

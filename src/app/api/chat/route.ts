@@ -239,6 +239,38 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
                     where: { id: conversationId },
                     data: { currentTopicId: nextTopic.id }
                 });
+
+                // --- CHAIN REACTION: GENERATE NEXT QUESTION ---
+                // Re-build prompt for the new topic to ensure immediate flow
+                // Force SCANNING state for the new topic to ensure we start with the first sub-goal
+                const nextSystemPrompt = PromptBuilder.build(
+                    conversation.bot,
+                    conversation,
+                    nextTopic,
+                    methodology,
+                    Math.floor(effectiveDuration || 0),
+                    { status: 'SCANNING', nextSubGoal: nextTopic.subGoals[0] }
+                );
+
+                // Add the transition message to history so the AI knows what it just said
+                const updatedMessages = [
+                    ...messagesForAI,
+                    { role: 'assistant', content: responseText } as CoreMessage
+                ];
+
+                const nextResult = await generateText({
+                    model,
+                    system: nextSystemPrompt,
+                    messages: updatedMessages,
+                    frequencyPenalty: 0.5
+                });
+
+                // Append the new question
+                responseText += "\n\n" + nextResult.text;
+
+                // Update local conversation object so the JSON response has the correct ID
+                conversation.currentTopicId = nextTopic.id;
+
             } else {
                 await markInterviewAsCompleted(conversationId);
                 responseText += " INTERVIEW_COMPLETED";

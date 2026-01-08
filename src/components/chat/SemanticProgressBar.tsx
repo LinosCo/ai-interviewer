@@ -69,12 +69,7 @@ export function SemanticProgressBar({ currentTopicId, topics, progress, brandCol
                 </div>
             </div>
 
-            {/* Percentage text (Optional) */}
-            <div className="mt-8 text-right">
-                <span className="text-xs font-medium text-gray-400">
-                    {Math.round(progress)}% completato
-                </span>
-            </div>
+
         </div>
     );
 }

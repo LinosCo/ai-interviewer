@@ -7,6 +7,7 @@ import { LLMService } from '@/services/llmService';
 import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
 import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
 import { analyzeForProactiveSuggestions } from '@/lib/proactive/proactive-suggestions';
+import { TopicManager } from '@/lib/llm/topic-manager';
 
 export const maxDuration = 60;
 
@@ -63,7 +64,11 @@ export async function POST(req: Request) {
                 ? "Il tempo a disposizione per questa intervista è terminato. Grazie per la partecipazione!"
                 : "Abbiamo raccolto sufficienti informazioni per questa fase. Grazie mille!";
 
-            return new Response(`${closingNotice} INTERVIEW_COMPLETED`, { status: 200 });
+            return Response.json({
+                text: `${closingNotice} INTERVIEW_COMPLETED`,
+                isCompleted: true,
+                currentTopicId: conversation.currentTopicId
+            });
         }
 
         // 4. Resolve Model
@@ -73,12 +78,34 @@ export async function POST(req: Request) {
         // 5. Build Prompts
         const currentTopic = conversation.bot.topics.find((t: any) => t.id === conversation.currentTopicId) || conversation.bot.topics[0];
 
+        // --- RESTORED TOPIC SUPERVISOR ---
+        let supervisorInsight = undefined;
+        if (currentTopic && messages.length > 2) {
+            // Only run supervisor if we have some history
+            try {
+                console.log("🔍 Running Topic Supervisor...");
+                const analysis = await TopicManager.evaluateTopicProgress(
+                    messages as any[],
+                    currentTopic,
+                    process.env.OPENAI_API_KEY || ''
+                );
+                console.log("🔍 Supervisor Verdict:", analysis);
+                supervisorInsight = {
+                    status: analysis.status,
+                    missingPoints: analysis.missingPoints
+                };
+            } catch (err) {
+                console.error("Supervisor Failed", err);
+            }
+        }
+
         let systemPrompt = PromptBuilder.build(
             conversation.bot,
             conversation,
             currentTopic || null,
             methodology,
-            updatedEffectiveDuration
+            updatedEffectiveDuration,
+            supervisorInsight
         );
 
         // --- BUSINESS TUNER MEMORY INTEGRATION ---
@@ -148,8 +175,8 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
             model,
             system: systemPrompt,
             messages: messagesForAI,
-            frequencyPenalty: 0.5,
-            presencePenalty: 0.3,
+            frequencyPenalty: 0.8, // Aggressive penalty for repeats
+            presencePenalty: 0.6, // Encourage new topics
         });
 
         let responseText = result.text;

@@ -24,7 +24,7 @@ export function SemanticProgressBar({ currentTopicId, topics, progress, brandCol
     const activeIndex = currentTopicIndex === -1 ? 0 : currentTopicIndex;
 
     return (
-        <div className="w-full mb-2 mt-6 px-1">
+        <div className="w-full mb-2 mt-6 px-6 md:px-8">
             <div className="relative pt-6"> {/* Increased top space for labels */}
                 {/* Connection Line */}
                 <div className="absolute top-[30px] left-0 w-full h-0.5 bg-gray-100 z-0"></div>

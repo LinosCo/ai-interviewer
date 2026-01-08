@@ -208,28 +208,18 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
 
         // 7. Post-Processing (Markers & Status)
 
-        // --- PHASE 4: PROACTIVE SUGGESTIONS ---
-        // If the user's last answer was short/vague, we might want to append suggestions.
-        // We check this AFTER generating the AI response, but we might also append it as metadata/structured data.
-        // For now, let's append it to the text if the AI didn't already handle it well, 
-        // OR better: return it as a structured part of the response if we were using a JSON API.
-        // Since we return text/stream, we'll append it visually or handle it client-side.
-        // Here, we'll try to detect if we need it.
+        // Hoist Topic Check for Failsafe
+        const botTopics = await prisma.topicBlock.findMany({
+            where: { botId: conversation.bot.id },
+            orderBy: { orderIndex: 'asc' }
+        });
+        const currentIndex = botTopics.findIndex((t: any) => t.id === conversation.currentTopicId);
+        const hasNextTopic = currentIndex !== -1 && currentIndex < botTopics.length - 1;
 
-        if (lastMessage && lastMessage.role === 'user' && lastMessage.content.length < 50) {
-            const suggestions = await analyzeForProactiveSuggestions(
-                lastMessage.content,
-                currentTopic?.label || '',
-                null,
-                process.env.OPENAI_API_KEY || ''
-            );
-
-            if (suggestions) {
-                // Append suggestions as a special block for the client to parse?
-                // Or just append text. Let's append text for now.
-                const suggestionsText = suggestions.suggestions.map(s => `• ${s}`).join('\n');
-                responseText += `\n\n(Suggerimenti: \n${suggestionsText})`;
-            }
+        // FAILSAFE: If AI wants to conclude but we have topics left, force transition
+        if (responseText.includes('[CONCLUDE_INTERVIEW]') && hasNextTopic) {
+            console.log(`⚠️ AI tried to conclude early (Topic ${currentIndex}). Forcing transition.`);
+            responseText = responseText.replace('[CONCLUDE_INTERVIEW]', '[TRANSITION_TO_NEXT_TOPIC]');
         }
 
         if (responseText.includes('[CONCLUDE_INTERVIEW]')) {
@@ -238,12 +228,8 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
             responseText += " INTERVIEW_COMPLETED";
         } else if (responseText.includes('[TRANSITION_TO_NEXT_TOPIC]')) {
             responseText = responseText.replace('[TRANSITION_TO_NEXT_TOPIC]', '').trim();
-            // Topic transition logic from Bot.topics index...
-            const botTopics = await prisma.topicBlock.findMany({
-                where: { botId: conversation.bot.id },
-                orderBy: { orderIndex: 'asc' }
-            });
-            const currentIndex = botTopics.findIndex((t: any) => t.id === conversation.currentTopicId);
+
+            // We already fetched botTopics above
             const nextTopic = botTopics[currentIndex + 1];
 
             if (nextTopic) {

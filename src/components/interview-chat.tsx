@@ -665,24 +665,34 @@ export default function InterviewChat({
                                     <div className="prose prose-lg max-w-none prose-headings:font-bold prose-p:text-gray-900 prose-p:font-medium prose-a:font-semibold">
                                         <ReactMarkdown
                                             components={{
+                                                // Handle Blockquotes (Transitions) - Make them distinct and smaller
+                                                blockquote: ({ children }) => (
+                                                    <blockquote className="border-l-4 border-gray-200 pl-4 py-2 my-6 text-gray-500 bg-gray-50 rounded-r-lg italic [&>p]:!text-base [&>p]:!font-medium [&>p]:!text-gray-500 [&>p]:!mb-0">
+                                                        {children}
+                                                    </blockquote>
+                                                ),
                                                 p: ({ children }) => {
                                                     const text = String(children);
+                                                    // Much more conservative sizing logic
                                                     const isShort = text.length < 80;
                                                     const isLong = text.length > 200;
 
+                                                    // If it looks like a transition message (starts with >), handled by blockquote usually, 
+                                                    // but if safe-guarding:
+
                                                     return (
                                                         <p className={`
-                                                            ${isShort ? 'text-3xl md:text-4xl font-bold tracking-tight text-gray-900' : ''} 
-                                                            ${!isShort && !isLong ? 'text-2xl md:text-3xl font-semibold text-gray-900' : ''}
-                                                            ${isLong ? 'text-xl md:text-2xl font-medium text-gray-800' : ''}
-                                                            leading-tight mb-6
-                                                        `} style={{ textShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                                                            ${isShort ? 'text-xl md:text-2xl font-semibold text-gray-900' : ''} 
+                                                            ${!isShort && !isLong ? 'text-lg md:text-xl font-medium text-gray-800' : ''}
+                                                            ${isLong ? 'text-base md:text-lg text-gray-700' : ''}
+                                                            leading-relaxed mb-6
+                                                        `} style={{ textShadow: 'none' }}>
                                                             {children}
                                                         </p>
                                                     );
                                                 },
-                                                strong: ({ children }) => <span style={{ color: brandColor }}>{children}</span>,
-                                                a: ({ href, children }) => <a href={href} style={{ color: brandColor }}>{children}</a>
+                                                strong: ({ children }) => <span style={{ color: brandColor, fontWeight: 700 }}>{children}</span>,
+                                                a: ({ href, children }) => <a href={href} style={{ color: brandColor, textDecoration: 'underline' }}>{children}</a>
                                             }}
                                         >
                                             {currentQuestion.content}

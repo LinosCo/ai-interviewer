@@ -159,9 +159,10 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
                 const focus = supervisorInsight.focusPoint || "their last point";
                 supervisorInstruction = `
 > [!IMPORTANT] PHASE 2: DEEPENING (ZOOM)
-> All core sub-goals are covered. The user showed interest in: "${focus}".
-> Ask ONE insightful follow-up question about "${focus}".
-> This is your chance to dig deeper.
+> All core sub-goals are covered. The user needs to elaborate on: "${focus}".
+> Ask ONE specific follow-up question about "${focus}".
+> CRITICAL: DO NOT ask generic questions (e.g., "Is there anything else?", "Anything to add?").
+> You MUST reference the user's previous words or the specific sub-goal nuance.
 `;
                 primaryInstruction = "Probe deeply into the focus point.";
             }

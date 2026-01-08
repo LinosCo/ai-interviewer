@@ -41,6 +41,18 @@ export async function POST(req: Request) {
             return new Response("INTERVIEW_COMPLETED", { status: 200 });
         }
 
+        // 1.5 Persist User Message (CRITICAL FIX for Transcript)
+        const lastMessageIncoming = messages[messages.length - 1];
+        if (lastMessageIncoming && lastMessageIncoming.role === 'user') {
+            await prisma.message.create({
+                data: {
+                    conversationId,
+                    role: 'user',
+                    content: lastMessageIncoming.content
+                }
+            });
+        }
+
         // 2. Update Progress (Effective Duration & Stats)
         const updatedEffectiveDuration = effectiveDuration !== undefined ? Number(effectiveDuration) : conversation.effectiveDuration;
 

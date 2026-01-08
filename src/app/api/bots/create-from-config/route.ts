@@ -37,12 +37,47 @@ export async function POST(req: Request) {
         let projectId = config.projectId;
 
         if (!projectId) {
-            let project = user.ownedProjects[0];
+            // Find a valid project (one that has an organization)
+            let project = await prisma.project.findFirst({
+                where: {
+                    ownerId: user.id,
+                    organizationId: { not: null }
+                }
+            });
+
             if (!project) {
+                // Determine organization
+                let organization = await prisma.organization.findFirst({
+                    where: { members: { some: { userId: user.id } } }
+                });
+
+                // If no org, create a Personal Organization
+                if (!organization) {
+                    const orgName = user.name ? `${user.name}'s Org` : 'My Organization';
+                    const slug = user.name
+                        ? `${user.name.toLowerCase().replace(/\s+/g, '-')}-${randomBytes(2).toString('hex')}`
+                        : `org-${randomBytes(4).toString('hex')}`;
+
+                    organization = await prisma.organization.create({
+                        data: {
+                            name: orgName,
+                            slug: slug,
+                            members: {
+                                create: {
+                                    userId: user.id,
+                                    role: 'OWNER'
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Create default project linked to this org
                 project = await prisma.project.create({
                     data: {
                         name: 'Il mio workspace',
-                        ownerId: user.id
+                        ownerId: user.id,
+                        organizationId: organization.id
                     }
                 });
             }
@@ -69,6 +104,7 @@ export async function POST(req: Request) {
         });
 
         if (!project?.organizationId) {
+            // Should not happen with above fix, but safety net
             return new Response('Organization not found for project', { status: 404 });
         }
 

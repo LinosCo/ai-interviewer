@@ -126,6 +126,8 @@ IMPORTANT:
             model,
             system: systemPrompt,
             messages: messagesForAI,
+            frequencyPenalty: 0.5,
+            presencePenalty: 0.3,
         });
 
         let responseText = result.text;

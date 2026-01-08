@@ -106,7 +106,9 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
 
             setMessages(prev => [...prev, assistantMessage]);
 
-            if (data.meta?.newTopicIndex !== undefined) {
+            if (data.nextTopicIndex !== undefined && data.nextTopicIndex !== null) {
+                setCurrentTopicIndex(data.nextTopicIndex);
+            } else if (data.meta?.newTopicIndex !== undefined) {
                 setCurrentTopicIndex(data.meta.newTopicIndex);
             }
 
@@ -231,9 +233,9 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                         components={{
                                             p: ({ children }) => {
                                                 const length = String(children).length;
-                                                let textSizeClass = 'text-2xl md:text-3xl';
-                                                if (length > 300) textSizeClass = 'text-lg md:text-xl';
-                                                else if (length > 200) textSizeClass = 'text-xl md:text-2xl';
+                                                let textSizeClass = 'text-lg md:text-xl';
+                                                if (length > 300) textSizeClass = 'text-base md:text-lg';
+                                                else if (length > 200) textSizeClass = 'text-lg md:text-xl';
 
                                                 return (
                                                     <p className={`${textSizeClass} font-medium text-gray-900 leading-relaxed mb-4 tracking-tight`}>

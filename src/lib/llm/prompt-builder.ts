@@ -135,13 +135,14 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
             if (supervisorInsight.status === 'TRANSITION') {
                 const nextTopic = allTopics[topicIndex + 1];
                 const transitionMessage = nextTopic
-                    ? `Passiamo ora a "${nextTopic.label}". Sei pronto?`
+                    ? `Passiamo ora a "${nextTopic.label}".`
                     : "Concludiamo qui l'intervista.";
 
                 supervisorInstruction = `
 > [!IMPORTANT] SUPERVISOR INSTRUCTION:
 > The current topic is considered COMPLETE (All phases done).
 > DO NOT ASK MORE QUESTIONS about "${currentTopic.label}".
+> DO NOT ask for permission (e.g., "Va bene?").
 > Say briefly: "Grazie. ${transitionMessage}"
 > Then output [TRANSITION_TO_NEXT_TOPIC].
 `;
@@ -153,7 +154,7 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 > Ask EXACTLY ONE question about "${target}".
 > Do NOT ask follow-up questions about previous points yet. Stick to the list.
 `;
-                primaryInstruction = "Focus ONLY on the target sub-goal for this turn.";
+                primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode).";
             } else if (supervisorInsight.status === 'DEEPENING') {
                 const focus = supervisorInsight.focusPoint || "their last point";
                 supervisorInstruction = `
@@ -170,17 +171,15 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 ## CURRENT TOPIC: ${currentTopic.label} (${progress})
 Description: ${currentTopic.description}
 Sub-Goals to Cover:
-${currentTopic.subGoals.map(g => `- ${g}`).join('\n')}
+1. ${currentTopic.subGoals.join('\n2. ')}
 
 ${supervisorInstruction}
 
 INSTRUCTION:
 ${primaryInstruction}
 - **STRICTLY ONE QUESTION AT A TIME**: Do not compound questions.
-- **NO REPETITION**: Do not repeat phrases like "Is there anything else?" multiple times.
-- If SCANNING: Move to the next point efficiently.
-- If DEEPENING: Show curiosity about the specific focus point.
-- **TRANSITION ONLY WITH CONSENSUS**: If Supervisor says TRANSITION, obey immediately.
+- **NO REPETITION**: Do not repeat phrases.
+- **TRANSITION IMMEDIATELY**: If Supervisor says TRANSITION, obey instructions exactly. Use the provided label.
 `.trim();
     }
 

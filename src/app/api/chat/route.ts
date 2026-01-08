@@ -250,7 +250,7 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
                     methodology,
                     Math.floor(effectiveDuration || 0),
                     { status: 'SCANNING', nextSubGoal: nextTopic.subGoals[0] }
-                );
+                ) + `\n\nSYSTEM NOTE: You successfully transitioned to "${nextTopic.label}". The user sees your previous message announcing this. DO NOT repeat the announcement. DO NOT say "Passiamo a...". JUST ASK THE FIRST QUESTION.`;
 
                 // Add the transition message to history so the AI knows what it just said
                 const updatedMessages = [

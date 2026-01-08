@@ -105,7 +105,7 @@ export async function POST(req: Request) {
         // If we are on the first topic and have excessive history, force move.
         // Approx 2 messages per turn. 10 turns = 20 messages.
         const topicIndex = conversation.bot.topics.findIndex((t: any) => t.id === conversation.currentTopicId);
-        if (topicIndex === 0 && messages.length > 18) {
+        if (topicIndex === 0 && messages.length > 14) {
             console.log("🚨 FORCE TRANSITION: Stuck on Topic 1 for too long.");
             supervisorInsight = {
                 status: 'TRANSITION'

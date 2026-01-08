@@ -620,7 +620,7 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col items-center justify-center px-4 pt-64 pb-48 w-full max-w-4xl mx-auto relative z-10">
+            <div className="flex-1 flex flex-col items-center justify-center px-4 pt-64 pb-72 w-full max-w-4xl mx-auto relative z-10">
                 <AnimatePresence mode="wait">
                     {currentQuestion && (
                         <motion.div

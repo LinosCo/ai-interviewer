@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import InterviewChat from '@/components/interview-chat';
 import { colors } from '@/lib/design-system';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ChatPage({ params }: { params: Promise<{ conversationId: string }> }) {
     const { conversationId } = await params;
     const conversation = await prisma.conversation.findUnique({

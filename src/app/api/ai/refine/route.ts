@@ -1,3 +1,7 @@
+import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
+import { createOpenAI } from '@ai-sdk/openai';
+import { generateText } from 'ai';
 import { LLMService } from '@/services/llmService';
 
 export async function POST(req: Request) {

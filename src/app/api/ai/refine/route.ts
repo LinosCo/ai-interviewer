@@ -1,7 +1,4 @@
-import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateText } from 'ai';
+import { LLMService } from '@/services/llmService';
 
 export async function POST(req: Request) {
     try {
@@ -28,8 +25,14 @@ export async function POST(req: Request) {
         }
 
         const openai = createOpenAI({ apiKey });
+        const methodology = LLMService.getMethodology();
 
-        let systemPrompt = `Sei un esperto di ricerca qualitativa e UX Research. Il tuo compito è raffinare il testo di un'intervista per renderlo più professionale, efficace e strategico.`;
+        let systemPrompt = `Sei un esperto di ricerca qualitativa e UX Research. Il tuo compito è raffinare il testo di un'intervista per renderlo più professionale, efficace e strategico.
+
+## METODOLOGIA DI RIFERIMENTO
+Segui rigorosamente questi principi guida per la formulazione delle domande e degli obiettivi:
+${methodology.substring(0, 3000)}
+`;
 
         if (fieldType === 'researchGoal') {
             systemPrompt += ` Trasforma l'obiettivo in una dichiarazione di ricerca ultra-professionale. Focus sul valore di business.`;

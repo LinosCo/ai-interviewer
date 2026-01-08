@@ -277,8 +277,12 @@ IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
                     frequencyPenalty: 0.5
                 });
 
+                // Append the transition message, formatted as a blockquote context to distinguish it from the question
+                // WE USE A DISTINCT VISUAL STYLE (Blockquote + Italics)
+                responseText = `> *${responseText.trim().replace(/\n/g, ' ')}*\n\n`;
+
                 // Append the new question
-                responseText += "\n\n" + nextResult.text;
+                responseText += nextResult.text;
 
                 // Update local conversation object so the JSON response has the correct ID
                 conversation.currentTopicId = nextTopic.id;

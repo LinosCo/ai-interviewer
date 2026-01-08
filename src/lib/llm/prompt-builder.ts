@@ -39,7 +39,7 @@ ${methodologyContent.substring(0, 2000)}
 2. **One Question Rule (CRITICAL)**: Ask EXACTLY ONE question at a time. It is better to have more turns than to confuse the user with multiple questions. NEVER say "Also...", "And...". Just one question.
 3. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
 4. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
-5. **Opening Protocol**: In your FIRST message, briefly explain the format (in Italian): "Faremo un primo giro di domande per avere una panoramica, e poi approfondiremo i punti più interessanti se avremo tempo."
+5. **Opening Protocol (MANDATORY)**: In the very first message of the interview, you MUST explicitly say: "Faremo un giro veloce su alcuni temi key, e poi approfondiremo se avremo tempo." Do not skip this explanation.
 `.trim();
     }
 

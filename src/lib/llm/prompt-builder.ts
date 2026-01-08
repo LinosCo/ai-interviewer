@@ -36,7 +36,7 @@ ${methodologyContent.substring(0, 2000)}
 
 ## RULES OF ENGAGEMENT
 1. **Neutrality**: Never judge. Never agree or disagree excessively. Use neutral acknowledgments ("I see", "Thanks for sharing").
-2. **One Question Rule**: Ask EXACTLY ONE question at a time. Never double-barrel questions.
+2. **One Question Rule (CRITICAL)**: Ask EXACTLY ONE question at a time. It is better to have more turns than to confuse the user with multiple questions. NEVER say "Also...", "And...". Just one question.
 3. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
 4. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
 `.trim();
@@ -73,7 +73,8 @@ ${methodologyContent.substring(0, 2000)}
         } else {
             statusInstruction = `STATUS: ON_TRACK. ${remainingMins} minutes remaining. 
             - Maintain steady pace. 
-            - If you feel the interview is ending too quickly, PROPOSE A DEEP DIVE: "We have some time left. Would you like to explore [Specific Topic] in more detail?"`;
+            - **CRITICAL**: If you feel the interview is ending too quickly (e.g. user gives very short answers), DO NOT ACCEPT THEM. Ask: "Can you tell me more about that specific aspect?"
+            - **PROPOSE DEEP DIVE**: If you are about to transition but have >5 minutes left, ask: "That's very clear. Before we move on, is there anything else about [Current Topic] you'd like to add?"`;
         }
 
         return `
@@ -106,12 +107,13 @@ Description: ${currentTopic.description}
 Sub-Goals to Cover:
 ${currentTopic.subGoals.map(g => `- ${g}`).join('\n')}
 
-INSTRUCTION: 
-Focus YOUR QUESTIONS on these sub-goals. 
-- Do NOT rush. Explore each sub-goal deeply.
-- Ask follow-up questions ("Why?", "Can you elaborate?") if the user provides brief answers.
-- Only when you have collected detailed information for ALL sub-goals, use the 'transitionToNextTopic' tool.
-- If you finish early (under 5 turns), ask if there are other aspects they'd like to discuss before moving on.
+                INSTRUCTION: 
+                Focus YOUR QUESTIONS on these sub-goals. 
+                - **STRICTLY ONE QUESTION AT A TIME**: Do not compound questions (e.g. "How did you do that AND why?"). Pick the most important one.
+                - **DEEP DIVES**: Do NOT rush using [TRANSITION_TO_NEXT_TOPIC]. You must obtain at least 2-3 detailed responses per sub-goal.
+                - Ask specific follow-up questions ("Could you give me an example?", "How did that make you feel?").
+                - **TRANSITION ONLY WITH CONSENSUS**: Use [TRANSITION_TO_NEXT_TOPIC] only when you have fully exhausted the sub-goals AND the user has nothing more to add.
+                - If the conversation is moving too fast (short answers), SLOW DOWN and ask for clarification.
 `.trim();
     }
 

@@ -69,8 +69,8 @@ export const gradients = {
     sectionOrange: `linear-gradient(180deg, rgba(251, 191, 36, 0.95) 0%, ${colors.amber} 30%, ${colors.amber} 70%, rgba(251, 191, 36, 0.95) 100%)`,
     mesh: `
     radial-gradient(ellipse 80% 50% at 50% -20%, ${colors.peach}50 0%, transparent 50%),
-    radial-gradient(ellipse 60% 40% at 100% 30%, ${colors.rose}30 0%, transparent 40%),
-    radial-gradient(ellipse 50% 30% at 0% 60%, ${colors.lavender}25 0%, transparent 35%),
+    radial-gradient(ellipse 60% 40% at 100% 30%, ${colors.apricot}30 0%, transparent 40%),
+    radial-gradient(ellipse 50% 30% at 0% 60%, ${colors.gold}15 0%, transparent 35%),
     ${colors.white}
   `,
 };

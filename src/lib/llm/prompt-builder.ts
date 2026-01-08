@@ -187,7 +187,7 @@ ${primaryInstruction}
         currentTopic: TopicBlock | null,
         methodologyContent: string,
         effectiveDurationSeconds: number,
-        supervisorInsight?: { status: string; missingPoints: string[] }
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string }
     ): string {
         return [
             this.buildPersonaPrompt(bot),

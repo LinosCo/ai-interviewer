@@ -11,7 +11,9 @@ export function RefinableField({
     onChange, // If using state. If utilizing form defaultValue, this might be tricky in pure server forms, but we are in client component editors.
     context,
     multiline = false,
-    className = ""
+    className = "",
+    placeholder = "",
+    rows = 2
 }: {
     label: string,
     name: string,
@@ -19,7 +21,9 @@ export function RefinableField({
     onChange?: (val: string) => void,
     context: string,
     multiline?: boolean,
-    className?: string
+    className?: string,
+    placeholder?: string,
+    rows?: number
 }) {
     const [isRefining, setIsRefining] = useState(false);
     // If no onChange is provided, we assume we want to update the input's value directly? 
@@ -78,7 +82,9 @@ export function RefinableField({
                         setInternalValue(e.target.value);
                         onChange?.(e.target.value);
                     }}
-                    className="w-full p-1 border rounded h-16"
+                    placeholder={placeholder}
+                    rows={rows}
+                    className="w-full p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
             ) : (
                 <input
@@ -88,7 +94,8 @@ export function RefinableField({
                         setInternalValue(e.target.value);
                         onChange?.(e.target.value);
                     }}
-                    className="w-full p-1 border rounded"
+                    placeholder={placeholder}
+                    className="w-full p-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
             )}
         </div>

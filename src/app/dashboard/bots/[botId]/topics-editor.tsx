@@ -43,7 +43,7 @@ export default function TopicsEditor({ botId, topics, canUseConditionalLogic = f
 }
 
 import { RefinableField } from '@/components/refinable-field';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, GitBranch, Lock, Edit } from 'lucide-react';
 
 function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel, canUseConditionalLogic }: any) {
     const updateAction = updateTopicAction.bind(null, topic.id, botId);
@@ -164,9 +164,9 @@ function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel, canUseCon
                     <div className="mt-6 pt-6 border-t border-gray-200">
                         <div className="flex items-center justify-between mb-2">
                             <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                                <Icons.GitBranch size={16} className="text-gray-400" />
+                                <GitBranch size={16} className="text-gray-400" />
                                 Conditional Logic
-                                {!canUseConditionalLogic && <Icons.Lock size={12} className="text-amber-500" />}
+                                {!canUseConditionalLogic && <Lock size={12} className="text-amber-500" />}
                             </label>
                             {!canUseConditionalLogic && (
                                 <Link href="/dashboard/billing/plans" className="text-xs text-white bg-amber-500 px-2 py-0.5 rounded-full font-bold hover:bg-amber-600">
@@ -222,7 +222,7 @@ function TopicCard({ topic, index, botId, isEditing, onEdit, onCancel, canUseCon
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pt-1">
                 <button onClick={onEdit} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Icons.Edit size={18} />
+                    <Edit size={18} />
                 </button>
                 <button onClick={() => deleteTopicAction(topic.id, botId)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                     <Trash2 size={18} />

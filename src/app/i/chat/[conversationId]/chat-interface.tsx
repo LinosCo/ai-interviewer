@@ -28,9 +28,38 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
     // Auto-start conversation if no messages
     useEffect(() => {
         if (messages.length === 0 && !isLoading) {
-            handleSendMessage("I'm ready to start the interview.");
+            startInterview();
         }
     }, []);
+
+    const startInterview = async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: [], // Send empty to trigger "I am ready" in backend
+                    conversationId,
+                    botId,
+                    effectiveDuration: 0
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to start');
+
+            const assistantText = await response.text();
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: assistantText
+            }]);
+        } catch (error) {
+            console.error('Start error:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Effective Time Timer
     useEffect(() => {
@@ -54,11 +83,6 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
         setMessages(prev => [...prev, userMessage]);
         setInput('');
-        // Thinking Time Start (implicitly tracked by isLoading if we had an interval, 
-        // but for simplicity we can track diff or just let isTyping handle user side.
-        // Wait, thinking time IS "user waiting time" which counts as engagement? 
-        // Usually engagement is USER action. 
-        // User said: "misurato in base al tempo di risposta del chatbot" -> so YES, thinking time counts.
 
         // Let's add interval for Thinking Time
         setIsLoading(true);

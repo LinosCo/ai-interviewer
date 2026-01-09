@@ -19,6 +19,7 @@ import Link from 'next/link';
 export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
     const updateAction = updateBotAction.bind(null, bot.id);
     const [provider, setProvider] = useState(bot.modelProvider || 'openai');
+    const [isRecruiting, setIsRecruiting] = useState(bot.collectCandidateData ?? false);
 
     // Wrapper to ignore return type compatibility issues with form action
     const handleSubmit = async (formData: FormData) => {
@@ -113,23 +114,64 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 pt-6 col-span-1 md:col-span-2 border-t mt-4">
-                        <input
-                            type="checkbox"
-                            name="collectCandidateData"
-                            id="collectCandidateData"
-                            defaultChecked={bot.collectCandidateData ?? false}
-                            className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                        />
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <label htmlFor="collectCandidateData" className="block text-sm font-medium text-gray-700">Abilita Recruitment Mode</label>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full">Pro</span>
+                    <div className="pt-6 col-span-1 md:col-span-2 border-t mt-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <input
+                                type="checkbox"
+                                name="collectCandidateData"
+                                id="collectCandidateData"
+                                checked={isRecruiting}
+                                onChange={(e) => setIsRecruiting(e.target.checked)}
+                                className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <label htmlFor="collectCandidateData" className="block text-sm font-medium text-gray-700">Abilita Recruitment Mode</label>
+                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full">Pro</span>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                    Al termine dell'intervista, l'AI profilera il candidato.
+                                </p>
                             </div>
-                            <p className="text-xs text-gray-500">
-                                Al termine dell'intervista, l'AI chiederà i dati del candidato (Nome, Email, Telefono) e genererà un profilo strutturato.
-                            </p>
                         </div>
+
+                        {isRecruiting && (
+                            <div className="ml-8 bg-blue-50/50 p-4 rounded-lg border border-blue-100 animate-fadeIn">
+                                <label className="block text-xs font-bold uppercase text-gray-500 mb-3">Dati da raccogliere</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[
+                                        { id: 'name', label: 'Nome Completo' },
+                                        { id: 'email', label: 'Email Address' },
+                                        { id: 'phone', label: 'Telefono' },
+                                        { id: 'linkedin', label: 'LinkedIn Profile' },
+                                        { id: 'portfolio', label: 'Portfolio URL' },
+                                        { id: 'currentRole', label: 'Ruolo Attuale' },
+                                        { id: 'location', label: 'Città / Locations' },
+                                        { id: 'availability', label: 'Disponibilità (Preavviso)' },
+                                    ].map((field) => (
+                                        <label key={field.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-white p-1 rounded transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                name="candidateFields"
+                                                value={field.id}
+                                                defaultChecked={
+                                                    // Handle JsonValue (string[] or null)
+                                                    Array.isArray(bot.candidateDataFields)
+                                                        ? (bot.candidateDataFields as string[]).includes(field.id)
+                                                        : ['name', 'email'].includes(field.id) // Default fields
+                                                }
+                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            {field.label}
+                                        </label>
+                                    ))}
+                                </div>
+                                <p className="text-[10px] text-blue-600 mt-3 flex items-center gap-1">
+                                    <Icons.Info size={12} />
+                                    L'AI chiederà questi dati in modo colloquiale alla fine della chat o tramite form.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </section>

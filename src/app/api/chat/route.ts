@@ -62,6 +62,8 @@ export async function POST(req: Request) {
                     currentTopic,
                     openAIKey,
                     currentPhase // Pass phase to TopicManager
+                    , conversation.bot.collectCandidateData // isRecruiting (Pass correct param)
+                    , conversation.bot.language // Language
                 );
                 supervisorInsight = insight as any;
 
@@ -74,13 +76,20 @@ export async function POST(req: Request) {
                 });
             } catch (e) {
                 console.error("❌ [CHAT] Supervisor error:", e);
+                supervisorInsight = { status: 'TRANSITION' }; // Default to transition on error
             }
         }
 
-        // 5.b. Failsafe for Stuck Topic 1 -> Relaxed for DEEP phase
-        const limit = currentPhase === 'SCAN' ? 20 : 25;
-        if (currentIndex === 0 && messages.length > limit) {
-            console.log("🚨 [CHAT] FORCE TRANSITION: Stuck on Topic 1.");
+        // 5.b. Failsafe for Stuck Topic -> Scale based on loop index & Phase
+        const isDeep = currentPhase === 'DEEP';
+        // Assume Scan phase takes approx 3 messages per topic.
+        const phaseOffset = isDeep ? (botTopics.length * 3) : 0;
+        const msgPerTopic = isDeep ? 8 : 5; // Allow more depth in Deep phase
+
+        const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 5;
+
+        if (messages.length > globalHeadroom) {
+            console.log(`🚨 [CHAT] FORCE TRANSITION: Messages (${messages.length}) > Headroom (${globalHeadroom}).`);
             supervisorInsight = { status: 'TRANSITION' };
         }
 
@@ -93,7 +102,37 @@ export async function POST(req: Request) {
         let isTransitioning = false;
         let nextPhase = currentPhase;
 
-        if (supervisorInsight.status === 'TRANSITION') {
+        // HANDLE COMPLETION / SKIP (User asked to stop/apply)
+        if (supervisorInsight.status === 'COMPLETION') {
+            console.log("⏩ [CHAT] FAST-TRACK: User asked to complete/apply.");
+            const shouldCollectData = conversation.bot.collectCandidateData;
+
+            if (shouldCollectData) {
+                nextPhase = 'DATA_COLLECTION';
+                isTransitioning = true;
+
+                // Fake Transition Prompt for Data Collection
+                systemPrompt = `
+You are acting as a Recruiter.
+The user has explicitly asked to APPLY or STOP.
+Acknowledge their request warmly.
+Then, immediately ask for their details (Name, Email, etc.) to process the application/profile.
+Do NOT ask more content questions.
+`;
+                // Force supervisorInsight to DATA_COLLECTION for PromptBuilder later
+                supervisorInsight.status = 'DATA_COLLECTION';
+
+            } else {
+                // FAST FINISH
+                await ChatService.completeInterview(conversationId);
+                return Response.json({
+                    text: "Certamente. Grazie per il tuo tempo! L'intervista è conclusa.",
+                    isCompleted: true,
+                    currentTopicId: conversation.currentTopicId
+                });
+            }
+
+        } else if (supervisorInsight.status === 'TRANSITION') {
             const nextTopic = botTopics[currentIndex + 1];
 
             if (nextTopic) {

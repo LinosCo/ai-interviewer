@@ -242,14 +242,31 @@ export async function updateBotAction(botId: string, formData: FormData) {
         // Let's rely on explicit 'false' setting via hidden fields if needed, OR:
         // For 'useWarmup':
         if (formData.get('useWarmup') === 'on') data.useWarmup = true;
-        // If we are in 'constraints' scope and it's missing, it's false.
-        else if (scope === 'constraints') data.useWarmup = false;
-        // If scope is 'all' (legacy full form), and missing, it's false.
-        else if (scope === 'all') data.useWarmup = false;
-
         // Same for collectCandidateData
         if (formData.get('collectCandidateData') === 'on') data.collectCandidateData = true;
         else if (scope === 'constraints' || scope === 'all') data.collectCandidateData = false;
+    }
+
+    // Candidate Fields (Array)
+    if (formData.has('candidateFields')) {
+        data.candidateDataFields = formData.getAll('candidateFields');
+    } else if (scope === 'constraints' || scope === 'all') {
+        // If checkboxes are present in the DOM but none checked, formData won't have the key.
+        // We rely on the context: if we are saving constraints and 'collectCandidateData' is ON, 
+        // but no fields are selected, we might want to clear them or default them.
+        // If collectCandidateData is false, fields don't matter.
+        // If collectCandidateData is true and no fields, it's empty array.
+        // To distinguish "not submitted" from "empty selection", we can use another hidden input or logic.
+        // For now, if 'collectCandidateData' is submitted (scope match), we assume fields are updateable.
+        // But formData.getAll returns empty if key missing? No, has() is false.
+
+        // Simple Logic: if collectCandidateData is true in DATA (meaning it's being set to true or is true),
+        // we should probably look for fields. 
+        // But if I uncheck all fields, I send nothing.
+        // Let's assume if we are in 'constraints' scope, we overwrite fields.
+        if (data.collectCandidateData) {
+            data.candidateDataFields = formData.getAll('candidateFields'); // empty array if none
+        }
     }
 
     // Landing Page fields

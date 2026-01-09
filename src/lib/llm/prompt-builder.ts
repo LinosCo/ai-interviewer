@@ -170,7 +170,7 @@ ${statusInstruction}
         currentTopic: TopicBlock | null,
         allTopics: TopicBlock[],
         supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string },
-        bot?: Bot // Added for language access
+        bot?: Bot // Added for language access and fields
     ): string {
         if (!currentTopic) {
             return `
@@ -189,28 +189,33 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 
         if (supervisorInsight) {
             if (supervisorInsight.status === 'DATA_COLLECTION') {
-                // RECRUITER MODE
-                // We use the helper if available, or fall back to English logic here.
-                // Re-using the localized prompt logic if it exists, otherwise the text seen in file.
-                // Since I can't confirm getRecruitmentPrompt exists in this view, I'll use the hardcoded one from the view to be safe, 
-                // but usually we want localization. I'll defer to the text I see.
-                return `
+                // RECRUITER MODE - DYNAMIC FIELDS
+                const fields = (bot?.candidateDataFields as string[]) || ['Full Name', 'Email', 'Phone Number'];
+                const fieldsList = fields.length > 0 ? fields.join(', ') : 'Full Name, Email';
+
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+
+                const instructions = isItalian ? `
+## FASE: RACCOLTA DATI (RECRUITING)
+L'intervista è conclusa. Agisci come un **Recruiter**.
+ISTRUZIONI:
+1. Ringrazia l'utente.
+2. Spiega che per procedere hai bisogno dei seguenti dati: **${fieldsList}**.
+3. Chiedili gentilmente.
+4. Se l'utente rifiuta, accetta e concludi.
+` : `
 ## PHASE: DATA COLLECTION (RECRUITMENT)
-The main interview is complete. 
-Your goal now is to act as a **polite Recruiter**.
-
+The interview is complete. Act as a **Recruiter**.
 INSTRUCTIONS:
-1. Thank the user for their time and valuable insights.
-2. Explain that to process their candidacy/application, you need some details.
-3. Ask clearly for: **Name, Email, and Phone Number** (or LinkedIn).
-4. If the user refuses, politely accept and conclude.
-5. If the user provides data, acknowledge and say you will save their profile.
+1. Thank the user.
+2. Explain you need these details: **${fieldsList}**.
+3. Ask for them politely.
+4. If refused, accept and conclude.
+`;
 
-STYLE:
-- Professional, administrative but warm.
-- "Before we wrap up, I'd love to stay in touch..."
-- DO NOT ask anymore content questions.
-`.trim();
+                return instructions.trim();
+
             } else if (supervisorInsight.status === 'TRANSITION') {
                 const nextTopic = allTopics[topicIndex + 1];
                 const transitionMessage = nextTopic
@@ -324,7 +329,7 @@ STYLE:
             this.buildPersonaPrompt(bot),
             this.buildMethodologyPrompt(methodologyContent, bot.language || 'en'),
             this.buildContextPrompt(conversation, bot, effectiveDurationSeconds),
-            this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight)
+            this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight, bot)
         ].join('\n\n');
     }
 }

@@ -16,6 +16,8 @@ export class ChatService {
                 bot: {
                     include: {
                         topics: { orderBy: { orderIndex: 'asc' } },
+                        knowledgeSources: true,
+                        rewardConfig: true,
                         project: {
                             include: {
                                 organization: true

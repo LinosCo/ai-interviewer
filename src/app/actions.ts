@@ -206,6 +206,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
         backgroundColor: formData.get('backgroundColor') as string,
         textColor: formData.get('textColor') as string,
         useWarmup: formData.get('useWarmup') === 'on',
+        collectCandidateData: formData.get('collectCandidateData') === 'on',
     };
 
     // Filter out undefined keys so we don't overwrite with null if they were just left empty

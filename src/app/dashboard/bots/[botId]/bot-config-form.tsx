@@ -208,6 +208,25 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                             <p className="text-xs text-gray-500">Se disabilitato, l'intervista passerà direttamente alle domande principali dopo l'introduzione.</p>
                         </div>
                     </div>
+
+                    <div className="flex items-center gap-3 pt-6 col-span-1 md:col-span-2 border-t mt-4">
+                        <input
+                            type="checkbox"
+                            name="collectCandidateData"
+                            id="collectCandidateData"
+                            defaultChecked={bot.collectCandidateData ?? false}
+                            className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <label htmlFor="collectCandidateData" className="block text-sm font-medium text-gray-700">Abilita Recruitment Mode</label>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full">Pro</span>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                                Al termine dell'intervista, l'AI chiederà i dati del candidato (Nome, Email, Telefono) e genererà un profilo strutturato.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </section>
 

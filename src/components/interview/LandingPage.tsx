@@ -86,18 +86,46 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                         </p>
                     </div>
 
-                    {/* Start Button */}
-                    <button
-                        onClick={onStart}
-                        disabled={!consentGiven}
-                        className={`group relative inline-flex items-center justify-center px-8 py-4 text-white font-bold text-lg rounded-xl shadow-lg transition-all duration-200 ${!consentGiven ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-xl hover:-translate-y-0.5'}`}
-                        style={{ background: !consentGiven ? '#ccc' : primaryColor }}
-                        title={!consentGiven ? "Devi acconsentire per iniziare" : ""}
-                    >
-                        <span>Inizia l'intervista</span>
-                        <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        <div className="absolute inset-0 rounded-xl ring-2 ring-white/20 group-hover:ring-white/40 transition-all" />
-                    </button>
+                    {/* Start Button & Consent */}
+                    <div className="space-y-4">
+                        {/* Consent Checkbox */}
+                        <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                            <input
+                                id="consent-checkbox"
+                                type="checkbox"
+                                checked={consentGiven}
+                                onChange={(e) => setConsentGiven(e.target.checked)}
+                                style={{ accentColor: primaryColor }}
+                                className="w-5 h-5 mt-0.5 cursor-pointer rounded border-gray-300"
+                            />
+                            <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer leading-relaxed">
+                                <span>Ho letto la </span>
+                                <a
+                                    href="/privacy"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: primaryColor }}
+                                    className="font-medium hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    Privacy Policy
+                                </a>
+                                <span> e acconsento al trattamento dei miei dati per finalità di ricerca.</span>
+                            </label>
+                        </div>
+
+                        <button
+                            onClick={onStart}
+                            disabled={!consentGiven}
+                            className={`w-full group relative inline-flex items-center justify-center px-8 py-4 text-white font-bold text-lg rounded-xl shadow-lg transition-all duration-200 ${!consentGiven ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-xl hover:-translate-y-0.5'}`}
+                            style={{ background: !consentGiven ? '#ccc' : primaryColor }}
+                            title={!consentGiven ? "Devi acconsentire per iniziare" : ""}
+                        >
+                            <span>Inizia l'intervista</span>
+                            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                            <div className="absolute inset-0 rounded-xl ring-2 ring-white/20 group-hover:ring-white/40 transition-all" />
+                        </button>
+                    </div>
 
                     <div className="flex items-center gap-6 text-sm text-gray-500">
                         <div className="flex items-center gap-1.5">
@@ -135,31 +163,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                 {/* Privacy & Consent Section */}
                 <div className="border-t border-gray-100 pt-8 mt-4">
                     <div className="max-w-xl">
-                        {/* Consent Checkbox */}
-                        <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 mb-6">
-                            <input
-                                id="consent-checkbox"
-                                type="checkbox"
-                                checked={consentGiven}
-                                onChange={(e) => setConsentGiven(e.target.checked)}
-                                style={{ accentColor: primaryColor }}
-                                className="w-5 h-5 mt-0.5 cursor-pointer rounded border-gray-300"
-                            />
-                            <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer leading-relaxed">
-                                <span>Ho letto la </span>
-                                <a
-                                    href="/privacy"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ color: primaryColor }}
-                                    className="font-medium hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    Privacy Policy
-                                </a>
-                                <span> e acconsento al trattamento dei miei dati per finalità di ricerca.</span>
-                            </label>
-                        </div>
+
 
                         {/* Legal Links */}
                         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-400 mb-4">

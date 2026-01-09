@@ -77,6 +77,8 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
                     <BotConfigForm bot={bot} canUseBranding={canUseBranding} />
+                    {/* Updated Landing/Branding Editor */}
+                    <LandingPageEditor bot={bot} plan={bot.project.organization?.plan || 'TRIAL'} />
                     <TopicsEditor botId={bot.id} topics={bot.topics} canUseConditionalLogic={canUseConditionalLogic} />
                 </div>
 
@@ -107,11 +109,6 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                         botId={bot.id}
                         rewardConfig={bot.rewardConfig}
                     />
-
-                    {/* Landing Page Customization */}
-                    <div className="pt-6">
-                        <LandingPageEditor bot={bot} plan={bot.project.organization?.plan || 'TRIAL'} />
-                    </div>
                 </div>
             </div>
         </div>

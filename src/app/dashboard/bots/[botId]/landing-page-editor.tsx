@@ -2,52 +2,27 @@
 
 import { useState } from 'react';
 import { Bot, PlanType } from '@prisma/client';
-import { Save, Lock, Layout, Image as ImageIcon, Video, Type, AlignLeft } from 'lucide-react';
+import { Save, Lock, Layout, Image as ImageIcon, Video, Type, AlignLeft, Palette, Upload } from 'lucide-react';
 import { colors, gradients, shadows } from '@/lib/design-system';
 import { useRouter } from 'next/navigation';
+import { updateBotAction } from '@/app/actions';
+import { showToast } from '@/components/toast';
 
-interface LandingPageEditorProps {
+interface BrandingEditorProps {
     bot: Bot;
     plan: PlanType;
 }
 
-export default function LandingPageEditor({ bot, plan }: LandingPageEditorProps) {
-    const router = useRouter();
+export default function BrandingEditor({ bot, plan }: BrandingEditorProps) {
     const isPro = plan === 'PRO' || plan === 'BUSINESS' || plan === 'TRIAL';
-    const [saving, setSaving] = useState(false);
+    const updateAction = updateBotAction.bind(null, bot.id);
+    const [logoPreview, setLogoPreview] = useState(bot.logoUrl || '');
 
-    // Local state for fields
-    const [landingTitle, setLandingTitle] = useState(bot.landingTitle || bot.name || '');
-    const [landingDescription, setLandingDescription] = useState(bot.landingDescription || bot.introMessage || '');
-    const [landingImageUrl, setLandingImageUrl] = useState(bot.landingImageUrl || '');
-    const [landingVideoUrl, setLandingVideoUrl] = useState(bot.landingVideoUrl || '');
-
-    const handleSave = async () => {
-        setSaving(true);
-        try {
-            const res = await fetch(`/api/bots/${bot.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    landingTitle,
-                    landingDescription,
-                    landingImageUrl,
-                    landingVideoUrl
-                })
-            });
-            if (res.ok) {
-                router.refresh();
-                // Show success toast (simulated)
-                alert('Landing page aggiornata!');
-            } else {
-                alert('Errore nel salvataggio');
-            }
-        } catch (e) {
-            console.error(e);
-            alert('Errore di connessione');
-        } finally {
-            setSaving(false);
-        }
+    const handleSubmit = async (formData: FormData) => {
+        // Appends scope
+        formData.append('_scope', 'branding');
+        await updateAction(formData);
+        showToast('Branding updated!', 'success');
     };
 
     if (!isPro) {
@@ -59,118 +34,160 @@ export default function LandingPageEditor({ bot, plan }: LandingPageEditorProps)
                             <Lock className="w-6 h-6" />
                         </div>
                         <h3 className="font-bold text-gray-900 text-lg">Funzionalità Pro</h3>
-                        <p className="text-gray-500 text-sm">Passa a Pro o Business per personalizzare completamente la Landing Page della tua intervista con logo, colori e video.</p>
-                        <button className="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition-colors">
+                        <p className="text-gray-500 text-sm">Passa a Pro o Business per personalizzare logo, colori e Landing Page.</p>
+                        <a href="/dashboard/billing/plans" className="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition-colors">
                             Vedi Piani
-                        </button>
+                        </a>
                     </div>
                 </div>
-                {/* Blurred mockup content behind */}
-                <div className="opacity-50 filter blur-sm pointer-events-none select-none flex flex-col gap-4 text-left">
-                    <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                    <div className="h-10 bg-white border border-gray-200 rounded-lg"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/4 mt-2"></div>
-                    <div className="h-24 bg-white border border-gray-200 rounded-lg"></div>
-                </div>
+                {/* Mockup content */}
+                <div className="opacity-40 filter blur-sm pointer-events-none select-none h-40"></div>
             </div>
         );
     }
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <form action={handleSubmit} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-gray-800">
-                    <Layout className="w-5 h-5 text-amber-500" />
-                    <h2 className="font-bold text-lg">Personalizza Landing Page</h2>
+                    <Palette className="w-5 h-5 text-amber-500" />
+                    <h2 className="font-bold text-lg">Look & Feel (Branding)</h2>
                 </div>
                 <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 text-sm font-medium"
+                    type="submit"
+                    className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
                 >
-                    {saving ? 'Salvataggio...' : <><Save className="w-4 h-4" /> Salva modifiche</>}
+                    <Save className="w-4 h-4" /> Salva Modifiche
                 </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-8">
 
-                {/* Title */}
-                <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        <Type className="w-4 h-4 text-gray-400" />
-                        Titolo Principale
-                    </label>
-                    <input
-                        type="text"
-                        value={landingTitle}
-                        onChange={(e) => setLandingTitle(e.target.value)}
-                        placeholder={bot.name}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-                    />
-                    <p className="text-xs text-gray-400">Il titolo grande mostrato all'inizio. Se vuoto, usa il nome del bot.</p>
-                </div>
+                {/* LOGO & COLORS */}
+                <section className="space-y-6">
+                    <h3 className="text-sm font-bold uppercase text-gray-400 tracking-wider mb-4 border-b pb-2">Identità Visiva</h3>
 
-                {/* Description */}
-                <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        <AlignLeft className="w-4 h-4 text-gray-400" />
-                        Descrizione / Sottotitolo
-                    </label>
-                    <textarea
-                        value={landingDescription}
-                        onChange={(e) => setLandingDescription(e.target.value)}
-                        placeholder={bot.introMessage || bot.researchGoal || ''}
-                        rows={3}
-                        className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all resize-none"
-                    />
-                    <p className="text-xs text-gray-400">Spiega ai partecipanti di cosa tratta l'intervista.</p>
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Logo Upload */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+                            <div className="flex items-start gap-4">
+                                <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden relative">
+                                    {logoPreview ? (
+                                        <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-1" />
+                                    ) : (
+                                        <ImageIcon className="text-gray-300 w-8 h-8" />
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-2"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    const res = reader.result as string;
+                                                    setLogoPreview(res);
+                                                    // Update hidden input
+                                                    const hidden = document.getElementById('logoUrl-hidden') as HTMLInputElement;
+                                                    if (hidden) hidden.value = res;
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                    />
+                                    <input type="hidden" name="logoUrl" id="logoUrl-hidden" defaultValue={bot.logoUrl || ''} />
+                                    <p className="text-xs text-gray-400">Consigliato: PNG trasparente 200x200px.</p>
+                                </div>
+                            </div>
+                        </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Image URL */}
-                    <div className="space-y-2">
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                            <ImageIcon className="w-4 h-4 text-gray-400" />
-                            Immagine di Copertina (URL)
-                        </label>
-                        <input
-                            type="url"
-                            value={landingImageUrl}
-                            onChange={(e) => setLandingImageUrl(e.target.value)}
-                            placeholder="https://example.com/image.jpg"
-                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-                        />
+                        {/* Colors */}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Colore Primario</label>
+                                <div className="flex items-center gap-3">
+                                    <input type="color" name="primaryColor" defaultValue={bot.primaryColor || '#f59e0b'} className="w-10 h-10 border rounded cursor-pointer" />
+                                    <span className="text-xs text-gray-500 font-mono">Usato per bottoni e accenti</span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Background</label>
+                                    <input type="color" name="backgroundColor" defaultValue={bot.backgroundColor || '#ffffff'} className="w-full h-8 border rounded cursor-pointer" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Testo</label>
+                                    <input type="color" name="textColor" defaultValue={bot.textColor || '#1f2937'} className="w-full h-8 border rounded cursor-pointer" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                </section>
 
-                    {/* Video URL */}
-                    <div className="space-y-2">
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                            <Video className="w-4 h-4 text-gray-400" />
-                            Video Embed (YouTube/Vimeo)
-                        </label>
-                        <input
-                            type="url"
-                            value={landingVideoUrl}
-                            onChange={(e) => setLandingVideoUrl(e.target.value)}
-                            placeholder="https://youtube.com/watch?v=..."
-                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
-                        />
-                    </div>
-                </div>
+                {/* LANDING PAGE */}
+                <section className="space-y-6 pt-6">
+                    <h3 className="text-sm font-bold uppercase text-gray-400 tracking-wider mb-4 border-b pb-2 flex items-center gap-2">
+                        <Layout className="w-4 h-4" /> Landing Page
+                    </h3>
 
-                {/* Preview Tip */}
-                <div className="bg-amber-50 rounded-lg p-4 text-sm text-amber-800 flex items-start gap-3">
-                    <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                        <strong>Anteprima:</strong> Le modifiche saranno visibili immediatamente sulla pagina pubblica dell'intervista.
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Titolo Pubblico</label>
+                            <input
+                                name="landingTitle"
+                                type="text"
+                                defaultValue={bot.landingTitle || bot.name}
+                                placeholder="e.g. Intervista stage 2024"
+                                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Descrizione / Sottotitolo</label>
+                            <textarea
+                                name="landingDescription"
+                                defaultValue={bot.landingDescription || bot.introMessage || ''}
+                                rows={3}
+                                className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 resize-none"
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL</label>
+                                <input
+                                    name="landingImageUrl"
+                                    type="url"
+                                    defaultValue={bot.landingImageUrl || ''}
+                                    placeholder="https://..."
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Video Embed URL</label>
+                                <input
+                                    name="landingVideoUrl"
+                                    type="url"
+                                    defaultValue={bot.landingVideoUrl || ''}
+                                    placeholder="https://youtube.com/..."
+                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                />
+                            </div>
+                        </div>
                     </div>
+                </section>
+
+                <div className="bg-amber-50 rounded-lg p-3 flex items-start gap-2 text-xs text-amber-800">
+                    <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <p>Le modifiche al branding si riflettono sia sulla Landing Page che sull'interfaccia della chat.</p>
                 </div>
             </div>
-        </div>
+        </form>
     );
 }
 
-// Simple Info Icon (if not imported)
 function Info({ className }: { className?: string }) {
     return (
         <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">

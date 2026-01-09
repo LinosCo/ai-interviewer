@@ -153,6 +153,7 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 > Your target is sub-goal: "${target}".
 > Ask EXACTLY ONE question about "${target}".
 > Do NOT ask follow-up questions about previous points yet. Stick to the list.
+> DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "We are done".
 `;
                 primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode).";
             } else if (supervisorInsight.status === 'DEEPENING') {
@@ -163,6 +164,7 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 > Ask ONE specific follow-up question about "${focus}".
 > CRITICAL: DO NOT ask generic questions (e.g., "Is there anything else?", "Anything to add?").
 > You MUST reference the user's previous words or the specific sub-goal nuance.
+> DO NOT output [CONCLUDE_INTERVIEW]. Continue probing.
 `;
                 primaryInstruction = "Probe deeply into the focus point.";
             }

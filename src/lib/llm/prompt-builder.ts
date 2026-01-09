@@ -188,12 +188,12 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
         let primaryInstruction = "";
 
         if (supervisorInsight) {
-            if (supervisorInsight.status === 'TRANSITION') {
-                // ... (existing transition logic) ...
-                const nextTopic = allTopics[topicIndex + 1];
-                // (rest of code)
-            } else if (supervisorInsight.status === 'DATA_COLLECTION') {
+            if (supervisorInsight.status === 'DATA_COLLECTION') {
                 // RECRUITER MODE
+                // We use the helper if available, or fall back to English logic here.
+                // Re-using the localized prompt logic if it exists, otherwise the text seen in file.
+                // Since I can't confirm getRecruitmentPrompt exists in this view, I'll use the hardcoded one from the view to be safe, 
+                // but usually we want localization. I'll defer to the text I see.
                 return `
 ## PHASE: DATA COLLECTION (RECRUITMENT)
 The main interview is complete. 
@@ -211,34 +211,32 @@ STYLE:
 - "Before we wrap up, I'd love to stay in touch..."
 - DO NOT ask anymore content questions.
 `.trim();
-            }
-            // ... (rest of scanning/deepening) ...
+            } else if (supervisorInsight.status === 'TRANSITION') {
+                const nextTopic = allTopics[topicIndex + 1];
+                const transitionMessage = nextTopic
+                    ? `Passiamo ora a "${nextTopic.label}".`
+                    : "Concludiamo qui l'intervista.";
 
-            const nextTopic = allTopics[topicIndex + 1];
-            const transitionMessage = nextTopic
-                ? `Passiamo ora a "${nextTopic.label}".`
-                : "Concludiamo qui l'intervista.";
-
-            supervisorInstruction = `
+                supervisorInstruction = `
 > [!IMPORTANT] SUPERVISOR INSTRUCTION:
 > The current topic is considered COMPLETE (All phases done).
 > DO NOT ASK MORE QUESTIONS about "${currentTopic.label}".
 > DO NOT ask for permission (e.g., "Va bene?").
 > Say briefly: "Grazie. ${transitionMessage}"
 `;
-        } else if (supervisorInsight.status === 'SCANNING') {
-            const target = supervisorInsight.nextSubGoal || "the next sub-goal";
-            supervisorInstruction = `
+            } else if (supervisorInsight.status === 'SCANNING') {
+                const target = supervisorInsight.nextSubGoal || "the next sub-goal";
+                supervisorInstruction = `
 > [!IMPORTANT] PHASE 1: SCANNING
 > Your target is sub-goal: "${target}".
 > Ask EXACTLY ONE question about "${target}".
 > Do NOT ask follow-up questions about previous points yet. Stick to the list.
 > DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "We are done".
 `;
-            primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode).";
-        } else if (supervisorInsight.status === 'DEEPENING') {
-            const focus = supervisorInsight.focusPoint || "their last point";
-            supervisorInstruction = `
+                primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode).";
+            } else if (supervisorInsight.status === 'DEEPENING') {
+                const focus = supervisorInsight.focusPoint || "their last point";
+                supervisorInstruction = `
 > [!IMPORTANT] PHASE 2: DEEPENING (ZOOM)
 > All core sub-goals are covered. The user needs to elaborate on: "${focus}".
 > Ask ONE specific follow-up question about "${focus}".
@@ -246,9 +244,9 @@ STYLE:
 > You MUST reference the user's previous words or the specific sub-goal nuance.
 > DO NOT output [CONCLUDE_INTERVIEW]. Continue probing.
 `;
-            primaryInstruction = "Probe deeply into the focus point.";
+                primaryInstruction = "Probe deeply into the focus point.";
+            }
         }
-    }
 
         return `
 ## CURRENT TOPIC: ${currentTopic.label} (${progress})
@@ -277,8 +275,8 @@ ${primaryInstruction}
         methodologyContent: string,
         phase: 'SCAN' | 'DEEP' = 'SCAN'
     ): string {
-    const transitionInstruction = phase === 'DEEP'
-        ? `
+        const transitionInstruction = phase === 'DEEP'
+            ? `
 > [!IMPORTANT] DEEP DIVE RELAUNCH
 > We are returning to "${nextTopic.label}" for a second pass (Deep Dive).
 > Context: The user has already touched on this topic lightly in the Scan Phase.
@@ -287,13 +285,13 @@ ${primaryInstruction}
 > 2. Pivot to "${nextTopic.label}" with a clear intent to go deeper.
 > 3. ASK A SPECIFIC, PROBING QUESTION about "${nextTopic.label}" based on what you know or a specific sub-goal.
 > 4. DO NOT ask a generic "What do you think?". BE SPECIFIC.`
-        : `
+            : `
 > SMOOTH TRANSITION
 > 1. Briefly acknowledge the user's last answer regarding "${currentTopic.label}".
 > 2. Smoothly pivot to the new topic: "${nextTopic.label}".
 > 3. ASK THE FIRST QUESTION of the new topic immediately.`;
 
-    return `
+        return `
 ## TRANSITION MODE (${phase} PHASE)
 You are moving from Topic: "${currentTopic.label}" -> To: "${nextTopic.label}".
 
@@ -309,24 +307,24 @@ STYLE:
 - NO "Passiamo a...". Just do it naturally.
 - **CRITICAL: YOU MUST END WITH A QUESTION.** Do not just say "Thanks".
 `.trim();
-}
+    }
 
     /**
      * Master Builder: Assembles the full prompt.
      */
     static build(
-    bot: Bot & { knowledgeSources?: KnowledgeSource[], topics: TopicBlock[], rewardConfig?: any },
-    conversation: Conversation,
-    currentTopic: TopicBlock | null,
-    methodologyContent: string,
-    effectiveDurationSeconds: number,
-    supervisorInsight ?: { status: string; nextSubGoal?: string; focusPoint?: string }
-): string {
-    return [
-        this.buildPersonaPrompt(bot),
-        this.buildMethodologyPrompt(methodologyContent, bot.language || 'en'),
-        this.buildContextPrompt(conversation, bot, effectiveDurationSeconds),
-        this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight)
-    ].join('\n\n');
-}
+        bot: Bot & { knowledgeSources?: KnowledgeSource[], topics: TopicBlock[], rewardConfig?: any },
+        conversation: Conversation,
+        currentTopic: TopicBlock | null,
+        methodologyContent: string,
+        effectiveDurationSeconds: number,
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string }
+    ): string {
+        return [
+            this.buildPersonaPrompt(bot),
+            this.buildMethodologyPrompt(methodologyContent, bot.language || 'en'),
+            this.buildContextPrompt(conversation, bot, effectiveDurationSeconds),
+            this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight)
+        ].join('\n\n');
+    }
 }

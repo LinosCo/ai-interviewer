@@ -61,14 +61,21 @@ export async function POST(req: Request) {
                     openAIKey
                 );
                 supervisorInsight = insight as any;
-                console.log("🔍 Supervisor Insight:", supervisorInsight);
-            } catch (e) { console.error("Supervisor error", e); }
+                console.log("🔍 [CHAT] Supervisor Decision:", {
+                    currentTopic: currentTopic.label,
+                    topicIndex: `${currentIndex + 1}/${botTopics.length}`,
+                    status: supervisorInsight.status,
+                    messagesCount: messages.length
+                });
+            } catch (e) {
+                console.error("❌ [CHAT] Supervisor error:", e);
+            }
         }
 
         // 5.b. Failsafe for Stuck Topic 1
-        // If stuck on first topic for > 14 messages (approx 7 turns)
+        // If stuck on first topic for > 30 messages (approx 15 turns)
         if (currentIndex === 0 && messages.length > 30) {
-            console.log("🚨 FORCE TRANSITION: Stuck on Topic 1 for too long.");
+            console.log("🚨 [CHAT] FORCE TRANSITION: Stuck on Topic 1 for too long.");
             supervisorInsight = { status: 'TRANSITION' };
         }
 
@@ -88,17 +95,44 @@ export async function POST(req: Request) {
 
             if (nextTopic) {
                 // SINGLE CALL TRANSITION: Bridge + New Question
+                console.log(`➡️ [CHAT] Transitioning: ${currentTopic.label} → ${nextTopic.label}`);
                 systemPrompt = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology);
                 nextTopicId = nextTopic.id;
                 isTransitioning = true;
             } else {
-                // No more topics -> Conclude
-                await ChatService.completeInterview(conversationId);
-                return Response.json({
-                    text: "Grazie per il tuo tempo. L'intervista è conclusa. INTERVIEW_COMPLETED",
-                    isCompleted: true,
-                    currentTopicId: conversation.currentTopicId
-                });
+                // No more topics in sequence
+                // Check if we should do DEEP DIVE cycle
+                console.log("🔄 [CHAT] Reached end of topics. Checking for deep dive opportunities...");
+
+                // Simple heuristic: if interview is short (< 50% of max time), do deep dives
+                const maxDurationSeconds = (conversation.bot.maxDurationMins || 10) * 60;
+                const timeUsedPercent = (Number(effectiveDuration || 0) / maxDurationSeconds) * 100;
+
+                console.log(`⏱️ [CHAT] Time used: ${timeUsedPercent.toFixed(0)}% (${effectiveDuration}s / ${maxDurationSeconds}s)`);
+
+                if (timeUsedPercent < 70) {
+                    // We have time for deep dives - go back to first topic
+                    console.log("🔍 [CHAT] Starting DEEP DIVE cycle - returning to first topic");
+                    systemPrompt = PromptBuilder.build(
+                        conversation.bot,
+                        conversation,
+                        botTopics[0], // Go back to first topic
+                        methodology,
+                        Number(effectiveDuration || 0),
+                        { status: 'DEEPENING', focusPoint: 'Explore the most interesting points from our conversation' } as any
+                    );
+                    nextTopicId = botTopics[0].id;
+                    isTransitioning = true;
+                } else {
+                    // Time is up or we've exhausted everything -> Conclude
+                    console.log("✅ [CHAT] Interview complete - concluding");
+                    await ChatService.completeInterview(conversationId);
+                    return Response.json({
+                        text: "Grazie per il tuo tempo. L'intervista è conclusa. INTERVIEW_COMPLETED",
+                        isCompleted: true,
+                        currentTopicId: conversation.currentTopicId
+                    });
+                }
             }
         } else {
             // STANDARD FLOW (Scanning / Deepening)

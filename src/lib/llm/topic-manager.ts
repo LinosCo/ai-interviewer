@@ -32,7 +32,7 @@ export class TopicManager {
 
         // Multilingual Triggers Definition
         const triggerInstruction = isRecruiting
-            ? `0. **RECRUITMENT TRIGGER**: If user says "apply", "candidate", "job", "work with you" (or translated: "candidarmi", "lavoro", "assunzione"), output status: 'COMPLETION'.`
+            ? `0. **DATA COLLECTION TRIGGER**: If user says "apply", "candidate", "job", "work with you", "demo", "buy", "contact", "cost" (or translated: "candidarmi", "lavoro", "assunzione", "contattami", "preventivo", "comprare"), output status: 'COMPLETION'.`
             : `0. **STOP TRIGGER**: If user explicitly says "stop", "finish", "fine", "basta", output status: 'COMPLETION'.`;
 
         let prompt = '';

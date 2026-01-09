@@ -197,19 +197,21 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
                 const isItalian = lang === 'it';
 
                 const instructions = isItalian ? `
-## FASE: RACCOLTA DATI (RECRUITING)
-L'intervista è conclusa. Agisci come un **Recruiter**.
+## FASE: RACCOLTA DATI (LEAD / RECRUITING)
+L'intervista è conclusa (o l'utente ha chiesto un contatto).
+Il tuo obiettivo ora è raccogliere i dati necessari.
 ISTRUZIONI:
 1. Ringrazia l'utente.
-2. Spiega che per procedere hai bisogno dei seguenti dati: **${fieldsList}**.
+2. Spiega che per procedere (con la candidatura o la richiesta) hai bisogno di: **${fieldsList}**.
 3. Chiedili gentilmente.
 4. Se l'utente rifiuta, accetta e concludi.
 ` : `
-## PHASE: DATA COLLECTION (RECRUITMENT)
-The interview is complete. Act as a **Recruiter**.
+## PHASE: DATA COLLECTION (LEAD / RECRUITING)
+The interview is complete (or user requested contact).
+Your goal is to collect necessary details.
 INSTRUCTIONS:
 1. Thank the user.
-2. Explain you need these details: **${fieldsList}**.
+2. Explain you need these details to proceed: **${fieldsList}**.
 3. Ask for them politely.
 4. If refused, accept and conclude.
 `;

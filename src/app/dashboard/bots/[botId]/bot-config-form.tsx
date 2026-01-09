@@ -14,6 +14,7 @@ type BotWithRelations = Bot & {
 };
 
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { Info } from 'lucide-react';
 import Link from 'next/link';
 
 export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
@@ -126,28 +127,30 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                             />
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <label htmlFor="collectCandidateData" className="block text-sm font-medium text-gray-700">Abilita Recruitment Mode</label>
+                                    <label htmlFor="collectCandidateData" className="block text-sm font-medium text-gray-700">Abilita "Data Collection Mode"</label>
                                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full">Pro</span>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                    Al termine dell'intervista, l'AI profilera il candidato.
+                                    Ideale per Recruiting o Lead Generation. L'AI chiederà i dati di contatto alla fine.
                                 </p>
                             </div>
                         </div>
 
                         {isRecruiting && (
                             <div className="ml-8 bg-blue-50/50 p-4 rounded-lg border border-blue-100 animate-fadeIn">
-                                <label className="block text-xs font-bold uppercase text-gray-500 mb-3">Dati da raccogliere</label>
+                                <label className="block text-xs font-bold uppercase text-gray-500 mb-3">Dati da raccogliere (Lead / Candidato)</label>
                                 <div className="grid grid-cols-2 gap-3">
                                     {[
                                         { id: 'name', label: 'Nome Completo' },
                                         { id: 'email', label: 'Email Address' },
                                         { id: 'phone', label: 'Telefono' },
-                                        { id: 'linkedin', label: 'LinkedIn Profile' },
-                                        { id: 'portfolio', label: 'Portfolio URL' },
-                                        { id: 'currentRole', label: 'Ruolo Attuale' },
+                                        { id: 'company', label: 'Azienda / Organizzazione' },
+                                        { id: 'linkedin', label: 'LinkedIn / Social' },
+                                        { id: 'portfolio', label: 'Portfolio / Website' },
+                                        { id: 'role', label: 'Ruolo Corrente / Job Title' },
                                         { id: 'location', label: 'Città / Locations' },
-                                        { id: 'availability', label: 'Disponibilità (Preavviso)' },
+                                        { id: 'budget', label: 'Budget (Lead Gen)' },
+                                        { id: 'availability', label: 'Disponibilità (Recruiting)' },
                                     ].map((field) => (
                                         <label key={field.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer hover:bg-white p-1 rounded transition-colors">
                                             <input
@@ -167,8 +170,8 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                     ))}
                                 </div>
                                 <p className="text-[10px] text-blue-600 mt-3 flex items-center gap-1">
-                                    <Icons.Info size={12} />
-                                    L'AI chiederà questi dati in modo colloquiale alla fine della chat o tramite form.
+                                    <Info size={12} />
+                                    L'AI chiederà questi dati in modo colloquiale quando l'utente mostra interesse o alla fine.
                                 </p>
                             </div>
                         )}

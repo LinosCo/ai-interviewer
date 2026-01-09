@@ -168,6 +168,7 @@ export default function InterviewChat({
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
     const [isTyping, setIsTyping] = useState(false);
     const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const [isCompleted, setIsCompleted] = useState(false);
 
     // Active Timer
     useEffect(() => {
@@ -279,10 +280,9 @@ export default function InterviewChat({
 
         try {
             // Construct payload
-            // If overrideHistory exists, use it. Otherwise append userMessage to current messages.
             // If isHiddenTrigger, we send [overrideHistory..., userMessage(hidden)]
 
-            let messagesPayload;
+            let messagesPayload: Message[];
             if (isHiddenTrigger && overrideHistory) {
                 // Intro (Assistant) -> User (Hidden "I am ready")
                 messagesPayload = [...overrideHistory, userMessage];
@@ -311,6 +311,10 @@ export default function InterviewChat({
             const data = await response.json();
             const assistantText = data.text || '';
 
+            if (data.isCompleted || assistantText.includes('INTERVIEW_COMPLETED')) {
+                setIsCompleted(true);
+            }
+
             // Update Active Topic
             if (data.currentTopicId) {
                 setActiveTopicId(data.currentTopicId);
@@ -338,6 +342,18 @@ export default function InterviewChat({
             }]);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        handleSendMessage(input);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage(input);
         }
     };
 

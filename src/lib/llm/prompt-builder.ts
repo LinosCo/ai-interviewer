@@ -181,6 +181,7 @@ INSTRUCTION:
 ${primaryInstruction}
 - **STRICTLY ONE QUESTION AT A TIME**: Do not compound questions.
 - **NO REPETITION**: Do not repeat phrases.
+- **ALWAYS END WITH A QUESTION**: Every response MUST end with "?". Never end with just "Grazie!" or acknowledgments.
 - **TRANSITION IMMEDIATELY**: If Supervisor says TRANSITION, obey instructions exactly. Use the provided label.
 `.trim();
     }

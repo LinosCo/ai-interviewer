@@ -14,6 +14,7 @@ interface LandingPageProps {
 
 export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const isPro = bot.project.organization?.plan === 'PRO' || bot.project.organization?.plan === 'BUSINESS' || bot.project.organization?.plan === 'TRIAL';
+    const [consentGiven, setConsentGiven] = useState(false);
 
     // Customization (fallback to defaults)
     const title = (isPro && bot.landingTitle) || bot.name;
@@ -88,8 +89,10 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                     {/* Start Button */}
                     <button
                         onClick={onStart}
-                        className="group relative inline-flex items-center justify-center px-8 py-4 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
-                        style={{ background: primaryColor }}
+                        disabled={!consentGiven}
+                        className={`group relative inline-flex items-center justify-center px-8 py-4 text-white font-bold text-lg rounded-xl shadow-lg transition-all duration-200 ${!consentGiven ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-xl hover:-translate-y-0.5'}`}
+                        style={{ background: !consentGiven ? '#ccc' : primaryColor }}
+                        title={!consentGiven ? "Devi acconsentire per iniziare" : ""}
                     >
                         <span>Inizia l'intervista</span>
                         <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />

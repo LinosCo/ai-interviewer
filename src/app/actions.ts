@@ -188,26 +188,76 @@ export async function updateBotAction(botId: string, formData: FormData) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
 
-    const data = {
-        name: formData.get('name') as string,
-        researchGoal: formData.get('researchGoal') as string,
-        targetAudience: formData.get('targetAudience') as string,
-        language: formData.get('language') as string,
-        tone: formData.get('tone') as string,
-        introMessage: formData.get('introMessage') as string,
-        maxDurationMins: Number(formData.get('maxDurationMins')),
-        modelProvider: formData.get('modelProvider') as string,
-        modelName: formData.get('modelName') as string,
-        openaiApiKey: formData.get('openaiApiKey') ? (formData.get('openaiApiKey') as string) : undefined,
-        anthropicApiKey: formData.get('anthropicApiKey') ? (formData.get('anthropicApiKey') as string) : undefined,
-        // Branding fields
-        logoUrl: formData.get('logoUrl') as string | null,
-        primaryColor: formData.get('primaryColor') as string,
-        backgroundColor: formData.get('backgroundColor') as string,
-        textColor: formData.get('textColor') as string,
-        useWarmup: formData.get('useWarmup') === 'on',
-        collectCandidateData: formData.get('collectCandidateData') === 'on',
-    };
+    const getInd = (key: string) => formData.has(key) ? formData.get(key) : undefined;
+    const getStr = (key: string) => formData.has(key) ? (formData.get(key) as string) : undefined;
+
+    // Construct data object only with present fields to allow partial updates (split forms)
+    const data: any = {};
+    if (formData.has('name')) data.name = getStr('name');
+    if (formData.has('researchGoal')) data.researchGoal = getStr('researchGoal');
+    if (formData.has('targetAudience')) data.targetAudience = getStr('targetAudience');
+    if (formData.has('language')) data.language = getStr('language');
+    if (formData.has('tone')) data.tone = getStr('tone');
+    if (formData.has('introMessage')) data.introMessage = getStr('introMessage');
+    if (formData.has('maxDurationMins')) data.maxDurationMins = Number(formData.get('maxDurationMins'));
+
+    if (formData.has('modelProvider')) data.modelProvider = getStr('modelProvider');
+    if (formData.has('modelName')) data.modelName = getStr('modelName');
+
+    if (formData.has('openaiApiKey')) data.openaiApiKey = getStr('openaiApiKey') || null;
+    if (formData.has('anthropicApiKey')) data.anthropicApiKey = getStr('anthropicApiKey') || null;
+
+    // Branding fields
+    if (formData.has('logoUrl')) data.logoUrl = getStr('logoUrl') || null;
+    if (formData.has('primaryColor')) data.primaryColor = getStr('primaryColor');
+    if (formData.has('backgroundColor')) data.backgroundColor = getStr('backgroundColor');
+    if (formData.has('textColor')) data.textColor = getStr('textColor');
+
+    // Toggles - Logic: If the form is submitted, and the checkbox is NOT checked, it is missing from formData.
+    // However, if we are doing partial updates, how do we know if it was unchecked or just not part of the form?
+    // Convention: If "formType" is passed, we know which fields to expect? 
+    // Or we stick to "hidden input" trick for checkboxes?
+    // For now, let's assume if 'useWarmup' is present it's 'on'.
+    // BUT we need to handle "unchecking".
+    // Strategy: The Frontend should send a hidden input with the same name if we want to support uncheck = false?
+    // Or we simply check keys.
+    // Issue: <input type="checkbox" name="useWarmup" />
+    // Checked -> sends "useWarmup=on". Unchecked -> sends NOTHING.
+    // If Unchecked, formData.has('useWarmup') is false.
+    // So we don't update it? That breaks unchecking.
+    // FIX: Frontend should use a hidden field or distinct action signatures. 
+    // OR, we assume that if 'name' is present (Identity Form), then 'useWarmup' SHOULD be present if checked. 
+    // If 'name' is present but 'useWarmup' is not, it means unchecked? No, useWarmup is in Constraints section.
+
+    // Solution: Look for a "marker" field to identify the context/form scope.
+    // e.g. formData.get('_scope') === 'identity' or 'branding'.
+    // If scope includes the checkbox, and it's missing, set to false.
+
+    const scope = getStr('_scope') || 'all'; // default to all for backward compat logic if possible
+
+    if (scope === 'all' || scope === 'identity' || scope === 'constraints') {
+        // Handle checkboxes logic if we are in the right scope
+        // However, simple HTML forms don't send anything for unchecked.
+        // We'll trust that if the user sends partial data, they handle checkboxes explicitly?
+        // Let's rely on explicit 'false' setting via hidden fields if needed, OR:
+        // For 'useWarmup':
+        if (formData.get('useWarmup') === 'on') data.useWarmup = true;
+        // If we are in 'constraints' scope and it's missing, it's false.
+        else if (scope === 'constraints') data.useWarmup = false;
+        // If scope is 'all' (legacy full form), and missing, it's false.
+        else if (scope === 'all') data.useWarmup = false;
+
+        // Same for collectCandidateData
+        if (formData.get('collectCandidateData') === 'on') data.collectCandidateData = true;
+        else if (scope === 'constraints' || scope === 'all') data.collectCandidateData = false;
+    }
+
+    // Landing Page fields
+    if (formData.has('landingTitle')) data.landingTitle = getStr('landingTitle');
+    if (formData.has('landingDescription')) data.landingDescription = getStr('landingDescription');
+    if (formData.has('landingImageUrl')) data.landingImageUrl = getStr('landingImageUrl');
+    if (formData.has('landingVideoUrl')) data.landingVideoUrl = getStr('landingVideoUrl');
+
 
     // Filter out undefined keys so we don't overwrite with null if they were just left empty
     // But here optional fields should be update-able to empty. 

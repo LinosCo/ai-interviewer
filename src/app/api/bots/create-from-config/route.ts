@@ -118,12 +118,48 @@ export async function POST(req: Request) {
         // Get organizationId from project
         const project = await prisma.project.findUnique({
             where: { id: projectId },
-            select: { organizationId: true }
+            select: { organizationId: true, name: true, id: true }
+        });
+
+        console.log('📁 [CREATE-BOT] Project lookup:', {
+            projectId,
+            found: !!project,
+            hasOrganization: !!project?.organizationId,
+            projectName: project?.name
         });
 
         if (!project?.organizationId) {
-            // Should not happen with above fix, but safety net
-            return new Response('Organization not found for project', { status: 404 });
+            // Project exists but has no organization - create one
+            console.log('🏢 [CREATE-BOT] Project has no organization, creating one...');
+
+            const orgName = user.name ? `${user.name}'s Organization` : 'My Organization';
+            const orgSlug = user.name
+                ? `${user.name.toLowerCase().replace(/\s+/g, '-')}-${randomBytes(2).toString('hex')}`
+                : `org-${randomBytes(4).toString('hex')}`;
+
+            const organization = await prisma.organization.create({
+                data: {
+                    name: orgName,
+                    slug: orgSlug,
+                    members: {
+                        create: {
+                            userId: user.id,
+                            role: 'OWNER'
+                        }
+                    }
+                }
+            });
+
+            // Link project to organization
+            await prisma.project.update({
+                where: { id: projectId },
+                data: { organizationId: organization.id }
+            });
+
+            console.log('✅ [CREATE-BOT] Organization created and linked:', organization.id);
+
+            // Update project variable
+            project.organizationId = organization.id;
         }
 
         const publishCheck = await canPublishBot(project.organizationId);

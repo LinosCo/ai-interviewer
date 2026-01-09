@@ -183,6 +183,15 @@ export default function BrandingEditor({ bot, plan }: BrandingEditorProps) {
                     <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <p>Le modifiche al branding si riflettono sia sulla Landing Page che sull'interfaccia della chat.</p>
                 </div>
+
+                <div className="pt-4 border-t flex justify-end">
+                    <button
+                        type="submit"
+                        className="flex items-center gap-2 px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium shadow-md"
+                    >
+                        <Save className="w-4 h-4" /> Salva Branding
+                    </button>
+                </div>
             </div>
         </form>
     );

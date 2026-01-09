@@ -302,7 +302,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         marketingFeatures: [
             '10 interviste attive',
             '300 risposte/mese',
-            'Recruitment Mode (New!)',
+            'Data Collection Mode (Recruitment/Lead)',
             'Custom Branding & Landing',
             'AI Analysis Avanzata',
             'Export CSV + Webhook'
@@ -376,7 +376,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         marketingFeatures: [
             'Illimitate interviste',
             '1.000+ risposte/mese',
-            'Recruitment Mode Illimitata',
+            'Data Collection Illimitata',
             'Full White Label & API',
             'Supporto Prioritario',
             '15 utenti inclusi'

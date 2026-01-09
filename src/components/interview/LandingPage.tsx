@@ -36,10 +36,28 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
             const videoId = url.split('/').pop();
             return `https://player.vimeo.com/video/${videoId}`;
         }
+        if (url.includes('drive.google.com')) {
+            // Convert /view to /preview for embedding
+            return url.replace('/view', '/preview');
+        }
         return null;
     };
 
+    // Helper to get image URL (handling Drive)
+    const getImageUrl = (url: string | null) => {
+        if (!url) return null;
+        if (url.includes('drive.google.com')) {
+            // Extract ID and use database export link
+            const idMatch = url.match(/\/d\/(.*?)\//);
+            if (idMatch && idMatch[1]) {
+                return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+            }
+        }
+        return url;
+    };
+
     const embedUrl = videoUrl ? getEmbedUrl(videoUrl) : null;
+    const computedImageUrl = getImageUrl(imageUrl);
 
     return (
         <div className="min-h-screen flex flex-col bg-white">
@@ -68,10 +86,10 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
 
                 {/* Hero Section */}
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         <div className="flex items-center gap-2 text-sm font-medium text-amber-600 mb-2">
                             <span className="px-2 py-1 bg-amber-50 rounded-md border border-amber-100">
-                                Intervista AI
+                                Sessione Interattiva
                             </span>
                             <span>•</span>
                             <span>{estimatedTime} min stimati</span>
@@ -80,6 +98,27 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                         <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-tight">
                             {title}
                         </h1>
+
+                        {/* Media Section (Moved Here) */}
+                        {(computedImageUrl || embedUrl) && (
+                            <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-100 bg-gray-50 aspect-video relative max-h-[400px]">
+                                {embedUrl ? (
+                                    <iframe
+                                        src={embedUrl}
+                                        className="absolute inset-0 w-full h-full"
+                                        frameBorder="0"
+                                        allow="autoplay; fullscreen; picture-in-picture"
+                                        allowFullScreen
+                                    />
+                                ) : computedImageUrl ? (
+                                    <img
+                                        src={computedImageUrl}
+                                        alt="Cover"
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : null}
+                            </div>
+                        )}
 
                         <p className="text-xl text-gray-600 leading-relaxed max-w-2xl">
                             {description}
@@ -110,7 +149,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                                 >
                                     Privacy Policy
                                 </a>
-                                <span> e acconsento al trattamento dei miei dati per finalità di ricerca.</span>
+                                <span> e acconsento al trattamento dei miei dati.</span>
                             </label>
                         </div>
 
@@ -121,7 +160,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                             style={{ background: !consentGiven ? '#ccc' : primaryColor }}
                             title={!consentGiven ? "Devi acconsentire per iniziare" : ""}
                         >
-                            <span>Inizia l'intervista</span>
+                            <span>Inizia Conversazione</span>
                             <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             <div className="absolute inset-0 rounded-xl ring-2 ring-white/20 group-hover:ring-white/40 transition-all" />
                         </button>
@@ -134,31 +173,10 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                         </div>
                         <div className="flex items-center gap-1.5">
                             <Lock className="w-4 h-4" />
-                            <span>Risposte anonime e sicure</span>
+                            <span>Risposte sicure</span>
                         </div>
                     </div>
                 </div>
-
-                {/* Media Section (Image or Video) */}
-                {(imageUrl || embedUrl) && (
-                    <div className="rounded-2xl overflow-hidden shadow-2xl border border-gray-100 bg-gray-50 aspect-video relative">
-                        {embedUrl ? (
-                            <iframe
-                                src={embedUrl}
-                                className="absolute inset-0 w-full h-full"
-                                frameBorder="0"
-                                allow="autoplay; fullscreen; picture-in-picture"
-                                allowFullScreen
-                            />
-                        ) : imageUrl ? (
-                            <img
-                                src={imageUrl}
-                                alt="Cover"
-                                className="w-full h-full object-cover"
-                            />
-                        ) : null}
-                    </div>
-                )}
 
                 {/* Privacy & Consent Section */}
                 <div className="border-t border-gray-100 pt-8 mt-4">

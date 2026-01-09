@@ -129,20 +129,48 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                     </div>
                 )}
 
-                {/* Legal / Data Info */}
-                <div className="border-t border-gray-100 pt-8 mt-4 text-sm text-gray-400">
-                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                        <p>© {new Date().getFullYear()} Business Tuner. Powered by AI.</p>
-                        <div className="flex gap-4">
+                {/* Privacy & Consent Section */}
+                <div className="border-t border-gray-100 pt-8 mt-4">
+                    <div className="max-w-xl">
+                        {/* Consent Checkbox */}
+                        <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 mb-6">
+                            <input
+                                id="consent-checkbox"
+                                type="checkbox"
+                                checked={consentGiven}
+                                onChange={(e) => setConsentGiven(e.target.checked)}
+                                style={{ accentColor: primaryColor }}
+                                className="w-5 h-5 mt-0.5 cursor-pointer rounded border-gray-300"
+                            />
+                            <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer leading-relaxed">
+                                <span>Ho letto la </span>
+                                <a
+                                    href="/privacy"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: primaryColor }}
+                                    className="font-medium hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    Privacy Policy
+                                </a>
+                                <span> e acconsento al trattamento dei miei dati per finalità di ricerca.</span>
+                            </label>
+                        </div>
+
+                        {/* Legal Links */}
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-400 mb-4">
                             <a href="/privacy" className="hover:text-gray-600 underline decoration-dotted">Privacy Policy</a>
                             <a href="/terms" className="hover:text-gray-600 underline decoration-dotted">Termini di utilizzo</a>
+                            <span>© {new Date().getFullYear()} Business Tuner</span>
                         </div>
+
+                        {bot.privacyNotice && (
+                            <p className="text-xs leading-relaxed text-gray-500">
+                                <strong>Nota:</strong> {bot.privacyNotice}
+                            </p>
+                        )}
                     </div>
-                    {bot.privacyNotice && (
-                        <p className="mt-4 p-4 bg-gray-50 rounded-lg text-xs leading-relaxed text-gray-500">
-                            <strong>Nota sulla Privacy:</strong> {bot.privacyNotice}
-                        </p>
-                    )}
                 </div>
             </main>
         </div>

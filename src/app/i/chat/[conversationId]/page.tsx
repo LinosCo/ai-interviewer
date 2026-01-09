@@ -78,6 +78,7 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             warmupIcebreaker={bot.warmupIcebreaker}
             warmupContextPrompt={bot.warmupContextPrompt}
             warmupFollowup={bot.warmupFollowup}
+            skipWelcome={true}
         />
     );
 }

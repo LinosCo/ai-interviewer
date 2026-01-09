@@ -197,25 +197,31 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
                 const isItalian = lang === 'it';
 
                 const instructions = isItalian ? `
-## FASE: RACCOLTA DATI (LEAD / RECRUITING)
-L'utente ha espresso interesse a lasciare i propri dati.
-Il tuo obiettivo ora è raccogliere i dati necessari.
+## FASE: RACCOLTA DATI (CONTATTI)
+L'utente ha accettato di lasciare i propri dati.
+**REGOLA D'ORO: Sii conversazionale. Chiedi i dati UNO ALLA VOLTA.**
+
 ISTRUZIONI:
-1. Accogli l'interesse dell'utente con calore.
-2. Spiega che per procedere (con la candidatura o la richiesta) hai bisogno di: **${fieldsList}**.
-3. Chiedili gentilmente.
-4. Se l'utente rifiuta, accetta e concludi.
-5. **IMPORTANTE**: Quando l'utente ha fornito i dati O ha rifiutato, devi scrivere alla fine della risposta: "INTERVIEW_COMPLETED".
+1. Ringrazia calorosamente l'utente.
+2. Chiedi il primo dato dell'elenco: **${fieldsList}**.
+3. **IMPORTANTE**: Non elencare mai tutti i campi richiesti in un unico messaggio. Chiedine sempre solo UNO alla volta (es: chiedi il nome, aspetta, poi chiedi l'email).
+4. Quando l'utente risponde, conferma con empatia e chiedi il dato successivo.
+5. Se l'utente rifiuta un dato, rispetta la scelta e termina se necessario o passa al successivo.
+6. **PROFILO AI**: Ti stai comportando come un recruiter umano, non come un bot che compila un form.
+7. **CHIUSURA**: Solo quando hai finito di raccogliere tutto o l'utente ha esplicitamente smesso, scrivi alla fine: "INTERVIEW_COMPLETED".
 ` : `
-## PHASE: DATA COLLECTION (LEAD / RECRUITING)
-The user has expressed interest in leaving their details.
-Your goal is to collect necessary details.
+## PHASE: DATA COLLECTION (CONTACTS)
+The user has agreed to leave their details.
+**GOLDEN RULE: Be conversational. Ask for details ONE BY ONE.**
+
 INSTRUCTIONS:
-1. Warmly acknowledge the user's interest.
-2. Explain you need these details to proceed: **${fieldsList}**.
-3. Ask for them politely.
-4. If refused, accept and conclude.
-5. **IMPORTANT**: When the user has provided the data OR refused, you MUST append "INTERVIEW_COMPLETED" to the end of your response.
+1. Warmly thank the user.
+2. Ask for the first data field from: **${fieldsList}**.
+3. **IMPORTANT**: Never list all requested fields in a single message. Always ask for only ONE at a time (e.g., ask for name, wait, then ask for email).
+4. When the user responds, confirm with empathy and ask for the next field.
+5. If the user refuses a field, respect the choice and terminate if necessary or move to the next.
+6. **AI PROFILE**: You are acting like a human recruiter, not a bot filling a form.
+7. **CLOSING**: Only when you have finished collecting everything or the user has explicitly stopped, write at the end: "INTERVIEW_COMPLETED".
 `;
 
                 return instructions.trim();

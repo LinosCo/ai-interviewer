@@ -17,14 +17,16 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const [consentGiven, setConsentGiven] = useState(false);
 
     // Customization (fallback to defaults)
-    const title = (isPro && bot.landingTitle) || bot.name;
-    const description = (isPro && bot.landingDescription) || bot.introMessage || bot.researchGoal;
-    const imageUrl = (isPro && bot.landingImageUrl) || null;
-    const videoUrl = (isPro && bot.landingVideoUrl) || null;
+    const title = (isPro && (bot as any).landingTitle) ? (bot as any).landingTitle : bot.name;
+    const description = (isPro && (bot as any).landingDescription)
+        ? (bot as any).landingDescription
+        : ((bot as any).welcomeSubtitle || bot.introMessage || bot.researchGoal);
+    const imageUrl = (isPro && (bot as any).landingImageUrl) || null;
+    const videoUrl = (isPro && (bot as any).landingVideoUrl) || null;
     const primaryColor = bot.primaryColor || colors.amber;
-    const logoUrl = bot.logoUrl;
+    const logoUrl = bot.logoUrl || bot.project.organization?.logoUrl;
 
-    const estimatedTime = bot.maxDurationMins || 15;
+    const estimatedTime = bot.maxDurationMins || 10;
 
     // Helper to get video embed URL
     const getEmbedUrl = (url: string) => {
@@ -38,7 +40,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
         }
         if (url.includes('drive.google.com')) {
             // Convert /view to /preview for embedding
-            return url.replace('/view', '/preview');
+            return url.replace('/view', '/preview').replace('/file/d/', '/file/d/').split('/view')[0] + '/preview';
         }
         return null;
     };
@@ -47,10 +49,10 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const getImageUrl = (url: string | null) => {
         if (!url) return null;
         if (url.includes('drive.google.com')) {
-            // Extract ID and use database export link
-            const idMatch = url.match(/\/d\/(.*?)\//);
-            if (idMatch && idMatch[1]) {
-                return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+            // Extract ID and use database export link - handling various drive formats
+            const idMatch = url.match(/[-\w]{25,}/);
+            if (idMatch) {
+                return `https://lh3.googleusercontent.com/u/0/d/${idMatch[0]}=w1000`;
             }
         }
         return url;
@@ -60,21 +62,29 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const computedImageUrl = getImageUrl(imageUrl);
 
     return (
-        <div className="min-h-screen flex flex-col bg-white">
+        <div className="min-h-screen flex flex-col bg-white overflow-x-hidden">
+            {/* Background Decoration */}
+            <div className="fixed inset-0 pointer-events-none opacity-40 z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px]"
+                    style={{ background: `radial-gradient(circle, ${primaryColor}40 0%, transparent 70%)` }} />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[120px]"
+                    style={{ background: `radial-gradient(circle, ${primaryColor}20 0%, transparent 70%)` }} />
+            </div>
+
             {/* Header */}
-            <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm px-6 py-4">
-                <div className="max-w-4xl mx-auto flex items-center justify-between">
+            <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-gray-100/50 px-6 py-4 transition-all">
+                <div className="max-w-5xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         {logoUrl ? (
                             <img src={logoUrl} alt="Logo" className="h-8 w-auto object-contain" />
                         ) : (
                             <div className="flex items-center gap-2">
-                                <Icons.Logo className="w-8 h-8 text-amber-500" />
-                                <span className="text-lg font-bold text-gray-900">Business Tuner</span>
+                                <Icons.Logo className="w-8 h-8" style={{ color: primaryColor }} />
+                                <span className="text-lg font-bold text-gray-900 tracking-tight">Business Tuner</span>
                             </div>
                         )}
                         {!logoUrl && bot.project.organization?.name && (
-                            <span className="text-sm text-gray-400 border-l pl-3 ml-1 border-gray-300">
+                            <span className="text-xs text-gray-400 border-l pl-3 ml-1 border-gray-300 uppercase tracking-widest hidden sm:inline-block">
                                 {bot.project.organization.name}
                             </span>
                         )}
@@ -82,26 +92,30 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                 </div>
             </header>
 
-            <main className="flex-1 max-w-4xl mx-auto w-full p-6 md:p-12 flex flex-col gap-12">
+            <main className="flex-1 relative z-10 w-full max-w-4xl mx-auto p-6 md:p-12 lg:p-16 flex flex-col items-center text-center gap-12 animate-in fade-in zoom-in-95 duration-1000">
 
                 {/* Hero Section */}
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="space-y-6">
-                        <div className="flex items-center gap-2 text-sm font-medium text-amber-600 mb-2">
-                            <span className="px-2 py-1 bg-amber-50 rounded-md border border-amber-100">
+                <div className="w-full space-y-10">
+                    <div className="space-y-6 flex flex-col items-center">
+                        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: primaryColor }}>
+                            <span className="px-3 py-1 rounded-full border border-current bg-white/50 backdrop-blur-sm">
                                 Sessione Interattiva
                             </span>
-                            <span>•</span>
+                            <span className="opacity-30">•</span>
                             <span>{estimatedTime} min stimati</span>
                         </div>
 
-                        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-tight">
+                        <h1 className="text-4xl md:text-6xl font-black text-gray-900 tracking-tight leading-[1.1] max-w-3xl">
                             {title}
                         </h1>
 
-                        {/* Media Section (Moved Here) */}
+                        <p className="text-lg md:text-xl text-gray-500 leading-relaxed max-w-2xl font-medium">
+                            {description}
+                        </p>
+
+                        {/* Media Section */}
                         {(computedImageUrl || embedUrl) && (
-                            <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-100 bg-gray-50 aspect-video relative max-h-[400px]">
+                            <div className="w-full rounded-[2rem] overflow-hidden shadow-2xl border border-gray-100/50 bg-gray-50/50 backdrop-blur-md aspect-video relative group transition-all">
                                 {embedUrl ? (
                                     <iframe
                                         src={embedUrl}
@@ -114,89 +128,94 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                                     <img
                                         src={computedImageUrl}
                                         alt="Cover"
-                                        className="w-full h-full object-cover"
+                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                        onError={(e) => {
+                                            // Fallback if image fails
+                                            (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                                        }}
                                     />
                                 ) : null}
                             </div>
                         )}
-
-                        <p className="text-xl text-gray-600 leading-relaxed max-w-2xl">
-                            {description}
-                        </p>
                     </div>
 
                     {/* Start Button & Consent */}
-                    <div className="space-y-4">
+                    <div className="w-full max-w-lg mx-auto space-y-6">
                         {/* Consent Checkbox */}
-                        <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                            <input
-                                id="consent-checkbox"
-                                type="checkbox"
-                                checked={consentGiven}
-                                onChange={(e) => setConsentGiven(e.target.checked)}
-                                style={{ accentColor: primaryColor }}
-                                className="w-5 h-5 mt-0.5 cursor-pointer rounded border-gray-300"
-                            />
-                            <label htmlFor="consent-checkbox" className="text-sm text-gray-700 select-none cursor-pointer leading-relaxed">
+                        <div className="group flex items-start gap-4 p-5 bg-white/50 backdrop-blur-md rounded-2xl border border-gray-100 shadow-sm transition-all hover:shadow-md hover:border-gray-200">
+                            <div className="relative flex items-center mt-0.5">
+                                <input
+                                    id="consent-checkbox"
+                                    type="checkbox"
+                                    checked={consentGiven}
+                                    onChange={(e) => setConsentGiven(e.target.checked)}
+                                    className="peer h-6 w-6 cursor-pointer appearance-none rounded-lg border-2 border-gray-200 transition-all checked:border-transparent"
+                                    style={{ backgroundColor: consentGiven ? primaryColor : 'transparent' }}
+                                />
+                                <Icons.Check
+                                    className={`absolute left-0 top-0 h-6 w-6 text-white pointer-events-none transition-all scale-50 opacity-0 ${consentGiven ? 'scale-100 opacity-100' : ''}`}
+                                    size={16}
+                                />
+                            </div>
+                            <label htmlFor="consent-checkbox" className="text-sm text-gray-500 text-left select-none cursor-pointer leading-relaxed font-medium">
                                 <span>Ho letto la </span>
                                 <a
                                     href="/privacy"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     style={{ color: primaryColor }}
-                                    className="font-medium hover:underline"
+                                    className="font-bold hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     Privacy Policy
                                 </a>
-                                <span> e acconsento al trattamento dei miei dati.</span>
+                                <span> e acconsento al trattamento dei miei dati per le finalità indicate.</span>
                             </label>
                         </div>
 
                         <button
                             onClick={onStart}
                             disabled={!consentGiven}
-                            className={`w-full group relative inline-flex items-center justify-center px-8 py-4 text-white font-bold text-lg rounded-xl shadow-lg transition-all duration-200 ${!consentGiven ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-xl hover:-translate-y-0.5'}`}
-                            style={{ background: !consentGiven ? '#ccc' : primaryColor }}
-                            title={!consentGiven ? "Devi acconsentire per iniziare" : ""}
+                            className={`w-full group relative inline-flex items-center justify-center px-10 py-5 text-white font-black text-xl rounded-2xl shadow-xl transition-all duration-300 transform ${!consentGiven ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:shadow-2xl hover:-translate-y-1 active:scale-95'}`}
+                            style={{
+                                background: consentGiven ? `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)` : '#999',
+                                boxShadow: consentGiven ? `0 20px 40px -15px ${primaryColor}70` : 'none'
+                            }}
                         >
-                            <span>Inizia Conversazione</span>
-                            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                            <div className="absolute inset-0 rounded-xl ring-2 ring-white/20 group-hover:ring-white/40 transition-all" />
+                            <span className="relative z-10">Inizia Conversazione</span>
+                            <ArrowRight className="relative z-10 ml-3 w-6 h-6 transition-transform group-hover:translate-x-1.5" />
                         </button>
-                    </div>
 
-                    <div className="flex items-center gap-6 text-sm text-gray-500">
-                        <div className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4" />
-                            <span>{estimatedTime} minuti</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <Lock className="w-4 h-4" />
-                            <span>Risposte sicure</span>
+                        <div className="flex items-center justify-center gap-8 text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                            <div className="flex items-center gap-1.5 transition-colors hover:text-gray-600">
+                                <Clock className="w-3.5 h-3.5" style={{ color: primaryColor }} />
+                                <span>{estimatedTime} minuti</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 transition-colors hover:text-gray-600">
+                                <Lock className="w-3.5 h-3.5" style={{ color: primaryColor }} />
+                                <span>Risposte sicure</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Privacy & Consent Section */}
-                <div className="border-t border-gray-100 pt-8 mt-4">
-                    <div className="max-w-xl">
-
-
-                        {/* Legal Links */}
-                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-400 mb-4">
-                            <a href="/privacy" className="hover:text-gray-600 underline decoration-dotted">Privacy Policy</a>
-                            <a href="/terms" className="hover:text-gray-600 underline decoration-dotted">Termini di utilizzo</a>
-                            <span>© {new Date().getFullYear()} Business Tuner</span>
+                {/* Footer Section */}
+                <footer className="w-full pt-12 border-t border-gray-100">
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                            <a href="/privacy" className="transition-colors hover:text-gray-900">Privacy Policy</a>
+                            <a href="/terms" className="transition-colors hover:text-gray-900">Termini</a>
+                            <span className="opacity-50">© {new Date().getFullYear()} Business Tuner AI</span>
                         </div>
 
                         {bot.privacyNotice && (
-                            <p className="text-xs leading-relaxed text-gray-500">
-                                <strong>Nota:</strong> {bot.privacyNotice}
+                            <p className="max-w-lg text-[10px] leading-relaxed text-gray-400 font-medium">
+                                <span className="text-gray-900 uppercase tracking-tighter mr-2 font-black">Nota legale:</span>
+                                {bot.privacyNotice}
                             </p>
                         )}
                     </div>
-                </div>
+                </footer>
             </main>
         </div>
     );

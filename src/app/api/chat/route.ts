@@ -9,7 +9,6 @@ import { TopicManager } from '@/lib/llm/topic-manager';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 
 export const maxDuration = 60;
-const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: Request) {
     try {
@@ -49,13 +48,16 @@ export async function POST(req: Request) {
 
         let supervisorInsight = { status: 'SCANNING' };
 
+        // Fetch API Key for Topic Manager
+        // Note: TopicManager currently uses OpenAI only for the supervisor/logic tier
+        const openAIKey = await LLMService.getApiKey(conversation.bot, 'openai') || process.env.OPENAI_API_KEY || '';
+
         if (messages.length > 2) {
             try {
-                // Use type casting if necessary or ensure TopicManager returns compatible types
                 const insight = await TopicManager.evaluateTopicProgress(
-                    messages,
+                    messages as any[],
                     currentTopic,
-                    process.env.OPENAI_API_KEY || ''
+                    openAIKey
                 );
                 supervisorInsight = insight as any;
                 console.log("🔍 Supervisor Insight:", supervisorInsight);
@@ -71,7 +73,9 @@ export async function POST(req: Request) {
 
         // 6. Transition Decision & Prompt Building
         const methodology = LLMService.getMethodology();
-        const model = openai('gpt-4o');
+
+        // Load the chosen model (OpenAI or Anthropic)
+        const model = await LLMService.getModel(conversation.bot);
 
         let systemPrompt = "";
         let nextTopicId = conversation.currentTopicId;
@@ -114,7 +118,6 @@ export async function POST(req: Request) {
             meta_comment: z.string().optional().describe("Internal reasoning (hidden from user)")
         });
 
-        // Prepare messages for AI SDK
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
         if (messagesForAI.length === 0) messagesForAI.push({ role: 'user', content: "I am ready." });
 
@@ -145,7 +148,7 @@ export async function POST(req: Request) {
                 lastUserContent,
                 currentTopic.id,
                 currentTopic.label,
-                process.env.OPENAI_API_KEY || ''
+                openAIKey
             ).catch(err => console.error("Memory update failed", err));
         }
 

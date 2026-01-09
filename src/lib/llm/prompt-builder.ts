@@ -185,6 +185,36 @@ ${primaryInstruction}
     }
 
     /**
+     * 5. Transition Prompt (NEW):
+     * Used when the system decides to switch topics in a single turn.
+     */
+    static buildTransitionPrompt(
+        currentTopic: TopicBlock,
+        nextTopic: TopicBlock,
+        methodologyContent: string
+    ): string {
+        return `
+## TRANSITION MODE
+You are moving from Topic: "${currentTopic.label}" -> To: "${nextTopic.label}".
+
+INSTRUCTIONS:
+1. Briefly acknowledge the user's last answer regarding "${currentTopic.label}".
+2. Smoothly pivot to the new topic: "${nextTopic.label}".
+3. ASK THE FIRST QUESTION of the new topic immediately.
+
+CONTEXT on New Topic:
+${nextTopic.description}
+Sub-Goals:
+${nextTopic.subGoals.map(g => `- ${g}`).join('\n')}
+
+STYLE:
+- Be conversational. Do not make it sound like a robotic announcement.
+- NO "Passiamo a...". Just do it naturally.
+- Example: "That clarifies your view on X. Now, regarding Y, what is your experience...?"
+`.trim();
+    }
+
+    /**
      * Master Builder: Assembles the full prompt.
      */
     static build(

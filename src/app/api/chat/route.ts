@@ -1,297 +1,158 @@
-import { prisma } from '@/lib/prisma';
-import { MemoryManager } from '@/lib/memory/memory-manager';
-import { generateText, CoreMessage } from 'ai';
+
+import { ChatService } from '@/services/chat-service';
+import { generateObject } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { z } from 'zod';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
-import { recordInterviewCompleted, checkInterviewStatus, markInterviewAsCompleted } from '@/lib/usage';
 import { LLMService } from '@/services/llmService';
-import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
-import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
-import { analyzeForProactiveSuggestions } from '@/lib/proactive/proactive-suggestions';
 import { TopicManager } from '@/lib/llm/topic-manager';
+import { MemoryManager } from '@/lib/memory/memory-manager';
 
 export const maxDuration = 60;
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: Request) {
-    console.log('=== Chat API POST (Phase 5: Limits Implementation) ===');
     try {
         const body = await req.json();
         const { messages, conversationId, botId, effectiveDuration } = body;
 
-        // 1. Data Loading & Initial Validation
-        if (!messages || !Array.isArray(messages)) {
-            return new Response(JSON.stringify({ error: 'Invalid messages format' }), { status: 400 });
+        // 1. Data Loading & Validation
+        const conversation = await ChatService.loadConversation(conversationId, botId);
+
+        // 2. Persist User Message
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage?.role === 'user') {
+            await ChatService.saveUserMessage(conversationId, lastMessage.content);
         }
 
-        const conversation = await prisma.conversation.findUnique({
-            where: { id: conversationId },
-            include: {
-                bot: {
-                    include: {
-                        topics: { orderBy: { orderIndex: 'asc' } }
-                    }
-                }
-            }
-        });
+        // 3. Update Progress
+        await ChatService.updateProgress(conversationId, Number(effectiveDuration || conversation.effectiveDuration));
 
-        if (!conversation || conversation.botId !== botId) {
-            return new Response("Unauthorized or Not Found", { status: 404 });
-        }
-
-        if (conversation.status === 'COMPLETED') {
-            return new Response("INTERVIEW_COMPLETED", { status: 200 });
-        }
-
-        // 1.5 Persist User Message (CRITICAL FIX for Transcript)
-        const lastMessageIncoming = messages[messages.length - 1];
-        if (lastMessageIncoming && lastMessageIncoming.role === 'user') {
-            await prisma.message.create({
-                data: {
-                    conversationId,
-                    role: 'user',
-                    content: lastMessageIncoming.content
-                }
-            });
-        }
-
-        // 2. Update Progress (Effective Duration & Stats)
-        const updatedEffectiveDuration = effectiveDuration !== undefined ? Number(effectiveDuration) : conversation.effectiveDuration;
-
-        await prisma.conversation.update({
-            where: { id: conversationId },
-            data: {
-                effectiveDuration: updatedEffectiveDuration,
-                exchangeCount: { increment: 1 }
-            }
-        });
-
-        // 3. Status & Limit Check
-        const status = await checkInterviewStatus(conversationId);
-
-        if (status.shouldConclude) {
-            console.log(`Interview Limit Reached (${status.reason}) for ${conversationId}`);
-            await markInterviewAsCompleted(conversationId);
-
-            // Send a final "Limit Reached" message or signal
-            const closingNotice = status.reason === 'TIME'
-                ? "Il tempo a disposizione per questa intervista è terminato. Grazie per la partecipazione!"
-                : "Abbiamo raccolto sufficienti informazioni per questa fase. Grazie mille!";
-
+        // 4. Check Limits
+        const statusCheck = await ChatService.checkLimits(conversationId);
+        if (statusCheck.shouldConclude) {
+            await ChatService.completeInterview(conversationId);
             return Response.json({
-                text: `${closingNotice} INTERVIEW_COMPLETED`,
+                text: "Il tempo a disposizione per questa intervista è terminato. Grazie per la partecipazione! INTERVIEW_COMPLETED",
                 isCompleted: true,
                 currentTopicId: conversation.currentTopicId
             });
         }
 
-        // 4. Resolve Model
-        const model = await LLMService.getModel(conversation.bot);
-        const methodology = LLMService.getMethodology();
+        // 5. Topic Supervision
+        const botTopics = conversation.bot.topics;
+        // Ensure topics are sorted
+        botTopics.sort((a, b) => a.orderIndex - b.orderIndex);
 
-        // 5. Build Prompts
-        const currentTopic = conversation.bot.topics.find((t: any) => t.id === conversation.currentTopicId) || conversation.bot.topics[0];
+        const currentTopic = botTopics.find(t => t.id === conversation.currentTopicId) || botTopics[0];
+        const currentIndex = botTopics.findIndex(t => t.id === conversation.currentTopicId);
 
-        // --- RESTORED TOPIC SUPERVISOR ---
-        let supervisorInsight = undefined;
-        if (currentTopic && messages.length > 2) {
-            // Only run supervisor if we have some history
+        let supervisorInsight = { status: 'SCANNING' };
+
+        if (messages.length > 2) {
             try {
-                console.log("🔍 Running Topic Supervisor...");
-                const analysis = await TopicManager.evaluateTopicProgress(
-                    messages as any[],
+                // Use type casting if necessary or ensure TopicManager returns compatible types
+                const insight = await TopicManager.evaluateTopicProgress(
+                    messages,
                     currentTopic,
                     process.env.OPENAI_API_KEY || ''
                 );
-                console.log("🔍 Supervisor Verdict:", analysis);
-                supervisorInsight = {
-                    status: analysis.status,
-                    nextSubGoal: analysis.nextSubGoal,
-                    focusPoint: analysis.focusPoint
-                };
-            } catch (err) {
-                console.error("Supervisor Failed", err);
-            }
+                supervisorInsight = insight as any;
+                console.log("🔍 Supervisor Insight:", supervisorInsight);
+            } catch (e) { console.error("Supervisor error", e); }
         }
 
-        // --- FAILSAFE: FORCE TRANSITION IF STUCK ON TOPIC 1 ---
-        // User reported "10 questions always on first subtopic".
-        // If we are on the first topic and have excessive history, force move.
-        // Approx 2 messages per turn. 10 turns = 20 messages.
-        const topicIndex = conversation.bot.topics.findIndex((t: any) => t.id === conversation.currentTopicId);
-        if (topicIndex === 0 && messages.length > 14) {
-            console.log("🚨 FORCE TRANSITION: Stuck on Topic 1 for too long.");
-            supervisorInsight = {
-                status: 'TRANSITION'
-            };
+        // 5.b. Failsafe for Stuck Topic 1
+        // If stuck on first topic for > 14 messages (approx 7 turns)
+        if (currentIndex === 0 && messages.length > 14) {
+            console.log("🚨 FORCE TRANSITION: Stuck on Topic 1");
+            supervisorInsight = { status: 'TRANSITION' };
         }
 
-        let systemPrompt = PromptBuilder.build(
-            conversation.bot,
-            conversation,
-            currentTopic || null,
-            methodology,
-            updatedEffectiveDuration,
-            supervisorInsight
-        );
+        // 6. Transition Decision & Prompt Building
+        const methodology = LLMService.getMethodology();
+        const model = openai('gpt-4o');
 
-        // --- BUSINESS TUNER MEMORY INTEGRATION ---
-        // 1. Update memory with new user message (if applicable)
-        const lastMessage = messages[messages.length - 1];
-        if (lastMessage && lastMessage.role === 'user') {
-            const apiKey = process.env.OPENAI_API_KEY || '';
-            const currentTopicLabel = currentTopic?.label || 'Generale';
+        let systemPrompt = "";
+        let nextTopicId = conversation.currentTopicId;
+        let isTransitioning = false;
 
-            // Non-blocking memory update (fire and forget to not slow down response too much, 
-            // or await if we want to ensure consistency)
-            // Awaiting is safer for the prototype to avoid race conditions on next turn
-            await MemoryManager.updateAfterUserResponse(
-                conversationId,
-                lastMessage.content,
-                currentTopic?.id || '',
-                currentTopicLabel,
-                apiKey
-            );
-        }
-
-        // 2. Get formatted memory context
-        const memory = await MemoryManager.get(conversationId);
-        const memoryContext = memory ? MemoryManager.formatForPrompt(memory) : '';
-
-        // 3. Inject into prompt
-        // We inject it before the control section
-
-        // --- PHASE 4: TONE ADAPTATION ---
-        const toneAnalyzer = new ToneAnalyzer(process.env.OPENAI_API_KEY || '');
-        // Analyze recent memory or messages
-        // We can use the memory's detectedTone or re-analyze last messages if needed.
-        // For simplicity, let's use the memory's detected tone if available, or analyze recent.
-
-        let toneInstructions = "";
-        if (memory?.detectedTone) {
-            // Simplified adaptation based on single label
-            toneInstructions = memory.detectedTone === 'formal' ? "Mantieni un tono professionale." :
-                memory.detectedTone === 'casual' ? "Usa un tono colloquiale." : "";
-        } else {
-            // Deeper analysis
-            const lastMessages = messages.slice(-5).map((m: any) => ({ role: m.role, content: m.content }));
-            const toneProfile = await toneAnalyzer.analyzeTone(lastMessages);
-            toneInstructions = buildToneAdaptationPrompt(toneProfile);
-        }
-
-        // -----------------------------------------
-
-        systemPrompt += `
-
-${memoryContext}
-
-${toneInstructions}
-
-## TRANSITION & COMPLETION CONTROL
-When topic is covered, add: [TRANSITION_TO_NEXT_TOPIC]
-When interview is complete, add: [CONCLUDE_INTERVIEW]
-
-IMPORTANT: Markers must be on THEIR OWN LINE at the very end of your response.
-`;
-
-        const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }) as CoreMessage);
-        if (messagesForAI.length === 0) messagesForAI.push({ role: 'user', content: "I am ready." });
-
-        // 6. Generate
-        const result = await generateText({
-            model,
-            system: systemPrompt,
-            messages: messagesForAI,
-            frequencyPenalty: 0.8, // Aggressive penalty for repeats
-            presencePenalty: 0.6, // Encourage new topics
-        });
-
-        let responseText = result.text;
-
-        // 7. Post-Processing (Markers & Status)
-
-        // Hoist Topic Check for Failsafe
-        const botTopics = await prisma.topicBlock.findMany({
-            where: { botId: conversation.bot.id },
-            orderBy: { orderIndex: 'asc' }
-        });
-        const currentIndex = botTopics.findIndex((t: any) => t.id === conversation.currentTopicId);
-        const hasNextTopic = currentIndex !== -1 && currentIndex < botTopics.length - 1;
-
-        // FAILSAFE: If AI wants to conclude but we have topics left, force transition
-        if (responseText.includes('[CONCLUDE_INTERVIEW]') && hasNextTopic) {
-            console.log(`⚠️ AI tried to conclude early (Topic ${currentIndex}). Forcing transition.`);
-            responseText = responseText.replace('[CONCLUDE_INTERVIEW]', '[TRANSITION_TO_NEXT_TOPIC]');
-        }
-
-        if (responseText.includes('[CONCLUDE_INTERVIEW]')) {
-            responseText = responseText.replace('[CONCLUDE_INTERVIEW]', '').trim();
-            await markInterviewAsCompleted(conversationId);
-            responseText += " INTERVIEW_COMPLETED";
-        } else if (responseText.includes('[TRANSITION_TO_NEXT_TOPIC]')) {
-            responseText = responseText.replace('[TRANSITION_TO_NEXT_TOPIC]', '').trim();
-
-            // We already fetched botTopics above
+        // Perform Single-Call Transition Logic
+        if (supervisorInsight.status === 'TRANSITION') {
             const nextTopic = botTopics[currentIndex + 1];
 
             if (nextTopic) {
-                await prisma.conversation.update({
-                    where: { id: conversationId },
-                    data: { currentTopicId: nextTopic.id }
-                });
-
-                // --- CHAIN REACTION: GENERATE NEXT QUESTION ---
-                // Re-build prompt for the new topic to ensure immediate flow
-                // Force SCANNING state for the new topic to ensure we start with the first sub-goal
-                const nextSystemPrompt = PromptBuilder.build(
-                    conversation.bot,
-                    conversation,
-                    nextTopic,
-                    methodology,
-                    Math.floor(effectiveDuration || 0),
-                    { status: 'SCANNING', nextSubGoal: nextTopic.subGoals[0] }
-                ) + `\n\nSYSTEM NOTE: You successfully transitioned to "${nextTopic.label}". The user sees your previous message announcing this. DO NOT repeat the announcement. DO NOT say "Passiamo a...". JUST ASK THE FIRST QUESTION.`;
-
-                // Add the transition message to history so the AI knows what it just said
-                const updatedMessages = [
-                    ...messagesForAI,
-                    { role: 'assistant', content: responseText } as CoreMessage
-                ];
-
-                const nextResult = await generateText({
-                    model,
-                    system: nextSystemPrompt,
-                    messages: updatedMessages,
-                    frequencyPenalty: 0.5
-                });
-
-                // Append the transition message, formatted as a blockquote context to distinguish it from the question
-                // WE USE A DISTINCT VISUAL STYLE (Blockquote + Italics)
-                responseText = `> *${responseText.trim().replace(/\n/g, ' ')}*\n\n`;
-
-                // Append the new question
-                responseText += nextResult.text;
-
-                // Update local conversation object so the JSON response has the correct ID
-                conversation.currentTopicId = nextTopic.id;
-
+                // SINGLE CALL TRANSITION: Bridge + New Question
+                systemPrompt = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology);
+                nextTopicId = nextTopic.id;
+                isTransitioning = true;
             } else {
-                await markInterviewAsCompleted(conversationId);
-                responseText += " INTERVIEW_COMPLETED";
+                // No more topics -> Conclude
+                await ChatService.completeInterview(conversationId);
+                return Response.json({
+                    text: "Grazie per il tuo tempo. L'intervista è conclusa. INTERVIEW_COMPLETED",
+                    isCompleted: true,
+                    currentTopicId: conversation.currentTopicId
+                });
             }
+        } else {
+            // STANDARD FLOW (Scanning / Deepening)
+            systemPrompt = PromptBuilder.build(
+                conversation.bot,
+                conversation,
+                currentTopic,
+                methodology,
+                Number(effectiveDuration || 0),
+                supervisorInsight as any
+            );
         }
 
-        // 8. Save Assistant Message
-        await prisma.message.create({
-            data: {
-                conversationId,
-                role: 'assistant',
-                content: responseText
-            }
+        // 7. Generation (Structured Output)
+        // User requested JSON markers. We use generateObject to enforce structure.
+        const schema = z.object({
+            response: z.string().describe("The conversational response to the user."),
+            meta_comment: z.string().optional().describe("Internal reasoning (hidden from user)")
         });
+
+        // Prepare messages for AI SDK
+        const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
+        if (messagesForAI.length === 0) messagesForAI.push({ role: 'user', content: "I am ready." });
+
+        const result = await generateObject({
+            model,
+            schema,
+            messages: messagesForAI,
+            system: systemPrompt,
+            temperature: 0.7
+        });
+
+        const responseText = result.object.response;
+
+        // 8. State Updates
+        if (isTransitioning && nextTopicId !== conversation.currentTopicId) {
+            await ChatService.updateCurrentTopic(conversationId, nextTopicId);
+        }
+
+        // 9. Persistence
+        await ChatService.saveAssistantMessage(conversationId, responseText);
+
+        // Memory Update (Background - Fire & Forget)
+        const lastUserContent = lastMessage?.role === 'user' ? lastMessage.content : null;
+        if (lastUserContent) {
+            console.log("🧠 Updating memory...");
+            MemoryManager.updateAfterUserResponse(
+                conversationId,
+                lastUserContent,
+                currentTopic.id,
+                currentTopic.label,
+                process.env.OPENAI_API_KEY || ''
+            ).catch(err => console.error("Memory update failed", err));
+        }
 
         return Response.json({
             text: responseText,
-            currentTopicId: conversation.currentTopicId, // Updated topic ID if changed
-            isCompleted: responseText.includes('INTERVIEW_COMPLETED')
+            currentTopicId: nextTopicId,
+            isCompleted: false
         });
 
     } catch (error: any) {

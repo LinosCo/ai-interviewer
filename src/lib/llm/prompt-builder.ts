@@ -8,7 +8,7 @@ export class PromptBuilder {
      */
     private static getOpeningProtocol(language: string): string {
         const messages: Record<string, string> = {
-            'it': '${openingProtocol}',
+            'it': 'Faremo un giro veloce su alcuni temi key, e poi approfondiremo se avremo tempo.',
             'en': 'We\'ll do a quick scan of key topics, then dive deeper into the most interesting points if we have time.',
             'es': 'Haremos un recorrido rápido por los temas clave, y luego profundizaremos si tenemos tiempo.',
             'fr': 'Nous ferons un tour rapide des sujets clés, puis nous approfondirons si nous avons le temps.',

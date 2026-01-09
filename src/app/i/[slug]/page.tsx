@@ -33,11 +33,15 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
     }
 
     // Create a new conversation and redirect directly to chat
+    // Initialize with the first topic
+    const firstTopic = bot.topics[0];
+
     const conversation = await prisma.conversation.create({
         data: {
             botId: bot.id,
             participantId: `anon-${Date.now()}`,
             status: 'STARTED',
+            currentTopicId: firstTopic?.id || null, // Start with first topic
         }
     });
 

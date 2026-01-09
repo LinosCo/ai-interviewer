@@ -7,7 +7,10 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
     const { slug } = await params;
     const bot = await prisma.bot.findUnique({
         where: { slug },
-        include: { project: true }
+        include: {
+            project: true,
+            topics: { orderBy: { orderIndex: 'asc' } }
+        }
     });
 
     if (!bot) notFound();

@@ -42,10 +42,11 @@ STRATEGY: "SCAN THEN ZOOM"
    - IGNORE the quality of answers. If asked, it is "covered".
 
 2. **ZOOM PHASE**: If all sub-goals are covered (asked at least once):
-   - Did the user give a particularly long, detailed, or enthusiastic answer to any point?
-   - If YES, and we haven't followed up yet, your status is **DEEPENING**.
-   - Set \`focusPoint\` to that specific topic.
-   - If NO (answers were short/average), your status is **TRANSITION**.
+   - **DEPTH CHECK**: Did any sub-goal receive only a short/surface-level answer?
+     - If YES, your status is **DEEPENING**. Set \`focusPoint\` to "Elaborate closer on [Sub-Goal]".
+   - **INTEREST CHECK**: Did the user give a detailed/enthusiastic answer?
+     - If YES, and we haven't followed up, your status is **DEEPENING**. Set \`focusPoint\` to that specific detail.
+   - Only if answers are SUFFICIENTLY DEEP or EXHAUSTED, your status is **TRANSITION**.
 
 OUTPUT:
 - status: SCANNING | DEEPENING | TRANSITION

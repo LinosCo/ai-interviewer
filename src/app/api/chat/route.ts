@@ -129,7 +129,7 @@ export async function POST(req: Request) {
         const responseText = result.object.response;
 
         // 8. State Updates
-        if (isTransitioning && nextTopicId !== conversation.currentTopicId) {
+        if (isTransitioning && nextTopicId && nextTopicId !== conversation.currentTopicId) {
             await ChatService.updateCurrentTopic(conversationId, nextTopicId);
         }
 

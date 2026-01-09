@@ -43,7 +43,7 @@ ${existingFactsSummary || '(nessuno)'}
 
 COMPITI:
 1. Estrai NUOVI fatti concreti dalla risposta (non ripetere quelli già noti)
-2. Rileva il tono comunicativo (formale/casual/breve/verboso)
+2. Rileva il tono comunicativo: usa SOLO questi valori in inglese: 'formal', 'casual', 'brief', 'verbose'
 3. Valuta segnali di fatica (risposte telegrafiche, "non so", evasioni)
 
 REGOLE ESTRAZIONE FATTI:

@@ -51,9 +51,9 @@ STRATEGY: "SCAN THEN ZOOM" (STRICT)
 
 OUTPUT:
 - status: SCANNING | DEEPENING | TRANSITION
-- nextSubGoal: (Only for SCANNING)
-- focusPoint: (Only for DEEPENING)
-- reason: Explain your decision
+- nextSubGoal: (ONLY include if status is SCANNING - otherwise omit this field entirely)
+- focusPoint: (ONLY include if status is DEEPENING - otherwise omit this field entirely)
+- reason: Explain your decision in detail
 `.trim();
 
         try {

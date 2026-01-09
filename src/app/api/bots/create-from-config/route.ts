@@ -116,7 +116,7 @@ export async function POST(req: Request) {
         const { canPublishBot } = require('@/lib/usage');
 
         // Get organizationId from project
-        const project = await prisma.project.findUnique({
+        let project = await prisma.project.findUnique({
             where: { id: projectId },
             select: { organizationId: true, name: true, id: true }
         });
@@ -128,7 +128,12 @@ export async function POST(req: Request) {
             projectName: project?.name
         });
 
-        if (!project?.organizationId) {
+        if (!project) {
+            console.error('❌ [CREATE-BOT] Project not found:', projectId);
+            return new Response('Project not found', { status: 404 });
+        }
+
+        if (!project.organizationId) {
             // Project exists but has no organization - create one
             console.log('🏢 [CREATE-BOT] Project has no organization, creating one...');
 

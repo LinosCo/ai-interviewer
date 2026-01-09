@@ -122,16 +122,75 @@ Your goal: Re-examine the first topic, but this time ask DEEP, contextual questi
                     `.trim();
 
                 } else {
-                    // End of DEEP -> Finish
-                    console.log("✅ [CHAT] Deep Dive Complete. Ending Interview.");
-                    await ChatService.completeInterview(conversationId);
-                    return Response.json({
-                        text: "Grazie per la tua partecipazione approfondita. L'intervista è terminata. INTERVIEW_COMPLETED",
-                        isCompleted: true,
-                        currentTopicId: conversation.currentTopicId
-                    });
+                    // End of DEEP -> Check for Data Collection OR Finish
+                    const shouldCollectData = conversation.bot.collectCandidateData;
+
+                    if (shouldCollectData && currentPhase !== 'DATA_COLLECTION') {
+                        console.log("📝 [CHAT] Deep Dive Complete. Switching to DATA_COLLECTION.");
+                        nextPhase = 'DATA_COLLECTION';
+                        isTransitioning = true;
+                        // Stay on current topic ID or null, doesn't matter much as prompt handles it
+
+                        systemPrompt = `
+You are transitioning to the FINAL PHASE: DATA COLLECTION.
+The interview content is done.
+Now you must ask the user for their details (Name, Email, Contacts) to complete the application.
+Be polite and professional.
+`;
+                    } else {
+                        // Truly Finished (either Deep done & no data collection, or Data Collection done)
+                        console.log("✅ [CHAT] Interview Complete. Ending.");
+
+                        // Trigger Extraction if Data Collection was active
+                        if (currentPhase === 'DATA_COLLECTION' || (shouldCollectData && currentPhase === 'DEEP')) {
+                            const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
+                            // Run extraction in background
+                            CandidateExtractor.extractProfile(messages, openAIKey).then(async (profile: any) => {
+                                if (profile) {
+                                    const { prisma } = require('@/lib/prisma');
+                                    await prisma.conversation.update({
+                                        where: { id: conversationId },
+                                        data: { candidateProfile: profile }
+                                    });
+                                    console.log("👤 [CHAT] Candidate Profile Saved:", profile.fullName);
+                                }
+                            }).catch((e: any) => console.error("Extraction failed", e));
+                        }
+
+                        await ChatService.completeInterview(conversationId);
+                        return Response.json({
+                            text: "Grazie! Abbiamo registrato tutto. A presto! INTERVIEW_COMPLETED",
+                            isCompleted: true,
+                            currentTopicId: conversation.currentTopicId
+                        });
+                    }
                 }
             }
+        } else if (currentPhase === 'DATA_COLLECTION') {
+            // Special handling for Data Collection Phase loop
+            // If we are here, it means we are already IN the phase.
+            // We need to check if we should finish.
+            // Simple heuristic: If message length in this phase > 3 or user said goodbye.
+            // But for now, let reliance be on the PromptBuilder `DATA_COLLECTION` instruction to say 'INTERVIEW_COMPLETED' logic?
+            // Actually, my PromptBuilder change puts `DATA_COLLECTION` prompt in `supervisorInsight`.
+            // But `TopicManager` doesn't know about `DATA_COLLECTION` phase in `evaluateTopicProgress`.
+
+            // So I should force supervisorInsight logic here manually if phase is DATA.
+            supervisorInsight = { status: 'DATA_COLLECTION' };
+            // But we need to detect if we are DONE.
+            // Let's rely on the LLM outputting INTERVIEW_COMPLETED if it got the data.
+            // The prompt I added says "If user provides data... say INTERVIEW_COMPLETED".
+            // So the standard `checkLimits` or client side handles completion token?
+            // Yes, `ChatInterface` handles `INTERVIEW_COMPLETED`.
+
+            systemPrompt = PromptBuilder.build(
+                conversation.bot,
+                conversation,
+                currentTopic,
+                methodology,
+                Number(effectiveDuration || 0),
+                supervisorInsight as any
+            );
         } else {
             // Standard Flow
             systemPrompt = PromptBuilder.build(
@@ -168,6 +227,31 @@ Your goal: Re-examine the first topic, but this time ask DEEP, contextual questi
         });
 
         const responseText = result.object.response;
+
+        // Check for Explicit Completion Tag (used in Data Collection)
+        if (responseText.includes('INTERVIEW_COMPLETED')) {
+            await ChatService.completeInterview(conversationId);
+
+            // Trigger Extraction
+            if (currentPhase === 'DATA_COLLECTION') {
+                const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
+                CandidateExtractor.extractProfile(messages, openAIKey).then(async (profile: any) => {
+                    if (profile) {
+                        const { prisma } = require('@/lib/prisma');
+                        await prisma.conversation.update({
+                            where: { id: conversationId },
+                            data: { candidateProfile: profile }
+                        });
+                    }
+                });
+            }
+
+            return Response.json({
+                text: responseText.replace('INTERVIEW_COMPLETED', '').trim(),
+                currentTopicId: nextTopicId,
+                isCompleted: true
+            });
+        }
 
         // 8. Updates
         if (isTransitioning) {

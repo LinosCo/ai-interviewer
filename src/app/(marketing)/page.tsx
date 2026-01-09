@@ -628,7 +628,116 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* --- POSITIONING DETAILS (White) --- */}
+            {/* --- NEW FEATURE SPOTLIGHT: RECRUITING & BRANDING (White) --- */}
+            <section className="relative z-20 bg-white py-24 lg:py-32 overflow-hidden">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="grid lg:grid-cols-2 gap-20 items-center mb-32">
+                        {/* Recruitment Mode */}
+                        <div className="order-2 lg:order-1 relative">
+                            <div className="absolute inset-0 bg-blue-500/5 rounded-[3rem] transform -rotate-3 scale-105" />
+                            <div className="bg-white border border-blue-100 rounded-[2.5rem] p-8 shadow-2xl relative">
+                                {/* Mock Profile Card */}
+                                <div className="flex items-start gap-4 border-b border-stone-100 pb-6 mb-6">
+                                    <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center text-2xl">👤</div>
+                                    <div>
+                                        <div className="font-bold text-lg text-stone-900">Marco Rossi</div>
+                                        <div className="text-sm text-stone-500">marco.rossi@example.com</div>
+                                        <div className="flex gap-2 mt-2">
+                                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">Culture Fit: 9/10</span>
+                                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">Senior</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <div className="text-xs font-bold text-stone-400 uppercase mb-1">Hard Skills Rilevate</div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {['React', 'Node.js', 'System Design', 'CI/CD'].map((s, i) => (
+                                                <span key={i} className="px-2 py-1 bg-stone-50 border border-stone-100 text-stone-600 text-xs rounded-md">{s}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-bold text-stone-400 uppercase mb-1">Recruiter Notes (AI)</div>
+                                        <p className="text-sm text-stone-600 leading-relaxed bg-blue-50 p-3 rounded-lg border border-blue-100 italic">
+                                            "Marco ha dimostrato una profonda conoscenza dell'architettura a microservizi. Ottima comunicazione, anche se potrebbe migliorare nella gestione dei tempi."
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="order-1 lg:order-2">
+                            <SectionLabel text="Novità Pro" color="#2563EB" bg="#EFF6FF" />
+                            <h3 className="text-4xl font-bold text-stone-900 mb-6">Colloqui automatici,<br />profili pronti.</h3>
+                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                Attiva la <strong>Recruitment Mode</strong> e lascia che l'AI conduca il primo colloquio conoscitivo per te.
+                            </p>
+                            <ul className="space-y-4">
+                                {[
+                                    'Intervista tecnica o attitudinale',
+                                    'Raccolta automatica dati contatto',
+                                    'Estrazione Skills & Culture Fit',
+                                    'Ranking automatico dei candidati'
+                                ].map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
+                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                                            <Icons.Check size={14} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div className="grid lg:grid-cols-2 gap-20 items-center">
+                        {/* Branding */}
+                        <div>
+                            <SectionLabel text="Business Identity" color="#D97706" bg="#FFFBEB" />
+                            <h3 className="text-4xl font-bold text-stone-900 mb-6">Il tuo Brand,<br />la tua esperienza.</h3>
+                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                L'intervistatore è tuo, e deve sembrarlo. Personalizza ogni dettaglio per offrire un'esperienza coerente con la tua azienda.
+                            </p>
+                            <ul className="space-y-4">
+                                {[
+                                    'Landing Page su misura (Logo, Video, Testi)',
+                                    'Dominio personalizzato (es. interview.tuaazienda.com)',
+                                    'Colori e Tone of Voice aziendale',
+                                    'Rimozione branding "Business Tuner"'
+                                ].map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
+                                        <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                                            <Icons.Check size={14} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-amber-500 to-purple-600 rounded-[2rem] transform rotate-2 blur opacity-20" />
+                            <div className="bg-stone-900 rounded-[2rem] p-8 shadow-2xl relative border border-stone-800 text-white overflow-hidden">
+                                {/* Mock Branding UI */}
+                                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-stone-800 to-transparent pointer-events-none" />
+                                <div className="text-center mt-8 mb-8">
+                                    <div className="w-16 h-16 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center text-stone-900 font-bold text-2xl shadow-lg shadow-white/20">A</div>
+                                    <h4 className="text-2xl font-bold">Acme Corp Careers</h4>
+                                    <p className="text-stone-400 text-sm">Tech Lead Interview</p>
+                                </div>
+                                <div className="bg-stone-800/50 backdrop-blur rounded-xl p-4 border border-stone-700">
+                                    <div className="flex gap-2 mb-2">
+                                        <div className="w-3 h-3 rounded-full bg-red-500" />
+                                        <div className="w-3 h-3 rounded-full bg-amber-500" />
+                                        <div className="w-3 h-3 rounded-full bg-green-500" />
+                                    </div>
+                                    <div className="h-2 bg-stone-700 rounded w-1/3 mb-2" />
+                                    <div className="h-2 bg-stone-700 rounded w-1/2" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
             <section className="relative z-20 bg-white py-24 lg:py-32">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="grid md:grid-cols-2 gap-16">

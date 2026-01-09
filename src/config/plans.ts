@@ -302,10 +302,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         marketingFeatures: [
             '10 interviste attive',
             '300 risposte/mese',
+            'Recruitment Mode (New!)',
+            'Custom Branding & Landing',
             'AI Analysis Avanzata',
-            'Logica condizionale',
-            'Export CSV + Webhook',
-            '5 utenti inclusi'
+            'Export CSV + Webhook'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_PRO,
@@ -376,8 +376,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         marketingFeatures: [
             'Illimitate interviste',
             '1.000+ risposte/mese',
-            'API Access',
-            'White Label',
+            'Recruitment Mode Illimitata',
+            'Full White Label & API',
             'Supporto Prioritario',
             '15 utenti inclusi'
         ],

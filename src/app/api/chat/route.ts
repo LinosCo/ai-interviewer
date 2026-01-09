@@ -78,7 +78,7 @@ export async function POST(req: Request) {
         }
 
         // 5.b. Failsafe for Stuck Topic 1 -> Relaxed for DEEP phase
-        const limit = currentPhase === 'SCAN' ? 20 : 30;
+        const limit = currentPhase === 'SCAN' ? 20 : 25;
         if (currentIndex === 0 && messages.length > limit) {
             console.log("🚨 [CHAT] FORCE TRANSITION: Stuck on Topic 1.");
             supervisorInsight = { status: 'TRANSITION' };
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
             if (nextTopic) {
                 // Normal transition within current loop
                 console.log(`➡️ [CHAT] Transition (${currentPhase}): ${currentTopic.label} → ${nextTopic.label}`);
-                systemPrompt = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology);
+                systemPrompt = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology, currentPhase as any);
                 nextTopicId = nextTopic.id;
                 isTransitioning = true;
             } else {

@@ -69,7 +69,10 @@ GOAL: Meticulous depth using SPECIFIC CONTEXT.
    - You MUST cite this in your \`focusPoint\`.
    - Example Focus Point: "User mentioned 'feeling overwhelmed by emails' - ask specifically about that."
    - DO NOT allow generic deep dives like "Tell me more about X". It must be "You said X, why?"
+   - **LIMIT**: You may perform a MAXIMUM of 2-3 deep dives (follow-up questions) per topic.
+   - CHECK HISTORY: If you see we have already asked 2+ specific follow-up questions for this topic in the Deep Phase, you MUST TRANSITION. Do not get stuck.
 3. If everything is thoroughly covered and we have probed the interesting bits -> TRANSITION.
+4. **FAILSAFE**: If the user's answers are becoming short or repetitive -> TRANSITION.
 
 OUTPUT criteria:
 - status: SCANNING (if gaps exist) | DEEPENING (to probe specific user quotes) | TRANSITION (if exhausted)

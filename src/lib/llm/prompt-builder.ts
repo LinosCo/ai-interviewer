@@ -208,16 +208,30 @@ ${primaryInstruction}
     static buildTransitionPrompt(
         currentTopic: TopicBlock,
         nextTopic: TopicBlock,
-        methodologyContent: string
+        methodologyContent: string,
+        phase: 'SCAN' | 'DEEP' = 'SCAN'
     ): string {
+        const transitionInstruction = phase === 'DEEP'
+            ? `
+> [!IMPORTANT] DEEP DIVE RELAUNCH
+> We are returning to "${nextTopic.label}" for a second pass (Deep Dive).
+> Context: The user has already touched on this topic lightly in the Scan Phase.
+> INSTRUCTION: 
+> 1. Acknowledge the previous topic briefly.
+> 2. Pivot to "${nextTopic.label}" with a clear intent to go deeper.
+> 3. ASK A SPECIFIC, PROBING QUESTION about "${nextTopic.label}" based on what you know or a specific sub-goal.
+> 4. DO NOT ask a generic "What do you think?". BE SPECIFIC.`
+            : `
+> SMOOTH TRANSITION
+> 1. Briefly acknowledge the user's last answer regarding "${currentTopic.label}".
+> 2. Smoothly pivot to the new topic: "${nextTopic.label}".
+> 3. ASK THE FIRST QUESTION of the new topic immediately.`;
+
         return `
-## TRANSITION MODE
+## TRANSITION MODE (${phase} PHASE)
 You are moving from Topic: "${currentTopic.label}" -> To: "${nextTopic.label}".
 
-INSTRUCTIONS:
-1. Briefly acknowledge the user's last answer regarding "${currentTopic.label}".
-2. Smoothly pivot to the new topic: "${nextTopic.label}".
-3. ASK THE FIRST QUESTION of the new topic immediately.
+${transitionInstruction}
 
 CONTEXT on New Topic:
 ${nextTopic.description}
@@ -225,9 +239,9 @@ Sub-Goals:
 ${nextTopic.subGoals.map(g => `- ${g}`).join('\n')}
 
 STYLE:
-- Be conversational. Do not make it sound like a robotic announcement.
+- Be conversational.
 - NO "Passiamo a...". Just do it naturally.
-- Example: "That clarifies your view on X. Now, regarding Y, what is your experience...?"
+- **CRITICAL: YOU MUST END WITH A QUESTION.** Do not just say "Thanks".
 `.trim();
     }
 

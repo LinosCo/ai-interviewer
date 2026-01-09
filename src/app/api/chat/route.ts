@@ -44,7 +44,8 @@ export async function POST(req: Request) {
         botTopics.sort((a, b) => a.orderIndex - b.orderIndex);
 
         const currentTopic = botTopics.find(t => t.id === conversation.currentTopicId) || botTopics[0];
-        const currentIndex = botTopics.findIndex(t => t.id === conversation.currentTopicId);
+        let currentIndex = botTopics.findIndex(t => t.id === conversation.currentTopicId);
+        if (currentIndex === -1) currentIndex = 0;
 
         let supervisorInsight = { status: 'SCANNING' };
 
@@ -66,8 +67,8 @@ export async function POST(req: Request) {
 
         // 5.b. Failsafe for Stuck Topic 1
         // If stuck on first topic for > 14 messages (approx 7 turns)
-        if (currentIndex === 0 && messages.length > 14) {
-            console.log("🚨 FORCE TRANSITION: Stuck on Topic 1");
+        if (currentIndex === 0 && messages.length > 30) {
+            console.log("🚨 FORCE TRANSITION: Stuck on Topic 1 for too long.");
             supervisorInsight = { status: 'TRANSITION' };
         }
 

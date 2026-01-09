@@ -283,7 +283,10 @@ export default function InterviewChat({
 
             // Update Active Topic
             if (data.currentTopicId) {
+                console.log("🔄 Updating Active Topic:", data.currentTopicId);
                 setActiveTopicId(data.currentTopicId);
+            } else {
+                console.warn("⚠️ No topic ID in response");
             }
 
             // Calculate Reading Time: ~225 words per minute

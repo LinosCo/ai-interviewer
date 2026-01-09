@@ -56,6 +56,8 @@ OUTPUT:
 - reason: Explain your decision in detail
 `.trim();
 
+        if (messages.length > 20) { return { status: "TRANSITION", reason: "Failsafe: Topic message limit reached." }; }
+
         try {
             const openai = createOpenAI({ apiKey });
 

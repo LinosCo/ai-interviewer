@@ -59,6 +59,7 @@ interface InterviewChatProps {
     warmupIcebreaker?: string | null;
     warmupContextPrompt?: string | null;
     warmupFollowup?: boolean;
+    skipWelcome?: boolean;
 }
 
 const TRANSLATIONS: Record<string, any> = {
@@ -135,7 +136,8 @@ export default function InterviewChat({
     warmupChoices,
     warmupIcebreaker,
     warmupContextPrompt,
-    warmupFollowup = true
+    warmupFollowup = true,
+    skipWelcome = false
 }: InterviewChatProps) {
     const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
     // State for local topic tracking
@@ -154,8 +156,8 @@ export default function InterviewChat({
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const [startTime, setStartTime] = useState<number | null>(null);
-    const [hasStarted, setHasStarted] = useState(initialMessages.length > 0);
-    const [showLanding, setShowLanding] = useState(initialMessages.length === 0);
+    const [hasStarted, setHasStarted] = useState(initialMessages.length > 0 || skipWelcome);
+    const [showLanding, setShowLanding] = useState(initialMessages.length === 0 && !skipWelcome);
     const [consentGiven, setConsentGiven] = useState(false);
 
     // Warm-up State

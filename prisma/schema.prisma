@@ -397,6 +397,12 @@ model Bot {
   warmupContextPrompt  String?  // Prompt for contextual question
   warmupFollowup       Boolean  @default(true)  // Whether to follow up on warm-up answer
 
+  // Landing Page Customization (Pro+ feature)
+  landingTitle       String?  // Custom title (fallback: bot name)
+  landingDescription String?  @db.Text // Custom description (fallback: researchGoal)
+  landingImageUrl    String?  // Optional hero image
+  landingVideoUrl    String?  // Optional video embed (YouTube, Vimeo)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -480,6 +486,8 @@ model Conversation {
   // Business Tuner: Hidden Limits Tracking
   exchangeCount Int @default(0) // Number of message exchanges
   totalTokens   Int @default(0) // Total tokens used in conversation
+
+  metadata      Json? // { phase: "SCAN" | "DEEP", currentLoop: 1 }
 
   bot         Bot          @relation(fields: [botId], references: [id], onDelete: Cascade)
   messages    Message[]

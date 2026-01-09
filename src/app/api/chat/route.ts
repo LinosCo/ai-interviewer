@@ -40,17 +40,19 @@ export async function POST(req: Request) {
 
         // 5. Topic Supervision
         const botTopics = conversation.bot.topics;
-        // Ensure topics are sorted
         botTopics.sort((a, b) => a.orderIndex - b.orderIndex);
 
         const currentTopic = botTopics.find(t => t.id === conversation.currentTopicId) || botTopics[0];
         let currentIndex = botTopics.findIndex(t => t.id === conversation.currentTopicId);
         if (currentIndex === -1) currentIndex = 0;
 
+        // Detect Phase from Metadata
+        const metadata = conversation.metadata as any || {};
+        const currentPhase = metadata.phase || 'SCAN'; // Default to SCAN
+
         let supervisorInsight = { status: 'SCANNING' };
 
-        // Fetch API Key for Topic Manager
-        // Note: TopicManager currently uses OpenAI only for the supervisor/logic tier
+        // Fetch API Key
         const openAIKey = await LLMService.getApiKey(conversation.bot, 'openai') || process.env.OPENAI_API_KEY || '';
 
         if (messages.length > 2) {
@@ -58,84 +60,80 @@ export async function POST(req: Request) {
                 const insight = await TopicManager.evaluateTopicProgress(
                     messages as any[],
                     currentTopic,
-                    openAIKey
+                    openAIKey,
+                    currentPhase // Pass phase to TopicManager
                 );
                 supervisorInsight = insight as any;
+
                 console.log("🔍 [CHAT] Supervisor Decision:", {
+                    phase: currentPhase,
                     currentTopic: currentTopic.label,
-                    topicIndex: `${currentIndex + 1}/${botTopics.length}`,
                     status: supervisorInsight.status,
-                    messagesCount: messages.length
+                    messagesCount: messages.length,
+                    reason: (supervisorInsight as any).reason
                 });
             } catch (e) {
                 console.error("❌ [CHAT] Supervisor error:", e);
             }
         }
 
-        // 5.b. Failsafe for Stuck Topic 1
-        // If stuck on first topic for > 30 messages (approx 15 turns)
-        if (currentIndex === 0 && messages.length > 30) {
-            console.log("🚨 [CHAT] FORCE TRANSITION: Stuck on Topic 1 for too long.");
+        // 5.b. Failsafe for Stuck Topic 1 -> Relaxed for DEEP phase
+        const limit = currentPhase === 'SCAN' ? 20 : 30;
+        if (currentIndex === 0 && messages.length > limit) {
+            console.log("🚨 [CHAT] FORCE TRANSITION: Stuck on Topic 1.");
             supervisorInsight = { status: 'TRANSITION' };
         }
 
-        // 6. Transition Decision & Prompt Building
+        // 6. Transition & Loop Logic
         const methodology = LLMService.getMethodology();
-
-        // Load the chosen model (OpenAI or Anthropic)
         const model = await LLMService.getModel(conversation.bot);
 
         let systemPrompt = "";
         let nextTopicId = conversation.currentTopicId;
         let isTransitioning = false;
+        let nextPhase = currentPhase;
 
-        // Perform Single-Call Transition Logic
         if (supervisorInsight.status === 'TRANSITION') {
             const nextTopic = botTopics[currentIndex + 1];
 
             if (nextTopic) {
-                // SINGLE CALL TRANSITION: Bridge + New Question
-                console.log(`➡️ [CHAT] Transitioning: ${currentTopic.label} → ${nextTopic.label}`);
+                // Normal transition within current loop
+                console.log(`➡️ [CHAT] Transition (${currentPhase}): ${currentTopic.label} → ${nextTopic.label}`);
                 systemPrompt = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology);
                 nextTopicId = nextTopic.id;
                 isTransitioning = true;
             } else {
-                // No more topics in sequence
-                // Check if we should do DEEP DIVE cycle
-                console.log("🔄 [CHAT] Reached end of topics. Checking for deep dive opportunities...");
+                // End of Topics List
+                console.log(`🔄 [CHAT] End of topics in phase ${currentPhase}`);
 
-                // Simple heuristic: if interview is short (< 50% of max time), do deep dives
-                const maxDurationSeconds = (conversation.bot.maxDurationMins || 10) * 60;
-                const timeUsedPercent = (Number(effectiveDuration || 0) / maxDurationSeconds) * 100;
-
-                console.log(`⏱️ [CHAT] Time used: ${timeUsedPercent.toFixed(0)}% (${effectiveDuration}s / ${maxDurationSeconds}s)`);
-
-                if (timeUsedPercent < 70) {
-                    // We have time for deep dives - go back to first topic
-                    console.log("🔍 [CHAT] Starting DEEP DIVE cycle - returning to first topic");
-                    systemPrompt = PromptBuilder.build(
-                        conversation.bot,
-                        conversation,
-                        botTopics[0], // Go back to first topic
-                        methodology,
-                        Number(effectiveDuration || 0),
-                        { status: 'DEEPENING', focusPoint: 'Explore the most interesting points from our conversation' } as any
-                    );
-                    nextTopicId = botTopics[0].id;
+                if (currentPhase === 'SCAN') {
+                    // End of SCAN -> Start DEEP LOOP
+                    console.log("🚀 [CHAT] Switching to DEEP PHASE. Restarting topics.");
+                    nextPhase = 'DEEP';
+                    nextTopicId = botTopics[0].id; // Back to first
                     isTransitioning = true;
+
+                    // Build a "Bridging" System Prompt
+                    systemPrompt = `
+You are an expert interviewer. We have just finished the "Scanning Phase" where we touched all topics lightly.
+NOW we are entering the "Deep Dive Phase".
+We will restart from the first topic: "${botTopics[0].label}".
+Your goal: Re-examine the first topic, but this time ask DEEP, contextual questions based on what the user said earlier.
+                    `.trim();
+
                 } else {
-                    // Time is up or we've exhausted everything -> Conclude
-                    console.log("✅ [CHAT] Interview complete - concluding");
+                    // End of DEEP -> Finish
+                    console.log("✅ [CHAT] Deep Dive Complete. Ending Interview.");
                     await ChatService.completeInterview(conversationId);
                     return Response.json({
-                        text: "Grazie per il tuo tempo. L'intervista è conclusa. INTERVIEW_COMPLETED",
+                        text: "Grazie per la tua partecipazione approfondita. L'intervista è terminata. INTERVIEW_COMPLETED",
                         isCompleted: true,
                         currentTopicId: conversation.currentTopicId
                     });
                 }
             }
         } else {
-            // STANDARD FLOW (Scanning / Deepening)
+            // Standard Flow
             systemPrompt = PromptBuilder.build(
                 conversation.bot,
                 conversation,
@@ -146,8 +144,7 @@ export async function POST(req: Request) {
             );
         }
 
-        // 7. Generation (Structured Output)
-        // User requested JSON markers. We use generateObject to enforce structure.
+        // 7. Generate Response
         const schema = z.object({
             response: z.string().describe("The conversational response to the user."),
             meta_comment: z.string().optional().describe("Internal reasoning (hidden from user)")
@@ -155,6 +152,12 @@ export async function POST(req: Request) {
 
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
         if (messagesForAI.length === 0) messagesForAI.push({ role: 'user', content: "I am ready." });
+
+        // Inject Phase context into system prompt if generic
+        if (!systemPrompt.includes("PHASE")) {
+            systemPrompt += `\n\nCURRENT INTERVIEW PHASE: ${currentPhase}\n` +
+                (currentPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history.");
+        }
 
         const result = await generateObject({
             model,
@@ -166,22 +169,27 @@ export async function POST(req: Request) {
 
         const responseText = result.object.response;
 
-        // 8. State Updates
-        if (isTransitioning && nextTopicId && nextTopicId !== conversation.currentTopicId) {
-            console.log(`🔄 [CHAT] Updating topic in DB: ${conversation.currentTopicId} → ${nextTopicId}`);
-            await ChatService.updateCurrentTopic(conversationId, nextTopicId);
-            console.log(`✅ [CHAT] Topic updated successfully`);
-        } else {
-            console.log(`⏸️ [CHAT] No topic update needed. isTransitioning=${isTransitioning}, nextTopicId=${nextTopicId}, currentTopicId=${conversation.currentTopicId}`);
+        // 8. Updates
+        if (isTransitioning) {
+            // Update Topic
+            if (nextTopicId !== conversation.currentTopicId) {
+                await ChatService.updateCurrentTopic(conversationId, nextTopicId);
+            }
+            // Update Metadata if Phase Changed
+            if (nextPhase !== currentPhase) {
+                const { prisma } = require('@/lib/prisma');
+                await prisma.conversation.update({
+                    where: { id: conversationId },
+                    data: { metadata: { ...metadata, phase: nextPhase } }
+                });
+            }
         }
 
-        // 9. Persistence
         await ChatService.saveAssistantMessage(conversationId, responseText);
 
-        // Memory Update (Background - Fire & Forget)
+        // Memory Update
         const lastUserContent = lastMessage?.role === 'user' ? lastMessage.content : null;
         if (lastUserContent) {
-            console.log("🧠 Updating memory...");
             MemoryManager.updateAfterUserResponse(
                 conversationId,
                 lastUserContent,

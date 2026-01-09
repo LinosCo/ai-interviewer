@@ -6,6 +6,7 @@ import TopicsEditor from './topics-editor';
 import KnowledgeSourcesEditor from './knowledge-sources';
 import LegalPrivacyEditor from './legal-privacy-editor';
 import RewardEditor from './reward-editor';
+import LandingPageEditor from './landing-page-editor';
 import ProjectSelector from './project-selector';
 import Link from 'next/link';
 import CopyLinkButton from '@/components/copy-link-button';
@@ -38,7 +39,11 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
             topics: { orderBy: { orderIndex: 'asc' } },
             knowledgeSources: true,
             rewardConfig: true,
-            project: true
+            project: {
+                include: {
+                    organization: true
+                }
+            }
         }
     });
 
@@ -102,6 +107,11 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                         botId={bot.id}
                         rewardConfig={bot.rewardConfig}
                     />
+
+                    {/* Landing Page Customization */}
+                    <div className="pt-6">
+                        <LandingPageEditor bot={bot} plan={bot.project.organization?.plan || 'TRIAL'} />
+                    </div>
                 </div>
             </div>
         </div>

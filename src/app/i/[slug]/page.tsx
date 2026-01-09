@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
+import LandingPage from '@/components/interview/LandingPage';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
     const bot = await prisma.bot.findUnique({
         where: { slug },
         include: {
-            project: true,
+            project: { include: { organization: true } },
             topics: { orderBy: { orderIndex: 'asc' } }
         }
     });
@@ -35,18 +36,24 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
         }
     }
 
-    // Create a new conversation and redirect directly to chat
-    // Initialize with the first topic
-    const firstTopic = bot.topics[0];
+    // Server Action to start interview
+    const startInterview = async () => {
+        'use server';
 
-    const conversation = await prisma.conversation.create({
-        data: {
-            botId: bot.id,
-            participantId: `anon-${Date.now()}`,
-            status: 'STARTED',
-            currentTopicId: firstTopic?.id || null, // Start with first topic
-        }
-    });
+        // Initialize with the first topic
+        const firstTopic = bot.topics[0];
 
-    redirect(`/i/chat/${conversation.id}`);
+        const conversation = await prisma.conversation.create({
+            data: {
+                botId: bot.id,
+                participantId: `anon-${Date.now()}`,
+                status: 'STARTED',
+                currentTopicId: firstTopic?.id || null, // Start with first topic
+            }
+        });
+
+        redirect(`/i/chat/${conversation.id}`);
+    };
+
+    return <LandingPage bot={bot} onStart={startInterview} />;
 }

@@ -235,7 +235,7 @@ export default function PreviewPage() {
 
         return (
             <div className="min-h-screen flex flex-col" style={{ background: gradients.mesh }}>
-                <Header />
+                {/* Header Removed for Preview */}
                 <main className="flex-1 flex items-center justify-center p-6">
                     <div style={{
                         maxWidth: '500px',
@@ -295,7 +295,7 @@ export default function PreviewPage() {
     // Preview & Edit View
     return (
         <div className="min-h-screen flex flex-col" style={{ background: gradients.mesh }}>
-            <Header />
+            {/* Header Removed for Preview */}
 
             <main className="max-w-3xl mx-auto p-6 space-y-8 pb-32 w-full flex-1">
                 {/* Back Button */}

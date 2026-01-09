@@ -9,76 +9,89 @@ export class TopicManager {
     /**
      * Evaluates if the current topic has been sufficiently covered based on the conversation history.
      * Uses a lightweight model (gpt-4o-mini) for speed and cost.
+     * 
+     * @param phase 'SCAN' for broad, quick coverage; 'DEEP' for meticulous, contextual probing.
      */
     static async evaluateTopicProgress(
         messages: Message[],
         currentTopic: TopicBlock,
-        apiKey: string
+        apiKey: string,
+        phase: 'SCAN' | 'DEEP' = 'SCAN'
     ): Promise<{ status: 'SCANNING' | 'DEEPENING' | 'TRANSITION'; nextSubGoal?: string; focusPoint?: string; reason: string }> {
 
         const recentHistory = messages.map(m => `${m.role}: ${m.content}`).join('\n');
 
         const schema = z.object({
             status: z.enum(['SCANNING', 'DEEPENING', 'TRANSITION']),
-            nextSubGoal: z.string().optional().describe("The next sub-goal to ask about (if SCANNING)"),
-            focusPoint: z.string().optional().describe("The specific topic to deep dive into (if DEEPENING)"),
+            nextSubGoal: z.string().optional().describe("The next sub-goal to ask about (only if SCANNING)"),
+            focusPoint: z.string().optional().describe("The specific user quote/concept to deep dive into (only if DEEPENING)"),
             reason: z.string()
         });
 
-        let prompt = `
-You are an Interview Supervisor.
+        let prompt = '';
+
+        if (phase === 'SCAN') {
+            prompt = `
+You are an Interview Supervisor in GLOBAL SCAN PHASE.
 Current Topic: "${currentTopic.label}"
-Sub-Goals List:
-${currentTopic.subGoals.map((g, i) => `${i + 1}. ${g}`).join('\n')}
+Sub-Goals: ${currentTopic.subGoals.join(', ')}
 
 Conversation History:
 ${recentHistory}
 
-STRATEGY: "SCAN THEN ZOOM" (FLEXIBLE)
-1. **SCAN PHASE**: Have we covered the sub-goals?
-   - Check if the sub-goals have been addressed, EITHER by a direct question OR by the user voluntarily providing the information appropriately.
-   - If a sub-goal is MISSING or barely touched, status is **SCANNING**. Set \`nextSubGoal\` to that topic.
-   - If the user has already talked about a sub-goal in a previous answer, DO NOT ask about it again just to tick a box. Mark it as covered.
+GOAL: Quick, broad coverage.
+1. Have we asked 2-3 high-level questions about this topic?
+   - If YES -> TRANSITION immediately. Do not go deep.
+   - If NO -> SCANNING. Pick a valid sub-goal.
+2. STRICT LIMIT: If we have exchanged > 5 messages on this topic, MUST TRANSITION.
+3. DO NOT ASK "Why?" or "Tell me more". Just get the basic facts.
 
-2. **ZOOM PHASE**: If sub-goals are reasonably covered:
-   - **DEPTH CHECK**: Is there an interesting point that deserves elaboration?
-     - If YES, status is **DEEPENING**. Set \`focusPoint\` to that specific detail.
-   - Only if we have a good understanding of the topic, status is **TRANSITION**.
-
-OUTPUT:
-- status: SCANNING | DEEPENING | TRANSITION
-- nextSubGoal: (ONLY include if status is SCANNING)
-- focusPoint: (ONLY include if status is DEEPENING)
-- reason: Explain clearly WHY (e.g. "User already mentioned X, so moving to Y" or "Sub-goals covered, transitioning")
+OUTPUT criteria:
+- status: SCANNING (if < 3 questions and sub-goals untouched) | TRANSITION (otherwise)
+- nextSubGoal: The next broad sub-goal to cover.
+- reason: "Scan limit reached" or "Moving to next sub-goal".
 `.trim();
+        } else {
+            // DEEP PHASE
+            prompt = `
+You are an Interview Supervisor in GLOBAL DEEP DIVE PHASE.
+Current Topic: "${currentTopic.label}"
+Sub-Goals: ${currentTopic.subGoals.join(', ')}
 
-        // FAILSAFE: If discussion is getting long, force progress
-        if (messages.length > 20) {
-            console.log('⚠️ [TopicManager] Failsafe triggered: Forced transition.');
-            return { status: "TRANSITION", reason: "Failsafe: Topic message limit reached." };
-        }
+Conversation History:
+${recentHistory}
 
-        // SOFT FAILSAFE: If > 12 messages, prioritize DEEPENING or TRANSITION over SCANNING to avoid loops
-        if (messages.length > 12) {
-            prompt += "\n\nCRITICAL INSTRUCTION: The conversation is getting long. PRIORITIZE moving to DEEPENING or TRANSITION. Only return SCANNING if a vital sub-goal is completely missing.";
+GOAL: Meticulous depth using SPECIFIC CONTEXT.
+1. Review the history for this topic (including earlier passes). Have we fully covered all sub-goals in detail?
+   - If sub-goals are missing or superficial -> SCANNING (but ask specific probing questions).
+2. **CONTEXTUAL DEEPENING (CRITICAL)**:
+   - Identify a specific interesting claim, emotion, or detail the user mentioned earlier.
+   - You MUST cite this in your \`focusPoint\`.
+   - Example Focus Point: "User mentioned 'feeling overwhelmed by emails' - ask specifically about that."
+   - DO NOT allow generic deep dives like "Tell me more about X". It must be "You said X, why?"
+3. If everything is thoroughly covered and we have probed the interesting bits -> TRANSITION.
+
+OUTPUT criteria:
+- status: SCANNING (if gaps exist) | DEEPENING (to probe specific user quotes) | TRANSITION (if exhausted)
+- nextSubGoal: (If SCANNING)
+- focusPoint: (If DEEPENING) - MUST refer to user's past words.
+- reason: Explanation.
+`.trim();
         }
 
         try {
             const openai = createOpenAI({ apiKey });
-
+            // FORCE JSON MODE to ensure schema adherence
             const result = await generateObject({
                 model: openai('gpt-4o-mini'),
                 schema,
                 prompt
             });
 
-            console.log('📊 [TopicManager] Evaluation:', {
+            console.log(`📊 [TopicManager] (${phase}) Evaluation:`, {
                 topic: currentTopic.label,
-                subGoalsCount: currentTopic.subGoals.length,
                 messagesCount: messages.length,
                 decision: result.object.status,
-                nextSubGoal: result.object.nextSubGoal,
-                focusPoint: result.object.focusPoint,
                 reason: result.object.reason
             });
 
@@ -86,7 +99,6 @@ OUTPUT:
 
         } catch (error) {
             console.error("TopicManager Error:", error);
-            // Default safe fallback: Just Keep Going (or Transition if really broken)
             return { status: 'TRANSITION', reason: 'Error in evaluation' };
         }
     }

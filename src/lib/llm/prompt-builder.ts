@@ -4,6 +4,20 @@ import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
 export class PromptBuilder {
 
     /**
+     * Helper: Get opening protocol message in the correct language
+     */
+    private static getOpeningProtocol(language: string): string {
+        const messages: Record<string, string> = {
+            'it': '${openingProtocol}',
+            'en': 'We\'ll do a quick scan of key topics, then dive deeper into the most interesting points if we have time.',
+            'es': 'Haremos un recorrido rápido por los temas clave, y luego profundizaremos si tenemos tiempo.',
+            'fr': 'Nous ferons un tour rapide des sujets clés, puis nous approfondirons si nous avons le temps.',
+            'de': 'Wir machen einen schnellen Durchgang durch die wichtigsten Themen und vertiefen dann, wenn wir Zeit haben.'
+        };
+        return messages[language] || messages['en'];
+    }
+
+    /**
      * 1. Persona Prompt: Defines WHO the interviewer is.
      * Static personality, role, and tone.
      */
@@ -29,7 +43,8 @@ ${knowledgeText}
      * 2. Methodology Prompt: Semi-static rules for probing and flow.
      * Loads from system knowledge or hardcoded best practices.
      */
-    static buildMethodologyPrompt(methodologyContent: string): string {
+    static buildMethodologyPrompt(methodologyContent: string, language: string = 'en'): string {
+        const openingProtocol = this.getOpeningProtocol(language);
         return `
 ## INTERVIEW METHODOLOGY
 ${methodologyContent.substring(0, 2000)}
@@ -39,7 +54,7 @@ ${methodologyContent.substring(0, 2000)}
 2. **One Question Rule (CRITICAL)**: Ask EXACTLY ONE question at a time. NEVER end a response without asking a question. Every response MUST end with "?". It is better to have more turns than to confuse the user with multiple questions. NEVER say "Also...", "And...". Just one question.
 3. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
 4. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
-5. **Opening Protocol (MANDATORY)**: In the very first message of the interview, you MUST explicitly say: "Faremo un giro veloce su alcuni temi key, e poi approfondiremo se avremo tempo." Do not skip this explanation.
+5. **Opening Protocol (MANDATORY)**: In the very first message of the interview, you MUST explicitly say: "${openingProtocol}" Do not skip this explanation.
 `.trim();
     }
 
@@ -229,7 +244,7 @@ STYLE:
     ): string {
         return [
             this.buildPersonaPrompt(bot),
-            this.buildMethodologyPrompt(methodologyContent),
+            this.buildMethodologyPrompt(methodologyContent, bot.language || 'en'),
             this.buildContextPrompt(conversation, bot, effectiveDurationSeconds),
             this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight)
         ].join('\n\n');

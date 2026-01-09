@@ -168,7 +168,11 @@ export async function POST(req: Request) {
 
         // 8. State Updates
         if (isTransitioning && nextTopicId && nextTopicId !== conversation.currentTopicId) {
+            console.log(`🔄 [CHAT] Updating topic in DB: ${conversation.currentTopicId} → ${nextTopicId}`);
             await ChatService.updateCurrentTopic(conversationId, nextTopicId);
+            console.log(`✅ [CHAT] Topic updated successfully`);
+        } else {
+            console.log(`⏸️ [CHAT] No topic update needed. isTransitioning=${isTransitioning}, nextTopicId=${nextTopicId}, currentTopicId=${conversation.currentTopicId}`);
         }
 
         // 9. Persistence

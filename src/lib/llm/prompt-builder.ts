@@ -78,16 +78,16 @@ ${methodologyContent.substring(0, 2000)}
 
         if (remainingMins <= 0) {
             statusInstruction = `STATUS: TIME_EXPIRED.
-            - Summarize briefly and output [CONCLUDE_INTERVIEW] immediately.
+            - Summarize briefly and conclude the interview.
             - Do not ask further questions.`;
         } else if (remainingMins < 2) {
             statusInstruction = `STATUS: URGENT_WRAP_UP. ${remainingMins} mins left.
             - Skip remaining deep dives.
-            - Ask one final crucial question if needed, then [CONCLUDE_INTERVIEW].`;
+            - Ask one final crucial question if needed, then conclude.`;
         } else if (isBehind || isCriticalTime) {
             statusInstruction = `STATUS: BEHIND_SCHEDULE. ${remainingMins}m left for ${topicsRemaining} topics.
             - SPEED UP. Do not deep dive.
-            - Ask 1 key question for this topic, then [TRANSITION_TO_NEXT_TOPIC] immediately.
+            - Ask 1 key question for this topic.
             - IT IS CRITICAL TO COVER ALL TOPICS.`;
         } else {
             statusInstruction = `STATUS: ON_TRACK/AHEAD. ${remainingMins}m left.
@@ -144,7 +144,6 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 > DO NOT ASK MORE QUESTIONS about "${currentTopic.label}".
 > DO NOT ask for permission (e.g., "Va bene?").
 > Say briefly: "Grazie. ${transitionMessage}"
-> Then output [TRANSITION_TO_NEXT_TOPIC].
 `;
             } else if (supervisorInsight.status === 'SCANNING') {
                 const target = supervisorInsight.nextSubGoal || "the next sub-goal";

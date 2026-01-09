@@ -17,8 +17,18 @@ function generateSlug(name: string): string {
 
 export async function POST(req: Request) {
     try {
+        console.log('🔐 [CREATE-BOT] Starting authentication check...');
         const session = await auth();
+
+        console.log('🔐 [CREATE-BOT] Session:', {
+            hasSession: !!session,
+            hasUser: !!session?.user,
+            email: session?.user?.email,
+            userId: session?.user?.id
+        });
+
         if (!session?.user?.email) {
+            console.error('❌ [CREATE-BOT] Unauthorized: No session or email');
             return new Response('Unauthorized', { status: 401 });
         }
 
@@ -27,7 +37,15 @@ export async function POST(req: Request) {
             include: { ownedProjects: true }
         });
 
+        console.log('👤 [CREATE-BOT] User lookup:', {
+            email: session.user.email,
+            found: !!user,
+            userId: user?.id,
+            projectsCount: user?.ownedProjects?.length || 0
+        });
+
         if (!user) {
+            console.error('❌ [CREATE-BOT] User not found in database:', session.user.email);
             return new Response('User not found', { status: 404 });
         }
 

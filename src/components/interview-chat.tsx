@@ -192,23 +192,26 @@ export default function InterviewChat({
         setHasStarted(true);
         setStartTime(Date.now());
 
-        // If we have a custom intro message, use it immediately as the assistant's first message
         if (introMessage) {
-            const assistantMessage: Message = {
+            // Show intro immediately
+            const introMsgObj: Message = {
                 id: Date.now().toString(),
                 role: 'assistant',
                 content: introMessage
             };
-            setMessages([assistantMessage]);
+            setMessages([introMsgObj]);
 
-            // Persist the intro message to DB so history is preserved
             try {
+                // Save it
                 await saveBotMessageAction(conversationId, introMessage);
+                // Trigger AI to continue
+                // We pass the intro message as history so the AI knows it happened
+                await handleSendMessage("I am ready.", true, [introMsgObj]);
             } catch (err) {
-                console.error("Failed to save intro message", err);
+                console.error("Intro Error", err);
             }
         } else {
-            // Default behavior: trigger the AI to start
+            // Default behavior
             await handleSendMessage("I'm ready to start the interview.", true);
         }
     };
@@ -228,13 +231,16 @@ export default function InterviewChat({
         setStartTime(Date.now());
 
         if (introMessage) {
-            const assistantMessage: Message = {
+            const introMsgObj: Message = {
                 id: Date.now().toString(),
                 role: 'assistant',
                 content: introMessage
             };
-            setMessages([assistantMessage]);
-            try { await saveBotMessageAction(conversationId, introMessage); } catch (e) { }
+            setMessages([introMsgObj]);
+            try {
+                await saveBotMessageAction(conversationId, introMessage);
+                await handleSendMessage("I am ready.", true, [introMsgObj]);
+            } catch (e) { }
         } else {
             await handleSendMessage("I'm ready to start.", true);
         }
@@ -247,8 +253,13 @@ export default function InterviewChat({
         }
     }, [currentQuestionIndex, isLoading]);
 
-    const handleSendMessage = async (messageContent: string, isInitial = false) => {
+    const handleSendMessage = async (messageContent: string, isInitial = false, overrideHistory?: Message[]) => {
         if ((!messageContent.trim() || isLoading) && !isInitial) return;
+
+        // If isInitial=true and we have overrideHistory (intro), we DON'T add a user message to UI
+        // We just use 'messageContent' as a hidden trigger for the AI
+
+        const isHiddenTrigger = isInitial && overrideHistory && overrideHistory.length > 0;
 
         const userMessage: Message = {
             id: Date.now().toString(),
@@ -256,19 +267,36 @@ export default function InterviewChat({
             content: messageContent
         };
 
-        if (!isInitial) {
+        if (!isInitial && !isHiddenTrigger) {
             setMessages(prev => [...prev, userMessage]);
         }
 
-        setInput('');
+        if (!isHiddenTrigger) {
+            setInput('');
+        }
+
         setIsLoading(true);
 
         try {
+            // Construct payload
+            // If overrideHistory exists, use it. Otherwise append userMessage to current messages.
+            // If isHiddenTrigger, we send [overrideHistory..., userMessage(hidden)]
+
+            let messagesPayload;
+            if (isHiddenTrigger && overrideHistory) {
+                // Intro (Assistant) -> User (Hidden "I am ready")
+                messagesPayload = [...overrideHistory, userMessage];
+            } else if (isInitial) {
+                messagesPayload = [];
+            } else {
+                messagesPayload = [...messages, userMessage];
+            }
+
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    messages: isInitial ? [] : [...messages, userMessage],
+                    messages: messagesPayload,
                     conversationId,
                     botId,
                     effectiveDuration: Math.floor(effectiveSeconds)
@@ -285,13 +313,10 @@ export default function InterviewChat({
 
             // Update Active Topic
             if (data.currentTopicId) {
-                console.log("🔄 Updating Active Topic:", data.currentTopicId);
                 setActiveTopicId(data.currentTopicId);
-            } else {
-                console.warn("⚠️ No topic ID in response");
             }
 
-            // Calculate Reading Time: ~225 words per minute
+            // Calculate Reading Time
             const wordCount = assistantText.split(/\s+/).length;
             const readingTimeSeconds = Math.ceil((wordCount / 225) * 60);
             setEffectiveSeconds(prev => prev + readingTimeSeconds);
@@ -302,7 +327,7 @@ export default function InterviewChat({
                 content: assistantText
             };
 
-            setMessages(prev => isInitial ? [assistantMessage] : [...prev, assistantMessage]);
+            setMessages(prev => [...prev, assistantMessage]);
             setCurrentQuestionIndex(prev => prev + 1);
         } catch (error: any) {
             console.error('Chat error:', error);
@@ -313,37 +338,6 @@ export default function InterviewChat({
             }]);
         } finally {
             setIsLoading(false);
-        }
-    };
-
-    const [isCompleted, setIsCompleted] = useState(false);
-
-    // Check for completion token whenever messages change
-    useEffect(() => {
-        const lastMessage = messages[messages.length - 1];
-        if (lastMessage?.role === 'assistant' && lastMessage.content.includes('INTERVIEW_COMPLETED')) {
-            const cleanContent = lastMessage.content.replace('INTERVIEW_COMPLETED', '').trim();
-            setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[newMessages.length - 1] = {
-                    ...lastMessage,
-                    content: cleanContent
-                };
-                return newMessages;
-            });
-            setIsCompleted(true);
-        }
-    }, [messages]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        handleSendMessage(input);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit(e as any);
         }
     };
 
@@ -583,7 +577,7 @@ export default function InterviewChat({
             )}
 
             {/* Header - Moved lower to avoid overlap with progress bar labels */}
-            <header className="fixed top-28 left-0 right-0 z-50 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
+            <header className="fixed top-44 left-0 right-0 z-50 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
                 <div className="flex items-center gap-3 bg-white border border-stone-200 p-2.5 pl-3.5 pr-5 rounded-full shadow-xl pointer-events-auto transition-all hover:shadow-2xl hover:scale-105">
                     {logoUrl ? (
                         <div className="h-8 w-8 rounded-full overflow-hidden border border-stone-100 flex-shrink-0 bg-stone-50">

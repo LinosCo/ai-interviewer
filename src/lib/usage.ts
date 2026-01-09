@@ -153,8 +153,7 @@ export async function checkInterviewStatus(conversationId: string): Promise<{ sh
     }
 
     // 2. Turn Limit (Fair Usage)
-    // Use hidden limits or a safe default
-    const maxTurns = 20; // Default fair usage
+    const maxTurns = bot.maxTurns || 20;
     if (messages.length >= maxTurns) {
         return { shouldConclude: true, reason: 'TURNS' };
     }

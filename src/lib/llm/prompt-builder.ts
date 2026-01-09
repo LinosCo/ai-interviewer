@@ -107,7 +107,7 @@ ${methodologyContent.substring(0, 2000)}
         bot: Bot & { rewardConfig?: any, topics: TopicBlock[] },
         effectiveDurationSeconds: number
     ): string {
-        const maxMins = bot.maxDurationMins || 15;
+        const maxMins = bot.maxDurationMins || 10;
         const elapsedMins = Math.floor(effectiveDurationSeconds / 60);
         const remainingMins = maxMins - elapsedMins;
 
@@ -170,7 +170,7 @@ ${statusInstruction}
         currentTopic: TopicBlock | null,
         allTopics: TopicBlock[],
         supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string },
-        bot?: Bot // Added for language access and fields
+        bot?: any // Added for language access and fields
     ): string {
         if (!currentTopic) {
             return `
@@ -198,22 +198,24 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 
                 const instructions = isItalian ? `
 ## FASE: RACCOLTA DATI (LEAD / RECRUITING)
-L'intervista è conclusa (o l'utente ha chiesto un contatto).
+L'utente ha espresso interesse a lasciare i propri dati.
 Il tuo obiettivo ora è raccogliere i dati necessari.
 ISTRUZIONI:
-1. Ringrazia l'utente.
+1. Accogli l'interesse dell'utente con calore.
 2. Spiega che per procedere (con la candidatura o la richiesta) hai bisogno di: **${fieldsList}**.
 3. Chiedili gentilmente.
 4. Se l'utente rifiuta, accetta e concludi.
+5. **IMPORTANTE**: Quando l'utente ha fornito i dati O ha rifiutato, devi scrivere alla fine della risposta: "INTERVIEW_COMPLETED".
 ` : `
 ## PHASE: DATA COLLECTION (LEAD / RECRUITING)
-The interview is complete (or user requested contact).
+The user has expressed interest in leaving their details.
 Your goal is to collect necessary details.
 INSTRUCTIONS:
-1. Thank the user.
+1. Warmly acknowledge the user's interest.
 2. Explain you need these details to proceed: **${fieldsList}**.
 3. Ask for them politely.
 4. If refused, accept and conclude.
+5. **IMPORTANT**: When the user has provided the data OR refused, you MUST append "INTERVIEW_COMPLETED" to the end of your response.
 `;
 
                 return instructions.trim();

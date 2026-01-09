@@ -13,7 +13,7 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { messages, conversationId, botId, effectiveDuration } = body;
+        const { messages, conversationId, botId, effectiveDuration, introMessage } = body;
 
         // 1. Data Loading & Validation
         const conversation = await ChatService.loadConversation(conversationId, botId);
@@ -27,17 +27,6 @@ export async function POST(req: Request) {
         // 3. Update Progress
         await ChatService.updateProgress(conversationId, Number(effectiveDuration || conversation.effectiveDuration));
 
-        // 4. Check Limits
-        const statusCheck = await ChatService.checkLimits(conversationId);
-        if (statusCheck.shouldConclude) {
-            await ChatService.completeInterview(conversationId);
-            return Response.json({
-                text: "Il tempo a disposizione per questa intervista è terminato. Grazie per la partecipazione! INTERVIEW_COMPLETED",
-                isCompleted: true,
-                currentTopicId: conversation.currentTopicId
-            });
-        }
-
         // 5. Topic Supervision
         const botTopics = conversation.bot.topics;
         botTopics.sort((a, b) => a.orderIndex - b.orderIndex);
@@ -47,36 +36,62 @@ export async function POST(req: Request) {
         if (currentIndex === -1) currentIndex = 0;
 
         // Detect Phase from Metadata
-        const metadata = conversation.metadata as any || {};
+        const metadata = (conversation as any).metadata || {};
         const currentPhase = metadata.phase || 'SCAN'; // Default to SCAN
 
         let supervisorInsight = { status: 'SCANNING' };
+
+        // 4. Check Limits
+        const statusCheck = await ChatService.checkLimits(conversationId);
+        const shouldCollectData = (conversation.bot as any).collectCandidateData;
+
+        if (statusCheck.shouldConclude) {
+            if (shouldCollectData && currentPhase !== 'DATA_COLLECTION') {
+                console.log("⏰ [CHAT] Time/Turn limit reached. Offering DATA_COLLECTION.");
+                // We don't return early. We force a transition below.
+                supervisorInsight.status = 'TRANSITION_TO_DATA';
+            } else {
+                await ChatService.completeInterview(conversationId);
+                return Response.json({
+                    text: (conversation.bot.language === 'it'
+                        ? "Il tempo a disposizione per questa intervista è terminato. Grazie per la partecipazione!"
+                        : "The time for this interview has ended. Thank you for participating!") + " INTERVIEW_COMPLETED",
+                    isCompleted: true,
+                    currentTopicId: conversation.currentTopicId
+                });
+            }
+        }
 
         // Fetch API Key
         const openAIKey = await LLMService.getApiKey(conversation.bot, 'openai') || process.env.OPENAI_API_KEY || '';
 
         if (messages.length > 2) {
-            try {
-                const insight = await TopicManager.evaluateTopicProgress(
-                    messages as any[],
-                    currentTopic,
-                    openAIKey,
-                    currentPhase // Pass phase to TopicManager
-                    , conversation.bot.collectCandidateData // isRecruiting (Pass correct param)
-                    , conversation.bot.language // Language
-                );
-                supervisorInsight = insight as any;
+            // SKIP TOPIC EVALUATION IN DATA COLLECTION PHASE
+            if (currentPhase === 'DATA_COLLECTION') {
+                supervisorInsight = { status: 'DATA_COLLECTION' };
+            } else {
+                try {
+                    const insight = await TopicManager.evaluateTopicProgress(
+                        messages as any[],
+                        currentTopic,
+                        openAIKey,
+                        currentPhase // Pass phase to TopicManager
+                        , (conversation.bot as any).collectCandidateData // isRecruiting (Pass correct param)
+                        , conversation.bot.language // Language
+                    );
+                    supervisorInsight = insight as any;
 
-                console.log("🔍 [CHAT] Supervisor Decision:", {
-                    phase: currentPhase,
-                    currentTopic: currentTopic.label,
-                    status: supervisorInsight.status,
-                    messagesCount: messages.length,
-                    reason: (supervisorInsight as any).reason
-                });
-            } catch (e) {
-                console.error("❌ [CHAT] Supervisor error:", e);
-                supervisorInsight = { status: 'TRANSITION' }; // Default to transition on error
+                    console.log("🔍 [CHAT] Supervisor Decision:", {
+                        phase: currentPhase,
+                        currentTopic: currentTopic.label,
+                        status: supervisorInsight.status,
+                        messagesCount: messages.length,
+                        reason: (supervisorInsight as any).reason
+                    });
+                } catch (e) {
+                    console.error("❌ [CHAT] Supervisor error:", e);
+                    supervisorInsight = { status: 'TRANSITION' }; // Default to transition on error
+                }
             }
         }
 
@@ -88,7 +103,8 @@ export async function POST(req: Request) {
 
         const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 5;
 
-        if (messages.length > globalHeadroom) {
+        // DISABLE HEADROOM CHECK FOR DATA COLLECTION
+        if (currentPhase !== 'DATA_COLLECTION' && messages.length > globalHeadroom) {
             console.log(`🚨 [CHAT] FORCE TRANSITION: Messages (${messages.length}) > Headroom (${globalHeadroom}).`);
             supervisorInsight = { status: 'TRANSITION' };
         }
@@ -103,30 +119,37 @@ export async function POST(req: Request) {
         let nextPhase = currentPhase;
 
         // HANDLE COMPLETION / SKIP (User asked to stop/apply)
-        if (supervisorInsight.status === 'COMPLETION') {
-            console.log("⏩ [CHAT] FAST-TRACK: User asked to complete/apply.");
-            const shouldCollectData = conversation.bot.collectCandidateData;
+        if (supervisorInsight.status === 'COMPLETION' || (supervisorInsight as any).status === 'TRANSITION_TO_DATA') {
+            console.log("⏩ [CHAT] Fast-tracking to DATA_COLLECTION or Ending.");
 
             if (shouldCollectData) {
                 nextPhase = 'DATA_COLLECTION';
                 isTransitioning = true;
 
-                // Fake Transition Prompt for Data Collection
-                systemPrompt = `
-You are acting as a Recruiter.
-The user has explicitly asked to APPLY or STOP.
-Acknowledge their request warmly.
-Then, immediately ask for their details (Name, Email, etc.) to process the application/profile.
-Do NOT ask more content questions.
+                // Soft Transition Prompt for Data Collection
+                const isItalian = conversation.bot.language === 'it';
+                systemPrompt = isItalian ? `
+## TRANSIZIONE: INTERESSE RACCOLTA DATI
+L'intervista è terminata (per tempo scaduto o richiesta utente).
+1. Comunica gentilmente che l'intervista è conclusa.
+2. Chiedi all'utente se è interessato a lasciare i propri dati per essere ricontattato o candidarsi (senza chiederli subito).
+3. Esempio: "L'intervista è terminata. Ti andrebbe di lasciare il tuo contatto per essere ricontattato?"
+` : `
+## TRANSITION: DATA COLLECTION INTEREST
+The interview is over (timeout or user request).
+1. Politely state that the interview is finished.
+2. Ask the user if they are interested in leaving their details to be contacted or to apply (don't ask for fields yet).
+3. Example: "The interview is over. Would you be interested in leaving your contact info to stay in touch?"
 `;
-                // Force supervisorInsight to DATA_COLLECTION for PromptBuilder later
-                supervisorInsight.status = 'DATA_COLLECTION';
+                // Force status for PromptBuilder mapping if needed (though we use systemPrompt override)
+                supervisorInsight.status = 'DATA_COLLECTION_FIRST_ASK';
 
             } else {
                 // FAST FINISH
                 await ChatService.completeInterview(conversationId);
+                const text = conversation.bot.language === 'it' ? "Certamente. Grazie per il tuo tempo! L'intervista è conclusa." : "Certainly. Thank you for your time! The interview is concluded.";
                 return Response.json({
-                    text: "Certamente. Grazie per il tuo tempo! L'intervista è conclusa.",
+                    text: text + " INTERVIEW_COMPLETED",
                     isCompleted: true,
                     currentTopicId: conversation.currentTopicId
                 });
@@ -162,7 +185,7 @@ Your goal: Re-examine the first topic, but this time ask DEEP, contextual questi
 
                 } else {
                     // End of DEEP -> Check for Data Collection OR Finish
-                    const shouldCollectData = conversation.bot.collectCandidateData;
+                    const shouldCollectData = (conversation.bot as any).collectCandidateData;
 
                     if (shouldCollectData && currentPhase !== 'DATA_COLLECTION') {
                         console.log("📝 [CHAT] Deep Dive Complete. Switching to DATA_COLLECTION.");
@@ -170,11 +193,19 @@ Your goal: Re-examine the first topic, but this time ask DEEP, contextual questi
                         isTransitioning = true;
                         // Stay on current topic ID or null, doesn't matter much as prompt handles it
 
-                        systemPrompt = `
-You are transitioning to the FINAL PHASE: DATA COLLECTION.
-The interview content is done.
-Now you must ask the user for their details (Name, Email, Contacts) to complete the application.
-Be polite and professional.
+                        const isItalian = conversation.bot.language === 'it';
+                        systemPrompt = isItalian ? `
+## TRANSIZIONE: FINE INTERVISTA -> INTERESSE DATI
+Abbiamo terminato tutti i temi.
+1. Ringrazia e comunica che l'intervista di contenuto è finita.
+2. Chiedi se è interessato a lasciare i propri dati per essere ricontattato o candidarsi (senza chiederli subito).
+3. Sii molto cordiale.
+` : `
+## TRANSITION: END OF CONTENT -> DATA INTEREST
+All topics are covered.
+1. Thank the user and state the content interview is finished.
+2. Ask if they'd be interested in leaving their details to be contacted or to apply (don't ask for fields yet).
+3. Be very warm.
 `;
                     } else {
                         // Truly Finished (either Deep done & no data collection, or Data Collection done)
@@ -255,6 +286,11 @@ Be polite and professional.
         if (!systemPrompt.includes("PHASE")) {
             systemPrompt += `\n\nCURRENT INTERVIEW PHASE: ${currentPhase}\n` +
                 (currentPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history.");
+        }
+
+        // Inject Custom Intro Message Requirement
+        if (introMessage) {
+            systemPrompt += `\n\nIMPORTANT: You are starting the interview. Your response MUST begin with the following text exactly:\n"${introMessage}"\nThen, immediately follow up with your first question or statement as per the methodology. Do not repeat the greeting if it's already in the text. combine them naturally.`;
         }
 
         const result = await generateObject({

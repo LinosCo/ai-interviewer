@@ -172,7 +172,7 @@ Your goal: Re-examine the first topic, but this time ask DEEP, contextual questi
         // 8. Updates
         if (isTransitioning) {
             // Update Topic
-            if (nextTopicId !== conversation.currentTopicId) {
+            if (nextTopicId && nextTopicId !== conversation.currentTopicId) {
                 await ChatService.updateCurrentTopic(conversationId, nextTopicId);
             }
             // Update Metadata if Phase Changed

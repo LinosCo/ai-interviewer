@@ -45,8 +45,8 @@ export async function POST(req: Request) {
         const statusCheck = await ChatService.checkLimits(conversationId);
         const shouldCollectData = (conversation.bot as any).collectCandidateData;
 
-        if (statusCheck.shouldConclude) {
-            if (shouldCollectData && currentPhase !== 'DATA_COLLECTION') {
+        if (statusCheck.shouldConclude && currentPhase !== 'DATA_COLLECTION') {
+            if (shouldCollectData && currentPhase !== 'DATA_COLLECTION' && currentPhase !== 'TRANSITION_TO_DATA') {
                 console.log("⏰ [CHAT] Time/Turn limit reached. Offering DATA_COLLECTION.");
                 // We don't return early. We force a transition below.
                 supervisorInsight.status = 'TRANSITION_TO_DATA';
@@ -129,17 +129,17 @@ export async function POST(req: Request) {
                 // Soft Transition Prompt for Data Collection
                 const isItalian = conversation.bot.language === 'it';
                 systemPrompt = isItalian ? `
-## TRANSIZIONE: INTERESSE RACCOLTA DATI
-L'intervista è terminata (per tempo scaduto o richiesta utente).
-1. Comunica gentilmente che l'intervista è conclusa.
-2. Chiedi all'utente se è interessato a lasciare i propri dati per essere ricontattato o candidarsi (senza chiederli subito).
-3. Esempio: "L'intervista è terminata. Ti andrebbe di lasciare il tuo contatto per essere ricontattato?"
+## TRANSIZIONE: OFFERTA RACCOLTA DATI (LEAD GEN)
+L'intervista è terminata per limiti raggiunti o completamento temi.
+1. Comunica chiaramente che la parte di contenuto dell'intervista è conclusa.
+2. Sii esplicito: "Vorrei chiederti un ultimo favore. Ti andrebbe di lasciare il tuo contatto per essere ricontattato o approfondire ulteriormente in futuro?"
+3. Se l'utente dice di sì o si mostra interessato, procederemo con la richiesta dei dati.
 ` : `
-## TRANSITION: DATA COLLECTION INTEREST
-The interview is over (timeout or user request).
-1. Politely state that the interview is finished.
-2. Ask the user if they are interested in leaving their details to be contacted or to apply (don't ask for fields yet).
-3. Example: "The interview is over. Would you be interested in leaving your contact info to stay in touch?"
+## TRANSITION: DATA COLLECTION OFFERING
+The interview content is complete or limits reached.
+1. Formally state that the interview phase is finished.
+2. Be explicit: "I'd like to ask a final favor. Would you be interested in leaving your contact information so we can follow up or keep this conversation open in the future?"
+3. If the user agrees or shows interest, we will proceed to collect the details.
 `;
                 // Force status for PromptBuilder mapping if needed (though we use systemPrompt override)
                 supervisorInsight.status = 'DATA_COLLECTION_FIRST_ASK';
@@ -176,12 +176,28 @@ The interview is over (timeout or user request).
                     isTransitioning = true;
 
                     // Build a "Bridging" System Prompt
-                    systemPrompt = `
-You are an expert interviewer. We have just finished the "Scanning Phase" where we touched all topics lightly.
-NOW we are entering the "Deep Dive Phase".
-We will restart from the first topic: "${botTopics[0].label}".
-Your goal: Re-examine the first topic, but this time ask DEEP, contextual questions based on what the user said earlier.
-                    `.trim();
+                    const isItalian = conversation.bot.language === 'it';
+                    systemPrompt = isItalian ? `
+## TRANSIZIONE ALLA FASE DEEP DIVE (APPROFONDIMENTO)
+Abbiamo completato la panoramica generale (Scanning).
+Ora ripartiamo dal primo tema: "${botTopics[0].label}".
+
+**ISTRUZIONI PER L'INTERVISTATORE**:
+1. Spiega chiaramente all'utente: "Abbiamo finito la panoramica veloce. Ora vorrei tornare su alcuni punti interessanti che hai menzionato per andare più a fondo."
+2. Inizia col primo tema: "${botTopics[0].label}".
+3. **REGOLA D'ORO**: Cita un dettaglio specifico che l'utente ha detto prima riguardo a questo tema. Mostra di aver memorizzato le sue risposte precedenti.
+4. Chiedi di approfondire quel dettaglio specifico.
+` : `
+## TRANSITION TO DEEP DIVE PHASE
+We have finished the general overview (Scanning).
+Now we restart from the first topic: "${botTopics[0].label}".
+
+**INSTRUCTIONS FOR THE INTERVIEWER**:
+1. Explicitly state to the user: "We've finished the quick overview. Now I'd like to revisit a few interesting points you mentioned earlier to explore them in more depth."
+2. Start with the first topic: "${botTopics[0].label}".
+3. **GOLDEN RULE**: Quote a specific detail the user mentioned earlier regarding this topic. Show that you remembered their previous answers.
+4. Ask to delve deeper into that specific detail.
+`;
 
                 } else {
                     // End of DEEP -> Check for Data Collection OR Finish

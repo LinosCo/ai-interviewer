@@ -32,7 +32,7 @@ export class TopicManager {
 
         // Multilingual Triggers Definition
         const triggerInstruction = isRecruiting
-            ? `0. **DATA COLLECTION TRIGGER**: If user says "apply", "candidate", "job", "work with you", "demo", "buy", "contact", "cost" (or translated: "candidarmi", "lavoro", "assunzione", "contattami", "preventivo", "comprare"), output status: 'COMPLETION'.`
+            ? `0. **DATA COLLECTION TRIGGER**: If user says "yes", "ok", "willingly", "sure", "apply", "candidate", "job", "work with you", "demo", "buy", "contact", "cost" (or translated: "si", "volentieri", "certo", "con piacere", "candidarmi", "lavoro", "assunzione", "contattami", "preventivo", "comprare"), output status: 'COMPLETION'.`
             : `0. **STOP TRIGGER**: If user explicitly says "stop", "finish", "fine", "basta", output status: 'COMPLETION'.`;
 
         let prompt = '';
@@ -75,14 +75,16 @@ GOAL: Meticulous depth using SPECIFIC CONTEXT.
 ${triggerInstruction}
 1. LIMIT: Max 2 specific deep-dive questions per topic. If reached -> TRANSITION.
 2. **CONTEXTUAL DEEPENING**:
-   - Identify interesting component.
-   - If user answers are short/neutral -> TRANSITION.
-3. **FAILSAFE**: If unsure -> TRANSITION.
+   - Carefully read user answers. Identify a point that was: Surprising, Emotional, Contradictory, or very Detailed.
+   - **CRITICAL**: If the user already provided a very thorough explanation of a point, DO NOT ask about it again.
+   - If user answers are short, generic ("va bene", "ok"), or they seem to have nothing more to say -> TRANSITION.
+3. **FAILSAFE**: If you cannot find a *new* and *interesting* angle to probe -> TRANSITION.
+4. **NO GENERIC PROBES**: Never suggest focus points like "anything else" or "tell me more".
 
 OUTPUT criteria:
 - status: DEEPENING | TRANSITION | COMPLETION
-- focusPoint: Must cite user words.
-- reason: Explanation.
+- focusPoint: Must cite the specific user words/concept to probe.
+- reason: Explanation of why this point deserves more depth.
 `.trim();
         }
 

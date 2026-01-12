@@ -11,6 +11,17 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ bot, onStart, onCancel, brandColor = '#F59E0B' }: WelcomeScreenProps) {
+    // Helper to get image URL (handling Drive)
+    const getImageUrl = (url: string | null) => {
+        if (!url) return null;
+        if (url.includes('drive.google.com')) {
+            const idMatch = url.match(/[-\w]{25,}/);
+            if (idMatch) return `https://lh3.googleusercontent.com/u/0/d/${idMatch[0]}=w1000`;
+        }
+        return url;
+    };
+    const logoUrl = getImageUrl(bot.logoUrl);
+
     const title = bot.welcomeTitle || `Benvenuto in ${bot.name}`;
     const subtitle = bot.welcomeSubtitle || bot.description || "Siamo pronti per iniziare questa conversazione.";
 
@@ -28,8 +39,8 @@ export function WelcomeScreen({ bot, onStart, onCancel, brandColor = '#F59E0B' }
             <div className="mb-10 relative group">
                 <div className="absolute inset-0 rounded-full blur-2xl opacity-20 scale-150 transition-all group-hover:opacity-40" style={{ backgroundColor: brandColor }} />
                 <div className="relative p-6 rounded-[2rem] bg-white border border-gray-100 shadow-xl overflow-hidden transition-transform duration-500 group-hover:scale-110">
-                    {bot.logoUrl ? (
-                        <img src={bot.logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
+                    {logoUrl ? (
+                        <img src={logoUrl} alt="Logo" className="w-16 h-16 object-contain" />
                     ) : (
                         <Bot className="w-16 h-16" style={{ color: brandColor }} />
                     )}

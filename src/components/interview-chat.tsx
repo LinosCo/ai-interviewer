@@ -164,6 +164,13 @@ export default function InterviewChat({
     const [showWarmup, setShowWarmup] = useState(false);
     const [warmupCompleted, setWarmupCompleted] = useState(false);
 
+    // Auto-start for welcome message if skipping landing
+    useEffect(() => {
+        if (skipWelcome && initialMessages.length === 0 && messages.length === 0 && !showLanding) {
+            handleStart();
+        }
+    }, [skipWelcome, initialMessages.length, messages.length]);
+
     // Effective Time Tracking
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
     const [isTyping, setIsTyping] = useState(false);

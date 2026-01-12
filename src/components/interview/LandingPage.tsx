@@ -16,18 +16,6 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const isPro = bot.project.organization?.plan === 'PRO' || bot.project.organization?.plan === 'BUSINESS' || bot.project.organization?.plan === 'TRIAL';
     const [consentGiven, setConsentGiven] = useState(false);
 
-    // Customization (fallback to defaults)
-    const title = (isPro && (bot as any).landingTitle) ? (bot as any).landingTitle : bot.name;
-    const description = (isPro && (bot as any).landingDescription)
-        ? (bot as any).landingDescription
-        : ((bot as any).welcomeSubtitle || bot.introMessage || bot.researchGoal);
-    const imageUrl = (isPro && (bot as any).landingImageUrl) || null;
-    const videoUrl = (isPro && (bot as any).landingVideoUrl) || null;
-    const primaryColor = bot.primaryColor || colors.amber;
-    const logoUrl = bot.logoUrl;
-
-    const estimatedTime = bot.maxDurationMins || 10;
-
     // Helper to get video embed URL
     const getEmbedUrl = (url: string) => {
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -57,6 +45,18 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
         }
         return url;
     };
+
+    // Customization (fallback to defaults)
+    const title = (isPro && (bot as any).landingTitle) ? (bot as any).landingTitle : bot.name;
+    const description = (isPro && (bot as any).landingDescription)
+        ? (bot as any).landingDescription
+        : ((bot as any).welcomeSubtitle || bot.introMessage || bot.researchGoal);
+    const imageUrl = (isPro && (bot as any).landingImageUrl) || null;
+    const videoUrl = (isPro && (bot as any).landingVideoUrl) || null;
+    const primaryColor = bot.primaryColor || colors.amber;
+    const logoUrl = getImageUrl(bot.logoUrl);
+
+    const estimatedTime = bot.maxDurationMins || 10;
 
     const embedUrl = videoUrl ? getEmbedUrl(videoUrl) : null;
     const computedImageUrl = getImageUrl(imageUrl);

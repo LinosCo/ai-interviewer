@@ -168,6 +168,8 @@ model Organization {
   // Usage Tracking
   responsesUsedThisMonth Int      @default(0)
   monthlyResetDate       DateTime @default(now())
+  
+  tokenUsage             TokenUsage?
 
   members      Membership[]
   projects     Project[]
@@ -425,6 +427,29 @@ model Bot {
 
   // Analytics aggregates
   analyticsMetadata Json? // { sentimentScore: 75, engagementScore: 80, ... }
+
+  // Chatbot-specific fields
+  botType                 String   @default("interview") // "interview" | "chatbot"
+  
+  // Chatbot configuration
+  enablePageContext       Boolean  @default(true)
+  maxTokensPerMessage     Int      @default(500)
+  maxMessagesPerSession   Int      @default(20)
+  fallbackMessage         String?  @db.Text
+  leadCaptureStrategy     String   @default("after_3_msgs") // "immediate" | "after_3_msgs" | "on_exit"
+  leadCaptureMessage      String?  @db.Text
+  
+  // Bubble UI customization
+  bubblePosition          String   @default("bottom-right") // "bottom-right" | "bottom-left"
+  bubbleIcon              String?
+  bubbleSize              String   @default("medium") // "small" | "medium" | "large"
+  bubbleAnimation         String   @default("bounce") // "bounce" | "fade" | "slide"
+  
+  // Advanced
+  allowedDomains          Json?    // ["example.com", "*.example.com"]
+  webhookUrl              String?  // POST conversation data on completion
+
+  chatbotSessions  ChatbotSession[]
 }
 
 model KnowledgeSource {
@@ -502,6 +527,7 @@ model Conversation {
   answers          StructuredAnswer[]
   analysis         ConversationAnalysis?
   memory           ConversationMemory?
+  chatbotSession   ChatbotSession?
 }
 
 model ConversationMemory {
@@ -679,4 +705,50 @@ model UsageLog {
 
   @@index([organizationId, timestamp])
   @@index([organizationId, type, timestamp])
+}
+
+// --- Chatbot & Usage Models ---
+
+model ChatbotSession {
+  id                String   @id @default(cuid())
+  botId             String
+  bot               Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  
+  conversationId    String   @unique
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  // Page context
+  pageUrl           String
+  pageTitle         String?
+  pageDescription   String?
+  pageContent       String?  @db.Text // Extracted text
+  
+  // Session tracking
+  sessionId         String   // Browser fingerprint
+  userAgent         String?
+  referrer          String?
+  
+  // Token usage
+  tokensUsed        Int      @default(0)
+  messagesCount     Int      @default(0)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([botId, sessionId])
+  @@index([botId, createdAt])
+}
+
+model TokenUsage {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  
+  periodStart     DateTime @default(now())
+  periodEnd       DateTime // Next billing date
+  
+  usedTokens      Int      @default(0)
+  purchasedTokens Int      @default(0) // Extra packs
+  
+  updatedAt       DateTime @updatedAt
 }

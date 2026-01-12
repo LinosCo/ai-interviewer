@@ -141,7 +141,7 @@ The interview content is complete or limits reached.
 2. Be explicit: "I'd like to ask a final favor. Would you be interested in leaving your contact information so we can follow up or keep this conversation open in the future?"
 3. If the user agrees or shows interest, we will proceed to collect the details.
 `;
-                systemPrompt = PromptBuilder.build(
+                systemPrompt = await PromptBuilder.build(
                     conversation.bot,
                     conversation,
                     currentTopic,
@@ -170,7 +170,7 @@ The interview content is complete or limits reached.
                 // Normal transition within current loop
                 console.log(`➡️ [CHAT] Transition (${currentPhase}): ${currentTopic.label} → ${nextTopic.label}`);
                 const transitionInstruction = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology, currentPhase as any);
-                systemPrompt = PromptBuilder.build(
+                systemPrompt = await PromptBuilder.build(
                     conversation.bot,
                     conversation,
                     nextTopic,
@@ -214,7 +214,7 @@ Now we restart from the first topic: "${botTopics[0].label}".
 3. **GOLDEN RULE**: Quote a specific detail the user mentioned earlier regarding this topic. Show that you remembered their previous answers.
 4. Ask to delve deeper into that specific detail.
 `;
-                    systemPrompt = PromptBuilder.build(
+                    systemPrompt = await PromptBuilder.build(
                         conversation.bot,
                         conversation,
                         botTopics[0],
@@ -246,7 +246,7 @@ All topics are covered.
 2. Ask if they'd be interested in leaving their details to be contacted or to apply (don't ask for fields yet).
 3. Be very warm.
 `;
-                        systemPrompt = PromptBuilder.build(
+                        systemPrompt = await PromptBuilder.build(
                             conversation.bot,
                             conversation,
                             currentTopic,
@@ -293,7 +293,7 @@ All topics are covered.
                 ? { status: 'DATA_COLLECTION' }
                 : supervisorInsight;
 
-            systemPrompt = PromptBuilder.build(
+            systemPrompt = await PromptBuilder.build(
                 conversation.bot,
                 conversation,
                 currentTopic,

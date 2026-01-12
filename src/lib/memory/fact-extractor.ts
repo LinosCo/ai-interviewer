@@ -1,82 +1,185 @@
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { CollectedFact } from '@/types/memory';
 
-const factSchema = z.object({
+/**
+ * Fact Extractor Service
+ * Extracts structured facts from user messages to build conversation memory
+ */
+
+// Schema for extracted facts
+const factExtractionSchema = z.object({
     facts: z.array(z.object({
-        content: z.string().describe('Fatto estratto in forma assertiva'),
-        confidence: z.number().min(0).max(1).describe('Confidenza estrazione'),
-        keywords: z.array(z.string()).describe('Parole chiave')
+        content: z.string().describe('The fact content (e.g., "Works as a Product Manager")'),
+        topic: z.string().describe('Related topic category (e.g., "occupation", "preferences", "pain_points")'),
+        confidence: z.number().min(0).max(1).describe('Confidence score 0-1'),
+        keywords: z.array(z.string()).describe('Key terms for matching')
     })),
-    detectedTone: z.enum(['formal', 'casual', 'brief', 'verbose']).nullable(),
-    fatigueSignals: z.number().min(0).max(1).describe('0 = engaged, 1 = fatigued')
+    tone: z.enum(['formal', 'casual', 'brief', 'verbose']).describe('Detected communication style'),
+    fatigueIndicators: z.object({
+        hasShortResponses: z.boolean(),
+        hasRepetition: z.boolean(),
+        hasDisengagement: z.boolean(),
+        score: z.number().min(0).max(1).describe('Fatigue score 0-1')
+    })
 });
 
-export async function extractFactsFromResponse(
+export type ExtractedFact = {
+    id: string;
+    content: string;
+    topic: string;
+    extractedAt: string;
+    confidence: number;
+    keywords: string[];
+};
+
+export type ToneDetection = 'formal' | 'casual' | 'brief' | 'verbose';
+
+export type FatigueAnalysis = {
+    hasShortResponses: boolean;
+    hasRepetition: boolean;
+    hasDisengagement: boolean;
+    score: number;
+};
+
+export type FactExtractionResult = {
+    facts: ExtractedFact[];
+    tone: ToneDetection;
+    fatigue: FatigueAnalysis;
+    avgResponseLength: number;
+    usesEmoji: boolean;
+};
+
+/**
+ * Extract facts from a user message
+ */
+export async function extractFactsFromMessage(
     userMessage: string,
-    currentTopicLabel: string,
-    existingFacts: CollectedFact[],
+    conversationContext: string[],
+    existingFacts: ExtractedFact[],
     apiKey: string
-): Promise<{
-    newFacts: Omit<CollectedFact, 'id' | 'extractedAt'>[];
-    detectedTone: string | null;
-    fatigueScore: number;
-}> {
+): Promise<FactExtractionResult> {
 
     const openai = createOpenAI({ apiKey });
 
-    const existingFactsSummary = existingFacts
-        .map(f => `- ${f.content}`)
-        .join('\n');
+    // Build context of recent messages
+    const recentContext = conversationContext.slice(-5).join('\n');
+
+    // Build existing facts summary
+    const existingFactsSummary = existingFacts.length > 0
+        ? existingFacts.map(f => `- ${f.content} (${f.topic})`).join('\n')
+        : 'None yet';
 
     const prompt = `
-Analizza questa risposta dell'utente in un'intervista.
+Analizza questo messaggio dell'utente ed estrai NUOVI fatti rilevanti.
 
-RISPOSTA UTENTE:
+MESSAGGIO UTENTE:
 "${userMessage}"
 
-TOPIC CORRENTE: ${currentTopicLabel}
+CONTESTO CONVERSAZIONE RECENTE:
+${recentContext}
 
-FATTI GIÀ NOTI:
-${existingFactsSummary || '(nessuno)'}
+FATTI GIÀ RACCOLTI:
+${existingFactsSummary}
 
-COMPITI:
-1. Estrai NUOVI fatti concreti dalla risposta (non ripetere quelli già noti)
-2. Rileva il tono comunicativo: usa SOLO questi valori in inglese: 'formal', 'casual', 'brief', 'verbose'
-3. Valuta segnali di fatica (risposte telegrafiche, "non so", evasioni)
+ISTRUZIONI:
+1. Estrai SOLO nuovi fatti non già presenti nei fatti esistenti
+2. Un fatto è un'informazione concreta su: preferenze, esperienze, ruolo, problemi, obiettivi, contesto
+3. Ignora opinioni generiche o risposte vaghe
+4. Assegna confidence alta (>0.7) solo a fatti espliciti
+5. Rileva il tono di comunicazione (formal/casual/brief/verbose)
+6. Identifica segnali di fatica:
+   - Risposte molto brevi (< 10 parole)
+   - Ripetizioni di concetti già detti
+   - Segnali di disimpegno ("ok", "va bene", "non so")
 
-REGOLE ESTRAZIONE FATTI:
-- Solo informazioni concrete e verificabili
-- Forma assertiva: "L'utente [fatto]"
-- NO interpretazioni o inferenze
-- NO fatti già presenti nella lista
-- Se la risposta è vaga, restituisci array vuoto
+CATEGORIE TOPIC:
+- occupation (lavoro, ruolo, settore)
+- preferences (gusti, scelte, priorità)
+- pain_points (problemi, frustrazioni)
+- goals (obiettivi, aspirazioni)
+- experience (esperienze passate)
+- context (situazione attuale, vincoli)
+- demographics (età, location, background)
 `.trim();
 
     try {
         const result = await generateObject({
-            model: openai('gpt-4o-mini'), // Modello economico per questa operazione
-            schema: factSchema,
-            prompt
+            model: openai('gpt-4o-mini'),
+            schema: factExtractionSchema,
+            prompt,
+            temperature: 0.3 // Low temperature for consistent extraction
         });
 
+        // Calculate additional metrics
+        const avgResponseLength = userMessage.split(' ').length;
+        const usesEmoji = /[\u{1F300}-\u{1F9FF}]/u.test(userMessage);
+
+        // Convert to our format with IDs and timestamps
+        const facts: ExtractedFact[] = result.object.facts.map(f => ({
+            id: `fact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            content: f.content,
+            topic: f.topic,
+            extractedAt: new Date().toISOString(),
+            confidence: f.confidence,
+            keywords: f.keywords
+        }));
+
         return {
-            newFacts: result.object.facts.map(f => ({
-                content: f.content,
-                topic: currentTopicLabel,
-                confidence: f.confidence,
-                keywords: f.keywords
-            })),
-            detectedTone: result.object.detectedTone,
-            fatigueScore: result.object.fatigueSignals
+            facts,
+            tone: result.object.tone,
+            fatigue: result.object.fatigueIndicators,
+            avgResponseLength,
+            usesEmoji
         };
+
     } catch (error) {
-        console.error('Fact extraction failed:', error);
+        console.error('Fact extraction error:', error);
+
+        // Fallback: return empty result
         return {
-            newFacts: [],
-            detectedTone: null,
-            fatigueScore: 0
+            facts: [],
+            tone: 'casual',
+            fatigue: {
+                hasShortResponses: userMessage.split(' ').length < 10,
+                hasRepetition: false,
+                hasDisengagement: false,
+                score: 0
+            },
+            avgResponseLength: userMessage.split(' ').length,
+            usesEmoji: /[\u{1F300}-\u{1F9FF}]/u.test(userMessage)
         };
     }
+}
+
+/**
+ * Filter out duplicate facts based on semantic similarity
+ */
+export function deduplicateFacts(
+    newFacts: ExtractedFact[],
+    existingFacts: ExtractedFact[]
+): ExtractedFact[] {
+
+    return newFacts.filter(newFact => {
+        // Check if this fact is semantically similar to any existing fact
+        const isDuplicate = existingFacts.some(existingFact => {
+            // Same topic is a prerequisite
+            if (newFact.topic !== existingFact.topic) return false;
+
+            // Check keyword overlap
+            const newKeywords = new Set(newFact.keywords.map(k => k.toLowerCase()));
+            const existingKeywords = new Set(existingFact.keywords.map(k => k.toLowerCase()));
+
+            const intersection = new Set(
+                [...newKeywords].filter(k => existingKeywords.has(k))
+            );
+
+            const overlapRatio = intersection.size / Math.min(newKeywords.size, existingKeywords.size);
+
+            // If >50% keyword overlap, consider it duplicate
+            return overlapRatio > 0.5;
+        });
+
+        return !isDuplicate;
+    });
 }

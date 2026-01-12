@@ -3,13 +3,38 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { Message } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
+
+// In-memory cache to avoid re-extraction
+const extractionCache = new Map<string, any>();
 
 export class CandidateExtractor {
 
     static async extractProfile(
         messages: Message[],
-        apiKey: string
+        apiKey: string,
+        conversationId?: string
     ) {
+        // Check cache first
+        if (conversationId && extractionCache.has(conversationId)) {
+            console.log('[CandidateExtractor] Using cached profile');
+            return extractionCache.get(conversationId);
+        }
+
+        // Check DB: if already extracted, skip
+        if (conversationId) {
+            const conversation = await prisma.conversation.findUnique({
+                where: { id: conversationId },
+                select: { candidateProfile: true }
+            });
+
+            if (conversation?.candidateProfile) {
+                console.log('[CandidateExtractor] Profile already in DB');
+                extractionCache.set(conversationId, conversation.candidateProfile);
+                return conversation.candidateProfile;
+            }
+        }
+
         const openai = createOpenAI({ apiKey });
         const transcript = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
@@ -35,7 +60,8 @@ export class CandidateExtractor {
         });
 
         try {
-            const result = await generateObject({
+            // Add timeout protection (10 seconds)
+            const extractionPromise = generateObject({
                 model: openai('gpt-4o'),
                 schema,
                 prompt: `
@@ -48,6 +74,17 @@ TRANSCRIPT:
 ${transcript}
 `.trim()
             });
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Extraction timeout after 10s')), 10000)
+            );
+
+            const result = await Promise.race([extractionPromise, timeoutPromise]) as any;
+
+            // Cache the result
+            if (conversationId && result.object) {
+                extractionCache.set(conversationId, result.object);
+            }
 
             return result.object;
         } catch (error) {

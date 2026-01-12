@@ -178,27 +178,50 @@ export async function POST(req: Request) {
             });
         }
 
-        // Create the bot with topics
+        // Create the bot with topics/KB based on type
         const slug = generateSlug(config.name || 'intervista');
+        const botType = config.botType || 'interview';
+        const isChatbot = botType === 'chatbot';
+        const botConfig = config.config || {}; // Chatbot config wrapper
 
-        const bot = await prisma.bot.create({
-            data: {
-                projectId,
-                slug,
-                name: config.name || 'Nuova intervista',
-                status: 'PUBLISHED',
-                description: config.researchGoal,
+        let botData: any = {
+            projectId,
+            slug,
+            name: config.name || 'Nuova intervista',
+            status: 'PUBLISHED',
+            description: config.researchGoal || botConfig.description,
+            language: config.language || 'it',
+            botType: botType,
+            primaryColor: isChatbot ? (botConfig.primaryColor || '#F59E0B') : '#F59E0B',
+        };
+
+        if (isChatbot) {
+            // Chatbot specific fields
+            botData = {
+                ...botData,
+                tone: botConfig.tone,
+                enablePageContext: true,
+                leadCaptureStrategy: botConfig.leadCaptureStrategy || 'after_3_msgs',
+                bubblePosition: botConfig.bubblePosition || 'bottom-right',
+                knowledgeSources: {
+                    create: botConfig.knowledgeSources?.map((k: any) => ({
+                        title: k.title,
+                        content: k.content,
+                        type: k.type || 'text'
+                    }))
+                }
+            };
+        } else {
+            // Interview specific fields
+            botData = {
+                ...botData,
                 researchGoal: config.researchGoal,
                 targetAudience: config.targetAudience,
-                language: config.language || 'it',
-                tone: config.tone,
                 maxDurationMins: config.maxDurationMins || 10,
                 introMessage: config.introMessage,
-                primaryColor: '#F59E0B', // Force Amber as default instead of Prisma default (Indigo)
-                useWarmup: false,         // Disable warmup by default as requested
-                // Create topics
+                useWarmup: false,
                 topics: {
-                    create: config.topics.map((topic: any, index: number) => ({
+                    create: config.topics?.map((topic: any, index: number) => ({
                         orderIndex: index,
                         label: topic.label,
                         description: topic.description,
@@ -206,9 +229,14 @@ export async function POST(req: Request) {
                         maxTurns: topic.maxTurns || 4
                     }))
                 }
-            },
+            };
+        }
+
+        const bot = await prisma.bot.create({
+            data: botData,
             include: {
-                topics: true
+                topics: true,
+                knowledgeSources: true
             }
         });
 

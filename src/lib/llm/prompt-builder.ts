@@ -1,5 +1,6 @@
 
 import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
+import { MemoryManager } from '@/lib/memory/memory-manager';
 
 const FIELD_LABELS: Record<string, { it: string, en: string }> = {
     name: { it: 'Nome Completo', en: 'Full Name' },
@@ -361,16 +362,28 @@ STYLE:
     /**
      * Master Builder: Assembles the full prompt.
      */
-    static build(
+    static async build(
         bot: Bot & { knowledgeSources?: KnowledgeSource[], topics: TopicBlock[], rewardConfig?: any },
         conversation: Conversation,
         currentTopic: TopicBlock | null,
         methodologyContent: string,
         effectiveDurationSeconds: number,
         supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string } | string // Can be a string for custom transition logic
-    ): string {
+    ): Promise<string> {
         const persona = this.buildPersonaPrompt(bot);
         const methodology = this.buildMethodologyPrompt(methodologyContent, bot.language || 'en');
+
+        // Fetch and format memory context
+        let memoryContext = '';
+        try {
+            const memory = await MemoryManager.get(conversation.id);
+            if (memory && memory.factsCollected.length > 0) {
+                memoryContext = MemoryManager.formatForPrompt(memory);
+            }
+        } catch (error) {
+            console.error('[PromptBuilder] Memory fetch failed:', error);
+        }
+
         const context = this.buildContextPrompt(conversation, bot, effectiveDurationSeconds);
 
         let specificPrompt = '';
@@ -386,7 +399,7 @@ ${persona}
 
 ${methodology}
 
-${context}
+${memoryContext ? memoryContext + '\n\n' : ''}${context}
 
 ${specificPrompt}
 

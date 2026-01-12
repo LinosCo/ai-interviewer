@@ -24,7 +24,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const imageUrl = (isPro && (bot as any).landingImageUrl) || null;
     const videoUrl = (isPro && (bot as any).landingVideoUrl) || null;
     const primaryColor = bot.primaryColor || colors.amber;
-    const logoUrl = bot.logoUrl || bot.project.organization?.logoUrl;
+    const logoUrl = bot.logoUrl;
 
     const estimatedTime = bot.maxDurationMins || 10;
 

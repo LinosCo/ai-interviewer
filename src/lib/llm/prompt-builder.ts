@@ -1,6 +1,19 @@
 
 import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
 
+const FIELD_LABELS: Record<string, { it: string, en: string }> = {
+    name: { it: 'Nome Completo', en: 'Full Name' },
+    email: { it: 'Indirizzo Email', en: 'Email Address' },
+    phone: { it: 'Numero di Telefono', en: 'Phone Number' },
+    company: { it: 'Azienda/Organizzazione', en: 'Company/Organization' },
+    linkedin: { it: 'Profilo LinkedIn/Social', en: 'LinkedIn/Social Profile' },
+    portfolio: { it: 'Portfolio/Sito Web', en: 'Portfolio/Website' },
+    role: { it: 'Ruolo Attuale', en: 'Current Role' },
+    location: { it: 'Città/Località', en: 'City/Location' },
+    budget: { it: 'Budget', en: 'Budget' },
+    availability: { it: 'Disponibilità (Recruiting)', en: 'Availability' }
+};
+
 export class PromptBuilder {
 
     /**
@@ -201,38 +214,47 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
         if (supervisorInsight) {
             if (supervisorInsight.status === 'DATA_COLLECTION') {
                 // RECRUITER MODE - DYNAMIC FIELDS
-                const fields = (bot?.candidateDataFields as string[]) || ['Full Name', 'Email', 'Phone Number'];
-                const fieldsList = fields.length > 0 ? fields.join(', ') : 'Full Name, Email';
-
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
+
+                const fieldIds = (bot?.candidateDataFields as string[]) || ['name', 'email'];
+                const fieldsList = fieldIds.map(id => {
+                    const label = FIELD_LABELS[id];
+                    return label ? (isItalian ? label.it : label.en) : id;
+                }).join(', ');
 
                 const instructions = isItalian ? `
 ## FASE: RACCOLTA DATI (CONTATTI)
 L'utente ha accettato di lasciare i propri dati.
-**REGOLA D'ORO: Sii conversazionale. Chiedi i dati UNO ALLA VOLTA.**
+**ELENCO CAMPI DA RACCOGLIERE**: ${fieldsList}
+
+**REGOLA D'ORO (MANDATORIA): Chiedi i dati UNO ALLA VOLTA.**
+Non passare al dato successivo finché non hai ricevuto quello precedente.
 
 ISTRUZIONI:
-1. Ringrazia calorosamente l'utente.
-2. Chiedi il primo dato dell'elenco: **${fieldsList}**.
-3. **IMPORTANTE**: Non elencare mai tutti i campi richiesti in un unico messaggio. Chiedine sempre solo UNO alla volta (es: chiedi il nome, aspetta, poi chiedi l'email).
-4. Quando l'utente risponde, conferma con empatia e chiedi il dato successivo.
-5. Se l'utente rifiuta un dato, rispetta la scelta e termina se necessario o passa al successivo.
-6. **PROFILO AI**: Ti stai comportando come un recruiter umano, non come un bot che compila un form.
-7. **CHIUSURA**: Solo quando hai finito di raccogliere tutto o l'utente ha esplicitamente smesso, scrivi alla fine: "INTERVIEW_COMPLETED".
+1. Ringrazia calorosamente l'utente per l'interesse.
+2. Chiedi il primo dato dell'elenco che non è ancora stato fornito.
+3. **NON elencare mai tutti i campi richiesti in un unico messaggio.**
+4. Se l'utente risponde, conferma con empatia e chiedi il dato SUCCESSIVO dall'elenco: [${fieldsList}].
+5. **CRITICO**: Non finire l'intervista finché non hai passato in rassegna TUTTI i campi richiesti (o finché l'utente non si rifiuta esplicitamente).
+6. **PROFILO AI**: Ti stai comportando come un recruiter umano, non come un bot. Usa il nome dell'utente se lo hai già ricevuto.
+7. **CHIUSURA**: Solo dopo aver chiesto TUTTI i campi (${fieldsList}), scrivi alla fine dell'ultimo messaggio: "INTERVIEW_COMPLETED".
 ` : `
 ## PHASE: DATA COLLECTION (CONTACTS)
 The user has agreed to leave their details.
-**GOLDEN RULE: Be conversational. Ask for details ONE BY ONE.**
+**FIELDS TO COLLECT**: ${fieldsList}
+
+**GOLDEN RULE (MANDATORY): Ask for details ONE BY ONE.**
+Do not move to the next field until you have received the previous one.
 
 INSTRUCTIONS:
 1. Warmly thank the user.
-2. Ask for the first data field from: **${fieldsList}**.
-3. **IMPORTANT**: Never list all requested fields in a single message. Always ask for only ONE at a time (e.g., ask for name, wait, then ask for email).
-4. When the user responds, confirm with empathy and ask for the next field.
-5. If the user refuses a field, respect the choice and terminate if necessary or move to the next.
-6. **AI PROFILE**: You are acting like a human recruiter, not a bot filling a form.
-7. **CLOSING**: Only when you have finished collecting everything or the user has explicitly stopped, write at the end: "INTERVIEW_COMPLETED".
+2. Ask for the first data field from the list that hasn't been provided yet.
+3. **NEVER list all requested fields in a single message.**
+4. When the user responds, confirm with empathy and ask for the NEXT field from the list: [${fieldsList}].
+5. **CRITICAL**: Do not terminate until you have gone through ALL requested fields.
+6. **AI PROFILE**: You are acting like a human recruiter. Use the user's name if already known.
+7. **CLOSING**: Only after asking for ALL fields (${fieldsList}), write at the end of the last response: "INTERVIEW_COMPLETED".
 `;
 
                 return instructions.trim();

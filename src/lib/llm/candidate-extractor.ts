@@ -14,19 +14,24 @@ export class CandidateExtractor {
         const transcript = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
         const schema = z.object({
-            fullName: z.string().nullable().describe("Candidate's full name if mentioned, else null"),
-            email: z.string().nullable().describe("Email address if mentioned"),
-            phone: z.string().nullable().describe("Phone number if mentioned"),
-            location: z.string().nullable().describe("City/Location if mentioned"),
-            linkedIn: z.string().nullable().describe("LinkedIn URL or handle if mentioned"),
+            fullName: z.string().nullable().describe("Candidate's full name"),
+            email: z.string().nullable().describe("Email address"),
+            phone: z.string().nullable().describe("Phone number"),
+            currentRole: z.string().nullable().describe("Current job title or role"),
+            company: z.string().nullable().describe("Current company or organization"),
+            location: z.string().nullable().describe("City/Location"),
+            linkedIn: z.string().nullable().describe("LinkedIn profile link/handle"),
+            portfolio: z.string().nullable().describe("Portfolio or website URL"),
+            budget: z.string().nullable().describe("Project budget (if applicable)"),
+            availability: z.string().nullable().describe("Recruiting availability (e.g. notice period, start date)"),
 
-            hardSkills: z.array(z.string()).describe("List of technical/hard skills demonstrated or mentioned"),
-            softSkills: z.array(z.string()).describe("List of soft skills (communication, leadership, etc) demonstratred"),
+            hardSkills: z.array(z.string()).describe("List of technical/hard skills mentioned"),
+            softSkills: z.array(z.string()).describe("List of soft skills demonstrated"),
 
-            experienceSummary: z.string().describe("Brief summary of experience/background (max 3 sentences)"),
+            experienceSummary: z.string().describe("Brief summary of experience (max 3 sentences)"),
 
-            cultureFitScore: z.number().min(1).max(10).describe("1-10 Score on fit for the role/event based on enthusiasm and alignment"),
-            recruiterNote: z.string().describe("Private note for the recruiter about this candidate's potential.")
+            cultureFitScore: z.number().min(1).max(10).describe("1-10 Score on alignment with the goal"),
+            recruiterNote: z.string().describe("Concise note for the recruiter about this candidate.")
         });
 
         try {

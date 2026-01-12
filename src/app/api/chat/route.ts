@@ -128,7 +128,7 @@ export async function POST(req: Request) {
 
                 // Soft Transition Prompt for Data Collection
                 const isItalian = conversation.bot.language === 'it';
-                systemPrompt = isItalian ? `
+                const softOfferInstruction = isItalian ? `
 ## TRANSIZIONE: OFFERTA RACCOLTA DATI (LEAD GEN)
 L'intervista è terminata per limiti raggiunti o completamento temi.
 1. Comunica chiaramente che la parte di contenuto dell'intervista è conclusa.
@@ -141,6 +141,14 @@ The interview content is complete or limits reached.
 2. Be explicit: "I'd like to ask a final favor. Would you be interested in leaving your contact information so we can follow up or keep this conversation open in the future?"
 3. If the user agrees or shows interest, we will proceed to collect the details.
 `;
+                systemPrompt = PromptBuilder.build(
+                    conversation.bot,
+                    conversation,
+                    currentTopic,
+                    methodology,
+                    Number(effectiveDuration || 0),
+                    softOfferInstruction
+                );
                 // Force status for PromptBuilder mapping if needed (though we use systemPrompt override)
                 supervisorInsight.status = 'DATA_COLLECTION_FIRST_ASK';
 

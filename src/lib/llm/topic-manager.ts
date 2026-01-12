@@ -21,7 +21,8 @@ export class TopicManager {
         language: string = 'en'
     ): Promise<{ status: 'SCANNING' | 'DEEPENING' | 'TRANSITION' | 'COMPLETION'; nextSubGoal?: string; focusPoint?: string; reason: string }> {
 
-        const recentHistory = messages.map(m => `${m.role}: ${m.content}`).join('\n');
+        // Limit history to last 15 messages to prevent timeouts and focus evaluation
+        const recentHistory = messages.slice(-15).map(m => `${m.role}: ${m.content}`).join('\n');
 
         const schema = z.object({
             status: z.enum(['SCANNING', 'DEEPENING', 'TRANSITION', 'COMPLETION']),
@@ -32,7 +33,7 @@ export class TopicManager {
 
         // Multilingual Triggers Definition
         const triggerInstruction = isRecruiting
-            ? `0. **DATA COLLECTION TRIGGER**: If user says "yes", "ok", "willingly", "sure", "apply", "candidate", "job", "work with you", "demo", "buy", "contact", "cost" (or translated: "si", "volentieri", "certo", "con piacere", "candidarmi", "lavoro", "assunzione", "contattami", "preventivo", "comprare"), output status: 'COMPLETION'.`
+            ? `0. **DATA COLLECTION TRIGGER**: If user says "yes", "ok", "willingly", "sure", "apply", "candidate", "job", "work with you", "demo", "buy", "contact", "cost", "data" (or translated: "si", "volentieri", "certo", "con piacere", "candidarmi", "lavoro", "assunzione", "contattami", "preventivo", "comprare", "dati", "contatto"), OR if the user asks why we aren't asking for data or asks "non mi chiedi i dati?", output status: 'COMPLETION'.`
             : `0. **STOP TRIGGER**: If user explicitly says "stop", "finish", "fine", "basta", output status: 'COMPLETION'.`;
 
         let prompt = '';

@@ -210,13 +210,12 @@ export default function InterviewChat({
             setMessages([introMsgObj]);
 
             try {
-                // Save it
+                // Save it to DB so the AI sees it in history when the user eventually responds
                 await saveBotMessageAction(conversationId, introMessage);
-                // Trigger AI to continue
-                // We pass the intro message as history so the AI knows it happened
-                await handleSendMessage("I am ready.", true, [introMsgObj]);
+                // DO NOT trigger handleSendMessage here. 
+                // The introMessage IS the first question/turn. We wait for user input.
             } catch (err) {
-                console.error("Intro Error", err);
+                console.error("Intro Saving Error", err);
             }
         } else {
             // Default behavior
@@ -247,7 +246,7 @@ export default function InterviewChat({
             setMessages([introMsgObj]);
             try {
                 await saveBotMessageAction(conversationId, introMessage);
-                await handleSendMessage("I am ready.", true, [introMsgObj]);
+                // DO NOT trigger handleSendMessage. Wait for user.
             } catch (e) { }
         } else {
             await handleSendMessage("I'm ready to start.", true);

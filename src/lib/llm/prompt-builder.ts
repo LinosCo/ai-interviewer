@@ -102,6 +102,10 @@ ${methodologyContent.substring(0, 2000)}
 4. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
 5. **NO REPETITION (STRICT)**: Always check the conversation history. Never ask a question that has already been answered or asked. Do not repeat the same concepts or words in consecutive turns.
 6. **Opening Protocol (MANDATORY)**: In the very first message of the interview, you MUST explicitly say: "${openingProtocol}" Do not skip this explanation.
+
+## FINAL FAILSAFE RULE
+ALWAYS END YOUR RESPONSE WITH A QUESTION MARK (?). 
+Even if you are thanking the user or transitioning to a new topic, the very last character of your output MUST be a question mark.
 `.trim();
     }
 
@@ -341,13 +345,35 @@ STYLE:
         currentTopic: TopicBlock | null,
         methodologyContent: string,
         effectiveDurationSeconds: number,
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string }
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string } | string // Can be a string for custom transition logic
     ): string {
-        return [
-            this.buildPersonaPrompt(bot),
-            this.buildMethodologyPrompt(methodologyContent, bot.language || 'en'),
-            this.buildContextPrompt(conversation, bot, effectiveDurationSeconds),
-            this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight, bot)
-        ].join('\n\n');
+        const persona = this.buildPersonaPrompt(bot);
+        const methodology = this.buildMethodologyPrompt(methodologyContent, bot.language || 'en');
+        const context = this.buildContextPrompt(conversation, bot, effectiveDurationSeconds);
+
+        let specificPrompt = '';
+        if (typeof supervisorInsight === 'string') {
+            // Custom instruction override (Transitions etc.)
+            specificPrompt = supervisorInsight;
+        } else {
+            specificPrompt = this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight, bot);
+        }
+
+        return `
+${persona}
+
+${methodology}
+
+${context}
+
+${specificPrompt}
+
+---
+## FINAL REMINDER (CRITICAL):
+- EVERY response MUST end with a question mark (?).
+- If you are transitioning, ask the first question of the new topic immediately.
+- If you are probe-deepening, ask for a specific detail.
+- NEVER end with a statement or a "Thank you" alone. Always follow with "?".
+`.trim();
     }
 }

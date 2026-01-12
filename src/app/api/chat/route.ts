@@ -161,7 +161,15 @@ The interview content is complete or limits reached.
             if (nextTopic) {
                 // Normal transition within current loop
                 console.log(`➡️ [CHAT] Transition (${currentPhase}): ${currentTopic.label} → ${nextTopic.label}`);
-                systemPrompt = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology, currentPhase as any);
+                const transitionInstruction = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology, currentPhase as any);
+                systemPrompt = PromptBuilder.build(
+                    conversation.bot,
+                    conversation,
+                    nextTopic,
+                    methodology,
+                    Number(effectiveDuration || 0),
+                    transitionInstruction
+                );
                 nextTopicId = nextTopic.id;
                 isTransitioning = true;
             } else {
@@ -177,7 +185,7 @@ The interview content is complete or limits reached.
 
                     // Build a "Bridging" System Prompt
                     const isItalian = conversation.bot.language === 'it';
-                    systemPrompt = isItalian ? `
+                    const bridgeInstruction = isItalian ? `
 ## TRANSIZIONE ALLA FASE DEEP DIVE (APPROFONDIMENTO)
 Abbiamo completato la panoramica generale (Scanning).
 Ora ripartiamo dal primo tema: "${botTopics[0].label}".
@@ -198,6 +206,14 @@ Now we restart from the first topic: "${botTopics[0].label}".
 3. **GOLDEN RULE**: Quote a specific detail the user mentioned earlier regarding this topic. Show that you remembered their previous answers.
 4. Ask to delve deeper into that specific detail.
 `;
+                    systemPrompt = PromptBuilder.build(
+                        conversation.bot,
+                        conversation,
+                        botTopics[0],
+                        methodology,
+                        Number(effectiveDuration || 0),
+                        bridgeInstruction
+                    );
 
                 } else {
                     // End of DEEP -> Check for Data Collection OR Finish
@@ -207,10 +223,9 @@ Now we restart from the first topic: "${botTopics[0].label}".
                         console.log("📝 [CHAT] Deep Dive Complete. Switching to DATA_COLLECTION.");
                         nextPhase = 'DATA_COLLECTION';
                         isTransitioning = true;
-                        // Stay on current topic ID or null, doesn't matter much as prompt handles it
 
                         const isItalian = conversation.bot.language === 'it';
-                        systemPrompt = isItalian ? `
+                        const dataInstruction = isItalian ? `
 ## TRANSIZIONE: FINE INTERVISTA -> INTERESSE DATI
 Abbiamo terminato tutti i temi.
 1. Ringrazia e comunica che l'intervista di contenuto è finita.
@@ -223,6 +238,14 @@ All topics are covered.
 2. Ask if they'd be interested in leaving their details to be contacted or to apply (don't ask for fields yet).
 3. Be very warm.
 `;
+                        systemPrompt = PromptBuilder.build(
+                            conversation.bot,
+                            conversation,
+                            currentTopic,
+                            methodology,
+                            Number(effectiveDuration || 0),
+                            dataInstruction
+                        );
                     } else {
                         // Truly Finished (either Deep done & no data collection, or Data Collection done)
                         console.log("✅ [CHAT] Interview Complete. Ending.");
@@ -252,22 +275,15 @@ All topics are covered.
                     }
                 }
             }
-        } else if (currentPhase === 'DATA_COLLECTION') {
-            // Special handling for Data Collection Phase loop
-            // If we are here, it means we are already IN the phase.
-            // We need to check if we should finish.
-            // Simple heuristic: If message length in this phase > 3 or user said goodbye.
-            // But for now, let reliance be on the PromptBuilder `DATA_COLLECTION` instruction to say 'INTERVIEW_COMPLETED' logic?
-            // Actually, my PromptBuilder change puts `DATA_COLLECTION` prompt in `supervisorInsight`.
-            // But `TopicManager` doesn't know about `DATA_COLLECTION` phase in `evaluateTopicProgress`.
+        }
 
-            // So I should force supervisorInsight logic here manually if phase is DATA.
-            supervisorInsight = { status: 'DATA_COLLECTION' };
-            // But we need to detect if we are DONE.
-            // Let's rely on the LLM outputting INTERVIEW_COMPLETED if it got the data.
-            // The prompt I added says "If user provides data... say INTERVIEW_COMPLETED".
-            // So the standard `checkLimits` or client side handles completion token?
-            // Yes, `ChatInterface` handles `INTERVIEW_COMPLETED`.
+        // 6.b. FINAL PROMPT ASSEMBLY
+        // If systemPrompt is still empty, build it using the standard builder
+        if (!systemPrompt) {
+            // Force status to DATA_COLLECTION if we are in that phase to ensure correct instructions
+            const insightForPrompt = currentPhase === 'DATA_COLLECTION'
+                ? { status: 'DATA_COLLECTION' }
+                : supervisorInsight;
 
             systemPrompt = PromptBuilder.build(
                 conversation.bot,
@@ -275,17 +291,7 @@ All topics are covered.
                 currentTopic,
                 methodology,
                 Number(effectiveDuration || 0),
-                supervisorInsight as any
-            );
-        } else {
-            // Standard Flow
-            systemPrompt = PromptBuilder.build(
-                conversation.bot,
-                conversation,
-                currentTopic,
-                methodology,
-                Number(effectiveDuration || 0),
-                supervisorInsight as any
+                insightForPrompt as any
             );
         }
 
@@ -296,16 +302,20 @@ All topics are covered.
         });
 
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
-        if (messagesForAI.length === 0) messagesForAI.push({ role: 'user', content: "I am ready." });
+        // Never inject "I am ready" - if empty, let the system prompt handle it or assume start.
+        // But the client should always send at least the intro message if it exists.
 
         // Inject Phase context into system prompt if generic
         if (!systemPrompt.includes("PHASE")) {
             systemPrompt += `\n\nCURRENT INTERVIEW PHASE: ${currentPhase}\n` +
-                (currentPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history.");
+                (currentPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history. Reference specific user details.");
         }
 
-        // Inject Custom Intro Message Requirement
-        if (introMessage) {
+        // Final Global Reinforcement
+        systemPrompt += `\n\n## MANDATORY CHARACTER RULE:\nYour response MUST end with a question mark (?). This is a hard constraint. Even if you are saying goodbye or transitioning, finish the turns with a clear question to the user.`;
+
+        // Inject Custom Intro Message Requirement (Only at the very start)
+        if (introMessage && messagesForAI.length <= 1) {
             systemPrompt += `\n\nIMPORTANT: You are starting the interview. Your response MUST begin with the following text exactly:\n"${introMessage}"\nThen, immediately follow up with your first question or statement as per the methodology. Do not repeat the greeting if it's already in the text. combine them naturally.`;
         }
 

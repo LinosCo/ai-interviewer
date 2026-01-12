@@ -447,10 +447,17 @@ export async function generateBotAnalyticsAction(botId: string) {
     // Instead of raw text, we send Summaries and Key Quotes from each convo.
     const aggregatedInput = analyzedConversations.map((c: any) => {
         const a = c.analysis!; // Verified by filter
-        // Extract metadata summary if available, or just use quotes
-        const summary = (a.metadata as any)?.summary || "No summary available.";
+        const metadata = a.metadata as any || {};
+        const summary = metadata.summary || "No summary available.";
         const quotes = (a.keyQuotes as string[])?.join(' | ') || "";
-        return `[ConvID:${c.id}] Summary: ${summary}\nKey Quotes: ${quotes}\nSentiment: ${a.sentimentScore}`;
+
+        // Include topic details if available
+        let details = "";
+        if (metadata.topicDetails && Array.isArray(metadata.topicDetails)) {
+            details = "\nTopic Breakdown:\n" + metadata.topicDetails.map((td: any) => `- ${td.label}: ${td.summary} (Keywords: ${td.keywords?.join(', ')})`).join('\n');
+        }
+
+        return `[ConvID:${c.id}] Summary: ${summary}${details}\nKey Quotes: ${quotes}\nSentiment: ${a.sentimentScore}`;
     }).join("\n\n----------------\n\n");
 
     const openai = createOpenAI({ apiKey });
@@ -484,25 +491,37 @@ export async function generateBotAnalyticsAction(botId: string) {
                 count: z.number(),
                 sentiment: z.enum(['POSITIVE', 'NEUTRAL', 'NEGATIVE']).optional()
             }))
-        })).optional()
+        }))
     });
+
+    const topicsList = bot.topics.map((t: any) => `- "${t.label}": ${t.description}`).join("\n");
+    const validLabels = bot.topics.map((t: any) => t.label);
 
     const result = await generateObject({
         model: openai('gpt-4o'),
         schema,
-        prompt: `Conduct a Global Meta-Analysis for the bot "${bot.name}" based on these pre-analyzed interview summaries.
+        prompt: `Conduct a Global Meta-Analysis for the bot "${bot.name}".
         
-        Input Data (Aggregated Summaries):
+        RESEARCH GOAL:
+        ${bot.researchGoal}
+
+        DEFINED TOPICS:
+        ${topicsList}
+        
+        Input Data (Aggregated Summaries from individual interviews):
         ${aggregatedInput.substring(0, 100000)} 
         
         Task:
         1. Identify recurring themes across multiple interviews.
         2. Synthesize strategic insights.
-        3. Calculate a weighted average sentiment score.
+        3. Calculate a weighted average sentiment score (0-100).
         4. Select the absolute best 'Golden Quotes' from the provided key quotes.
-        5. Analyze topic trends based on the summaries.
+        5. Analyze keywords and trends for each of the DEFINED TOPICS.
 
-        IMPORTANT: Use the [ConvID:...] from the input to strictly cite your sources.`
+        CONSTRAINTS:
+        - For "topicAnalysis", you MUST only use labels from this list: [${validLabels.join(', ')}].
+        - Use the [ConvID:...] from the input to strictly cite your sources.
+        - Ensure keyword counts reflect their importance/frequency across the aggregated data.`
     });
 
     // Save to DB (Clear old and rewrite)
@@ -817,7 +836,9 @@ export async function generateConversationInsightAction(conversationId: string) 
         where: { id: conversationId },
         include: {
             messages: true,
-            bot: true
+            bot: {
+                include: { topics: true }
+            }
         }
     });
 
@@ -850,23 +871,36 @@ export async function generateConversationInsightAction(conversationId: string) 
         summary: z.string().describe("Brief summary of the main points discussed"),
         topicCoverage: z.number().describe("0 to 1 score of how well goals were met"),
         sentimentScore: z.number().describe("-1 (Negative) to 1 (Positive)"),
-        keyQuotes: z.array(z.string()).describe("3-5 exact, meaningful quotes from the user")
+        keyQuotes: z.array(z.string()).describe("3-5 exact, meaningful quotes from the user"),
+        topicDetails: z.array(z.object({
+            label: z.string(),
+            summary: z.string(),
+            keywords: z.array(z.string())
+        })).optional().describe("Breakdown of what was discussed per topic")
     });
+
+    const topicsContext = conversation.bot.topics.map((t: any) => `- ${t.label}: ${t.description}`).join("\n");
 
     try {
         const { object } = await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
-            prompt: `Analyze this interview transcript based on the Research Goal: "${conversation.bot.researchGoal}".
+            prompt: `Analyze this interview transcript based on the Research Goal and defined Topics.
             
+            GOAL: "${conversation.bot.researchGoal}"
+            
+            TOPICS DEFINED:
+            ${topicsContext}
+
             Transcript:
             ${transcript.substring(0, 50000)}
             
             Task:
             1. Summarize the user's main feedback.
-            2. Estimate Topic Coverage (did they answer all questions?).
-            3. Sentiment Analysis.
-            4. Extract the most valuable quotes.`
+            2. Estimate Topic Coverage (0.0 to 1.0).
+            3. Sentiment Analysis (-1 to 1).
+            4. Extract the most valuable user quotes.
+            5. Identify which topics were discussed and what were the main keywords for each.`
         });
 
         // 5. Save to DB
@@ -876,14 +910,14 @@ export async function generateConversationInsightAction(conversationId: string) 
                 topicCoverage: object.topicCoverage,
                 sentimentScore: object.sentimentScore,
                 keyQuotes: object.keyQuotes as any,
-                metadata: { summary: object.summary } as any
+                metadata: { summary: object.summary, topicDetails: (object as any).topicDetails } as any
             },
             create: {
                 conversationId,
                 topicCoverage: object.topicCoverage,
                 sentimentScore: object.sentimentScore,
                 keyQuotes: object.keyQuotes as any,
-                metadata: { summary: object.summary } as any
+                metadata: { summary: object.summary, topicDetails: (object as any).topicDetails } as any
             }
         });
 

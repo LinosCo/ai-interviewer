@@ -23,7 +23,7 @@ const configSchema = z.object({
     candidateDataFields: z.array(z.object({
         field: z.string(),
         question: z.string(),
-        required: z.boolean()
+        required: z.boolean().optional().default(false)
     })).optional().describe('List of data fields to collect from the user'),
     topics: z.array(z.string()).optional().describe('Main topics the chatbot handles'),
     knowledgeAreas: z.array(z.string()).optional().describe('Knowledge domains needed'),

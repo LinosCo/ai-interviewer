@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { isFeatureEnabled } from '@/lib/usage'
+import { decryptIfNeeded, encryptIfNeeded } from '@/lib/encryption'
 
 const BotSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -22,16 +23,17 @@ const BotSchema = z.object({
 })
 
 async function getEffectiveApiKey(user: any, botSpecificKey?: string | null) {
-    // 1. Bot-specific key always wins
-    if (botSpecificKey) return botSpecificKey;
+    // 1. Bot-specific key always wins (decrypt if needed)
+    if (botSpecificKey) return decryptIfNeeded(botSpecificKey);
 
-    // 2. If User has their own personal platform key set, use it (Legacy/Personal)
-    if (user.platformOpenaiApiKey) return user.platformOpenaiApiKey;
+    // 2. If User has their own personal platform key set, use it (decrypt if needed)
+    if (user.platformOpenaiApiKey) return decryptIfNeeded(user.platformOpenaiApiKey);
 
     // 3. ADMIN Logic: Fallback to Global/Env allowed
     if (user.role === 'ADMIN') {
         const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
-        if (globalConfig?.openaiApiKey) return globalConfig.openaiApiKey;
+        if (globalConfig?.openaiApiKey) return decryptIfNeeded(globalConfig.openaiApiKey);
+        // Never expose env key directly - should be set in DB encrypted
         return process.env.OPENAI_API_KEY;
     }
 
@@ -94,7 +96,7 @@ export async function createBotAction(projectId: string, formData: FormData) {
             //             researchGoal, // TODO: Add to schema? Yes, schema has it.
             researchGoal: researchGoal || null,
             targetAudience: targetAudience || null,
-            slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(Math.random() * 1000),
+            slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().split('-')[0],
             topics: {
                 create: topicsToCreate
             }
@@ -162,7 +164,13 @@ export async function renameProjectAction(projectId: string, newName: string) {
 export async function deleteBotAction(botId: string) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: {
+            ownedProjects: true,
+            projectAccess: true
+        }
+    });
     if (!user) throw new Error("User not found");
 
     const bot = await prisma.bot.findUnique({
@@ -172,12 +180,14 @@ export async function deleteBotAction(botId: string) {
     if (!bot) throw new Error("Bot not found");
 
     const isOwner = bot.project.ownerId === user.id;
+    const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
 
-    console.log(`Delete Bot Attempt: BotId=${botId}, User=${user.email}, Role=${user.role}, ProjectOwner=${bot.project.ownerId}, IsOwner=${isOwner}`);
+    console.log(`Delete Bot Attempt: BotId=${botId}, User=${user.email}, Role=${user.role}, ProjectOwner=${bot.project.ownerId}, IsOwner=${isOwner}, HasAccess=${hasAccess}`);
 
-    if (user.role !== 'ADMIN' && !isOwner) {
-        console.error("Delete Bot Unauthorized");
-        throw new Error("Unauthorized");
+    // Only owner can delete (not just any member with access)
+    if (!isOwner) {
+        console.error("Delete Bot Unauthorized - User is not project owner");
+        throw new Error("Unauthorized - Only project owner can delete bots");
     }
 
     await prisma.bot.delete({ where: { id: botId } });
@@ -204,8 +214,8 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (formData.has('modelProvider')) data.modelProvider = getStr('modelProvider');
     if (formData.has('modelName')) data.modelName = getStr('modelName');
 
-    if (formData.has('openaiApiKey')) data.openaiApiKey = getStr('openaiApiKey') || null;
-    if (formData.has('anthropicApiKey')) data.anthropicApiKey = getStr('anthropicApiKey') || null;
+    if (formData.has('openaiApiKey')) data.openaiApiKey = encryptIfNeeded(getStr('openaiApiKey')) || null;
+    if (formData.has('anthropicApiKey')) data.anthropicApiKey = encryptIfNeeded(getStr('anthropicApiKey')) || null;
 
     // Branding fields
     if (formData.has('logoUrl')) data.logoUrl = getStr('logoUrl') || null;
@@ -648,18 +658,54 @@ export async function addKnowledgeSourceAction(botId: string, formData: FormData
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
 
+    // Verify bot ownership
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: {
+            ownedProjects: true,
+            projectAccess: true
+        }
+    });
+    if (!user) throw new Error("User not found");
+
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: { project: true }
+    });
+    if (!bot) throw new Error("Bot not found");
+
+    const isOwner = user.ownedProjects.some(p => p.id === bot.projectId);
+    const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
+
+    if (!isOwner && !hasAccess) {
+        throw new Error("Unauthorized - No access to this bot");
+    }
+
     const title = formData.get('title') as string;
     const content = formData.get('content') as string;
-    const type = formData.get('type') as string || 'TEXT'; // TEXT or FILE (though we only support text paste for MVP)
+    const type = formData.get('type') as string || 'TEXT';
 
-    if (!content) return; // Silent fail or error?
+    if (!content || !content.trim()) {
+        throw new Error("Content is required");
+    }
+
+    // Sanitize content: limit size and remove potential prompt injection patterns
+    const maxContentLength = 50000; // 50KB max
+    let sanitizedContent = content.trim();
+
+    if (sanitizedContent.length > maxContentLength) {
+        throw new Error(`Content too long. Maximum ${maxContentLength} characters allowed.`);
+    }
+
+    // Basic sanitization: remove control characters except newlines/tabs
+    sanitizedContent = sanitizedContent.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
     await prisma.knowledgeSource.create({
         data: {
             botId,
-            title: title || 'Untitled Source',
+            title: (title?.trim() || 'Untitled Source').substring(0, 200),
             type: type,
-            content: content
+            content: sanitizedContent
         }
     });
     revalidatePath(`/dashboard/bots/${botId}`);
@@ -684,18 +730,18 @@ export async function updateSettingsAction(userId: string, formData: FormData) {
     const openaiKey = formData.get('platformOpenaiApiKey') as string;
     const anthropicKey = formData.get('platformAnthropicApiKey') as string;
 
-    // If Admin, update Global Config
+    // If Admin, update Global Config with encrypted keys
     if (currentUser.role === 'ADMIN') {
         await prisma.globalConfig.upsert({
             where: { id: "default" },
             update: {
-                openaiApiKey: openaiKey || null,
-                anthropicApiKey: anthropicKey || null,
+                openaiApiKey: encryptIfNeeded(openaiKey),
+                anthropicApiKey: encryptIfNeeded(anthropicKey),
             },
             create: {
                 id: "default",
-                openaiApiKey: openaiKey || null,
-                anthropicApiKey: anthropicKey || null,
+                openaiApiKey: encryptIfNeeded(openaiKey),
+                anthropicApiKey: encryptIfNeeded(anthropicKey),
             }
         });
     }

@@ -1,119 +1,124 @@
-# AI Interviewer Platform (MVP)
+# Business Tuner - AI-Powered Qualitative Research Platform
 
-A multi-tenant SaaS application for creating AI-powered qualitative research bots. Built with Next.js 14, Prisma, and Vercel AI SDK.
+**Version**: 1.0.0  
+**Last Updated**: 2026-01-13
 
-## Features
+Business Tuner è una piattaforma SaaS che automatizza le interviste qualitative utilizzando agenti AI conversazionali. Sostituisce i tradizionali questionari con conversazioni naturali, analizzando automaticamente le risposte per estrarre insight strategici.
 
-- **Bot Builder**: Configure research goals, target audience, and conversational flow.
-- **AI Interviewer**: Adaptive chat interface that probes for deeper insights.
-- **Analytics**: Basic conversation tracking (MVP) with scaffolds for Themes & Insights.
-- **Multi-Tenant**: Supports Projects and Teams (User-based tenancy for MVP).
+---
 
-## Tech Stack
+## 🎯 Funzionalità Principali
 
-- **Framework**: Next.js 16 (App Router)
-- **Database**: PostgreSQL (Prisma ORM)
-- **Auth**: NextAuth.js (v5 Beta)
-- **AI**: Vercel AI SDK + OpenAI / Anthropic
+### ✅ Implementate
 
-## Getting Started
+#### Core Features
+- **AI Interview Generation**: Generazione automatica di interviste strutturate
+- **Conversational AI**: Chat bot intelligente basato su GPT-4/Claude
+- **Multi-Topic Structure**: Organizzazione dell'intervista in topic logici
+- **Fatigue Detection**: Sistema di rilevamento stanchezza utente
+- **Knowledge Base**: Upload di documenti/testi di contesto per l'AI
+- **Warm-up Questions**: Domande introduttive opzionali
 
-1. **Clone & Install**
-   ```bash
-   git clone <repo>
-   cd ai-interviewer
-   npm install
-   ```
+#### Analytics & Insights
+- **Sentiment Analysis**: Scoring automatico 0-100 del sentiment
+- **Theme Extraction**: Identificazione automatica di temi ricorrenti
+- **Key Quotes**: Estrazione automatica delle citazioni più significative
+- **Topic Coverage**: Analisi di completezza per ogni area tematica
+- **Aggregated Insights**: Meta-analisi su dataset completi
 
-2. **Environment Setup**
-   Copy `.env.template` (or just create `.env`):
-   ```env
-   DATABASE_URL="postgresql://user:pass@localhost:5432/ai_interviewer"
-   AUTH_SECRET="your_generated_secret" # generate with: openssl rand -base64 32
-   AUTH_URL="http://localhost:3000"
-   OPENAI_API_KEY="sk-..."
-   ANTHROPIC_API_KEY="sk-..."
-   ```
+#### Data Collection Mode
+- **Recruitment Mode**: Raccolta strutturata di profili candidati
+- **Lead Generation**: Cattura lead qualificati con informazioni contestuali
+- **Structured Export**: Export CSV con campi strutturati
 
-3. **Database Setup**
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
+#### Customization & Branding
+- **Custom Logo**: Upload logo personalizzato (PRO+)
+- **Brand Colors**: Personalizzazione colori primari e background
+- **Custom Landing Page**: Landing page personalizzata per ogni bot
+- **Watermark Removal**: Rimozione branding Business Tuner (PRO+)
+- **White Label**: Completa rimozione riferimenti Business Tuner (BUSINESS)
+- **Custom Domain**: Utilizzo domini personalizzati (BUSINESS)
 
-4. **Default Credentials**
-   The seed script creates a default admin user:
-   - **Email**: `admin@example.com`
-   - **Password**: `password123`
-   
-   To run seed manually: `npx prisma db seed`.
+#### Security & Compliance
+- **End-to-end Encryption**: TLS 1.3 in transito, AES-256-GCM per API keys
+- **GDPR Compliant**: Consent management, DSAR tools, data portability
+- **Role-Based Access Control**: ADMIN, MEMBER, VIEWER, USER roles
+- **Audit Logging**: Tracking azioni sensibili per compliance
 
-5. **Run Locally**
-   ```bash
-   npm run dev
-   ```
-   Visit `http://localhost:3000`.
+---
 
-## Deployment Guide (Vercel)
+## 🛠 Stack Tecnologico
 
-### 1. Push to GitHub
-If you haven't already, push your code to a new GitHub repository:
+- **Framework**: Next.js 16.0.8 (App Router)
+- **Database**: PostgreSQL (Neon serverless)
+- **Authentication**: NextAuth 5.0.0-beta.30
+- **AI Providers**: OpenAI (GPT-4), Anthropic (Claude 3.5)
+- **Payments**: Stripe 20.1.0
+- **Hosting**: Vercel
+
+---
+
+## 📦 Setup & Installation
+
+### Environment Variables
+
 ```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/<your-username>/<repo-name>.git
-git push -u origin main
+# Database
+DATABASE_URL=postgresql://...
+
+# Authentication
+AUTH_SECRET=your_32_byte_random_secret
+
+# Encryption (CRITICAL)
+ENCRYPTION_KEY=your_64_character_hex_key
+
+# AI Providers
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Stripe
+STRIPE_SECRET_KEY=sk_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Email
+RESEND_API_KEY=re_...
 ```
 
-### 2. Import in Vercel
-1. Go to the [Vercel Dashboard](https://vercel.com/dashboard).
-2. Click **"Add New..."** -> **"Project"**.
-3. Select your GitHub repository (`ai-interviewer`) and click **Import**.
+### Installation
 
-### 3. Configure Database (Vercel Postgres)
-*Before clicking Deploy:*
-1. In the configuration screen, expand the **"Storage"** section (or set it up after deploying).
-2. It's easiest to create the database **after** the project is created but before a successful build, OR:
-   - Click "Deploy" first (it might fail on DB connection initially if variables aren't there).
-   - Once the project exists in Vercel, go to the **Storage** tab.
-   - Click **Connect Store** -> **Create New**.
-   - Select **Neon** (Serverless Postgres) or **Vercel Postgres** from the Marketplace list.
-   - Accept the defaults.
-   - **Important**: This automatically adds `POSTGRES_PRISMA_URL`, `POSTGRES_URL`, etc., to your environment variables.
-
-### 4. Configure Environment Variables
-Go to **Settings** -> **Environment Variables** and add the remaining keys:
-
-| Key | Value | Note |
-|-----|-------|------|
-| `DATABASE_URL` | *Copy value from POSTGRES_PRISMA_URL* | **CRITICAL**: Vercel creates `POSTGRES_PRISMA_URL`. You MUST create a new variable called `DATABASE_URL` and paste that same value into it so Prisma can find it. |
-| `AUTH_SECRET` | *Generate a random strong string* | Use `openssl rand -base64 32` locally to generate one. |
-| `OPENAI_API_KEY`| `sk-...` | Your OpenAI Key. |
-| `ANTHROPIC_API_KEY` | `sk-...` | Your Anthropic Key (Optional). |
-
-*Note: `AUTH_URL` is generally not required on Vercel as it detects the deployment URL automatically.* 
-
-### 5. Final Redeploy
-1. Go to **Deployments**.
-2. If the first deploy failed, click **Redeploy** now that the Database and Env Vars are set.
-3. The `postinstall` script (`prisma generate`) will run automatically.
-4. Your app should be live!
-
-### 6. Initialize the DB
-After deployment, you might need to push your schema to the production DB. You can do this locally by pointing to the prod DB, or assume `db push` isn't run automatically. 
-**Recommended**: Connect your local terminal to the remote DB just once to push schema:
 ```bash
-# In your local terminal
-export DATABASE_URL="<your-vercel-postgres-connection-string>"
+npm install
+npx prisma generate
 npx prisma db push
+npm run dev
 ```
-*(Retrieve the connection string from Vercel Storage -> .env.local -> Copy snippet)*
 
-## Project Structure
+---
 
-- `/src/app/dashboard`: Admin UI for creating bots.
-- `/src/app/i/[slug]`: Public participant interface.
-- `/src/lib/llm/orchestrator.ts`: Core logic for managing interview state and prompts.
-- `/prisma/schema.prisma`: Data model.
+## 🔐 Security
+
+See [SECURITY.md](./SECURITY.md) for complete security documentation.
+
+**Critical**: Always set `ENCRYPTION_KEY` before storing API keys.
+
+---
+
+## 📖 Documentation
+
+- [Security Guide](./SECURITY.md)
+- [Cookie Policy](./src/app/(marketing)/cookie-policy/page.tsx)
+- [DPA](./src/app/(marketing)/dpa/page.tsx)
+- [SLA](./src/app/(marketing)/sla/page.tsx)
+- [FAQ](./src/app/(marketing)/faq/page.tsx)
+- [CHANGELOG](./CHANGELOG.md)
+
+---
+
+## 📞 Support
+
+- Email: hello@voler.ai
+- Security: security@voler.ai
+
+---
+
+**Made with ❤️ by Voler AI**

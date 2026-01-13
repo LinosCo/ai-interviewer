@@ -608,9 +608,14 @@ export default function InterviewChat({
                                 alt={botName}
                                 className="h-full w-full object-cover"
                                 onError={(e) => {
-                                    // Fallback if image fails to load
-                                    (e.target as any).style.display = 'none';
-                                    (e.target as any).parentElement.innerHTML = `<div class="w-full h-full rounded-full flex items-center justify-center text-white" style="background: ${brandColor}">?</div>`;
+                                    // Fallback if image fails to load - XSS safe
+                                    const img = e.target as HTMLImageElement;
+                                    img.style.display = 'none';
+                                    const fallbackDiv = document.createElement('div');
+                                    fallbackDiv.className = 'w-full h-full rounded-full flex items-center justify-center text-white';
+                                    fallbackDiv.style.background = brandColor;
+                                    fallbackDiv.textContent = '?';
+                                    img.parentElement?.appendChild(fallbackDiv);
                                 }}
                             />
                         </div>

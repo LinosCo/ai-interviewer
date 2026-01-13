@@ -66,6 +66,7 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
                 <nav className="flex flex-col gap-2 flex-1">
                     <DashboardLink href="/dashboard" icon={<Icons.Home size={20} />} label="Home" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/interviews" icon={<Icons.MessageSquare size={20} />} label="Le mie interviste" onClick={() => setIsOpen(false)} />
+                    <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/templates" icon={<Icons.LayoutTemplate size={20} />} label="Template" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
 

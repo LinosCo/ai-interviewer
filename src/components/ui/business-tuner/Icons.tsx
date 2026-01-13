@@ -1,6 +1,6 @@
 import React from 'react';
 import { colors } from '@/lib/design-system';
-import { AlertCircle, FolderKanban, Loader2, CreditCard, BarChart3, Settings2, Lock, Unlock } from 'lucide-react';
+import { AlertCircle, FolderKanban, Loader2, CreditCard, BarChart3, Settings2, Lock, Unlock, Bot } from 'lucide-react';
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {
     size?: number | string;
@@ -252,5 +252,6 @@ export const Icons = {
     BarChart: (props: IconProps) => <BarChart3 {...props} />,
     Settings2: (props: IconProps) => <Settings2 {...props} />,
     Lock: (props: IconProps) => <Lock {...props} />,
-    Unlock: (props: IconProps) => <Unlock {...props} />
+    Unlock: (props: IconProps) => <Unlock {...props} />,
+    Bot: (props: IconProps) => <Bot {...props} />
 };

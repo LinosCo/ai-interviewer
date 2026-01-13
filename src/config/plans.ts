@@ -111,8 +111,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedTemplates: true,
             manualEdit: true,
             knowledgeBase: true,
-            conditionalLogic: true,
-            customTemplates: true,
+            conditionalLogic: false,    // TODO: Not implemented
+            customTemplates: false,     // TODO: Not implemented
 
             watermark: false,
             customColor: true,
@@ -127,15 +127,15 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             keyQuotes: true,
             trends: true,
             comparison: true,
-            segmentation: true,
-            customDashboards: true,
+            segmentation: false,        // TODO: Not implemented
+            customDashboards: false,    // TODO: Not implemented
 
             exportPdf: true,
             exportCsv: true,
             webhooks: true,
-            apiAccess: true,
-            zapier: true,
-            sso: false, // Potere di gestione utenti disabilitato
+            apiAccess: false,           // TODO: Not implemented
+            zapier: false,              // TODO: Not implemented
+            sso: false,                 // Gestione utenti disabilitato
 
             supportLevel: 'priority'
         },
@@ -258,9 +258,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             basicTemplates: true,
             advancedTemplates: true,
             manualEdit: true,
-            knowledgeBase: true,        // ⭐ Da Pro
-            conditionalLogic: true,     // ⭐ Da Pro
-            customTemplates: false,
+            knowledgeBase: true,        // ⭐ Da Pro (IMPLEMENTED)
+            conditionalLogic: false,    // TODO: Not implemented
+            customTemplates: false,     // TODO: Not implemented
 
             watermark: false,           // ⭐ Rimosso da Pro
             customColor: true,
@@ -273,17 +273,17 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             sentiment: true,
             themeExtraction: true,
             keyQuotes: true,
-            trends: true,               // ⭐ Da Pro
-            comparison: true,           // ⭐ Da Pro
-            segmentation: false,
-            customDashboards: false,
+            trends: true,               // ⭐ Da Pro (IMPLEMENTED)
+            comparison: true,           // ⭐ Da Pro (Partial)
+            segmentation: false,        // TODO: Not implemented
+            customDashboards: false,    // TODO: Not implemented
 
             exportPdf: true,
             exportCsv: true,            // ⭐ Da Pro
-            webhooks: true,             // ⭐ Da Pro
-            apiAccess: false,
-            zapier: false,
-            sso: false,
+            webhooks: true,             // ⭐ Da Pro (IMPLEMENTED)
+            apiAccess: false,           // TODO: Not implemented
+            zapier: false,              // TODO: Not implemented
+            sso: false,                 // TODO: Not implemented
 
             supportLevel: 'priority'
         },
@@ -309,7 +309,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '10 interviste attive',
             '300 risposte/mese',
             'Data Collection Mode (Recruitment/Lead)',
-            'Custom Branding & Landing',
+            'Custom Branding & Logo',
+            'Knowledge Base',
             'AI Analysis Avanzata',
             'Export CSV + Webhook'
         ],
@@ -334,14 +335,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedTemplates: true,
             manualEdit: true,
             knowledgeBase: true,
-            conditionalLogic: true,
-            customTemplates: true,      // ⭐ Solo Business
+            conditionalLogic: false,    // TODO: Not implemented
+            customTemplates: false,     // TODO: Not implemented
 
             watermark: false,
             customColor: true,
             customLogo: true,
-            customDomain: true,         // ⭐ Solo Business
-            whiteLabel: true,           // ⭐ Solo Business
+            customDomain: true,         // ⭐ Solo Business (IMPLEMENTED)
+            whiteLabel: true,           // ⭐ Solo Business (IMPLEMENTED)
 
             basicStats: true,
             transcripts: true,
@@ -350,15 +351,15 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             keyQuotes: true,
             trends: true,
             comparison: true,
-            segmentation: true,         // ⭐ Solo Business
-            customDashboards: true,     // ⭐ Solo Business
+            segmentation: false,        // TODO: Not implemented
+            customDashboards: false,    // TODO: Not implemented
 
             exportPdf: true,
             exportCsv: true,
             webhooks: true,
-            apiAccess: true,            // ⭐ Solo Business
-            zapier: true,               // ⭐ Solo Business
-            sso: true,                  // ⭐ Solo Business
+            apiAccess: false,           // TODO: Not implemented
+            zapier: false,              // TODO: Not implemented
+            sso: false,                 // TODO: Not implemented
 
             supportLevel: 'dedicated'
         },
@@ -381,11 +382,12 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             monthlyTokenBudget: 5000000
         },
         marketingFeatures: [
-            'Illimitate interviste',
+            'Interviste illimitate',
             '1.000+ risposte/mese',
-            'Data Collection Illimitata',
-            'Full White Label & API',
-            'Supporto Prioritario',
+            'Data Collection illimitata',
+            'Full White Label',
+            'Webhook integrations',
+            'Supporto prioritario',
             '15 utenti inclusi'
         ],
 

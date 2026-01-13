@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { canPublishBot } from '@/lib/usage';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
+import { scrapeUrl } from '@/lib/scraping';
 
 function generateSlug(name: string): string {
     const base = name
@@ -197,19 +198,48 @@ export async function POST(req: Request) {
         };
 
         if (isChatbot) {
+            // Process knowledge sources (scrape URLs if content is placeholder)
+            const processedSources = [];
+            if (botConfig.knowledgeSources) {
+                for (const k of botConfig.knowledgeSources) {
+                    if (k.type === 'url' && (k.content === 'To be scraped' || !k.content)) {
+                        try {
+                            const scraped = await scrapeUrl(k.title); // Title holds the URL in the simplistic wizard
+                            processedSources.push({
+                                title: scraped.title,
+                                content: `URL: ${scraped.url}\n\nTitle: ${scraped.title}\n\n${scraped.content}`,
+                                type: 'url'
+                            });
+                        } catch (e) {
+                            console.error(`Failed to scrape ${k.title}`, e);
+                            // Add as failed or skip? Add as basic link
+                            processedSources.push({
+                                title: k.title,
+                                content: `URL: ${k.title} (Scraping failed)`,
+                                type: 'url'
+                            });
+                        }
+                    } else {
+                        processedSources.push({
+                            title: k.title,
+                            content: k.content,
+                            type: k.type || 'text'
+                        });
+                    }
+                }
+            }
+
             // Chatbot specific fields
             botData = {
                 ...botData,
                 tone: botConfig.tone,
                 enablePageContext: true,
                 leadCaptureStrategy: botConfig.leadCaptureStrategy || 'after_3_msgs',
+                candidateDataFields: botConfig.candidateDataFields,
+                introMessage: botConfig.welcomeMessage,
                 bubblePosition: botConfig.bubblePosition || 'bottom-right',
                 knowledgeSources: {
-                    create: botConfig.knowledgeSources?.map((k: any) => ({
-                        title: k.title,
-                        content: k.content,
-                        type: k.type || 'text'
-                    }))
+                    create: processedSources
                 }
             };
         } else {

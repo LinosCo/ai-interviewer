@@ -1,646 +1,364 @@
-(function () {
-    'use strict';
+(function (window) {
+  const CONFIG = {
+    apiBase: document.currentScript.getAttribute('data-domain') || 'https://interviewer.businesstuner.ai',
+    botId: document.currentScript.getAttribute('data-bot-id'),
+    primaryColor: '#F97316', // Orange-500 default
+  };
 
-    const BusinessTunerChatbot = {
-        config: {},
-        state: {
-            isOpen: false,
-            conversationId: null,
-            sessionId: null,
-            messages: [],
-            isThinking: false
-        },
+  if (!CONFIG.botId) {
+    console.error('BusinessTuner: data-bot-id is required');
+    return;
+  }
 
-        init(config) {
-            this.config = {
-                botId: config.botId,
-                apiUrl: config.apiUrl || 'https://businesstuner.ai', // Default prod URL
-                position: config.position || 'bottom-right',
-                primaryColor: config.primaryColor || '#F59E0B',
-                pageContext: config.pageContext !== false,
-                ...config
-            };
-
-            this.generateSessionId();
-            this.injectStyles();
-            this.createBubble();
-            this.createChatWindow();
-
-            if (this.config.pageContext) {
-                this.extractPageContext();
-            }
-        },
-
-        generateSessionId() {
-            // Simple fingerprint: timestamp + random
-            if (localStorage.getItem('bt_session_id')) {
-                this.state.sessionId = localStorage.getItem('bt_session_id');
-            } else {
-                this.state.sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                localStorage.setItem('bt_session_id', this.state.sessionId);
-            }
-        },
-
-        extractPageContext() {
-            const context = {
-                url: window.location.href,
-                title: document.title,
-                description: document.querySelector('meta[name="description"]')?.content || '',
-                headings: Array.from(document.querySelectorAll('h1, h2, h3'))
-                    .slice(0, 10)
-                    .map(h => h.textContent.trim())
-                    .filter(Boolean),
-                mainContent: this.extractMainText()
-            };
-
-            this.state.pageContext = context;
-        },
-
-        extractMainText() {
-            // Extract main text content (skip nav, footer, scripts)
-            const main = document.querySelector('main') || document.body;
-            const clone = main.cloneNode(true);
-
-            // Remove unwanted elements
-            const toRemove = clone.querySelectorAll('nav, footer, script, style, iframe, .bt-chatbot, [hidden], noscript');
-            toRemove.forEach(el => el.remove());
-
-            // Get text, limit to 3000 chars
-            const text = clone.textContent
-                .replace(/\s+/g, ' ')
-                .trim()
-                .substring(0, 3000);
-
-            return text;
-        },
-
-        injectStyles() {
-            const style = document.createElement('style');
-            style.textContent = `
-        .bt-chatbot * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        
-        /* Bubble Button */
-        .bt-bubble {
-          position: fixed;
-          ${this.config.position.includes('right') ? 'right: 24px;' : 'left: 24px;'}
-          bottom: 24px;
-          width: 60px;
-          height: 60px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, ${this.config.primaryColor}, ${this.adjustColor(this.config.primaryColor, -20)});
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 999999;
-          transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        }
-        
-        .bt-bubble:hover {
-          transform: scale(1.05);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-        }
-        
-        .bt-bubble svg {
-          width: 30px;
-          height: 30px;
-          fill: white;
-          transition: transform 0.3s ease;
-        }
-        
-        .bt-bubble.open svg {
-          transform: rotate(90deg);
-          opacity: 0;
-        }
-
-        .bt-bubble .bt-close-icon {
-            position: absolute;
-            opacity: 0;
-            transform: rotate(-90deg);
-        }
-
-        .bt-bubble.open .bt-close-icon {
-            opacity: 1;
-            transform: rotate(0);
-        }
-        
-        /* Chat Window */
-        .bt-chat-window {
-          position: fixed;
-          ${this.config.position.includes('right') ? 'right: 24px;' : 'left: 24px;'}
-          bottom: 100px;
-          width: 380px;
-          max-width: calc(100vw - 48px);
-          height: 600px;
-          max-height: calc(100vh - 120px);
-          background: white;
-          border-radius: 20px;
-          box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-          display: flex;
-          flex-direction: column;
-          opacity: 0;
-          transform: translateY(20px) scale(0.95);
-          pointer-events: none;
-          transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-          z-index: 999998;
-          overflow: hidden;
-          border: 1px solid rgba(0,0,0,0.05);
-        }
-        
-        .bt-chat-window.open {
-          opacity: 1;
-          transform: translateY(0) scale(1);
-          pointer-events: all;
-        }
-        
-        /* Header */
-        .bt-header {
-          background: linear-gradient(135deg, ${this.config.primaryColor}, ${this.adjustColor(this.config.primaryColor, -20)});
-          color: white;
-          padding: 16px 20px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          flex-shrink: 0;
-        }
-        
-        .bt-avatar {
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          background: rgba(255,255,255,0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-          backdrop-filter: blur(4px);
-        }
-        
-        .bt-header-text h3 {
-          margin: 0;
-          font-size: 16px;
-          font-weight: 600;
-        }
-        
-        .bt-header-text p {
-          margin: 2px 0 0;
-          font-size: 12px;
-          opacity: 0.9;
-        }
-        
-        /* Messages */
-        .bt-messages {
-          flex: 1;
-          overflow-y: auto;
-          padding: 20px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          background: #f9f9f9;
-        }
-        
-        .bt-message {
-          display: flex;
-          gap: 8px;
-          max-width: 85%;
-          align-self: flex-start;
-          animation: bt-slideUp 0.3s ease-out forwards;
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        
-        .bt-message.user {
-          align-self: flex-end;
-          flex-direction: row-reverse;
-        }
-        
-        .bt-message-content {
-          padding: 10px 14px;
-          border-radius: 12px;
-          font-size: 14px;
-          line-height: 1.5;
-          word-wrap: break-word;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        
-        .bt-message.assistant .bt-message-content {
-          background: white;
-          color: #1f2937;
-          border-top-left-radius: 2px;
-        }
-        
-        .bt-message.user .bt-message-content {
-          background: ${this.config.primaryColor};
-          color: white;
-          border-top-right-radius: 2px;
-        }
-        
-        @keyframes bt-slideUp {
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* Typing Indicator */
-        .bt-typing {
-          display: flex;
-          gap: 4px;
-          padding: 12px 16px;
-          background: white;
-          border-radius: 12px;
-          border-top-left-radius: 2px;
-          width: fit-content;
-          margin-bottom: 12px;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-          align-self: flex-start;
-        }
-        
-        .bt-typing span {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: #9ca3af;
-          animation: bt-bounce 1.4s infinite ease-in-out both;
-        }
-        
-        .bt-typing span:nth-child(1) { animation-delay: -0.32s; }
-        .bt-typing span:nth-child(2) { animation-delay: -0.16s; }
-        
-        @keyframes bt-bounce {
-          0%, 80%, 100% { transform: scale(0); }
-          40% { transform: scale(1); }
-        }
-        
-        /* Input */
-        .bt-input-container {
-          padding: 16px;
-          background: white;
-          border-top: 1px solid #f3f4f6;
-          flex-shrink: 0;
-        }
-        
-        .bt-input-wrapper {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          background: #f3f4f6;
-          border-radius: 24px;
-          padding: 8px 8px 8px 16px;
-          border: 1px solid transparent;
-          transition: all 0.2s;
-        }
-        
-        .bt-input-wrapper:focus-within {
-          background: white;
-          border-color: ${this.config.primaryColor};
-          box-shadow: 0 0 0 2px ${this.config.primaryColor}20;
-        }
-        
-        .bt-input {
-          flex: 1;
-          border: none;
-          background: transparent;
-          outline: none;
-          font-size: 14px;
-          color: #1f2937;
-          min-height: 20px;
-          max-height: 100px;
-          resize: none;
-          padding: 0;
-          margin: 0;
-        }
-
-        .bt-input::placeholder { color: #9ca3af; }
-        
-        .bt-send-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          background: ${this.config.primaryColor};
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s;
-          flex-shrink: 0;
-        }
-        
-        .bt-send-btn:hover {
-          transform: scale(1.05);
-          filter: brightness(1.1);
-        }
-        
-        .bt-send-btn:disabled {
-          background: #d1d5db;
-          cursor: not-allowed;
-          transform: none;
-        }
-        
-        .bt-send-btn svg {
-          width: 16px;
-          height: 16px;
-          fill: white;
-          margin-left: 2px; /* Visual centering */
-        }
-        
-        /* Lead Form */
-        .bt-lead-form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            background: white;
-            padding: 16px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            margin-top: 8px;
-            align-self: flex-start;
-            width: 85%;
-        }
-
-        .bt-lead-input {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            font-size: 14px;
-            outline: none;
-        }
-        
-        .bt-lead-input:focus {
-            border-color: ${this.config.primaryColor};
-        }
-
-        .bt-lead-submit {
-            background: ${this.config.primaryColor};
-            color: white;
-            border: none;
-            padding: 8px;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        /* Mobile */
-        @media (max-width: 640px) {
-          .bt-chat-window {
-            width: 100%;
-            height: 100%;
-            max-height: 100%;
-            bottom: 0;
-            right: 0;
-            left: 0;
-            border-radius: 0;
-            z-index: 999999; /* On top of everything */
-          }
-          
-          .bt-bubble {
+  // Styles
+  const STYLES = `
+        #bt-root {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            z-index: 2147483647; /* Max z-index */
+            position: fixed;
             bottom: 20px;
             right: 20px;
-          }
-
-          .bt-chat-window.open ~ .bt-bubble {
-              display: none; /* Hide bubble when full screen open on mobile */
-          }
-           /* Close button on mobile within header maybe? For now user can use browser back or X if we add it */
+            line-height: 1.5;
         }
-      `;
-            document.head.appendChild(style);
-        },
+        
+        #bt-root * { box-sizing: border-box; }
 
-        adjustColor(color, amount) {
-            // Simple color adjustment (darken/lighten)
-            const num = parseInt(color.replace('#', ''), 16);
-            const r = Math.max(0, Math.min(255, (num >> 16) + amount));
-            const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
-            const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
-            return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-        },
-
-        createBubble() {
-            const bubble = document.createElement('div');
-            bubble.className = 'bt-bubble bt-chatbot';
-            bubble.innerHTML = `
-        <svg class="bt-chat-icon" viewBox="0 0 24 24">
-          <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
-        </svg>
-        <svg class="bt-close-icon" viewBox="0 0 24 24">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-        </svg>
-      `;
-
-            bubble.onclick = () => this.toggleChat();
-            document.body.appendChild(bubble);
-            this.elements = { bubble };
-        },
-
-        createChatWindow() {
-            const window = document.createElement('div');
-            window.className = 'bt-chat-window bt-chatbot';
-            window.innerHTML = `
-        <div class="bt-header">
-          <div class="bt-avatar">🤖</div>
-          <div class="bt-header-text">
-            <h3>Assistente AI</h3>
-            <p>Online • Risponde subito</p>
-          </div>
-        </div>
-        <div class="bt-messages"></div>
-        <div class="bt-input-container">
-          <div class="bt-input-wrapper">
-            <input type="text" class="bt-input" placeholder="Scrivi un messaggio..." />
-            <button class="bt-send-btn">
-              <svg viewBox="0 0 24 24">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      `;
-
-            document.body.appendChild(window);
-            this.elements.window = window;
-            this.elements.messages = window.querySelector('.bt-messages');
-            this.elements.input = window.querySelector('.bt-input');
-            this.elements.sendBtn = window.querySelector('.bt-send-btn');
-
-            this.elements.input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendMessage();
-                }
-            });
-
-            this.elements.sendBtn.onclick = () => this.sendMessage();
-        },
-
-        toggleChat() {
-            this.state.isOpen = !this.state.isOpen;
-            this.elements.bubble.classList.toggle('open');
-            this.elements.window.classList.toggle('open');
-
-            if (this.state.isOpen) {
-                this.elements.input.focus();
-                if (this.state.messages.length === 0 && !this.state.isThinking) {
-                    this.startConversation();
-                }
-            }
-        },
-
-        async startConversation() {
-            this.showThinking();
-            try {
-                const response = await fetch(`${this.config.apiUrl}/api/chatbot/start`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        botId: this.config.botId,
-                        sessionId: this.state.sessionId,
-                        pageContext: this.state.pageContext
-                    })
-                });
-
-                const data = await response.json();
-                this.hideThinking();
-
-                if (response.ok) {
-                    this.state.conversationId = data.conversationId;
-                    if (data.welcomeMessage) {
-                        this.addMessage('assistant', data.welcomeMessage);
-                    }
-                } else {
-                    console.error('Chatbot init error', data);
-                    this.addMessage('assistant', 'Errore di connessione. Riprova più tardi.');
-                }
-
-            } catch (error) {
-                this.hideThinking();
-                console.error('Failed to start conversation:', error);
-                this.addMessage('assistant', 'Mi dispiace, si è verificato un errore di rete.');
-            }
-        },
-
-        async sendMessage() {
-            const text = this.elements.input.value.trim();
-            if (!text || this.state.isThinking) return;
-
-            this.addMessage('user', text);
-            this.elements.input.value = '';
-            this.showThinking();
-
-            try {
-                const response = await fetch(`${this.config.apiUrl}/api/chatbot/message`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        conversationId: this.state.conversationId,
-                        message: text
-                    })
-                });
-
-                const data = await response.json();
-                this.hideThinking();
-
-                if (data.response) {
-                    this.addMessage('assistant', data.response);
-                }
-
-                if (data.shouldCaptureLead) {
-                    this.showLeadCapture();
-                }
-            } catch (error) {
-                this.hideThinking();
-                console.error('Failed to send message:', error);
-                this.addMessage('assistant', 'Mi dispiace, non ho ricevuto il messaggio. Riprova.');
-            }
-        },
-
-        async submitLead(e) {
-            e.preventDefault();
-            const email = e.target.elements.email.value;
-            const name = e.target.elements.name.value;
-            const form = e.target;
-
-            form.innerHTML = '<div style="text-align:center; padding: 10px;">Grazie! Ti contatteremo presto.</div>';
-
-            try {
-                // In a real app we'd have a specific endpoint or update candidate data
-                // leveraging the message/context update
-                await fetch(`${this.config.apiUrl}/api/chatbot/message`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        conversationId: this.state.conversationId,
-                        message: `[LEAD FORM SUBMITTED] Name: ${name}, Email: ${email}`,
-                        isHidden: true // hypothetical flag to not show in chat but process
-                    })
-                });
-            } catch (err) {
-                console.error("Lead submit error", err);
-            }
-        },
-
-        addMessage(role, content) {
-            const msg = { role, content, timestamp: Date.now() };
-            this.state.messages.push(msg);
-
-            const msgEl = document.createElement('div');
-            msgEl.className = `bt-message ${role}`;
-            msgEl.innerHTML = `
-        <div class="bt-message-content">${this.escapeHtml(content)}</div>
-      `;
-            // User avatar removed for cleaner look, Assistant avatar still in header
-
-            this.elements.messages.appendChild(msgEl);
-            this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
-        },
-
-        showThinking() {
-            this.state.isThinking = true;
-            this.elements.sendBtn.disabled = true;
-
-            const typing = document.createElement('div');
-            typing.className = 'bt-typing bt-typing-indicator';
-            typing.innerHTML = '<span></span><span></span>';
-            this.elements.messages.appendChild(typing);
-            this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
-        },
-
-        hideThinking() {
-            this.state.isThinking = false;
-            this.elements.sendBtn.disabled = false;
-            const typing = this.elements.messages.querySelector('.bt-typing-indicator');
-            if (typing) typing.remove();
-        },
-
-        showLeadCapture() {
-            const formId = `bt-lead-form-${Date.now()}`;
-            const formEl = document.createElement('form');
-            formEl.className = 'bt-lead-form';
-            formEl.id = formId;
-            formEl.innerHTML = `
-            <input type="text" name="name" class="bt-lead-input" placeholder="Il tuo nome" required />
-            <input type="email" name="email" class="bt-lead-input" placeholder="La tua email" required />
-            <button type="submit" class="bt-lead-submit">Invia Contatto</button>
-        `;
-
-            formEl.onsubmit = (e) => this.submitLead(e);
-            this.elements.messages.appendChild(formEl);
-            this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
-        },
-
-        escapeHtml(text) {
-            if (!text) return '';
-            // Support basic simple links
-            // const linkRegex = /(https?:\/\/[^\s]+)/g;
-            // return text.replace(linkRegex, '<a href="$1" target="_blank" style="color:inherit; text-decoration: underline;">$1</a>');
-
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        .bt-bubble {
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            background: linear-gradient(135deg, ${CONFIG.primaryColor}, #EA580C);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: absolute;
+            bottom: 0;
+            right: 0;
         }
-    };
 
-    // Expose globally
-    window.BusinessTuner = BusinessTunerChatbot;
-})();
+        .bt-bubble:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        }
+
+        .bt-bubble svg { width: 32px; height: 32px; color: white; }
+
+        .bt-window {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            width: 380px;
+            height: 600px;
+            max-height: calc(100vh - 100px);
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            border: 1px solid rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            pointer-events: none;
+            transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+        }
+
+        .bt-window.open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .bt-header {
+            padding: 16px 20px;
+            background: linear-gradient(to right, #FFF7ED, #FFF);
+            border-bottom: 1px solid #FED7AA;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .bt-title { font-weight: 600; color: #1F2937; font-size: 16px; }
+        .bt-status { font-size: 12px; color: #16A34A; display: flex; items-center; gap: 4px; }
+        .bt-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #16A34A; display: inline-block; margin-right: 4px; }
+
+        .bt-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #FAFAFA;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bt-msg {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            word-wrap: break-word;
+            animation: bt-fade-in 0.3s ease-out;
+        }
+
+        .bt-msg.user {
+            background: ${CONFIG.primaryColor};
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .bt-msg.assistant {
+            background: white;
+            color: #374151;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border: 1px solid #E5E7EB;
+        }
+
+        .bt-input-area {
+            padding: 16px;
+            background: white;
+            border-top: 1px solid #F3F4F6;
+            display: flex;
+            gap: 8px;
+        }
+
+        .bt-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #E5E7EB;
+            border-radius: 24px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .bt-input:focus { border-color: ${CONFIG.primaryColor}; }
+
+        .bt-send {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: transparent;
+            color: ${CONFIG.primaryColor};
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .bt-send:hover { background: #FFF7ED; }
+        .bt-send svg { width: 20px; height: 20px; }
+
+        .bt-typing { 
+            display: flex; gap: 4px; padding: 12px 16px; 
+            background: white; border-radius: 12px;
+            align-self: flex-start;
+            width: fit-content;
+        }
+        .bt-dot { width: 6px; height: 6px; background: #9CA3AF; border-radius: 50%; animation: bt-bounce 1.4s infinite; }
+        .bt-dot:nth-child(2) { animation-delay: 0.2s; }
+        .bt-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bt-fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bt-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        
+        @media (max-width: 480px) {
+            .bt-window { width: calc(100vw - 40px); bottom: 90px; height: calc(100vh - 120px); }
+        }
+    `;
+
+  class BusinessTunerBot {
+    constructor() {
+      this.isOpen = false;
+      this.conversationId = localStorage.getItem(`bt_cid_${CONFIG.botId}`);
+      this.messages = [];
+      this.isTyping = false;
+
+      this.init();
+    }
+
+    init() {
+      this.injectStyles();
+      this.createUI();
+
+      if (this.conversationId) {
+        this.loadHistory();
+      } else {
+        this.startNewConversation();
+      }
+    }
+
+    injectStyles() {
+      const style = document.createElement('style');
+      style.textContent = STYLES;
+      document.head.appendChild(style);
+    }
+
+    createUI() {
+      this.root = document.createElement('div');
+      this.root.id = 'bt-root';
+
+      this.root.innerHTML = `
+                <div class="bt-window" id="bt-window">
+                    <div class="bt-header">
+                        <div>
+                            <div class="bt-title">Assistente AI</div>
+                            <div class="bt-status">Online</div>
+                        </div>
+                        <button style="background:none; border:none; cursor:pointer;" onclick="window.BusinessTuner.toggle()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                    <div class="bt-messages" id="bt-messages"></div>
+                    <form class="bt-input-area" id="bt-form">
+                        <input type="text" class="bt-input" placeholder="Scrivi un messaggio..." id="bt-input">
+                        <button type="submit" class="bt-send">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        </button>
+                    </form>
+                </div>
+                <div class="bt-bubble" onclick="window.BusinessTuner.toggle()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                    </svg>
+                </div>
+            `;
+
+      document.body.appendChild(this.root);
+
+      this.dom = {
+        window: this.root.querySelector('#bt-window'),
+        messages: this.root.querySelector('#bt-messages'),
+        input: this.root.querySelector('#bt-input'),
+        form: this.root.querySelector('#bt-form')
+      };
+
+      this.dom.form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.sendMessage();
+      });
+    }
+
+    toggle() {
+      this.isOpen = !this.isOpen;
+      this.dom.window.classList.toggle('open', this.isOpen);
+      if (this.isOpen) setTimeout(() => this.dom.input.focus(), 100);
+    }
+
+    appendMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `bt-msg ${role}`;
+      div.innerHTML = text.replace(/\n/g, '<br>'); // Simple formatting
+      this.dom.messages.appendChild(div);
+      this.dom.messages.scrollTop = this.dom.messages.scrollHeight;
+    }
+
+    setTyping(typing) {
+      if (typing) {
+        if (this.typingEl) return;
+        this.typingEl = document.createElement('div');
+        this.typingEl.className = 'bt-typing';
+        this.typingEl.innerHTML = '<div class="bt-dot"></div><div class="bt-dot"></div><div class="bt-dot"></div>';
+        this.dom.messages.appendChild(this.typingEl);
+        this.dom.messages.scrollTop = this.dom.messages.scrollHeight;
+      } else {
+        if (this.typingEl) {
+          this.typingEl.remove();
+          this.typingEl = null;
+        }
+      }
+    }
+    async startNewConversation() {
+      try {
+        // Generate or retrieve Session ID (Browser Fingerprint)
+        let sessionId = localStorage.getItem('bt_sid');
+        if (!sessionId) {
+          sessionId = 's_' + Math.random().toString(36).substr(2, 9);
+          localStorage.setItem('bt_sid', sessionId);
+        }
+
+        const res = await fetch(`${CONFIG.apiBase}/api/chatbot/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            botId: CONFIG.botId,
+            sessionId: sessionId,
+            pageContext: {
+              url: window.location.href,
+              title: document.title
+            }
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.error) {
+          console.error('BusinessTuner Bot Error:', data.error);
+          return;
+        }
+
+        this.conversationId = data.conversationId;
+        localStorage.setItem(`bt_cid_${CONFIG.botId}`, this.conversationId);
+
+        if (data.welcomeMessage) {
+          this.appendMessage('assistant', data.welcomeMessage);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    async loadHistory() {
+      // Restore previous messages? For now just reset if expired or keep local array?
+      // Simple MVP: Just start fresh visually but keep ID.
+      // Ideally fetch history.
+      // For now, assume fresh session visually.
+      // Or maybe start new if session is old.
+    }
+
+    async sendMessage(text = null, hidden = false) {
+      const content = text || this.dom.input.value.trim();
+      if (!content) return;
+
+      if (!hidden) {
+        this.appendMessage('user', content);
+        this.dom.input.value = '';
+      }
+
+      this.setTyping(true);
+
+      try {
+        const res = await fetch(`${CONFIG.apiBase}/api/chatbot/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId: this.conversationId,
+            message: content,
+            isHidden: hidden
+          })
+        });
+
+        const data = await res.json();
+        this.setTyping(false);
+
+        if (data.response) {
+          this.appendMessage('assistant', data.response);
+        }
+      } catch (e) {
+        this.setTyping(false);
+        if (!hidden) this.appendMessage('assistant', '⚠️ Errore di connessione. Riprova.');
+      }
+    }
+  }
+
+  // Expose global instance
+  window.BusinessTuner = new BusinessTunerBot();
+
+})(window);

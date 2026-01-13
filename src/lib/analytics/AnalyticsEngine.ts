@@ -12,20 +12,27 @@ export interface UnifiedInsight {
     reasoning: string;
 }
 
+export interface UnifiedStats {
+    totalConversations: number;
+    totalMessages: number;
+    avgSentiment: number;
+    avgDuration: number; // in seconds
+    completionRate: number;
+    trends: MetricTrend[];
+}
+
 export interface MetricTrend {
     date: string;
-    chatbotSentiment: number;
-    interviewSentiment: number;
-    combinedSentiment: number;
     volume: number;
+    sentiment: number;
 }
 
 export class AnalyticsEngine {
 
     /**
-     * Aggregates data for a given Project to generate unified insights.
+     * Aggregates data for a given Project to generate unified insights and stats.
      */
-    static async generateProjectInsights(projectId: string, botIds?: string[]): Promise<UnifiedInsight[]> {
+    static async generateProjectInsights(projectId: string, botIds?: string[]): Promise<{ insights: UnifiedInsight[], stats: UnifiedStats }> {
         // 1. Fetch all bots in the project
         const whereClause: any = { projectId };
 
@@ -38,41 +45,97 @@ export class AnalyticsEngine {
             include: {
                 conversations: {
                     orderBy: { startedAt: 'desc' },
-                    take: 100, // Analyze last 100 conversations per bot for relevance
+                    // Analyze last 30 days for stats
+                    where: { startedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
                     include: {
                         themeOccurrences: { include: { theme: true } },
-                        analysis: true
+                        analysis: true,
+                        messages: { select: { id: true } } // needed for counting
                     }
                 }
             }
         });
 
-        const insights: UnifiedInsight[] = [];
+        const allConversations = bots.flatMap(b => b.conversations);
         const chatbotConversations = bots.filter((b: any) => b.botType === 'chatbot').flatMap(b => b.conversations);
-        const interviewConversations = bots.filter((b: any) => b.botType === 'interview').flatMap(b => b.conversations);
+        const interviewConversations = bots.filter((b: any) => b.botType === 'interview' || !b.botType).flatMap(b => b.conversations);
+
+        // --- Calculate Stats ---
+        const totalConversations = allConversations.length;
+        const totalMessages = allConversations.reduce((acc, c) => acc + c.messages.length, 0);
+
+        // Sentiment averaging
+        const sentimentScores = allConversations
+            .map(c => c.analysis?.sentimentScore)
+            .filter(s => s !== undefined && s !== null) as number[];
+        const avgSentiment = sentimentScores.length > 0
+            ? sentimentScores.reduce((a, b) => a + b, 0) / sentimentScores.length
+            : 0;
+
+        // Duration & Completion
+        const completedConvos = allConversations.filter(c => c.status === 'COMPLETED' || c.completedAt);
+        const completionRate = totalConversations > 0 ? (completedConvos.length / totalConversations) * 100 : 0;
+
+        const durations = completedConvos
+            .map(c => c.completedAt && c.startedAt ? (new Date(c.completedAt).getTime() - new Date(c.startedAt).getTime()) / 1000 : 0)
+            .filter(d => d > 0);
+        const avgDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
+
+        // --- Calculate Trends (Daily) ---
+        const trendsMap = new Map<string, { volume: number, sentimentSum: number, sentimentCount: number }>();
+
+        // Initialize last 30 days
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateKey = d.toISOString().split('T')[0];
+            trendsMap.set(dateKey, { volume: 0, sentimentSum: 0, sentimentCount: 0 });
+        }
+
+        allConversations.forEach(c => {
+            if (c.startedAt) {
+                const dateKey = new Date(c.startedAt).toISOString().split('T')[0];
+                if (trendsMap.has(dateKey)) {
+                    const entry = trendsMap.get(dateKey)!;
+                    entry.volume++;
+                    if (c.analysis?.sentimentScore !== undefined && c.analysis.sentimentScore !== null) {
+                        entry.sentimentSum += c.analysis.sentimentScore;
+                        entry.sentimentCount++;
+                    }
+                }
+            }
+        });
+
+        const trends: MetricTrend[] = Array.from(trendsMap.entries()).map(([date, data]) => ({
+            date: new Date(date).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric' }),
+            volume: data.volume,
+            sentiment: data.sentimentCount > 0 ? (data.sentimentSum / data.sentimentCount) * 100 : 0
+        }));
+
+
+        // --- Generate Insights ---
+        const insights: UnifiedInsight[] = [];
 
         // 2. Identify Hot Topics in Chatbot (Reactive) -> Suggest Interview Questions (Proactive)
         const chatbotThemes = this.extractThemes(chatbotConversations);
 
         chatbotThemes.forEach(theme => {
-            // Logic: If users ask frequently about X, but we don't have deep qualitative data on X from interviews
             if (theme.frequency > 5 && !this.isCoveredInInterviews(theme.name, interviewConversations)) {
                 insights.push({
                     type: 'INTERVIEW_QUESTION',
-                    title: `Indaga su "${theme.name}"`,
-                    description: `Gli utenti del sito chiedono spesso di "${theme.name}". Aggiungi una domanda specifica nelle tue interviste per capire meglio le loro esigenze.`,
+                    title: `Nuova domanda su "${theme.name}"`,
+                    description: `Molti utenti chiedono informazioni su "${theme.name}". Aggiungi una domanda alle interviste per approfondire.`,
                     confidence: 0.85,
                     source: 'CHATBOT',
-                    reasoning: `Alta frequenza nel chatbot (${theme.frequency} occorrenze) ma bassa copertura nelle interviste.`
+                    reasoning: `Tema frequente nel chatbot (${theme.frequency} volte) ma assente nelle interviste.`
                 });
             }
 
-            // Logic: High volume + Low Sentiment -> Content Gap
             if (theme.frequency > 3 && theme.sentiment < 0) {
                 insights.push({
-                    type: 'CONTENT_SUGGESTION',
-                    title: `Scrivi un articolo su "${theme.name}"`,
-                    description: `C'è confusione o frustrazione riguardo "${theme.name}". Pubblica una guida chiara o un post sul blog per chiarire.`,
+                    type: 'KB_UPDATE',
+                    title: `Aggiorna FAQ: "${theme.name}"`,
+                    description: `Gli utenti sembrano confusi o insoddisfatti riguardo "${theme.name}". Crea una FAQ chiara e rassicurante.`,
                     confidence: 0.9,
                     source: 'CHATBOT',
                     reasoning: `Sentiment negativo rilevato su un tema frequente.`
@@ -80,34 +143,43 @@ export class AnalyticsEngine {
             }
         });
 
-        // 3. Identify Pain Points in Interviews (Deep) -> Suggest KB Updates (Immediate Fix)
+        // 3. Interview Insights -> Marketing & Social
         const interviewThemes = this.extractThemes(interviewConversations);
 
         interviewThemes.forEach(theme => {
-            if (theme.sentiment < -0.3) {
-                insights.push({
-                    type: 'KB_UPDATE',
-                    title: `Aggiorna Knowledge Base su "${theme.name}"`,
-                    description: `Dalle interviste emerge che "${theme.name}" è un punto critico. Assicurati che il chatbot abbia risposte rassicuranti e complete su questo.`,
-                    confidence: 0.95,
-                    source: 'INTERVIEW',
-                    reasoning: `Sentiment molto negativo (${theme.sentiment.toFixed(2)}) rilevato nelle interviste di profondità.`
-                });
-            }
-
-            if (theme.sentiment > 0.7 && theme.frequency > 5) {
+            if (theme.sentiment > 0.6) {
                 insights.push({
                     type: 'AD_CAMPAIGN',
-                    title: `Lancia una campagna su "${theme.name}"`,
-                    description: `I clienti adorano "${theme.name}". Usa questo levearage nelle tue campagne pubblicitarie.`,
+                    title: `Post Social: "${theme.name}"`,
+                    description: `I clienti apprezzano molto "${theme.name}". Crea un post social o una campagna che evidenzi questo punto di forza.`,
                     confidence: 0.8,
                     source: 'INTERVIEW',
-                    reasoning: `Sentiment eccellente e alta menzione spontanea nelle interviste.`
+                    reasoning: `Punto di forza emerso dalle interviste (Sentiment: ${(theme.sentiment * 100).toFixed(0)}%).`
+                });
+            }
+            if (theme.frequency > 3 && theme.sentiment < -0.2) {
+                insights.push({
+                    type: 'CONTENT_SUGGESTION',
+                    title: `Contenuto Sito: Risolvi "${theme.name}"`,
+                    description: `È emersa una frizione ricorrente su "${theme.name}". Crea un banner o una sezione "Come funziona" dedicata sul sito.`,
+                    confidence: 0.85,
+                    source: 'INTERVIEW',
+                    reasoning: `Problema ricorrente identificato nelle interviste.`
                 });
             }
         });
 
-        return insights;
+        return {
+            stats: {
+                totalConversations,
+                totalMessages,
+                avgSentiment: avgSentiment * 100, // Scale to 0-100
+                avgDuration,
+                completionRate,
+                trends
+            },
+            insights
+        };
     }
 
     // --- Helper Methods ---
@@ -120,11 +192,9 @@ export class AnalyticsEngine {
                 const current = themeMap.get(t.theme.name) || { count: 0, totalSentiment: 0 };
                 themeMap.set(t.theme.name, {
                     count: current.count + 1,
-                    totalSentiment: current.totalSentiment + (t.strengthScore || 0) // Assuming strengthScore correlates to sentiment or using conversation sentiment relies on improved schema
+                    totalSentiment: current.totalSentiment + (t.strengthScore || 0)
                 });
             });
-
-            // Fallback if no extracted themes yet: use metadata or manual keywords (simplified for POC)
         });
 
         return Array.from(themeMap.entries()).map(([name, data]) => ({
@@ -135,7 +205,6 @@ export class AnalyticsEngine {
     }
 
     private static isCoveredInInterviews(topicInfo: string, interviews: any[]): boolean {
-        // Simple check: does the topic appear in interview themes?
         return interviews.some(i =>
             i.themeOccurrences.some((t: any) => t.theme.name.toLowerCase().includes(topicInfo.toLowerCase()))
         );

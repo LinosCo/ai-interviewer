@@ -21,7 +21,7 @@ export async function GET(
         }
 
         // Generate insights using the engine
-        const { searchParams } = new URL(request.url);
+        const { searchParams } = new URL(req.url);
         const botIdsParam = searchParams.get('botIds');
         const botIds = botIdsParam ? botIdsParam.split(',') : undefined;
 

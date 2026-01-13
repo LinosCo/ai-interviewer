@@ -76,6 +76,15 @@ export async function POST(req: Request) {
                 supervisorInsight = { status: 'DATA_COLLECTION' };
             } else {
                 try {
+                    // Calculate remaining time for adaptive depth
+                    const maxDurationMins = conversation.bot.maxDurationMins || 10;
+                    const elapsedMins = Math.floor((Number(effectiveDuration || conversation.effectiveDuration) || 0) / 60);
+                    const remainingMins = maxDurationMins - elapsedMins;
+
+                    // Calculate how many topics are left in DEEP
+                    const topicsRemaining = currentPhase === 'DEEP' ? (botTopics.length - currentIndex) : botTopics.length;
+                    const timePerTopic = remainingMins / (topicsRemaining || 1);
+
                     const insight = await TopicManager.evaluateTopicProgress(
                         messages as any[],
                         currentTopic,
@@ -83,6 +92,7 @@ export async function POST(req: Request) {
                         currentPhase // Pass phase to TopicManager
                         , (conversation.bot as any).collectCandidateData // isRecruiting (Pass correct param)
                         , conversation.bot.language // Language
+                        , timePerTopic // NEW: time budget per topic
                     );
                     supervisorInsight = insight as any;
 
@@ -366,6 +376,20 @@ All interview topics are complete.
         if (!systemPrompt.includes("PHASE")) {
             systemPrompt += `\n\nCURRENT INTERVIEW PHASE: ${currentPhase}\n` +
                 (currentPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history. Reference specific user details.");
+
+            // INJECT TIME PRESSURE
+            if (currentPhase === 'DEEP' && supervisorInsight.status !== 'TRANSITION') {
+                const maxDurationMins = conversation.bot.maxDurationMins || 10;
+                const elapsedMins = Math.floor((Number(effectiveDuration || conversation.effectiveDuration) || 0) / 60);
+                const remainingMins = maxDurationMins - elapsedMins;
+                // Rough estimate of remaining topics
+                const topicsRemaining = botTopics.length - currentIndex;
+                const budgetPerTopic = remainingMins / (topicsRemaining || 1);
+
+                if (budgetPerTopic < 2.0 && remainingMins > 0) {
+                    systemPrompt += `\n\n⚠️ TIME ALERT: You have very limited time left (${budgetPerTopic.toFixed(1)} mins for this topic). ASK ONLY ONE FINAL QUESTION for this topic. Make it count, then we must move on. Be concise.`;
+                }
+            }
         }
 
         // Final Global Reinforcement

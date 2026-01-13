@@ -344,7 +344,7 @@ ${primaryInstruction}
     }
 
     /**
-     * 5. Transition Prompt (NEW):
+     * 5. Transition Prompt:
      * Used when the system decides to switch topics in a single turn.
      */
     static buildTransitionPrompt(
@@ -409,6 +409,76 @@ ${nextTopic.subGoals.map(g => `- ${g}`).join('\n')}
 4. The question should feel natural and flow from the conversation
 5. Be conversational but direct - get to the question quickly
 `.trim();
+    }
+
+    /**
+     * 6. Bridge Prompt (Scan -> Deep):
+     * Explicit instruction to bridge the gap between phases.
+     */
+    static buildBridgePrompt(firstTopic: TopicBlock, language: string = 'en'): string {
+        const isItalian = language === 'it';
+        return isItalian ? `
+## TRANSIZIONE ALLA FASE DEEP DIVE (APPROFONDIMENTO)
+Abbiamo completato la panoramica generale (Scanning).
+Ora ripartiamo dal primo tema: "${firstTopic.label}".
+
+**ISTRUZIONI PER L'INTERVISTATORE**:
+1. Spiega chiaramente all'utente: "Abbiamo finito la panoramica veloce. Ora vorrei tornare su alcuni punti interessanti che hai menzionato per andare più a fondo."
+2. Inizia col primo tema: "${firstTopic.label}".
+3. **REGOLA D'ORO**: Cita un dettaglio specifico che l'utente ha detto prima riguardo a questo tema. Mostra di aver memorizzato le sue risposte precedenti.
+4. Chiedi di approfondire quel dettaglio specifico.
+` : `
+## TRANSITION TO DEEP DIVE PHASE
+We have finished the general overview (Scanning).
+Now we restart from the first topic: "${firstTopic.label}".
+
+**INSTRUCTIONS FOR THE INTERVIEWER**:
+1. Explicitly state to the user: "We've finished the quick overview. Now I'd like to revisit a few interesting points you mentioned earlier to explore them in more depth."
+2. Start with the first topic: "${firstTopic.label}".
+3. **GOLDEN RULE**: Quote a specific detail the user mentioned earlier regarding this topic. Show that you remembered their previous answers.
+4. Ask to delve deeper into that specific detail.
+`;
+    }
+
+    /**
+     * 7. Soft Offer Prompt (End -> Data Collection):
+     * Polite transition to ask for contact details.
+     */
+    static buildSoftOfferPrompt(language: string = 'en'): string {
+        const isItalian = language === 'it';
+        return isItalian ? `
+## TRANSIZIONE CRITICA: RICHIESTA DATI DI CONTATTO
+Il tempo/turni dell'intervista sono esauriti o i temi sono completati.
+
+**ISTRUZIONI OBBLIGATORIE**:
+1. **RINGRAZIAMENTO**: Ringrazia sinceramente per il tempo dedicato
+2. **COMUNICAZIONE CHIARA**: Spiega che l'intervista è conclusa
+3. **RICHIESTA DIRETTA E CORDIALE**: Chiedi i dati di contatto in modo diretto ma amichevole
+   - NON essere vago: "Vorrei chiederti i tuoi dati di contatto"
+   - NON dire "se vuoi", "magari", "eventualmente"
+   - SPIEGA IL PERCHÉ: "per poterti ricontattare/per restare in contatto"
+4. **ASPETTA CONFERMA**: Attendi che l'utente confermi prima di chiedere campi specifici
+5. Tono: Professionale ma caloroso, come un recruiter
+
+**STRUTTURA ESEMPIO**:
+"[Nome], ti ringrazio molto per il tempo che hai dedicato a questa conversazione. Siamo arrivati alla conclusione, ma vorrei davvero restare in contatto con te. Posso chiederti i tuoi dati di contatto?"
+` : `
+## CRITICAL TRANSITION: REQUEST CONTACT DATA
+Interview time/turns limit reached or topics completed.
+
+**MANDATORY INSTRUCTIONS**:
+1. **THANK YOU**: Sincerely thank them for their time
+2. **CLEAR COMMUNICATION**: Explain the interview concluded
+3. **DIRECT & FRIENDLY REQUEST**: Ask for contact details directly but warmly
+   - DO NOT be vague: "I'd like to ask for your contact details"
+   - DO NOT say "if you want", "maybe", "possibly"
+   - EXPLAIN WHY: "so we can follow up/stay in touch"
+4. **WAIT FOR CONFIRMATION**: Wait for user to confirm before asking specific fields
+5. Tone: Professional but warm, like a recruiter
+
+**EXAMPLE STRUCTURE**:
+"[Name], thank you so much for the time you've dedicated to this conversation. We've reached the end, but I'd really like to stay in touch with you. May I ask for your contact details?"
+`;
     }
 
     /**

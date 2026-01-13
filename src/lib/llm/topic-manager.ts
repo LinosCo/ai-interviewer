@@ -157,4 +157,50 @@ OUTPUT format:
             return { status: 'TRANSITION', reason: 'Error in evaluation' };
         }
     }
+
+    /**
+     * Checks if the user's message indicates consent to data collection.
+     * Uses LLM for robust intent classification instead of brittle keywords.
+     */
+    static async checkConsent(
+        userMessage: string,
+        apiKey: string,
+        language: string = 'en'
+    ): Promise<'CONSENT' | 'REFUSAL' | 'NEUTRAL'> {
+        const schema = z.object({
+            intent: z.enum(['CONSENT', 'REFUSAL', 'NEUTRAL']),
+            reason: z.string()
+        });
+
+        const prompt = `
+You are evaluating a user's response to a request for contact details (recruiting/follow-up).
+User Language: ${language}
+User Message: "${userMessage}"
+
+CONTEXT: The system just asked: "May I ask for your contact details?"
+
+CLASSIFY INTENT:
+- CONSENT: User agrees ("Yes", "Sure", "Why not", "Go ahead", "Ok", "Va bene", "Certo").
+- REFUSAL: User declines ("No", "I'd rather not", "Maybe later", "Non voglio").
+- NEUTRAL: Users asks a question or says something unrelated.
+
+OUTPUT JSON: { intent, reason }
+`.trim();
+
+        try {
+            const openai = createOpenAI({ apiKey });
+            const result = await generateObject({
+                model: openai('gpt-4o-mini'), // Fast & Cheap
+                schema,
+                prompt,
+                temperature: 0
+            });
+
+            console.log(`🛡️ [TopicManager] Consent Check: ${result.object.intent} ("${userMessage.substring(0, 20)}...")`);
+            return result.object.intent;
+        } catch (e) {
+            console.error("Consent check failed", e);
+            return 'NEUTRAL'; // Fail safe
+        }
+    }
 }

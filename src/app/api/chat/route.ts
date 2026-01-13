@@ -147,40 +147,8 @@ export async function POST(req: Request) {
                 isTransitioning = true;
 
                 // Direct Transition to Data Collection
-                const isItalian = conversation.bot.language === 'it';
-                const softOfferInstruction = isItalian ? `
-## TRANSIZIONE CRITICA: RICHIESTA DATI DI CONTATTO
-Il tempo/turni dell'intervista sono esauriti.
+                const softOfferInstruction = PromptBuilder.buildSoftOfferPrompt(conversation.bot.language || 'en');
 
-**ISTRUZIONI OBBLIGATORIE**:
-1. **RINGRAZIAMENTO**: Ringrazia sinceramente per il tempo dedicato
-2. **COMUNICAZIONE CHIARA**: Spiega che l'intervista è conclusa per limiti temporali
-3. **RICHIESTA DIRETTA E CORDIALE**: Chiedi i dati di contatto in modo diretto ma amichevole
-   - NON essere vago: "Vorrei chiederti i tuoi dati di contatto"
-   - NON dire "se vuoi", "magari", "eventualmente"
-   - SPIEGA IL PERCHÉ: "per poterti ricontattare/per restare in contatto"
-4. **ASPETTA CONFERMA**: Attendi che l'utente confermi prima di chiedere campi specifici
-5. Tono: Professionale ma caloroso, come un recruiter
-
-**STRUTTURA ESEMPIO**:
-"[Nome], ti ringrazio molto per il tempo che hai dedicato a questa conversazione. Purtroppo abbiamo esaurito il tempo a disposizione, ma vorrei davvero restare in contatto con te. Posso chiederti i tuoi dati di contatto?"
-` : `
-## CRITICAL TRANSITION: REQUEST CONTACT DATA
-Interview time/turns limit reached.
-
-**MANDATORY INSTRUCTIONS**:
-1. **THANK YOU**: Sincerely thank them for their time
-2. **CLEAR COMMUNICATION**: Explain the interview concluded due to time limits
-3. **DIRECT & FRIENDLY REQUEST**: Ask for contact details directly but warmly
-   - DO NOT be vague: "I'd like to ask for your contact details"
-   - DO NOT say "if you want", "maybe", "possibly"
-   - EXPLAIN WHY: "so we can follow up/stay in touch"
-4. **WAIT FOR CONFIRMATION**: Wait for user to confirm before asking specific fields
-5. Tone: Professional but warm, like a recruiter
-
-**EXAMPLE STRUCTURE**:
-"[Name], thank you so much for the time you've dedicated to this conversation. Unfortunately we've reached our time limit, but I'd really like to stay in touch with you. May I ask for your contact details?"
-`;
                 systemPrompt = await PromptBuilder.build(
                     conversation.bot,
                     conversation,
@@ -232,28 +200,11 @@ Interview time/turns limit reached.
                     isTransitioning = true;
 
                     // Build a "Bridging" System Prompt
-                    const isItalian = conversation.bot.language === 'it';
-                    const bridgeInstruction = isItalian ? `
-## TRANSIZIONE ALLA FASE DEEP DIVE (APPROFONDIMENTO)
-Abbiamo completato la panoramica generale (Scanning).
-Ora ripartiamo dal primo tema: "${botTopics[0].label}".
+                    const bridgeInstruction = PromptBuilder.buildBridgePrompt(
+                        botTopics[0],
+                        conversation.bot.language || 'en'
+                    );
 
-**ISTRUZIONI PER L'INTERVISTATORE**:
-1. Spiega chiaramente all'utente: "Abbiamo finito la panoramica veloce. Ora vorrei tornare su alcuni punti interessanti che hai menzionato per andare più a fondo."
-2. Inizia col primo tema: "${botTopics[0].label}".
-3. **REGOLA D'ORO**: Cita un dettaglio specifico che l'utente ha detto prima riguardo a questo tema. Mostra di aver memorizzato le sue risposte precedenti.
-4. Chiedi di approfondire quel dettaglio specifico.
-` : `
-## TRANSITION TO DEEP DIVE PHASE
-We have finished the general overview (Scanning).
-Now we restart from the first topic: "${botTopics[0].label}".
-
-**INSTRUCTIONS FOR THE INTERVIEWER**:
-1. Explicitly state to the user: "We've finished the quick overview. Now I'd like to revisit a few interesting points you mentioned earlier to explore them in more depth."
-2. Start with the first topic: "${botTopics[0].label}".
-3. **GOLDEN RULE**: Quote a specific detail the user mentioned earlier regarding this topic. Show that you remembered their previous answers.
-4. Ask to delve deeper into that specific detail.
-`;
                     systemPrompt = await PromptBuilder.build(
                         conversation.bot,
                         conversation,
@@ -272,40 +223,8 @@ Now we restart from the first topic: "${botTopics[0].label}".
                         nextPhase = 'DATA_COLLECTION';
                         isTransitioning = true;
 
-                        const isItalian = conversation.bot.language === 'it';
-                        const dataInstruction = isItalian ? `
-## TRANSIZIONE CRITICA: PASSAGGIO A RACCOLTA DATI
-Abbiamo completato tutti i temi dell'intervista.
+                        const dataInstruction = PromptBuilder.buildSoftOfferPrompt(conversation.bot.language || 'en');
 
-**ISTRUZIONI OBBLIGATORIE**:
-1. Ringrazia calorosamente l'utente per il tempo dedicato
-2. **COMUNICAZIONE ESPLICITA**: Devi dire chiaramente che l'intervista di contenuto è finita
-3. **RICHIESTA DIRETTA**: Chiedi DIRETTAMENTE se vuole lasciare i suoi dati di contatto
-   - NON essere vago o timido
-   - NON dire "se ti va", "magari", "eventualmente"
-   - DI': "Vorrei chiederti i tuoi dati di contatto per restare in contatto"
-4. **ASPETTA CONSENSO**: Non chiedere subito i campi specifici, aspetta che confermi interesse
-5. Tono: Cordiale ma professionale, come un recruiter
-
-**ESEMPIO**:
-"Perfetto! Abbiamo finito con le domande di contenuto. Ti ringrazio davvero per il tempo e gli spunti preziosi che hai condiviso. Prima di salutarci, vorrei chiederti i tuoi dati di contatto per poterti ricontattare. Ti va?"
-` : `
-## CRITICAL TRANSITION: MOVE TO DATA COLLECTION
-All interview topics are complete.
-
-**MANDATORY INSTRUCTIONS**:
-1. Warmly thank the user for their time
-2. **EXPLICIT COMMUNICATION**: Clearly state that the content interview is finished
-3. **DIRECT REQUEST**: Ask DIRECTLY if they want to leave contact details
-   - DO NOT be vague or shy
-   - DO NOT say "if you'd like", "maybe", "possibly"
-   - SAY: "I'd like to ask for your contact details to stay in touch"
-4. **WAIT FOR CONSENT**: Don't ask for specific fields yet, wait for them to confirm interest
-5. Tone: Friendly but professional, like a recruiter
-
-**EXAMPLE**:
-"Great! We've finished with the content questions. Thank you so much for your time and the valuable insights you've shared. Before we wrap up, I'd like to ask for your contact details so we can follow up. Would that work for you?"
-`;
                         systemPrompt = await PromptBuilder.build(
                             conversation.bot,
                             conversation,
@@ -445,15 +364,30 @@ All interview topics are complete.
         // 7.5. Check if user consented to data collection (if we asked but haven't started collecting yet)
         if (nextPhase === 'DATA_COLLECTION' && currentPhase === 'DATA_COLLECTION' && !isTransitioning) {
             // We're in DATA_COLLECTION but haven't transitioned yet - check if this is consent
-            const lastUserMsg = lastMessage?.content?.toLowerCase() || '';
-            const consentKeywords = ['sì', 'si', 'yes', 'ok', 'certo', 'volentieri', 'va bene', 'sure', 'yeah', 'va benissimo', 'perfetto', 'certamente'];
-            const hasConsented = consentKeywords.some(keyword => lastUserMsg.includes(keyword));
+            const lastUserMsg = lastMessage?.content || '';
 
-            if (hasConsented && lastUserMsg.length < 100) {
+            // USE ROBUST LLM CHECK
+            const userIntent = await TopicManager.checkConsent(
+                lastUserMsg,
+                openAIKey,
+                conversation.bot.language || 'en'
+            );
+
+            if (userIntent === 'CONSENT') {
                 // User gave consent - mark as transitioning to actually start collecting
-                console.log("✅ [CHAT] User consented to data collection. Starting field collection.");
+                console.log("✅ [CHAT] User consented to data collection (LLM verified). Starting field collection.");
                 isTransitioning = true;
+            } else if (userIntent === 'REFUSAL') {
+                // User refused - end interview
+                console.log("❌ [CHAT] User refused data collection. Ending.");
+                await ChatService.completeInterview(conversationId);
+                return Response.json({
+                    text: (conversation.bot.language === 'it' ? "Va bene, nessun problema. Grazie ancora per il tuo tempo!" : "Alright, no problem. Thank you again for your time!") + " INTERVIEW_COMPLETED",
+                    isCompleted: true,
+                    currentTopicId: conversation.currentTopicId
+                });
             }
+            // If NEUTRAL, do nothing (let the AI reply normally to clarify)
         }
 
         // 8. Updates

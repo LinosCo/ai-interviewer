@@ -44,6 +44,7 @@ export async function POST(req: Request) {
         // 4. Check Limits
         const statusCheck = await ChatService.checkLimits(conversationId);
         const shouldCollectData = (conversation.bot as any).collectCandidateData;
+        console.log("🔍 [CHAT] Limits Check:", { shouldConclude: statusCheck.shouldConclude, shouldCollectData });
 
         // Check time/turn limits - force end if exceeded
         if (statusCheck.shouldConclude && currentPhase !== 'DATA_COLLECTION') {
@@ -373,12 +374,18 @@ All interview topics are complete.
         // But the client should always send at least the intro message if it exists.
 
         // Inject Phase context into system prompt if generic
+        // FIX: Use nextPhase to avoid conflict if transitioning (e.g. DEEP -> DATA)
         if (!systemPrompt.includes("PHASE")) {
-            systemPrompt += `\n\nCURRENT INTERVIEW PHASE: ${currentPhase}\n` +
-                (currentPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history. Reference specific user details.");
+            // If transitioning to DATA_COLLECTION, don't inject the standard SCAN/DEEP prompts
+            if (nextPhase === 'DATA_COLLECTION') {
+                systemPrompt += `\n\nCURRENT INTERVIEW PHASE: DATA_COLLECTION\nGoal: Securely collect candidate contact details. Be professional and reassuring.`;
+            } else {
+                systemPrompt += `\n\nCURRENT INTERVIEW PHASE: ${nextPhase}\n` +
+                    (nextPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history. Reference specific user details.");
+            }
 
-            // INJECT TIME PRESSURE
-            if (currentPhase === 'DEEP' && supervisorInsight.status !== 'TRANSITION') {
+            // INJECT TIME PRESSURE (Only in DEEP phase loop)
+            if (nextPhase === 'DEEP' && supervisorInsight.status !== 'TRANSITION' && !isTransitioning) {
                 const maxDurationMins = conversation.bot.maxDurationMins || 10;
                 const elapsedMins = Math.floor((Number(effectiveDuration || conversation.effectiveDuration) || 0) / 60);
                 const remainingMins = maxDurationMins - elapsedMins;

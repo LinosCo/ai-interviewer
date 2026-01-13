@@ -81,7 +81,9 @@ OUTPUT format:
             // TIME BUDGET LOGIC
             // If we have very little time allocated (< 2 mins), we must be extremely strict.
             const isHurried = timeBudget !== undefined && timeBudget < 2;
-            const maxQuestions = isHurried ? 1 : 2; // Reduce max questions if hurried
+            // PREVIOUS SCAN (approx 2 msgs) + NEW DEEP (2 msgs) = 4 TOTAL
+            // If hurried: PREVIOUS SCAN (2) + NEW DEEP (1) = 3 TOTAL
+            const maxQuestions = isHurried ? 3 : 4;
 
             prompt = `
 You are an Interview Supervisor in GLOBAL DEEP DIVE PHASE.
@@ -104,7 +106,7 @@ MANDATORY DECISION RULES (in priority order):
    - Look at the recent conversation history above
    - Count how many assistant messages you see that are asking questions about "${currentTopic.label}"
    - If you count ${maxQuestions} or MORE assistant questions about this specific topic -> OUTPUT status: TRANSITION immediately
-   - If recentAssistantCount > 3 -> OUTPUT status: TRANSITION immediately (safety limit)
+   - If recentAssistantCount > 4 -> OUTPUT status: TRANSITION immediately (safety limit)
    - NO EXCEPTIONS. NO DEEPENING if limit reached.
 
 2. **WORTHWHILE CONCEPT CHECK** (only if < ${maxQuestions} questions asked):
@@ -123,7 +125,7 @@ MANDATORY DECISION RULES (in priority order):
    - NEVER use vague focus points like: "anything else", "tell me more", "elaborate", "other thoughts".
    - Focus point must describe a specific concept or theme to explore.
 
-**REMINDER**: Max ${maxQuestions} questions per topic in DEEP phase ${isHurried ? '(REDUCED DUE TO LOW TIME)' : ''}. After that, ALWAYS TRANSITION.
+**REMINDER**: Max ${maxQuestions} questions per topic in DEEP phase (Total including previous Scan phase). After that, ALWAYS TRANSITION.
 
 OUTPUT format:
 - status: DEEPENING | TRANSITION | COMPLETION

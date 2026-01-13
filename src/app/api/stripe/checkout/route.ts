@@ -70,6 +70,9 @@ export async function GET(req: NextRequest) {
 
         // Get or create subscription
         const subscription = await getOrCreateSubscription(organization.id);
+        if (!subscription) {
+            return new Response('Failed to get subscription', { status: 500 });
+        }
 
         // Create or get Stripe customer
         let customerId = subscription?.stripeCustomerId;
@@ -223,6 +226,9 @@ export async function POST(req: Request) { // Changed NextRequest to Request
 
         // Get or create subscription
         const subscription = await getOrCreateSubscription(organization.id);
+        if (!subscription) {
+            return new Response('Failed to get subscription', { status: 500 });
+        }
 
         // Create or get Stripe customer
         let customerId = subscription?.stripeCustomerId;

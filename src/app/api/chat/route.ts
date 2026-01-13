@@ -45,12 +45,16 @@ export async function POST(req: Request) {
         const statusCheck = await ChatService.checkLimits(conversationId);
         const shouldCollectData = (conversation.bot as any).collectCandidateData;
 
+        // Check time/turn limits - force end if exceeded
         if (statusCheck.shouldConclude && currentPhase !== 'DATA_COLLECTION') {
-            if (shouldCollectData && currentPhase !== 'DATA_COLLECTION' && currentPhase !== 'TRANSITION_TO_DATA') {
-                console.log("⏰ [CHAT] Time/Turn limit reached. Offering DATA_COLLECTION.");
-                // We don't return early. We force a transition below.
-                supervisorInsight.status = 'TRANSITION_TO_DATA';
+            console.log("⏰ [CHAT] Time/Turn limit reached.");
+
+            if (shouldCollectData) {
+                // Skip remaining topics and go directly to data collection
+                console.log("📝 [CHAT] Forcing transition to DATA_COLLECTION due to limits.");
+                supervisorInsight = { status: 'COMPLETION' };
             } else {
+                // No data collection - end interview
                 await ChatService.completeInterview(conversationId);
                 return Response.json({
                     text: (conversation.bot.language === 'it'
@@ -65,7 +69,8 @@ export async function POST(req: Request) {
         // Fetch API Key
         const openAIKey = await LLMService.getApiKey(conversation.bot, 'openai') || process.env.OPENAI_API_KEY || '';
 
-        if (messages.length > 2) {
+        // 5. Topic Evaluation (skip if we already decided to collect data or terminate)
+        if (messages.length > 2 && supervisorInsight.status !== 'COMPLETION') {
             // SKIP TOPIC EVALUATION IN DATA COLLECTION PHASE
             if (currentPhase === 'DATA_COLLECTION') {
                 supervisorInsight = { status: 'DATA_COLLECTION' };
@@ -96,18 +101,21 @@ export async function POST(req: Request) {
         }
 
         // 5.b. Failsafe for Stuck Topic -> Scale based on loop index & Phase
-        const isDeep = currentPhase === 'DEEP';
-        // SCAN phase: 2 exchanges per topic (1 assistant question + 1 user response = 2 messages)
-        // Add some buffer for intro, but keep it tight
-        const phaseOffset = isDeep ? (botTopics.length * 3) : 0;
-        const msgPerTopic = isDeep ? 6 : 3; // SCAN: ~3 msgs/topic, DEEP: ~6 msgs/topic
+        // ONLY apply if we haven't already decided to complete/collect data
+        if (supervisorInsight.status !== 'COMPLETION') {
+            const isDeep = currentPhase === 'DEEP';
+            // SCAN phase: 2 exchanges per topic (1 assistant question + 1 user response = 2 messages)
+            // Add some buffer for intro, but keep it tight
+            const phaseOffset = isDeep ? (botTopics.length * 3) : 0;
+            const msgPerTopic = isDeep ? 6 : 3; // SCAN: ~3 msgs/topic, DEEP: ~6 msgs/topic
 
-        const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 3;
+            const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 3;
 
-        // DISABLE HEADROOM CHECK FOR DATA COLLECTION
-        if (currentPhase !== 'DATA_COLLECTION' && messages.length > globalHeadroom) {
-            console.log(`🚨 [CHAT] FORCE TRANSITION: Messages (${messages.length}) > Headroom (${globalHeadroom}).`);
-            supervisorInsight = { status: 'TRANSITION' };
+            // DISABLE HEADROOM CHECK FOR DATA COLLECTION
+            if (currentPhase !== 'DATA_COLLECTION' && messages.length > globalHeadroom) {
+                console.log(`🚨 [CHAT] FORCE TRANSITION: Messages (${messages.length}) > Headroom (${globalHeadroom}).`);
+                supervisorInsight = { status: 'TRANSITION' };
+            }
         }
 
         // 6. Transition & Loop Logic

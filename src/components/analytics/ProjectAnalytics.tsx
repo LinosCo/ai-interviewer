@@ -18,6 +18,7 @@ interface ProjectAnalyticsProps {
 
 export default function ProjectAnalytics({ projectId, availableBots }: ProjectAnalyticsProps) {
     const [insights, setInsights] = useState<UnifiedInsight[]>([]);
+    const [stats, setStats] = useState<UnifiedStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [selectedBotIds, setSelectedBotIds] = useState<string[]>([]);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -35,7 +36,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                 if (!res.ok) throw new Error('Failed to fetch analytics');
                 const data = await res.json();
                 setInsights(data.insights);
-                // If we want to use real trends: setTrendData(data.trends);
+                setStats(data.stats);
             } catch (error) {
                 console.error(error);
             } finally {
@@ -56,19 +57,13 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
 
     const clearFilters = () => setSelectedBotIds([]);
 
-    const mockTrendData = [
-        { date: 'Lun', sentiment: 65, volume: 120 },
-        { date: 'Mar', sentiment: 58, volume: 145 },
-        { date: 'Mer', sentiment: 72, volume: 132 },
-        { date: 'Gio', sentiment: 68, volume: 150 },
-        { date: 'Ven', sentiment: 75, volume: 180 },
-        { date: 'Sab', sentiment: 82, volume: 90 },
-        { date: 'Dom', sentiment: 80, volume: 85 },
-    ];
-
-    if (loading && insights.length === 0) {
+    if (loading && !stats) {
         return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
     }
+
+    const { avgSentiment, totalMessages, completionRate, trends } = stats || {
+        avgSentiment: 0, totalMessages: 0, completionRate: 0, trends: []
+    };
 
     return (
         <div className="space-y-8 p-6">
@@ -130,8 +125,8 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                         <div className="text-lg font-medium opacity-90 flex items-center gap-2">
                             <Sparkles className="w-5 h-5" /> Brand Reputation
                         </div>
-                        <div className="text-4xl font-bold">72/100</div>
-                        <div className="text-sm opacity-80">+5% vs settimana scorsa</div>
+                        <div className="text-4xl font-bold">{avgSentiment.toFixed(0)}/100</div>
+                        <div className="text-sm opacity-80">Sentiment Medio</div>
                     </div>
                 </Card>
 
@@ -139,14 +134,14 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                     <CardHeader
                         title={(
                             <span className="flex items-center gap-2 text-lg">
-                                <MessageSquare className="w-5 h-5 text-blue-500" /> Domande Chatbot
+                                <MessageSquare className="w-5 h-5 text-blue-500" /> Messaggi Totali
                             </span>
                         )}
                         style={{ marginBottom: '0.5rem' }}
                     />
                     <div>
-                        <div className="text-3xl font-bold text-gray-900">1,240</div>
-                        <div className="text-sm text-gray-500 mt-1">Topic top: "Spedizioni", "Pricing"</div>
+                        <div className="text-3xl font-bold text-gray-900">{totalMessages.toLocaleString()}</div>
+                        <div className="text-sm text-gray-500 mt-1">Volume Conversazioni</div>
                     </div>
                 </Card>
 
@@ -154,14 +149,14 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                     <CardHeader
                         title={(
                             <span className="flex items-center gap-2 text-lg">
-                                <Users className="w-5 h-5 text-green-500" /> Interviste Completate
+                                <Users className="w-5 h-5 text-green-500" /> Tasso Completamento
                             </span>
                         )}
                         style={{ marginBottom: '0.5rem' }}
                     />
                     <div>
-                        <div className="text-3xl font-bold text-gray-900">85</div>
-                        <div className="text-sm text-gray-500 mt-1">Insight top: "UX sito confusa"</div>
+                        <div className="text-3xl font-bold text-gray-900">{completionRate.toFixed(1)}%</div>
+                        <div className="text-sm text-gray-500 mt-1">Engagement Utenti</div>
                     </div>
                 </Card>
             </div>
@@ -230,7 +225,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                     />
                     <div className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={mockTrendData}>
+                            <LineChart data={trends}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="date" />
                                 <YAxis />
@@ -256,7 +251,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                     />
                     <div className="h-[300px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={mockTrendData}>
+                            <BarChart data={trends}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="date" />
                                 <YAxis />

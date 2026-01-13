@@ -74,53 +74,54 @@ OUTPUT format:
 `.trim();
         } else {
             // DEEP PHASE
-            // Data collection trigger only in DEEP phase
-            const dataCollectionTrigger = isRecruiting
-                ? `\n0. **DATA COLLECTION TRIGGER** (ONLY if explicitly appropriate):
-   - If user explicitly asks to apply, be contacted, or share data ("candidarmi", "contattami", "apply")
-   - OR if user asks "why aren't you asking for my contact?"
-   - THEN output status: COMPLETION.
-   - OTHERWISE: Never output COMPLETION. Use TRANSITION when topic is exhausted.`
-                : '';
+            // Simple heuristic: count recent assistant messages
+            // If we see 2+ assistant messages in recent history, we've likely asked enough
+            const recentAssistantCount = (recentHistory.match(/assistant:/gi) || []).length;
 
             prompt = `
 You are an Interview Supervisor in GLOBAL DEEP DIVE PHASE.
 Current Topic: "${currentTopic.label}"
 Sub-Goals: ${currentTopic.subGoals.join(', ')}
 Language: ${language}
+Recent assistant messages in history: ${recentAssistantCount}
 
 Recent Conversation History:
 ${recentHistory}
 
-PHASE GOAL: Add depth by exploring interesting concepts from the SCAN phase.${dataCollectionTrigger}
+PHASE GOAL: Add depth by exploring interesting concepts from the SCAN phase.
+CRITICAL: We are in DEEP phase which means we must be VERY selective. Only 1-2 questions max per topic.
 
 MANDATORY DECISION RULES (in priority order):
 
-1. **ABSOLUTE LIMIT** (HIGHEST PRIORITY):
-   - Count assistant messages about "${currentTopic.label}" in the recent history.
-   - If you count 2 or more deep-dive questions -> IMMEDIATELY output status: TRANSITION.
-   - NO EXCEPTIONS. Deep dive = max 2 questions per topic.
+1. **ABSOLUTE LIMIT** (HIGHEST PRIORITY - STRICTLY ENFORCED):
+   - Look at the recent conversation history above
+   - Count how many assistant messages you see that are asking questions about "${currentTopic.label}"
+   - If you count 2 or MORE assistant questions about this specific topic -> OUTPUT status: TRANSITION immediately
+   - If recentAssistantCount > 3 -> OUTPUT status: TRANSITION immediately (safety limit)
+   - NO EXCEPTIONS. NO DEEPENING if limit reached.
 
-2. **WORTHWHILE CONCEPT CHECK**:
+2. **WORTHWHILE CONCEPT CHECK** (only if < 2 questions asked):
    - Review the user's previous answers about "${currentTopic.label}".
    - Identify concepts or themes that emerged and deserve deeper exploration.
    - Examples: motivations, concerns, contradictions, interesting details, emotional aspects.
-   - **FOCUS ON CONCEPTS, NOT QUOTES**: Describe the concept to probe (e.g., "the user's concern about time management")
-   - If you find such a concept AND haven't asked 2 deep questions yet -> OUTPUT status: DEEPENING with focusPoint.
+   - **FOCUS ON CONCEPTS, NOT QUOTES**: Describe the concept to probe
+   - If you find such a concept AND haven't reached 2 questions -> OUTPUT status: DEEPENING with focusPoint.
 
 3. **EXHAUSTION SIGNALS**:
    - If user's recent answers are short, generic ("ok", "va bene", "non lo so") -> TRANSITION.
-   - If user already gave thorough explanations on all interesting aspects -> TRANSITION.
-   - If you cannot identify a NEW and MEANINGFUL concept to explore -> TRANSITION.
+   - If user already gave thorough explanations -> TRANSITION.
+   - If you cannot identify a NEW and MEANINGFUL concept -> TRANSITION.
 
 4. **ANTI-GENERIC RULE**:
    - NEVER use vague focus points like: "anything else", "tell me more", "elaborate", "other thoughts".
    - Focus point must describe a specific concept or theme to explore.
 
+**REMINDER**: Max 2 questions per topic in DEEP phase. After 2 questions, ALWAYS TRANSITION.
+
 OUTPUT format:
 - status: DEEPENING | TRANSITION | COMPLETION
-- focusPoint: (only if DEEPENING) Clear description of the concept to probe, e.g. "user's concerns about balancing multiple priorities"
-- reason: Explanation of why this concept deserves depth OR why we should transition
+- focusPoint: (only if DEEPENING) Clear description of the concept to probe
+- reason: Explanation of why this concept deserves depth OR why we should transition (mention question count)
 `.trim();
         }
 

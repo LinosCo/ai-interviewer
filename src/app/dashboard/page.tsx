@@ -43,8 +43,8 @@ export default async function DashboardPage() {
 
     // Get bots and split by type
     const allBots = user.ownedProjects.flatMap(p => p.bots);
-    const interviews = allBots.filter(b => b.botType === 'interview' || !b.botType); // Default to interview
-    const chatbots = allBots.filter(b => b.botType === 'chatbot');
+    const interviews = allBots.filter((b: any) => b.botType === 'interview' || !b.botType); // Default to interview
+    const chatbots = allBots.filter((b: any) => b.botType === 'chatbot');
 
     // Calculate stats
     const totalInterviews = interviews.length;
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
             ...c,
             botName: bot.name,
             botId: bot.id,
-            type: bot.botType || 'interview'
+            type: (bot as any).botType || 'interview'
         })))
         .filter(c => c.completedAt)
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
@@ -142,7 +142,7 @@ export default async function DashboardPage() {
                         </div>
                         <div>
                             <p className="text-2xl font-bold text-gray-900">{activeInterviews.length}</p>
-                            <p className="text-sm text-gray-500">Bot Attivi (7gg)</p>
+                            <p className="text-sm text-gray-500">Attività Recente (7gg)</p>
                         </div>
                     </div>
                 </div>

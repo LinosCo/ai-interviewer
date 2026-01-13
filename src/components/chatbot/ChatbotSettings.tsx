@@ -94,14 +94,23 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex gap-6 overflow-hidden">
+            <div className="flex-1 flex gap-6 overflow-hidden relative">
                 {/* Form Area */}
-                <div className="flex-1 overflow-y-auto pr-2 space-y-6 pb-20">
-                    <div className="flex justify-between items-center mb-6">
+                <div className="flex-1 overflow-y-auto pr-2 space-y-6 pb-24 lg:pb-0 scrollbar-hide">
+                    <div className="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 py-4 border-b border-gray-100">
                         <h2 className="text-2xl font-bold text-gray-900">
                             {TABS.find(t => t.id === activeTab)?.label}
                         </h2>
                         <div className="flex gap-2">
+                            {/* Mobile Preview Toggle */}
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+                                className="xl:hidden"
+                            >
+                                {isPreviewOpen ? 'Nascondi Preview' : 'Vedi Preview'}
+                            </Button>
+
                             <Button
                                 variant="outline"
                                 onClick={() => window.open(`/dashboard/bots/${bot.id}/embed`)}
@@ -254,56 +263,54 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                     </AnimatePresence>
                 </div>
 
-                {/* Live Preview Panel - Hidden on small screens unless toggled */}
-                <div className={`w-[400px] flex-shrink-0 bg-gray-50 border-l border-gray-200 flex flex-col hidden xl:flex`}>
+                {/* Live Preview Panel */}
+                <div className={`w-[400px] flex-shrink-0 bg-gray-50 border-l border-gray-200 flex flex-col transition-all duration-300 ${isPreviewOpen ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full z-50 xl:relative xl:translate-x-0 xl:block hidden'
+                    } xl:flex`}>
                     <div className="p-4 border-b border-gray-200 bg-white flex justify-between items-center">
                         <h3 className="font-semibold text-gray-700">Live Preview</h3>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                            Active
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+                                className="text-xs text-gray-500 hover:text-gray-900 underline"
+                            >
+                                {isPreviewOpen ? 'Mostra Bubble' : 'Mostra Finestra'}
+                            </button>
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                Active
+                            </div>
                         </div>
                     </div>
                     <div className="flex-1 relative bg-[url('/grid.svg')] opacity-100 p-6 flex flex-col justify-end items-end overflow-hidden">
                         {/* Mock Website Background */}
                         <div className="absolute inset-0 opacity-5 pointer-events-none bg-gradient-to-br from-gray-100 to-gray-200" />
 
-                        {/* We render the ChatWindow here, "open" by default or controlled */}
-                        {/* Since ChatWindow is fixed position, we need to override it for preview or wrap it in a transform container */}
-                        {/* Ideally ChatWindow accepts a 'style' or 'className' prop to override fixed positioning */}
-                        {/* OR we make a specific Preview Wrapper that forces it to be relative/absolute inside this div */}
+                        {/* Two States: Open Window vs Closed Bubble */}
+                        {isPreviewOpen ? (
+                            <div className="relative w-full h-[600px] border border-gray-200 shadow-2xl rounded-2xl overflow-hidden bg-white transform translate-z-0 flex flex-col animate-in slide-in-from-bottom-4 duration-300">
+                                {/* Header Mock */}
+                                <div className="h-14 flex-shrink-0 flex items-center justify-between px-4 text-white" style={{ backgroundColor: config.primaryColor }}>
+                                    <span className="font-semibold">{config.name}</span>
+                                    <Icons.X
+                                        className="w-5 h-5 opacity-80 cursor-pointer"
+                                        onClick={() => setIsPreviewOpen(false)}
+                                    />
+                                </div>
 
-                        {/* IMPORTANT: ChatWindow has 'fixed' class. We need to override it or use a "preview mode" prop. */}
-                        {/* Let's wrap it in a div with `transform: translate(0)` which creates a new stacking context? 
-                            No, properties like `fixed` are relative to viewport unless transformed ancestor? 
-                            Yes, `transform`, `filter`, `perspective` on ancestor makes `fixed` child relative to it.
-                        */}
-                        <div className="relative w-full h-[600px] border border-gray-200 shadow-2xl rounded-2xl overflow-hidden bg-white transform translate-z-0">
-                            {/* Header Mock */}
-                            <div className="absolute top-0 left-0 right-0 h-14 z-10 flex items-center justify-between px-4 text-white" style={{ backgroundColor: config.primaryColor }}>
-                                <span className="font-semibold">{config.name}</span>
-                                <Icons.X className="w-5 h-5 opacity-80" />
-                            </div>
-                            {/* Body Mock - basically we can't easily reuse ChatWindow logic if it fetches API. 
-                                For visual preview, we might want a "Stateless" version of ChatWindow.
-                                But for now let's just show a static visual or try to iframe it?
-                                
-                                Actually, sticking the real ChatWindow (which does API calls) might be annoying as it creates conversations.
-                                Better: A "VisualOnlyChatWindow" or pass `demoMode={true}` to ChatWindow.
-                                
-                                Let's just create a quick visual mock here that reflects the config updates in real-time.
-                             */}
-                            <div className="absolute inset-0 pt-16 pb-4 px-4 bg-gray-50 flex flex-col">
-                                <div className="flex-1 space-y-4">
+                                {/* Body Mock */}
+                                <div className="flex-1 overflow-y-auto p-4 bg-gray-50 space-y-4">
                                     <div className="flex gap-2">
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs shadow-sm bg-gray-400" style={{ backgroundColor: config.primaryColor }}>
+                                        <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs shadow-sm" style={{ backgroundColor: config.primaryColor }}>
                                             <Bot className="w-4 h-4" />
                                         </div>
-                                        <div className="p-3.5 rounded-2xl rounded-bl-none shadow-sm text-sm leading-relaxed bg-white text-gray-800 border border-gray-100">
+                                        <div className="p-3.5 rounded-2xl rounded-bl-none shadow-sm text-sm leading-relaxed bg-white text-gray-800 border border-gray-100 max-w-[85%]">
                                             {config.welcomeMessage || 'Ciao! Come posso aiutarti?'}
                                         </div>
                                     </div>
                                 </div>
-                                <div className="mt-4">
+
+                                {/* Input Mock */}
+                                <div className="p-4 bg-white border-t border-gray-100">
                                     <div className="flex gap-2 items-center bg-white p-2 rounded-xl border border-gray-200">
                                         <div className="flex-1 text-sm text-gray-400 pl-2">Scrivi un messaggio...</div>
                                         <div className="p-2 rounded-lg bg-gray-200 text-white">
@@ -312,7 +319,24 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="flex flex-col items-end gap-2 animate-in fade-in zoom-in duration-300">
+                                {/* Tooltip preview */}
+                                <div className="bg-white px-4 py-2 rounded-lg shadow-lg mb-2 text-sm font-medium text-gray-800 border border-gray-100 whitespace-nowrap">
+                                    Ciao! Serve aiuto? 👋
+                                </div>
+
+                                {/* Bubble Button */}
+                                <button
+                                    onClick={() => setIsPreviewOpen(true)}
+                                    className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white hover:scale-105 transition-transform"
+                                    style={{ backgroundColor: config.primaryColor }}
+                                >
+                                    <MessageSquare className="w-7 h-7" />
+                                </button>
+                            </div>
+                        )}
+
                     </div>
                 </div>
             </div>

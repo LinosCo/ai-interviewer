@@ -52,6 +52,9 @@ export default async function InterviewsPage() {
 
     if (user.role === 'ADMIN') {
         const allBotsFromDB = await prisma.bot.findMany({
+            where: {
+                botType: 'interview'
+            } as any,
             include: {
                 conversations: {
                     select: { id: true, status: true, completedAt: true }

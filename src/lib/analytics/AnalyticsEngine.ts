@@ -25,10 +25,16 @@ export class AnalyticsEngine {
     /**
      * Aggregates data for a given Project to generate unified insights.
      */
-    static async generateProjectInsights(projectId: string): Promise<UnifiedInsight[]> {
+    static async generateProjectInsights(projectId: string, botIds?: string[]): Promise<UnifiedInsight[]> {
         // 1. Fetch all bots in the project
+        const whereClause: any = { projectId };
+
+        if (botIds && botIds.length > 0) {
+            whereClause.id = { in: botIds };
+        }
+
         const bots = await prisma.bot.findMany({
-            where: { projectId },
+            where: whereClause,
             include: {
                 conversations: {
                     orderBy: { startedAt: 'desc' },

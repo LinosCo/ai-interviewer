@@ -76,9 +76,9 @@ export default function WizardStepPreview({ config, onBack }: WizardStepPreviewP
 
             {/* Preview Container */}
             <div className="relative bg-gray-100 rounded-2xl border border-gray-200 h-[500px] overflow-hidden flex items-center justify-center">
-                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
+                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10 pointer-events-none"></div>
 
-                <div className="text-center p-8 max-w-md">
+                <div className="text-center p-8 max-w-md z-0">
                     <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4">
                         <Bot className="w-8 h-8 text-gray-400" />
                     </div>
@@ -86,59 +86,63 @@ export default function WizardStepPreview({ config, onBack }: WizardStepPreviewP
                         Anteprima Live
                     </h3>
                     <p className="text-gray-500 text-sm">
-                        Il chatbot apparirà nell'angolo in basso a destra (o sinistra) del tuo sito.
-                        I colori e i testi rifletteranno le tue impostazioni.
+                        Il tuo chatbot è pronto. Clicca sull'icona in basso a destra per provare la conversazione.
                     </p>
                 </div>
 
-                {/* Mock Chat Bubble */}
+                {/* Mock Chat Bubble - Ensuring High Z-Index */}
                 <div
-                    className="absolute bottom-8 right-8 w-14 h-14 rounded-full shadow-lg flex items-center justify-center cursor-pointer transition-transform hover:scale-105"
-                    style={{ backgroundColor: config.primaryColor || '#7C3AED' }}
+                    className="absolute bottom-8 right-8 w-14 h-14 rounded-full shadow-lg flex items-center justify-center cursor-pointer transition-transform hover:scale-105 z-20"
+                    style={{ backgroundColor: config.primaryColor || '#2563EB' }}
                 >
                     <MessageSquare className="w-7 h-7 text-white" />
                 </div>
 
-                {/* Mock Chat Window (Open state visualization could be added here) */}
-                <div className="absolute bottom-24 right-8 w-80 bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 flex flex-col">
+                {/* Mock Chat Window - Ensuring High Z-Index */}
+                <div className="absolute bottom-24 right-8 w-80 bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 flex flex-col z-20 origin-bottom-right animate-in fade-in slide-in-from-bottom-4 duration-300">
                     {/* Header */}
-                    <div className="p-4 text-white" style={{ backgroundColor: config.primaryColor || '#7C3AED' }}>
+                    <div className="p-4 text-white" style={{ backgroundColor: config.primaryColor || '#2563EB' }}>
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center border border-white/20">
                                 <Bot className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                                <div className="font-semibold text-sm">{config.name}</div>
-                                <div className="text-xs opacity-90">Online</div>
+                                <div className="font-semibold text-sm">{config.name || 'AI Assistant'}</div>
+                                <div className="text-xs opacity-90 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                                    Online
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     {/* Messages */}
                     <div className="p-4 bg-gray-50 h-64 space-y-4 overflow-y-auto">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-start">
                             <div
-                                className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs"
-                                style={{ backgroundColor: config.primaryColor || '#7C3AED' }}
+                                className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs mt-1"
+                                style={{ backgroundColor: config.primaryColor || '#2563EB' }}
                             >
                                 <Bot className="w-3 h-3" />
                             </div>
-                            <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-gray-800 border border-gray-100">
-                                {config.welcomeMessage}
+                            <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-gray-800 border border-gray-100 max-w-[85%]">
+                                <p>{config.welcomeMessage || 'Ciao! Come posso aiutarti oggi?'}</p>
                             </div>
                         </div>
                     </div>
 
                     {/* Input */}
                     <div className="p-3 border-t bg-white">
-                        <div className="bg-gray-100 rounded-full h-10 w-full" />
+                        <div className="bg-gray-100 rounded-full h-10 w-full flex items-center px-4 text-gray-400 text-sm">
+                            Scrivi un messaggio...
+                        </div>
                     </div>
                 </div>
             </div>
 
             {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                    {error}
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                    <span className="font-bold">Error:</span> {error}
                 </div>
             )}
 

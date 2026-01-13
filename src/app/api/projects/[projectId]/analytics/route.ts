@@ -21,7 +21,13 @@ export async function GET(
         }
 
         // Generate insights using the engine
-        const insights = await AnalyticsEngine.generateProjectInsights(projectId);
+        const { searchParams } = new URL(request.url);
+        const botIdsParam = searchParams.get('botIds');
+        const botIds = botIdsParam ? botIdsParam.split(',') : undefined;
+
+        console.log("Generating insights for project:", projectId, "Bots filter:", botIds);
+
+        const insights = await AnalyticsEngine.generateProjectInsights(projectId, botIds);
 
         return NextResponse.json({
             insights,

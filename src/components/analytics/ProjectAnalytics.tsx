@@ -7,23 +7,31 @@ import {
 } from 'recharts';
 import {
     ArrowRight, Sparkles, MessageSquare, Users, Zap,
-    Lightbulb, TrendingUp, AlertTriangle, Megaphone, FileText
+    Lightbulb, TrendingUp, AlertTriangle, Megaphone, FileText, Bot, Check
 } from 'lucide-react';
 import { UnifiedInsight } from '@/lib/analytics/AnalyticsEngine';
 
 interface ProjectAnalyticsProps {
     projectId: string;
+    availableBots: { id: string; name: string; botType: string | null }[];
 }
 
-export default function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
+export default function ProjectAnalytics({ projectId, availableBots }: ProjectAnalyticsProps) {
     const [insights, setInsights] = useState<UnifiedInsight[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedBotIds, setSelectedBotIds] = useState<string[]>([]);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     useEffect(() => {
         const fetchAnalytics = async () => {
             setLoading(true);
             try {
-                const res = await fetch(`/api/projects/${projectId}/analytics`);
+                const queryParams = new URLSearchParams();
+                if (selectedBotIds.length > 0) {
+                    queryParams.append('botIds', selectedBotIds.join(','));
+                }
+
+                const res = await fetch(`/api/projects/${projectId}/analytics?${queryParams.toString()}`);
                 if (!res.ok) throw new Error('Failed to fetch analytics');
                 const data = await res.json();
                 setInsights(data.insights);
@@ -36,7 +44,17 @@ export default function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
         };
 
         fetchAnalytics();
-    }, [projectId]);
+    }, [projectId, selectedBotIds]);
+
+    const toggleBotFilter = (botId: string) => {
+        setSelectedBotIds(prev =>
+            prev.includes(botId)
+                ? prev.filter(id => id !== botId)
+                : [...prev, botId]
+        );
+    };
+
+    const clearFilters = () => setSelectedBotIds([]);
 
     const mockTrendData = [
         { date: 'Lun', sentiment: 65, volume: 120 },
@@ -48,18 +66,60 @@ export default function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
         { date: 'Dom', sentiment: 80, volume: 85 },
     ];
 
-    if (loading) {
+    if (loading && insights.length === 0) {
         return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
     }
 
     return (
         <div className="space-y-8 p-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Virtuous Cycle Analytics</h2>
                     <p className="text-gray-500 mt-1">
                         Come le conversazioni (Chatbot) e le interviste (AI Interviewer) si influenzano a vicenda.
                     </p>
+                </div>
+
+                {/* Filter Controls */}
+                <div className="relative">
+                    <button
+                        onClick={() => setIsFilterOpen(!isFilterOpen)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 font-medium text-gray-700"
+                    >
+                        <Bot className="w-4 h-4" />
+                        Filtra Fonti ({selectedBotIds.length > 0 ? selectedBotIds.length : 'Tutte'})
+                        <ArrowRight className={`w-3 h-3 transition-transform ${isFilterOpen ? 'rotate-90' : ''}`} />
+                    </button>
+
+                    {isFilterOpen && (
+                        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-50 p-4 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex justify-between items-center mb-3">
+                                <span className="font-semibold text-sm">Seleziona Fonti</span>
+                                {selectedBotIds.length > 0 && (
+                                    <button onClick={clearFilters} className="text-xs text-red-600 hover:underline">Reset</button>
+                                )}
+                            </div>
+                            <div className="max-h-60 overflow-y-auto space-y-2">
+                                {availableBots.map(bot => (
+                                    <label key={bot.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedBotIds.includes(bot.id) ? 'bg-purple-600 border-purple-600' : 'border-gray-300'}`}>
+                                            {selectedBotIds.includes(bot.id) && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            className="hidden"
+                                            checked={selectedBotIds.includes(bot.id)}
+                                            onChange={() => toggleBotFilter(bot.id)}
+                                        />
+                                        <div className="flex-1 overflow-hidden">
+                                            <div className="font-medium text-sm truncate">{bot.name}</div>
+                                            <div className="text-xs text-gray-500 capitalize">{bot.botType || 'Interview'}</div>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 

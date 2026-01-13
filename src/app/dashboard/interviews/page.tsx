@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { MessageSquare, Plus, TrendingUp, Users, Clock, ArrowRight } from 'lucide-react';
+import { BotListItem } from '@/components/dashboard/BotListItem';
 
 export default async function InterviewsPage() {
     const session = await auth();
@@ -14,6 +15,12 @@ export default async function InterviewsPage() {
             ownedProjects: {
                 include: {
                     bots: {
+                        where: {
+                            OR: [
+                                { botType: 'interview' },
+                                { botType: null }
+                            ]
+                        },
                         include: {
                             conversations: {
                                 select: { id: true, status: true, completedAt: true }
@@ -154,40 +161,19 @@ export default async function InterviewsPage() {
                         <h2 className="font-semibold text-gray-900">Tutte le interviste</h2>
                     </div>
                     <div className="divide-y divide-gray-100">
-                        {allBots.map((bot: any) => {
-                            const completed = bot.conversations.filter((c: any) => c.status === 'COMPLETED').length;
-                            const total = bot.conversations.length;
-
-                            return (
-                                <Link
-                                    key={bot.id}
-                                    href={`/dashboard/bots/${bot.id}`}
-                                    className="flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div
-                                            className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-medium"
-                                            style={{ backgroundColor: bot.primaryColor || '#F59E0B' }}
-                                        >
-                                            {bot.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <h3 className="font-medium text-gray-900">{bot.name}</h3>
-                                            <p className="text-sm text-gray-500 line-clamp-1">
-                                                {bot.researchGoal || bot.description || 'Nessuna descrizione'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-6">
-                                        <div className="text-right">
-                                            <p className="font-medium text-gray-900">{completed}/{total}</p>
-                                            <p className="text-xs text-gray-500">risposte</p>
-                                        </div>
-                                        <ArrowRight className="w-5 h-5 text-gray-400" />
-                                    </div>
-                                </Link>
-                            );
-                        })}
+                        {allBots.map((bot: any) => (
+                            <BotListItem
+                                key={bot.id}
+                                bot={{
+                                    ...bot,
+                                    updatedAt: bot.updatedAt.toISOString(),
+                                    conversations: bot.conversations.map((c: any) => ({
+                                        ...c,
+                                        completedAt: c.completedAt ? c.completedAt.toISOString() : null
+                                    }))
+                                }}
+                            />
+                        ))}
                     </div>
                 </div>
             )}

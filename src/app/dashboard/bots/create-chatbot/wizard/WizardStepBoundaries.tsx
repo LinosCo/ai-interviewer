@@ -57,17 +57,17 @@ export default function WizardStepBoundaries({ initialConfig, onNext, onBack }: 
 
             {/* AI Suggested Boundaries */}
             {config.boundaries && config.boundaries.length > 0 && (
-                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-                    <h3 className="font-medium text-purple-900 mb-2 flex items-center gap-2">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <h3 className="font-medium text-blue-900 mb-2 flex items-center gap-2">
                         <Shield className="w-4 h-4" />
-                        Limiti Suggeriti dall'AI
+                        Suggerimenti di Sicurezza
                     </h3>
-                    <p className="text-sm text-purple-700 mb-3">
-                        Questi limiti sono stati generati in base al tuo caso d'uso:
+                    <p className="text-sm text-blue-700 mb-3">
+                        L'AI suggerisce di limitare questi argomenti sensibili:
                     </p>
-                    <ul className="space-y-2">
+                    <ul className="space-y-1">
                         {config.boundaries.map((boundary: string, idx: number) => (
-                            <li key={idx} className="text-sm text-purple-800 flex items-start gap-2">
+                            <li key={idx} className="text-sm text-blue-800 flex items-start gap-2">
                                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                                 {boundary}
                             </li>
@@ -112,7 +112,7 @@ export default function WizardStepBoundaries({ initialConfig, onNext, onBack }: 
                     <button
                         onClick={handleAddBoundary}
                         disabled={!newBoundary.trim()}
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
                     >
                         Aggiungi
                     </button>
@@ -164,7 +164,7 @@ export default function WizardStepBoundaries({ initialConfig, onNext, onBack }: 
                 </button>
                 <button
                     onClick={handleContinue}
-                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 shadow-lg"
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-lg"
                 >
                     Continua →
                 </button>

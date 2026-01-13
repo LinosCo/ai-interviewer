@@ -4,9 +4,13 @@ import { notFound, redirect } from 'next/navigation';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
-export default async function EmbedPage({ params }: { params: { botId: string } }) {
+export default async function EmbedPage(props: { params: Promise<{ botId: string }> }) {
+    const params = await props.params;
     const session = await auth();
-    if (!session?.user?.email) redirect('/login');
+
+    if (!session?.user?.email) {
+        redirect('/login');
+    }
 
     const bot = await prisma.bot.findUnique({
         where: { id: params.botId },

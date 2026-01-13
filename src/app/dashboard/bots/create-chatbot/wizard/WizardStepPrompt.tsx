@@ -84,9 +84,9 @@ export default function WizardStepPrompt({ onNext }: WizardStepPromptProps) {
             </div>
 
             {/* AI Generation Option */}
-            <div className="bg-white border border-purple-100 rounded-2xl p-6 shadow-sm ring-4 ring-purple-50/50">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg text-white">
+            <div className="bg-white border border-blue-100 rounded-2xl p-6 shadow-sm ring-4 ring-blue-50/50">
+                <div className="flex gap-4">
+                    <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg text-white">
                         <Sparkles className="w-5 h-5" />
                     </div>
                     <h3 className="font-semibold text-lg">Genera con AI</h3>
@@ -103,7 +103,7 @@ export default function WizardStepPrompt({ onNext }: WizardStepPromptProps) {
                                 setPrompt(e.target.value);
                                 setSelectedTemplate(null);
                             }}
-                            className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                            className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                             rows={3}
                             placeholder="Es: Voglio un chatbot per supporto clienti e-commerce che aiuti gli utenti a trovare prodotti..."
                         />
@@ -118,7 +118,7 @@ export default function WizardStepPrompt({ onNext }: WizardStepPromptProps) {
                             type="text"
                             value={businessContext}
                             onChange={(e) => setBusinessContext(e.target.value)}
-                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="Es: Target audience, tono di voce, informazioni chiave..."
                         />
                     </div>
@@ -126,7 +126,7 @@ export default function WizardStepPrompt({ onNext }: WizardStepPromptProps) {
                     <button
                         onClick={handleGenerate}
                         disabled={loading || !prompt.trim()}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium shadow transition-all hover:shadow-lg disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium shadow transition-all hover:shadow-lg disabled:opacity-50"
                     >
                         {loading ? (
                             <>
@@ -171,9 +171,9 @@ function TemplateSelector({ onSelect }: { onSelect: (id: string) => void }) {
                     <button
                         key={template.id}
                         onClick={() => onSelect(template.id)}
-                        className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-purple-300 hover:shadow-md transition-all text-left bg-white group"
+                        className="flex items-start gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all text-left bg-white group"
                     >
-                        <div className="p-3 bg-gray-50 rounded-lg group-hover:bg-purple-50 text-gray-500 group-hover:text-purple-600 transition-colors">
+                        <div className="p-3 bg-gray-50 rounded-lg group-hover:bg-blue-50 text-gray-500 group-hover:text-blue-600 transition-colors">
                             <Icon className="w-6 h-6" />
                         </div>
                         <div>

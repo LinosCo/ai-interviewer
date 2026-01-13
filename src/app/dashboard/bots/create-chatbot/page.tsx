@@ -41,7 +41,7 @@ export default function CreateChatbotPage() {
                 <div className="mb-8">
                     <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-purple-600 transition-all duration-500 ease-out"
+                            className="h-full bg-blue-600 transition-all duration-500 ease-out"
                             style={{ width: `${(step / 6) * 100}%` }}
                         />
                     </div>

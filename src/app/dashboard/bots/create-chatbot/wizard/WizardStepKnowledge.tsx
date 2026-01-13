@@ -103,8 +103,8 @@ export default function WizardStepKnowledge({ initialConfig, onNext, onBack }: W
                 <button
                     onClick={() => setActiveTab('text')}
                     className={`px-4 py-2 font-medium transition-colors ${activeTab === 'text'
-                            ? 'text-purple-600 border-b-2 border-purple-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-blue-600 border-b-2 border-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <FileText className="w-4 h-4 inline mr-2" />
@@ -113,8 +113,8 @@ export default function WizardStepKnowledge({ initialConfig, onNext, onBack }: W
                 <button
                     onClick={() => setActiveTab('url')}
                     className={`px-4 py-2 font-medium transition-colors ${activeTab === 'url'
-                            ? 'text-purple-600 border-b-2 border-purple-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'text-blue-600 border-b-2 border-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <LinkIcon className="w-4 h-4 inline mr-2" />
@@ -139,7 +139,7 @@ export default function WizardStepKnowledge({ initialConfig, onNext, onBack }: W
                         <button
                             onClick={handleAddText}
                             disabled={!textContent.trim()}
-                            className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50"
+                            className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                         >
                             Aggiungi Testo
                         </button>
@@ -163,7 +163,7 @@ export default function WizardStepKnowledge({ initialConfig, onNext, onBack }: W
                             <button
                                 onClick={handleAddUrl}
                                 disabled={!urlInput.trim() || loading}
-                                className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                             >
                                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LinkIcon className="w-4 h-4" />}
                                 Aggiungi
@@ -189,9 +189,9 @@ export default function WizardStepKnowledge({ initialConfig, onNext, onBack }: W
                         >
                             <div className="flex items-center gap-3">
                                 {source.type === 'url' ? (
-                                    <LinkIcon className="w-4 h-4 text-purple-600" />
+                                    <LinkIcon className="w-4 h-4 text-blue-600" />
                                 ) : (
-                                    <FileText className="w-4 h-4 text-purple-600" />
+                                    <FileText className="w-4 h-4 text-blue-600" />
                                 )}
                                 <div>
                                     <p className="text-sm font-medium text-gray-900">{source.title}</p>
@@ -233,7 +233,7 @@ export default function WizardStepKnowledge({ initialConfig, onNext, onBack }: W
                 </button>
                 <button
                     onClick={handleContinue}
-                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 shadow-lg"
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-lg"
                 >
                     Continua →
                 </button>

@@ -154,7 +154,7 @@ export default function WizardStepPreview({ config, onBack }: WizardStepPreviewP
                 <button
                     onClick={handlePublish}
                     disabled={loading}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-70 flex items-center justify-center gap-2"
                 >
                     {loading ? (
                         <>

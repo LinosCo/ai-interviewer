@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Users, Mail, Building, Phone, MessageSquare } from 'lucide-react';
+import { Users, Mail, Building, Phone, MessageSquare, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface WizardStepLeadsProps {
@@ -43,7 +43,7 @@ export default function WizardStepLeads({ initialConfig, onNext, onBack }: Wizar
             label: 'Intelligente',
             desc: 'L\'AI decide il momento migliore',
             icon: Building,
-            color: 'purple'
+            color: 'blue'
         },
         {
             id: 'on_exit',
@@ -58,7 +58,8 @@ export default function WizardStepLeads({ initialConfig, onNext, onBack }: Wizar
         { field: 'name', question: 'Come ti chiami?', icon: Users },
         { field: 'email', question: 'Qual è la tua email?', icon: Mail },
         { field: 'phone', question: 'Qual è il tuo numero di telefono?', icon: Phone },
-        { field: 'company', question: 'Per quale azienda lavori?', icon: Building }
+        { field: 'company', question: 'Per quale azienda lavori?', icon: Building },
+        { field: 'location', question: 'Da dove ci scrivi?', icon: MapPin }
     ];
 
     const toggleField = (field: any) => {
@@ -147,13 +148,13 @@ export default function WizardStepLeads({ initialConfig, onNext, onBack }: Wizar
                             <div
                                 key={field.field}
                                 className={`p-4 border rounded-xl transition-all ${isSelected
-                                    ? 'border-purple-300 bg-purple-50'
+                                    ? 'border-blue-300 bg-blue-50'
                                     : 'border-gray-200 bg-white'
                                     }`}
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <Icon className={`w-5 h-5 ${isSelected ? 'text-purple-600' : 'text-gray-400'
+                                        <Icon className={`w-5 h-5 ${isSelected ? 'text-blue-600' : 'text-gray-400'
                                             }`} />
                                         <div>
                                             <div className="font-medium text-gray-900 capitalize">
@@ -185,7 +186,7 @@ export default function WizardStepLeads({ initialConfig, onNext, onBack }: Wizar
                                         <button
                                             onClick={() => toggleField(field)}
                                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isSelected
-                                                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                                ? 'bg-blue-600 text-white hover:bg-blue-700'
                                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                                 }`}
                                         >
@@ -211,7 +212,7 @@ export default function WizardStepLeads({ initialConfig, onNext, onBack }: Wizar
                         </p>
                         {dataFields.map((field: any, idx: number) => (
                             <div key={idx} className="flex items-center gap-2 text-sm">
-                                <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-medium">
+                                <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-medium">
                                     {idx + 1}
                                 </span>
                                 <span className="text-gray-900">{field.question}</span>
@@ -253,7 +254,7 @@ export default function WizardStepLeads({ initialConfig, onNext, onBack }: Wizar
                 </button>
                 <button
                     onClick={handleContinue}
-                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 shadow-lg"
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-lg"
                 >
                     Continua →
                 </button>

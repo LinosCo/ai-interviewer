@@ -51,7 +51,7 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
     ];
 
     const colorOptions = [
-        { name: 'Purple', value: '#7C3AED' },
+        { name: 'Indigo', value: '#4F46E5' },
         { name: 'Blue', value: '#3B82F6' },
         { name: 'Green', value: '#10B981' },
         { name: 'Orange', value: '#F59E0B' },
@@ -75,9 +75,9 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
             </div>
 
             {/* AI Refinement */}
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
-                <div className="flex gap-3 mb-3">
-                    <Sparkles className="w-5 h-5 text-purple-600 mt-0.5" />
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-blue-600 mt-0.5" />
                     <div className="flex-1">
                         <h3 className="font-medium text-gray-900 mb-1">Raffina con AI</h3>
                         <p className="text-sm text-gray-600 mb-3">
@@ -89,13 +89,13 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                                 value={refinementPrompt}
                                 onChange={(e) => setRefinementPrompt(e.target.value)}
                                 placeholder="Es: Rendi il tono più formale"
-                                className="flex-1 px-3 py-2 border border-purple-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="flex-1 px-3 py-2 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 onKeyDown={(e) => e.key === 'Enter' && handleRefine()}
                             />
                             <button
                                 onClick={handleRefine}
                                 disabled={refining || !refinementPrompt.trim()}
-                                className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                             >
                                 {refining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                                 Raffina
@@ -113,7 +113,7 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                         <label className="text-sm font-medium text-gray-700">Nome Chatbot</label>
                         <button
                             onClick={() => setEditingField(editingField === 'name' ? null : 'name')}
-                            className="text-purple-600 hover:text-purple-700"
+                            className="text-blue-600 hover:text-blue-700"
                         >
                             <Edit2 className="w-4 h-4" />
                         </button>
@@ -137,7 +137,7 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                         <label className="text-sm font-medium text-gray-700">Descrizione</label>
                         <button
                             onClick={() => setEditingField(editingField === 'description' ? null : 'description')}
-                            className="text-purple-600 hover:text-purple-700"
+                            className="text-blue-600 hover:text-blue-700"
                         >
                             <Edit2 className="w-4 h-4" />
                         </button>
@@ -178,8 +178,8 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                                 key={color.value}
                                 onClick={() => setConfig({ ...config, primaryColor: color.value })}
                                 className={`w-12 h-12 rounded-full border-2 transition-all ${config.primaryColor === color.value
-                                        ? 'border-gray-900 scale-110 shadow-lg'
-                                        : 'border-transparent hover:scale-105'
+                                    ? 'border-gray-900 scale-110 shadow-lg'
+                                    : 'border-transparent hover:scale-105'
                                     }`}
                                 style={{ backgroundColor: color.value }}
                                 title={color.name}
@@ -202,7 +202,7 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                             {config.topics.map((topic: string, idx: number) => (
                                 <span
                                     key={idx}
-                                    className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm flex items-center gap-1"
+                                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm flex items-center gap-1"
                                 >
                                     <Check className="w-3 h-3" />
                                     {topic}
@@ -218,7 +218,7 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                         <label className="text-sm font-medium text-gray-700">Messaggio di Benvenuto</label>
                         <button
                             onClick={() => setEditingField(editingField === 'welcomeMessage' ? null : 'welcomeMessage')}
-                            className="text-purple-600 hover:text-purple-700"
+                            className="text-blue-600 hover:text-blue-700"
                         >
                             <Edit2 className="w-4 h-4" />
                         </button>
@@ -247,7 +247,7 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                 </button>
                 <button
                     onClick={() => onNext(config)}
-                    className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-xl font-medium hover:bg-purple-700 shadow-lg"
+                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 shadow-lg"
                 >
                     Continua →
                 </button>

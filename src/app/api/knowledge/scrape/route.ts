@@ -44,7 +44,8 @@ export async function POST(req: Request) {
             }
         });
 
-        if (!bot || bot.project.organization.members.length === 0) {
+        // Check if organization exists and has members (or handle personal projects if needed, but for now safe navigation)
+        if (!bot || !bot.project.organization || bot.project.organization.members.length === 0) {
             return new Response('Bot not found or unauthorized', { status: 404 });
         }
 

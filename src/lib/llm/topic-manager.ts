@@ -106,7 +106,6 @@ MANDATORY DECISION RULES (in priority order):
    - Look at the recent conversation history above
    - Count how many assistant messages you see that are asking questions about "${currentTopic.label}"
    - If you count ${maxQuestions} or MORE assistant questions about this specific topic -> OUTPUT status: TRANSITION immediately
-   - If recentAssistantCount > 4 -> OUTPUT status: TRANSITION immediately (safety limit)
    - NO EXCEPTIONS. NO DEEPENING if limit reached.
 
 2. **WORTHWHILE CONCEPT CHECK** (only if < ${maxQuestions} questions asked):

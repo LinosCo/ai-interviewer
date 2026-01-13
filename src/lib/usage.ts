@@ -192,7 +192,7 @@ export async function getUsageStats(organizationId: string) {
         where: { organizationId }
     });
 
-    const tokenUsage = await prisma.tokenUsage.findUnique({
+    const tokenUsage = await (prisma as any).tokenUsage.findUnique({
         where: { organizationId }
     });
 

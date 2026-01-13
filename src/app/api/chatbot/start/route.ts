@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
         // if (bot.botType !== 'chatbot') { ... } 
 
         // Check domain whitelist
-        if (bot.allowedDomains && Array.isArray(bot.allowedDomains) && (bot.allowedDomains as string[]).length > 0) {
-            const allowedList = bot.allowedDomains as string[];
+        if ((bot as any).allowedDomains && Array.isArray((bot as any).allowedDomains) && ((bot as any).allowedDomains as string[]).length > 0) {
+            const allowedList = (bot as any).allowedDomains as string[];
             const currentUrl = pageContext?.url || '';
 
             // Extract hostname from URL
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
         // Create chatbot session with page context
         if (pageContext) {
-            await prisma.chatbotSession.create({
+            await (prisma as any).chatbotSession.create({
                 data: {
                     botId,
                     conversationId: conversation.id,

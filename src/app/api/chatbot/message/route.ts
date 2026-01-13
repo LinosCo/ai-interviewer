@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
         // Load conversation with bot and session
         // @ts-ignore: Prisma client might be stale in IDE
-        const conversation: any = await prisma.conversation.findUnique({
+        const conversation: any = await (prisma.conversation as any).findUnique({
             where: { id: conversationId },
             include: {
                 bot: { include: { knowledgeSources: true, topics: true } },

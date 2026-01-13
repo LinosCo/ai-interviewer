@@ -58,7 +58,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
     const canUseConditionalLogic = await isFeatureEnabled(organizationId, 'conditionalLogic');
     // check feature flags above
 
-    // const canUseBranding = ... (already declared above)
+    const canUseBranding = await isFeatureEnabled(organizationId, 'customLogo');
 
     if ((bot as any).botType === 'chatbot') {
         return (

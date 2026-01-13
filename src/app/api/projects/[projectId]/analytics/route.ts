@@ -27,20 +27,11 @@ export async function GET(
 
         console.log("Generating insights for project:", projectId, "Bots filter:", botIds);
 
-        const insights = await AnalyticsEngine.generateProjectInsights(projectId, botIds);
+        const data = await AnalyticsEngine.generateProjectInsights(projectId, botIds);
 
         return NextResponse.json({
-            insights,
-            // We can also add trend data here later by extending the engine
-            trends: [
-                { date: 'Lun', sentiment: 65, volume: 120 },
-                { date: 'Mar', sentiment: 58, volume: 145 },
-                { date: 'Mer', sentiment: 72, volume: 132 },
-                { date: 'Gio', sentiment: 68, volume: 150 },
-                { date: 'Ven', sentiment: 75, volume: 180 },
-                { date: 'Sab', sentiment: 82, volume: 90 },
-                { date: 'Dom', sentiment: 80, volume: 85 },
-            ]
+            insights: data.insights,
+            stats: data.stats
         });
 
     } catch (error) {

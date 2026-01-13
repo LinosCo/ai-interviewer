@@ -9,7 +9,7 @@ import {
     ArrowRight, Sparkles, MessageSquare, Users, Zap,
     Lightbulb, TrendingUp, AlertTriangle, Megaphone, FileText, Bot, Check
 } from 'lucide-react';
-import { UnifiedInsight } from '@/lib/analytics/AnalyticsEngine';
+import { UnifiedInsight, UnifiedStats } from '@/lib/analytics/AnalyticsEngine';
 
 interface ProjectAnalyticsProps {
     projectId: string;

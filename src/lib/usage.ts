@@ -5,6 +5,7 @@ import { generateConversationInsightAction } from '@/lib/analytics-actions';
 
 // Get or create subscription for an organization
 export async function getOrCreateSubscription(organizationId: string) {
+    if (!organizationId) return null;
     let subscription = await prisma.subscription.findUnique({
         where: { organizationId }
     });
@@ -35,6 +36,7 @@ export async function getOrCreateSubscription(organizationId: string) {
 // Check if user can create/publish a new bot
 export async function canPublishBot(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);
+    if (!subscription) return { allowed: true }; // Fallback if no org/subscription found
 
     // Unlimited bots for Business/Enterprise
     if (subscription.maxActiveBots === -1) {
@@ -61,6 +63,7 @@ export async function canPublishBot(organizationId: string): Promise<{ allowed: 
 // Check if an interview can be completed (usage limit)
 export async function canStartInterview(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);
+    if (!subscription) return { allowed: true };
 
     // Unlimited for Enterprise
     if (subscription.maxInterviewsPerMonth === -1) {
@@ -176,6 +179,7 @@ export async function recordBotPublished(organizationId: string, botId: string) 
 // Get current usage stats
 export async function getUsageStats(organizationId: string) {
     const subscription = await getOrCreateSubscription(organizationId);
+    if (!subscription) throw new Error("Subscription not found");
 
     const activeBotsCount = await prisma.bot.count({
         where: {
@@ -282,6 +286,7 @@ export async function upgradeSubscription(
 // Check if a specific feature is enabled for an organization
 export async function isFeatureEnabled(organizationId: string, featureKey: string): Promise<boolean> {
     const subscription = await getOrCreateSubscription(organizationId);
+    if (!subscription) return false;
 
     // Enterprise/Business has everything
     if (subscription.tier === 'BUSINESS' || subscription.tier === 'ENTERPRISE') return true;

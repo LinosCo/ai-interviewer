@@ -25,7 +25,7 @@ export default async function EmbedPage({ params }: { params: { id: string } }) 
         }
     });
 
-    if (!bot || !bot.project.organization || bot.project.organization.members.length === 0) {
+    if (!bot || !bot.project?.organization || bot.project.organization.members.length === 0) {
         notFound();
     }
 

@@ -85,7 +85,6 @@ export async function POST(req: Request) {
             if (extraction.object[nextMissingField.field] && extraction.object.isRelevantAnswer) {
                 // Saved!
                 candidateProfile = { ...candidateProfile, [nextMissingField.field]: extraction.object[nextMissingField.field] };
-                candidateProfile = { ...candidateProfile, [nextMissingField.field]: extraction.object[nextMissingField.field] };
                 await prisma.conversation.update({
                     where: { id: conversationId },
                     data: { candidateProfile } as any

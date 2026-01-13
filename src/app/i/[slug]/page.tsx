@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import LandingPage from '@/components/interview/LandingPage';
+import { canStartInterview } from '@/lib/usage';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +18,9 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
     if (!bot) notFound();
 
     // Usage check
-    const { canStartInterview } = require('@/lib/usage');
-    if (bot.project?.organizationId) {
-        const check = await canStartInterview(bot.project.organizationId);
+    const organizationId = bot.project?.organizationId;
+    if (organizationId) {
+        const check = await canStartInterview(organizationId);
         if (!check.allowed) {
             return (
                 <div className="min-h-screen flex items-center justify-center bg-amber-50 flex-col p-6 text-center">

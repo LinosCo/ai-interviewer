@@ -12,6 +12,7 @@ import Link from 'next/link';
 import CopyLinkButton from '@/components/copy-link-button';
 import ChatbotSettings from '@/components/chatbot/ChatbotSettings';
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { isFeatureEnabled } from '@/lib/usage';
 
 export default async function BotEditorPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
@@ -51,13 +52,10 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
 
     if (!bot) notFound();
 
-    const organizationId = bot.project.organizationId;
-    const { isFeatureEnabled } = require('@/lib/usage');
+    const organizationId = bot.project?.organizationId || '';
 
     const canUseKnowledgeBase = await isFeatureEnabled(organizationId, 'knowledgeBase');
     const canUseConditionalLogic = await isFeatureEnabled(organizationId, 'conditionalLogic');
-    // check feature flags above
-
     const canUseBranding = await isFeatureEnabled(organizationId, 'customLogo');
 
     if ((bot as any).botType === 'chatbot') {

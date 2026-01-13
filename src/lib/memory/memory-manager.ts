@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { extractFactsFromResponse } from './fact-extractor';
+import { extractFactsFromMessage } from './fact-extractor';
 import {
     ConversationMemoryData,
     CollectedFact,
@@ -64,15 +64,15 @@ export class MemoryManager {
         }
 
         // 2. Estrai nuovi fatti
-        const extraction = await extractFactsFromResponse(
+        const extraction = await extractFactsFromMessage(
             userMessage,
-            currentTopicLabel,
+            [], // TODO: Pass conversation history context
             memory!.factsCollected,
             apiKey
         );
 
         // 3. Aggiungi nuovi fatti
-        const newFacts: CollectedFact[] = extraction.newFacts.map(f => ({
+        const newFacts: CollectedFact[] = extraction.facts.map(f => ({
             ...f,
             id: uuidv4(),
             extractedAt: new Date().toISOString()
@@ -88,7 +88,7 @@ export class MemoryManager {
         const newAvg = Math.round((currentAvg * (messageCount - 1) + messageLength) / messageCount);
 
         // 5. Aggiorna fatica (media mobile)
-        const newFatigueScore = (memory!.userFatigueScore * 0.7) + (extraction.fatigueScore * 0.3);
+        const newFatigueScore = (memory!.userFatigueScore * 0.7) + (extraction.fatigue.score * 0.3);
 
         // 6. Salva
         await prisma.conversationMemory.update({
@@ -96,7 +96,7 @@ export class MemoryManager {
             data: {
                 factsCollected: updatedFacts as any, // Cast to any for Prisma JSON
                 userFatigueScore: newFatigueScore,
-                detectedTone: (extraction.detectedTone || memory!.detectedTone) as ConversationMemoryData['detectedTone'],
+                detectedTone: (extraction.tone || memory!.detectedTone) as ConversationMemoryData['detectedTone'],
                 avgResponseLength: newAvg,
                 usesEmoji: memory!.usesEmoji || hasEmoji
             }
@@ -106,7 +106,7 @@ export class MemoryManager {
             ...memory!,
             factsCollected: updatedFacts,
             userFatigueScore: newFatigueScore,
-            detectedTone: (extraction.detectedTone || memory!.detectedTone) as ConversationMemoryData['detectedTone'],
+            detectedTone: (extraction.tone || memory!.detectedTone) as ConversationMemoryData['detectedTone'],
             avgResponseLength: newAvg,
             usesEmoji: memory!.usesEmoji || hasEmoji
         };

@@ -7,6 +7,8 @@ import { getPricingPlans } from '@/lib/stripe';
 import Link from 'next/link';
 import { CreditCard, ArrowUpRight, FileText, AlertCircle } from 'lucide-react';
 
+import { TokenUsageCard } from '@/components/billing/TokenUsageCard';
+
 export default async function BillingPage() {
     const session = await auth();
     if (!session?.user?.email) redirect('/login');
@@ -69,6 +71,11 @@ export default async function BillingPage() {
     return (
         <div className="space-y-8">
             <h1 className="text-2xl font-bold text-gray-900">Piano e fatturazione</h1>
+
+            {/* Token Usage Card - Prominent */}
+            <TokenUsageCard
+                usage={usage.tokens}
+            />
 
             {/* Current Plan */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

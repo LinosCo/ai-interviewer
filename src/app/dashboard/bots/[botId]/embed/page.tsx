@@ -39,7 +39,7 @@ export default function EmbedPage() {
                     </div>
                     <div>
                         <h2 className="text-xl font-semibold text-gray-900">Chatbot creato con successo!</h2>
-                        <p className="text-gray-500 mt-1">Il tuo assistente AI è pronto. Copia il codice qui sotto e incollalo nel `<body>` del tuo sito web.</p>
+                        <p className="text-gray-500 mt-1">Il tuo assistente AI è pronto. Copia il codice qui sotto e incollalo nel <code>&lt;body&gt;</code> del tuo sito web.</p>
                     </div>
                 </div>
 
@@ -59,17 +59,17 @@ export default function EmbedPage() {
                     <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                         <h3 className="font-semibold text-sm mb-2">🚀 Installazione Rapida</h3>
                         <p className="text-xs text-gray-500 leading-relaxed">
-                            Incolla questo codice prima della chiusura del tag `</body>` in tutte le pagine dove vuoi che appaia il chatbot.
-                    </p>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                    <h3 className="font-semibold text-sm mb-2">⚡️ Performance</h3>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                        Il nostro script pesa meno di 20KB e non rallenta il caricamento del tuo sito. Funziona in modo asincrono.
-                    </p>
+                            Incolla questo codice prima della chiusura del tag <code>&lt;/body&gt;</code> in tutte le pagine dove vuoi che appaia il chatbot.
+                        </p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                        <h3 className="font-semibold text-sm mb-2">⚡️ Performance</h3>
+                        <p className="text-xs text-gray-500 leading-relaxed">
+                            Il nostro script pesa meno di 20KB e non rallenta il caricamento del tuo sito. Funziona in modo asincrono.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
-        </div >
     );
 }

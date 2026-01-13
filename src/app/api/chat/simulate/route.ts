@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         // 3. Build Prompt
         const currentTopic = mockTopics[currentTopicIndex] || null;
 
-        let systemPrompt = PromptBuilder.build(
+        let systemPrompt = await PromptBuilder.build(
             mockBot,
             mockConversation,
             currentTopic,

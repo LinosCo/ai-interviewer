@@ -109,7 +109,7 @@ export async function POST(req: Request) {
             system: systemPrompt,
             messages: limitedMessages as any,
             temperature: 0.7,
-            maxTokens: bot.maxTokensPerMessage
+
         });
 
         // Save assistant response

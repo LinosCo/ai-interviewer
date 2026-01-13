@@ -1,4 +1,5 @@
 import { auth } from '@/auth';
+import { canPublishBot } from '@/lib/usage';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
         }
 
         // Check usage limits
-        const { canPublishBot } = require('@/lib/usage');
+        // Check usage limits
 
         // Get organizationId from project
         let project = await prisma.project.findUnique({

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { SubscriptionTier } from '@prisma/client';
 import { getPricingPlans, PlanKey } from './stripe';
+import { generateConversationInsightAction } from '@/lib/analytics-actions';
 
 // Get or create subscription for an organization
 export async function getOrCreateSubscription(organizationId: string) {
@@ -123,7 +124,7 @@ export async function markInterviewAsCompleted(conversationId: string) {
 
         // Trigger Analysis if not already done
         try {
-            const { generateConversationInsightAction } = require('@/app/actions');
+            // Use imported action
             await generateConversationInsightAction(conversationId);
         } catch (e) {
             console.error("Auto-analysis failed during completion", e);
@@ -187,6 +188,20 @@ export async function getUsageStats(organizationId: string) {
         where: { organizationId }
     });
 
+    const tokenUsage = await prisma.tokenUsage.findUnique({
+        where: { organizationId }
+    });
+
+    // Get limits for plan
+    const plans = await getPricingPlans();
+    // @ts-ignore
+    const planLimits = plans[subscription.tier]?.limits || plans.FREE.limits;
+    const monthlyTokenBudget = planLimits.monthlyTokenBudget || 50000;
+
+    const usedTokens = tokenUsage?.usedTokens || 0;
+    const purchasedTokens = tokenUsage?.purchasedTokens || 0;
+    const totalLimit = monthlyTokenBudget + purchasedTokens;
+
     return {
         tier: subscription.tier,
         activeBots: {
@@ -201,6 +216,15 @@ export async function getUsageStats(organizationId: string) {
             limit: subscription.maxInterviewsPerMonth,
             percentage: subscription.maxInterviewsPerMonth > 0
                 ? Math.round((subscription.interviewsUsedThisMonth / subscription.maxInterviewsPerMonth) * 100)
+                : 0
+        },
+        tokens: {
+            used: usedTokens,
+            limit: totalLimit,
+            purchased: purchasedTokens,
+            monthlyBudget: monthlyTokenBudget,
+            percentage: totalLimit > 0
+                ? Math.round((usedTokens / totalLimit) * 100)
                 : 0
         },
         users: {

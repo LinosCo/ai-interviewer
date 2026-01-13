@@ -64,6 +64,9 @@ export interface PlanLimits {
     // Rate limits (nascosti)
     maxParallelInterviews: number;
     messageCooldownSeconds: number;
+
+    // Chatbot limits
+    monthlyTokenBudget: number;
 }
 
 export interface PlanConfig {
@@ -151,7 +154,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiRegenerationsPerDay: 100,
 
             maxParallelInterviews: 100,
-            messageCooldownSeconds: 0.5
+            messageCooldownSeconds: 0.5,
+            monthlyTokenBudget: 50000
         },
         marketingFeatures: [
             'Partner Full Access',
@@ -224,7 +228,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiRegenerationsPerDay: 10,
 
             maxParallelInterviews: 10,
-            messageCooldownSeconds: 2
+            messageCooldownSeconds: 2,
+            monthlyTokenBudget: 200000
         },
         marketingFeatures: [
             '3 interviste attive',
@@ -297,7 +302,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiRegenerationsPerDay: 25,
 
             maxParallelInterviews: 30,
-            messageCooldownSeconds: 1
+            messageCooldownSeconds: 1,
+            monthlyTokenBudget: 1000000
         },
         marketingFeatures: [
             '10 interviste attive',
@@ -371,7 +377,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiRegenerationsPerDay: 50,
 
             maxParallelInterviews: 100,
-            messageCooldownSeconds: 0.5
+            messageCooldownSeconds: 0.5,
+            monthlyTokenBudget: 5000000
         },
         marketingFeatures: [
             'Illimitate interviste',

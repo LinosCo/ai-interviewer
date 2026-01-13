@@ -5,24 +5,41 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { KnowledgeManager } from '@/components/chatbot/KnowledgeManager';
-import { Bot, Zap, LayoutTemplate, Save } from 'lucide-react';
+import ChatWindow from '@/components/chatbot/ChatWindow';
+import {
+    Bot, Zap, LayoutTemplate, Save, MessageSquare, Shield,
+    Palette, BookOpen, ExternalLink, RefreshCw, Send
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChatbotSettingsProps {
     bot: any;
     canUseKnowledgeBase: boolean;
 }
 
+const TABS = [
+    { id: 'general', label: 'Generale', icon: Bot },
+    { id: 'knowledge', label: 'Conoscenza', icon: BookOpen },
+    { id: 'behavior', label: 'Comportamento', icon: Shield }, // Boundaries & Fallback
+    { id: 'leads', label: 'Lead Gen', icon: Zap },
+    { id: 'appearance', label: 'Aspetto', icon: Palette },
+];
+
 export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSettingsProps) {
     const router = useRouter();
+    const [activeTab, setActiveTab] = useState('general');
     const [config, setConfig] = useState({
         name: bot.name,
         tone: bot.tone || '',
         welcomeMessage: bot.introMessage || '',
         leadCaptureStrategy: bot.leadCaptureStrategy || 'after_3_msgs',
         fallbackMessage: bot.fallbackMessage || '',
-        candidateDataFields: (bot.candidateDataFields as any[]) || []
+        candidateDataFields: (bot.candidateDataFields as any[]) || [],
+        primaryColor: bot.primaryColor || '#7C3AED', // Add color support
+        boundaries: (bot.boundaries as string[]) || [],
     });
     const [isSaving, setIsSaving] = useState(false);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(true); // Toggle for mobile maybe
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -37,6 +54,8 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                     leadCaptureStrategy: config.leadCaptureStrategy,
                     candidateDataFields: config.candidateDataFields,
                     fallbackMessage: config.fallbackMessage,
+                    boundaries: config.boundaries,
+                    // primaryColor: config.primaryColor, // Ensure backend supports this field
                     botType: 'chatbot'
                 })
             });
@@ -52,127 +71,249 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
     };
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-end gap-3">
-                <Button
-                    variant="outline"
-                    onClick={() => window.open(`/dashboard/bots/${bot.id}/embed`)}
-                >
-                    <Icons.Settings2 className="w-4 h-4 mr-2" />
-                    Install Widget
-                </Button>
-                <Button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="bg-orange-600 hover:bg-orange-700 text-white"
-                >
-                    {isSaving ? <Icons.Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Salva Modifiche
-                </Button>
+        <div className="flex flex-col h-[calc(100vh-100px)] lg:flex-row gap-6">
+            {/* Left Sidebar / Tabs - Mobile: Top Bar */}
+            <div className="lg:w-64 flex-shrink-0 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-2 lg:pb-0 border-b lg:border-none border-gray-200">
+                {TABS.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all whitespace-nowrap ${isActive
+                                ? 'bg-purple-100 text-purple-700 font-medium'
+                                : 'text-gray-600 hover:bg-gray-50'
+                                }`}
+                        >
+                            <Icon className={`w-5 h-5 ${isActive ? 'text-purple-600' : 'text-gray-400'}`} />
+                            {tab.label}
+                        </button>
+                    );
+                })}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                    <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <Bot className="w-5 h-5 text-orange-600" />
-                            Identità Chatbot
+            {/* Main Content Area */}
+            <div className="flex-1 flex gap-6 overflow-hidden">
+                {/* Form Area */}
+                <div className="flex-1 overflow-y-auto pr-2 space-y-6 pb-20">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold text-gray-900">
+                            {TABS.find(t => t.id === activeTab)?.label}
                         </h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nome Assistente</label>
-                                <input
-                                    type="text"
-                                    value={config.name}
-                                    onChange={e => setConfig({ ...config, name: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Tono di Voce</label>
-                                <input
-                                    type="text"
-                                    value={config.tone}
-                                    onChange={e => setConfig({ ...config, tone: e.target.value })}
-                                    placeholder="Es. Professionale, Incoraggiante, Conciso"
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Messaggio di Benvenuto</label>
-                                <textarea
-                                    value={config.welcomeMessage}
-                                    onChange={e => setConfig({ ...config, welcomeMessage: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg h-24 resize-none focus:ring-2 focus:ring-orange-500 outline-none"
-                                />
-                            </div>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => window.open(`/dashboard/bots/${bot.id}/embed`)}
+                                className="hidden sm:flex"
+                            >
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Widget
+                            </Button>
+                            <Button
+                                onClick={handleSave}
+                                disabled={isSaving}
+                                className="bg-purple-600 hover:bg-purple-700 text-white"
+                            >
+                                {isSaving ? <Icons.Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                Salva
+                            </Button>
                         </div>
-                    </section>
+                    </div>
 
-                    <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <Icons.BookOpen className="w-5 h-5 text-blue-600" />
-                            Base di Conoscenza
-                        </h2>
-                        {canUseKnowledgeBase ? (
-                            <KnowledgeManager
-                                botId={bot.id}
-                                initialSources={bot.knowledgeSources}
-                            />
-                        ) : (
-                            <div className="p-4 bg-gray-50 text-gray-500 text-sm rounded-lg">
-                                Il tuo piano non supporta la Knowledge Base personalizzata.
-                            </div>
-                        )}
-                    </section>
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={activeTab}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="space-y-6"
+                        >
+                            {activeTab === 'general' && (
+                                <section className="space-y-6">
+                                    <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Nome Assistente</label>
+                                            <input
+                                                type="text"
+                                                value={config.name}
+                                                onChange={e => setConfig({ ...config, name: e.target.value })}
+                                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tono di Voce</label>
+                                            <input
+                                                type="text"
+                                                value={config.tone}
+                                                onChange={e => setConfig({ ...config, tone: e.target.value })}
+                                                placeholder="Es. Professionale, Amichevole"
+                                                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Messaggio di Benvenuto</label>
+                                            <textarea
+                                                value={config.welcomeMessage}
+                                                onChange={e => setConfig({ ...config, welcomeMessage: e.target.value })}
+                                                className="w-full p-2 border border-gray-300 rounded-lg h-24 resize-none focus:ring-2 focus:ring-purple-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {activeTab === 'knowledge' && (
+                                <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                                    {canUseKnowledgeBase ? (
+                                        <KnowledgeManager
+                                            botId={bot.id}
+                                            initialSources={bot.knowledgeSources}
+                                        />
+                                    ) : (
+                                        <div className="p-4 bg-gray-50 text-gray-500 text-sm rounded-lg">
+                                            Il tuo piano non supporta la Knowledge Base personalizzata.
+                                        </div>
+                                    )}
+                                </section>
+                            )}
+
+                            {activeTab === 'behavior' && (
+                                <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Messaggio di Fallback</label>
+                                        <p className="text-sm text-gray-500 mb-2">Cosa dire quando il bot non sa la risposta.</p>
+                                        <textarea
+                                            value={config.fallbackMessage}
+                                            onChange={e => setConfig({ ...config, fallbackMessage: e.target.value })}
+                                            className="w-full p-2 border border-gray-300 rounded-lg h-24 resize-none focus:ring-2 focus:ring-purple-500 outline-none"
+                                        />
+                                    </div>
+                                    {/* Boundaries could go here as a list editor */}
+                                </section>
+                            )}
+
+                            {activeTab === 'leads' && (
+                                <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Quando chiedere i dati?</label>
+                                        <select
+                                            value={config.leadCaptureStrategy}
+                                            onChange={e => setConfig({ ...config, leadCaptureStrategy: e.target.value })}
+                                            className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+                                        >
+                                            <option value="immediate">Subito (dopo il benvenuto)</option>
+                                            <option value="after_3_msgs">Dopo 3 messaggi (Consigliato)</option>
+                                            <option value="smart">Smart (Decide l'AI)</option>
+                                            <option value="on_exit">All'uscita (Exit Intent)</option>
+                                        </select>
+                                    </div>
+                                    <div className="pt-4 border-t border-gray-100">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Campi da raccogliere</label>
+                                        {config.candidateDataFields.length > 0 ? (
+                                            config.candidateDataFields.map((field: any, i: number) => (
+                                                <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2 text-sm">
+                                                    <span className="font-medium text-gray-800 capitalize">{field.field}</span>
+                                                    <span className="text-xs text-gray-500">{field.required ? 'Required' : 'Optional'}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500 italic">Nessun campo configuato.</p>
+                                        )}
+                                        {/* Add/Edit fields UI could be added here similar to wizard */}
+                                    </div>
+                                </section>
+                            )}
+
+                            {activeTab === 'appearance' && (
+                                <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Colore Primario</label>
+                                        <div className="flex gap-2 mt-2">
+                                            {['#7C3AED', '#2563EB', '#DB2777', '#EA580C', '#16A34A', '#000000'].map(color => (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => setConfig({ ...config, primaryColor: color })}
+                                                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${config.primaryColor === color ? 'border-gray-900 scale-110' : 'border-transparent'
+                                                        }`}
+                                                    style={{ backgroundColor: color }}
+                                                />
+                                            ))}
+                                            <input
+                                                type="color"
+                                                value={config.primaryColor}
+                                                onChange={e => setConfig({ ...config, primaryColor: e.target.value })}
+                                                className="w-8 h-8 rounded-full overflow-hidden cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+                                    {/* Position etc */}
+                                </section>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
                 </div>
 
-                <div className="space-y-8">
-                    <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-yellow-500" />
-                            Lead Generation
-                        </h2>
+                {/* Live Preview Panel - Hidden on small screens unless toggled */}
+                <div className={`w-[400px] flex-shrink-0 bg-gray-50 border-l border-gray-200 flex flex-col hidden xl:flex`}>
+                    <div className="p-4 border-b border-gray-200 bg-white flex justify-between items-center">
+                        <h3 className="font-semibold text-gray-700">Live Preview</h3>
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                            Active
+                        </div>
+                    </div>
+                    <div className="flex-1 relative bg-[url('/grid.svg')] opacity-100 p-6 flex flex-col justify-end items-end overflow-hidden">
+                        {/* Mock Website Background */}
+                        <div className="absolute inset-0 opacity-5 pointer-events-none bg-gradient-to-br from-gray-100 to-gray-200" />
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Quando chiedere i dati?</label>
-                                <select
-                                    value={config.leadCaptureStrategy}
-                                    onChange={e => setConfig({ ...config, leadCaptureStrategy: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
-                                >
-                                    <option value="immediate">Subito (dopo il benvenuto)</option>
-                                    <option value="after_3_msgs">Dopo 3 messaggi (Consigliato)</option>
-                                    <option value="smart">Smart (Decide l'AI)</option>
-                                </select>
+                        {/* We render the ChatWindow here, "open" by default or controlled */}
+                        {/* Since ChatWindow is fixed position, we need to override it for preview or wrap it in a transform container */}
+                        {/* Ideally ChatWindow accepts a 'style' or 'className' prop to override fixed positioning */}
+                        {/* OR we make a specific Preview Wrapper that forces it to be relative/absolute inside this div */}
+
+                        {/* IMPORTANT: ChatWindow has 'fixed' class. We need to override it or use a "preview mode" prop. */}
+                        {/* Let's wrap it in a div with `transform: translate(0)` which creates a new stacking context? 
+                            No, properties like `fixed` are relative to viewport unless transformed ancestor? 
+                            Yes, `transform`, `filter`, `perspective` on ancestor makes `fixed` child relative to it.
+                        */}
+                        <div className="relative w-full h-[600px] border border-gray-200 shadow-2xl rounded-2xl overflow-hidden bg-white transform translate-z-0">
+                            {/* Header Mock */}
+                            <div className="absolute top-0 left-0 right-0 h-14 z-10 flex items-center justify-between px-4 text-white" style={{ backgroundColor: config.primaryColor }}>
+                                <span className="font-semibold">{config.name}</span>
+                                <Icons.X className="w-5 h-5 opacity-80" />
                             </div>
-
-                            <div className="pt-4 border-t border-gray-100">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Campi da raccogliere</label>
-                                {config.candidateDataFields.length > 0 ? (
-                                    config.candidateDataFields.map((field: any, i: number) => (
-                                        <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2 text-sm">
-                                            <span className="font-medium text-gray-800">{field.field}</span>
-                                            <span className="text-xs text-gray-500">{field.required ? 'Required' : 'Optional'}</span>
+                            {/* Body Mock - basically we can't easily reuse ChatWindow logic if it fetches API. 
+                                For visual preview, we might want a "Stateless" version of ChatWindow.
+                                But for now let's just show a static visual or try to iframe it?
+                                
+                                Actually, sticking the real ChatWindow (which does API calls) might be annoying as it creates conversations.
+                                Better: A "VisualOnlyChatWindow" or pass `demoMode={true}` to ChatWindow.
+                                
+                                Let's just create a quick visual mock here that reflects the config updates in real-time.
+                             */}
+                            <div className="absolute inset-0 pt-16 pb-4 px-4 bg-gray-50 flex flex-col">
+                                <div className="flex-1 space-y-4">
+                                    <div className="flex gap-2">
+                                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs shadow-sm bg-gray-400" style={{ backgroundColor: config.primaryColor }}>
+                                            <Bot className="w-4 h-4" />
                                         </div>
-                                    ))
-                                ) : (
-                                    <p className="text-sm text-gray-500 italic">Nessun campo configuato.</p>
-                                )}
+                                        <div className="p-3.5 rounded-2xl rounded-bl-none shadow-sm text-sm leading-relaxed bg-white text-gray-800 border border-gray-100">
+                                            {config.welcomeMessage || 'Ciao! Come posso aiutarti?'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <div className="flex gap-2 items-center bg-white p-2 rounded-xl border border-gray-200">
+                                        <div className="flex-1 text-sm text-gray-400 pl-2">Scrivi un messaggio...</div>
+                                        <div className="p-2 rounded-lg bg-gray-200 text-white">
+                                            <Send className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </section>
-
-                    <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm opacity-60 pointer-events-none">
-                        <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <LayoutTemplate className="w-5 h-5 text-purple-500" />
-                            Aspetto Widget
-                        </h2>
-                        <p className="text-sm text-gray-500">
-                            Personalizzazione colori e icona in arrivo.
-                        </p>
-                    </section>
+                    </div>
                 </div>
             </div>
         </div>

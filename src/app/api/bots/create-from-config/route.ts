@@ -272,6 +272,7 @@ export async function POST(req: Request) {
         });
 
         return Response.json({
+            botId: bot.id,  // Frontend expects botId
             id: bot.id,
             slug: bot.slug,
             name: bot.name

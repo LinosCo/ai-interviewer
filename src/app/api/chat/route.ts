@@ -241,16 +241,18 @@ export async function POST(req: Request) {
                         if (currentPhase === 'DATA_COLLECTION' || (shouldCollectData && currentPhase === 'DEEP')) {
                             const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
                             // Run extraction in background
-                            CandidateExtractor.extractProfile(messages, openAIKey).then(async (profile: any) => {
+                            CandidateExtractor.extractProfile(messages, openAIKey, conversationId).then(async (profile: any) => {
                                 if (profile) {
                                     const { prisma } = require('@/lib/prisma');
                                     await prisma.conversation.update({
                                         where: { id: conversationId },
                                         data: { candidateProfile: profile }
                                     });
-                                    console.log("👤 [CHAT] Candidate Profile Saved:", profile.fullName);
+                                    console.log("👤 [CHAT] Candidate Profile Saved:", profile.fullName || 'Unknown');
+                                } else {
+                                    console.error("❌ [CHAT] Candidate extraction returned null");
                                 }
-                            }).catch((e: any) => console.error("Extraction failed", e));
+                            }).catch((e: any) => console.error("❌ [CHAT] Candidate extraction failed:", e));
                         }
 
                         await ChatService.completeInterview(conversationId);
@@ -343,15 +345,18 @@ export async function POST(req: Request) {
             // Trigger Extraction
             if (currentPhase === 'DATA_COLLECTION') {
                 const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-                CandidateExtractor.extractProfile(messages, openAIKey).then(async (profile: any) => {
+                CandidateExtractor.extractProfile(messages, openAIKey, conversationId).then(async (profile: any) => {
                     if (profile) {
                         const { prisma } = require('@/lib/prisma');
                         await prisma.conversation.update({
                             where: { id: conversationId },
                             data: { candidateProfile: profile }
                         });
+                        console.log("👤 [CHAT] Candidate Profile Saved:", profile.fullName || 'Unknown');
+                    } else {
+                        console.error("❌ [CHAT] Candidate extraction returned null");
                     }
-                });
+                }).catch((e: any) => console.error("❌ [CHAT] Candidate extraction failed:", e));
             }
 
             return Response.json({
@@ -361,8 +366,10 @@ export async function POST(req: Request) {
             });
         }
 
-        // 7.5. Check if user consented to data collection (if we asked but haven't started collecting yet)
-        if (nextPhase === 'DATA_COLLECTION' && currentPhase === 'DATA_COLLECTION' && !isTransitioning) {
+        // 7.5. Check if user consented to data collection (ONLY ONCE - first time in DATA_COLLECTION)
+        const consentGiven = metadata.consentGiven || false;
+
+        if (nextPhase === 'DATA_COLLECTION' && currentPhase === 'DATA_COLLECTION' && !isTransitioning && !consentGiven) {
             // We're in DATA_COLLECTION but haven't transitioned yet - check if this is consent
             const lastUserMsg = lastMessage?.content || '';
 
@@ -374,9 +381,16 @@ export async function POST(req: Request) {
             );
 
             if (userIntent === 'CONSENT') {
-                // User gave consent - mark as transitioning to actually start collecting
+                // User gave consent - mark as transitioning AND set consent flag
                 console.log("✅ [CHAT] User consented to data collection (LLM verified). Starting field collection.");
                 isTransitioning = true;
+
+                // CRITICAL: Set consent flag to prevent re-checking on every message
+                const { prisma } = require('@/lib/prisma');
+                await prisma.conversation.update({
+                    where: { id: conversationId },
+                    data: { metadata: { ...metadata, phase: nextPhase, consentGiven: true } }
+                });
             } else if (userIntent === 'REFUSAL') {
                 // User refused - end interview
                 console.log("❌ [CHAT] User refused data collection. Ending.");

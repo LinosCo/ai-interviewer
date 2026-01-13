@@ -89,6 +89,9 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                     <Link href={`/dashboard/bots/${bot.id}/claims`} className="px-3 py-2 sm:px-4 sm:py-2 border rounded hover:bg-gray-50 bg-green-50 text-green-700 border-green-200 text-sm sm:text-base">
                         Claims
                     </Link>
+                    <Link href={`/dashboard/bots/${bot.id}/profiles`} className="px-3 py-2 sm:px-4 sm:py-2 border rounded hover:bg-gray-50 bg-purple-50 text-purple-700 border-purple-200 text-sm sm:text-base">
+                        Profili
+                    </Link>
                     <a href={`/i/${bot.slug}`} target="_blank" className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm sm:text-base">
                         Public Link
                     </a>

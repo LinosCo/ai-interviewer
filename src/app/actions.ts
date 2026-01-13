@@ -650,7 +650,26 @@ export async function updateTopicAction(topicId: string, botId: string, data: an
 export async function deleteTopicAction(topicId: string, botId: string) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
+
+    // Delete the topic
     await prisma.topicBlock.delete({ where: { id: topicId } });
+
+    // CRITICAL FIX: Recalculate orderIndex for remaining topics to prevent gaps
+    const remainingTopics = await prisma.topicBlock.findMany({
+        where: { botId },
+        orderBy: { orderIndex: 'asc' }
+    });
+
+    // Update each topic with sequential orderIndex (0, 1, 2, 3...)
+    for (let i = 0; i < remainingTopics.length; i++) {
+        if (remainingTopics[i].orderIndex !== i) {
+            await prisma.topicBlock.update({
+                where: { id: remainingTopics[i].id },
+                data: { orderIndex: i }
+            });
+        }
+    }
+
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 

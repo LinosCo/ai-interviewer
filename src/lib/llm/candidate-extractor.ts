@@ -39,7 +39,7 @@ export class CandidateExtractor {
         const transcript = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
         const schema = z.object({
-            fullName: z.string().nullable().describe("Candidate's full name"),
+            fullName: z.string().nullable().describe("Full name"),
             email: z.string().nullable().describe("Email address"),
             phone: z.string().nullable().describe("Phone number"),
             currentRole: z.string().nullable().describe("Current job title or role"),
@@ -48,15 +48,15 @@ export class CandidateExtractor {
             linkedIn: z.string().nullable().describe("LinkedIn profile link/handle"),
             portfolio: z.string().nullable().describe("Portfolio or website URL"),
             budget: z.string().nullable().describe("Project budget (if applicable)"),
-            availability: z.string().nullable().describe("Recruiting availability (e.g. notice period, start date)"),
+            availability: z.string().nullable().describe("Availability or timeline (e.g. start date, notice period)"),
 
-            hardSkills: z.array(z.string()).describe("List of technical/hard skills mentioned"),
-            softSkills: z.array(z.string()).describe("List of soft skills demonstrated"),
+            hardSkills: z.array(z.string()).describe("List of technical skills or capabilities mentioned"),
+            softSkills: z.array(z.string()).describe("List of soft skills or traits demonstrated"),
 
-            experienceSummary: z.string().describe("Brief summary of experience (max 3 sentences)"),
+            experienceSummary: z.string().describe("Brief summary of experience/background (max 3 sentences)"),
 
-            cultureFitScore: z.number().min(1).max(10).describe("1-10 Score on alignment with the goal"),
-            recruiterNote: z.string().describe("Concise note for the recruiter about this candidate.")
+            alignmentScore: z.number().min(1).max(10).describe("1-10 Score on alignment with the goals"),
+            summaryNote: z.string().describe("Concise note for the reviewer about this contact.")
         });
 
         try {
@@ -65,10 +65,10 @@ export class CandidateExtractor {
                 model: openai('gpt-4o'),
                 schema,
                 prompt: `
-You are an expert HR Recruiter and Profiler.
-Analyze the following interview transcript and extract a structured candidate profile.
-Focus on factual data provided by the user (Candidate). 
-Also evaluate their skills and fit based on their answers.
+You are an expert Lead Qualifier and Profiler.
+Analyze the following interview transcript and extract a structured profile.
+Focus on factual data provided by the user. 
+Also evaluate their qualifications and alignment based on their answers.
 
 TRANSCRIPT:
 ${transcript}

@@ -37,7 +37,7 @@ export async function POST(req: Request) {
             }
         });
 
-        if (!bot || bot.project.organization.members.length === 0) {
+        if (!bot || !bot.project.organization || bot.project.organization.members.length === 0) {
             return new Response('Bot not found or unauthorized', { status: 404 });
         }
 

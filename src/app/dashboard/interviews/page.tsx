@@ -17,7 +17,7 @@ export default async function InterviewsPage() {
                     bots: {
                         where: {
                             botType: 'interview'
-                        },
+                        } as any,
                         include: {
                             conversations: {
                                 select: { id: true, status: true, completedAt: true }

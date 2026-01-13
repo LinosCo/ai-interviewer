@@ -16,10 +16,7 @@ export default async function InterviewsPage() {
                 include: {
                     bots: {
                         where: {
-                            OR: [
-                                { botType: 'interview' },
-                                { botType: null }
-                            ]
+                            botType: 'interview'
                         },
                         include: {
                             conversations: {
@@ -64,11 +61,13 @@ export default async function InterviewsPage() {
         });
         allBots = allBotsFromDB;
     } else {
-        const ownedBots = user.ownedProjects.flatMap(p => p.bots);
-        const assignedBots = user.projectAccess.flatMap(pa => pa.project.bots);
+        // Explicitly type the user with relations to satisfy TS
+        const userWithRelations = user as any;
+        const ownedBots = userWithRelations.ownedProjects.flatMap((p: any) => p.bots);
+        const assignedBots = userWithRelations.projectAccess.flatMap((pa: any) => pa.project.bots);
 
         const uniqueIds = new Set();
-        allBots = [...ownedBots, ...assignedBots].filter(bot => {
+        allBots = [...ownedBots, ...assignedBots].filter((bot: any) => {
             if (uniqueIds.has(bot.id)) return false;
             uniqueIds.add(bot.id);
             return true;

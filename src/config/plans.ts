@@ -67,6 +67,7 @@ export interface PlanLimits {
 
     // Chatbot limits
     monthlyTokenBudget: number;
+    maxActiveChatbots: number;
 }
 
 export interface PlanConfig {
@@ -155,7 +156,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 100,
             messageCooldownSeconds: 0.5,
-            monthlyTokenBudget: 50000
+            monthlyTokenBudget: 50000,
+            maxActiveChatbots: -1
         },
         marketingFeatures: [
             'Partner Full Access',
@@ -229,7 +231,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 10,
             messageCooldownSeconds: 2,
-            monthlyTokenBudget: 200000
+            monthlyTokenBudget: 200000,
+            maxActiveChatbots: 0
         },
         marketingFeatures: [
             '3 interviste attive',
@@ -303,7 +306,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 30,
             messageCooldownSeconds: 1,
-            monthlyTokenBudget: 1000000
+            monthlyTokenBudget: 1000000,
+            maxActiveChatbots: 1
         },
         marketingFeatures: [
             '10 interviste attive',
@@ -379,7 +383,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 100,
             messageCooldownSeconds: 0.5,
-            monthlyTokenBudget: 5000000
+            monthlyTokenBudget: 5000000,
+            maxActiveChatbots: -1
         },
         marketingFeatures: [
             'Interviste illimitate',

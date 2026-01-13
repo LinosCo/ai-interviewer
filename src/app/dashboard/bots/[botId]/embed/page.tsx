@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
@@ -55,9 +56,11 @@ export default async function EmbedPage(props: { params: Promise<{ botId: string
                             Copia il codice e incollalo nel tuo sito web per attivare {bot.name}.
                         </p>
                     </div>
-                    <Button variant="outline" onClick={() => window.open(`/dashboard/bots`)}>
-                        Torna alla Dashboard
-                    </Button>
+                    <Link href="/dashboard/bots" passHref>
+                        <Button variant="outline">
+                            Torna alla Dashboard
+                        </Button>
+                    </Link>
                 </div>
 
                 {/* Code Snippet */}

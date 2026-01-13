@@ -60,6 +60,44 @@ export async function canPublishBot(organizationId: string): Promise<{ allowed: 
     return { allowed: true };
 }
 
+export async function canCreateChatbot(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
+    const subscription = await getOrCreateSubscription(organizationId);
+    if (!subscription) return { allowed: true };
+
+    const plans = await getPricingPlans();
+    // @ts-ignore - access hidden limits
+    const limit = plans[subscription.tier]?.limits?.maxActiveChatbots;
+
+    // undefined means unlimited (legacy/fallback), -1 means unlimited
+    if (limit === undefined || limit === -1) {
+        return { allowed: true };
+    }
+
+    if (limit === 0) {
+        return {
+            allowed: false,
+            reason: `Il tuo piano ${subscription.tier} non include la creazione di Chatbot AI. Passa a PRO per sbloccarla.`
+        };
+    }
+
+    const activeChatbotsCount = await prisma.bot.count({
+        where: {
+            project: { organizationId },
+            botType: 'chatbot',
+            status: { not: 'ARCHIVED' } // Consider all non-archived bots as taking a "slot" or just PUBLISHED? User said "created", implies existing. Safe to assume non-archived.
+        }
+    });
+
+    if (activeChatbotsCount >= limit) {
+        return {
+            allowed: false,
+            reason: `Hai raggiunto il limite di ${limit} Chatbot per il piano ${subscription.tier}. Effettua l'upgrade per crearne altri.`
+        };
+    }
+
+    return { allowed: true };
+}
+
 // Check if an interview can be completed (usage limit)
 export async function canStartInterview(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);

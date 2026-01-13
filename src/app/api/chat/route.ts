@@ -97,11 +97,12 @@ export async function POST(req: Request) {
 
         // 5.b. Failsafe for Stuck Topic -> Scale based on loop index & Phase
         const isDeep = currentPhase === 'DEEP';
-        // Assume Scan phase takes approx 3 messages per topic.
+        // SCAN phase: 2 exchanges per topic (1 assistant question + 1 user response = 2 messages)
+        // Add some buffer for intro, but keep it tight
         const phaseOffset = isDeep ? (botTopics.length * 3) : 0;
-        const msgPerTopic = isDeep ? 8 : 5; // Allow more depth in Deep phase
+        const msgPerTopic = isDeep ? 6 : 3; // SCAN: ~3 msgs/topic, DEEP: ~6 msgs/topic
 
-        const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 5;
+        const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 3;
 
         // DISABLE HEADROOM CHECK FOR DATA COLLECTION
         if (currentPhase !== 'DATA_COLLECTION' && messages.length > globalHeadroom) {
@@ -126,20 +127,40 @@ export async function POST(req: Request) {
                 nextPhase = 'DATA_COLLECTION';
                 isTransitioning = true;
 
-                // Soft Transition Prompt for Data Collection
+                // Direct Transition to Data Collection
                 const isItalian = conversation.bot.language === 'it';
                 const softOfferInstruction = isItalian ? `
-## TRANSIZIONE: OFFERTA RACCOLTA DATI (LEAD GEN)
-L'intervista è terminata per limiti raggiunti o completamento temi.
-1. Comunica chiaramente che la parte di contenuto dell'intervista è conclusa.
-2. Sii esplicito: "Vorrei chiederti un ultimo favore. Ti andrebbe di lasciare il tuo contatto per essere ricontattato o approfondire ulteriormente in futuro?"
-3. Se l'utente dice di sì o si mostra interessato, procederemo con la richiesta dei dati.
+## TRANSIZIONE CRITICA: RICHIESTA DATI DI CONTATTO
+Il tempo/turni dell'intervista sono esauriti.
+
+**ISTRUZIONI OBBLIGATORIE**:
+1. **RINGRAZIAMENTO**: Ringrazia sinceramente per il tempo dedicato
+2. **COMUNICAZIONE CHIARA**: Spiega che l'intervista è conclusa per limiti temporali
+3. **RICHIESTA DIRETTA E CORDIALE**: Chiedi i dati di contatto in modo diretto ma amichevole
+   - NON essere vago: "Vorrei chiederti i tuoi dati di contatto"
+   - NON dire "se vuoi", "magari", "eventualmente"
+   - SPIEGA IL PERCHÉ: "per poterti ricontattare/per restare in contatto"
+4. **ASPETTA CONFERMA**: Attendi che l'utente confermi prima di chiedere campi specifici
+5. Tono: Professionale ma caloroso, come un recruiter
+
+**STRUTTURA ESEMPIO**:
+"[Nome], ti ringrazio molto per il tempo che hai dedicato a questa conversazione. Purtroppo abbiamo esaurito il tempo a disposizione, ma vorrei davvero restare in contatto con te. Posso chiederti i tuoi dati di contatto?"
 ` : `
-## TRANSITION: DATA COLLECTION OFFERING
-The interview content is complete or limits reached.
-1. Formally state that the interview phase is finished.
-2. Be explicit: "I'd like to ask a final favor. Would you be interested in leaving your contact information so we can follow up or keep this conversation open in the future?"
-3. If the user agrees or shows interest, we will proceed to collect the details.
+## CRITICAL TRANSITION: REQUEST CONTACT DATA
+Interview time/turns limit reached.
+
+**MANDATORY INSTRUCTIONS**:
+1. **THANK YOU**: Sincerely thank them for their time
+2. **CLEAR COMMUNICATION**: Explain the interview concluded due to time limits
+3. **DIRECT & FRIENDLY REQUEST**: Ask for contact details directly but warmly
+   - DO NOT be vague: "I'd like to ask for your contact details"
+   - DO NOT say "if you want", "maybe", "possibly"
+   - EXPLAIN WHY: "so we can follow up/stay in touch"
+4. **WAIT FOR CONFIRMATION**: Wait for user to confirm before asking specific fields
+5. Tone: Professional but warm, like a recruiter
+
+**EXAMPLE STRUCTURE**:
+"[Name], thank you so much for the time you've dedicated to this conversation. Unfortunately we've reached our time limit, but I'd really like to stay in touch with you. May I ask for your contact details?"
 `;
                 systemPrompt = await PromptBuilder.build(
                     conversation.bot,
@@ -234,17 +255,37 @@ Now we restart from the first topic: "${botTopics[0].label}".
 
                         const isItalian = conversation.bot.language === 'it';
                         const dataInstruction = isItalian ? `
-## TRANSIZIONE: FINE INTERVISTA -> INTERESSE DATI
-Abbiamo terminato tutti i temi.
-1. Ringrazia e comunica che l'intervista di contenuto è finita.
-2. Chiedi se è interessato a lasciare i propri dati per essere ricontattato o candidarsi (senza chiederli subito).
-3. Sii molto cordiale.
+## TRANSIZIONE CRITICA: PASSAGGIO A RACCOLTA DATI
+Abbiamo completato tutti i temi dell'intervista.
+
+**ISTRUZIONI OBBLIGATORIE**:
+1. Ringrazia calorosamente l'utente per il tempo dedicato
+2. **COMUNICAZIONE ESPLICITA**: Devi dire chiaramente che l'intervista di contenuto è finita
+3. **RICHIESTA DIRETTA**: Chiedi DIRETTAMENTE se vuole lasciare i suoi dati di contatto
+   - NON essere vago o timido
+   - NON dire "se ti va", "magari", "eventualmente"
+   - DI': "Vorrei chiederti i tuoi dati di contatto per restare in contatto"
+4. **ASPETTA CONSENSO**: Non chiedere subito i campi specifici, aspetta che confermi interesse
+5. Tono: Cordiale ma professionale, come un recruiter
+
+**ESEMPIO**:
+"Perfetto! Abbiamo finito con le domande di contenuto. Ti ringrazio davvero per il tempo e gli spunti preziosi che hai condiviso. Prima di salutarci, vorrei chiederti i tuoi dati di contatto per poterti ricontattare. Ti va?"
 ` : `
-## TRANSITION: END OF CONTENT -> DATA INTEREST
-All topics are covered.
-1. Thank the user and state the content interview is finished.
-2. Ask if they'd be interested in leaving their details to be contacted or to apply (don't ask for fields yet).
-3. Be very warm.
+## CRITICAL TRANSITION: MOVE TO DATA COLLECTION
+All interview topics are complete.
+
+**MANDATORY INSTRUCTIONS**:
+1. Warmly thank the user for their time
+2. **EXPLICIT COMMUNICATION**: Clearly state that the content interview is finished
+3. **DIRECT REQUEST**: Ask DIRECTLY if they want to leave contact details
+   - DO NOT be vague or shy
+   - DO NOT say "if you'd like", "maybe", "possibly"
+   - SAY: "I'd like to ask for your contact details to stay in touch"
+4. **WAIT FOR CONSENT**: Don't ask for specific fields yet, wait for them to confirm interest
+5. Tone: Friendly but professional, like a recruiter
+
+**EXAMPLE**:
+"Great! We've finished with the content questions. Thank you so much for your time and the valuable insights you've shared. Before we wrap up, I'd like to ask for your contact details so we can follow up. Would that work for you?"
 `;
                         systemPrompt = await PromptBuilder.build(
                             conversation.bot,
@@ -360,6 +401,20 @@ All topics are covered.
                 currentTopicId: nextTopicId,
                 isCompleted: true
             });
+        }
+
+        // 7.5. Check if user consented to data collection (if we asked but haven't started collecting yet)
+        if (nextPhase === 'DATA_COLLECTION' && currentPhase === 'DATA_COLLECTION' && !isTransitioning) {
+            // We're in DATA_COLLECTION but haven't transitioned yet - check if this is consent
+            const lastUserMsg = lastMessage?.content?.toLowerCase() || '';
+            const consentKeywords = ['sì', 'si', 'yes', 'ok', 'certo', 'volentieri', 'va bene', 'sure', 'yeah', 'va benissimo', 'perfetto', 'certamente'];
+            const hasConsented = consentKeywords.some(keyword => lastUserMsg.includes(keyword));
+
+            if (hasConsented && lastUserMsg.length < 100) {
+                // User gave consent - mark as transitioning to actually start collecting
+                console.log("✅ [CHAT] User consented to data collection. Starting field collection.");
+                isTransitioning = true;
+            }
         }
 
         // 8. Updates

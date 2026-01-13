@@ -226,52 +226,80 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 
                 const instructions = isItalian ? `
 ## FASE: RACCOLTA DATI (CONTATTI)
-L'utente ha accettato di lasciare i propri dati.
-**ELENCO CAMPI DA RACCOGLIERE**: ${fieldsList}
+L'utente ha ACCETTATO di lasciare i propri dati di contatto.
 
-**REGOLA D'ORO (MANDATORIA): Chiedi i dati UNO ALLA VOLTA.**
-Non passare al dato successivo finché non hai ricevuto quello precedente.
+**CAMPI DA RACCOGLIERE**: ${fieldsList}
 
-ISTRUZIONI:
-1. Ringrazia calorosamente l'utente per l'interesse.
-2. Chiedi il primo dato dell'elenco che non è ancora stato fornito.
-3. **NON elencare mai tutti i campi richiesti in un unico messaggio.**
-4. Se l'utente risponde, conferma con empatia e chiedi il dato SUCCESSIVO dall'elenco: [${fieldsList}].
-5. **CRITICO**: Non finire l'intervista finché non hai passato in rassegna TUTTI i campi richiesti (o finché l'utente non si rifiuta esplicitamente).
-6. **PROFILO AI**: Ti stai comportando come un recruiter umano, non come un bot. Usa il nome dell'utente se lo hai già ricevuto.
-7. **CHIUSURA**: Solo dopo aver chiesto TUTTI i campi (${fieldsList}), scrivi alla fine dell'ultimo messaggio: "INTERVIEW_COMPLETED".
+**REGOLA D'ORO ASSOLUTA**: Chiedi i dati UNO ALLA VOLTA. Mai più di un campo per volta.
+
+**PROCESSO PASSO-PASSO**:
+1. **RINGRAZIAMENTO**: "Perfetto! Grazie mille."
+2. **PRIMO CAMPO**: Chiedi SOLO il primo campo che manca: ${fieldIds[0] ? (FIELD_LABELS[fieldIds[0]]?.it || fieldIds[0]) : 'primo campo'}
+3. **CONFERMA E NEXT**: Quando l'utente risponde, conferma e chiedi il SUCCESSIVO
+4. **RIPETI**: Continua fino ad aver chiesto TUTTI i campi della lista
+
+**IMPORTANTISSIMO**:
+- NON elencare tutti i campi richiesti ("Ti chiederò nome, email e telefono...")
+- NON chiedere due campi insieme ("Qual è il tuo nome e email?")
+- Se l'utente fornisce più dati insieme, ringraziali e chiedi il campo successivo mancante
+- Usa il nome dell'utente se lo hai già ricevuto (tono personale)
+- Se l'utente rifiuta esplicitamente → termina con "INTERVIEW_COMPLETED"
+
+**CHIUSURA**: Dopo aver ricevuto TUTTI i ${fieldIds.length} campi (${fieldsList}), ringrazia e scrivi: "INTERVIEW_COMPLETED"
+
+**ESEMPIO FLUSSO**:
+- "Perfetto! Cominciamo dal tuo nome. Come ti chiami?"
+- [utente: "Mario Rossi"]
+- "Grazie Mario! Ora, qual è la tua email?"
+- [utente: "mario@email.it"]
+- "Perfetto. Ultimo dato: il tuo numero di telefono?"
+- [utente: "333..."]
+- "Grazie mille Mario! Ho registrato tutto. INTERVIEW_COMPLETED"
 ` : `
 ## PHASE: DATA COLLECTION (CONTACTS)
-The user has agreed to leave their details.
+The user has AGREED to leave their contact details.
+
 **FIELDS TO COLLECT**: ${fieldsList}
 
-**GOLDEN RULE (MANDATORY): Ask for details ONE BY ONE.**
-Do not move to the next field until you have received the previous one.
+**ABSOLUTE GOLDEN RULE**: Ask for details ONE AT A TIME. Never more than one field per turn.
 
-INSTRUCTIONS:
-1. Warmly thank the user.
-2. Ask for the first data field from the list that hasn't been provided yet.
-3. **NEVER list all requested fields in a single message.**
-4. When the user responds, confirm with empathy and ask for the NEXT field from the list: [${fieldsList}].
-5. **CRITICAL**: Do not terminate until you have gone through ALL requested fields.
-6. **AI PROFILE**: You are acting like a human recruiter. Use the user's name if already known.
-7. **CLOSING**: Only after asking for ALL fields (${fieldsList}), write at the end of the last response: "INTERVIEW_COMPLETED".
+**STEP-BY-STEP PROCESS**:
+1. **THANK YOU**: "Perfect! Thank you so much."
+2. **FIRST FIELD**: Ask ONLY for the first missing field: ${fieldIds[0] ? (FIELD_LABELS[fieldIds[0]]?.en || fieldIds[0]) : 'first field'}
+3. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one
+4. **REPEAT**: Continue until you've asked for ALL fields in the list
+
+**CRITICALLY IMPORTANT**:
+- DO NOT list all required fields ("I'll need your name, email and phone...")
+- DO NOT ask for two fields together ("What's your name and email?")
+- If user provides multiple data points together, thank them and ask for next missing field
+- Use the user's name if you already have it (personal tone)
+- If user explicitly refuses → end with "INTERVIEW_COMPLETED"
+
+**CLOSING**: After receiving ALL ${fieldIds.length} fields (${fieldsList}), thank them and write: "INTERVIEW_COMPLETED"
+
+**EXAMPLE FLOW**:
+- "Perfect! Let's start with your name. What's your full name?"
+- [user: "John Smith"]
+- "Thank you John! Now, what's your email?"
+- [user: "john@email.com"]
+- "Great. Last one: your phone number?"
+- [user: "555..."]
+- "Thank you so much John! I've got everything. INTERVIEW_COMPLETED"
 `;
 
                 return instructions.trim();
 
             } else if (supervisorInsight.status === 'TRANSITION') {
                 const nextTopic = allTopics[topicIndex + 1];
-                const transitionMessage = nextTopic
-                    ? `Passiamo ora a "${nextTopic.label}".`
-                    : "Concludiamo qui l'intervista.";
 
                 supervisorInstruction = `
-> [!IMPORTANT] SUPERVISOR INSTRUCTION:
-> The current topic is considered COMPLETE (All phases done).
-> DO NOT ASK MORE QUESTIONS about "${currentTopic.label}".
-> DO NOT ask for permission (e.g., "Va bene?").
-> Say briefly: "Grazie. ${transitionMessage}"
+> [!IMPORTANT] SUPERVISOR INSTRUCTION: TOPIC TRANSITION
+> The current topic "${currentTopic.label}" is COMPLETE.
+> ${nextTopic ? `You are transitioning to: "${nextTopic.label}"` : 'This is the end of the topic loop.'}
+>
+> **CRITICAL RULE**: This message will handle the transition in the next turn.
+> DO NOT try to transition in this response. Continue with the current topic status.
 `;
             } else if (supervisorInsight.status === 'SCANNING') {
                 const target = supervisorInsight.nextSubGoal || "the next sub-goal";
@@ -325,37 +353,61 @@ ${primaryInstruction}
         methodologyContent: string,
         phase: 'SCAN' | 'DEEP' = 'SCAN'
     ): string {
+        const firstSubGoal = nextTopic.subGoals[0] || nextTopic.label;
+
         const transitionInstruction = phase === 'DEEP'
             ? `
-> [!IMPORTANT] DEEP DIVE RELAUNCH
-> We are returning to "${nextTopic.label}" for a second pass (Deep Dive).
-> Context: The user has already touched on this topic lightly in the Scan Phase.
-> INSTRUCTION: 
-> 1. Acknowledge the previous topic briefly.
-> 2. Pivot to "${nextTopic.label}" with a clear intent to go deeper.
-> 3. ASK A SPECIFIC, PROBING QUESTION about "${nextTopic.label}" based on what you know or a specific sub-goal.
-> 4. DO NOT ask a generic "What do you think?". BE SPECIFIC.`
+> [!CRITICAL] DEEP DIVE TRANSITION & QUESTION
+> We are returning to "${nextTopic.label}" for deeper exploration.
+> The user touched on this in SCAN phase - now we probe deeper.
+>
+> **MANDATORY STRUCTURE**:
+> 1. Brief natural transition (1 short sentence acknowledging previous topic)
+> 2. IMMEDIATELY ask a specific probing question about "${nextTopic.label}"
+>
+> **QUESTION REQUIREMENTS**:
+> - Must relate to: ${firstSubGoal}
+> - Must be specific and contextual (not generic like "what do you think?")
+> - Must reference or build on what you learned in SCAN phase if possible
+> - MUST end with "?"
+>
+> Example flow: "Grazie per questi spunti. Tornando a [topic], mi interessa capire [specific aspect]. [Specific question]?"
+`
             : `
-> SMOOTH TRANSITION
-> 1. Briefly acknowledge the user's last answer regarding "${currentTopic.label}".
-> 2. Smoothly pivot to the new topic: "${nextTopic.label}".
-> 3. ASK THE FIRST QUESTION of the new topic immediately.`;
+> [!CRITICAL] SCAN TRANSITION & QUESTION
+> Moving from "${currentTopic.label}" to "${nextTopic.label}".
+>
+> **MANDATORY STRUCTURE**:
+> 1. Very brief acknowledgment of previous answer (max 5 words, can be omitted)
+> 2. IMMEDIATELY ask the first question about "${nextTopic.label}"
+>
+> **QUESTION REQUIREMENTS**:
+> - Must relate to: ${firstSubGoal}
+> - Must be clear and direct
+> - NO meta-commentary like "Passiamo a...", "Ora vorrei chiederti..."
+> - Just naturally ask the question
+> - MUST end with "?"
+>
+> Example: "Perfetto. Parlando di [topic], [specific question]?"
+`;
 
         return `
 ## TRANSITION MODE (${phase} PHASE)
-You are moving from Topic: "${currentTopic.label}" -> To: "${nextTopic.label}".
+Topic: "${currentTopic.label}" → "${nextTopic.label}"
 
 ${transitionInstruction}
 
-CONTEXT on New Topic:
+NEW TOPIC CONTEXT:
 ${nextTopic.description}
-Sub-Goals:
+Key Sub-Goals:
 ${nextTopic.subGoals.map(g => `- ${g}`).join('\n')}
 
-STYLE:
-- Be conversational.
-- NO "Passiamo a...". Just do it naturally.
-- **CRITICAL: YOU MUST END WITH A QUESTION.** Do not just say "Thanks".
+**CRITICAL RULES**:
+1. DO NOT explain the transition ("Ora passiamo a...", "Let's move to...")
+2. DO NOT ask for permission ("Possiamo parlare di...?", "Va bene se...?")
+3. Your response MUST contain a question mark (?) - this is mandatory
+4. The question should feel natural and flow from the conversation
+5. Be conversational but direct - get to the question quickly
 `.trim();
     }
 

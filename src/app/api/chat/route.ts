@@ -47,6 +47,7 @@ export async function POST(req: Request) {
         console.log("🔍 [CHAT] Limits Check:", { shouldConclude: statusCheck.shouldConclude, shouldCollectData });
 
         // Check time/turn limits - force end if exceeded
+        // BUFFER: Allow 60s buffer before hard stop to allow wrap-up
         if (statusCheck.shouldConclude && currentPhase !== 'DATA_COLLECTION') {
             console.log("⏰ [CHAT] Time/Turn limit reached.");
 
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
                 supervisorInsight = { status: 'COMPLETION' };
             } else {
                 // No data collection - end interview
+                // Don't cut off substantially early - if within 1 min of limit, it's fine.
                 await ChatService.completeInterview(conversationId);
                 return Response.json({
                     text: (conversation.bot.language === 'it'
@@ -118,7 +120,7 @@ export async function POST(req: Request) {
             // SCAN phase: 2 exchanges per topic (1 assistant question + 1 user response = 2 messages)
             // Add some buffer for intro, but keep it tight
             const phaseOffset = isDeep ? (botTopics.length * 3) : 0;
-            const msgPerTopic = isDeep ? 6 : 3; // SCAN: ~3 msgs/topic, DEEP: ~6 msgs/topic
+            const msgPerTopic = isDeep ? 10 : 5; // RELAXED LIMITS (Scanning ~5, Deep ~10)
 
             const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 3;
 

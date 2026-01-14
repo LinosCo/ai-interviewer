@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Bot, Trash2, ExternalLink, MoreVertical, Loader2 } from 'lucide-react';
+import { MessageSquare, Bot, Trash2, ExternalLink, MoreVertical, Loader2, Users } from 'lucide-react';
 import { deleteBotAction } from '@/actions/bot-actions';
 
 interface BotListItemProps {
@@ -72,8 +72,16 @@ export function BotListItem({ bot, compact = false }: BotListItemProps) {
                     </span>
                 ) : (
                     // Full view actions can go here
-                    <></>
+                    <Link
+                        href={`/dashboard/bots/${bot.id}/profiles`}
+                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="Profili & Lead"
+                    >
+                        <Users className="w-4 h-4" />
+                    </Link>
                 )}
+
+                <div className="w-px h-4 bg-gray-200 mx-1" />
 
                 <button
                     onClick={handleDelete}

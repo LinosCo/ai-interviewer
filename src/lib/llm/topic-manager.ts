@@ -34,6 +34,7 @@ export class TopicManager {
 
         let prompt = '';
 
+
         if (phase === 'SCAN') {
             prompt = `
 You are an Interview Supervisor in GLOBAL SCAN PHASE.
@@ -44,18 +45,18 @@ Language: ${language}
 Recent Conversation History:
 ${recentHistory}
 
-PHASE GOAL: Quick, broad coverage. Move FAST. Do NOT aim for depth.
+PHASE GOAL: Broad coverage, but ensuring the user feels heard.
 
 MANDATORY DECISION RULES (in priority order):
 
 1. **ABSOLUTE LIMIT** (HIGHEST PRIORITY):
    - Count the assistant messages in the recent history that discuss "${currentTopic.label}".
-   - If you count 2 or more assistant questions about this topic -> IMMEDIATELY output status: TRANSITION.
-   - NO EXCEPTIONS. This is a hard limit.
+   - If you count 3 or more assistant questions *specifically* about this topic in the recent history -> IMMEDIATELY output status: TRANSITION.
+   - Do NOT count questions from previous topics.
 
-2. **CONTENT SUFFICIENCY** (if fewer than 2 assistant questions):
+2. **CONTENT SUFFICIENCY**:
    - Have we asked at least 1 substantial question about this topic?
-   - Did the user provide a meaningful answer (not just "yes", "ok", "non saprei")?
+   - Did the user provide a meaningful answer?
    - If YES to both -> OUTPUT status: TRANSITION.
    - If NO -> OUTPUT status: SCANNING with nextSubGoal.
 
@@ -65,13 +66,13 @@ MANDATORY DECISION RULES (in priority order):
 4. **USER SIGNALS**:
    - If user says "next", "basta", shows impatience -> TRANSITION.
 
-CRITICAL: In SCAN phase, 2 questions per topic is the MAXIMUM. Your job is breadth, not depth.
+CRITICAL: In SCAN phase, 3 questions per topic is the MAXIMUM.
 NEVER output status: COMPLETION in SCAN phase. Only SCANNING or TRANSITION.
 
 OUTPUT format:
 - status: SCANNING | TRANSITION
 - nextSubGoal: (only if SCANNING) Which sub-goal to explore next
-- reason: Short explanation mentioning question count and content coverage
+- reason: Short explanation
 `.trim();
         } else {
             // DEEP PHASE
@@ -79,11 +80,10 @@ OUTPUT format:
             const recentAssistantCount = (recentHistory.match(/assistant:/gi) || []).length;
 
             // TIME BUDGET LOGIC
-            // If we have very little time allocated (< 2 mins), we must be extremely strict.
-            const isHurried = timeBudget !== undefined && timeBudget < 2;
-            // PREVIOUS SCAN (approx 2 msgs) + NEW DEEP (2 msgs) = 4 TOTAL
-            // If hurried: PREVIOUS SCAN (2) + NEW DEEP (1) = 3 TOTAL
-            const maxQuestions = isHurried ? 3 : 4;
+            // If we have very little time allocated (< 1.5 mins), we must be extremely strict.
+            const isHurried = timeBudget !== undefined && timeBudget < 1.5;
+            // PREVIOUS SCAN (approx 2 msgs) + NEW DEEP (increased to 3 msgs) = 5 TOTAL
+            const maxQuestions = isHurried ? 3 : 5;
 
             prompt = `
 You are an Interview Supervisor in GLOBAL DEEP DIVE PHASE.
@@ -97,8 +97,8 @@ Recent assistant messages in history: ${recentAssistantCount}
 Recent Conversation History:
 ${recentHistory}
 
-PHASE GOAL: Add depth by exploring interesting concepts from the SCAN phase.
-CRITICAL: ${isHurried ? 'WE ARE SHORT ON TIME. WRAP UP THIS TOPIC FAST.' : 'Be selective but thorough.'}
+PHASE GOAL: Add depth. Explore concepts.
+CRITICAL: ${isHurried ? 'WE ARE SHORT ON TIME. WRAP UP THIS TOPIC FAST.' : 'Be thorough.'}
 
 MANDATORY DECISION RULES (in priority order):
 
@@ -106,30 +106,27 @@ MANDATORY DECISION RULES (in priority order):
    - Look at the recent conversation history above
    - Count how many assistant messages you see that are asking questions about "${currentTopic.label}"
    - If you count ${maxQuestions} or MORE assistant questions about this specific topic -> OUTPUT status: TRANSITION immediately
-   - NO EXCEPTIONS. NO DEEPENING if limit reached.
+   - **IMPORTANT**: Be generous. If in doubt, assume we haven't reached the limit yet to avoid skipping the topic.
 
 2. **WORTHWHILE CONCEPT CHECK** (only if < ${maxQuestions} questions asked):
    - Review the user's previous answers about "${currentTopic.label}".
    - Identify concepts or themes that emerged and deserve deeper exploration.
-   - Examples: motivations, concerns, contradictions, interesting details, emotional aspects.
-   - **FOCUS ON CONCEPTS, NOT QUOTES**: Describe the concept to probe
-   - If you find such a concept AND haven't reached ${maxQuestions} questions -> OUTPUT status: DEEPENING with focusPoint.
+   - If user has NOT answered any question about this topic in THIS Deep Phase yet -> OUTPUT status: DEEPENING.
+   - If you find a new concept AND haven't reached ${maxQuestions} questions -> OUTPUT status: DEEPENING with focusPoint.
 
 3. **EXHAUSTION SIGNALS**:
-   - If user's recent answers are short, generic ("ok", "va bene", "non lo so") -> TRANSITION.
-   - If user already gave thorough explanations -> TRANSITION.
+   - If user's recent answers are short, generic -> TRANSITION.
    - If you cannot identify a NEW and MEANINGFUL concept -> TRANSITION.
 
 4. **ANTI-GENERIC RULE**:
-   - NEVER use vague focus points like: "anything else", "tell me more", "elaborate", "other thoughts".
-   - Focus point must describe a specific concept or theme to explore.
+   - NEVER use vague focus points like: "anything else", "tell me more".
 
-**REMINDER**: Max ${maxQuestions} questions per topic in DEEP phase (Total including previous Scan phase). After that, ALWAYS TRANSITION.
+**REMINDER**: Max ${maxQuestions} questions per topic. After that, ALWAYS TRANSITION.
 
 OUTPUT format:
 - status: DEEPENING | TRANSITION | COMPLETION
 - focusPoint: (only if DEEPENING) Clear description of the concept to probe
-- reason: Explanation of why this concept deserves depth OR why we should transition (mention question count and time pressure)
+- reason: Explanation
 `.trim();
         }
 

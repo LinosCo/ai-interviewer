@@ -446,6 +446,7 @@ Now we restart from the first topic: "${firstTopic.label}".
      */
     static buildSoftOfferPrompt(language: string = 'en'): string {
         const isItalian = language === 'it';
+
         return isItalian ? `
 ## TRANSIZIONE CRITICA: RICHIESTA DATI DI CONTATTO
 Il tempo/turni dell'intervista sono esauriti o i temi sono completati.
@@ -454,11 +455,13 @@ Il tempo/turni dell'intervista sono esauriti o i temi sono completati.
 1. **RINGRAZIAMENTO**: Ringrazia sinceramente per il tempo dedicato
 2. **COMUNICAZIONE CHIARA**: Spiega che l'intervista è conclusa
 3. **RICHIESTA DIRETTA E CORDIALE**: Chiedi i dati di contatto in modo diretto ma amichevole
-   - NON essere vago: "Vorrei chiederti i tuoi dati di contatto"
-   - NON dire "se vuoi", "magari", "eventualmente"
    - SPIEGA IL PERCHÉ: "per poterti ricontattare/per restare in contatto"
 4. **ASPETTA CONFERMA**: Attendi che l'utente confermi prima di chiedere campi specifici
-5. Tono: Professionale ma caloroso, come un recruiter
+
+**DIVIETI ASSOLUTI (CRITICO)**:
+- **NON chiedere "Come ti chiami?" in questo messaggio.**
+- **NON chiedere email o telefono in questo messaggio.**
+- **CHIEDI SOLO IL PERMESSO.**
 
 **STRUTTURA ESEMPIO**:
 "[Nome], ti ringrazio molto per il tempo che hai dedicato a questa conversazione. Siamo arrivati alla conclusione, ma vorrei davvero restare in contatto con te. Posso chiederti i tuoi dati di contatto?"
@@ -470,11 +473,13 @@ Interview time/turns limit reached or topics completed.
 1. **THANK YOU**: Sincerely thank them for their time
 2. **CLEAR COMMUNICATION**: Explain the interview concluded
 3. **DIRECT & FRIENDLY REQUEST**: Ask for contact details directly but warmly
-   - DO NOT be vague: "I'd like to ask for your contact details"
-   - DO NOT say "if you want", "maybe", "possibly"
    - EXPLAIN WHY: "so we can follow up/stay in touch"
 4. **WAIT FOR CONFIRMATION**: Wait for user to confirm before asking specific fields
-5. Tone: Professional but warm, like a recruiter
+
+**ABSOLUTE PROHIBITIONS (CRITICAL)**:
+- **DO NOT ask "What is your name?" in this message.**
+- **DO NOT ask for email or phone in this message.**
+- **ONLY ASK FOR PERMISSION.**
 
 **EXAMPLE STRUCTURE**:
 "[Name], thank you so much for the time you've dedicated to this conversation. We've reached the end, but I'd really like to stay in touch with you. May I ask for your contact details?"

@@ -176,6 +176,20 @@ Even if you are thanking the user or transitioning to a new topic, the very last
             - Only transition when you have exhausted the topic.`;
         }
 
+
+        // CRITICAL DATA COLLECTION GUARDRAIL
+        const shouldCollectData = (bot as any).collectCandidateData;
+        let dataCollectionGuard = "";
+
+        if (shouldCollectData && (remainingMins < 1 || isCriticalTime || remainingMins <= 0)) {
+            dataCollectionGuard = `
+> [!CRITICAL] RECRUITMENT ACTIVE - DO NOT JUST SAY GOODBYE
+> The user must provide their contact details before you end the call since "collectCandidateData" is TRUE.
+> If you are about to end the interview or say goodbye, YOU MUST first ask:
+> "Before we finish, may I ask for your contact details to stay in touch?"
+> DO NOT output "INTERVIEW_COMPLETED" until you have asked this permission.`;
+        }
+
         return `
 ## TIMING CONTEXT
 Elapsed: ${elapsedMins}m / Budget: ${maxMins}m
@@ -183,6 +197,8 @@ Current Topic: ${currentTopicIndex + 1}/${allTopics.length}
 ${rewardText}
 
 ${statusInstruction}
+
+${dataCollectionGuard}
 `.trim();
     }
 
@@ -326,6 +342,48 @@ The user has AGREED to leave their contact details.
             }
         }
 
+
+        // SUPERVISOR SUPREMACY LOGIC
+        // We must override the bot's tendency to say goodbye if the supervisor says "continue"
+        // And we must force the data ask if the supervisor says "completion"
+
+        let supervisorSupremacyInstruction = "";
+        const isCompletion = supervisorInsight && (typeof supervisorInsight === 'string' ? false : supervisorInsight.status === 'COMPLETION');
+        // Logic for Data Collection (Pre-check) - ensure we don't miss it
+        const collectingData = bot.collectCandidateData;
+
+        if (!isCompletion) {
+            // ACTIVE PHASE (SCAN / DEEP / TRANSITION)
+            // STRICTLY FORBID CLOSURE
+            supervisorSupremacyInstruction = `
+> [!CRITICAL] SUPERVISOR SUPREMACY: INTERVIEW IS ACTIVE
+> The Interview Supervisor has indicated that the conversation MUST CONTINUE.
+> **YOU ARE FORBIDDEN FROM SAYING GOODBYE.**
+> Do NOT use phrases like "A presto", "Buona giornata", "Goodbye", "See you".
+> Do NOT wrap up the interview.
+> You MUST ask the next question or feedback as instructed.
+> If the user said "prego" or "thank you", acknowledge it briefly ("Di nulla") and IMMEDIATELY move to the next topic/question.
+`;
+        } else {
+            // COMPLETION PHASE
+            if (collectingData) {
+                supervisorSupremacyInstruction = `
+> [!CRITICAL] SUPERVISOR SUPREMACY: DATA COLLECTION REQUIRED
+> The active phase is now DATA COLLECTION.
+> **DO NOT SAY GOODBYE YET.**
+> You MUST explicitly ask for permission to collect contact details first.
+> Phrase: "Before we finish, may I ask for your contact details to stay in touch?" (or Italian: "Prima di salutarci, posso chiederti i contatti per restare aggiornati?")
+> ONLY after they agree can you proceed to collect fields.
+`;
+            } else {
+                // Normal Completion
+                supervisorSupremacyInstruction = `
+> [!NOTE] SUPERVISOR SUPREMACY: COMPLETION
+> You are authorized to wrap up and say goodbye.
+`;
+            }
+        }
+
         return `
 ## CURRENT TOPIC: ${currentTopic.label} (${progress})
 Description: ${currentTopic.description}
@@ -333,6 +391,8 @@ Sub-Goals to Cover:
 1. ${currentTopic.subGoals.join('\n2. ')}
 
 ${supervisorInstruction}
+
+${supervisorSupremacyInstruction}
 
 INSTRUCTION:
 ${primaryInstruction}
@@ -357,58 +417,58 @@ ${primaryInstruction}
 
         const transitionInstruction = phase === 'DEEP'
             ? `
-> [!CRITICAL] DEEP DIVE TRANSITION & QUESTION
-> We are returning to "${nextTopic.label}" for deeper exploration.
+            > [!CRITICAL] DEEP DIVE TRANSITION & QUESTION
+                > We are returning to "${nextTopic.label}" for deeper exploration.
 > The user touched on this in SCAN phase - now we probe deeper.
 >
-> **MANDATORY STRUCTURE**:
-> 1. Brief natural transition (1 short sentence acknowledging previous topic)
-> 2. IMMEDIATELY ask a specific probing question about "${nextTopic.label}"
->
-> **QUESTION REQUIREMENTS**:
+> ** MANDATORY STRUCTURE **:
+> 1. Brief natural transition(1 short sentence acknowledging previous topic)
+            > 2. IMMEDIATELY ask a specific probing question about "${nextTopic.label}"
+                >
+> ** QUESTION REQUIREMENTS **:
 > - Must relate to: ${firstSubGoal}
-> - Must be specific and contextual (not generic like "what do you think?")
-> - Must reference or build on what you learned in SCAN phase if possible
-> - MUST end with "?"
->
+> - Must be specific and contextual(not generic like "what do you think?")
+            > - Must reference or build on what you learned in SCAN phase if possible
+                > - MUST end with "?"
+                >
 > Example flow: "Grazie per questi spunti. Tornando a [topic], mi interessa capire [specific aspect]. [Specific question]?"
-`
+            `
             : `
-> [!CRITICAL] SCAN TRANSITION & QUESTION
-> Moving from "${currentTopic.label}" to "${nextTopic.label}".
+            > [!CRITICAL] SCAN TRANSITION & QUESTION
+                > Moving from "${currentTopic.label}" to "${nextTopic.label}".
 >
-> **MANDATORY STRUCTURE**:
-> 1. Very brief acknowledgment of previous answer (max 5 words, can be omitted)
-> 2. IMMEDIATELY ask the first question about "${nextTopic.label}"
->
-> **QUESTION REQUIREMENTS**:
+> ** MANDATORY STRUCTURE **:
+> 1. Very brief acknowledgment of previous answer(max 5 words, can be omitted)
+            > 2. IMMEDIATELY ask the first question about "${nextTopic.label}"
+                >
+> ** QUESTION REQUIREMENTS **:
 > - Must relate to: ${firstSubGoal}
 > - Must be clear and direct
-> - NO meta-commentary like "Passiamo a...", "Ora vorrei chiederti..."
-> - Just naturally ask the question
-> - MUST end with "?"
->
+            > - NO meta - commentary like "Passiamo a...", "Ora vorrei chiederti..."
+                > - Just naturally ask the question
+                    > - MUST end with "?"
+                    >
 > Example: "Perfetto. Parlando di [topic], [specific question]?"
-`;
+            `;
 
         return `
-## TRANSITION MODE (${phase} PHASE)
-Topic: "${currentTopic.label}" → "${nextTopic.label}"
+## TRANSITION MODE(${phase} PHASE)
+        Topic: "${currentTopic.label}" → "${nextTopic.label}"
 
 ${transitionInstruction}
 
 NEW TOPIC CONTEXT:
 ${nextTopic.description}
-Key Sub-Goals:
+Key Sub - Goals:
 ${nextTopic.subGoals.map(g => `- ${g}`).join('\n')}
 
-**CRITICAL RULES**:
-1. DO NOT explain the transition ("Ora passiamo a...", "Let's move to...")
-2. DO NOT ask for permission ("Possiamo parlare di...?", "Va bene se...?")
-3. Your response MUST contain a question mark (?) - this is mandatory
-4. The question should feel natural and flow from the conversation
-5. Be conversational but direct - get to the question quickly
-`.trim();
+** CRITICAL RULES **:
+        1. DO NOT explain the transition("Ora passiamo a...", "Let's move to...")
+        2. DO NOT ask for permission("Possiamo parlare di...?", "Va bene se...?")
+3. Your response MUST contain a question mark(?) - this is mandatory
+        4. The question should feel natural and flow from the conversation
+        5. Be conversational but direct - get to the question quickly
+            `.trim();
     }
 
     /**
@@ -418,24 +478,24 @@ ${nextTopic.subGoals.map(g => `- ${g}`).join('\n')}
     static buildBridgePrompt(firstTopic: TopicBlock, language: string = 'en'): string {
         const isItalian = language === 'it';
         return isItalian ? `
-## TRANSIZIONE ALLA FASE DEEP DIVE (APPROFONDIMENTO)
-Abbiamo completato la panoramica generale (Scanning).
+## TRANSIZIONE ALLA FASE DEEP DIVE(APPROFONDIMENTO)
+Abbiamo completato la panoramica generale(Scanning).
 Ora ripartiamo dal primo tema: "${firstTopic.label}".
 
-**ISTRUZIONI PER L'INTERVISTATORE**:
-1. Spiega chiaramente all'utente: "Abbiamo finito la panoramica veloce. Ora vorrei tornare su alcuni punti interessanti che hai menzionato per andare più a fondo."
-2. Inizia col primo tema: "${firstTopic.label}".
-3. **REGOLA D'ORO**: Cita un dettaglio specifico che l'utente ha detto prima riguardo a questo tema. Mostra di aver memorizzato le sue risposte precedenti.
+** ISTRUZIONI PER L'INTERVISTATORE**:
+        1. Spiega chiaramente all'utente: "Abbiamo finito la panoramica veloce. Ora vorrei tornare su alcuni punti interessanti che hai menzionato per andare più a fondo."
+        2. Inizia col primo tema: "${firstTopic.label}".
+3. ** REGOLA D'ORO**: Cita un dettaglio specifico che l'utente ha detto prima riguardo a questo tema.Mostra di aver memorizzato le sue risposte precedenti.
 4. Chiedi di approfondire quel dettaglio specifico.
 ` : `
 ## TRANSITION TO DEEP DIVE PHASE
-We have finished the general overview (Scanning).
+We have finished the general overview(Scanning).
 Now we restart from the first topic: "${firstTopic.label}".
 
-**INSTRUCTIONS FOR THE INTERVIEWER**:
-1. Explicitly state to the user: "We've finished the quick overview. Now I'd like to revisit a few interesting points you mentioned earlier to explore them in more depth."
-2. Start with the first topic: "${firstTopic.label}".
-3. **GOLDEN RULE**: Quote a specific detail the user mentioned earlier regarding this topic. Show that you remembered their previous answers.
+** INSTRUCTIONS FOR THE INTERVIEWER **:
+        1. Explicitly state to the user: "We've finished the quick overview. Now I'd like to revisit a few interesting points you mentioned earlier to explore them in more depth."
+        2. Start with the first topic: "${firstTopic.label}".
+3. ** GOLDEN RULE **: Quote a specific detail the user mentioned earlier regarding this topic.Show that you remembered their previous answers.
 4. Ask to delve deeper into that specific detail.
 `;
     }
@@ -449,41 +509,41 @@ Now we restart from the first topic: "${firstTopic.label}".
 
         return isItalian ? `
 ## TRANSIZIONE CRITICA: RICHIESTA DATI DI CONTATTO
-Il tempo/turni dell'intervista sono esauriti o i temi sono completati.
+Il tempo / turni dell'intervista sono esauriti o i temi sono completati.
 
-**ISTRUZIONI OBBLIGATORIE**:
-1. **RINGRAZIAMENTO**: Ringrazia sinceramente per il tempo dedicato
-2. **COMUNICAZIONE CHIARA**: Spiega che l'intervista è conclusa
-3. **RICHIESTA DIRETTA E CORDIALE**: Chiedi i dati di contatto in modo diretto ma amichevole
-   - SPIEGA IL PERCHÉ: "per poterti ricontattare/per restare in contatto"
-4. **ASPETTA CONFERMA**: Attendi che l'utente confermi prima di chiedere campi specifici
+            ** ISTRUZIONI OBBLIGATORIE **:
+        1. ** RINGRAZIAMENTO **: Ringrazia sinceramente per il tempo dedicato
+        2. ** COMUNICAZIONE CHIARA **: Spiega che l'intervista è conclusa
+        3. ** RICHIESTA DIRETTA E CORDIALE **: Chiedi i dati di contatto in modo diretto ma amichevole
+            - SPIEGA IL PERCHÉ: "per poterti ricontattare/per restare in contatto"
+        4. ** ASPETTA CONFERMA **: Attendi che l'utente confermi prima di chiedere campi specifici
 
-**DIVIETI ASSOLUTI (CRITICO)**:
-- **NON chiedere "Come ti chiami?" in questo messaggio.**
-- **NON chiedere email o telefono in questo messaggio.**
-- **CHIEDI SOLO IL PERMESSO.**
+            ** DIVIETI ASSOLUTI(CRITICO) **:
+- ** NON chiedere "Come ti chiami?" in questo messaggio.**
+- ** NON chiedere email o telefono in questo messaggio.**
+- ** CHIEDI SOLO IL PERMESSO.**
 
-**STRUTTURA ESEMPIO**:
-"[Nome], ti ringrazio molto per il tempo che hai dedicato a questa conversazione. Siamo arrivati alla conclusione, ma vorrei davvero restare in contatto con te. Posso chiederti i tuoi dati di contatto?"
-` : `
+** STRUTTURA ESEMPIO **:
+        "[Nome], ti ringrazio molto per il tempo che hai dedicato a questa conversazione. Siamo arrivati alla conclusione, ma vorrei davvero restare in contatto con te. Posso chiederti i tuoi dati di contatto?"
+            ` : `
 ## CRITICAL TRANSITION: REQUEST CONTACT DATA
-Interview time/turns limit reached or topics completed.
+Interview time / turns limit reached or topics completed.
 
-**MANDATORY INSTRUCTIONS**:
-1. **THANK YOU**: Sincerely thank them for their time
-2. **CLEAR COMMUNICATION**: Explain the interview concluded
-3. **DIRECT & FRIENDLY REQUEST**: Ask for contact details directly but warmly
-   - EXPLAIN WHY: "so we can follow up/stay in touch"
-4. **WAIT FOR CONFIRMATION**: Wait for user to confirm before asking specific fields
+** MANDATORY INSTRUCTIONS **:
+        1. ** THANK YOU **: Sincerely thank them for their time
+2. ** CLEAR COMMUNICATION **: Explain the interview concluded
+        3. ** DIRECT & FRIENDLY REQUEST **: Ask for contact details directly but warmly
+            - EXPLAIN WHY: "so we can follow up/stay in touch"
+        4. ** WAIT FOR CONFIRMATION **: Wait for user to confirm before asking specific fields
 
-**ABSOLUTE PROHIBITIONS (CRITICAL)**:
-- **DO NOT ask "What is your name?" in this message.**
-- **DO NOT ask for email or phone in this message.**
-- **ONLY ASK FOR PERMISSION.**
+            ** ABSOLUTE PROHIBITIONS(CRITICAL) **:
+- ** DO NOT ask "What is your name?" in this message.**
+- ** DO NOT ask for email or phone in this message.**
+- ** ONLY ASK FOR PERMISSION.**
 
-**EXAMPLE STRUCTURE**:
-"[Name], thank you so much for the time you've dedicated to this conversation. We've reached the end, but I'd really like to stay in touch with you. May I ask for your contact details?"
-`;
+** EXAMPLE STRUCTURE **:
+        "[Name], thank you so much for the time you've dedicated to this conversation. We've reached the end, but I'd really like to stay in touch with you. May I ask for your contact details?"
+            `;
     }
 
     /**
@@ -530,12 +590,12 @@ ${memoryContext ? memoryContext + '\n\n' : ''}${context}
 
 ${specificPrompt}
 
----
-## FINAL REMINDER (CRITICAL):
-- EVERY response MUST end with a question mark (?).
+        ---
+## FINAL REMINDER(CRITICAL):
+        - EVERY response MUST end with a question mark(?).
 - If you are transitioning, ask the first question of the new topic immediately.
-- If you are probe-deepening, ask for a specific detail.
-- NEVER end with a statement or a "Thank you" alone. Always follow with "?".
+- If you are probe - deepening, ask for a specific detail.
+- NEVER end with a statement or a "Thank you" alone.Always follow with "?".
 `.trim();
     }
 }

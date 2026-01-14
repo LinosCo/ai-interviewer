@@ -330,14 +330,55 @@ export async function POST(req: Request) {
             systemPrompt += `\n\nIMPORTANT: You are starting the interview. Your response MUST begin with the following text exactly:\n"${introMessage}"\nThen, immediately follow up with your first question or statement as per the methodology. Do not repeat the greeting if it's already in the text. combine them naturally.`;
         }
 
-        const result = await generateObject({
-            model,
-            schema,
-            messages: messagesForAI,
-            system: systemPrompt,
-            temperature: 0.7
+
+        console.log("⏳ [CHAT] Starting LLM Generation...");
+        console.time("LLM Generation");
+
+        // TIMEOUT PROTECTION (50s)
+        const timeoutMs = 50000;
+        let didTimeout = false;
+
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => {
+                didTimeout = true;
+                reject(new Error("LLM_TIMEOUT"));
+            }, timeoutMs);
         });
 
+        let result: any;
+
+        try {
+            result = await Promise.race([
+                generateObject({
+                    model,
+                    schema,
+                    messages: messagesForAI,
+                    system: systemPrompt,
+                    temperature: 0.7
+                }),
+                timeoutPromise
+            ]);
+        } catch (error: any) {
+            if (error.message === "LLM_TIMEOUT") {
+                console.error(`⚠️ [CHAT] LLM Generation TIMED OUT after ${timeoutMs}ms.`);
+                console.timeEnd("LLM Generation");
+
+                // Fallback response to prevent crash
+                const fallbackText = conversation.bot.language === 'it'
+                    ? "Mi scuso, sto elaborando molte informazioni e ci sto mettendo un po' più del previsto. Potresti ripetere l'ultimo concetto o darmi un attimo?"
+                    : "I apologize, I'm processing a lot of information and it's taking a bit longer than expected. Could you please repeat that last point or give me a moment?";
+
+                await ChatService.saveAssistantMessage(conversationId, fallbackText);
+                return Response.json({
+                    text: fallbackText,
+                    currentTopicId: nextTopicId,
+                    isCompleted: false
+                });
+            }
+            throw error; // Re-throw real errors
+        }
+
+        console.timeEnd("LLM Generation");
         const responseText = result.object.response;
 
         // Check for Explicit Completion Tag (used in Data Collection)

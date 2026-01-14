@@ -49,21 +49,25 @@ PHASE GOAL: Broad coverage, but ensuring the user feels heard.
 
 MANDATORY DECISION RULES (in priority order):
 
-1. **ABSOLUTE LIMIT** (HIGHEST PRIORITY):
+1. **TRIVIAL / CLOSING RESPONSE** (ABSOLUTE PRIORITY):
+   - If the user's latest message is a polite filler (e.g., "prego", "grazie", "ok", "va bene", "no", "basta") WITHOUT new content -> IMMEDIATELY output status: TRANSITION.
+   - Do NOT attempt to "deepen" on a "prego" or "thank you". It is a signal to move on.
+
+2. **ABSOLUTE LIMIT** (HIGHEST PRIORITY):
    - Count the assistant messages in the recent history that discuss "${currentTopic.label}".
    - If you count 3 or more assistant questions *specifically* about this topic in the recent history -> IMMEDIATELY output status: TRANSITION.
    - Do NOT count questions from previous topics.
 
-2. **CONTENT SUFFICIENCY**:
+3. **CONTENT SUFFICIENCY**:
    - Have we asked at least 1 substantial question about this topic?
    - Did the user provide a meaningful answer?
    - If YES to both -> OUTPUT status: TRANSITION.
    - If NO -> OUTPUT status: SCANNING with nextSubGoal.
 
-3. **COMPREHENSIVE ANSWER TRIGGER**:
+4. **COMPREHENSIVE ANSWER TRIGGER**:
    - If the user's last answer was very detailed and covered multiple sub-goals -> TRANSITION immediately.
 
-4. **USER SIGNALS**:
+5. **USER SIGNALS**:
    - If user says "next", "basta", shows impatience -> TRANSITION.
 
 CRITICAL: In SCAN phase, 3 questions per topic is the MAXIMUM.

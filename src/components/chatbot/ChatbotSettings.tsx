@@ -195,7 +195,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                         <textarea
                                             value={config.fallbackMessage}
                                             onChange={e => setConfig({ ...config, fallbackMessage: e.target.value })}
-                                            className="w-full p-2 border border-gray-300 rounded-lg h-24 resize-none focus:ring-2 focus:ring-purple-500 outline-none"
+                                            className="w-full p-2 border border-gray-300 rounded-lg h-24 focus:ring-2 focus:ring-purple-500 outline-none"
                                         />
                                     </div>
                                     {/* Boundaries could go here as a list editor */}
@@ -219,17 +219,51 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                     </div>
                                     <div className="pt-4 border-t border-gray-100">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">Campi da raccogliere</label>
-                                        {config.candidateDataFields.length > 0 ? (
-                                            config.candidateDataFields.map((field: any, i: number) => (
-                                                <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded mb-2 text-sm">
-                                                    <span className="font-medium text-gray-800 capitalize">{field.field}</span>
-                                                    <span className="text-xs text-gray-500">{field.required ? 'Required' : 'Optional'}</span>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-gray-500 italic">Nessun campo configuato.</p>
-                                        )}
-                                        {/* Add/Edit fields UI could be added here similar to wizard */}
+                                        <div className="space-y-3">
+                                            {[
+                                                { field: 'name', question: 'Come ti chiami?' },
+                                                { field: 'email', question: 'Qual è la tua email?' },
+                                                { field: 'phone', question: 'Qual è il tuo numero di telefono?' },
+                                                { field: 'company', question: 'Per quale azienda lavori?' },
+                                                { field: 'location', question: 'Da dove ci scrivi?' },
+                                                { field: 'role', question: 'Qual è il tuo ruolo?' },
+                                                { field: 'portfolio', question: 'Hai un portfolio/sito?' },
+                                                { field: 'availability', question: 'Disponibilità?' }
+                                            ].map(field => {
+                                                const isSelected = config.candidateDataFields.some((f: any) => f.field === field.field);
+                                                return (
+                                                    <div key={field.field} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium capitalize">{field.field}</span>
+                                                            <span className="text-xs text-gray-500">{field.question}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isSelected}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) {
+                                                                            setConfig({
+                                                                                ...config,
+                                                                                candidateDataFields: [...config.candidateDataFields, { field: field.field, required: true }]
+                                                                            });
+                                                                        } else {
+                                                                            setConfig({
+                                                                                ...config,
+                                                                                candidateDataFields: config.candidateDataFields.filter((f: any) => f.field !== field.field)
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                                                />
+                                                                <span className="text-sm font-medium text-gray-700">Abilita</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </section>
                             )}

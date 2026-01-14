@@ -5,11 +5,20 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 const updateSchema = z.object({
+    name: z.string().min(1).optional(),
+    introMessage: z.string().optional(),
+    tone: z.string().optional(),
+    leadCaptureStrategy: z.string().optional(),
+    fallbackMessage: z.string().optional(),
+    boundaries: z.array(z.string()).optional(),
+    candidateDataFields: z.array(z.any()).optional(), // Allow full JSON array
+    primaryColor: z.string().optional(),
+
+    // Landing Page Fields
     landingTitle: z.string().optional(),
     landingDescription: z.string().optional(),
     landingImageUrl: z.string().optional(),
     landingVideoUrl: z.string().optional(),
-    // Allow other fields in future
 });
 
 export async function PATCH(
@@ -67,11 +76,7 @@ export async function PATCH(
             where: { id: botId },
             data: {
                 ...data,
-                // Only update fields that are present
-                landingTitle: data.landingTitle,
-                landingDescription: data.landingDescription,
-                landingImageUrl: data.landingImageUrl,
-                landingVideoUrl: data.landingVideoUrl
+                // Explicit mappings if needed, but spread handles most schema-matching fields
             }
         });
 

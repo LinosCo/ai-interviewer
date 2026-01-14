@@ -57,6 +57,9 @@ export default async function ProfileDetailPage({ params }: { params: Promise<{ 
                                 {profile.linkedIn && (
                                     <a href={profile.linkedIn} target="_blank" className="text-sm text-blue-600 hover:underline block mt-1">LinkedIn Profile</a>
                                 )}
+                                {profile.portfolio && (
+                                    <a href={profile.portfolio} target="_blank" className="text-sm text-purple-600 hover:underline block mt-1">Portfolio / Website</a>
+                                )}
                             </div>
 
                             <div>

@@ -238,26 +238,29 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
                 const rawFields = (bot?.candidateDataFields as any[]) || ['name', 'email'];
                 const fieldIds = rawFields.map((f: any) => typeof f === 'string' ? f : f.field);
                 console.log("📝 [PromptBuilder] Configured Fields:", fieldIds);
-                const fieldsList = fieldIds.map(id => {
+                const formattedChecklist = fieldIds.map(id => {
                     const label = FIELD_LABELS[id];
-                    return label ? (isItalian ? label.it : label.en) : id;
-                }).join(', ');
+                    const txt = label ? (isItalian ? label.it : label.en) : id;
+                    return `- [ ] ${txt.toUpperCase()}`;
+                }).join('\n');
 
                 const instructions = isItalian ? `
 ## FASE: RACCOLTA DATI (CONTATTI)
 L'utente ha ACCETTATO di lasciare i propri dati di contatto.
 
-**LISTA CAMPI DA RACCOGLIERE**: ${fieldsList}
+**CHECKLIST DATI DA RACCOGLIERE**:
+${formattedChecklist}
 
 **REGOLA D'ORO ASSOLUTA**: Chiedi i dati UNO ALLA VOLTA. Mai più di un campo per volta.
 **CONTROLLA LA CRONOLOGIA**: Prima di chiedere, verifica quali dati l'utente ha GIÀ fornito nei messaggi precedenti.
 
 **PROCESSO PASSO-PASSO**:
-1. **ANALISI**: Guarda la chat. Quali campi della lista "${fieldsList}" mancano?
-2. **NEXT FIELD**: Chiedi il PRIMO campo della lista che non hai ancora ricevuto.
-3. **IMMEDITATO**: Se l'utente ha appena detto "Sì/Ok", NON chiedere "Quale contatto preferisci?". Chiedi SUBITO il primo campo (es. "Come ti chiami?").
+**PROCESSO PASSO-PASSO**:
+1. **ANALISI**: Guarda la chat. Quali voci della CHECKLIST qui sopra mancano?
+2. **NEXT FIELD**: Chiedi la PRIMA voce della checklist non ancora spuntata nella tua mente.
+3. **IMMEDITATO**: Se l'utente ha appena detto "Sì/Ok", NON chiedere "Quale contatto preferisci?". Chiedi SUBITO la prima voce (es. "Come ti chiami?").
 4. **CONFERMA E NEXT**: Quando l'utente risponde, conferma brevemente e chiedi il SUCCESSIVO.
-5. **RIPETI**: Continua finché hai TUTTI i campi.
+5. **RIPETI**: Continua finché hai spuntato TUTTA la checklist.
 
 **ESEMPI**:
 - Se mancano tutti -> Chiedi il primo (es. Nome).
@@ -277,17 +280,18 @@ L'utente ha ACCETTATO di lasciare i propri dati di contatto.
 ## PHASE: DATA COLLECTION (CONTACTS)
 The user has AGREED to leave their contact details.
 
-**FIELDS TO COLLECT**: ${fieldsList}
+**DATA CHECKLIST TO COMPLETE**:
+${formattedChecklist}
 
 **ABSOLUTE GOLDEN RULE**: Ask for details ONE AT A TIME. Never more than one field per turn.
 **CHECK HISTORY**: Before asking, verify which fields the user has ALREADY provided.
 
 **STEP-BY-STEP PROCESS**:
-1. **ANALYZE**: Look at the chat. Which fields from the list "${fieldsList}" are missing?
-2. **NEXT FIELD**: Ask for the FIRST field from the list that you have not received yet.
-3. **IMMEDIATE**: If user just said "Yes/Ok", DO NOT ask "Which contact?". Ask for the FIRST field IMMEDIATELY (e.g. "What is your name?").
+1. **ANALYZE**: Look at the chat. Which items in the CHECKLIST above are missing?
+2. **NEXT FIELD**: Ask for the FIRST unchecked item from the checklist.
+3. **IMMEDIATE**: If user just said "Yes/Ok", DO NOT ask "Which contact?". Ask for the FIRST item IMMEDIATELY (e.g. "What is your name?").
 4. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one.
-5. **REPEAT**: Continue until you have ALL fields.
+5. **REPEAT**: Continue until the checklist is COMPLETE.
 
 **EXAMPLES**:
 - If all missing -> Ask first (e.g. Name).

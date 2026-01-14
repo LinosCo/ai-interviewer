@@ -67,8 +67,13 @@ export class CandidateExtractor {
                 prompt: `
 You are an expert Lead Qualifier and Profiler.
 Analyze the following interview transcript and extract a structured profile.
-Focus on factual data provided by the user. 
-Also evaluate their qualifications and alignment based on their answers.
+
+**GUIDELINES**:
+1. **Facts First**: Focus on factual data provided by the user.
+2. **Smart Inference**: 
+   - Looking for Location/Role in the context of their stories if not explicitly asked.
+   - DO NOT infer name from email. Only extract name if explicitly stated or clearly addressed.
+3. **Be Generous**: If you are 80% sure, extract the data. Don't return null unless truly unknown.
 
 TRANSCRIPT:
 ${transcript}

@@ -58,6 +58,7 @@ export function SemanticProgressBar({ currentTopicId, topics, progress, brandCol
                                         className={`
                                             absolute -top-8 text-[9px] font-bold uppercase tracking-wider text-center transition-all duration-300 -translate-x-1/2 left-1/2 w-24 leading-tight
                                             ${isCurrent ? 'opacity-100 scale-105' : 'text-gray-400 opacity-60 group-hover:opacity-100'}
+                                            line-clamp-2 text-ellipsis overflow-hidden
                                         `}
                                         style={{
                                             color: isCurrent ? brandColor : undefined

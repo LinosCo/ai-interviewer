@@ -236,6 +236,7 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
                 const isItalian = lang === 'it';
 
                 const fieldIds = (bot?.candidateDataFields as string[]) || ['name', 'email'];
+                console.log("📝 [PromptBuilder] Configured Fields:", fieldIds);
                 const fieldsList = fieldIds.map(id => {
                     const label = FIELD_LABELS[id];
                     return label ? (isItalian ? label.it : label.en) : id;

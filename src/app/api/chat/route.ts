@@ -334,8 +334,8 @@ export async function POST(req: Request) {
         console.log("⏳ [CHAT] Starting LLM Generation...");
         console.time("LLM Generation");
 
-        // TIMEOUT PROTECTION (50s)
-        const timeoutMs = 50000;
+        // TIMEOUT PROTECTION (45s)
+        const timeoutMs = 45000;
         let didTimeout = false;
 
         const timeoutPromise = new Promise((_, reject) => {

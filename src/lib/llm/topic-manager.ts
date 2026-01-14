@@ -20,14 +20,14 @@ export class TopicManager {
         isRecruiting: boolean = false,
         language: string = 'en',
         timeBudget?: number // Optional time budget per topic in minutes
-    ): Promise<{ status: 'SCANNING' | 'DEEPENING' | 'TRANSITION' | 'COMPLETION'; nextSubGoal?: string; focusPoint?: string; reason: string }> {
+    ): Promise<{ status: 'SCANNING' | 'DEEPENING' | 'TRANSITION' | 'COMPLETION'; nextSubGoal?: string | null; focusPoint?: string; reason: string }> {
 
         // Limit history to last 15 messages to prevent timeouts and focus evaluation
         const recentHistory = messages.slice(-15).map(m => `${m.role}: ${m.content}`).join('\n');
 
         const schema = z.object({
             status: z.enum(['SCANNING', 'DEEPENING', 'TRANSITION', 'COMPLETION']),
-            nextSubGoal: z.string().optional().describe("The next sub-goal to ask about (only if SCANNING)"),
+            nextSubGoal: z.string().nullable().optional().describe("The next sub-goal to ask about (only if SCANNING)"),
             focusPoint: z.string().optional().describe("The specific user quote/concept to deep dive into (only if DEEPENING)"),
             reason: z.string()
         });

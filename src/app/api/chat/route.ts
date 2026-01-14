@@ -382,7 +382,9 @@ export async function POST(req: Request) {
         const responseText = result.object.response;
 
         // Check for Explicit Completion Tag (used in Data Collection)
-        if (responseText.includes('INTERVIEW_COMPLETED')) {
+        // Case insensitive check for robustness
+        const completionRegex = /INTERVIEW_COMPLETED/i;
+        if (completionRegex.test(responseText)) {
             await ChatService.completeInterview(conversationId);
 
             // Trigger Extraction

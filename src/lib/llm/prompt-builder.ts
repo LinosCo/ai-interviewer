@@ -229,6 +229,7 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
         let primaryInstruction = "";
 
         if (supervisorInsight) {
+
             if (supervisorInsight.status === 'DATA_COLLECTION') {
                 // RECRUITER MODE - DYNAMIC FIELDS
                 const lang = bot?.language || 'en';
@@ -244,15 +245,21 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 ## FASE: RACCOLTA DATI (CONTATTI)
 L'utente ha ACCETTATO di lasciare i propri dati di contatto.
 
-**CAMPI DA RACCOGLIERE**: ${fieldsList}
+**LISTA CAMPI DA RACCOGLIERE**: ${fieldsList}
 
 **REGOLA D'ORO ASSOLUTA**: Chiedi i dati UNO ALLA VOLTA. Mai più di un campo per volta.
+**CONTROLLA LA CRONOLOGIA**: Prima di chiedere, verifica quali dati l'utente ha GIÀ fornito nei messaggi precedenti.
 
 **PROCESSO PASSO-PASSO**:
-1. **RINGRAZIAMENTO**: "Perfetto! Grazie mille."
-2. **PRIMO CAMPO**: Chiedi SOLO il primo campo che manca: ${fieldIds[0] ? (FIELD_LABELS[fieldIds[0]]?.it || fieldIds[0]) : 'primo campo'}
-3. **CONFERMA E NEXT**: Quando l'utente risponde, conferma e chiedi il SUCCESSIVO
-4. **RIPETI**: Continua fino ad aver chiesto TUTTI i campi della lista
+1. **ANALISI**: Guarda la chat. Quali campi della lista "${fieldsList}" mancano?
+2. **NEXT FIELD**: Chiedi il PRIMO campo della lista che non hai ancora ricevuto.
+3. **CONFERMA E NEXT**: Quando l'utente risponde, conferma brevemente e chiedi il SUCCESSIVO.
+4. **RIPETI**: Continua finché hai TUTTI i campi.
+
+**ESEMPI**:
+- Se mancano tutti -> Chiedi il primo (es. Nome).
+- Se hai il Nome -> Chiedi la Email.
+- Se hai Nome ed Email -> Chiedi il Telefono (se presente in lista).
 
 **IMPORTANTISSIMO**:
 - NON elencare tutti i campi richiesti ("Ti chiederò nome, email e telefono...")
@@ -261,16 +268,7 @@ L'utente ha ACCETTATO di lasciare i propri dati di contatto.
 - Usa il nome dell'utente se lo hai già ricevuto (tono personale)
 - Se l'utente rifiuta esplicitamente → termina con "INTERVIEW_COMPLETED"
 
-**CHIUSURA**: Dopo aver ricevuto TUTTI i ${fieldIds.length} campi (${fieldsList}), ringrazia e scrivi: "INTERVIEW_COMPLETED"
-
-**ESEMPIO FLUSSO**:
-- "Perfetto! Cominciamo dal tuo nome. Come ti chiami?"
-- [utente: "Mario Rossi"]
-- "Grazie Mario! Ora, qual è la tua email?"
-- [utente: "mario@email.it"]
-- "Perfetto. Ultimo dato: il tuo numero di telefono?"
-- [utente: "333..."]
-- "Grazie mille Mario! Ho registrato tutto. INTERVIEW_COMPLETED"
+**CHIUSURA**: SOLO quando hai ricevuto TUTTI i campi della lista, ringrazia e scrivi: "INTERVIEW_COMPLETED"
 ` : `
 ## PHASE: DATA COLLECTION (CONTACTS)
 The user has AGREED to leave their contact details.
@@ -278,12 +276,18 @@ The user has AGREED to leave their contact details.
 **FIELDS TO COLLECT**: ${fieldsList}
 
 **ABSOLUTE GOLDEN RULE**: Ask for details ONE AT A TIME. Never more than one field per turn.
+**CHECK HISTORY**: Before asking, verify which fields the user has ALREADY provided.
 
 **STEP-BY-STEP PROCESS**:
-1. **THANK YOU**: "Perfect! Thank you so much."
-2. **FIRST FIELD**: Ask ONLY for the first missing field: ${fieldIds[0] ? (FIELD_LABELS[fieldIds[0]]?.en || fieldIds[0]) : 'first field'}
-3. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one
-4. **REPEAT**: Continue until you've asked for ALL fields in the list
+1. **ANALYZE**: Look at the chat. Which fields from the list "${fieldsList}" are missing?
+2. **NEXT FIELD**: Ask for the FIRST field from the list that you have not received yet.
+3. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one.
+4. **REPEAT**: Continue until you have ALL fields.
+
+**EXAMPLES**:
+- If all missing -> Ask first (e.g. Name).
+- If you have Name -> Ask Email.
+- If you have Name & Email -> Ask Phone (if in list).
 
 **CRITICALLY IMPORTANT**:
 - DO NOT list all required fields ("I'll need your name, email and phone...")
@@ -292,16 +296,7 @@ The user has AGREED to leave their contact details.
 - Use the user's name if you already have it (personal tone)
 - If user explicitly refuses → end with "INTERVIEW_COMPLETED"
 
-**CLOSING**: After receiving ALL ${fieldIds.length} fields (${fieldsList}), thank them and write: "INTERVIEW_COMPLETED"
-
-**EXAMPLE FLOW**:
-- "Perfect! Let's start with your name. What's your full name?"
-- [user: "John Smith"]
-- "Thank you John! Now, what's your email?"
-- [user: "john@email.com"]
-- "Great. Last one: your phone number?"
-- [user: "555..."]
-- "Thank you so much John! I've got everything. INTERVIEW_COMPLETED"
+**CLOSING**: ONLY when you have received ALL fields in the list, thank them and write: "INTERVIEW_COMPLETED"
 `;
 
                 return instructions.trim();

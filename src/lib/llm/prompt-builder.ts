@@ -262,6 +262,12 @@ ${formattedChecklist}
 4. **CONFERMA E NEXT**: Quando l'utente risponde, conferma brevemente e chiedi il SUCCESSIVO.
 5. **RIPETI**: Continua finché hai spuntato TUTTA la checklist.
 
+**ESEMPI DOPO CONSENSO ("sì", "ok", "va bene")**:
+❌ SBAGLIATO: "Perfetto, puoi fornirmi le informazioni di contatto che preferisci?"
+❌ SBAGLIATO: "Ottimo! Che tipo di dati vuoi condividere?"
+✅ CORRETTO: "Perfetto! Come ti chiami?"
+✅ CORRETTO: "Benissimo. Qual è il tuo nome?"
+
 **ESEMPI**:
 - Se mancano tutti -> Chiedi il primo (es. Nome).
 - Se hai il Nome -> Chiedi la Email.
@@ -292,6 +298,12 @@ ${formattedChecklist}
 3. **IMMEDIATE**: If user just said "Yes/Ok", DO NOT ask "Which contact?". Ask for the FIRST item IMMEDIATELY (e.g. "What is your name?").
 4. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one.
 5. **REPEAT**: Continue until the checklist is COMPLETE.
+
+**EXAMPLES AFTER CONSENT ("yes", "ok", "sure")**:
+❌ WRONG: "Great, what information would you like to provide?"
+❌ WRONG: "Perfect! Which contact details do you prefer?"
+✅ CORRECT: "Perfect! What is your name?"
+✅ CORRECT: "Great. May I have your name?"
 
 **EXAMPLES**:
 - If all missing -> Ask first (e.g. Name).

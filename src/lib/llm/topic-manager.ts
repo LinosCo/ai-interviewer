@@ -19,8 +19,22 @@ export class TopicManager {
         phase: 'SCAN' | 'DEEP' = 'SCAN',
         isRecruiting: boolean = false,
         language: string = 'en',
-        timeBudget?: number // Optional time budget per topic in minutes
+        timeBudget?: number, // Optional time budget per topic in minutes
+        deepTurnsByTopic?: Record<string, number> // NEW: Track turns per topic in DEEP phase
     ): Promise<{ status: 'SCANNING' | 'DEEPENING' | 'TRANSITION' | 'COMPLETION'; nextSubGoal?: string | null; focusPoint?: string | null; reason: string }> {
+
+        // DEEP PHASE: Enforce max turns per topic to prevent tunnel vision
+        const MAX_DEEP_TURNS_PER_TOPIC = 4;
+        if (phase === 'DEEP' && deepTurnsByTopic) {
+            const currentTopicTurns = deepTurnsByTopic[currentTopic.id] || 0;
+            if (currentTopicTurns >= MAX_DEEP_TURNS_PER_TOPIC) {
+                console.log(`🚫 [TopicManager] Max turns (${MAX_DEEP_TURNS_PER_TOPIC}) reached for topic "${currentTopic.label}". Forcing TRANSITION.`);
+                return {
+                    status: 'TRANSITION',
+                    reason: `Maximum depth limit (${MAX_DEEP_TURNS_PER_TOPIC} turns) reached for this topic to ensure balanced exploration.`
+                };
+            }
+        }
 
         // Limit history to last 15 messages to prevent timeouts and focus evaluation
         const recentHistory = messages.slice(-15).map(m => `${m.role}: ${m.content}`).join('\n');

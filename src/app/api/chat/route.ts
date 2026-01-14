@@ -96,6 +96,7 @@ export async function POST(req: Request) {
                         , (conversation.bot as any).collectCandidateData // isRecruiting (Pass correct param)
                         , conversation.bot.language // Language
                         , timePerTopic // NEW: time budget per topic
+                        , metadata.deepTurnsByTopic || {} // NEW: Pass turn tracking
                     );
                     supervisorInsight = insight as any;
 
@@ -469,7 +470,42 @@ export async function POST(req: Request) {
             }
         }
 
+        // 9. Save Assistant Response to Database
         await ChatService.saveAssistantMessage(conversationId, responseText);
+
+        // 10. Update Metadata (Phase Tracking + Topic Turn Tracking)
+        const updatedMetadata: any = { phase: nextPhase || currentPhase };
+
+        // Initialize deepTurnsByTopic if transitioning to DEEP for the first time
+        if (nextPhase === 'DEEP' && !metadata.deepTurnsByTopic) {
+            updatedMetadata.deepTurnsByTopic = {};
+        } else if (currentPhase === 'DEEP') {
+            // Carry forward existing tracking
+            updatedMetadata.deepTurnsByTopic = metadata.deepTurnsByTopic || {};
+
+            // Increment turn count for current topic if we're deepening
+            if (supervisorInsight.status === 'DEEPENING') {
+                const topicId = currentTopic?.id;
+                if (topicId) {
+                    updatedMetadata.deepTurnsByTopic[topicId] = (updatedMetadata.deepTurnsByTopic[topicId] || 0) + 1;
+                    console.log(`📊 [CHAT] Turn tracking: Topic "${currentTopic.label}" now at ${updatedMetadata.deepTurnsByTopic[topicId]} turns in DEEP phase`);
+                }
+            }
+        }
+
+        // Preserve consentGiven flag if it exists
+        if (metadata.consentGiven) {
+            updatedMetadata.consentGiven = metadata.consentGiven;
+        }
+
+        const { prisma } = require('@/lib/prisma');
+        await prisma.conversation.update({
+            where: { id: conversationId },
+            data: {
+                metadata: updatedMetadata,
+                currentTopicId: nextTopicId
+            }
+        });
 
         // Memory Update
         const lastUserContent = lastMessage?.role === 'user' ? lastMessage.content : null;

@@ -56,8 +56,8 @@ export function SemanticProgressBar({ currentTopicId, topics, progress, brandCol
                                     {/* Label - Moved ABOVE the dot */}
                                     <span
                                         className={`
-                                            absolute -top-6 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all duration-300 -translate-x-1/2 left-1/2
-                                            ${isCurrent ? 'opacity-100' : 'text-gray-400 opacity-60 group-hover:opacity-100'}
+                                            absolute -top-8 text-[9px] font-bold uppercase tracking-wider text-center transition-all duration-300 -translate-x-1/2 left-1/2 w-24 leading-tight
+                                            ${isCurrent ? 'opacity-100 scale-105' : 'text-gray-400 opacity-60 group-hover:opacity-100'}
                                         `}
                                         style={{
                                             color: isCurrent ? brandColor : undefined

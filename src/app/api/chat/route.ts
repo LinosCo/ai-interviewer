@@ -347,7 +347,9 @@ export async function POST(req: Request) {
             // Trigger Extraction
             if (currentPhase === 'DATA_COLLECTION') {
                 const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-                CandidateExtractor.extractProfile(messages, openAIKey, conversationId).then(async (profile: any) => {
+                // AWAIT the extraction to ensure it runs before the lambda terminates
+                try {
+                    const profile = await CandidateExtractor.extractProfile(messages, openAIKey, conversationId);
                     if (profile) {
                         const { prisma } = require('@/lib/prisma');
                         await prisma.conversation.update({
@@ -358,7 +360,9 @@ export async function POST(req: Request) {
                     } else {
                         console.error("❌ [CHAT] Candidate extraction returned null");
                     }
-                }).catch((e: any) => console.error("❌ [CHAT] Candidate extraction failed:", e));
+                } catch (e: any) {
+                    console.error("❌ [CHAT] Candidate extraction failed:", e);
+                }
             }
 
             return Response.json({

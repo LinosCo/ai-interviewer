@@ -40,7 +40,7 @@ export class CandidateExtractor {
 
         const schema = z.object({
             fullName: z.string().nullable().describe("Full name"),
-            email: z.string().nullable().describe("Email address"),
+            email: z.string().email().nullable().describe("Email address"),
             phone: z.string().nullable().describe("Phone number"),
             currentRole: z.string().nullable().describe("Current job title or role"),
             company: z.string().nullable().describe("Current company or organization"),

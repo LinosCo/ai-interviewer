@@ -255,8 +255,9 @@ L'utente ha ACCETTATO di lasciare i propri dati di contatto.
 **PROCESSO PASSO-PASSO**:
 1. **ANALISI**: Guarda la chat. Quali campi della lista "${fieldsList}" mancano?
 2. **NEXT FIELD**: Chiedi il PRIMO campo della lista che non hai ancora ricevuto.
-3. **CONFERMA E NEXT**: Quando l'utente risponde, conferma brevemente e chiedi il SUCCESSIVO.
-4. **RIPETI**: Continua finché hai TUTTI i campi.
+3. **IMMEDITATO**: Se l'utente ha appena detto "Sì/Ok", NON chiedere "Quale contatto preferisci?". Chiedi SUBITO il primo campo (es. "Come ti chiami?").
+4. **CONFERMA E NEXT**: Quando l'utente risponde, conferma brevemente e chiedi il SUCCESSIVO.
+5. **RIPETI**: Continua finché hai TUTTI i campi.
 
 **ESEMPI**:
 - Se mancano tutti -> Chiedi il primo (es. Nome).
@@ -267,7 +268,8 @@ L'utente ha ACCETTATO di lasciare i propri dati di contatto.
 - NON elencare tutti i campi richiesti ("Ti chiederò nome, email e telefono...")
 - NON chiedere due campi insieme ("Qual è il tuo nome e email?")
 - Se l'utente fornisce più dati insieme, ringraziali e chiedi il campo successivo mancante
-- Usa il nome dell'utente se lo hai già ricevuto (tono personale)
+- USA IL NOME dell'utente SOLO se l'ha fornito ESPLICITAMENTE in risposta alla domanda sul nome. NON presumerlo dall'email.
+- Se l'utente fornisce solo l'email (es. tommy@gmail.com), devi comunque chiedere il NOME se è nella lista.
 - Se l'utente rifiuta esplicitamente → termina con "INTERVIEW_COMPLETED"
 
 **CHIUSURA**: SOLO quando hai ricevuto TUTTI i campi della lista, ringrazia e scrivi: "INTERVIEW_COMPLETED"
@@ -283,8 +285,9 @@ The user has AGREED to leave their contact details.
 **STEP-BY-STEP PROCESS**:
 1. **ANALYZE**: Look at the chat. Which fields from the list "${fieldsList}" are missing?
 2. **NEXT FIELD**: Ask for the FIRST field from the list that you have not received yet.
-3. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one.
-4. **REPEAT**: Continue until you have ALL fields.
+3. **IMMEDIATE**: If user just said "Yes/Ok", DO NOT ask "Which contact?". Ask for the FIRST field IMMEDIATELY (e.g. "What is your name?").
+4. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one.
+5. **REPEAT**: Continue until you have ALL fields.
 
 **EXAMPLES**:
 - If all missing -> Ask first (e.g. Name).
@@ -295,7 +298,8 @@ The user has AGREED to leave their contact details.
 - DO NOT list all required fields ("I'll need your name, email and phone...")
 - DO NOT ask for two fields together ("What's your name and email?")
 - If user provides multiple data points together, thank them and ask for next missing field
-- Use the user's name if you already have it (personal tone)
+- USE THE USER'S NAME ONLY if explicitly provided in response to the name question. DO NOT infer it from email.
+- If user provides only email (e.g. tommy@gmail.com), you MUST still ask for NAME if it is in the list.
 - If user explicitly refuses → end with "INTERVIEW_COMPLETED"
 
 **CLOSING**: ONLY when you have received ALL fields in the list, thank them and write: "INTERVIEW_COMPLETED"

@@ -56,7 +56,8 @@ export class CandidateExtractor {
             experienceSummary: z.string().describe("Brief summary of experience/background (max 3 sentences)"),
 
             alignmentScore: z.number().min(1).max(10).describe("1-10 Score on alignment with the goals"),
-            summaryNote: z.string().describe("Concise note for the reviewer about this contact.")
+            summaryNote: z.string().describe("Concise note for the reviewer about this contact."),
+            userMessage: z.string().nullable().describe("A specific message, question, or final thought left by the user.")
         });
 
         try {

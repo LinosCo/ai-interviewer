@@ -13,6 +13,9 @@ const updateSchema = z.object({
     boundaries: z.array(z.string()).optional(),
     candidateDataFields: z.array(z.any()).optional(), // Allow full JSON array
     primaryColor: z.string().optional(),
+    backgroundColor: z.string().optional(),
+    textColor: z.string().optional(),
+    logoUrl: z.string().optional(),
 
     // Landing Page Fields
     landingTitle: z.string().optional(),

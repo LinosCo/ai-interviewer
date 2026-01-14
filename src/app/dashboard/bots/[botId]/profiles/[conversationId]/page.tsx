@@ -32,24 +32,24 @@ export default async function ProfileDetailPage({ params }: { params: Promise<{ 
     const softSkills = profile.softSkills || [];
 
     return (
-        <div className="space-y-6 max-w-6xl mx-auto">
+        <div className="space-y-6 max-w-6xl mx-auto text-gray-900">
             <div className="flex items-center gap-4">
                 <Link href={`/dashboard/bots/${botId}/profiles`} className="text-gray-500 hover:text-gray-900">
                     &larr; Torna alla lista
                 </Link>
-                <h1 className="text-2xl font-bold">Dettaglio Contatto</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Dettaglio Contatto</h1>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 {/* LEFT COLUMN: Profile Data */}
                 <div className="lg:col-span-1 space-y-6">
-                    <Card>
+                    <Card className="bg-white border-slate-200">
                         <CardHeader>
-                            <CardTitle>{displayName}</CardTitle>
+                            <CardTitle className="text-gray-900">{displayName}</CardTitle>
                             <p className="text-sm text-gray-500">{profile.currentRole || "Ruolo non specificato"}</p>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-4 text-gray-900">
                             <div>
                                 <label className="text-xs font-semibold text-gray-500 uppercase">Contatti</label>
                                 <div className="text-sm">{profile.email || "-"}</div>
@@ -84,10 +84,19 @@ export default async function ProfileDetailPage({ params }: { params: Promise<{ 
 
                             <div>
                                 <label className="text-xs font-semibold text-gray-500 uppercase mb-2 block">Note di Sintesi</label>
-                                <p className="text-sm bg-gray-50 p-3 rounded-md italic">
+                                <p className="text-sm bg-gray-50 p-3 rounded-md italic text-gray-700 border border-gray-100">
                                     "{note}"
                                 </p>
                             </div>
+
+                            {profile.userMessage && (
+                                <div>
+                                    <label className="text-xs font-semibold text-purple-600 uppercase mb-2 block">Messaggio Utente</label>
+                                    <p className="text-sm bg-purple-50 p-3 rounded-md text-purple-900 border border-purple-100">
+                                        "{profile.userMessage}"
+                                    </p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 

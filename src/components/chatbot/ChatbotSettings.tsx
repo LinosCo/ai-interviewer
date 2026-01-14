@@ -228,7 +228,8 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                 { field: 'location', question: 'Da dove ci scrivi?' },
                                                 { field: 'role', question: 'Qual è il tuo ruolo?' },
                                                 { field: 'portfolio', question: 'Hai un portfolio/sito?' },
-                                                { field: 'availability', question: 'Disponibilità?' }
+                                                { field: 'availability', question: 'Disponibilità?' },
+                                                { field: 'userMessage', question: 'Lasciare un messaggio/domanda?' }
                                             ].map(field => {
                                                 const isSelected = config.candidateDataFields.some((f: any) => f.field === field.field);
                                                 return (

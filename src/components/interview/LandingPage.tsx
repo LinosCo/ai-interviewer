@@ -60,9 +60,10 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
 
     const embedUrl = videoUrl ? getEmbedUrl(videoUrl) : null;
     const computedImageUrl = getImageUrl(imageUrl);
+    const backgroundColor = bot.backgroundColor || '#ffffff'; // Default to white if not set
 
     return (
-        <div className="min-h-screen flex flex-col bg-white overflow-x-hidden">
+        <div className="min-h-screen flex flex-col overflow-x-hidden" style={{ backgroundColor }}>
             {/* Background Decoration */}
             <div className="fixed inset-0 pointer-events-none opacity-40 z-0">
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px]"

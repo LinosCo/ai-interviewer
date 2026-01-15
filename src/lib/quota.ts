@@ -108,9 +108,11 @@ export async function checkStaticLimit(
         where: { id: orgId },
         include: {
             members: true,
-            _count: {
-                select: {
-                    bots: { where: { status: 'PUBLISHED' } }
+            projects: {
+                include: {
+                    bots: {
+                        where: { status: 'PUBLISHED' }
+                    }
                 }
             }
         }
@@ -124,7 +126,7 @@ export async function checkStaticLimit(
     if (limitType === 'maxUsers') {
         current = org.members.length;
     } else if (limitType === 'maxActiveBots') {
-        current = org._count.bots;
+        current = org.projects.reduce((sum, project) => sum + project.bots.length, 0);
     }
 
     return {

@@ -87,24 +87,23 @@ export default function BrandingEditor({ bot, plan }: BrandingEditorProps) {
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
-                                                // Check size limit (max 800KB to be safe for Server Actions)
-                                                if (file.size > 800 * 1024) {
-                                                    alert("L'immagine è troppo grande. Per favore usa un file più piccolo di 800KB.");
+                                                // Check size limit (max 500KB to ensure Base64 < 1MB limit of Server Actions)
+                                                // 500KB * 1.33 = ~665KB Base64. Safe.
+                                                if (file.size > 500 * 1024) {
+                                                    alert("L'immagine è troppo grande. Per favore usa un file più piccolo di 500KB.");
                                                     return;
                                                 }
                                                 const reader = new FileReader();
                                                 reader.onloadend = () => {
                                                     const res = reader.result as string;
                                                     setLogoPreview(res);
-                                                    // Update hidden input
-                                                    const hidden = document.getElementById('logoUrl-hidden') as HTMLInputElement;
-                                                    if (hidden) hidden.value = res;
+                                                    // No need for manual DOM update, we use controlled input below
                                                 };
                                                 reader.readAsDataURL(file);
                                             }
                                         }}
                                     />
-                                    <input type="hidden" name="logoUrl" id="logoUrl-hidden" defaultValue={bot.logoUrl || ''} />
+                                    <input type="hidden" name="logoUrl" value={logoPreview} />
                                     <p className="text-xs text-gray-400">Consigliato: PNG trasparente 200x200px.</p>
                                 </div>
                             </div>

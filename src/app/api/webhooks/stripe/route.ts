@@ -99,7 +99,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, 
                 stripeCustomerId: session.customer as string,
                 status: SubscriptionStatus.ACTIVE,
                 tier: subTier,
-                currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+                currentPeriodEnd: new Date((stripeSub as any).current_period_end * 1000),
             }
         }),
         prisma.organization.update({
@@ -128,7 +128,7 @@ async function handleSubscriptionUpdated(stripeSub: Stripe.Subscription) {
         where: { id: dbSub.id },
         data: {
             status: status,
-            currentPeriodEnd: new Date(stripeSub.current_period_end * 1000)
+            currentPeriodEnd: new Date((stripeSub as any).current_period_end * 1000)
         }
     });
 
@@ -167,11 +167,11 @@ async function handleSubscriptionDeleted(stripeSub: Stripe.Subscription) {
 }
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-    if (!invoice.subscription) return;
+    if (!(invoice as any).subscription) return;
 
     // Just ensure dates are synced
     const dbSub = await prisma.subscription.findFirst({
-        where: { stripeSubscriptionId: invoice.subscription as string }
+        where: { stripeSubscriptionId: (invoice as any).subscription as string }
     });
 
     if (dbSub) {

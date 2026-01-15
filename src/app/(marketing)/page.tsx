@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import Script from 'next/script';
 import { colors, gradients } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
@@ -954,6 +955,14 @@ export default function LandingPage() {
                 </div>
             </section>
 
+
+            {/* Chatbot Widget for Customer Support */}
+            <Script
+                src="https://businesstuner.voler.ai/embed/chatbot.js"
+                data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
+                data-domain="https://businesstuner.voler.ai"
+                strategy="lazyOnload"
+            />
         </div >
     );
 }

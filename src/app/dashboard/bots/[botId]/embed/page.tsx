@@ -1,120 +1,94 @@
-import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
-import { notFound, redirect } from 'next/navigation';
-import Link from 'next/link';
-import { Button } from '@/components/ui/business-tuner/Button';
-import { Icons } from '@/components/ui/business-tuner/Icons';
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import WidgetPreview from "../widget/WidgetPreview";
+import { Code, Torus } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/business-tuner/Button";
 
-export default async function EmbedPage(props: { params: Promise<{ botId: string }> }) {
-    const params = await props.params;
+export default async function EmbedPage({ params }: { params: Promise<{ botId: string }> }) {
+    const { botId } = await params;
     const session = await auth();
-
-    if (!session?.user?.email) {
-        redirect('/login');
-    }
+    if (!session) redirect("/login");
 
     const bot = await prisma.bot.findUnique({
-        where: { id: params.botId },
-        include: {
-            project: {
-                include: {
-                    organization: {
-                        include: {
-                            members: {
-                                where: { user: { email: session.user.email } }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        where: { id: botId }
     });
 
-    if (!bot || !bot.project?.organization || bot.project.organization.members.length === 0) {
-        notFound();
-    }
+    if (!bot) redirect("/dashboard");
 
-    // For V2: If it's an interview bot, show warning or redirect
-    // But we might want to allow embedding interviews too?
-    // Let's assume this page is for the new Chatbot Embed V2.
-
-    const scriptTag = `<script 
-  src="${process.env.NEXT_PUBLIC_APP_URL || 'https://interviewer.businesstuner.ai'}/embed/chatbot.js"
+    const embedCode = `<script 
+  src="${process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai'}/embed/chatbot.js"
   data-bot-id="${bot.id}"
-  data-domain="${process.env.NEXT_PUBLIC_APP_URL || 'https://interviewer.businesstuner.ai'}"
+  data-domain="${process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai'}"
   defer
 ></script>`;
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
-            <div className="max-w-5xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Installazione Widget</h1>
-                        <p className="text-gray-500">
-                            Copia il codice e incollalo nel tuo sito web per attivare {bot.name}.
-                        </p>
-                    </div>
-                    <Link href="/dashboard/bots" passHref>
-                        <Button variant="outline">
-                            Torna alla Dashboard
-                        </Button>
-                    </Link>
-                </div>
-
-                {/* Code Snippet */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                    <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">Codice di Incorporamento</h2>
-                    <div className="relative bg-gray-900 rounded-lg p-4 overflow-x-auto group">
-                        <pre className="text-sm text-gray-100 font-mono">
-                            {scriptTag}
-                        </pre>
-                        {/* Copy button would need client component wrapper or interactivity */}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-3">
-                        Inserisci questo script prima della chiusura del tag <code>&lt;/body&gt;</code> di ogni pagina dove vuoi che appaia il chatbot.
+        <div className="p-8 max-w-6xl mx-auto space-y-8 min-h-screen bg-white">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold mb-2">Installazione Widget</h1>
+                    <p className="text-slate-500">
+                        Visualizza come apparirà il tuo chatbot sul sito web e copia il codice di integrazione.
                     </p>
                 </div>
-
-                {/* Preview Area */}
-                <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm h-[600px] relative overflow-hidden flex flex-col items-center justify-center text-center">
-                    <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5 pointer-events-none"></div>
-
-                    <div className="max-w-md z-0">
-                        <Icons.Bot className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                        <h2 className="text-xl font-bold text-gray-900">Anteprima Live</h2>
-                        <p className="text-gray-500 mb-6">
-                            Il widget dovrebbe apparire nell'angolo in basso a destra di questo riquadro.
-                            <br />
-                            Prova a cliccarci per interagire!
-                        </p>
-                    </div>
-
-                    {/* Inject the script for preview */}
-                    {/* Note: In Next.js, injecting script tags in body of specific page needs Script component or raw HTML handling. 
-                        Since this is a preview inside dashboard, we can just render strict logic.
-                        However, the script attaches to 'document.body'. 
-                        To demo it safely inside this div, we ideally would use an iframe or shadow DOM, 
-                        but our script uses `fixed` positioning on `body`.
-                        
-                        For a dashboard preview, we can just let it attach to the main body 
-                        (it will appear on top of dashboard UI) which is fine for "Preview".
-                    */}
-                </div>
+                <Link href={`/dashboard/bots/${botId}`}>
+                    <Button variant="outline">
+                        Torna alla Configurazione
+                    </Button>
+                </Link>
             </div>
 
-            {/* Actual Script Injection for Preview */}
-            {/* We use dangerouslySetInnerHTML for the script to run? No, Script component. */}
-            {/* Actually Script component works best. */}
-            {/* We need to pass params to it. */}
+            {/* Live Preview Section */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                    <Torus className="w-5 h-5 text-amber-500" />
+                    <h2 className="text-lg font-semibold">Anteprima Live Interattiva</h2>
+                </div>
+                <WidgetPreview bot={bot} />
+            </div>
 
-            <script
-                src="/embed/chatbot.js"
-                data-bot-id={bot.id}
-                data-domain="" // self relative
-                defer
-            />
+            {/* Embed Code Section */}
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-8 space-y-4 shadow-sm">
+                <div className="flex items-center gap-2">
+                    <Code className="w-5 h-5 text-slate-700" />
+                    <h2 className="text-lg font-semibold text-slate-900">Codice di Integrazione</h2>
+                </div>
+                <p className="text-sm text-slate-600">
+                    Copia questo codice e incollalo nel tag <code className="bg-slate-200 px-1 py-0.5 rounded text-xs text-slate-800">&lt;head&gt;</code> o prima della chiusura del <code className="bg-slate-200 px-1 py-0.5 rounded text-xs text-slate-800">&lt;/body&gt;</code> del tuo sito web.
+                </p>
+
+                <div className="relative group">
+                    <pre className="bg-slate-900 text-slate-100 p-5 rounded-xl overflow-x-auto text-xs leading-relaxed border border-slate-800">
+                        <code className="block">{embedCode}</code>
+                    </pre>
+                    <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                            size="sm"
+                            onClick={() => {
+                                // This will need a client component for functionality, but for now we provide the UI
+                                // We'll keep it simple for the preview
+                            }}
+                            className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border-white/20"
+                        >
+                            Copia Codice
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-start gap-3">
+                    <div className="mt-1 bg-amber-500 rounded-full p-1 text-white">
+                        <Code size={12} />
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-amber-900 uppercase tracking-tight mb-1">Suggerimento</p>
+                        <p className="text-xs text-amber-800">
+                            Lo script caricherà automaticamente la bolla e la finestra di chat secondo le tue configurazioni di stile e comportamento.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

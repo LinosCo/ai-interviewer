@@ -1,83 +1,62 @@
-'use client';
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import WidgetPreview from "./WidgetPreview";
+import { Code } from "lucide-react";
 
-import { useState, useEffect } from 'react';
-import ChatBubble from '@/components/chatbot/ChatBubble';
-import ChatWindow from '@/components/chatbot/ChatWindow';
+export default async function WidgetPage({ params }: { params: Promise<{ botId: string }> }) {
+    const { botId } = await params;
+    const session = await auth();
+    if (!session) redirect("/login");
 
-export default function WidgetPage({ params }: { params: { botId: string } }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [config, setConfig] = useState<any>(null);
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId }
+    });
 
-    useEffect(() => {
-        // Fetch bot config specifically for the widget
-        // We can reuse the start endpoint or a new one to get just config
-        // Or we assume the parent passed it? No, widget loads independently.
-        // Let's call a simple config endpoint or use /api/bots/[id]
-        const fetchConfig = async () => {
-            try {
-                // We use the bots API but we might need public access
-                // src/app/api/bots/[botId] might be protected.
-                // Let's use /api/chatbot/start to get initial config + conv?
-                // Actually start gives us welcome message but not full styling config if not in response.
-                // Let's fetch /api/bots/[botId] assuming it allows public read for widgets OR create a specific endpoint.
-                // For now, let's use /api/chatbot/start which we can modify to return config, 
-                // OR we just use defaults until we fetch.
+    if (!bot) redirect("/dashboard");
 
-                // Better: Use /api/bots/[botId] but check if it's public.
-                // If it's protected, we need a public endpoint. 
-                // Let's use /api/chatbot/start for now to get minimal info or create /api/chatbot/config/[botId]
-
-                // Minimal Mock for now to get it rendering, then we connect real config
-                const res = await fetch(`/api/bots/${params.botId}/public-config`);
-                // Note: I need to create this endpoint or use existing.
-                // Let's use the one we have or hardcode defaults if it fails.
-            } catch (e) {
-                console.error(e);
-            }
-        };
-        // fetchConfig();
-    }, [params.botId]);
-
-    // Communication with Parent (chatbot.js)
-    useEffect(() => {
-        if (window.parent) {
-            window.parent.postMessage({
-                type: 'bt-widget-resize',
-                isOpen
-            }, '*');
-        }
-    }, [isOpen]);
-
-    // Handle initial open state from URL or parent?
+    const embedCode = `<script 
+  src="${process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai'}/embed/chatbot.js"
+  data-bot-id="${bot.id}"
+  data-domain="${process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai'}"
+  defer
+></script>`;
 
     return (
-        <div className="bg-transparent">
-            {/* We render both bubble and window here */}
-            {/* If isOpen, the parent iframe should be large. If !isOpen, small. */}
+        <div className="p-8 max-w-6xl mx-auto space-y-8">
+            <div>
+                <h1 className="text-3xl font-bold mb-2">Anteprima Widget</h1>
+                <p className="text-slate-500">
+                    Visualizza come apparirà il tuo chatbot sul sito web.
+                </p>
+            </div>
 
-            <ChatWindow
-                botId={params.botId}
-                isOpen={isOpen}
-                onClose={() => setIsOpen(false)}
-                botName="Assistente" // Todo: get from config
-                primaryColor="#7C3AED" // Todo: get from config
-                welcomeMessage="Ciao! Come posso aiutarti?" // Todo: get from config
-            />
+            {/* Live Preview */}
+            <WidgetPreview bot={bot} />
 
-            {/* We hide the bubble logic inside ChatBubble but we need to trigger isOpen */}
-            {/* ChatBubble component manages its own isOpen state internally? 
-                In my implementation it does: const [isOpen, setIsOpen] = useState(initialIsOpen);
-                But here we need to lift state up to resize iframe.
-            */}
-
-            {/* I need to modify ChatBubble to accept isOpen/onToggle props or control it. */}
-            {/* My ChatBubble implementation uses internal state. I should refactor it slightly or force it. */}
-
-            {/* Let's wrap ChatBubble to control it */}
-            <div className="fixed bottom-0 right-0 p-6">
-                {/* Re-implement bubble button here or use component if it accepts props */}
-                {/* The ChatBubble component I wrote has internal state. I should update it to be controlled. */}
-                {/* Or I just click it and it sets internal state, but I need to know in parent. */}
+            {/* Embed Code */}
+            <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                    <Code className="w-5 h-5 text-slate-600" />
+                    <h2 className="text-lg font-semibold">Codice di Integrazione</h2>
+                </div>
+                <p className="text-sm text-slate-500">
+                    Copia questo codice e incollalo nel tag <code className="bg-slate-100 px-1 py-0.5 rounded text-xs">&lt;head&gt;</code> o prima della chiusura del <code className="bg-slate-100 px-1 py-0.5 rounded text-xs">&lt;/body&gt;</code> del tuo sito web.
+                </p>
+                <div className="relative">
+                    <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto text-xs">
+                        <code>{embedCode}</code>
+                    </pre>
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(embedCode);
+                            alert('Codice copiato!');
+                        }}
+                        className="absolute top-2 right-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs rounded transition-colors"
+                    >
+                        Copia
+                    </button>
+                </div>
             </div>
         </div>
     );

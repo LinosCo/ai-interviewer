@@ -1,7 +1,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import AnalyticsView from "./analytics-view";
+import ChatbotAnalyticsView from "./ChatbotAnalyticsView";
+import AnalyticsView from "./analytics-view"; // Interview analytics
 
 export default async function AnalyticsPage({ params }: { params: Promise<{ botId: string }> }) {
     const { botId } = await params;
@@ -17,15 +18,25 @@ export default async function AnalyticsPage({ params }: { params: Promise<{ botI
                         orderBy: { createdAt: 'asc' }
                     }
                 },
-                orderBy: { startedAt: 'desc' }
+                orderBy: { startedAt: 'desc' },
+                take: 100 // Last 100 sessions
             },
-            topics: true
+            topics: true,
+            knowledgeGaps: {
+                where: { status: 'pending' }
+            }
         }
     });
 
     if (!bot) redirect("/dashboard");
 
-    // Fetch themes and insights
+    // Check if it's a chatbot or interview bot
+    if ((bot as any).botType === 'chatbot') {
+        // Chatbot Analytics
+        return <ChatbotAnalyticsView bot={bot} sessions={(bot as any).conversations} gaps={(bot as any).knowledgeGaps} />;
+    }
+
+    // Interview Analytics (existing)
     const themes = await prisma.theme.findMany({
         where: { botId },
         include: {

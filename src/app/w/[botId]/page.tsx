@@ -1,0 +1,76 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import ChatBubble from '@/components/chatbot/ChatBubble';
+import ChatWindow from '@/components/chatbot/ChatWindow';
+
+interface WidgetPageProps {
+    params: { botId: string };
+}
+
+export default function PublicWidgetPage({ params }: WidgetPageProps) {
+    const { botId } = params;
+    const [bot, setBot] = useState<any>(null);
+    const [isOpen, setIsOpen] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function fetchBot() {
+            try {
+                const res = await fetch(`/api/chatbot/${botId}/config`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setBot(data);
+                }
+            } catch (err) {
+                console.error('Failed to load bot config:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchBot();
+    }, [botId]);
+
+    // Notify parent window of resize
+    useEffect(() => {
+        if (window.parent !== window) {
+            window.parent.postMessage({
+                type: 'bt-widget-resize',
+                isOpen: isOpen
+            }, '*');
+        }
+    }, [isOpen]);
+
+    if (loading) return null;
+    if (!bot) return null;
+
+    return (
+        <div className="relative w-full h-full min-h-screen bg-transparent">
+            <ChatBubble
+                botId={botId}
+                primaryColor={bot.primaryColor || '#7C3AED'}
+                welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
+                isOpen={isOpen}
+                onToggle={setIsOpen}
+                position="bottom-right"
+            />
+            <ChatWindow
+                botId={botId}
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                botName={bot.name}
+                primaryColor={bot.primaryColor || '#7C3AED'}
+                welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
+            />
+            {/* Minimal styles for the iframe body */}
+            <style jsx global>{`
+                body {
+                    background: transparent !important;
+                    margin: 0;
+                    padding: 0;
+                    overflow: hidden;
+                }
+            `}</style>
+        </div>
+    );
+}

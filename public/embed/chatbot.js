@@ -1,7 +1,12 @@
 (function (window) {
+  // Determine API Base from the script tag itself if no data-domain is provided
+  const scriptTag = document.currentScript;
+  const scriptUrl = new URL(scriptTag.src);
+  const detectedBase = `${scriptUrl.protocol}//${scriptUrl.host}`;
+
   const CONFIG = {
-    apiBase: document.currentScript.getAttribute('data-domain') || 'https://interviewer.businesstuner.ai',
-    botId: document.currentScript.getAttribute('data-bot-id'),
+    apiBase: scriptTag.getAttribute('data-domain') || detectedBase,
+    botId: scriptTag.getAttribute('data-bot-id'),
   };
 
   if (!CONFIG.botId) {
@@ -19,23 +24,17 @@
   container.style.width = '100px'; // Initial small size for bubble
   container.style.height = '100px';
   container.style.transition = 'width 0.2s, height 0.2s';
-  // We don't want to block clicks outside the widget area, 
-  // but if the iframe is rectangular and the widget is circular, clicks on corners might be intercepted.
-  // Standard solution: Iframe is full size but allows pointer-events: none on background?
-  // Or resize iframe dinamically. 
-  // Let's go with dynamic resizing.
 
   // Construct Iframe URL
-  // We point to /dashboard/bots/[botId]/widget
-  // We need to ensure the domain is correct.
-  const widgetUrl = `${CONFIG.apiBase}/dashboard/bots/${CONFIG.botId}/widget`;
+  // We point to the new public route /w/[botId]
+  const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}`;
 
   const iframe = document.createElement('iframe');
   iframe.src = widgetUrl;
   iframe.style.width = '100%';
   iframe.style.height = '100%';
   iframe.style.border = 'none';
-  iframe.style.borderRadius = '20px'; // Rounded corners for aesthetics
+  iframe.style.borderRadius = '20px';
   iframe.allow = 'microphone; autoplay';
 
   container.appendChild(iframe);
@@ -43,16 +42,15 @@
 
   // Communication
   window.addEventListener('message', (event) => {
-    // Verify origin if possible, or check structure
+    // Basic origin check (optional if we want to support any domain)
     const data = event.data;
     if (data && data.type === 'bt-widget-resize') {
       if (data.isOpen) {
         // Expanded state
-        container.style.width = '420px'; // Slightly larger than typical bot width
+        container.style.width = '420px';
         container.style.height = '720px';
         container.style.maxHeight = '90vh';
         container.style.maxWidth = '90vw';
-        // Adjust position for mobile if needed
       } else {
         // Collapsed state (Bubble only)
         container.style.width = '100px';
@@ -60,7 +58,5 @@
       }
     }
   });
-
-  // Mobile responsiveness logic could be added here to change container styles on window resize.
 
 })(window);

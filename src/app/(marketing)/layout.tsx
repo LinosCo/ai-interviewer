@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Script from 'next/script';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Footer } from '@/components/Footer';
 import { gradients, shadows } from '@/lib/design-system';
@@ -69,6 +70,13 @@ export default async function MarketingLayout({
 
             {/* Footer */}
             <Footer />
+
+            {/* Chatbot Widget for Customer Support (Only on marketing pages) */}
+            <Script
+                src="https://businesstuner.voler.ai/embed/chatbot.js"
+                data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
+                strategy="lazyOnload"
+            />
         </div>
     );
 }

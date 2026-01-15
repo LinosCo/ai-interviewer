@@ -955,14 +955,6 @@ export default function LandingPage() {
                 </div>
             </section>
 
-
-            {/* Chatbot Widget for Customer Support */}
-            <Script
-                src="https://businesstuner.voler.ai/embed/chatbot.js"
-                data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
-                data-domain="https://businesstuner.voler.ai"
-                strategy="lazyOnload"
-            />
         </div >
     );
 }

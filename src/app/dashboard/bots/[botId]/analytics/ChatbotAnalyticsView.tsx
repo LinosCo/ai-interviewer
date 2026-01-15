@@ -147,6 +147,75 @@ export default function ChatbotAnalyticsView({ bot, sessions, gaps }: any) {
                 </div>
             </div>
 
+            {/* Leads Section */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-200 flex justify-between items-center">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Users className="w-5 h-5 text-green-600" />
+                        Lead Raccolti
+                    </h3>
+                    <span className="px-3 py-1 bg-green-50 text-green-700 text-xs rounded-full font-bold uppercase tracking-wider">
+                        {leadsCollected} Lead
+                    </span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                                <th className="px-6 py-3 border-b border-slate-100">Nome / ID</th>
+                                <th className="px-6 py-3 border-b border-slate-100">Contatto / Dettagli</th>
+                                <th className="px-6 py-3 border-b border-slate-100">Data</th>
+                                <th className="px-6 py-3 border-b border-slate-100 text-right">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {sessions.filter((s: any) => s.candidateProfile).length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-10 text-center text-slate-400 text-sm">
+                                        Nessun lead raccolto ancora in questo periodo.
+                                    </td>
+                                </tr>
+                            ) : (
+                                sessions.filter((s: any) => s.candidateProfile).map((lead: any) => (
+                                    <tr key={lead.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium text-slate-900">
+                                                {lead.candidateProfile.name || lead.candidateProfile.fullName || `User #${lead.id.slice(-4)}`}
+                                            </div>
+                                            <div className="text-xs text-slate-500 font-mono">{lead.id.slice(-8)}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-slate-600">
+                                                {lead.candidateProfile.email || lead.candidateProfile.contact || 'Nessuna email'}
+                                            </div>
+                                            {lead.candidateProfile.phone && (
+                                                <div className="text-xs text-slate-400 mt-1">{lead.candidateProfile.phone}</div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-slate-600">
+                                                {new Date(lead.startedAt).toLocaleDateString('it-IT')}
+                                            </div>
+                                            <div className="text-xs text-slate-400">
+                                                {new Date(lead.startedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <Link
+                                                href={`/dashboard/bots/${bot.id}/conversations/${lead.id}`}
+                                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                            >
+                                                Vedi Chat →
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {/* Recent Sessions */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-slate-200">

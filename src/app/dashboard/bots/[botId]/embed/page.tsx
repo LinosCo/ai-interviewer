@@ -20,7 +20,6 @@ export default async function EmbedPage({ params }: { params: Promise<{ botId: s
     const embedCode = `<script 
   src="${process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai'}/embed/chatbot.js"
   data-bot-id="${bot.id}"
-  data-domain="${process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai'}"
   defer
 ></script>`;
 
@@ -66,10 +65,6 @@ export default async function EmbedPage({ params }: { params: Promise<{ botId: s
                     <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
                             size="sm"
-                            onClick={() => {
-                                // This will need a client component for functionality, but for now we provide the UI
-                                // We'll keep it simple for the preview
-                            }}
                             className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm border-white/20"
                         >
                             Copia Codice

@@ -108,7 +108,11 @@ export class VisibilityEngine {
                 data: {
                     organizationId: orgId,
                     text: prompt,
-                    category
+                    category,
+                    variables: {},
+                    languages: ['en'],
+                    platforms: ['ChatGPT', 'Perplexity'],
+                    frequency: 'weekly'
                 }
             });
 

@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.text();
-        const signature = headers().get('Stripe-Signature');
+        const headerList = await headers();
+        const signature = headerList.get('Stripe-Signature');
 
         if (!signature) {
             return new NextResponse('Missing Stripe signature', { status: 400 });

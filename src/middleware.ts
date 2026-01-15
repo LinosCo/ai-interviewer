@@ -26,7 +26,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
 export default auth(async (req) => {
     // Only rate limit API routes
     if (ratelimit && req.nextUrl.pathname.startsWith('/api')) {
-        const identifier = req.auth?.user?.id || req.ip || "127.0.0.1";
+        const identifier = req.auth?.user?.id || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || "127.0.0.1";
 
         try {
             const { success, limit, reset, remaining } = await ratelimit.limit(identifier);

@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 0 0% 10%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 40%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 10%;
+
+    /* Creative AI brand color - warm orange */
+    --creative: 16 100% 60%;
+    --creative-foreground: 0 0% 100%;
+    --creative-light: 16 100% 97%;
+
+    --success: 122 39% 49%;
+    --success-foreground: 0 0% 100%;
+    --success-light: 122 39% 96%;
+
+    --warning: 36 100% 50%;
+    --warning-foreground: 0 0% 100%;
+    --warning-light: 36 100% 97%;
+
+    --error: 4 90% 58%;
+    --error-foreground: 0 0% 100%;
+    --error-light: 4 90% 97%;
+
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 10%;
+
+    --radius: 0.75rem;
+
+    --gradient-dark: linear-gradient(135deg, hsl(0 0% 10%) 0%, hsl(0 0% 20%) 100%);
+    --gradient-creative: linear-gradient(135deg, hsl(16 100% 60%) 0%, hsl(28 100% 65%) 100%);
+    --gradient-ai: linear-gradient(135deg, hsl(0 0% 10%) 0%, hsl(16 100% 60%) 100%);
+    
+    /* Shadows with creative accent */
+    --shadow-creative: 0 10px 30px -10px hsl(16 100% 60% / 0.3);
+    --shadow-glow: 0 0 40px hsl(16 100% 60% / 0.2);
+  }
+
+  .dark {
+    --background: 0 0% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 10%;
+
+    --secondary: 0 0% 40%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
+
+    --creative: 16 100% 60%;
+    --creative-foreground: 0 0% 100%;
+    --creative-light: 16 100% 20%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

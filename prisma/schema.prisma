@@ -175,6 +175,10 @@ model Organization {
   projects     Project[]
   subscription Subscription?
   usageLogs    UsageLog[]
+
+  // Sprint 3 Relations
+  visibilityPrompts   VisibilityPrompt[]
+  crossChannelInsights CrossChannelInsight[]
 }
 
 // --- Subscription & Billing ---
@@ -450,6 +454,11 @@ model Bot {
   webhookUrl              String?  // POST conversation data on completion
 
   chatbotSessions  ChatbotSession[]
+
+  // Sprint 2 Relations
+  analytics        ChatbotAnalytics[]
+  knowledgeGaps    KnowledgeGap[]
+  faqSuggestions   FaqSuggestion[]
 }
 
 model KnowledgeSource {
@@ -751,4 +760,143 @@ model TokenUsage {
   purchasedTokens Int      @default(0) // Extra packs
   
   updatedAt       DateTime @updatedAt
+}
+
+// --- Sprint 2: Chatbot Analytics & Knowledge ---
+
+model ChatbotAnalytics {
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  
+  period        String   // "2026-01-15" o "2026-W03"
+  
+  // Metriche aggregate
+  sessionsCount     Int
+  messagesCount     Int
+  avgSessionLength  Float
+  leadsCollected    Int
+  bounceRate        Float
+  
+  // JSON per flessibilità
+  questionClusters  Json    // QuestionCluster[]
+  knowledgeGaps     Json    // KnowledgeGap[]
+  sentiment         Json    // { average, distribution, byTopic }
+  
+  createdAt     DateTime @default(now())
+  
+  @@unique([botId, period])
+}
+
+model KnowledgeGap {
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  
+  topic         String
+  priority      String   // high, medium, low
+  evidence      Json     // { fallbackCount, questions, frustrationSignals }
+  
+  suggestedFaq  Json?    // { question, answer }
+  
+  status        String   @default("pending") // pending, approved, dismissed
+  resolvedAt    DateTime?
+  resolvedBy    String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FaqSuggestion {
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  
+  question      String
+  answer        String
+  confidence    Float
+  occurrences   Int
+  
+  status        String   @default("pending") // pending, approved, rejected
+  
+  createdAt     DateTime @default(now())
+}
+
+// --- Sprint 3: Visibility & Cross-Channel ---
+
+model VisibilityPrompt {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Contenuto
+  text            String
+  category        String   // direct_search, competitor, problem, custom
+  variables       Json     // { brand: "TuoBrand", competitor1: "CompA" }
+  
+  // Configurazione
+  languages       String[] // ["it", "en", "de"]
+  platforms       String[] // ["chatgpt", "claude", "perplexity", "gemini"]
+  frequency       String   // daily, weekly, monthly
+  isActive        Boolean  @default(true)
+  
+  // Sistema
+  isSystemGenerated Boolean @default(false)
+  
+  responses       VisibilityResponse[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model VisibilityResponse {
+  id              String   @id @default(cuid())
+  promptId        String
+  prompt          VisibilityPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  
+  // Risposta
+  platform        String   // chatgpt, claude, etc.
+  language        String
+  responseText    String   @db.Text
+  
+  // Analisi
+  brandPosition   Int?     // null se non menzionato
+  competitorPositions Json // { "CompA": 1, "CompB": 3 }
+  sourcesCited    String[]
+  
+  // Metadata
+  executedAt      DateTime @default(now())
+  tokenUsage      Json     // { input, output }
+}
+
+model CrossChannelInsight {
+  id              String   @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Topic unificato
+  topicName       String
+  
+  // Dati per fonte
+  interviewData   Json?    // { mentions, sentiment, quotes, trend }
+  chatbotData     Json?    // { questions, unanswered, sentiment, trend }
+  visibilityData  Json?    // { brandMentions, competitorMentions, sources }
+  
+  // Score calcolati
+  crossChannelScore Float
+  priorityScore     Float
+  
+  // Azioni
+  suggestedActions  Json     // SuggestedAction[]
+  
+  // Workflow
+  status            String   @default("new") // new, reviewing, actioned, dismissed
+  reviewedBy        String?
+  reviewedAt        DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([organizationId, status])
+  @@index([organizationId, priorityScore])
 }

@@ -26,7 +26,7 @@ export async function detectKnowledgeGaps(botId: string, lookbackDays: number = 
     const badConversations = await prisma.conversation.findMany({
         where: {
             botId: botId,
-            createdAt: { gte: startDate },
+            startedAt: { gte: startDate },
             messages: {
                 some: {
                     role: "assistant",

@@ -6,9 +6,16 @@ import { ScanForm } from "./ScanForm";
 
 export default async function VisibilityPage() {
     const session = await auth();
-    if (!session?.user?.organizationId) redirect("/login");
+    if (!session?.user?.id) redirect("/login");
 
-    const orgId = session.user.organizationId;
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { memberships: { take: 1, include: { organization: true } } }
+    });
+
+    const orgId = user?.memberships[0]?.organizationId;
+
+    if (!orgId) redirect("/login"); // Or setup page
 
     // Fetch visibility metrics
     const responses = await prisma.visibilityResponse.findMany({

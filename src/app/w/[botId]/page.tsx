@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import ChatBubble from '@/components/chatbot/ChatBubble';
 import ChatWindow from '@/components/chatbot/ChatWindow';
 
 interface WidgetPageProps {
-    params: { botId: string };
+    params: Promise<{ botId: string }>;
 }
 
 export default function PublicWidgetPage({ params }: WidgetPageProps) {
-    const { botId } = params;
+    const { botId } = use(params);
     const [bot, setBot] = useState<any>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(true);

@@ -73,6 +73,7 @@ export default async function MarketingLayout({
 
             {/* Chatbot Widget for Customer Support (Only on marketing pages) */}
             <Script
+                id="bt-chatbot-script"
                 src="https://businesstuner.voler.ai/embed/chatbot.js"
                 data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
                 strategy="lazyOnload"

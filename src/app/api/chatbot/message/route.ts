@@ -49,7 +49,21 @@ export async function POST(req: Request) {
         }
 
         const systemPromptBase = buildChatbotPrompt(bot, session);
-        const apiKey = bot.openaiApiKey || process.env.OPENAI_API_KEY || '';
+
+        // Retrieve Global Config for API Key fallback
+        const globalConfig = await prisma.globalConfig.findUnique({
+            where: { id: 'default' }
+        });
+
+        const apiKey = bot.openaiApiKey || globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
+
+        if (!apiKey) {
+            return Response.json({
+                error: 'API_KEY_MISSING',
+                message: 'Chiave API OpenAI mancante. Configurala nelle impostazioni generali.'
+            }, { status: 401 });
+        }
+
         const openai = createOpenAI({ apiKey });
 
         let finalResponse = "";

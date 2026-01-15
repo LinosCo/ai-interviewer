@@ -203,6 +203,18 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                 {/* Footer Section */}
                 <footer className="w-full pt-12 border-t border-gray-100">
                     <div className="flex flex-col items-center gap-6">
+                        <div className="flex flex-col items-center gap-2 mb-4">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Powered by</span>
+                            <a
+                                href="/"
+                                target="_blank"
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-all border border-gray-100 hover:border-gray-200 group"
+                            >
+                                <Icons.Logo className="w-5 h-5" />
+                                <span className="font-bold text-gray-700 text-sm tracking-tight group-hover:text-gray-900">Business Tuner AI</span>
+                            </a>
+                        </div>
+
                         <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs font-bold text-gray-400 uppercase tracking-widest">
                             <a href="/privacy" className="transition-colors hover:text-gray-900">Privacy Policy</a>
                             <a href="/terms" className="transition-colors hover:text-gray-900">Termini</a>

@@ -87,6 +87,11 @@ export default function BrandingEditor({ bot, plan }: BrandingEditorProps) {
                                         onChange={(e) => {
                                             const file = e.target.files?.[0];
                                             if (file) {
+                                                // Check size limit (max 800KB to be safe for Server Actions)
+                                                if (file.size > 800 * 1024) {
+                                                    alert("L'immagine è troppo grande. Per favore usa un file più piccolo di 800KB.");
+                                                    return;
+                                                }
                                                 const reader = new FileReader();
                                                 reader.onloadend = () => {
                                                     const res = reader.result as string;

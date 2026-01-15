@@ -35,8 +35,10 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
         leadCaptureStrategy: bot.leadCaptureStrategy || 'after_3_msgs',
         fallbackMessage: bot.fallbackMessage || '',
         candidateDataFields: (bot.candidateDataFields as any[]) || [],
-        primaryColor: bot.primaryColor || '#7C3AED', // Add color support
+        primaryColor: bot.primaryColor || '#7C3AED',
+        logoUrl: bot.logoUrl || '',
         boundaries: (bot.boundaries as string[]) || [],
+        backgroundColor: bot.backgroundColor, // Add background color support
     });
     const [isSaving, setIsSaving] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(true); // Toggle for mobile maybe
@@ -55,7 +57,9 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                     candidateDataFields: config.candidateDataFields,
                     fallbackMessage: config.fallbackMessage,
                     boundaries: config.boundaries,
-                    // primaryColor: config.primaryColor, // Ensure backend supports this field
+                    primaryColor: config.primaryColor,
+                    backgroundColor: config.backgroundColor,
+                    logoUrl: config.logoUrl,
                     botType: 'chatbot'
                 })
             });

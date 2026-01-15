@@ -33,7 +33,7 @@ export class CrossChannelSync {
         const visibilityIssues = await prisma.visibilityResponse.findMany({
             where: {
                 prompt: { organizationId: orgId },
-                rank: { gt: 3 } // Not in top 3
+                brandPosition: { gt: 3 } // Not in top 3
             },
             include: { prompt: true },
             take: 10
@@ -50,7 +50,7 @@ export class CrossChannelSync {
         ${gaps.map(g => `- Topic: ${g.topic} (${g.priority})`).join('\n')}
 
         Visibility Issues (Rank > 3):
-        ${visibilityIssues.map(v => `- Query: "${v.prompt.text}" on ${v.platform} ranked #${v.rank}`).join('\n')}
+        ${visibilityIssues.map(v => `- Query: "${v.prompt.text}" on ${v.platform} ranked #${v.brandPosition}`).join('\n')}
         `;
 
         try {
@@ -70,10 +70,10 @@ export class CrossChannelSync {
                 await prisma.crossChannelInsight.create({
                     data: {
                         organizationId: orgId,
-                        topic: insight.title, // using title as topic
-                        score: insight.priority,
-                        sources: [insight.source],
-                        suggestedAction: insight.suggestedAction,
+                        topicName: insight.title,
+                        crossChannelScore: insight.priority,
+                        priorityScore: insight.priority,
+                        suggestedActions: [{ action: insight.suggestedAction }],
                         status: 'new'
                     }
                 });

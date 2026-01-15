@@ -317,6 +317,8 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (data.anthropicApiKey === '') data.anthropicApiKey = null as any;
     if (data.logoUrl === '') data.logoUrl = null;
 
+    console.log(`[updateBotAction] Updating bot ${botId}. LogoUrl length: ${data.logoUrl?.length || 'null'}`);
+
     await prisma.bot.update({
         where: { id: botId },
         data

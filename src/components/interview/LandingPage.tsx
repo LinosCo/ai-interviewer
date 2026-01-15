@@ -55,6 +55,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const videoUrl = (isPro && (bot as any).landingVideoUrl) || null;
     const primaryColor = bot.primaryColor || colors.amber;
     const logoUrl = getImageUrl(bot.logoUrl);
+    console.log(`[LandingPage] Bot ID: ${bot.id}, LogoURL raw length: ${bot.logoUrl?.length}, Processed URL: ${logoUrl}`);
 
     const estimatedTime = bot.maxDurationMins || 10;
 

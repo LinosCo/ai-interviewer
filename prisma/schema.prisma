@@ -861,6 +861,7 @@ model VisibilityResponse {
   
   // Analisi
   brandPosition   Int?     // null se non menzionato
+  sentiment       String?  // positive, neutral, negative
   competitorPositions Json // { "CompA": 1, "CompB": 3 }
   sourcesCited    String[]
   

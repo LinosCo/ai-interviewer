@@ -124,10 +124,12 @@ export class VisibilityEngine {
                     data: {
                         promptId: savedPrompt.id,
                         platform,
-                        content: rawResponse,
-                        rank: analysis.brandPosition,
+                        responseText: rawResponse,
+                        brandPosition: analysis.brandPosition,
                         sentiment: analysis.sentiment,
-                        // Mentions not in schema? We can add if needed.
+                        language: 'en', // default
+                        competitorPositions: {}, // default empty
+                        tokenUsage: {}, // default empty
                     }
                 });
             }

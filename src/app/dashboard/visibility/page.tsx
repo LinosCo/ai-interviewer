@@ -20,7 +20,7 @@ export default async function VisibilityPage() {
     // Fetch visibility metrics
     const responses = await prisma.visibilityResponse.findMany({
         where: { prompt: { organizationId: orgId } },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { executedAt: 'desc' },
         take: 50
     });
 
@@ -28,7 +28,7 @@ export default async function VisibilityPage() {
     // Calculate Average Rank (ignoring 0/unranked? or 0 means unranked = bad?)
     // Assume 0 means "Not in top 10". So high number.
     // Let's count mentions.
-    const mentions = responses.filter(r => r.rank > 0 && r.rank <= 10).length;
+    const mentions = responses.filter(r => (r.brandPosition ?? 0) > 0 && (r.brandPosition ?? 0) <= 10).length;
     const visibilityScore = totalScans > 0 ? Math.round((mentions / totalScans) * 100) : 0;
 
     return (
@@ -87,13 +87,13 @@ export default async function VisibilityPage() {
                                         <div className="font-medium text-sm text-slate-900">{res.platform}</div>
                                         {/* Ideally fetch prompt text too. Using 'include' above would be better. */}
                                         <div className="text-xs text-slate-500">
-                                            Rank: {res.rank > 0 ? `#${res.rank}` : 'Not found'} | Sentiment: {res.sentiment}
+                                            Rank: {res.brandPosition && res.brandPosition > 0 ? `#${res.brandPosition}` : 'Not found'} | Sentiment: {res.sentiment}
                                         </div>
                                     </div>
                                     <div className="mt-2 md:mt-0">
-                                        <span className={`px-2 py-1 rounded text-xs font-medium ${res.rank > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                        <span className={`px-2 py-1 rounded text-xs font-medium ${(res.brandPosition ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                             }`}>
-                                            {res.rank > 0 ? 'Visible' : 'Invisible'}
+                                            {(res.brandPosition ?? 0) > 0 ? 'Visible' : 'Invisible'}
                                         </span>
                                     </div>
                                 </div>

@@ -7,10 +7,6 @@ import { prisma } from "@/lib/prisma";
 
 export async function runVisibilityScan(category: string, brandName: string) {
     const session = await auth();
-    if (!session?.user?.id) {
-        throw new Error("Unauthorized");
-    }
-
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
         include: { memberships: { take: 1, include: { organization: true } } }

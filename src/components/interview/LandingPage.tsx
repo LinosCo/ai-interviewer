@@ -73,28 +73,23 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                     style={{ background: `radial-gradient(circle, ${primaryColor}20 0%, transparent 70%)` }} />
             </div>
 
-            {/* Header */}
-            <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-gray-100/50 px-6 py-4 transition-all">
-                <div className="max-w-5xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        {logoUrl ? (
-                            <img src={logoUrl} alt="Logo" className="h-8 w-auto object-contain" />
-                        ) : (
-                            <div className="flex items-center gap-2">
-                                <Icons.Logo className="w-8 h-8" style={{ color: primaryColor }} />
-                                <span className="text-lg font-bold text-gray-900 tracking-tight">Business Tuner</span>
-                            </div>
-                        )}
-                        {!logoUrl && bot.project.organization?.name && (
-                            <span className="text-xs text-gray-400 border-l pl-3 ml-1 border-gray-300 uppercase tracking-widest hidden sm:inline-block">
-                                {bot.project.organization.name}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </header>
-
             <main className="flex-1 relative z-10 w-full max-w-4xl mx-auto p-6 md:p-12 lg:p-16 flex flex-col items-center text-center gap-12 animate-in fade-in zoom-in-95 duration-1000">
+
+                {/* Logo Section (Centered & Large) */}
+                <div className="w-full flex justify-center mb-4">
+                    {logoUrl ? (
+                        <img
+                            src={logoUrl}
+                            alt="Logo"
+                            className="h-24 md:h-28 w-auto object-contain"
+                        />
+                    ) : (
+                        <div className="flex items-center gap-3">
+                            <Icons.Logo className="w-10 h-10" style={{ color: primaryColor }} />
+                            <span className="text-2xl font-bold text-gray-900 tracking-tight">Business Tuner</span>
+                        </div>
+                    )}
+                </div>
 
                 {/* Hero Section */}
                 <div className="w-full space-y-10">

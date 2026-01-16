@@ -15,10 +15,10 @@ export const maxDuration = 60;
 // CONFIGURATION
 // ============================================================================
 const CONFIG = {
-    SCAN_TURNS_PER_TOPIC: 2,        // Target turns per topic in SCAN (min 1 guaranteed)
+    SCAN_TURNS_PER_TOPIC: 3,        // Target turns per topic in SCAN (was 2, too short)
     SECONDS_PER_TURN: 45,           // Average time per turn (read + respond + process)
     TIME_BUFFER_PERCENT: 0.15,      // Below this remaining % -> offer optional DEEP
-    DEEP_QUICK_TURNS: 1,            // Turns per topic if user accepts quick DEEP
+    DEEP_QUICK_TURNS: 2,            // Turns per topic if user accepts quick DEEP (was 1)
     MAX_DATA_COLLECTION_ATTEMPTS: 15,
 };
 
@@ -356,7 +356,11 @@ export async function POST(req: Request) {
         // PHASE: DEEP
         // --------------------------------------------------------------------
         else if (state.phase === 'DEEP') {
+            // Use the budget calculated at end of SCAN (stored in state.deepTurnsPerTopic)
+            // DATA_COLLECTION is OUTSIDE time budget - it's extra!
             const turnsLimit = state.deepTurnsPerTopic || CONFIG.DEEP_QUICK_TURNS;
+
+            console.log(`📊 [DEEP] Topic ${state.topicIndex + 1}/${numTopics}, Turn ${state.turnInTopic + 1}/${turnsLimit}`);
 
             if (state.turnInTopic >= turnsLimit) {
                 // Move to next topic
@@ -368,11 +372,12 @@ export async function POST(req: Request) {
                     console.log(`➡️ [DEEP] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
                     supervisorInsight = { status: 'TRANSITION', nextTopic: botTopics[nextState.topicIndex].label };
                 } else {
-                    // End of DEEP
+                    // End of DEEP - ALL topics done, move to DATA_COLLECTION
+                    console.log(`✅ [DEEP] All ${numTopics} topics completed. Moving to DATA_COLLECTION.`);
                     if (shouldCollectData) {
                         nextState.phase = 'DATA_COLLECTION';
                         supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                        nextState.consentGiven = false; // Waiting for consent
+                        nextState.consentGiven = false;
                     } else {
                         await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
                         return Response.json({
@@ -397,6 +402,7 @@ export async function POST(req: Request) {
                     language
                 );
                 supervisorInsight = { status: 'DEEPENING', focusPoint: insight.focusPoint };
+                console.log(`🔍 [DEEP] Continuing topic "${currentTopic.label}", turn ${nextState.turnInTopic}/${turnsLimit}`);
             }
         }
 

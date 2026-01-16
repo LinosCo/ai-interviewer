@@ -273,7 +273,8 @@ export async function POST(req: Request) {
                         // No time for DEEP - go to DATA_COLLECTION or END
                         if (shouldCollectData) {
                             nextState.phase = 'DATA_COLLECTION';
-                            supervisorInsight = { status: 'START_DATA_COLLECTION' };
+                            supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                        nextState.consentGiven = false; // Waiting for consent
                         } else {
                             await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
                             return Response.json({
@@ -305,12 +306,18 @@ export async function POST(req: Request) {
         // PHASE: DEEP_OFFER
         // --------------------------------------------------------------------
         else if (state.phase === 'DEEP_OFFER') {
+            console.log(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted}`);
+
             if (state.deepAccepted === null) {
-                // First time - bot will ask
+                // First time - bot will ask the offer question
+                console.log(`🎁 [DEEP_OFFER] First time, asking offer question`);
                 supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-            } else {
-                // User already responded - check intent
+                nextState.deepAccepted = false; // Mark that we're waiting for response
+            } else if (state.deepAccepted === false) {
+                // We asked, now check user's response
+                console.log(`🎁 [DEEP_OFFER] Checking user response: "${lastMessage?.content}"`);
                 const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
+                console.log(`🎁 [DEEP_OFFER] Intent detected: ${intent}`);
 
                 if (intent === 'ACCEPT') {
                     nextState.deepAccepted = true;
@@ -322,10 +329,11 @@ export async function POST(req: Request) {
                     supervisorInsight = { status: 'START_DEEP' };
                     console.log("✅ [DEEP_OFFER] User accepted quick DEEP");
                 } else if (intent === 'REFUSE') {
-                    nextState.deepAccepted = false;
+                    console.log("❌ [DEEP_OFFER] User declined");
                     if (shouldCollectData) {
                         nextState.phase = 'DATA_COLLECTION';
-                        supervisorInsight = { status: 'START_DATA_COLLECTION' };
+                        supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                        nextState.consentGiven = false; // Waiting for consent
                     } else {
                         await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
                         return Response.json({
@@ -336,9 +344,9 @@ export async function POST(req: Request) {
                             currentTopicId: currentTopic?.id || null
                         });
                     }
-                    console.log("❌ [DEEP_OFFER] User declined");
                 } else {
                     // NEUTRAL - re-ask
+                    console.log(`🎁 [DEEP_OFFER] Neutral response, re-asking`);
                     supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                 }
             }
@@ -363,7 +371,8 @@ export async function POST(req: Request) {
                     // End of DEEP
                     if (shouldCollectData) {
                         nextState.phase = 'DATA_COLLECTION';
-                        supervisorInsight = { status: 'START_DATA_COLLECTION' };
+                        supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                        nextState.consentGiven = false; // Waiting for consent
                     } else {
                         await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
                         return Response.json({
@@ -395,6 +404,8 @@ export async function POST(req: Request) {
         // PHASE: DATA_COLLECTION
         // --------------------------------------------------------------------
         else if (state.phase === 'DATA_COLLECTION') {
+            console.log(`📋 [DATA_COLLECTION] State: consentGiven=${state.consentGiven}, lastAskedField=${state.lastAskedField}, attempts=${state.dataCollectionAttempts}`);
+
             // Anti-loop protection
             if (state.dataCollectionAttempts >= CONFIG.MAX_DATA_COLLECTION_ATTEMPTS) {
                 await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
@@ -409,20 +420,28 @@ export async function POST(req: Request) {
 
             const candidateFields = (bot.candidateDataFields as any[]) || [];
             let currentProfile = (conversation.candidateProfile as any) || {};
+            console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFields.map((f: any) => typeof f === 'string' ? f : f.field).join(', ')}`);
+            console.log(`📋 [DATA_COLLECTION] Current profile: ${JSON.stringify(currentProfile)}`);
 
-            // Check consent first
+            // STEP 1: Handle consent flow
             if (state.consentGiven === null) {
-                // Bot will ask for consent
+                // First time in DATA_COLLECTION - ask for consent
+                console.log(`📋 [DATA_COLLECTION] Asking for consent (first time)`);
                 supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                nextState.consentGiven = false; // Mark that we're waiting for response
                 nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
             } else if (state.consentGiven === false) {
-                // Check if user now consents
+                // We asked for consent, now check user's response
+                console.log(`📋 [DATA_COLLECTION] Checking consent response: "${lastMessage?.content}"`);
                 const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'consent');
+                console.log(`📋 [DATA_COLLECTION] Intent detected: ${intent}`);
 
                 if (intent === 'ACCEPT') {
                     nextState.consentGiven = true;
-                    // Will proceed to ask first field
+                    console.log(`📋 [DATA_COLLECTION] User accepted, will ask first field`);
+                    // Don't set supervisorInsight here - let it fall through to ask first field
                 } else if (intent === 'REFUSE') {
+                    console.log(`📋 [DATA_COLLECTION] User refused`);
                     await completeInterview(conversationId, messages, openAIKey, currentProfile);
                     return Response.json({
                         text: language === 'it'
@@ -432,28 +451,37 @@ export async function POST(req: Request) {
                         currentTopicId: currentTopic?.id || null
                     });
                 } else {
+                    // NEUTRAL - re-ask consent
+                    console.log(`📋 [DATA_COLLECTION] Neutral response, re-asking consent`);
                     supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
                     nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
                 }
             }
 
-            // If consent given, extract field and determine next
+            // STEP 2: If consent given (now or before), handle field collection
             if (nextState.consentGiven === true || state.consentGiven === true) {
-                // Extract last asked field
+                console.log(`📋 [DATA_COLLECTION] Consent given, processing fields`);
+
+                // Extract value from last asked field
                 if (state.lastAskedField && lastMessage?.role === 'user') {
+                    console.log(`📋 [DATA_COLLECTION] Extracting "${state.lastAskedField}" from: "${lastMessage.content}"`);
                     const extraction = await extractFieldFromMessage(
                         state.lastAskedField,
                         lastMessage.content,
                         openAIKey,
                         language
                     );
+                    console.log(`📋 [DATA_COLLECTION] Extraction result: ${JSON.stringify(extraction)}`);
+
                     if (extraction.value && extraction.confidence !== 'none') {
                         currentProfile = { ...currentProfile, [state.lastAskedField]: extraction.value };
                         await prisma.conversation.update({
                             where: { id: conversationId },
                             data: { candidateProfile: currentProfile }
                         });
-                        console.log(`✅ Saved "${state.lastAskedField}": "${extraction.value}"`);
+                        console.log(`✅ [DATA_COLLECTION] Saved "${state.lastAskedField}": "${extraction.value}"`);
+                    } else {
+                        console.log(`⚠️ [DATA_COLLECTION] Could not extract "${state.lastAskedField}"`);
                     }
                 }
 
@@ -466,9 +494,11 @@ export async function POST(req: Request) {
                         break;
                     }
                 }
+                console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected'}`);
 
                 if (!nextField) {
                     // All fields collected!
+                    console.log(`✅ [DATA_COLLECTION] All fields collected, completing interview`);
                     await completeInterview(conversationId, messages, openAIKey, currentProfile);
                     return Response.json({
                         text: language === 'it'
@@ -479,10 +509,12 @@ export async function POST(req: Request) {
                     });
                 }
 
+                // Set up to ask next field
                 nextState.lastAskedField = nextField;
                 nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
                 nextState.consentGiven = true;
                 supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
+                console.log(`📋 [DATA_COLLECTION] Will ask for: ${nextField}`);
             }
         }
 

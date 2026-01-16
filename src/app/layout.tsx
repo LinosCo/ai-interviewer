@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastContainer } from "@/components/toast";
 import { Providers } from "@/components/Providers";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,9 +21,6 @@ export const metadata: Metadata = {
     template: "%s | Business Tuner",
   },
   description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
-  icons: {
-    icon: "/icon.png",
-  },
 };
 
 export default function RootLayout({
@@ -42,6 +40,7 @@ export default function RootLayout({
           {children}
           <ToastContainer />
         </Providers>
+        <SpeedInsights />
       </body>
     </html>
   );

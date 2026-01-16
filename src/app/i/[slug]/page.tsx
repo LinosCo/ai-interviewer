@@ -2,8 +2,38 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import LandingPage from '@/components/interview/LandingPage';
 import { canStartInterview } from '@/lib/usage';
+import { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+    const { slug } = await params;
+    const bot = await prisma.bot.findUnique({
+        where: { slug }
+    });
+
+    if (!bot) return {};
+
+    const title = bot.landingTitle || bot.name;
+    const description = bot.landingDescription || bot.researchGoal || "Partecipa a questa intervista intelligente su Business Tuner.";
+    const image = bot.landingImageUrl || bot.logoUrl;
+
+    return {
+        title,
+        description,
+        openGraph: {
+            title,
+            description,
+            images: image ? [image] : undefined,
+        },
+        twitter: {
+            card: "summary_large_image",
+            title,
+            description,
+            images: image ? [image] : undefined,
+        }
+    };
+}
 
 export default async function InterviewPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;

@@ -260,7 +260,14 @@ export default function ChatWindow({
                             </button>
                         </div>
                         <div className="text-center mt-2 pb-1">
-                            <span className="text-[10px] text-gray-400 font-medium">Powered by LinosCo AI</span>
+                            <a
+                                href="https://businesstuner.voler.ai"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] text-gray-400 font-medium hover:text-gray-600 transition-colors"
+                            >
+                                Powered by Business Tuner
+                            </a>
                         </div>
                     </div>
                 </motion.div>

@@ -42,6 +42,13 @@ export default function Icon() {
                         </linearGradient>
                     </defs>
                     <rect width="48" height="48" rx="14" fill="url(#logoGradient)" />
+                    <g fill="white" opacity="0.9">
+                        <rect x="8" y="28" width="5" height="12" rx="2" opacity="0.4" />
+                        <rect x="15" y="24" width="5" height="16" rx="2" opacity="0.55" />
+                        <rect x="22" y="18" width="5" height="22" rx="2" opacity="0.7" />
+                        <rect x="29" y="14" width="5" height="26" rx="2" opacity="0.85" />
+                        <rect x="36" y="20" width="5" height="20" rx="2" opacity="0.7" />
+                    </g>
                     <path
                         d="M10 34 L17.5 30 L24.5 22 L31.5 16 L38.5 22"
                         stroke="white"

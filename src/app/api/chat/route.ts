@@ -553,7 +553,24 @@ export async function POST(req: Request) {
             systemPrompt += `\n\n## DEEP OFFER\nYou must ask: "${offerText}"`;
         }
 
-        // Final reinforcement
+        // Final reinforcement based on phase
+        if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
+            systemPrompt += `
+
+## PHASE ENFORCEMENT: ${nextState.phase}
+**YOU ARE IN ${nextState.phase} PHASE - Topic ${nextState.topicIndex + 1}/${numTopics}**
+
+🚫 **FORBIDDEN ACTIONS:**
+- Asking for contacts/email/phone/name
+- Saying goodbye or wrapping up
+- Mentioning "before we conclude" or similar
+
+✅ **REQUIRED ACTION:**
+- Ask ONE question about the current topic
+- End with a question mark (?)
+`;
+        }
+
         systemPrompt += `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
 
         // ====================================================================
@@ -610,6 +627,15 @@ export async function POST(req: Request) {
         const isGoodbyeWithQuestion = isGoodbyeResponse && responseText.includes('?');
         if (isGoodbyeWithQuestion) {
             console.log(`⚠️ [SUPERVISOR] Detected goodbye phrase WITH question mark - treating as closure attempt`);
+        }
+
+        // CRITICAL: Detect premature contact requests (bot asking for contacts during SCAN/DEEP)
+        const CONTACT_REQUEST_PATTERNS_IT = /\b(posso chiederti i tuoi contatti|i tuoi dati di contatto|la tua email|il tuo numero|come ti chiami|qual è la tua email|prima di salutarci|prima di concludere.*contatt)/i;
+        const CONTACT_REQUEST_PATTERNS_EN = /\b(may i ask for your contact|your contact details|your email|your phone|what is your name|before we say goodbye.*contact|before we wrap up.*contact)/i;
+        const contactRequestPattern = language === 'it' ? CONTACT_REQUEST_PATTERNS_IT : CONTACT_REQUEST_PATTERNS_EN;
+        const isPrematureContactRequest = contactRequestPattern.test(responseText) && nextState.phase !== 'DATA_COLLECTION';
+        if (isPrematureContactRequest) {
+            console.log(`⚠️ [SUPERVISOR] Bot tried to ask for contacts during ${nextState.phase} phase - intercepting!`);
         }
 
         // Helper to get field label
@@ -693,36 +719,24 @@ export async function POST(req: Request) {
                     : "Thank you so much for all the information! We will contact you soon.") + " INTERVIEW_COMPLETED";
             }
         }
-        // Other phases - OVERRIDE if bot tries to close
-        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion)) {
+        // Other phases - OVERRIDE if bot tries to close OR asks for contacts prematurely
+        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isPrematureContactRequest)) {
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Overriding with appropriate question.`);
             console.log(`   Original response: "${responseText.substring(0, 100)}..."`);
 
-            // Get current topic and sub-goal from supervisor insight
-            const currentSubGoal = supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || 'questo argomento';
+            // Use TOPIC LABEL for natural-sounding questions (not the subGoal which can be action-oriented)
+            const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
+            const topicLabel = targetTopic?.label || 'questo argomento';
 
-            // Remove goodbye phrases but keep any useful content
-            let cleanedResponse = responseText
-                .replace(GOODBYE_PATTERNS_IT, '')
-                .replace(GOODBYE_PATTERNS_EN, '')
-                .trim();
-
-            // If there's still some content, append a question; otherwise generate a fresh question
-            if (cleanedResponse.length > 20 && !cleanedResponse.includes('?')) {
+            // Generate a natural follow-up question using the topic label
+            if (nextState.phase === 'SCAN') {
                 responseText = language === 'it'
-                    ? `${cleanedResponse} Puoi dirmi di più su ${currentSubGoal}?`
-                    : `${cleanedResponse} Can you tell me more about ${currentSubGoal}?`;
+                    ? `Interessante! Tornando al tema "${topicLabel}", qual è la tua esperienza diretta in merito?`
+                    : `Interesting! Going back to "${topicLabel}", what has been your direct experience with this?`;
             } else {
-                // Generate a completely new question based on phase
-                if (nextState.phase === 'SCAN') {
-                    responseText = language === 'it'
-                        ? `Interessante! Parlando di ${currentSubGoal}, qual è la tua esperienza in merito?`
-                        : `Interesting! Speaking of ${currentSubGoal}, what has been your experience with this?`;
-                } else {
-                    responseText = language === 'it'
-                        ? `Grazie per questo spunto. Riguardo a ${currentSubGoal}, puoi approfondire questo aspetto?`
-                        : `Thanks for that insight. Regarding ${currentSubGoal}, can you elaborate on this aspect?`;
-                }
+                responseText = language === 'it'
+                    ? `Grazie per questo spunto. Riguardo a "${topicLabel}", puoi approfondire un aspetto specifico che ti sta a cuore?`
+                    : `Thanks for that insight. Regarding "${topicLabel}", can you elaborate on a specific aspect that matters to you?`;
             }
         }
         else if (nextState.phase === 'DEEP_OFFER' && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion)) {

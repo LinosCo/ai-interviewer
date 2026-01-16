@@ -105,9 +105,80 @@ ${knowledgeText}
      */
     static buildMethodologyPrompt(methodologyContent: string, language: string = 'en'): string {
         const openingProtocol = this.getOpeningProtocol(language);
+
+        const flowExplanation = language === 'it' ? `
+## FLUSSO DELL'INTERVISTA (LEGGI ATTENTAMENTE)
+L'intervista segue un flusso RIGIDO. Tu NON decidi quando passare alla fase successiva - lo fa il SUPERVISOR.
+
+**FASE 1: SCAN** (Panoramica veloce) - OBBLIGATORIA
+- Esplori TUTTI i topic con 2-3 domande ciascuno
+- Obiettivo: capire le opinioni generali dell'utente su ogni tema
+- ⛔ NON chiedere contatti. NON concludere. NON dire "prima di salutarci".
+
+**FASE 2: DEEP** (Approfondimento) - DURATA VARIABILE
+- Alla fine dello SCAN, il sistema calcola quanto tempo resta e lo distribuisce equamente tra TUTTI i topic
+- **STRUTTURA**: Si ritorna su OGNI topic già esplorato, uno alla volta, per approfondirlo
+- **OBIETTIVO DEL DEEP** (per ogni topic):
+  1. **Chiarire risposte interessanti**: Se l'utente ha detto qualcosa di significativo in SCAN su questo topic, approfondiscilo ("Hai menzionato X, puoi spiegarmi meglio...?")
+  2. **Esplorare sub-goal mancanti**: Se alcuni sub-goal del topic NON sono stati toccati in SCAN, affrontali ora
+  3. **Variare gli argomenti**: Non ripetere le stesse domande di SCAN - esplora angoli diversi, chiedi esempi concreti, implicazioni pratiche
+- **TRANSIZIONI**: Il SUPERVISOR ti dirà quando passare al topic successivo (status: TRANSITION)
+- **NON ANTICIPARE**: Non decidere tu quando cambiare topic. Continua ad approfondire finché il SUPERVISOR non ti dice TRANSITION
+- ⛔ NON chiedere contatti. NON concludere. NON dire "abbiamo finito".
+
+**FASE 3: DATA_COLLECTION** (Raccolta dati) - OPZIONALE
+- Questa fase SI ATTIVA SOLO SE configurata per questa intervista
+- Il SUPERVISOR ti dirà esplicitamente quando inizia
+- Prima chiedi il PERMESSO, poi i campi UNO ALLA VOLTA
+- ✅ SOLO quando il SUPERVISOR dice "DATA_COLLECTION" puoi chiedere dati personali
+
+**CHIUSURA**
+- Puoi salutare SOLO quando il SUPERVISOR autorizza la chiusura
+- Se c'è DATA_COLLECTION: solo dopo aver raccolto TUTTI i campi
+- Se NON c'è DATA_COLLECTION: il SUPERVISOR ti dirà quando concludere
+
+⚠️ **REGOLA D'ORO**: Finché sei in SCAN o DEEP, il tuo UNICO compito è fare domande sui topic.
+NON anticipare mai le fasi successive. Il SUPERVISOR ti guida passo passo.
+` : `
+## INTERVIEW FLOW (READ CAREFULLY)
+The interview follows a STRICT flow. YOU do not decide when to move to the next phase - the SUPERVISOR does.
+
+**PHASE 1: SCAN** (Quick Overview) - MANDATORY
+- Explore ALL topics with 2-3 questions each
+- Goal: understand the user's general opinions on each theme
+- ⛔ DO NOT ask for contacts. DO NOT conclude. DO NOT say "before we wrap up".
+
+**PHASE 2: DEEP** (Deep Dive) - VARIABLE DURATION
+- At the end of SCAN, the system calculates remaining time and distributes it equally among ALL topics
+- **STRUCTURE**: We return to EACH topic already explored, one at a time, for deeper probing
+- **DEEP OBJECTIVES** (for each topic):
+  1. **Clarify interesting responses**: If the user said something significant in SCAN about this topic, probe deeper ("You mentioned X, can you explain more...?")
+  2. **Explore missing sub-goals**: If some sub-goals of the topic were NOT covered in SCAN, address them now
+  3. **Vary the angles**: Don't repeat the same questions from SCAN - explore different angles, ask for concrete examples, practical implications
+- **TRANSITIONS**: The SUPERVISOR will tell you when to move to the next topic (status: TRANSITION)
+- **DON'T ANTICIPATE**: Don't decide when to change topics yourself. Keep probing until the SUPERVISOR says TRANSITION
+- ⛔ DO NOT ask for contacts. DO NOT conclude. DO NOT say "we're done".
+
+**PHASE 3: DATA_COLLECTION** (Data Collection) - OPTIONAL
+- This phase ONLY ACTIVATES IF configured for this interview
+- The SUPERVISOR will explicitly tell you when it starts
+- First ask for PERMISSION, then fields ONE AT A TIME
+- ✅ ONLY when SUPERVISOR says "DATA_COLLECTION" can you ask for personal data
+
+**CLOSURE**
+- You can say goodbye ONLY when the SUPERVISOR authorizes closure
+- If DATA_COLLECTION exists: only after collecting ALL fields
+- If NO DATA_COLLECTION: the SUPERVISOR will tell you when to conclude
+
+⚠️ **GOLDEN RULE**: While in SCAN or DEEP, your ONLY job is to ask questions about topics.
+NEVER anticipate the next phases. The SUPERVISOR guides you step by step.
+`;
+
         return `
 ## INTERVIEW METHODOLOGY
 ${methodologyContent.substring(0, 2000)}
+
+${flowExplanation}
 
 ## RULES OF ENGAGEMENT
 1. **Neutrality**: Never judge. Never agree or disagree excessively. Use neutral acknowledgments ("I see", "Thanks for sharing").
@@ -523,16 +594,32 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
                 primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode).";
             } else if (supervisorInsight.status === 'DEEPENING') {
                 const focus = supervisorInsight.focusPoint || "their last point";
+                const subGoalsList = currentTopic.subGoals?.join(', ') || 'various aspects';
                 supervisorInstruction = `
-> [!IMPORTANT] PHASE 2: DEEPENING (ZOOM)
-> All core sub-goals are covered. The user needs to elaborate on: "${focus}".
-> Ask ONE specific follow-up question about "${focus}".
-> **ANTI-GENERIC RULE**: DO NOT ask "Is there anything else?", "Anything to add?", or "Tell me more".
-> **CONTEXT RULE**: You MUST explicitly reference a specific detail from the user's previous answers. Show that you listened.
-> If the user's previous answer was already very detailed on this point, move to a different nuance of "${focus}" or move on.
-> DO NOT output [CONCLUDE_INTERVIEW]. Continue probing.
+> [!IMPORTANT] PHASE 2: DEEPENING - Topic: "${currentTopic.label}"
+> You are in DEEP DIVE phase exploring topic "${currentTopic.label}" more thoroughly.
+> Suggested focus for this turn: "${focus}".
+> Available sub-goals for this topic: ${subGoalsList}
+>
+> **YOUR OBJECTIVE** (pick ONE):
+> 1. **Clarify an interesting SCAN response**: If the user said something noteworthy about "${currentTopic.label}" earlier, ask them to elaborate ("You mentioned X earlier, can you tell me more about...?")
+> 2. **Explore a missing sub-goal**: If a sub-goal hasn't been discussed yet, ask about it now
+> 3. **Vary the angle**: Ask for concrete examples, practical implications, or a different perspective on "${focus}"
+>
+> **WHAT YOU MUST DO**:
+> - Ask ONE specific question (not generic)
+> - Reference something from the conversation when possible
+> - Focus on "${currentTopic.label}" - don't drift to other topics
+>
+> **WHAT YOU MUST NOT DO**:
+> - ❌ Generic questions ("Is there anything else?", "Tell me more", "Any other thoughts?")
+> - ❌ Repeat questions already asked in SCAN
+> - ❌ Transition to another topic yourself - wait for SUPERVISOR's TRANSITION
+> - ❌ Conclude or ask for contacts
+>
+> **FLOW**: The SUPERVISOR manages topic transitions. Keep probing "${currentTopic.label}" until you receive a TRANSITION instruction.
 `;
-                primaryInstruction = "Probe deeply into the focus point using specific user context.";
+                primaryInstruction = `Probe deeply into "${currentTopic.label}". Clarify interesting responses, explore missing sub-goals, or vary the angle.`;
             }
         }
 
@@ -548,15 +635,23 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 
         if (!isCompletion) {
             // ACTIVE PHASE (SCAN / DEEP / TRANSITION)
-            // STRICTLY FORBID CLOSURE
+            // STRICTLY FORBID CLOSURE AND CONTACT REQUESTS
             supervisorSupremacyInstruction = `
-> [!CRITICAL] SUPERVISOR SUPREMACY: INTERVIEW IS ACTIVE
+> [!CRITICAL] SUPERVISOR SUPREMACY: INTERVIEW IS ACTIVE - PHASE ${supervisorInsight?.status || 'UNKNOWN'}
 > The Interview Supervisor has indicated that the conversation MUST CONTINUE.
-> **YOU ARE FORBIDDEN FROM SAYING GOODBYE.**
-> Do NOT use phrases like "A presto", "Buona giornata", "Goodbye", "See you".
-> Do NOT wrap up the interview.
-> You MUST ask the next question or feedback as instructed.
-> If the user said "prego" or "thank you", acknowledge it briefly ("Di nulla") and IMMEDIATELY move to the next topic/question.
+>
+> **ABSOLUTE PROHIBITIONS (VIOLATING THESE = FAILURE):**
+> 1. **NO GOODBYE**: Do NOT say "A presto", "Buona giornata", "Goodbye", "See you", "Grazie per il tempo"
+> 2. **NO CONTACT REQUESTS**: Do NOT ask for email, phone, name, contacts, or ANY personal data
+>    - ❌ "Posso chiederti i contatti?"
+>    - ❌ "Prima di concludere, la tua email?"
+>    - ❌ "Qual è il tuo nome/email/telefono?"
+> 3. **NO WRAP-UP**: Do NOT say "Abbiamo finito", "Siamo alla fine", "Prima di salutarci"
+>
+> **YOUR ONLY JOB**: Ask questions about the CURRENT TOPIC. Nothing else.
+> Contact collection happens LATER, in a different phase. NOT NOW.
+>
+> If the user said "prego" or "thank you", acknowledge briefly and IMMEDIATELY ask the next topic question.
 `;
         } else {
             // COMPLETION PHASE

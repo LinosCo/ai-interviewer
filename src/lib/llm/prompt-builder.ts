@@ -230,6 +230,146 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
 
         if (supervisorInsight) {
 
+            // ========== DEEP_OFFER_ASK ==========
+            // Time is running low - offer user to continue with deeper questions
+            if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+
+                const offerPrompt = isItalian ? `
+## FASE: OFFERTA APPROFONDIMENTO
+Il tempo previsto per l'intervista sta per terminare, ma abbiamo ancora qualche domanda di approfondimento.
+
+**ISTRUZIONI**:
+1. Ringrazia brevemente l'utente per le risposte finora
+2. Spiega che il tempo indicativo è quasi finito
+3. Offri la possibilità di continuare con alcune domande extra di approfondimento
+4. Attendi la risposta dell'utente
+
+**ESEMPIO**:
+"Grazie mille per queste risposte interessanti! Il tempo che avevamo previsto sta per terminare, ma se hai ancora qualche minuto, avrei alcune domande di approfondimento che mi piacerebbe farti. Ti va di continuare?"
+
+**DIVIETI**:
+- NON chiedere dati di contatto ora
+- NON fare altre domande sui topic
+- SOLO offri la scelta di continuare o meno
+` : `
+## PHASE: DEEP DIVE OFFER
+The scheduled interview time is almost up, but we have some deeper follow-up questions.
+
+**INSTRUCTIONS**:
+1. Briefly thank the user for their answers so far
+2. Explain that the expected time is almost up
+3. Offer the opportunity to continue with a few extra deep-dive questions
+4. Wait for user's response
+
+**EXAMPLE**:
+"Thank you so much for these insightful answers! Our scheduled time is almost up, but if you have a few more minutes, I'd love to ask some deeper follow-up questions. Would you like to continue?"
+
+**PROHIBITIONS**:
+- DO NOT ask for contact details now
+- DO NOT ask other topic questions
+- ONLY offer the choice to continue or not
+`;
+                return offerPrompt.trim();
+            }
+
+            // ========== START_DEEP ==========
+            // Transitioning to DEEP phase after SCAN is complete
+            if (supervisorInsight.status === 'START_DEEP') {
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+                const focusTopic = supervisorInsight.focusPoint || allTopics[0]?.label || 'the first topic';
+
+                const startDeepPrompt = isItalian ? `
+## FASE: INIZIO APPROFONDIMENTO (DEEP)
+Abbiamo completato la panoramica generale di tutti i temi.
+Ora approfondiamo alcuni punti interessanti, partendo da: "${focusTopic}".
+
+**ISTRUZIONI**:
+1. Fai una breve transizione naturale ("Grazie per questa panoramica. Ora vorrei approfondire alcuni punti...")
+2. Torna al tema "${focusTopic}" e fai una domanda specifica di approfondimento
+3. Cita un dettaglio specifico che l'utente ha menzionato prima su questo tema
+4. La domanda deve essere SPECIFICA, non generica
+
+**ESEMPIO**:
+"Grazie per questi spunti! Tornando a ${focusTopic}, hai menzionato [dettaglio specifico]. Puoi dirmi di più su [aspetto specifico]?"
+
+**DIVIETI**:
+- NON chiedere "c'è altro da aggiungere?"
+- NON fare domande generiche
+- NON ripetere domande già fatte in SCAN
+` : `
+## PHASE: START DEEP DIVE
+We have completed the general overview of all topics.
+Now we dive deeper into interesting points, starting with: "${focusTopic}".
+
+**INSTRUCTIONS**:
+1. Make a brief natural transition ("Thanks for this overview. Now I'd like to explore some points more deeply...")
+2. Return to "${focusTopic}" and ask a specific follow-up question
+3. Reference a specific detail the user mentioned before about this topic
+4. The question must be SPECIFIC, not generic
+
+**EXAMPLE**:
+"Thank you for these insights! Going back to ${focusTopic}, you mentioned [specific detail]. Can you tell me more about [specific aspect]?"
+
+**PROHIBITIONS**:
+- DO NOT ask "is there anything else to add?"
+- DO NOT ask generic questions
+- DO NOT repeat questions already asked in SCAN
+`;
+                return startDeepPrompt.trim();
+            }
+
+            // ========== DATA_COLLECTION_CONSENT ==========
+            // Ask for permission to collect contact data
+            if (supervisorInsight.status === 'DATA_COLLECTION_CONSENT') {
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+
+                const consentPrompt = isItalian ? `
+## FASE: RICHIESTA CONSENSO DATI
+L'intervista sui contenuti è completata.
+Ora devi chiedere il PERMESSO di raccogliere i dati di contatto.
+
+**ISTRUZIONI**:
+1. Ringrazia sinceramente l'utente per il tempo e le risposte
+2. Spiega che l'intervista è conclusa
+3. Chiedi il PERMESSO di raccogliere i dati di contatto
+4. Spiega brevemente PERCHÉ (per restare in contatto / per follow-up)
+
+**STRUTTURA ESEMPIO**:
+"Ti ringrazio molto per questa conversazione, è stata davvero interessante! Siamo arrivati alla fine. Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?"
+
+**DIVIETI ASSOLUTI**:
+- NON chiedere "Come ti chiami?" in questo messaggio
+- NON chiedere email, telefono o altri campi specifici
+- CHIEDI SOLO IL PERMESSO
+- Attendi la conferma dell'utente prima di procedere
+` : `
+## PHASE: DATA COLLECTION CONSENT
+The content interview is complete.
+Now you must ask for PERMISSION to collect contact data.
+
+**INSTRUCTIONS**:
+1. Sincerely thank the user for their time and answers
+2. Explain that the interview is concluded
+3. Ask for PERMISSION to collect contact details
+4. Briefly explain WHY (to stay in touch / for follow-up)
+
+**EXAMPLE STRUCTURE**:
+"Thank you so much for this conversation, it was really insightful! We've reached the end. Before we say goodbye, may I ask for your contact details so we can stay in touch?"
+
+**ABSOLUTE PROHIBITIONS**:
+- DO NOT ask "What is your name?" in this message
+- DO NOT ask for email, phone or other specific fields
+- ONLY ASK FOR PERMISSION
+- Wait for user confirmation before proceeding
+`;
+                return consentPrompt.trim();
+            }
+
+            // ========== DATA_COLLECTION ==========
             if (supervisorInsight.status === 'DATA_COLLECTION') {
                 // RECRUITER MODE - DYNAMIC FIELDS
                 const lang = bot?.language || 'en';
@@ -276,9 +416,14 @@ ${supervisorInsight.nextSubGoal ? `2. **OBIETTIVO PRIORITARIO**: Il campo mancan
 - NON elencare tutti i campi richiesti ("Ti chiederò nome, email e telefono...")
 - NON chiedere due campi insieme ("Qual è il tuo nome e email?")
 - Se l'utente fornisce più dati insieme, ringraziali e chiedi il campo successivo mancante
-- USA IL NOME dell'utente SOLO se l'ha fornito ESPLICITAMENTE in risposta alla domanda sul nome. NON presumerlo dall'email.
-- Se l'utente fornisce solo l'email (es. tommy@gmail.com), devi comunque chiedere il NOME se è nella lista.
+- **DIVIETO ASSOLUTO**: NON usare MAI un nome estratto dall'email. Se l'email è "mario.rossi@example.com", NON chiamare l'utente "Mario" o "Mario Rossi". Il nome deve essere chiesto ESPLICITAMENTE.
+- Se l'utente fornisce solo l'email, devi SEMPRE chiedere "Come ti chiami?" se il nome è nella checklist.
+- NON SALUTARE finché non hai TUTTI i campi della checklist.
 - Se l'utente rifiuta esplicitamente → termina con "INTERVIEW_COMPLETED"
+
+**DIVIETO SALUTI PREMATURI**:
+- NON dire "Buona giornata", "A presto", "Grazie, ci sentiamo" FINCHÉ non hai raccolto TUTTI i campi.
+- Se manca anche UN SOLO campo della checklist, DEVI continuare a chiedere.
 
 **CHIUSURA**: SOLO quando hai ricevuto TUTTI i campi della lista, ringrazia e scrivi: "INTERVIEW_COMPLETED"
 ` : `
@@ -313,8 +458,10 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 - DO NOT list all required fields ("I'll need your name, email and phone...")
 - DO NOT ask for two fields together ("What's your name and email?")
 - If user provides multiple data points together, thank them and ask for next missing field
-- USE THE USER'S NAME ONLY if explicitly provided in response to the name question. DO NOT infer it from email.
-- If user provides only email (e.g. tommy@gmail.com), you MUST still ask for NAME if it is in the list.
+
+**ABSOLUTE PROHIBITION**: NEVER use a name extracted from an email address. If the email is "john.smith@example.com", DO NOT call the user "John" or "John Smith". The email username is NOT the user's name.
+**PREMATURE GOODBYE PROHIBITION**: DO NOT say "Have a great day", "Thanks for your time", "Goodbye" or similar UNTIL you have collected ALL fields in the checklist above.
+- If user provides only email, you MUST still ask for NAME separately if it is in the list.
 - If user explicitly refuses → end with "INTERVIEW_COMPLETED"
 
 **CLOSING**: ONLY when you have received ALL fields in the list, thank them and write: "INTERVIEW_COMPLETED"

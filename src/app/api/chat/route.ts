@@ -7,13 +7,40 @@ import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { LLMService } from '@/services/llmService';
 import { TopicManager } from '@/lib/llm/topic-manager';
 import { MemoryManager } from '@/lib/memory/memory-manager';
+import { prisma } from '@/lib/prisma';
 
 export const maxDuration = 60;
 
-/**
- * Extracts a specific field value from a user's message using LLM.
- * Used during DATA_COLLECTION phase to incrementally save lead data.
- */
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+const CONFIG = {
+    SCAN_TURNS_PER_TOPIC: 2,        // Target turns per topic in SCAN (min 1 guaranteed)
+    SECONDS_PER_TURN: 45,           // Average time per turn (read + respond + process)
+    TIME_BUFFER_PERCENT: 0.15,      // Below this remaining % -> offer optional DEEP
+    DEEP_QUICK_TURNS: 1,            // Turns per topic if user accepts quick DEEP
+    MAX_DATA_COLLECTION_ATTEMPTS: 15,
+};
+
+// ============================================================================
+// TYPES
+// ============================================================================
+type Phase = 'SCAN' | 'DEEP_OFFER' | 'DEEP' | 'DATA_COLLECTION';
+
+interface InterviewState {
+    phase: Phase;
+    topicIndex: number;
+    turnInTopic: number;
+    deepAccepted: boolean | null;   // null = not asked yet
+    consentGiven: boolean | null;   // null = not asked yet
+    lastAskedField: string | null;
+    dataCollectionAttempts: number;
+    deepTurnsPerTopic: number;      // Calculated budget for DEEP phase
+}
+
+// ============================================================================
+// HELPER: Extract field from user message
+// ============================================================================
 async function extractFieldFromMessage(
     fieldName: string,
     userMessage: string,
@@ -36,480 +63,497 @@ async function extractFieldFromMessage(
     };
 
     const schema = z.object({
-        extractedValue: z.string().nullable().describe('The extracted value, or null if not found'),
-        confidence: z.enum(['high', 'low', 'none']).describe('Confidence level of extraction')
+        extractedValue: z.string().nullable(),
+        confidence: z.enum(['high', 'low', 'none'])
     });
-
-    const prompt = `
-Extract the following field from the user's message.
-
-Field to extract: ${fieldName}
-Field description: ${fieldDescriptions[fieldName] || fieldName}
-
-User message: "${userMessage}"
-
-Rules:
-- If the user clearly provides this information, extract it with "high" confidence
-- If the user mentions something that might be this field but is unclear, extract with "low" confidence
-- If the user does not provide this information at all, return null with "none" confidence
-- For email: look for patterns like xxx@xxx.xxx
-- For phone: look for numeric sequences that could be phone numbers
-- For name: look for proper nouns that appear to be a person's name
-- Do NOT infer the name from an email address (e.g., do not extract "Marco" from marco@email.com)
-
-Return JSON: { extractedValue, confidence }
-`.trim();
 
     try {
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
-            prompt,
+            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences`,
             temperature: 0
         });
-
-        console.log(`🔍 [CHAT] Field extraction for "${fieldName}":`, result.object);
-        return {
-            value: result.object.extractedValue,
-            confidence: result.object.confidence
-        };
+        return { value: result.object.extractedValue, confidence: result.object.confidence };
     } catch (e) {
-        console.error(`❌ [CHAT] Field extraction failed for "${fieldName}":`, e);
+        console.error(`Field extraction failed for "${fieldName}":`, e);
         return { value: null, confidence: 'none' };
     }
 }
 
+// ============================================================================
+// HELPER: Check user intent (consent/refusal/neutral)
+// ============================================================================
+async function checkUserIntent(
+    userMessage: string,
+    apiKey: string,
+    language: string,
+    context: 'consent' | 'deep_offer'
+): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> {
+    const openai = createOpenAI({ apiKey });
+
+    const contextPrompts = {
+        consent: `The system asked for contact details. Did the user agree?`,
+        deep_offer: `The system offered to continue with deeper questions. Did the user accept?`
+    };
+
+    const schema = z.object({
+        intent: z.enum(['ACCEPT', 'REFUSE', 'NEUTRAL']),
+        reason: z.string()
+    });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: `${contextPrompts[context]}\nLanguage: ${language}\nUser message: "${userMessage}"\n\nClassify: ACCEPT (yes, ok, sure, va bene), REFUSE (no, skip, basta), NEUTRAL (question or unrelated)`,
+            temperature: 0
+        });
+        return result.object.intent;
+    } catch (e) {
+        console.error('Intent check failed:', e);
+        return 'NEUTRAL';
+    }
+}
+
+// ============================================================================
+// HELPER: Calculate time budget for DEEP phase
+// ============================================================================
+function calculateDeepBudget(
+    effectiveDurationSec: number,
+    maxDurationMins: number,
+    numTopics: number
+): { canDoDeep: boolean; turnsPerTopic: number; isLowTime: boolean } {
+    const maxDurationSec = maxDurationMins * 60;
+    const remainingSec = maxDurationSec - effectiveDurationSec;
+    const remainingPercent = remainingSec / maxDurationSec;
+
+    // If we're below buffer, time is almost up
+    const isLowTime = remainingPercent <= CONFIG.TIME_BUFFER_PERCENT;
+
+    if (remainingSec <= 0) {
+        return { canDoDeep: false, turnsPerTopic: 0, isLowTime: true };
+    }
+
+    // Calculate available turns
+    const totalTurnsAvailable = Math.floor(remainingSec / CONFIG.SECONDS_PER_TURN);
+    const turnsPerTopic = Math.max(1, Math.floor(totalTurnsAvailable / numTopics));
+
+    return {
+        canDoDeep: totalTurnsAvailable >= numTopics, // At least 1 turn per topic
+        turnsPerTopic,
+        isLowTime
+    };
+}
+
+// ============================================================================
+// HELPER: Complete interview and save profile
+// ============================================================================
+async function completeInterview(
+    conversationId: string,
+    messages: any[],
+    apiKey: string,
+    existingProfile: any
+): Promise<void> {
+    try {
+        const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
+        const extractedProfile = await CandidateExtractor.extractProfile(messages, apiKey, conversationId);
+        if (extractedProfile) {
+            const mergedProfile = { ...extractedProfile, ...existingProfile };
+            await prisma.conversation.update({
+                where: { id: conversationId },
+                data: { candidateProfile: mergedProfile }
+            });
+            console.log("👤 Profile saved:", mergedProfile.email || 'partial');
+        }
+    } catch (e) {
+        console.error("Profile extraction failed:", e);
+    }
+    await ChatService.completeInterview(conversationId);
+}
+
+// ============================================================================
+// MAIN API HANDLER
+// ============================================================================
 export async function POST(req: Request) {
     try {
         const body = await req.json();
         const { messages, conversationId, botId, effectiveDuration, introMessage } = body;
 
-        // 1. Data Loading & Validation
+        // ====================================================================
+        // 1. LOAD DATA
+        // ====================================================================
         const conversation = await ChatService.loadConversation(conversationId, botId);
+        const bot = conversation.bot;
+        const language = bot.language || 'en';
+        const shouldCollectData = (bot as any).collectCandidateData;
 
-        // 2. Persist User Message
         const lastMessage = messages[messages.length - 1];
         if (lastMessage?.role === 'user') {
             await ChatService.saveUserMessage(conversationId, lastMessage.content);
         }
 
-        // 3. Update Progress
         await ChatService.updateProgress(conversationId, Number(effectiveDuration || conversation.effectiveDuration));
 
-        // 5. Topic Supervision
-        const botTopics = conversation.bot.topics;
-        botTopics.sort((a, b) => a.orderIndex - b.orderIndex);
+        // Topics
+        const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
+        const numTopics = botTopics.length;
 
-        const currentTopic = botTopics.find(t => t.id === conversation.currentTopicId) || botTopics[0];
-        let currentIndex = botTopics.findIndex(t => t.id === conversation.currentTopicId);
-        if (currentIndex === -1) currentIndex = 0;
+        // ====================================================================
+        // 2. LOAD STATE
+        // ====================================================================
+        const rawMetadata = (conversation as any).metadata || {};
+        const state: InterviewState = {
+            phase: rawMetadata.phase || 'SCAN',
+            topicIndex: rawMetadata.topicIndex ?? 0,
+            turnInTopic: rawMetadata.turnInTopic ?? 0,
+            deepAccepted: rawMetadata.deepAccepted ?? null,
+            consentGiven: rawMetadata.consentGiven ?? null,
+            lastAskedField: rawMetadata.lastAskedField ?? null,
+            dataCollectionAttempts: rawMetadata.dataCollectionAttempts ?? 0,
+            deepTurnsPerTopic: rawMetadata.deepTurnsPerTopic ?? 0,
+        };
 
-        // Detect Phase from Metadata
-        const metadata = (conversation as any).metadata || {};
-        const currentPhase = metadata.phase || 'SCAN'; // Default to SCAN
+        const currentTopic = botTopics[state.topicIndex] || botTopics[0];
+        const effectiveSec = Number(effectiveDuration || conversation.effectiveDuration) || 0;
+        const maxDurationMins = bot.maxDurationMins || 10;
 
-        let supervisorInsight = { status: 'SCANNING' };
+        // API Key
+        const openAIKey = await LLMService.getApiKey(bot, 'openai') || process.env.OPENAI_API_KEY || '';
 
-        // 4. Check Limits
-        const statusCheck = await ChatService.checkLimits(conversationId);
-        const shouldCollectData = (conversation.bot as any).collectCandidateData;
+        console.log("📊 [CHAT] State:", {
+            phase: state.phase,
+            topic: currentTopic.label,
+            topicIndex: state.topicIndex,
+            turnInTopic: state.turnInTopic,
+            effectiveSec,
+            maxDurationMins
+        });
 
-        // BUFFER: Increase default turns if not specified to allow DEEP phase
-        const maxTurns = conversation.bot.maxTurns || 40;
-        const turnsReached = ((conversation as any).messages.filter((m: any) => m.role === 'assistant').length >= maxTurns);
-
-        console.log("🔍 [CHAT] Limits Check:", { shouldConclude: statusCheck.shouldConclude, shouldCollectData, turnsReached, maxTurns });
-
-        // Check time/turn limits - force end if exceeded
-        if ((statusCheck.shouldConclude || turnsReached) && currentPhase !== 'DATA_COLLECTION') {
-            console.log("⏰ [CHAT] Time/Turn limit reached.");
-
-            if (shouldCollectData) {
-                // Skip remaining topics and go directly to data collection
-                console.log("📝 [CHAT] Forcing transition to DATA_COLLECTION due to limits.");
-                supervisorInsight = { status: 'TRANSITION_TO_DATA' }; // Custom status to trigger transition
-            } else {
-                await ChatService.completeInterview(conversationId);
-                return Response.json({
-                    text: (conversation.bot.language === 'it'
-                        ? "Il tempo a disposizione per questa intervista è terminato. Grazie per la partecipazione!"
-                        : "The time for this interview has ended. Thank you for participating!") + " INTERVIEW_COMPLETED",
-                    isCompleted: true,
-                    currentTopicId: conversation.currentTopicId
-                });
-            }
-        }
-
-        // Fetch API Key
-        const openAIKey = await LLMService.getApiKey(conversation.bot, 'openai') || process.env.OPENAI_API_KEY || '';
-
-        // === FALLBACK: Anti-loop protection for DATA_COLLECTION ===
-        const MAX_DATA_COLLECTION_ATTEMPTS = 15; // ~5 fields * 3 retry attempts
-        if (currentPhase === 'DATA_COLLECTION' && (metadata.dataCollectionAttempts || 0) >= MAX_DATA_COLLECTION_ATTEMPTS) {
-            console.log("⚠️ [CHAT] Max DATA_COLLECTION attempts reached. Forcing completion.");
-
-            // Trigger final extraction with whatever we have
-            const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-            const { prisma } = require('@/lib/prisma');
-
-            try {
-                const profile = await CandidateExtractor.extractProfile(messages, openAIKey, conversationId);
-                if (profile) {
-                    // Merge with any existing profile data
-                    const existingProfile = (conversation.candidateProfile as any) || {};
-                    const mergedProfile = { ...profile, ...existingProfile };
-                    await prisma.conversation.update({
-                        where: { id: conversationId },
-                        data: { candidateProfile: mergedProfile }
-                    });
-                    console.log("👤 [CHAT] Fallback profile saved:", mergedProfile.email || 'partial');
-                }
-            } catch (e) {
-                console.error("❌ [CHAT] Fallback extraction failed:", e);
-            }
-
-            await ChatService.completeInterview(conversationId);
-            return Response.json({
-                text: (conversation.bot.language === 'it'
-                    ? "Grazie per le informazioni fornite. L'intervista è conclusa!"
-                    : "Thank you for the information provided. The interview is concluded!") + " INTERVIEW_COMPLETED",
-                isCompleted: true,
-                currentTopicId: conversation.currentTopicId
-            });
-        }
-
-        // 5. Topic Evaluation (skip if we already decided to collect data or terminate)
-        if (messages.length > 2 && supervisorInsight.status !== 'COMPLETION') {
-            // SKIP TOPIC EVALUATION IN DATA COLLECTION PHASE
-            if (currentPhase === 'DATA_COLLECTION') {
-                supervisorInsight = { status: 'DATA_COLLECTION' };
-            } else {
-                try {
-                    // Calculate remaining time for adaptive depth
-                    const maxDurationMins = conversation.bot.maxDurationMins || 10;
-                    const elapsedMins = Math.floor((Number(effectiveDuration || conversation.effectiveDuration) || 0) / 60);
-                    const remainingMins = maxDurationMins - elapsedMins;
-
-                    // Calculate how many topics are left in DEEP
-                    const topicsRemaining = currentPhase === 'DEEP' ? (botTopics.length - currentIndex) : botTopics.length;
-                    const timePerTopic = remainingMins / (topicsRemaining || 1);
-
-                    const insight = await TopicManager.evaluateTopicProgress(
-                        messages as any[],
-                        currentTopic,
-                        openAIKey,
-                        currentPhase, // Pass phase to TopicManager
-                        (conversation.bot as any).collectCandidateData, // isRecruiting
-                        conversation.bot.language, // Language
-                        timePerTopic, // time budget per topic
-                        metadata.deepTurnsByTopic || {}, // DEEP turn tracking
-                        metadata.scanTurnsByTopic || {} // SCAN turn tracking
-                    );
-                    supervisorInsight = insight as any;
-
-                    console.log("🔍 [CHAT] Supervisor Decision:", {
-                        phase: currentPhase,
-                        currentTopic: currentTopic.label,
-                        status: supervisorInsight.status,
-                        messagesCount: messages.length,
-                        reason: (supervisorInsight as any).reason
-                    });
-                } catch (e) {
-                    console.error("❌ [CHAT] Supervisor error:", e);
-                    supervisorInsight = { status: 'TRANSITION' }; // Default to transition on error
-                }
-            }
-        }
-
-        // 5.b. Failsafe for Stuck Topic -> Scale based on loop index & Phase
-        // ONLY apply if we haven't already decided to complete/collect data
-        if (supervisorInsight.status !== 'COMPLETION') {
-            const isDeep = currentPhase === 'DEEP';
-            // SCAN phase: 2 exchanges per topic (1 assistant question + 1 user response = 2 messages)
-            // Add some buffer for intro, but keep it tight
-            const phaseOffset = isDeep ? (botTopics.length * 3) : 0;
-            const msgPerTopic = isDeep ? 10 : 5; // RELAXED LIMITS (Scanning ~5, Deep ~10)
-
-            const globalHeadroom = phaseOffset + ((currentIndex + 1) * msgPerTopic) + 3;
-
-            // DISABLE HEADROOM CHECK FOR DATA COLLECTION
-            if (currentPhase !== 'DATA_COLLECTION' && messages.length > globalHeadroom) {
-                console.log(`🚨 [CHAT] FORCE TRANSITION: Messages (${messages.length}) > Headroom (${globalHeadroom}).`);
-                supervisorInsight = { status: 'TRANSITION' };
-            }
-        }
-
-        // 6. Transition & Loop Logic
-        const methodology = LLMService.getMethodology();
-        const model = await LLMService.getModel(conversation.bot);
-
+        // ====================================================================
+        // 3. PHASE MACHINE
+        // ====================================================================
+        let nextState = { ...state };
         let systemPrompt = "";
-        let nextTopicId = conversation.currentTopicId;
-        let isTransitioning = false;
-        let nextPhase = currentPhase;
+        let nextTopicId = currentTopic.id;
+        let supervisorInsight: any = { status: 'SCANNING' };
 
-        // HANDLE COMPLETION / SKIP (User asked to stop/apply)
-        if (supervisorInsight.status === 'COMPLETION' || (supervisorInsight as any).status === 'TRANSITION_TO_DATA') {
-            console.log("⏩ [CHAT] Fast-tracking to DATA_COLLECTION or Ending.");
+        // --------------------------------------------------------------------
+        // PHASE: SCAN
+        // --------------------------------------------------------------------
+        if (state.phase === 'SCAN') {
+            // Check if we should transition to next topic
+            if (state.turnInTopic >= CONFIG.SCAN_TURNS_PER_TOPIC) {
+                // Move to next topic
+                if (state.topicIndex + 1 < numTopics) {
+                    nextState.topicIndex = state.topicIndex + 1;
+                    nextState.turnInTopic = 0;
+                    nextTopicId = botTopics[nextState.topicIndex].id;
 
-            if (shouldCollectData) {
-                nextPhase = 'DATA_COLLECTION';
-                isTransitioning = true;
-
-                // Direct Transition to Data Collection
-                const softOfferInstruction = PromptBuilder.buildSoftOfferPrompt(conversation.bot.language || 'en');
-
-                systemPrompt = await PromptBuilder.build(
-                    conversation.bot,
-                    conversation,
-                    currentTopic,
-                    methodology,
-                    Number(effectiveDuration || 0),
-                    softOfferInstruction
-                );
-                // Force status for PromptBuilder mapping if needed (though we use systemPrompt override)
-                supervisorInsight.status = 'DATA_COLLECTION_FIRST_ASK';
-
-            } else {
-                // FAST FINISH
-                await ChatService.completeInterview(conversationId);
-                const text = conversation.bot.language === 'it' ? "Certamente. Grazie per il tuo tempo! L'intervista è conclusa." : "Certainly. Thank you for your time! The interview is concluded.";
-                return Response.json({
-                    text: text + " INTERVIEW_COMPLETED",
-                    isCompleted: true,
-                    currentTopicId: conversation.currentTopicId
-                });
-            }
-
-        } else if (supervisorInsight.status === 'TRANSITION') {
-            const nextTopic = botTopics[currentIndex + 1];
-
-            if (nextTopic) {
-                // Normal transition within current loop
-                console.log(`➡️ [CHAT] Transition (${currentPhase}): ${currentTopic.label} → ${nextTopic.label}`);
-                const transitionInstruction = PromptBuilder.buildTransitionPrompt(currentTopic, nextTopic, methodology, currentPhase as any);
-                systemPrompt = await PromptBuilder.build(
-                    conversation.bot,
-                    conversation,
-                    nextTopic,
-                    methodology,
-                    Number(effectiveDuration || 0),
-                    transitionInstruction
-                );
-                nextTopicId = nextTopic.id;
-                isTransitioning = true;
-            } else {
-                // End of Topics List
-                console.log(`🔄 [CHAT] End of topics in phase ${currentPhase}`);
-
-                if (currentPhase === 'SCAN') {
-                    // End of SCAN -> Start DEEP LOOP
-                    console.log("🚀 [CHAT] Switching to DEEP PHASE. Restarting topics.");
-                    nextPhase = 'DEEP';
-                    nextTopicId = botTopics[0].id; // Back to first
-                    isTransitioning = true;
-
-                    // Build a "Bridging" System Prompt
-                    const bridgeInstruction = PromptBuilder.buildBridgePrompt(
-                        botTopics[0],
-                        conversation.bot.language || 'en'
-                    );
-
-                    systemPrompt = await PromptBuilder.build(
-                        conversation.bot,
-                        conversation,
-                        botTopics[0],
-                        methodology,
-                        Number(effectiveDuration || 0),
-                        bridgeInstruction
-                    );
-
+                    console.log(`➡️ [SCAN] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
+                    supervisorInsight = { status: 'TRANSITION', nextTopic: botTopics[nextState.topicIndex].label };
                 } else {
-                    // End of DEEP -> Check for Data Collection OR Finish
-                    const shouldCollectData = (conversation.bot as any).collectCandidateData;
+                    // End of SCAN - check time for DEEP
+                    const budget = calculateDeepBudget(effectiveSec, maxDurationMins, numTopics);
+                    console.log("📊 [SCAN] Complete. Budget:", budget);
 
-                    if (shouldCollectData && currentPhase !== 'DATA_COLLECTION') {
-                        console.log("📝 [CHAT] Deep Dive Complete. Switching to DATA_COLLECTION.");
-                        nextPhase = 'DATA_COLLECTION';
-                        isTransitioning = true;
-
-                        const dataInstruction = PromptBuilder.buildSoftOfferPrompt(conversation.bot.language || 'en');
-
-                        systemPrompt = await PromptBuilder.build(
-                            conversation.bot,
-                            conversation,
-                            currentTopic,
-                            methodology,
-                            Number(effectiveDuration || 0),
-                            dataInstruction
-                        );
+                    if (budget.isLowTime) {
+                        // Time almost up - offer optional DEEP
+                        nextState.phase = 'DEEP_OFFER';
+                        supervisorInsight = { status: 'DEEP_OFFER' };
+                    } else if (budget.canDoDeep) {
+                        // Enough time - go to DEEP
+                        nextState.phase = 'DEEP';
+                        nextState.topicIndex = 0;
+                        nextState.turnInTopic = 0;
+                        nextState.deepTurnsPerTopic = budget.turnsPerTopic;
+                        nextTopicId = botTopics[0].id;
+                        supervisorInsight = { status: 'START_DEEP' };
                     } else {
-                        // Truly Finished 
-                        console.log("✅ [CHAT] Interview Complete. Ending.");
-                        await ChatService.completeInterview(conversationId);
-
-                        // Final extraction pass
+                        // No time for DEEP - go to DATA_COLLECTION or END
                         if (shouldCollectData) {
-                            const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-                            CandidateExtractor.extractProfile(messages, openAIKey, conversationId).then(async (profile: any) => {
-                                if (profile) {
-                                    const { prisma } = require('@/lib/prisma');
-                                    await prisma.conversation.update({
-                                        where: { id: conversationId },
-                                        data: { candidateProfile: profile }
-                                    });
-                                }
-                            }).catch((e: any) => console.error("Final extraction failed", e));
+                            nextState.phase = 'DATA_COLLECTION';
+                            supervisorInsight = { status: 'START_DATA_COLLECTION' };
+                        } else {
+                            await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
+                            return Response.json({
+                                text: language === 'it'
+                                    ? "Grazie mille per il tuo tempo! L'intervista è conclusa."
+                                    : "Thank you so much for your time! The interview is complete.",
+                                isCompleted: true,
+                                currentTopicId: currentTopic?.id || null
+                            });
                         }
+                    }
+                }
+            } else {
+                // Continue SCAN on current topic
+                nextState.turnInTopic = state.turnInTopic + 1;
 
+                // Ask TopicManager for next sub-goal
+                const insight = await TopicManager.generateScanQuestion(
+                    currentTopic,
+                    state.turnInTopic,
+                    openAIKey,
+                    language
+                );
+                supervisorInsight = { status: 'SCANNING', nextSubGoal: insight.nextSubGoal };
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // PHASE: DEEP_OFFER
+        // --------------------------------------------------------------------
+        else if (state.phase === 'DEEP_OFFER') {
+            if (state.deepAccepted === null) {
+                // First time - bot will ask
+                supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+            } else {
+                // User already responded - check intent
+                const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
+
+                if (intent === 'ACCEPT') {
+                    nextState.deepAccepted = true;
+                    nextState.phase = 'DEEP';
+                    nextState.topicIndex = 0;
+                    nextState.turnInTopic = 0;
+                    nextState.deepTurnsPerTopic = CONFIG.DEEP_QUICK_TURNS;
+                    nextTopicId = botTopics[0].id;
+                    supervisorInsight = { status: 'START_DEEP' };
+                    console.log("✅ [DEEP_OFFER] User accepted quick DEEP");
+                } else if (intent === 'REFUSE') {
+                    nextState.deepAccepted = false;
+                    if (shouldCollectData) {
+                        nextState.phase = 'DATA_COLLECTION';
+                        supervisorInsight = { status: 'START_DATA_COLLECTION' };
+                    } else {
+                        await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
                         return Response.json({
-                            text: (conversation.bot.language === 'it' ? "Grazie! Abbiamo registrato tutto. A presto!" : "Thank you! We've recorded everything. See you soon!") + " INTERVIEW_COMPLETED",
+                            text: language === 'it'
+                                ? "Perfetto, grazie per il tuo tempo!"
+                                : "Perfect, thank you for your time!",
                             isCompleted: true,
-                            currentTopicId: conversation.currentTopicId
+                            currentTopicId: currentTopic?.id || null
+                        });
+                    }
+                    console.log("❌ [DEEP_OFFER] User declined");
+                } else {
+                    // NEUTRAL - re-ask
+                    supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // PHASE: DEEP
+        // --------------------------------------------------------------------
+        else if (state.phase === 'DEEP') {
+            const turnsLimit = state.deepTurnsPerTopic || CONFIG.DEEP_QUICK_TURNS;
+
+            if (state.turnInTopic >= turnsLimit) {
+                // Move to next topic
+                if (state.topicIndex + 1 < numTopics) {
+                    nextState.topicIndex = state.topicIndex + 1;
+                    nextState.turnInTopic = 0;
+                    nextTopicId = botTopics[nextState.topicIndex].id;
+
+                    console.log(`➡️ [DEEP] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
+                    supervisorInsight = { status: 'TRANSITION', nextTopic: botTopics[nextState.topicIndex].label };
+                } else {
+                    // End of DEEP
+                    if (shouldCollectData) {
+                        nextState.phase = 'DATA_COLLECTION';
+                        supervisorInsight = { status: 'START_DATA_COLLECTION' };
+                    } else {
+                        await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
+                        return Response.json({
+                            text: language === 'it'
+                                ? "Grazie mille! Abbiamo concluso l'intervista."
+                                : "Thank you so much! The interview is complete.",
+                            isCompleted: true,
+                            currentTopicId: currentTopic?.id || null
                         });
                     }
                 }
+            } else {
+                // Continue DEEP on current topic
+                nextState.turnInTopic = state.turnInTopic + 1;
+
+                // Ask TopicManager for focus point (MUST be different each turn)
+                const insight = await TopicManager.generateDeepQuestion(
+                    currentTopic,
+                    state.turnInTopic,
+                    messages.slice(-10),
+                    openAIKey,
+                    language
+                );
+                supervisorInsight = { status: 'DEEPENING', focusPoint: insight.focusPoint };
             }
         }
 
-        // 6.b. FINAL PROMPT ASSEMBLY
-        // If systemPrompt is still empty, build it using the standard builder
-        if (!systemPrompt) {
-            // Force status to DATA_COLLECTION if we are in that phase to ensure correct instructions
-            const insightForPrompt = currentPhase === 'DATA_COLLECTION'
-                ? { status: 'DATA_COLLECTION' }
-                : supervisorInsight;
+        // --------------------------------------------------------------------
+        // PHASE: DATA_COLLECTION
+        // --------------------------------------------------------------------
+        else if (state.phase === 'DATA_COLLECTION') {
+            // Anti-loop protection
+            if (state.dataCollectionAttempts >= CONFIG.MAX_DATA_COLLECTION_ATTEMPTS) {
+                await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
+                return Response.json({
+                    text: language === 'it'
+                        ? "Grazie per le informazioni fornite. L'intervista è conclusa!"
+                        : "Thank you for the information. The interview is complete!",
+                    isCompleted: true,
+                    currentTopicId: currentTopic?.id || null
+                });
+            }
 
-            systemPrompt = await PromptBuilder.build(
-                conversation.bot,
-                conversation,
-                currentTopic,
-                methodology,
-                Number(effectiveDuration || 0),
-                insightForPrompt as any
-            );
+            const candidateFields = (bot.candidateDataFields as any[]) || [];
+            let currentProfile = (conversation.candidateProfile as any) || {};
+
+            // Check consent first
+            if (state.consentGiven === null) {
+                // Bot will ask for consent
+                supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+            } else if (state.consentGiven === false) {
+                // Check if user now consents
+                const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'consent');
+
+                if (intent === 'ACCEPT') {
+                    nextState.consentGiven = true;
+                    // Will proceed to ask first field
+                } else if (intent === 'REFUSE') {
+                    await completeInterview(conversationId, messages, openAIKey, currentProfile);
+                    return Response.json({
+                        text: language === 'it'
+                            ? "Nessun problema. Grazie per il tuo tempo!"
+                            : "No problem. Thank you for your time!",
+                        isCompleted: true,
+                        currentTopicId: currentTopic?.id || null
+                    });
+                } else {
+                    supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                    nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                }
+            }
+
+            // If consent given, extract field and determine next
+            if (nextState.consentGiven === true || state.consentGiven === true) {
+                // Extract last asked field
+                if (state.lastAskedField && lastMessage?.role === 'user') {
+                    const extraction = await extractFieldFromMessage(
+                        state.lastAskedField,
+                        lastMessage.content,
+                        openAIKey,
+                        language
+                    );
+                    if (extraction.value && extraction.confidence !== 'none') {
+                        currentProfile = { ...currentProfile, [state.lastAskedField]: extraction.value };
+                        await prisma.conversation.update({
+                            where: { id: conversationId },
+                            data: { candidateProfile: currentProfile }
+                        });
+                        console.log(`✅ Saved "${state.lastAskedField}": "${extraction.value}"`);
+                    }
+                }
+
+                // Find next missing field
+                let nextField = null;
+                for (const field of candidateFields) {
+                    const fieldName = typeof field === 'string' ? field : field.field;
+                    if (!currentProfile[fieldName]) {
+                        nextField = fieldName;
+                        break;
+                    }
+                }
+
+                if (!nextField) {
+                    // All fields collected!
+                    await completeInterview(conversationId, messages, openAIKey, currentProfile);
+                    return Response.json({
+                        text: language === 'it'
+                            ? "Grazie mille per tutte le informazioni. L'intervista è conclusa, ti contatteremo presto!"
+                            : "Thank you for all the information. The interview is complete, we will contact you soon!",
+                        isCompleted: true,
+                        currentTopicId: currentTopic?.id || null
+                    });
+                }
+
+                nextState.lastAskedField = nextField;
+                nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                nextState.consentGiven = true;
+                supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
+            }
         }
 
-        // 7. Generate Response
+        // ====================================================================
+        // 4. BUILD PROMPT
+        // ====================================================================
+        const methodology = LLMService.getMethodology();
+        const model = await LLMService.getModel(bot);
+        const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
+
+        systemPrompt = await PromptBuilder.build(
+            bot,
+            conversation,
+            targetTopic,
+            methodology,
+            effectiveSec,
+            supervisorInsight
+        );
+
+        // Inject intro message at start
+        if (introMessage && messages.length <= 1) {
+            systemPrompt += `\n\nIMPORTANT: Start your response with exactly:\n"${introMessage}"\nThen follow with your first question.`;
+        }
+
+        // Phase-specific injections
+        if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
+            const offerText = language === 'it'
+                ? "Abbiamo quasi finito il tempo a disposizione. Vorresti approfondire qualche argomento con qualche altra domanda, oppure preferisci concludere?"
+                : "We're almost out of time. Would you like to explore some topics in more depth with a few more questions, or would you prefer to wrap up?";
+            systemPrompt += `\n\n## DEEP OFFER\nYou must ask: "${offerText}"`;
+        }
+
+        // Final reinforcement
+        systemPrompt += `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
+
+        // ====================================================================
+        // 5. GENERATE RESPONSE
+        // ====================================================================
         const schema = z.object({
             response: z.string().describe("The conversational response to the user."),
-            meta_comment: z.string().optional().describe("Internal reasoning (hidden from user)")
+            meta_comment: z.string().optional()
         });
 
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
-        // Never inject "I am ready" - if empty, let the system prompt handle it or assume start.
-        // But the client should always send at least the intro message if it exists.
 
-        // Inject Phase context into system prompt if generic
-        // FIX: Use nextPhase to avoid conflict if transitioning (e.g. DEEP -> DATA)
-        if (!systemPrompt.includes("PHASE")) {
-            // If transitioning to DATA_COLLECTION, don't inject the standard SCAN/DEEP prompts
-            if (nextPhase === 'DATA_COLLECTION') {
-                systemPrompt += `\n\nCURRENT INTERVIEW PHASE: DATA_COLLECTION\nGoal: Securely collect candidate contact details. Be professional and reassuring.`;
-            } else {
-                systemPrompt += `\n\nCURRENT INTERVIEW PHASE: ${nextPhase}\n` +
-                    (nextPhase === 'SCAN' ? "Keep it brief. Move fast. Only 2-3 questions per topic." : "Dig deep. Use quotes from user history. Reference specific user details.");
-            }
-
-            // INJECT TIME PRESSURE (Only in DEEP phase loop)
-            if (nextPhase === 'DEEP' && supervisorInsight.status !== 'TRANSITION' && !isTransitioning) {
-                const maxDurationMins = conversation.bot.maxDurationMins || 10;
-                const elapsedMins = Math.floor((Number(effectiveDuration || conversation.effectiveDuration) || 0) / 60);
-                const remainingMins = maxDurationMins - elapsedMins;
-                // Rough estimate of remaining topics
-                const topicsRemaining = botTopics.length - currentIndex;
-                const budgetPerTopic = remainingMins / (topicsRemaining || 1);
-
-                if (budgetPerTopic < 2.0 && remainingMins > 0) {
-                    systemPrompt += `\n\n⚠️ TIME ALERT: You have very limited time left (${budgetPerTopic.toFixed(1)} mins for this topic). ASK ONLY ONE FINAL QUESTION for this topic. Make it count, then we must move on. Be concise.`;
-                }
-            }
-        }
-
-        // Final Global Reinforcement
-        systemPrompt += `\n\n## MANDATORY CHARACTER RULE:\nYour response MUST end with a question mark (?). This is a hard constraint. Even if you are saying goodbye or transitioning, finish the turns with a clear question to the user.`;
-
-        // Inject Custom Intro Message Requirement (Only at the very start)
-        if (introMessage && messagesForAI.length <= 1) {
-            systemPrompt += `\n\nIMPORTANT: You are starting the interview. Your response MUST begin with the following text exactly:\n"${introMessage}"\nThen, immediately follow up with your first question or statement as per the methodology. Do not repeat the greeting if it's already in the text. combine them naturally.`;
-        }
-
-
-        console.log("⏳ [CHAT] Starting LLM Generation...");
-        console.time("LLM Generation");
-
-        // TIMEOUT PROTECTION (45s)
-        const timeoutMs = 45000;
-        let didTimeout = false;
-
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-                didTimeout = true;
-                reject(new Error("LLM_TIMEOUT"));
-            }, timeoutMs);
-        });
+        console.log("⏳ [CHAT] Generating response...");
+        console.time("LLM");
 
         let result: any;
-
         try {
             result = await Promise.race([
-                generateObject({
-                    model,
-                    schema,
-                    messages: messagesForAI,
-                    system: systemPrompt,
-                    temperature: 0.7
-                }),
-                timeoutPromise
+                generateObject({ model, schema, messages: messagesForAI, system: systemPrompt, temperature: 0.7 }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 45000))
             ]);
         } catch (error: any) {
-            if (error.message === "LLM_TIMEOUT") {
-                console.error(`⚠️ [CHAT] LLM Generation TIMED OUT after ${timeoutMs}ms.`);
-                console.timeEnd("LLM Generation");
-
-                // Fallback response to prevent crash
-                const fallbackText = conversation.bot.language === 'it'
-                    ? "Mi scuso, sto elaborando molte informazioni e ci sto mettendo un po' più del previsto. Potresti ripetere l'ultimo concetto o darmi un attimo?"
-                    : "I apologize, I'm processing a lot of information and it's taking a bit longer than expected. Could you please repeat that last point or give me a moment?";
-
-                await ChatService.saveAssistantMessage(conversationId, fallbackText);
-                return Response.json({
-                    text: fallbackText,
-                    currentTopicId: nextTopicId,
-                    isCompleted: false
-                });
+            if (error.message === "TIMEOUT") {
+                const fallback = language === 'it'
+                    ? "Mi scuso, ho bisogno di un momento. Puoi ripetere?"
+                    : "I apologize, I need a moment. Could you repeat that?";
+                await ChatService.saveAssistantMessage(conversationId, fallback);
+                return Response.json({ text: fallback, currentTopicId: nextTopicId, isCompleted: false });
             }
-            throw error; // Re-throw real errors
+            throw error;
         }
 
-        console.timeEnd("LLM Generation");
+        console.timeEnd("LLM");
         const responseText = result.object.response;
 
-        // Check for Explicit Completion Tag (used in Data Collection)
-        // Case insensitive check for robustness
-        const completionRegex = /INTERVIEW_COMPLETED/i;
-        if (completionRegex.test(responseText)) {
-            console.log("🏁 [CHAT] LLM triggered completion.");
-            await ChatService.completeInterview(conversationId);
-
-            // Trigger Final Extraction
-            if (currentPhase === 'DATA_COLLECTION' || shouldCollectData) {
-                const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-                try {
-                    const profile = await CandidateExtractor.extractProfile(messages.concat({ role: 'assistant', content: responseText }), openAIKey, conversationId);
-                    if (profile) {
-                        const { prisma } = require('@/lib/prisma');
-                        await prisma.conversation.update({
-                            where: { id: conversationId },
-                            data: { candidateProfile: profile }
-                        });
-                        console.log("👤 [CHAT] Final Profile Saved:", profile.email || 'Done');
-                    }
-                } catch (e: any) {
-                    console.error("❌ [CHAT] Final extraction failed:", e);
-                }
-            }
-
+        // Check for completion tag
+        if (/INTERVIEW_COMPLETED/i.test(responseText)) {
+            await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
             return Response.json({
                 text: responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim(),
                 currentTopicId: nextTopicId,
@@ -517,239 +561,30 @@ export async function POST(req: Request) {
             });
         }
 
-        // 7.5. LEAD GENERATION SEQUENTIAL LOGIC
-        // If we are in DATA_COLLECTION and user has consented, we ensure we ask for the next field
-        if (nextPhase === 'DATA_COLLECTION' && (metadata.consentGiven || isTransitioning)) {
-            const { prisma } = require('@/lib/prisma');
-
-            // Robust Field Checking
-            const candidateFields = (conversation.bot.candidateDataFields as any[]) || [];
-            let currentProfile = (conversation.candidateProfile as any) || {};
-
-            // === INCREMENTAL EXTRACTION ===
-            // If we asked for a field last turn and user just responded, try to extract the value
-            const lastAskedField = metadata.lastAskedField;
-            if (lastAskedField && lastMessage?.role === 'user' && lastMessage.content) {
-                console.log(`🔍 [CHAT] Attempting to extract "${lastAskedField}" from user message...`);
-
-                const extraction = await extractFieldFromMessage(
-                    lastAskedField,
-                    lastMessage.content,
-                    openAIKey,
-                    conversation.bot.language || 'en'
-                );
-
-                if (extraction.value && extraction.confidence !== 'none') {
-                    // Save the extracted value to the profile
-                    currentProfile = { ...currentProfile, [lastAskedField]: extraction.value };
-
-                    // SAVE TO DB IMMEDIATELY
-                    await prisma.conversation.update({
-                        where: { id: conversationId },
-                        data: { candidateProfile: currentProfile }
-                    });
-                    console.log(`✅ [CHAT] Saved field "${lastAskedField}": "${extraction.value}" (confidence: ${extraction.confidence})`);
-                } else {
-                    console.log(`⚠️ [CHAT] Could not extract "${lastAskedField}" from message. Will re-ask.`);
-                }
-            }
-
-            // Check what's still missing
-            let nextFieldToAsk = null;
-            for (const field of candidateFields) {
-                const fieldName = typeof field === 'string' ? field : field.field;
-                if (!currentProfile[fieldName]) {
-                    nextFieldToAsk = field;
-                    break;
-                }
-            }
-
-            if (!nextFieldToAsk) {
-                // All fields collected! Auto-complete.
-                console.log("✅ [CHAT] All lead fields collected. Finishing.");
-
-                // Final extraction pass to ensure we have everything
-                const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-                try {
-                    const finalProfile = await CandidateExtractor.extractProfile(messages, openAIKey, conversationId);
-                    if (finalProfile) {
-                        // Merge with existing profile (keep our extracted values, add any additional insights)
-                        const mergedProfile = { ...finalProfile, ...currentProfile };
-                        await prisma.conversation.update({
-                            where: { id: conversationId },
-                            data: { candidateProfile: mergedProfile }
-                        });
-                        console.log("👤 [CHAT] Final merged profile saved:", mergedProfile.email || 'Done');
-                    }
-                } catch (e) {
-                    console.error("❌ [CHAT] Final profile extraction failed:", e);
-                }
-
-                await ChatService.completeInterview(conversationId);
-                return Response.json({
-                    text: (conversation.bot.language === 'it'
-                        ? "Grazie mille per tutte le informazioni. Abbiamo terminato!"
-                        : "Thank you very much for all the information. We are finished!") + " INTERVIEW_COMPLETED",
-                    isCompleted: true,
-                    currentTopicId: nextTopicId
-                });
-            }
-
-            // Track which field we're about to ask (for next iteration)
-            const nextFieldName = typeof nextFieldToAsk === 'string' ? nextFieldToAsk : nextFieldToAsk.field;
-
-            // Update metadata with lastAskedField for next iteration
-            await prisma.conversation.update({
-                where: { id: conversationId },
-                data: {
-                    metadata: {
-                        ...metadata,
-                        lastAskedField: nextFieldName,
-                        dataCollectionAttempts: (metadata.dataCollectionAttempts || 0) + 1
-                    }
-                }
-            });
-
-            // If we have a next field, we should ensure the next prompt focuses on it.
-            // We'll update the supervisorInsight to force the topic prompt logic
-            supervisorInsight = {
-                status: 'DATA_COLLECTION',
-                nextSubGoal: nextFieldName
-            } as any;
-
-            console.log(`📝 [CHAT] Next field to ask: "${nextFieldName}". Profile so far:`, Object.keys(currentProfile));
-
-            // Re-build system prompt with specific field instruction if needed
-            // (buildTopicPrompt handles DATA_COLLECTION status specifically)
-            systemPrompt = await PromptBuilder.build(
-                conversation.bot,
-                conversation,
-                currentTopic,
-                methodology,
-                Number(effectiveDuration || 0),
-                supervisorInsight
-            );
-        }
-
-        const consentGiven = metadata.consentGiven || false;
-
-        if (nextPhase === 'DATA_COLLECTION' && currentPhase === 'DATA_COLLECTION' && !isTransitioning && !consentGiven) {
-            // We're in DATA_COLLECTION but haven't transitioned yet - check if this is consent
-            const lastUserMsg = lastMessage?.content || '';
-
-            // USE ROBUST LLM CHECK
-            const userIntent = await TopicManager.checkConsent(
-                lastUserMsg,
-                openAIKey,
-                conversation.bot.language || 'en'
-            );
-
-            if (userIntent === 'CONSENT') {
-                // User gave consent - mark as transitioning AND set consent flag
-                console.log("✅ [CHAT] User consented to data collection (LLM verified). Starting field collection.");
-                isTransitioning = true;
-
-                // CRITICAL: Set consent flag to prevent re-checking on every message
-                const { prisma } = require('@/lib/prisma');
-                await prisma.conversation.update({
-                    where: { id: conversationId },
-                    data: { metadata: { ...metadata, phase: nextPhase, consentGiven: true } }
-                });
-            } else if (userIntent === 'REFUSAL') {
-                // User refused - end interview
-                console.log("❌ [CHAT] User refused data collection. Ending.");
-                await ChatService.completeInterview(conversationId);
-                return Response.json({
-                    text: (conversation.bot.language === 'it' ? "Va bene, nessun problema. Grazie ancora per il tuo tempo!" : "Alright, no problem. Thank you again for your time!") + " INTERVIEW_COMPLETED",
-                    isCompleted: true,
-                    currentTopicId: conversation.currentTopicId
-                });
-            }
-            // If NEUTRAL, do nothing (let the AI reply normally to clarify)
-        }
-
-        // 8. Updates
-        if (isTransitioning) {
-            // Update Topic
-            if (nextTopicId && nextTopicId !== conversation.currentTopicId) {
-                await ChatService.updateCurrentTopic(conversationId, nextTopicId);
-            }
-            // Update Metadata if Phase Changed
-            if (nextPhase !== currentPhase) {
-                const { prisma } = require('@/lib/prisma');
-                await prisma.conversation.update({
-                    where: { id: conversationId },
-                    data: { metadata: { ...metadata, phase: nextPhase } }
-                });
-            }
-        }
-
-        // 9. Save Assistant Response to Database
+        // ====================================================================
+        // 6. SAVE & UPDATE STATE
+        // ====================================================================
         await ChatService.saveAssistantMessage(conversationId, responseText);
 
-        // 10. Update Metadata (Phase Tracking + Topic Turn Tracking)
-        const updatedMetadata: any = { phase: nextPhase || currentPhase };
-
-        // SCAN PHASE: Track turns per topic
-        if (currentPhase === 'SCAN') {
-            // Carry forward existing tracking or initialize
-            updatedMetadata.scanTurnsByTopic = metadata.scanTurnsByTopic || {};
-
-            // Increment turn count for current topic if we're scanning (not transitioning)
-            if (supervisorInsight.status === 'SCANNING' || !isTransitioning) {
-                const topicId = currentTopic?.id;
-                if (topicId) {
-                    updatedMetadata.scanTurnsByTopic[topicId] = (updatedMetadata.scanTurnsByTopic[topicId] || 0) + 1;
-                    console.log(`📊 [CHAT] Turn tracking: Topic "${currentTopic.label}" now at ${updatedMetadata.scanTurnsByTopic[topicId]} turns in SCAN phase`);
-                }
-            }
+        // Update topic if changed
+        if (nextTopicId !== currentTopic.id) {
+            await ChatService.updateCurrentTopic(conversationId, nextTopicId);
         }
 
-        // Initialize deepTurnsByTopic if transitioning to DEEP for the first time
-        if (nextPhase === 'DEEP' && !metadata.deepTurnsByTopic) {
-            updatedMetadata.deepTurnsByTopic = {};
-        } else if (currentPhase === 'DEEP') {
-            // Carry forward existing tracking
-            updatedMetadata.deepTurnsByTopic = metadata.deepTurnsByTopic || {};
-
-            // Increment turn count for current topic if we're deepening
-            if (supervisorInsight.status === 'DEEPENING') {
-                const topicId = currentTopic?.id;
-                if (topicId) {
-                    updatedMetadata.deepTurnsByTopic[topicId] = (updatedMetadata.deepTurnsByTopic[topicId] || 0) + 1;
-                    console.log(`📊 [CHAT] Turn tracking: Topic "${currentTopic.label}" now at ${updatedMetadata.deepTurnsByTopic[topicId]} turns in DEEP phase`);
-                }
-            }
-        }
-
-        // Preserve consentGiven flag if it exists
-        if (metadata.consentGiven) {
-            updatedMetadata.consentGiven = metadata.consentGiven;
-        }
-
-        // Preserve DATA_COLLECTION tracking fields
-        if (metadata.lastAskedField) {
-            updatedMetadata.lastAskedField = metadata.lastAskedField;
-        }
-        if (metadata.dataCollectionAttempts) {
-            updatedMetadata.dataCollectionAttempts = metadata.dataCollectionAttempts;
-        }
-
-        const { prisma } = require('@/lib/prisma');
+        // Save state
         await prisma.conversation.update({
             where: { id: conversationId },
             data: {
-                metadata: updatedMetadata,
+                metadata: nextState,
                 currentTopicId: nextTopicId
             }
         });
 
-        // Memory Update
-        const lastUserContent = lastMessage?.role === 'user' ? lastMessage.content : null;
-        if (lastUserContent) {
+        // Memory update (async)
+        if (lastMessage?.role === 'user') {
             MemoryManager.updateAfterUserResponse(
                 conversationId,
-                lastUserContent,
+                lastMessage.content,
                 currentTopic.id,
                 currentTopic.label,
                 openAIKey

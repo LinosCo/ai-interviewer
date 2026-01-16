@@ -581,16 +581,142 @@ export async function POST(req: Request) {
         }
 
         console.timeEnd("LLM");
-        const responseText = result.object.response;
+        let responseText = result.object.response;
 
-        // Check for completion tag
+        // ====================================================================
+        // 5.5 POST-PROCESSING: Detect premature closures and vague responses
+        // ====================================================================
+        const GOODBYE_PATTERNS_IT = /\b(arrivederci|buona giornata|buona serata|a presto|ci sentiamo|grazie per il tuo tempo|è stato un piacere|ti auguro|in bocca al lupo|ti contatteremo|ti terremo aggiornato)\b/i;
+        const GOODBYE_PATTERNS_EN = /\b(goodbye|see you|take care|have a great day|it was a pleasure|best wishes|all the best|farewell|we will contact you|we'll be in touch)\b/i;
+        const goodbyePattern = language === 'it' ? GOODBYE_PATTERNS_IT : GOODBYE_PATTERNS_EN;
+
+        // Vague data collection patterns - bot is not asking for specific field
+        const VAGUE_DATA_PATTERNS_IT = /\b(quali contatti|che tipo di dati|le informazioni che preferisci|condividi.*contatti|c'è qualcos'altro|qualcos'altro da aggiungere|altri temi|altre domande|vuoi aggiungere)\b/i;
+        const VAGUE_DATA_PATTERNS_EN = /\b(which contact|what type of data|information you prefer|share.*contact|anything else|something to add|other topics|other questions|want to add)\b/i;
+        const vagueDataPattern = language === 'it' ? VAGUE_DATA_PATTERNS_IT : VAGUE_DATA_PATTERNS_EN;
+
+        const isGoodbyeResponse = goodbyePattern.test(responseText);
+        const isVagueDataRequest = vagueDataPattern.test(responseText);
+        const hasNoQuestion = !responseText.includes('?');
+
+        // Helper to get field label
+        const getFieldLabel = (field: string, lang: string) => {
+            const labels: Record<string, { it: string; en: string }> = {
+                name: { it: 'il tuo nome', en: 'your name' },
+                email: { it: 'la tua email', en: 'your email' },
+                phone: { it: 'il tuo numero di telefono', en: 'your phone number' },
+                company: { it: 'la tua azienda', en: 'your company' },
+                role: { it: 'il tuo ruolo', en: 'your role' },
+                linkedin: { it: 'il tuo profilo LinkedIn', en: 'your LinkedIn profile' }
+            };
+            return labels[field]?.[lang === 'it' ? 'it' : 'en'] || field;
+        };
+
+        // Helper to get direct question for field
+        const getDirectQuestion = (field: string, lang: string) => {
+            const questions: Record<string, { it: string; en: string }> = {
+                name: { it: 'Perfetto! Come ti chiami?', en: 'Perfect! What is your name?' },
+                email: { it: 'Grazie! Qual è la tua email?', en: 'Thanks! What is your email?' },
+                phone: { it: 'Ottimo! Qual è il tuo numero di telefono?', en: 'Great! What is your phone number?' },
+                company: { it: 'Per quale azienda lavori?', en: 'What company do you work for?' },
+                role: { it: 'Qual è il tuo ruolo?', en: 'What is your role?' },
+                linkedin: { it: 'Qual è il tuo profilo LinkedIn?', en: 'What is your LinkedIn profile?' }
+            };
+            return questions[field]?.[lang === 'it' ? 'it' : 'en'] || `Qual è ${getFieldLabel(field, lang)}?`;
+        };
+
+        // If in DATA_COLLECTION phase, ALWAYS ensure we ask for the specific field
+        if (nextState.phase === 'DATA_COLLECTION') {
+            const candidateFields = (bot.candidateDataFields as any[]) || [];
+            const currentProfile = (conversation.candidateProfile as any) || {};
+
+            // Find first missing field
+            let missingField: string | null = null;
+            for (const field of candidateFields) {
+                const fieldName = typeof field === 'string' ? field : field.field;
+                if (!currentProfile[fieldName]) {
+                    missingField = fieldName;
+                    break;
+                }
+            }
+
+            // CONSENT PHASE: bot should ask for permission
+            if (nextState.consentGiven === false && (isGoodbyeResponse || hasNoQuestion || isVagueDataRequest)) {
+                console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. Overriding.`);
+                responseText = language === 'it'
+                    ? "Grazie mille per questa conversazione interessante! Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?"
+                    : "Thank you so much for this interesting conversation! Before we say goodbye, may I ask for your contact details to stay in touch?";
+            }
+            // FIELD COLLECTION PHASE: bot should ask for specific field
+            else if (nextState.consentGiven === true && missingField) {
+                // Check if bot is being vague, saying goodbye, or not asking the right question
+                const isAskingWrongThing = isVagueDataRequest || isGoodbyeResponse || hasNoQuestion;
+
+                // Also check if bot is asking a generic question instead of specific field
+                const specificFieldPattern = language === 'it'
+                    ? new RegExp(`\\b(nome|email|telefono|azienda|ruolo|linkedin)\\b.*\\?`, 'i')
+                    : new RegExp(`\\b(name|email|phone|company|role|linkedin)\\b.*\\?`, 'i');
+                const isAskingSpecificField = specificFieldPattern.test(responseText);
+
+                if (isAskingWrongThing || !isAskingSpecificField) {
+                    console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". Overriding.`);
+                    console.log(`   Original response: "${responseText.substring(0, 100)}..."`);
+                    responseText = getDirectQuestion(missingField, language);
+                }
+            }
+            // ALL FIELDS COLLECTED but bot didn't complete
+            else if (!missingField && !responseText.includes('INTERVIEW_COMPLETED')) {
+                console.log(`✅ [SUPERVISOR] All fields collected, adding completion tag.`);
+                responseText = (language === 'it'
+                    ? "Grazie mille per tutte le informazioni! Ti contatteremo presto."
+                    : "Thank you so much for all the information! We will contact you soon.") + " INTERVIEW_COMPLETED";
+            }
+        }
+        // Other phases - just log if bot tries to close
+        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP' || nextState.phase === 'DEEP_OFFER') && isGoodbyeResponse) {
+            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. This shouldn't happen.`);
+        }
+
+        // Check for completion tag - only valid if we're actually done
         if (/INTERVIEW_COMPLETED/i.test(responseText)) {
-            await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
-            return Response.json({
-                text: responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim(),
-                currentTopicId: nextTopicId,
-                isCompleted: true
+            // Verify we're actually done
+            const candidateFields = (bot.candidateDataFields as any[]) || [];
+            const currentProfile = (conversation.candidateProfile as any) || {};
+            const allFieldsCollected = candidateFields.every((field: any) => {
+                const fieldName = typeof field === 'string' ? field : field.field;
+                return !!currentProfile[fieldName];
             });
+
+            if (shouldCollectData && !allFieldsCollected && nextState.consentGiven !== false) {
+                // Not done yet! Remove the tag and continue
+                console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but fields are missing. Removing tag.`);
+                responseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
+                if (!responseText.includes('?')) {
+                    let nextField = null;
+                    for (const field of candidateFields) {
+                        const fieldName = typeof field === 'string' ? field : field.field;
+                        if (!currentProfile[fieldName]) {
+                            nextField = fieldName;
+                            break;
+                        }
+                    }
+                    const fieldLabel = nextField === 'name' ? (language === 'it' ? 'il tuo nome' : 'your name')
+                        : nextField === 'email' ? (language === 'it' ? 'la tua email' : 'your email')
+                        : nextField === 'phone' ? (language === 'it' ? 'il tuo numero di telefono' : 'your phone number')
+                        : nextField;
+                    responseText = language === 'it'
+                        ? `${responseText} Qual è ${fieldLabel}?`
+                        : `${responseText} What is ${fieldLabel}?`;
+                }
+            } else {
+                // Actually complete
+                await completeInterview(conversationId, messages, openAIKey, currentProfile || {});
+                return Response.json({
+                    text: responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim(),
+                    currentTopicId: nextTopicId,
+                    isCompleted: true
+                });
+            }
         }
 
         // ====================================================================

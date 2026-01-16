@@ -62,7 +62,7 @@ export default function ChatBubble({
                         initial={{ opacity: 0, y: 10, scale: 0.9 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className={`absolute bottom-20 ${position === 'bottom-right' ? 'right-0' : 'left-0'} max-w-xs p-4 bg-white rounded-2xl shadow-xl border border-gray-100 cursor-pointer`}
+                        className={`absolute bottom-20 ${position === 'bottom-right' ? 'right-0' : 'left-0'} max-w-xs p-4 bg-white rounded-2xl shadow-2xl border border-gray-100 cursor-pointer z-50`}
                         onClick={() => {
                             if (!isControlled) setInternalIsOpen(true);
                             onToggle?.(true);
@@ -127,7 +127,7 @@ export default function ChatBubble({
 
                 {/* Unread Indicator */}
                 {!isOpen && hasUnread && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white rounded-full p-2">
+                    <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     </span>
                 )}

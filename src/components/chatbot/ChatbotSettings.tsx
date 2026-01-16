@@ -251,7 +251,11 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                                         if (e.target.checked) {
                                                                             setConfig({
                                                                                 ...config,
-                                                                                candidateDataFields: [...config.candidateDataFields, { field: field.field, required: true }]
+                                                                                candidateDataFields: [...config.candidateDataFields, {
+                                                                                    field: field.field,
+                                                                                    required: true,
+                                                                                    question: field.question
+                                                                                }]
                                                                             });
                                                                         } else {
                                                                             setConfig({

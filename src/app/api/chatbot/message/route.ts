@@ -89,10 +89,17 @@ export async function POST(req: Request) {
             const extraction = await generateObject({
                 model: openai('gpt-4o-mini'),
                 schema: z.object({
-                    [nextMissingField.field]: z.string().optional().describe(`Extracted ${nextMissingField.field} from user text`),
-                    isRelevantAnswer: z.boolean().describe('Is the user answering a data collection question?')
+                    [nextMissingField.field]: z.string().optional().describe(`Extracted value for ${nextMissingField.field}`),
+                    isRelevantAnswer: z.boolean().describe('Did the user provide the requested information?')
                 }),
-                system: `You are a data extractor. Extract the field "${nextMissingField.field}" from the user message. Context: User was asked "${nextMissingField.question}".`,
+                system: `You are an expert data extractor. 
+                Field to extract: "${nextMissingField.field}"
+                Context: The user was previously asked: "${nextMissingField.question || nextMissingField.field}".
+                
+                Rules:
+                - If the message contains the requested information, extract it and set isRelevantAnswer to true.
+                - If the message is unrelated or a refusal, set isRelevantAnswer to false.
+                - Be flexible with formatting but accurate with data.`,
                 prompt: message
             });
 
@@ -119,7 +126,9 @@ export async function POST(req: Request) {
         // If we still have a missing field and we are in collection mode -> ASK IT
         if (nextMissingField && shouldCollect) {
             // We force the bot to ask the question
-            // But we wrap it naturally
+            const fieldLabel = nextMissingField.field;
+            const fieldQuestion = nextMissingField.question || `Qual è la tua ${fieldLabel}?`;
+
             const schema = z.object({
                 response: z.string().describe('Response to user'),
             });
@@ -130,15 +139,16 @@ export async function POST(req: Request) {
                 system: `
                     ${systemPromptBase}
                     
-                    IMPORTANT: You need to collect the user's ${nextMissingField.field}.
+                    IMPORTANT: You need to collect the user's information for the field: "${fieldLabel}".
                     The user just said: "${message}".
-                    Acknowledge what they said briefly, then ask: "${nextMissingField.question}".
-                    Maintain the bot's persona.
+                    Acknowledge what they said briefly (if relevant), then ask for this information: "${fieldQuestion}".
+                    Maintain a natural, helpful, and professional persona.
+                    DO NOT ask for more than one piece of information at a time.
                 `,
                 messages: conversation.messages.map((m: any) => ({
                     role: m.role as 'user' | 'assistant',
                     content: m.content
-                })).concat({ role: 'user', content: message }),
+                })).slice(-10).concat({ role: 'user', content: message }),
             });
 
             finalResponse = result.object.response;

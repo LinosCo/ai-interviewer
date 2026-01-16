@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Paperclip, Image as ImageIcon, Loader2, Bot, User } from 'lucide-react';
+import { Send, X, Paperclip, Image as ImageIcon, Loader2, Bot, User, Maximize2, Minimize2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
     id: string;
@@ -163,7 +164,7 @@ export default function ChatWindow({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.95 }}
                     transition={{ duration: 0.2 }}
-                    className="fixed bottom-24 right-6 w-96 max-w-[calc(100vw-48px)] h-[600px] max-h-[calc(100vh-120px)] bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 z-[9999] flex flex-col font-sans"
+                    className="fixed bottom-0 right-0 sm:bottom-24 sm:right-6 w-full sm:w-96 sm:max-w-[calc(100vw-48px)] h-full sm:h-[600px] sm:max-h-[calc(100vh-120px)] bg-white sm:rounded-2xl shadow-2xl overflow-hidden border border-gray-200 z-[9999] flex flex-col font-sans"
                 >
                     {/* Header */}
                     <div
@@ -217,7 +218,12 @@ export default function ChatWindow({
                                                 : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
                                             }`}
                                     >
-                                        {msg.content}
+                                        <div className={`prose prose-sm max-w-none ${msg.role === 'user' ? 'prose-invert' : ''} 
+                                            prose-p:leading-relaxed prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-strong:font-bold prose-ul:list-disc prose-ol:list-decimal`}>
+                                            <ReactMarkdown>
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
                                 </div>
                             </motion.div>

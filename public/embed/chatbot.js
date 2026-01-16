@@ -53,13 +53,17 @@
   const container = document.createElement('div');
   container.id = 'bt-root';
   container.style.position = 'fixed';
-  container.style.bottom = '20px';
-  container.style.right = '20px';
+  container.style.bottom = '0';
+  container.style.right = '0';
   container.style.zIndex = '2147483647';
-  container.style.width = '100px';
-  container.style.height = '100px';
-  container.style.transition = 'width 0.2s, height 0.2s';
-  container.style.overflow = 'hidden'; // Keep neat
+  container.style.width = '120px';
+  container.style.height = '120px';
+  container.style.transition = 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+  container.style.pointerEvents = 'none'; // Background clicks go through
+  container.style.display = 'flex';
+  container.style.alignItems = 'flex-end';
+  container.style.justifyContent = 'flex-end';
+  container.style.padding = '20px';
 
   // Construct Iframe URL
   const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}`;
@@ -70,6 +74,7 @@
   iframe.style.height = '100%';
   iframe.style.border = 'none';
   iframe.style.borderRadius = '20px';
+  iframe.style.pointerEvents = 'auto'; // Iframe captures clicks
   iframe.allow = 'microphone; autoplay';
 
   container.appendChild(iframe);
@@ -79,14 +84,22 @@
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (data && data.type === 'bt-widget-resize') {
+      const isMobile = window.innerWidth < 640;
+
       if (data.isOpen) {
-        container.style.width = '420px';
-        container.style.height = '720px';
-        container.style.maxHeight = '90vh';
-        container.style.maxWidth = '90vw';
+        if (isMobile) {
+          container.style.width = '100%';
+          container.style.height = '100%';
+          container.style.padding = '0';
+        } else {
+          container.style.width = '420px';
+          container.style.height = '750px';
+          container.style.padding = '20px';
+        }
       } else {
-        container.style.width = '100px';
-        container.style.height = '100px';
+        container.style.width = '120px';
+        container.style.height = '120px';
+        container.style.padding = '20px';
       }
     }
   });

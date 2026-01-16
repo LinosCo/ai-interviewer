@@ -20,8 +20,22 @@ export class TopicManager {
         isRecruiting: boolean = false,
         language: string = 'en',
         timeBudget?: number, // Optional time budget per topic in minutes
-        deepTurnsByTopic?: Record<string, number> // NEW: Track turns per topic in DEEP phase
+        deepTurnsByTopic?: Record<string, number>, // Track turns per topic in DEEP phase
+        scanTurnsByTopic?: Record<string, number> // NEW: Track turns per topic in SCAN phase
     ): Promise<{ status: 'SCANNING' | 'DEEPENING' | 'TRANSITION' | 'COMPLETION'; nextSubGoal?: string | null; focusPoint?: string | null; reason: string }> {
+
+        // SCAN PHASE: Enforce max turns per topic for deterministic behavior
+        const MAX_SCAN_TURNS_PER_TOPIC = 3;
+        if (phase === 'SCAN' && scanTurnsByTopic) {
+            const currentTopicTurns = scanTurnsByTopic[currentTopic.id] || 0;
+            if (currentTopicTurns >= MAX_SCAN_TURNS_PER_TOPIC) {
+                console.log(`🚫 [TopicManager] Max SCAN turns (${MAX_SCAN_TURNS_PER_TOPIC}) reached for topic "${currentTopic.label}". Forcing TRANSITION.`);
+                return {
+                    status: 'TRANSITION',
+                    reason: `Maximum scan limit (${MAX_SCAN_TURNS_PER_TOPIC} turns) reached for this topic.`
+                };
+            }
+        }
 
         // DEEP PHASE: Enforce max turns per topic to prevent tunnel vision
         const MAX_DEEP_TURNS_PER_TOPIC = 4;
@@ -67,24 +81,19 @@ MANDATORY DECISION RULES (in priority order):
    - If the user's latest message is a polite filler (e.g., "prego", "grazie", "ok", "va bene", "no", "basta") WITHOUT new content -> IMMEDIATELY output status: TRANSITION.
    - Do NOT attempt to "deepen" on a "prego" or "thank you". It is a signal to move on.
 
-2. **ABSOLUTE LIMIT** (HIGHEST PRIORITY):
-   - Count the assistant messages in the recent history that discuss "${currentTopic.label}".
-   - If you count 3 or more assistant questions *specifically* about this topic in the recent history -> IMMEDIATELY output status: TRANSITION.
-   - Do NOT count questions from previous topics.
-
-3. **CONTENT SUFFICIENCY**:
+2. **CONTENT SUFFICIENCY**:
    - Have we asked at least 1 substantial question about this topic?
    - Did the user provide a meaningful answer?
-   - If YES to both -> OUTPUT status: TRANSITION.
-   - If NO -> OUTPUT status: SCANNING with nextSubGoal.
+   - If YES to both AND we have explored the key aspects -> OUTPUT status: TRANSITION.
+   - If NO or there are important sub-goals unexplored -> OUTPUT status: SCANNING with nextSubGoal.
 
-4. **COMPREHENSIVE ANSWER TRIGGER**:
+3. **COMPREHENSIVE ANSWER TRIGGER**:
    - If the user's last answer was very detailed and covered multiple sub-goals -> TRANSITION immediately.
 
-5. **USER SIGNALS**:
+4. **USER SIGNALS**:
    - If user says "next", "basta", shows impatience -> TRANSITION.
 
-CRITICAL: In SCAN phase, 3 questions per topic is the MAXIMUM.
+NOTE: The system tracks turn limits externally. Focus on content quality, not counting.
 NEVER output status: COMPLETION in SCAN phase. Only SCANNING or TRANSITION.
 
 OUTPUT format:
@@ -120,26 +129,21 @@ CRITICAL: ${isHurried ? 'WE ARE SHORT ON TIME. WRAP UP THIS TOPIC FAST.' : 'Be t
 
 MANDATORY DECISION RULES (in priority order):
 
-1. **ABSOLUTE LIMIT** (HIGHEST PRIORITY - STRICTLY ENFORCED):
-   - Look at the recent conversation history above
-   - Count how many assistant messages you see that are asking questions about "${currentTopic.label}"
-   - If you count ${maxQuestions} or MORE assistant questions about this specific topic -> OUTPUT status: TRANSITION immediately
-   - **IMPORTANT**: Be generous. If in doubt, assume we haven't reached the limit yet to avoid skipping the topic.
-
-2. **WORTHWHILE CONCEPT CHECK** (only if < ${maxQuestions} questions asked):
+1. **WORTHWHILE CONCEPT CHECK**:
    - Review the user's previous answers about "${currentTopic.label}".
    - Identify concepts or themes that emerged and deserve deeper exploration.
    - If user has NOT answered any question about this topic in THIS Deep Phase yet -> OUTPUT status: DEEPENING.
-   - If you find a new concept AND haven't reached ${maxQuestions} questions -> OUTPUT status: DEEPENING with focusPoint.
+   - If you find a new concept worth exploring -> OUTPUT status: DEEPENING with focusPoint.
 
-3. **EXHAUSTION SIGNALS**:
-   - If user's recent answers are short, generic -> TRANSITION.
-   - If you cannot identify a NEW and MEANINGFUL concept -> TRANSITION.
+2. **EXHAUSTION SIGNALS**:
+   - If user's recent answers are short, generic, or repetitive -> TRANSITION.
+   - If you cannot identify a NEW and MEANINGFUL concept to explore -> TRANSITION.
 
-4. **ANTI-GENERIC RULE**:
+3. **ANTI-GENERIC RULE**:
    - NEVER use vague focus points like: "anything else", "tell me more".
+   - Focus points must be SPECIFIC concepts from the user's answers.
 
-**REMINDER**: Max ${maxQuestions} questions per topic. After that, ALWAYS TRANSITION.
+NOTE: The system tracks turn limits externally (max ${maxQuestions} questions per topic). Focus on finding valuable concepts to explore.
 
 OUTPUT format:
 - status: DEEPENING | TRANSITION | COMPLETION

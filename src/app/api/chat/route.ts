@@ -10,6 +10,75 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 
 export const maxDuration = 60;
 
+/**
+ * Extracts a specific field value from a user's message using LLM.
+ * Used during DATA_COLLECTION phase to incrementally save lead data.
+ */
+async function extractFieldFromMessage(
+    fieldName: string,
+    userMessage: string,
+    apiKey: string,
+    language: string = 'en'
+): Promise<{ value: string | null; confidence: 'high' | 'low' | 'none' }> {
+    const openai = createOpenAI({ apiKey });
+
+    const fieldDescriptions: Record<string, string> = {
+        name: language === 'it' ? 'Nome e cognome della persona' : 'Full name of the person',
+        email: language === 'it' ? 'Indirizzo email' : 'Email address',
+        phone: language === 'it' ? 'Numero di telefono' : 'Phone number',
+        company: language === 'it' ? 'Nome dell\'azienda o organizzazione' : 'Company or organization name',
+        linkedin: language === 'it' ? 'URL del profilo LinkedIn o social' : 'LinkedIn or social profile URL',
+        portfolio: language === 'it' ? 'URL del portfolio o sito web personale' : 'Portfolio or personal website URL',
+        role: language === 'it' ? 'Ruolo o posizione lavorativa' : 'Job role or position',
+        location: language === 'it' ? 'Città o località' : 'City or location',
+        budget: language === 'it' ? 'Budget disponibile' : 'Available budget',
+        availability: language === 'it' ? 'Disponibilità temporale' : 'Time availability'
+    };
+
+    const schema = z.object({
+        extractedValue: z.string().nullable().describe('The extracted value, or null if not found'),
+        confidence: z.enum(['high', 'low', 'none']).describe('Confidence level of extraction')
+    });
+
+    const prompt = `
+Extract the following field from the user's message.
+
+Field to extract: ${fieldName}
+Field description: ${fieldDescriptions[fieldName] || fieldName}
+
+User message: "${userMessage}"
+
+Rules:
+- If the user clearly provides this information, extract it with "high" confidence
+- If the user mentions something that might be this field but is unclear, extract with "low" confidence
+- If the user does not provide this information at all, return null with "none" confidence
+- For email: look for patterns like xxx@xxx.xxx
+- For phone: look for numeric sequences that could be phone numbers
+- For name: look for proper nouns that appear to be a person's name
+- Do NOT infer the name from an email address (e.g., do not extract "Marco" from marco@email.com)
+
+Return JSON: { extractedValue, confidence }
+`.trim();
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt,
+            temperature: 0
+        });
+
+        console.log(`🔍 [CHAT] Field extraction for "${fieldName}":`, result.object);
+        return {
+            value: result.object.extractedValue,
+            confidence: result.object.confidence
+        };
+    } catch (e) {
+        console.error(`❌ [CHAT] Field extraction failed for "${fieldName}":`, e);
+        return { value: null, confidence: 'none' };
+    }
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -74,6 +143,41 @@ export async function POST(req: Request) {
         // Fetch API Key
         const openAIKey = await LLMService.getApiKey(conversation.bot, 'openai') || process.env.OPENAI_API_KEY || '';
 
+        // === FALLBACK: Anti-loop protection for DATA_COLLECTION ===
+        const MAX_DATA_COLLECTION_ATTEMPTS = 15; // ~5 fields * 3 retry attempts
+        if (currentPhase === 'DATA_COLLECTION' && (metadata.dataCollectionAttempts || 0) >= MAX_DATA_COLLECTION_ATTEMPTS) {
+            console.log("⚠️ [CHAT] Max DATA_COLLECTION attempts reached. Forcing completion.");
+
+            // Trigger final extraction with whatever we have
+            const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
+            const { prisma } = require('@/lib/prisma');
+
+            try {
+                const profile = await CandidateExtractor.extractProfile(messages, openAIKey, conversationId);
+                if (profile) {
+                    // Merge with any existing profile data
+                    const existingProfile = (conversation.candidateProfile as any) || {};
+                    const mergedProfile = { ...profile, ...existingProfile };
+                    await prisma.conversation.update({
+                        where: { id: conversationId },
+                        data: { candidateProfile: mergedProfile }
+                    });
+                    console.log("👤 [CHAT] Fallback profile saved:", mergedProfile.email || 'partial');
+                }
+            } catch (e) {
+                console.error("❌ [CHAT] Fallback extraction failed:", e);
+            }
+
+            await ChatService.completeInterview(conversationId);
+            return Response.json({
+                text: (conversation.bot.language === 'it'
+                    ? "Grazie per le informazioni fornite. L'intervista è conclusa!"
+                    : "Thank you for the information provided. The interview is concluded!") + " INTERVIEW_COMPLETED",
+                isCompleted: true,
+                currentTopicId: conversation.currentTopicId
+            });
+        }
+
         // 5. Topic Evaluation (skip if we already decided to collect data or terminate)
         if (messages.length > 2 && supervisorInsight.status !== 'COMPLETION') {
             // SKIP TOPIC EVALUATION IN DATA COLLECTION PHASE
@@ -94,11 +198,12 @@ export async function POST(req: Request) {
                         messages as any[],
                         currentTopic,
                         openAIKey,
-                        currentPhase // Pass phase to TopicManager
-                        , (conversation.bot as any).collectCandidateData // isRecruiting (Pass correct param)
-                        , conversation.bot.language // Language
-                        , timePerTopic // NEW: time budget per topic
-                        , metadata.deepTurnsByTopic || {} // NEW: Pass turn tracking
+                        currentPhase, // Pass phase to TopicManager
+                        (conversation.bot as any).collectCandidateData, // isRecruiting
+                        conversation.bot.language, // Language
+                        timePerTopic, // time budget per topic
+                        metadata.deepTurnsByTopic || {}, // DEEP turn tracking
+                        metadata.scanTurnsByTopic || {} // SCAN turn tracking
                     );
                     supervisorInsight = insight as any;
 
@@ -415,17 +520,45 @@ export async function POST(req: Request) {
         // 7.5. LEAD GENERATION SEQUENTIAL LOGIC
         // If we are in DATA_COLLECTION and user has consented, we ensure we ask for the next field
         if (nextPhase === 'DATA_COLLECTION' && (metadata.consentGiven || isTransitioning)) {
+            const { prisma } = require('@/lib/prisma');
+
             // Robust Field Checking
             const candidateFields = (conversation.bot.candidateDataFields as any[]) || [];
             let currentProfile = (conversation.candidateProfile as any) || {};
 
-            // Extraction pass for the user's latest message if they just provided something
-            // (Already handled partially by CandidateExtractor later, but for UI flow we want it now)
+            // === INCREMENTAL EXTRACTION ===
+            // If we asked for a field last turn and user just responded, try to extract the value
+            const lastAskedField = metadata.lastAskedField;
+            if (lastAskedField && lastMessage?.role === 'user' && lastMessage.content) {
+                console.log(`🔍 [CHAT] Attempting to extract "${lastAskedField}" from user message...`);
+
+                const extraction = await extractFieldFromMessage(
+                    lastAskedField,
+                    lastMessage.content,
+                    openAIKey,
+                    conversation.bot.language || 'en'
+                );
+
+                if (extraction.value && extraction.confidence !== 'none') {
+                    // Save the extracted value to the profile
+                    currentProfile = { ...currentProfile, [lastAskedField]: extraction.value };
+
+                    // SAVE TO DB IMMEDIATELY
+                    await prisma.conversation.update({
+                        where: { id: conversationId },
+                        data: { candidateProfile: currentProfile }
+                    });
+                    console.log(`✅ [CHAT] Saved field "${lastAskedField}": "${extraction.value}" (confidence: ${extraction.confidence})`);
+                } else {
+                    console.log(`⚠️ [CHAT] Could not extract "${lastAskedField}" from message. Will re-ask.`);
+                }
+            }
 
             // Check what's still missing
             let nextFieldToAsk = null;
             for (const field of candidateFields) {
-                if (!currentProfile[field.field]) {
+                const fieldName = typeof field === 'string' ? field : field.field;
+                if (!currentProfile[fieldName]) {
                     nextFieldToAsk = field;
                     break;
                 }
@@ -434,6 +567,24 @@ export async function POST(req: Request) {
             if (!nextFieldToAsk) {
                 // All fields collected! Auto-complete.
                 console.log("✅ [CHAT] All lead fields collected. Finishing.");
+
+                // Final extraction pass to ensure we have everything
+                const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
+                try {
+                    const finalProfile = await CandidateExtractor.extractProfile(messages, openAIKey, conversationId);
+                    if (finalProfile) {
+                        // Merge with existing profile (keep our extracted values, add any additional insights)
+                        const mergedProfile = { ...finalProfile, ...currentProfile };
+                        await prisma.conversation.update({
+                            where: { id: conversationId },
+                            data: { candidateProfile: mergedProfile }
+                        });
+                        console.log("👤 [CHAT] Final merged profile saved:", mergedProfile.email || 'Done');
+                    }
+                } catch (e) {
+                    console.error("❌ [CHAT] Final profile extraction failed:", e);
+                }
+
                 await ChatService.completeInterview(conversationId);
                 return Response.json({
                     text: (conversation.bot.language === 'it'
@@ -444,12 +595,29 @@ export async function POST(req: Request) {
                 });
             }
 
+            // Track which field we're about to ask (for next iteration)
+            const nextFieldName = typeof nextFieldToAsk === 'string' ? nextFieldToAsk : nextFieldToAsk.field;
+
+            // Update metadata with lastAskedField for next iteration
+            await prisma.conversation.update({
+                where: { id: conversationId },
+                data: {
+                    metadata: {
+                        ...metadata,
+                        lastAskedField: nextFieldName,
+                        dataCollectionAttempts: (metadata.dataCollectionAttempts || 0) + 1
+                    }
+                }
+            });
+
             // If we have a next field, we should ensure the next prompt focuses on it.
             // We'll update the supervisorInsight to force the topic prompt logic
             supervisorInsight = {
                 status: 'DATA_COLLECTION',
-                nextSubGoal: nextFieldToAsk.field
+                nextSubGoal: nextFieldName
             } as any;
+
+            console.log(`📝 [CHAT] Next field to ask: "${nextFieldName}". Profile so far:`, Object.keys(currentProfile));
 
             // Re-build system prompt with specific field instruction if needed
             // (buildTopicPrompt handles DATA_COLLECTION status specifically)
@@ -522,6 +690,21 @@ export async function POST(req: Request) {
         // 10. Update Metadata (Phase Tracking + Topic Turn Tracking)
         const updatedMetadata: any = { phase: nextPhase || currentPhase };
 
+        // SCAN PHASE: Track turns per topic
+        if (currentPhase === 'SCAN') {
+            // Carry forward existing tracking or initialize
+            updatedMetadata.scanTurnsByTopic = metadata.scanTurnsByTopic || {};
+
+            // Increment turn count for current topic if we're scanning (not transitioning)
+            if (supervisorInsight.status === 'SCANNING' || !isTransitioning) {
+                const topicId = currentTopic?.id;
+                if (topicId) {
+                    updatedMetadata.scanTurnsByTopic[topicId] = (updatedMetadata.scanTurnsByTopic[topicId] || 0) + 1;
+                    console.log(`📊 [CHAT] Turn tracking: Topic "${currentTopic.label}" now at ${updatedMetadata.scanTurnsByTopic[topicId]} turns in SCAN phase`);
+                }
+            }
+        }
+
         // Initialize deepTurnsByTopic if transitioning to DEEP for the first time
         if (nextPhase === 'DEEP' && !metadata.deepTurnsByTopic) {
             updatedMetadata.deepTurnsByTopic = {};
@@ -542,6 +725,14 @@ export async function POST(req: Request) {
         // Preserve consentGiven flag if it exists
         if (metadata.consentGiven) {
             updatedMetadata.consentGiven = metadata.consentGiven;
+        }
+
+        // Preserve DATA_COLLECTION tracking fields
+        if (metadata.lastAskedField) {
+            updatedMetadata.lastAskedField = metadata.lastAskedField;
+        }
+        if (metadata.dataCollectionAttempts) {
+            updatedMetadata.dataCollectionAttempts = metadata.dataCollectionAttempts;
         }
 
         const { prisma } = require('@/lib/prisma');

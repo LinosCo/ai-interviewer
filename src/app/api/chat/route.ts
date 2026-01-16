@@ -260,7 +260,8 @@ export async function POST(req: Request) {
                     if (budget.isLowTime) {
                         // Time almost up - offer optional DEEP
                         nextState.phase = 'DEEP_OFFER';
-                        supervisorInsight = { status: 'DEEP_OFFER' };
+                        nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
+                        supervisorInsight = { status: 'DEEP_OFFER_ASK' }; // FIX: was 'DEEP_OFFER' which isn't handled
                     } else if (budget.canDoDeep) {
                         // Enough time - go to DEEP
                         nextState.phase = 'DEEP';
@@ -468,34 +469,76 @@ export async function POST(req: Request) {
             if (nextState.consentGiven === true || state.consentGiven === true) {
                 console.log(`📋 [DATA_COLLECTION] Consent given, processing fields`);
 
-                // Extract value from last asked field
-                if (state.lastAskedField && lastMessage?.role === 'user') {
-                    console.log(`📋 [DATA_COLLECTION] Extracting "${state.lastAskedField}" from: "${lastMessage.content}"`);
-                    const extraction = await extractFieldFromMessage(
-                        state.lastAskedField,
-                        lastMessage.content,
-                        openAIKey,
-                        language
-                    );
-                    console.log(`📋 [DATA_COLLECTION] Extraction result: ${JSON.stringify(extraction)}`);
+                // CHECK: Did user change their mind mid-collection? ("basta", "non voglio", "stop")
+                const REFUSAL_MID_COLLECTION_IT = /\b(basta|non voglio|stop|preferisco fermarmi|non continuare|lascia stare)\b/i;
+                const REFUSAL_MID_COLLECTION_EN = /\b(stop|enough|i don't want|let's stop|never mind|forget it)\b/i;
+                const refusalPattern = language === 'it' ? REFUSAL_MID_COLLECTION_IT : REFUSAL_MID_COLLECTION_EN;
 
-                    if (extraction.value && extraction.confidence !== 'none') {
-                        currentProfile = { ...currentProfile, [state.lastAskedField]: extraction.value };
+                if (lastMessage?.role === 'user' && refusalPattern.test(lastMessage.content)) {
+                    console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
+                    await completeInterview(conversationId, messages, openAIKey, currentProfile);
+                    return Response.json({
+                        text: language === 'it'
+                            ? "Nessun problema, grazie per il tempo dedicato!"
+                            : "No problem, thank you for your time!",
+                        isCompleted: true,
+                        currentTopicId: currentTopic?.id || null
+                    });
+                }
+
+                // CHECK: Did user say they don't have this field? ("non ho email", "I don't have")
+                const SKIP_FIELD_IT = /\b(non ho|non ce l'ho|non posso|preferisco non)\b/i;
+                const SKIP_FIELD_EN = /\b(i don't have|don't have|can't provide|prefer not to)\b/i;
+                const skipPattern = language === 'it' ? SKIP_FIELD_IT : SKIP_FIELD_EN;
+                const userWantsToSkip = lastMessage?.role === 'user' && skipPattern.test(lastMessage.content);
+
+                // Extract ALL possible fields from user message (user might provide multiple at once)
+                if (lastMessage?.role === 'user' && !userWantsToSkip) {
+                    const fieldsToExtract = candidateFields
+                        .map((f: any) => typeof f === 'string' ? f : f.field)
+                        .filter((fieldName: string) => !currentProfile[fieldName]); // Only missing fields
+
+                    console.log(`📋 [DATA_COLLECTION] Attempting to extract fields: ${fieldsToExtract.join(', ')} from: "${lastMessage.content}"`);
+
+                    for (const fieldName of fieldsToExtract) {
+                        const extraction = await extractFieldFromMessage(
+                            fieldName,
+                            lastMessage.content,
+                            openAIKey,
+                            language
+                        );
+
+                        if (extraction.value && extraction.confidence !== 'none') {
+                            currentProfile = { ...currentProfile, [fieldName]: extraction.value };
+                            console.log(`✅ [DATA_COLLECTION] Extracted "${fieldName}": "${extraction.value}"`);
+                        }
+                    }
+
+                    // Save all extracted fields at once
+                    if (Object.keys(currentProfile).length > 0) {
                         await prisma.conversation.update({
                             where: { id: conversationId },
                             data: { candidateProfile: currentProfile }
                         });
-                        console.log(`✅ [DATA_COLLECTION] Saved "${state.lastAskedField}": "${extraction.value}"`);
-                    } else {
-                        console.log(`⚠️ [DATA_COLLECTION] Could not extract "${state.lastAskedField}"`);
+                        console.log(`✅ [DATA_COLLECTION] Saved profile: ${JSON.stringify(currentProfile)}`);
                     }
+                } else if (userWantsToSkip && state.lastAskedField) {
+                    // User wants to skip this field - mark it as skipped so we don't ask again
+                    console.log(`📋 [DATA_COLLECTION] User wants to skip "${state.lastAskedField}"`);
+                    currentProfile = { ...currentProfile, [state.lastAskedField]: '__SKIPPED__' };
+                    await prisma.conversation.update({
+                        where: { id: conversationId },
+                        data: { candidateProfile: currentProfile }
+                    });
                 }
 
-                // Find next missing field
+                // Find next missing field (skip fields marked as __SKIPPED__)
                 let nextField = null;
                 for (const field of candidateFields) {
                     const fieldName = typeof field === 'string' ? field : field.field;
-                    if (!currentProfile[fieldName]) {
+                    if (!currentProfile[fieldName] || currentProfile[fieldName] === '__SKIPPED__') {
+                        // If it's skipped, don't ask again
+                        if (currentProfile[fieldName] === '__SKIPPED__') continue;
                         nextField = fieldName;
                         break;
                     }
@@ -553,21 +596,31 @@ export async function POST(req: Request) {
             systemPrompt += `\n\n## DEEP OFFER\nYou must ask: "${offerText}"`;
         }
 
-        // Final reinforcement based on phase
+        // Final reinforcement based on phase - CLEAR STATUS BANNER
         if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
+            const currentTopicLabel = botTopics[nextState.topicIndex]?.label || 'current topic';
+            const turnsInfo = nextState.phase === 'SCAN'
+                ? `Turn ${nextState.turnInTopic}/${CONFIG.SCAN_TURNS_PER_TOPIC}`
+                : `Turn ${nextState.turnInTopic}/${nextState.deepTurnsPerTopic || CONFIG.DEEP_QUICK_TURNS}`;
+
             systemPrompt += `
 
-## PHASE ENFORCEMENT: ${nextState.phase}
-**YOU ARE IN ${nextState.phase} PHASE - Topic ${nextState.topicIndex + 1}/${numTopics}**
+## ═══════════════════════════════════════════════════════
+## 📍 CURRENT STATUS: ${nextState.phase} PHASE
+## Topic: "${currentTopicLabel}" (${nextState.topicIndex + 1}/${numTopics})
+## Progress: ${turnsInfo}
+## ═══════════════════════════════════════════════════════
 
-🚫 **FORBIDDEN ACTIONS:**
+🚫 **FORBIDDEN ACTIONS (will be blocked by system):**
 - Asking for contacts/email/phone/name
 - Saying goodbye or wrapping up
 - Mentioning "before we conclude" or similar
 
-✅ **REQUIRED ACTION:**
-- Ask ONE question about the current topic
+✅ **YOUR ONLY TASK:**
+- Ask ONE question about "${currentTopicLabel}"
 - End with a question mark (?)
+
+The SUPERVISOR controls phase transitions. Just focus on asking good questions.
 `;
         }
 
@@ -748,12 +801,16 @@ export async function POST(req: Request) {
 
         // Check for completion tag - only valid if we're actually done
         if (/INTERVIEW_COMPLETED/i.test(responseText)) {
-            // Verify we're actually done
+            // Verify we're actually done - MUST re-read from DB for fresh data
             const candidateFields = (bot.candidateDataFields as any[]) || [];
-            const currentProfile = (conversation.candidateProfile as any) || {};
+            const freshConvForCompletion = await prisma.conversation.findUnique({
+                where: { id: conversationId },
+                select: { candidateProfile: true }
+            });
+            const currentProfileForCompletion = (freshConvForCompletion?.candidateProfile as any) || {};
             const allFieldsCollected = candidateFields.every((field: any) => {
                 const fieldName = typeof field === 'string' ? field : field.field;
-                return !!currentProfile[fieldName];
+                return !!currentProfileForCompletion[fieldName];
             });
 
             if (shouldCollectData && !allFieldsCollected && nextState.consentGiven !== false) {
@@ -764,7 +821,7 @@ export async function POST(req: Request) {
                     let nextField = null;
                     for (const field of candidateFields) {
                         const fieldName = typeof field === 'string' ? field : field.field;
-                        if (!currentProfile[fieldName]) {
+                        if (!currentProfileForCompletion[fieldName]) {
                             nextField = fieldName;
                             break;
                         }
@@ -779,7 +836,7 @@ export async function POST(req: Request) {
                 }
             } else {
                 // Actually complete
-                await completeInterview(conversationId, messages, openAIKey, currentProfile || {});
+                await completeInterview(conversationId, messages, openAIKey, currentProfileForCompletion || {});
                 return Response.json({
                     text: responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim(),
                     currentTopicId: nextTopicId,

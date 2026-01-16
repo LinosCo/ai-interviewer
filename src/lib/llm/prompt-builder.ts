@@ -231,42 +231,23 @@ Even if you are thanking the user or transitioning to a new topic, the very last
             ? `REWARD STATUS: ACTIVE. User earns "${(bot.rewardConfig as any).displayText}".`
             : `REWARD STATUS: NONE.`;
 
-        // Status Logic
+        // Status Logic - SIMPLIFIED to avoid contradicting SUPERVISOR
+        // The SUPERVISOR in route.ts controls the actual flow - this is just informational context
         let statusInstruction = "";
 
         if (remainingMins <= 0) {
-            statusInstruction = `STATUS: TIME_EXPIRED.
-            - Summarize briefly and conclude the interview.
-            - Do not ask further questions.`;
+            statusInstruction = `STATUS: TIME_BUDGET_REACHED. The SUPERVISOR will guide you on what to do next.`;
         } else if (remainingMins < 2) {
-            statusInstruction = `STATUS: URGENT_WRAP_UP. ${remainingMins} mins left.
-            - Skip remaining deep dives.
-            - Ask one final crucial question if needed, then conclude.`;
+            statusInstruction = `STATUS: LOW_TIME. ${remainingMins} mins left. Follow SUPERVISOR instructions.`;
         } else if (isBehind || isCriticalTime) {
-            statusInstruction = `STATUS: BEHIND_SCHEDULE. ${remainingMins}m left for ${topicsRemaining} topics.
-            - SPEED UP. Do not deep dive.
-            - Ask 1 key question for this topic.
-            - IT IS CRITICAL TO COVER ALL TOPICS.`;
+            statusInstruction = `STATUS: BEHIND_SCHEDULE. ${remainingMins}m left for ${topicsRemaining} topics. Keep questions focused.`;
         } else {
-            statusInstruction = `STATUS: ON_TRACK/AHEAD. ${remainingMins}m left.
-            - You have time for deep dives.
-            - Explore the current topic thoroughly before moving on.
-            - Only transition when you have exhausted the topic.`;
+            statusInstruction = `STATUS: ON_TRACK. ${remainingMins}m left. You can explore topics thoroughly.`;
         }
 
-
-        // CRITICAL DATA COLLECTION GUARDRAIL
-        const shouldCollectData = (bot as any).collectCandidateData;
-        let dataCollectionGuard = "";
-
-        if (shouldCollectData && (remainingMins < 1 || isCriticalTime || remainingMins <= 0)) {
-            dataCollectionGuard = `
-> [!CRITICAL] RECRUITMENT ACTIVE - DO NOT JUST SAY GOODBYE
-> The user must provide their contact details before you end the call since "collectCandidateData" is TRUE.
-> If you are about to end the interview or say goodbye, YOU MUST first ask:
-> "Before we finish, may I ask for your contact details to stay in touch?"
-> DO NOT output "INTERVIEW_COMPLETED" until you have asked this permission.`;
-        }
+        // NOTE: Data collection guardrail REMOVED from context prompt.
+        // The SUPERVISOR in route.ts handles this via phase transitions.
+        // Having it here caused contradictions (telling bot to ask for contacts while in SCAN/DEEP)
 
         return `
 ## TIMING CONTEXT
@@ -275,8 +256,6 @@ Current Topic: ${currentTopicIndex + 1}/${allTopics.length}
 ${rewardText}
 
 ${statusInstruction}
-
-${dataCollectionGuard}
 `.trim();
     }
 
@@ -573,14 +552,28 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 
             } else if (supervisorInsight.status === 'TRANSITION') {
                 const nextTopic = allTopics[topicIndex + 1];
+                const nextTopicLabel = (supervisorInsight as any).nextTopic || nextTopic?.label || 'the next topic';
+                const nextTopicObj = allTopics.find(t => t.label === nextTopicLabel) || nextTopic;
+                const firstSubGoal = nextTopicObj?.subGoals?.[0] || nextTopicLabel;
 
                 supervisorInstruction = `
-> [!IMPORTANT] SUPERVISOR INSTRUCTION: TOPIC TRANSITION
-> The current topic "${currentTopic.label}" is COMPLETE.
-> ${nextTopic ? `You are transitioning to: "${nextTopic.label}"` : 'This is the end of the topic loop.'}
+> [!CRITICAL] SUPERVISOR INSTRUCTION: TOPIC TRANSITION - ACT NOW
+> You have finished topic "${currentTopic.label}".
+> **YOUR TASK**: Transition to "${nextTopicLabel}" and ask the FIRST question about it.
 >
-> **CRITICAL RULE**: This message will handle the transition in the next turn.
-> DO NOT try to transition in this response. Continue with the current topic status.
+> **STRUCTURE**:
+> 1. Brief acknowledgment (max 5 words, e.g., "Grazie per questi spunti.")
+> 2. IMMEDIATELY ask a question about "${nextTopicLabel}"
+>
+> **QUESTION FOCUS**: ${firstSubGoal}
+>
+> **EXAMPLE**: "Interessante! Parlando di ${nextTopicLabel}, ${firstSubGoal.toLowerCase().includes('come') ? '' : 'come'} [question about ${firstSubGoal}]?"
+>
+> **PROHIBITIONS**:
+> - ❌ Do NOT say "Ora passiamo a..." or "Let's move to..."
+> - ❌ Do NOT ask permission ("Possiamo parlare di...?")
+> - ❌ Do NOT conclude or ask for contacts
+> - ✅ Just naturally ask the question about the new topic
 `;
             } else if (supervisorInsight.status === 'SCANNING') {
                 const target = supervisorInsight.nextSubGoal || "the next sub-goal";

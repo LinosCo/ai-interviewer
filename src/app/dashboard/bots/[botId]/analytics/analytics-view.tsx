@@ -345,6 +345,73 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 }
             </div >
 
-        </div >
+            {/* Recent Sessions & Transcripts */}
+            <div className="bg-white p-6 rounded shadow">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-semibold flex items-center gap-2 text-gray-800">
+                        <MessageSquare className="w-5 h-5 text-amber-600" />
+                        Recent Sessions & Transcripts
+                    </h3>
+                    <Link
+                        href={`/dashboard/bots/${bot.id}/profiles`}
+                        className="text-sm text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1"
+                    >
+                        View All Collected Profiles <ExternalLink className="w-3 h-3" />
+                    </Link>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left text-gray-500">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th className="px-4 py-3">Date</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">Messages</th>
+                                <th className="px-4 py-3">Duration</th>
+                                <th className="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {bot.conversations && bot.conversations.length > 0 ? (
+                                bot.conversations.slice(0, 10).map((c: any) => (
+                                    <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-4 py-3 font-medium text-gray-900">
+                                            {new Date(c.startedAt).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${c.status === 'COMPLETED' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                                                }`}>
+                                                {c.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600">
+                                            {c.messages?.filter((m: any) => m.role === 'user').length || 0} user msgs
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600">
+                                            {c.durationSeconds ? `${Math.floor(c.durationSeconds / 60)}m ${c.durationSeconds % 60}s` : '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <Link
+                                                href={`/dashboard/bots/${bot.id}/conversations/${c.id}`}
+                                                className="bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200 text-xs inline-flex items-center gap-1"
+                                            >
+                                                View Transcript <ExternalLink className="w-3 h-3" />
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="px-4 py-10 text-center italic text-gray-400">
+                                        No sessions recorded yet.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
     );
 }

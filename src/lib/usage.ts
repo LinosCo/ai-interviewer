@@ -195,7 +195,7 @@ export async function checkInterviewStatus(conversationId: string): Promise<{ sh
     }
 
     // 2. Turn Limit (Fair Usage)
-    const maxTurns = bot.maxTurns || 20;
+    const maxTurns = bot.maxTurns || 40;
     if (messages.length >= maxTurns) {
         return { shouldConclude: true, reason: 'TURNS' };
     }

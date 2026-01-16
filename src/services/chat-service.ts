@@ -13,6 +13,7 @@ export class ChatService {
         const conversation = await prisma.conversation.findUnique({
             where: { id: conversationId },
             include: {
+                messages: { orderBy: { createdAt: 'asc' } },
                 bot: {
                     include: {
                         topics: { orderBy: { orderIndex: 'asc' } },

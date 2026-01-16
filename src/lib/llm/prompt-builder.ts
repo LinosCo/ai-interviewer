@@ -255,10 +255,9 @@ ${formattedChecklist}
 **CONTROLLA LA CRONOLOGIA**: Prima di chiedere, verifica quali dati l'utente ha GIÀ fornito nei messaggi precedenti.
 
 **PROCESSO PASSO-PASSO**:
-**PROCESSO PASSO-PASSO**:
 1. **ANALISI**: Guarda la chat. Quali voci della CHECKLIST qui sopra mancano?
-2. **NEXT FIELD**: Chiedi la PRIMA voce della checklist non ancora spuntata nella tua mente.
-3. **IMMEDITATO**: Se l'utente ha appena detto "Sì/Ok", NON chiedere "Quale contatto preferisci?". Chiedi SUBITO la prima voce (es. "Come ti chiami?").
+${supervisorInsight.nextSubGoal ? `2. **OBIETTIVO PRIORITARIO**: Il campo mancante identificato dal sistema è: **${supervisorInsight.nextSubGoal.toUpperCase()}**. Concentrati su questo.` : '2. **NEXT FIELD**: Chiedi la PRIMA voce della checklist non ancora spuntata nella tua mente.'}
+3. **IMMEDIATO**: Se l'utente ha appena detto "Sì/Ok", NON chiedere "Quale contatto preferisci?". Chiedi SUBITO la prima voce mancante.
 4. **CONFERMA E NEXT**: Quando l'utente risponde, conferma brevemente e chiedi il SUCCESSIVO.
 5. **RIPETI**: Continua finché hai spuntato TUTTA la checklist.
 
@@ -294,8 +293,8 @@ ${formattedChecklist}
 
 **STEP-BY-STEP PROCESS**:
 1. **ANALYZE**: Look at the chat. Which items in the CHECKLIST above are missing?
-2. **NEXT FIELD**: Ask for the FIRST unchecked item from the checklist.
-3. **IMMEDIATE**: If user just said "Yes/Ok", DO NOT ask "Which contact?". Ask for the FIRST item IMMEDIATELY (e.g. "What is your name?").
+${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified the missing field as: **${supervisorInsight.nextSubGoal.toUpperCase()}**. Focus on this.` : '2. **NEXT FIELD**: Ask for the FIRST unchecked item from the checklist.'}
+3. **IMMEDIATE**: If user just said "Yes/Ok", DO NOT ask "Which contact?". Ask for the first missing item IMMEDIATELY.
 4. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one.
 5. **REPEAT**: Continue until the checklist is COMPLETE.
 

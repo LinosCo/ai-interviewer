@@ -44,20 +44,22 @@ export async function POST(req: Request) {
         // 4. Check Limits
         const statusCheck = await ChatService.checkLimits(conversationId);
         const shouldCollectData = (conversation.bot as any).collectCandidateData;
-        console.log("🔍 [CHAT] Limits Check:", { shouldConclude: statusCheck.shouldConclude, shouldCollectData });
+
+        // BUFFER: Increase default turns if not specified to allow DEEP phase
+        const maxTurns = conversation.bot.maxTurns || 40;
+        const turnsReached = ((conversation as any).messages.filter((m: any) => m.role === 'assistant').length >= maxTurns);
+
+        console.log("🔍 [CHAT] Limits Check:", { shouldConclude: statusCheck.shouldConclude, shouldCollectData, turnsReached, maxTurns });
 
         // Check time/turn limits - force end if exceeded
-        // BUFFER: Allow 60s buffer before hard stop to allow wrap-up
-        if (statusCheck.shouldConclude && currentPhase !== 'DATA_COLLECTION') {
+        if ((statusCheck.shouldConclude || turnsReached) && currentPhase !== 'DATA_COLLECTION') {
             console.log("⏰ [CHAT] Time/Turn limit reached.");
 
             if (shouldCollectData) {
                 // Skip remaining topics and go directly to data collection
                 console.log("📝 [CHAT] Forcing transition to DATA_COLLECTION due to limits.");
-                supervisorInsight = { status: 'COMPLETION' };
+                supervisorInsight = { status: 'TRANSITION_TO_DATA' }; // Custom status to trigger transition
             } else {
-                // No data collection - end interview
-                // Don't cut off substantially early - if within 1 min of limit, it's fine.
                 await ChatService.completeInterview(conversationId);
                 return Response.json({
                     text: (conversation.bot.language === 'it'
@@ -237,13 +239,13 @@ export async function POST(req: Request) {
                             dataInstruction
                         );
                     } else {
-                        // Truly Finished (either Deep done & no data collection, or Data Collection done)
+                        // Truly Finished 
                         console.log("✅ [CHAT] Interview Complete. Ending.");
+                        await ChatService.completeInterview(conversationId);
 
-                        // Trigger Extraction if Data Collection was active
-                        if (currentPhase === 'DATA_COLLECTION' || (shouldCollectData && currentPhase === 'DEEP')) {
+                        // Final extraction pass
+                        if (shouldCollectData) {
                             const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-                            // Run extraction in background
                             CandidateExtractor.extractProfile(messages, openAIKey, conversationId).then(async (profile: any) => {
                                 if (profile) {
                                     const { prisma } = require('@/lib/prisma');
@@ -251,16 +253,12 @@ export async function POST(req: Request) {
                                         where: { id: conversationId },
                                         data: { candidateProfile: profile }
                                     });
-                                    console.log("👤 [CHAT] Candidate Profile Saved:", profile.fullName || 'Unknown');
-                                } else {
-                                    console.error("❌ [CHAT] Candidate extraction returned null");
                                 }
-                            }).catch((e: any) => console.error("❌ [CHAT] Candidate extraction failed:", e));
+                            }).catch((e: any) => console.error("Final extraction failed", e));
                         }
 
-                        await ChatService.completeInterview(conversationId);
                         return Response.json({
-                            text: "Grazie! Abbiamo registrato tutto. A presto! INTERVIEW_COMPLETED",
+                            text: (conversation.bot.language === 'it' ? "Grazie! Abbiamo registrato tutto. A presto!" : "Thank you! We've recorded everything. See you soon!") + " INTERVIEW_COMPLETED",
                             isCompleted: true,
                             currentTopicId: conversation.currentTopicId
                         });
@@ -386,37 +384,85 @@ export async function POST(req: Request) {
         // Case insensitive check for robustness
         const completionRegex = /INTERVIEW_COMPLETED/i;
         if (completionRegex.test(responseText)) {
+            console.log("🏁 [CHAT] LLM triggered completion.");
             await ChatService.completeInterview(conversationId);
 
-            // Trigger Extraction
-            if (currentPhase === 'DATA_COLLECTION') {
+            // Trigger Final Extraction
+            if (currentPhase === 'DATA_COLLECTION' || shouldCollectData) {
                 const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-                // AWAIT the extraction to ensure it runs before the lambda terminates
                 try {
-                    const profile = await CandidateExtractor.extractProfile(messages, openAIKey, conversationId);
+                    const profile = await CandidateExtractor.extractProfile(messages.concat({ role: 'assistant', content: responseText }), openAIKey, conversationId);
                     if (profile) {
                         const { prisma } = require('@/lib/prisma');
                         await prisma.conversation.update({
                             where: { id: conversationId },
                             data: { candidateProfile: profile }
                         });
-                        console.log("👤 [CHAT] Candidate Profile Saved:", profile.fullName || 'Unknown');
-                    } else {
-                        console.error("❌ [CHAT] Candidate extraction returned null");
+                        console.log("👤 [CHAT] Final Profile Saved:", profile.email || 'Done');
                     }
                 } catch (e: any) {
-                    console.error("❌ [CHAT] Candidate extraction failed:", e);
+                    console.error("❌ [CHAT] Final extraction failed:", e);
                 }
             }
 
             return Response.json({
-                text: responseText.replace('INTERVIEW_COMPLETED', '').trim(),
+                text: responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim(),
                 currentTopicId: nextTopicId,
                 isCompleted: true
             });
         }
 
-        // 7.5. Check if user consented to data collection (ONLY ONCE - first time in DATA_COLLECTION)
+        // 7.5. LEAD GENERATION SEQUENTIAL LOGIC
+        // If we are in DATA_COLLECTION and user has consented, we ensure we ask for the next field
+        if (nextPhase === 'DATA_COLLECTION' && (metadata.consentGiven || isTransitioning)) {
+            // Robust Field Checking
+            const candidateFields = (conversation.bot.candidateDataFields as any[]) || [];
+            let currentProfile = (conversation.candidateProfile as any) || {};
+
+            // Extraction pass for the user's latest message if they just provided something
+            // (Already handled partially by CandidateExtractor later, but for UI flow we want it now)
+
+            // Check what's still missing
+            let nextFieldToAsk = null;
+            for (const field of candidateFields) {
+                if (!currentProfile[field.field]) {
+                    nextFieldToAsk = field;
+                    break;
+                }
+            }
+
+            if (!nextFieldToAsk) {
+                // All fields collected! Auto-complete.
+                console.log("✅ [CHAT] All lead fields collected. Finishing.");
+                await ChatService.completeInterview(conversationId);
+                return Response.json({
+                    text: (conversation.bot.language === 'it'
+                        ? "Grazie mille per tutte le informazioni. Abbiamo terminato!"
+                        : "Thank you very much for all the information. We are finished!") + " INTERVIEW_COMPLETED",
+                    isCompleted: true,
+                    currentTopicId: nextTopicId
+                });
+            }
+
+            // If we have a next field, we should ensure the next prompt focuses on it.
+            // We'll update the supervisorInsight to force the topic prompt logic
+            supervisorInsight = {
+                status: 'DATA_COLLECTION',
+                nextSubGoal: nextFieldToAsk.field
+            } as any;
+
+            // Re-build system prompt with specific field instruction if needed
+            // (buildTopicPrompt handles DATA_COLLECTION status specifically)
+            systemPrompt = await PromptBuilder.build(
+                conversation.bot,
+                conversation,
+                currentTopic,
+                methodology,
+                Number(effectiveDuration || 0),
+                supervisorInsight
+            );
+        }
+
         const consentGiven = metadata.consentGiven || false;
 
         if (nextPhase === 'DATA_COLLECTION' && currentPhase === 'DATA_COLLECTION' && !isTransitioning && !consentGiven) {

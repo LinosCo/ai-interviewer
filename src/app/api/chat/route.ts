@@ -599,6 +599,13 @@ export async function POST(req: Request) {
         const isVagueDataRequest = vagueDataPattern.test(responseText);
         const hasNoQuestion = !responseText.includes('?');
 
+        // CRITICAL: Detect "goodbye with question" pattern (e.g., "Buona giornata! Ci vediamo?")
+        // This is a closure attempt disguised as a question
+        const isGoodbyeWithQuestion = isGoodbyeResponse && responseText.includes('?');
+        if (isGoodbyeWithQuestion) {
+            console.log(`⚠️ [SUPERVISOR] Detected goodbye phrase WITH question mark - treating as closure attempt`);
+        }
+
         // Helper to get field label
         const getFieldLabel = (field: string, lang: string) => {
             const labels: Record<string, { it: string; en: string }> = {
@@ -628,7 +635,14 @@ export async function POST(req: Request) {
         // If in DATA_COLLECTION phase, ALWAYS ensure we ask for the specific field
         if (nextState.phase === 'DATA_COLLECTION') {
             const candidateFields = (bot.candidateDataFields as any[]) || [];
-            const currentProfile = (conversation.candidateProfile as any) || {};
+
+            // CRITICAL: Re-read profile from DB to get updated values after extraction
+            // The `conversation.candidateProfile` is stale (from start of request)
+            const freshConversation = await prisma.conversation.findUnique({
+                where: { id: conversationId },
+                select: { candidateProfile: true }
+            });
+            const currentProfile = (freshConversation?.candidateProfile as any) || {};
 
             // Find first missing field
             let missingField: string | null = null;
@@ -641,7 +655,7 @@ export async function POST(req: Request) {
             }
 
             // CONSENT PHASE: bot should ask for permission
-            if (nextState.consentGiven === false && (isGoodbyeResponse || hasNoQuestion || isVagueDataRequest)) {
+            if (nextState.consentGiven === false && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isVagueDataRequest)) {
                 console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. Overriding.`);
                 responseText = language === 'it'
                     ? "Grazie mille per questa conversazione interessante! Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?"
@@ -650,7 +664,8 @@ export async function POST(req: Request) {
             // FIELD COLLECTION PHASE: bot should ask for specific field
             else if (nextState.consentGiven === true && missingField) {
                 // Check if bot is being vague, saying goodbye, or not asking the right question
-                const isAskingWrongThing = isVagueDataRequest || isGoodbyeResponse || hasNoQuestion;
+                // CRITICAL: isGoodbyeWithQuestion catches "Buona giornata! Ci vediamo?" patterns
+                const isAskingWrongThing = isVagueDataRequest || isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion;
 
                 // Also check if bot is asking a generic question instead of specific field
                 const specificFieldPattern = language === 'it'
@@ -672,9 +687,43 @@ export async function POST(req: Request) {
                     : "Thank you so much for all the information! We will contact you soon.") + " INTERVIEW_COMPLETED";
             }
         }
-        // Other phases - just log if bot tries to close
-        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP' || nextState.phase === 'DEEP_OFFER') && isGoodbyeResponse) {
-            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. This shouldn't happen.`);
+        // Other phases - OVERRIDE if bot tries to close
+        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion)) {
+            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Overriding with appropriate question.`);
+            console.log(`   Original response: "${responseText.substring(0, 100)}..."`);
+
+            // Get current topic and sub-goal from supervisor insight
+            const currentSubGoal = supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || 'questo argomento';
+
+            // Remove goodbye phrases but keep any useful content
+            let cleanedResponse = responseText
+                .replace(GOODBYE_PATTERNS_IT, '')
+                .replace(GOODBYE_PATTERNS_EN, '')
+                .trim();
+
+            // If there's still some content, append a question; otherwise generate a fresh question
+            if (cleanedResponse.length > 20 && !cleanedResponse.includes('?')) {
+                responseText = language === 'it'
+                    ? `${cleanedResponse} Puoi dirmi di più su ${currentSubGoal}?`
+                    : `${cleanedResponse} Can you tell me more about ${currentSubGoal}?`;
+            } else {
+                // Generate a completely new question based on phase
+                if (nextState.phase === 'SCAN') {
+                    responseText = language === 'it'
+                        ? `Interessante! Parlando di ${currentSubGoal}, qual è la tua esperienza in merito?`
+                        : `Interesting! Speaking of ${currentSubGoal}, what has been your experience with this?`;
+                } else {
+                    responseText = language === 'it'
+                        ? `Grazie per questo spunto. Riguardo a ${currentSubGoal}, puoi approfondire questo aspetto?`
+                        : `Thanks for that insight. Regarding ${currentSubGoal}, can you elaborate on this aspect?`;
+                }
+            }
+        }
+        else if (nextState.phase === 'DEEP_OFFER' && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion)) {
+            console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. Overriding with offer question.`);
+            responseText = language === 'it'
+                ? "Grazie mille per queste risposte interessanti! Il tempo che avevamo previsto sta per terminare, ma se hai ancora qualche minuto, avrei alcune domande di approfondimento che mi piacerebbe farti. Ti va di continuare?"
+                : "Thank you so much for these insightful answers! Our scheduled time is almost up, but if you have a few more minutes, I'd love to ask some deeper follow-up questions. Would you like to continue?";
         }
 
         // Check for completion tag - only valid if we're actually done

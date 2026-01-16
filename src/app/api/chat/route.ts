@@ -36,6 +36,7 @@ interface InterviewState {
     lastAskedField: string | null;
     dataCollectionAttempts: number;
     deepTurnsPerTopic: number;      // Calculated budget for DEEP phase
+    fieldAttemptCounts: Record<string, number>;  // Track attempts per field to prevent loops
 }
 
 // ============================================================================
@@ -50,7 +51,9 @@ async function extractFieldFromMessage(
     const openai = createOpenAI({ apiKey });
 
     const fieldDescriptions: Record<string, string> = {
-        name: language === 'it' ? 'Nome e cognome della persona' : 'Full name of the person',
+        name: language === 'it'
+            ? 'Nome della persona (può essere solo nome, o nome e cognome)'
+            : 'Name of the person (can be first name only, or full name)',
         email: language === 'it' ? 'Indirizzo email' : 'Email address',
         phone: language === 'it' ? 'Numero di telefono' : 'Phone number',
         company: language === 'it' ? 'Nome dell\'azienda o organizzazione' : 'Company or organization name',
@@ -68,10 +71,14 @@ async function extractFieldFromMessage(
     });
 
     try {
+        const nameSpecificRules = fieldName === 'name'
+            ? `\n- For name: Accept first name only (e.g., "Marco", "Geppi", "Anna"). Don't require full name.\n- If the message contains a word that looks like a name, extract it.`
+            : '';
+
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
-            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences`,
+            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${nameSpecificRules}`,
             temperature: 0
         });
         return { value: result.object.extractedValue, confidence: result.object.confidence };
@@ -212,6 +219,7 @@ export async function POST(req: Request) {
             lastAskedField: rawMetadata.lastAskedField ?? null,
             dataCollectionAttempts: rawMetadata.dataCollectionAttempts ?? 0,
             deepTurnsPerTopic: rawMetadata.deepTurnsPerTopic ?? 0,
+            fieldAttemptCounts: rawMetadata.fieldAttemptCounts ?? {},
         };
 
         const currentTopic = botTopics[state.topicIndex] || botTopics[0];
@@ -474,6 +482,12 @@ export async function POST(req: Request) {
                 const REFUSAL_MID_COLLECTION_EN = /\b(stop|enough|i don't want|let's stop|never mind|forget it)\b/i;
                 const refusalPattern = language === 'it' ? REFUSAL_MID_COLLECTION_IT : REFUSAL_MID_COLLECTION_EN;
 
+                // CHECK: Is user frustrated/complaining about repeated questions?
+                const FRUSTRATION_IT = /\b(già (detto|chiesto)|te l'ho (già|appena)|incantato|bloccato|ripeti|sempre la stessa|loop)\b/i;
+                const FRUSTRATION_EN = /\b(already (told|said|asked)|just (told|said)|stuck|loop|same question|repeating)\b/i;
+                const frustrationPattern = language === 'it' ? FRUSTRATION_IT : FRUSTRATION_EN;
+                const userFrustrated = lastMessage?.role === 'user' && frustrationPattern.test(lastMessage.content);
+
                 if (lastMessage?.role === 'user' && refusalPattern.test(lastMessage.content)) {
                     console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
                     await completeInterview(conversationId, messages, openAIKey, currentProfile);
@@ -481,6 +495,47 @@ export async function POST(req: Request) {
                         text: language === 'it'
                             ? "Nessun problema, grazie per il tempo dedicato!"
                             : "No problem, thank you for your time!",
+                        isCompleted: true,
+                        currentTopicId: currentTopic?.id || null
+                    });
+                }
+
+                // If user is frustrated about repeated questions, try to extract info from conversation history
+                // and complete the interview with what we have
+                if (userFrustrated) {
+                    console.log(`⚠️ [DATA_COLLECTION] User frustrated - attempting to extract from history and complete`);
+
+                    // Try to find the name in previous messages if we don't have it
+                    if (!currentProfile.name) {
+                        // Look for a short reply (1-3 words) after a "name" question
+                        for (let i = messages.length - 1; i >= 0; i--) {
+                            const msg = messages[i];
+                            if (msg.role === 'user') {
+                                const content = msg.content.trim();
+                                const words = content.split(/\s+/);
+                                // Short response that looks like a name
+                                if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content)) {
+                                    const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
+                                    if (cleanedName.length > 1) {
+                                        currentProfile = { ...currentProfile, name: cleanedName };
+                                        console.log(`✅ [DATA_COLLECTION] Recovered name from history: "${cleanedName}"`);
+                                        await prisma.conversation.update({
+                                            where: { id: conversationId },
+                                            data: { candidateProfile: currentProfile }
+                                        });
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Complete with what we have
+                    await completeInterview(conversationId, messages, openAIKey, currentProfile);
+                    return Response.json({
+                        text: language === 'it'
+                            ? "Mi scuso per l'inconveniente! Grazie mille per il tuo tempo e le informazioni condivise. Ti contatteremo presto!"
+                            : "I apologize for the inconvenience! Thank you so much for your time and the information shared. We will contact you soon!",
                         isCompleted: true,
                         currentTopicId: currentTopic?.id || null
                     });
@@ -500,7 +555,22 @@ export async function POST(req: Request) {
 
                     console.log(`📋 [DATA_COLLECTION] Attempting to extract fields: ${fieldsToExtract.join(', ')} from: "${lastMessage.content}"`);
 
+                    // SPECIAL HANDLING FOR NAME: If we asked for name and user replied with 1-3 words, use it directly
+                    const userReply = lastMessage.content.trim();
+                    const wordCount = userReply.split(/\s+/).length;
+                    if (state.lastAskedField === 'name' && wordCount <= 3 && !currentProfile.name) {
+                        // User probably just gave their name - use it directly
+                        const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
+                        if (cleanedName.length > 0 && cleanedName.length < 50) {
+                            currentProfile = { ...currentProfile, name: cleanedName };
+                            console.log(`✅ [DATA_COLLECTION] Direct name capture: "${cleanedName}"`);
+                        }
+                    }
+
                     for (const fieldName of fieldsToExtract) {
+                        // Skip name if we already captured it directly
+                        if (fieldName === 'name' && currentProfile.name) continue;
+
                         const extraction = await extractFieldFromMessage(
                             fieldName,
                             lastMessage.content,
@@ -532,22 +602,29 @@ export async function POST(req: Request) {
                     });
                 }
 
-                // Find next missing field (skip fields marked as __SKIPPED__)
+                // Find next missing field (skip fields marked as __SKIPPED__ or asked too many times)
+                const MAX_FIELD_ATTEMPTS = 3; // Skip field if asked more than 3 times
                 let nextField = null;
                 for (const field of candidateFields) {
                     const fieldName = typeof field === 'string' ? field : field.field;
-                    if (!currentProfile[fieldName] || currentProfile[fieldName] === '__SKIPPED__') {
-                        // If it's skipped, don't ask again
-                        if (currentProfile[fieldName] === '__SKIPPED__') continue;
-                        nextField = fieldName;
-                        break;
+                    const attempts = state.fieldAttemptCounts[fieldName] || 0;
+
+                    // Skip if already collected, explicitly skipped, or asked too many times
+                    if (currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__') continue;
+                    if (currentProfile[fieldName] === '__SKIPPED__') continue;
+                    if (attempts >= MAX_FIELD_ATTEMPTS) {
+                        console.log(`⚠️ [DATA_COLLECTION] Skipping "${fieldName}" - asked ${attempts} times without success`);
+                        continue;
                     }
+
+                    nextField = fieldName;
+                    break;
                 }
-                console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected'}`);
+                console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected/skipped'}`);
 
                 if (!nextField) {
-                    // All fields collected!
-                    console.log(`✅ [DATA_COLLECTION] All fields collected, completing interview`);
+                    // All fields collected or skipped!
+                    console.log(`✅ [DATA_COLLECTION] All fields collected/skipped, completing interview`);
                     await completeInterview(conversationId, messages, openAIKey, currentProfile);
                     return Response.json({
                         text: language === 'it'
@@ -558,12 +635,16 @@ export async function POST(req: Request) {
                     });
                 }
 
-                // Set up to ask next field
+                // Set up to ask next field - track attempt count
                 nextState.lastAskedField = nextField;
                 nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
                 nextState.consentGiven = true;
+                nextState.fieldAttemptCounts = {
+                    ...state.fieldAttemptCounts,
+                    [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
+                };
                 supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
-                console.log(`📋 [DATA_COLLECTION] Will ask for: ${nextField}`);
+                console.log(`📋 [DATA_COLLECTION] Will ask for: ${nextField} (attempt ${nextState.fieldAttemptCounts[nextField]})`);
             }
         }
 
@@ -704,17 +785,112 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             return labels[field]?.[lang === 'it' ? 'it' : 'en'] || field;
         };
 
-        // Helper to get direct question for field
-        const getDirectQuestion = (field: string, lang: string) => {
-            const questions: Record<string, { it: string; en: string }> = {
-                name: { it: 'Perfetto! Come ti chiami?', en: 'Perfect! What is your name?' },
-                email: { it: 'Grazie! Qual è la tua email?', en: 'Thanks! What is your email?' },
-                phone: { it: 'Ottimo! Qual è il tuo numero di telefono?', en: 'Great! What is your phone number?' },
-                company: { it: 'Per quale azienda lavori?', en: 'What company do you work for?' },
-                role: { it: 'Qual è il tuo ruolo?', en: 'What is your role?' },
-                linkedin: { it: 'Qual è il tuo profilo LinkedIn?', en: 'What is your LinkedIn profile?' }
+        // Helper to get direct question for field - varies based on attempt number and user context
+        const getDirectQuestion = (field: string, lang: string, attemptNumber: number = 1, userMessage: string = '') => {
+            const isIt = lang === 'it';
+
+            // Check if user is complaining/frustrated (e.g., "ti sei incantato?", "già chiesto")
+            const COMPLAINT_IT = /\b(incantato|bloccato|ripeti|già (detto|chiesto)|te l'ho (già|appena)|stessa (cosa|domanda)|loop)\b/i;
+            const COMPLAINT_EN = /\b(stuck|loop|same (question|thing)|already (told|said|asked)|repeating)\b/i;
+            const complaintPattern = isIt ? COMPLAINT_IT : COMPLAINT_EN;
+            const userIsComplaining = complaintPattern.test(userMessage);
+
+            // Field-specific question variations
+            const questions: Record<string, { it: string[]; en: string[] }> = {
+                name: {
+                    it: [
+                        'Perfetto! Come ti chiami?',
+                        'Scusa se non ho capito bene prima. Mi diresti il tuo nome completo (nome e cognome)?',
+                        'Mi servirebbe il tuo nome per i nostri archivi. Come ti chiami?'
+                    ],
+                    en: [
+                        'Perfect! What is your name?',
+                        'Sorry if I didn\'t catch that before. Could you tell me your full name?',
+                        'I need your name for our records. What is your name?'
+                    ]
+                },
+                email: {
+                    it: [
+                        'Grazie! Qual è la tua email?',
+                        'Per poterti ricontattare, mi daresti il tuo indirizzo email?',
+                        'Mi servirebbe la tua email per inviarti eventuali aggiornamenti. Qual è?'
+                    ],
+                    en: [
+                        'Thanks! What is your email?',
+                        'To follow up with you, could you share your email address?',
+                        'I need your email to send you updates. What is it?'
+                    ]
+                },
+                phone: {
+                    it: [
+                        'Ottimo! Qual è il tuo numero di telefono?',
+                        'Per contattarti più facilmente, potresti darmi il tuo numero?',
+                        'Mi lasceresti anche un recapito telefonico?'
+                    ],
+                    en: [
+                        'Great! What is your phone number?',
+                        'To reach you more easily, could you share your phone number?',
+                        'Would you also leave me a phone number?'
+                    ]
+                },
+                company: {
+                    it: [
+                        'Per quale azienda lavori?',
+                        'Potresti dirmi il nome della tua azienda?',
+                        'In quale organizzazione lavori attualmente?'
+                    ],
+                    en: [
+                        'What company do you work for?',
+                        'Could you tell me your company name?',
+                        'What organization do you currently work for?'
+                    ]
+                },
+                role: {
+                    it: [
+                        'Qual è il tuo ruolo?',
+                        'Che posizione ricopri nella tua azienda?',
+                        'Di cosa ti occupi esattamente?'
+                    ],
+                    en: [
+                        'What is your role?',
+                        'What position do you hold at your company?',
+                        'What exactly do you do?'
+                    ]
+                },
+                linkedin: {
+                    it: [
+                        'Qual è il tuo profilo LinkedIn?',
+                        'Hai un profilo LinkedIn che potresti condividere?',
+                        'Mi daresti il link al tuo profilo LinkedIn?'
+                    ],
+                    en: [
+                        'What is your LinkedIn profile?',
+                        'Do you have a LinkedIn profile you could share?',
+                        'Could you give me the link to your LinkedIn profile?'
+                    ]
+                }
             };
-            return questions[field]?.[lang === 'it' ? 'it' : 'en'] || `Qual è ${getFieldLabel(field, lang)}?`;
+
+            // Get variations for this field
+            const fieldQuestions = questions[field]?.[isIt ? 'it' : 'en'] || [
+                `Qual è ${getFieldLabel(field, lang)}?`,
+                `Potresti dirmi ${getFieldLabel(field, lang)}?`,
+                `Mi servirebbe ${getFieldLabel(field, lang)}.`
+            ];
+
+            // If user is complaining, acknowledge it first
+            if (userIsComplaining) {
+                const acknowledgment = isIt
+                    ? 'No, scusa! Non mi sono incantato. '
+                    : 'No, sorry! I\'m not stuck. ';
+                // Pick a later variation to sound different
+                const questionIdx = Math.min(attemptNumber, fieldQuestions.length - 1);
+                return acknowledgment + fieldQuestions[questionIdx];
+            }
+
+            // Pick question based on attempt number (0-indexed internally, but attemptNumber is 1-indexed)
+            const questionIdx = Math.min(attemptNumber - 1, fieldQuestions.length - 1);
+            return fieldQuestions[questionIdx];
         };
 
         // If in DATA_COLLECTION phase, ALWAYS ensure we ask for the specific field
@@ -761,7 +937,10 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 if (isAskingWrongThing || !isAskingSpecificField) {
                     console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". Overriding.`);
                     console.log(`   Original response: "${responseText.substring(0, 100)}..."`);
-                    responseText = getDirectQuestion(missingField, language);
+                    // Get attempt count for this field and user's last message
+                    const fieldAttempts = nextState.fieldAttemptCounts[missingField] || 1;
+                    const userLastMsg = lastMessage?.role === 'user' ? lastMessage.content : '';
+                    responseText = getDirectQuestion(missingField, language, fieldAttempts, userLastMsg);
                 }
             }
             // ALL FIELDS COLLECTED but bot didn't complete
@@ -826,13 +1005,11 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                             break;
                         }
                     }
-                    const fieldLabel = nextField === 'name' ? (language === 'it' ? 'il tuo nome' : 'your name')
-                        : nextField === 'email' ? (language === 'it' ? 'la tua email' : 'your email')
-                        : nextField === 'phone' ? (language === 'it' ? 'il tuo numero di telefono' : 'your phone number')
-                        : nextField;
-                    responseText = language === 'it'
-                        ? `${responseText} Qual è ${fieldLabel}?`
-                        : `${responseText} What is ${fieldLabel}?`;
+                    if (nextField) {
+                        const fieldAttempts = nextState.fieldAttemptCounts[nextField] || 1;
+                        const userLastMsg = lastMessage?.role === 'user' ? lastMessage.content : '';
+                        responseText = getDirectQuestion(nextField, language, fieldAttempts, userLastMsg);
+                    }
                 }
             } else {
                 // Actually complete

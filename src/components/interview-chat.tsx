@@ -647,6 +647,26 @@ export default function InterviewChat({
 
             {/* Chat Area */}
             <div className="flex-1 flex flex-col items-center justify-center px-4 pt-64 pb-72 w-full max-w-4xl mx-auto relative z-10">
+
+                {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
+                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
+                    <div className="w-full max-w-2xl mb-4">
+                        <motion.div
+                            key={`answer-${messages[messages.length - 2].id}`}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="ml-auto max-w-[85%]"
+                        >
+                            <div className="bg-white/40 backdrop-blur-md border border-white/60 p-4 rounded-2xl rounded-tr-sm shadow-sm text-right">
+                                <div className="text-xs font-semibold mb-1 uppercase tracking-wider" style={{ color: brandColor }}>{t.yourAnswer}</div>
+                                <div className="text-gray-700 font-medium leading-relaxed">
+                                    "{messages[messages.length - 2].content}"
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
                 <AnimatePresence mode="wait">
                     {currentQuestion && (
                         <motion.div
@@ -657,22 +677,6 @@ export default function InterviewChat({
                             transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
                             className="w-full max-w-2xl"
                         >
-                            {/* Previous Answer Context */}
-                            {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    className="mb-8 ml-auto max-w-[85%]"
-                                >
-                                    <div className="bg-white/40 backdrop-blur-md border border-white/60 p-4 rounded-2xl rounded-tr-sm shadow-sm text-right">
-                                        <div className="text-xs font-semibold mb-1 uppercase tracking-wider" style={{ color: brandColor }}>{t.yourAnswer}</div>
-                                        <div className="text-gray-700 font-medium leading-relaxed">
-                                            "{messages[messages.length - 2].content}"
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-
                             {/* Bot Question Card */}
                             <div className="relative">
                                 {/* Decor */}

@@ -186,6 +186,7 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         const { messages, conversationId, botId, effectiveDuration, introMessage } = body;
+        console.log(`\n🚀 [CHAT_API] Processing message for conversation: ${conversationId}`);
 
         // ====================================================================
         // 1. LOAD DATA
@@ -228,6 +229,9 @@ export async function POST(req: Request) {
 
         // API Key
         const openAIKey = await LLMService.getApiKey(bot, 'openai') || process.env.OPENAI_API_KEY || '';
+
+        console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
+        console.log(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
 
         console.log("📊 [CHAT] State:", {
             phase: state.phase,
@@ -283,7 +287,7 @@ export async function POST(req: Request) {
                         if (shouldCollectData) {
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                        nextState.consentGiven = false; // Waiting for consent
+                            nextState.consentGiven = false; // Waiting for consent
                         } else {
                             await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
                             return Response.json({
@@ -567,17 +571,21 @@ export async function POST(req: Request) {
                         }
                     }
 
-                    for (const fieldName of fieldsToExtract) {
-                        // Skip name if we already captured it directly
-                        if (fieldName === 'name' && currentProfile.name) continue;
+                    const extractions = await Promise.all(
+                        fieldsToExtract.map(async (fieldName) => {
+                            if (fieldName === 'name' && currentProfile.name) return { fieldName, extraction: { value: null, confidence: 'none' } };
 
-                        const extraction = await extractFieldFromMessage(
-                            fieldName,
-                            lastMessage.content,
-                            openAIKey,
-                            language
-                        );
+                            const extraction = await extractFieldFromMessage(
+                                fieldName,
+                                lastMessage.content,
+                                openAIKey,
+                                language
+                            );
+                            return { fieldName, extraction };
+                        })
+                    );
 
+                    for (const { fieldName, extraction } of extractions) {
                         if (extraction.value && extraction.confidence !== 'none') {
                             currentProfile = { ...currentProfile, [fieldName]: extraction.value };
                             console.log(`✅ [DATA_COLLECTION] Extracted "${fieldName}": "${extraction.value}"`);
@@ -664,6 +672,9 @@ export async function POST(req: Request) {
             supervisorInsight
         );
 
+        console.log("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);
+        // console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 500) + "...");
+
         // Inject intro message at start
         if (introMessage && messages.length <= 1) {
             systemPrompt += `\n\nIMPORTANT: Start your response with exactly:\n"${introMessage}"\nThen follow with your first question.`;
@@ -739,6 +750,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
 
         console.timeEnd("LLM");
         let responseText = result.object.response;
+        console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
 
         // ====================================================================
         // 5.5 POST-PROCESSING: Detect premature closures and vague responses
@@ -1040,6 +1052,8 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 currentTopicId: nextTopicId
             }
         });
+
+        console.log(`✅ [CHAT_API] Finished. Response sent. Next Phase: ${nextState.phase}`);
 
         // Memory update (async)
         if (lastMessage?.role === 'user') {

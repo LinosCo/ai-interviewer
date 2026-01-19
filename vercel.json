@@ -1,6 +1,10 @@
 {
     "crons": [
         {
+            "path": "/api/cron/aggregate-chatbot-analytics",
+            "schedule": "0 2 * * *"
+        },
+        {
             "path": "/api/cron/detect-gaps",
             "schedule": "0 3 * * 0"
         },

@@ -623,8 +623,8 @@ model VisibilityConfig {
 
 model VisibilityPrompt {
   id                String           @id @default(cuid())
-  configId          String?
-  visibilityConfig  VisibilityConfig? @relation(fields: [configId], references: [id], onDelete: Cascade)
+  configId          String
+  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
   
   text              String
   enabled           Boolean          @default(true)
@@ -634,6 +634,8 @@ model VisibilityPrompt {
   
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
+
+  responses         VisibilityResponse[]
 }
 
 model Competitor {
@@ -654,11 +656,33 @@ model VisibilityScan {
   configId          String
   visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
   
+  scanType          String           @default("manual") // manual, scheduled
+  score             Float            @default(0)
   startedAt         DateTime         @default(now())
   completedAt       DateTime?
   status            String           @default("pending")
   
   metrics           VisibilityScanMetric[]
+  responses         VisibilityResponse[]
+}
+
+model VisibilityResponse {
+  id                  String           @id @default(cuid())
+  scanId              String
+  promptId            String
+  platform            String
+  model               String
+  responseText        String           @db.Text
+  brandMentioned      Boolean
+  brandPosition       Int?
+  competitorPositions Json
+  sentiment           String?
+  sourcesCited        String[]
+  tokenUsage          Json?
+  createdAt           DateTime         @default(now())
+  
+  scan                VisibilityScan   @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  prompt              VisibilityPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
 }
 
 model VisibilityScanMetric {

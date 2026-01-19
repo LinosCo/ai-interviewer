@@ -623,8 +623,8 @@ model VisibilityConfig {
 
 model VisibilityPrompt {
   id                String           @id @default(cuid())
-  configId          String
-  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  configId          String?
+  visibilityConfig  VisibilityConfig? @relation(fields: [configId], references: [id], onDelete: Cascade)
   
   text              String
   enabled           Boolean          @default(true)

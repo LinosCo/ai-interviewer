@@ -79,9 +79,46 @@ const FeatureIcon = ({ icon: Icon, color = colors.amber }: { icon: any, color?: 
 
 // --- Sections ---
 
+const TYPING_WORDS = [
+    'i tuoi clienti',
+    'il mercato',
+    'i prospect',
+    'i dipendenti',
+    'i partner',
+    'gli utenti',
+];
+
 export default function LandingPage() {
     const { data: session } = useSession();
     const [isYearly, setIsYearly] = useState(true);
+    const [currentWordIndex, setCurrentWordIndex] = useState(0);
+    const [displayText, setDisplayText] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    useEffect(() => {
+        const currentWord = TYPING_WORDS[currentWordIndex];
+        const typingSpeed = isDeleting ? 50 : 100;
+        const pauseTime = 2000;
+
+        const timeout = setTimeout(() => {
+            if (!isDeleting) {
+                if (displayText.length < currentWord.length) {
+                    setDisplayText(currentWord.slice(0, displayText.length + 1));
+                } else {
+                    setTimeout(() => setIsDeleting(true), pauseTime);
+                }
+            } else {
+                if (displayText.length > 0) {
+                    setDisplayText(displayText.slice(0, -1));
+                } else {
+                    setIsDeleting(false);
+                    setCurrentWordIndex((prev) => (prev + 1) % TYPING_WORDS.length);
+                }
+            }
+        }, typingSpeed);
+
+        return () => clearTimeout(timeout);
+    }, [displayText, isDeleting, currentWordIndex]);
 
     return (
         <div className="bg-white overflow-x-hidden">
@@ -109,8 +146,13 @@ export default function LandingPage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="text-5xl lg:text-8xl font-black text-stone-900 leading-[1] mb-8 tracking-tighter"
                         >
-                            Ascolta il mercato. <br />
-                            <span className="text-gradient">Decidi meglio.</span>
+                            Ascolta{' '}
+                            <span className="text-gradient inline-block min-w-[280px] lg:min-w-[450px] text-left">
+                                {displayText}
+                                <span className="animate-pulse">|</span>
+                            </span>
+                            <br />
+                            <span className="text-stone-900">Decidi meglio.</span>
                         </motion.h1>
 
                         <motion.p

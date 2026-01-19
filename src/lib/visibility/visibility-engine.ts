@@ -1,142 +1,164 @@
-import { prisma } from "@/lib/prisma";
-import { generateObject, generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { z } from "zod";
+import { prisma } from '@/lib/prisma';
+import { queryVisibilityLLM } from './llm-providers';
+import { generateObject } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
 
-// Schema for generating realistic user prompts
-const PromptGenerationSchema = z.object({
-    prompts: z.array(z.string()).describe("List of realistic user prompts related to the product category")
-});
-
-// Schema for analyzing the AI response
 const AnalysisSchema = z.object({
     brandMentioned: z.boolean(),
-    brandPosition: z.number().describe("Position in the list (1-10), or 0 if not mentioned"),
-    sentiment: z.enum(["positive", "neutral", "negative"]),
-    competitors: z.array(z.string()).describe("List of competitors mentioned")
+    brandPosition: z.number().nullable().describe("Position in the list (1-based), or null if not mentioned"),
+    competitorPositions: z.record(z.string(), z.number().nullable()).describe("Map of competitor names to their positions"),
+    sentiment: z.enum(['positive', 'neutral', 'negative']).nullable(),
+    sourcesCited: z.array(z.string()).describe("List of sources/links cited if any")
 });
 
 export class VisibilityEngine {
-
     /**
-     * 1. Generate User Prompts
-     * Generates realistic prompts that a user might ask when looking for a product in this category.
+     * Run a visibility scan for a specific configuration
      */
-    async generatePrompts(category: string, count: number = 3): Promise<string[]> {
-        try {
-            const { object } = await generateObject({
-                model: openai("gpt-4o-mini"),
-                schema: PromptGenerationSchema,
-                prompt: `Generate ${count} realistic user prompts/questions for exploring the category: "${category}". 
-        The user is looking for a solution but hasn't decided yet.
-        Examples: "Best CRM for small business", "Alternatives to Salesforce", "How to track sales leads?"`
-            });
-            return object.prompts;
-        } catch (error) {
-            console.error("Prompt generation failed", error);
-            return [`Best ${category} solutions`, `Top rated ${category}`, `${category} reviews`];
-        }
-    }
+    static async runScan(configId: string) {
+        // 1. Fetch config with prompts and competitors
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
+            include: {
+                prompts: { where: { enabled: true }, orderBy: { orderIndex: 'asc' } },
+                competitors: { where: { enabled: true } }
+            }
+        });
 
-    /**
-     * 2. Execute Query (Mocked for now)
-     * Simulates querying an external AI Search engine (Perplexity, SearchGPT, Gemini).
-     */
-    async executeQuery(platform: string, prompt: string): Promise<string> {
-        // TODO: Integrate actual APIs (Perplexity, Google Custom Search, etc.)
-        // For now, we simulate a response using an LLM to "imagine" what a search engine would say, 
-        // OR we just assume a generic response for testing.
+        if (!config) throw new Error(`Config ${configId} not found`);
 
-        // Simulating a response that MIGHT mention the brand if we are lucky (or rigged for demo)
-        // In production, this calls `fetch('https://api.perplexity.ai/...')`
+        // 2. Create Scan Record
+        const scan = await prisma.visibilityScan.create({
+            data: {
+                configId: config.id,
+                status: 'running',
+                scanType: 'manual', // or scheduled, passed as arg
+                startedAt: new Date(),
+                score: 0 // Will be updated later
+            }
+        });
 
-        console.log(`[Visibility] Querying ${platform}: "${prompt}"`);
-
-        // Placeholder response
-        return `Here are the top solutions for ${prompt}:
-    1. Competitor A - The industry leader.
-    2. Competitor B - Good for enterprise.
-    3. Business Tuner - Excellent for qualitative feedback and AI interviews.
-    4. Competitor C - Cheap option.`;
-    }
-
-    /**
-     * 3. Analyze Response
-     * Checks if our brand matches.
-     */
-    async analyzeResponse(responseKey: string, brandName: string): Promise<{
-        brandMentioned: boolean;
-        brandPosition: number;
-        sentiment: 'positive' | 'neutral' | 'negative';
-        competitors: string[];
-    }> {
+        const results = [];
+        const providers = ['openai', 'anthropic', 'gemini'] as const;
 
         try {
-            const { object } = await generateObject({
-                model: openai("gpt-4o-mini"),
-                schema: AnalysisSchema,
-                prompt: `Analyze this search result text.
-        Target Brand: "${brandName}"
-        
-        Search Result:
-        """${responseKey}"""
-        
-        Extract visibility metrics.`
+            // 3. Iterate over prompts
+            for (const prompt of config.prompts) {
+                // Run queries in parallel for all providers
+                const providerPromises = providers.map(async (provider) => {
+                    // Query LLM (returns null if failed/missing key)
+                    const llmResult = await queryVisibilityLLM(
+                        provider,
+                        prompt.text,
+                        config.language,
+                        config.territory
+                    );
+
+                    if (!llmResult) return null; // Skip if failed
+
+                    // Analyze response
+                    const analysis = await this.analyzeResponse(
+                        llmResult.text,
+                        config.brandName,
+                        config.competitors.map(c => c.name)
+                    );
+
+                    // Save response
+                    const response = await prisma.visibilityResponse.create({
+                        data: {
+                            scanId: scan.id,
+                            promptId: prompt.id,
+                            platform: provider,
+                            model: 'standard', // dynamic based on provider
+                            responseText: llmResult.text,
+                            brandMentioned: analysis.brandMentioned,
+                            brandPosition: analysis.brandPosition,
+                            competitorPositions: analysis.competitorPositions as any,
+                            sentiment: analysis.sentiment,
+                            sourcesCited: analysis.sourcesCited,
+                            tokenUsage: llmResult.usage // Save token usage!
+                        }
+                    });
+
+                    return { provider, response };
+                });
+
+                const promptResults = await Promise.all(providerPromises);
+                results.push(...promptResults.filter(r => r !== null));
+            }
+
+            // 4. Calculate Aggregate Score (only based on successful responses)
+            // Valid responses are those where brandMentioned is true or false (completed analysis)
+            const validResponses = await prisma.visibilityResponse.findMany({
+                where: { scanId: scan.id }
             });
-            return object;
-        } catch (error) {
-            // Fallback regex
-            const brandMentioned = responseKey.toLowerCase().includes(brandName.toLowerCase());
-            return {
-                brandMentioned,
-                brandPosition: brandMentioned ? 1 : 0,
-                sentiment: 'neutral',
-                competitors: []
-            };
-        }
-    }
 
-    /**
-     * Orchestrator: Run full analysis
-     */
-    async runAnalysis(orgId: string, brandName: string, category: string) {
-        const prompts = await this.generatePrompts(category);
+            let totalScore = 0;
+            if (validResponses.length > 0) {
+                const mentions = validResponses.filter(r => r.brandMentioned).length;
+                totalScore = Math.round((mentions / validResponses.length) * 100);
+            }
 
-        for (const prompt of prompts) {
-            // Save prompt
-            const savedPrompt = await prisma.visibilityPrompt.create({
+            // 5. Update Scan Status
+            await prisma.visibilityScan.update({
+                where: { id: scan.id },
                 data: {
-                    organizationId: orgId,
-                    text: prompt,
-                    category,
-                    variables: {},
-                    languages: ['en'],
-                    platforms: ['ChatGPT', 'Perplexity'],
-                    frequency: 'weekly'
+                    status: 'completed',
+                    completedAt: new Date(),
+                    score: totalScore
                 }
             });
 
-            // Run on platforms (e.g. ChatGPT, Perplexity)
-            const platforms = ['ChatGPT', 'Perplexity'];
+            return { success: true, scanId: scan.id, partial: results.length < (config.prompts.length * providers.length) };
 
-            for (const platform of platforms) {
-                const rawResponse = await this.executeQuery(platform, prompt);
-                const analysis = await this.analyzeResponse(rawResponse, brandName);
+        } catch (error) {
+            console.error('Scan failed:', error);
+            await prisma.visibilityScan.update({
+                where: { id: scan.id },
+                data: { status: 'failed' }
+            });
+            throw error;
+        }
+    }
 
-                // Save Response
-                await prisma.visibilityResponse.create({
-                    data: {
-                        promptId: savedPrompt.id,
-                        platform,
-                        responseText: rawResponse,
-                        brandPosition: analysis.brandPosition,
-                        sentiment: analysis.sentiment,
-                        language: 'en', // default
-                        competitorPositions: {}, // default empty
-                        tokenUsage: {}, // default empty
-                    }
-                });
-            }
+    /**
+     * Analyze LLM response to extract visibility metrics
+     */
+    private static async analyzeResponse(text: string, brandName: string, competitors: string[]) {
+        try {
+            const { object } = await generateObject({
+                model: openai('gpt-4o-mini'),
+                schema: AnalysisSchema,
+                prompt: `Analyze the following text which represents an LLM's response to a user query.
+                
+                Product/Brand to track: "${brandName}"
+                Competitors: ${JSON.stringify(competitors)}
+                
+                Determine:
+                1. Is "${brandName}" mentioned?
+                2. If yes, what is its position in the list/text (1-based index)?
+                3. For each competitor, are they mentioned and at what position?
+                4. What is the overall sentiment towards "${brandName}"?
+                
+                Text to analyze:
+                """
+                ${text.substring(0, 8000)}
+                """`,
+                temperature: 0
+            });
+
+            return object;
+        } catch (error) {
+            console.error('Analysis failed:', error);
+            // Fallback default
+            return {
+                brandMentioned: false,
+                brandPosition: null, // Ensure explicit null
+                competitorPositions: {},
+                sentiment: null, // Ensure explicit null
+                sourcesCited: []
+            };
         }
     }
 }

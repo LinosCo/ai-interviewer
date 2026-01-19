@@ -69,6 +69,11 @@ export interface PlanLimits {
     // Chatbot limits
     monthlyTokenBudget: number;
     maxActiveChatbots: number;
+
+    // Visibility tracking limits
+    maxVisibilityPrompts: number;
+    visibilityScansPerWeek: number;
+    maxCompetitorsTracked: number;
 }
 
 export interface PlanConfig {
@@ -158,7 +163,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 100,
             messageCooldownSeconds: 0.5,
             monthlyTokenBudget: 500000,
-            maxActiveChatbots: 1
+            maxActiveChatbots: 1,
+            maxVisibilityPrompts: 5,
+            visibilityScansPerWeek: 1,
+            maxCompetitorsTracked: 2
         },
         marketingFeatures: [
             '14 giorni di prova gratuita',
@@ -231,7 +239,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 50,
             messageCooldownSeconds: 1,
             monthlyTokenBudget: 1000000,
-            maxActiveChatbots: 3
+            maxActiveChatbots: 3,
+            maxVisibilityPrompts: 15,
+            visibilityScansPerWeek: 1,
+            maxCompetitorsTracked: 5
         },
         marketingFeatures: [
             'Piano Partner Gratuito',
@@ -305,7 +316,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 15,
             messageCooldownSeconds: 2,
             monthlyTokenBudget: 200000,
-            maxActiveChatbots: 0
+            maxActiveChatbots: 0,
+            maxVisibilityPrompts: 0,
+            visibilityScansPerWeek: 0,
+            maxCompetitorsTracked: 0
         },
         marketingFeatures: [
             '5 interviste attive',
@@ -380,7 +394,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 50,
             messageCooldownSeconds: 1,
             monthlyTokenBudget: 1000000,
-            maxActiveChatbots: 3
+            maxActiveChatbots: 3,
+            maxVisibilityPrompts: 15,
+            visibilityScansPerWeek: 1,
+            maxCompetitorsTracked: 5
         },
         marketingFeatures: [
             '20 interviste attive',
@@ -458,7 +475,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxParallelInterviews: 200,
             messageCooldownSeconds: 0.5,
             monthlyTokenBudget: 5000000,
-            maxActiveChatbots: -1
+            maxActiveChatbots: -1,
+            maxVisibilityPrompts: 50,
+            visibilityScansPerWeek: 1,
+            maxCompetitorsTracked: 15
         },
         marketingFeatures: [
             'Interviste illimitate',

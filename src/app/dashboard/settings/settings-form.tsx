@@ -10,6 +10,8 @@ interface PlatformSettingsFormProps {
 
     platformOpenaiApiKey: string;
     platformAnthropicApiKey: string;
+    platformGeminiApiKey?: string;
+    googleSerpApiKey?: string;
     isAdmin: boolean;
 
     // Stripe Config (Admin only)
@@ -27,6 +29,8 @@ export default function PlatformSettingsForm({
     settingsId,
     platformOpenaiApiKey,
     platformAnthropicApiKey,
+    platformGeminiApiKey = '',
+    googleSerpApiKey = '',
     isAdmin,
     stripeSecretKey = '',
     stripeWebhookSecret = '',
@@ -39,6 +43,8 @@ export default function PlatformSettingsForm({
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
     const [openaiKey, setOpenaiKey] = useState('');
     const [anthropicKey, setAnthropicKey] = useState('');
+    const [geminiKey, setGeminiKey] = useState('');
+    const [serpKey, setSerpKey] = useState('');
 
     // Stripe State
     const [sSecretKey, setSSecretKey] = useState('');
@@ -51,6 +57,8 @@ export default function PlatformSettingsForm({
     const isDirty = (
         (openaiKey && openaiKey !== platformOpenaiApiKey) ||
         (anthropicKey && anthropicKey !== platformAnthropicApiKey) ||
+        (geminiKey && geminiKey !== platformGeminiApiKey) ||
+        (serpKey && serpKey !== googleSerpApiKey) ||
         (sSecretKey && sSecretKey !== stripeSecretKey) ||
         (sWebhookSecret && sWebhookSecret !== stripeWebhookSecret) ||
         sPriceStarter !== stripePriceStarter ||
@@ -73,17 +81,10 @@ export default function PlatformSettingsForm({
                     userId,
                     settingsId,
                     methodologyKnowledge: knowledge,
-                    // If empty string, don't send updates unless we want to clear it?
-                    // Actually, if user leaves empty, we assume they don't want to change it.
-                    // But if they want to clear it? Hard to say. 
-                    // For now, let's send what we have. API should handle partials? 
-                    // No, upsert replaces.
-                    // But we init with empty. So valid update requires typing.
-                    // If empty, pass the original prop value so it doesn't get cleared?
-                    // Better: Send only if changed. But this is a simple form.
-                    // Let's rely on backend: we send current input. If input is empty, backend should probably ignore OR we send the ORIGINAL if input is empty.
-                    platformOpenaiApiKey: openaiKey || undefined, // undefined to not overwrite if empty ? No, backend logic handles specific field update.
+                    platformOpenaiApiKey: openaiKey || undefined,
                     platformAnthropicApiKey: anthropicKey || undefined,
+                    platformGeminiApiKey: geminiKey || undefined,
+                    googleSerpApiKey: serpKey || undefined,
 
                     // Stripe
                     stripeSecretKey: sSecretKey || undefined,
@@ -153,6 +154,33 @@ export default function PlatformSettingsForm({
                                 className="w-full border border-gray-300 rounded-lg px-4 py-2"
                                 placeholder={platformAnthropicApiKey ? "•••••••••••••••• (Enter new to replace)" : "sk-ant-..."}
                             />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Google Gemini API Key (For Visibility Tracking)
+                                {platformGeminiApiKey && <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">● Configured</span>}
+                            </label>
+                            <input
+                                type="password"
+                                value={geminiKey}
+                                onChange={(e) => setGeminiKey(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                placeholder={platformGeminiApiKey ? "•••••••••••••••• (Enter new to replace)" : "AIzaSy..."}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Google SERP API Key (Optional - For SEO Tracking)
+                                {googleSerpApiKey && <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">● Configured</span>}
+                            </label>
+                            <input
+                                type="password"
+                                value={serpKey}
+                                onChange={(e) => setSerpKey(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                placeholder={googleSerpApiKey ? "•••••••••••••••• (Enter new to replace)" : "serpapi_..."}
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Per ricerche web e SEO tracking (opzionale)</p>
                         </div>
                     </div>
                 </div>

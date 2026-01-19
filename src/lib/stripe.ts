@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
-import { PLANS, PlanType, PlanFeatures } from '@/config/plans';
+import { PLANS, PlanType, PlanFeatures, PlanLimits } from '@/config/plans';
 
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
@@ -22,6 +22,7 @@ interface PriceConfig {
         maxInterviewsPerMonth: number;
         maxUsers: number;
     } & PlanFeatures;
+    limits: PlanLimits;
 }
 
 async function getStripeConfig() {
@@ -105,6 +106,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxUsers: PLANS[PlanType.TRIAL].users,
                 ...PLANS[PlanType.TRIAL].features,
             },
+            limits: PLANS[PlanType.TRIAL].limits,
         } as PriceConfig,
         FREE: {
             name: PLANS[PlanType.TRIAL].name,
@@ -118,6 +120,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxUsers: PLANS[PlanType.TRIAL].users,
                 ...PLANS[PlanType.TRIAL].features,
             },
+            limits: PLANS[PlanType.TRIAL].limits,
         } as PriceConfig,
         STARTER: {
             name: PLANS[PlanType.STARTER].name,
@@ -131,6 +134,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxUsers: PLANS[PlanType.STARTER].users,
                 ...PLANS[PlanType.STARTER].features,
             },
+            limits: PLANS[PlanType.STARTER].limits,
         } as PriceConfig,
         PRO: {
             name: PLANS[PlanType.PRO].name,
@@ -144,6 +148,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxUsers: PLANS[PlanType.PRO].users,
                 ...PLANS[PlanType.PRO].features,
             },
+            limits: PLANS[PlanType.PRO].limits,
         } as PriceConfig,
         BUSINESS: {
             name: PLANS[PlanType.BUSINESS].name,
@@ -157,6 +162,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxUsers: PLANS[PlanType.BUSINESS].users,
                 ...PLANS[PlanType.BUSINESS].features,
             },
+            limits: PLANS[PlanType.BUSINESS].limits,
         } as PriceConfig,
         PARTNER: {
             name: PLANS[PlanType.PARTNER].name,
@@ -170,6 +176,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxUsers: PLANS[PlanType.PARTNER].users,
                 ...PLANS[PlanType.PARTNER].features,
             },
+            limits: PLANS[PlanType.PARTNER].limits,
         } as PriceConfig,
         ENTERPRISE: {
             name: 'Enterprise',
@@ -182,6 +189,12 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxInterviewsPerMonth: -1,
                 maxUsers: -1,
                 ...PLANS[PlanType.BUSINESS].features,
+            },
+            // Inherit business limits or maximize them
+            limits: {
+                ...PLANS[PlanType.BUSINESS].limits,
+                monthlyTokenBudget: 10000000,
+                maxActiveChatbots: 999
             },
         } as PriceConfig,
     };

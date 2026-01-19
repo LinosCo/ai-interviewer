@@ -1,8 +1,11 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScanForm } from "./ScanForm";
+import { ScanResults } from "@/components/visibility/ScanResults";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Settings } from "lucide-react";
 
 export default async function VisibilityPage() {
     const session = await auth();
@@ -14,94 +17,93 @@ export default async function VisibilityPage() {
     });
 
     const orgId = user?.memberships[0]?.organizationId;
+    if (!orgId) redirect("/login");
 
-    if (!orgId) redirect("/login"); // Or setup page
-
-    // Fetch visibility metrics
-    const responses = await prisma.visibilityResponse.findMany({
-        where: { prompt: { organizationId: orgId } },
-        orderBy: { executedAt: 'desc' },
-        take: 50
+    // 1. Check if config exists
+    const config = await prisma.visibilityConfig.findUnique({
+        where: { organizationId: orgId },
+        include: { prompts: true }
     });
 
-    const totalScans = responses.length;
-    // Calculate Average Rank (ignoring 0/unranked? or 0 means unranked = bad?)
-    // Assume 0 means "Not in top 10". So high number.
-    // Let's count mentions.
-    const mentions = responses.filter(r => (r.brandPosition ?? 0) > 0 && (r.brandPosition ?? 0) <= 10).length;
-    const visibilityScore = totalScans > 0 ? Math.round((mentions / totalScans) * 100) : 0;
+    if (!config) {
+        redirect("/dashboard/visibility/create");
+    }
+
+    // 2. Fetch latest completed scan
+    const latestScan = await prisma.visibilityScan.findFirst({
+        where: {
+            configId: config.id,
+            status: 'completed'
+        },
+        orderBy: { completedAt: 'desc' },
+        include: {
+            responses: {
+                include: { prompt: true }
+            }
+        }
+    });
+
+    const totalScans = await prisma.visibilityScan.count({
+        where: { configId: config.id, status: 'completed' }
+    });
+
+    // 3. Aggregate Data for Visualization
+    let scanData = null;
+
+    if (latestScan) {
+        // Calculate platform scores
+        const platforms = Array.from(new Set(latestScan.responses.map(r => r.platform)));
+
+        const platformScores = platforms.map(platform => {
+            const p = platform as string;
+            const platformResponses = latestScan.responses.filter(r => r.platform === p);
+            const total = platformResponses.length;
+            const mentions = platformResponses.filter(r => r.brandMentioned).length;
+            const score = total > 0 ? Math.round((mentions / total) * 100) : 0;
+            return { platform: p, score, total, mentions };
+        });
+
+        // Determine partial status (heuristic: if less than expected responses)
+        // Expected ~ prompts * 3 providers (openai, anthropic, gemini)
+        // But gemini might be disabled. Let's just rely on what we have.
+        // We set partial = false for stored scans to avoid confusing warnings on old data.
+        const partial = false;
+
+        scanData = {
+            id: latestScan.id,
+            completedAt: latestScan.completedAt || new Date(),
+            score: latestScan.score,
+            platformScores,
+            responses: latestScan.responses.map(r => ({
+                id: r.id,
+                platform: r.platform,
+                promptText: r.prompt.text,
+                brandMentioned: r.brandMentioned,
+                brandPosition: r.brandPosition,
+                sentiment: r.sentiment
+            })),
+            partial
+        };
+    }
 
     return (
         <div className="space-y-8 p-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight">Visibility Tracker</h2>
-                    <p className="text-muted-foreground">Monitora come l'IA parla del tuo brand.</p>
+                    <p className="text-muted-foreground">Monitora la presenza del tuo brand nelle risposte AI.</p>
                 </div>
-                <ScanForm />
+                <div className="flex items-center gap-2">
+                    <Link href="/dashboard/visibility/create">
+                        <Button variant="outline" size="sm" title="Settings" className="px-3">
+                            <Settings className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <ScanForm />
+                </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Visibility Score</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-bold">{visibilityScore}%</div>
-                        <p className="text-xs text-muted-foreground">Prompt dove appariamo</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Totale Scans</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{totalScans}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Top Sentiment</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold capitalize">
-                            {/* Simple mode for now */}
-                            {responses.length > 0 ? responses[0].sentiment : '-'}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Ultimi Rilevamenti</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {responses.length === 0 ? (
-                            <p className="text-slate-500">Nessuna scansione recente.</p>
-                        ) : (
-                            responses.map((res) => (
-                                <div key={res.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-4 border rounded-lg bg-slate-50">
-                                    <div className="space-y-1">
-                                        <div className="font-medium text-sm text-slate-900">{res.platform}</div>
-                                        {/* Ideally fetch prompt text too. Using 'include' above would be better. */}
-                                        <div className="text-xs text-slate-500">
-                                            Rank: {res.brandPosition && res.brandPosition > 0 ? `#${res.brandPosition}` : 'Not found'} | Sentiment: {res.sentiment}
-                                        </div>
-                                    </div>
-                                    <div className="mt-2 md:mt-0">
-                                        <span className={`px-2 py-1 rounded text-xs font-medium ${(res.brandPosition ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                            }`}>
-                                            {(res.brandPosition ?? 0) > 0 ? 'Visible' : 'Invisible'}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+            <ScanResults scan={scanData} totalScans={totalScans} />
         </div>
     );
 }

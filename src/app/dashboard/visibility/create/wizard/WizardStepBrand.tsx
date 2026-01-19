@@ -1,0 +1,107 @@
+'use client';
+
+import { VisibilityConfig } from '../page';
+
+interface Props {
+    config: VisibilityConfig;
+    setConfig: (config: VisibilityConfig) => void;
+}
+
+export function WizardStepBrand({ config, setConfig }: Props) {
+    return (
+        <div className="space-y-6">
+            <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    Informazioni sul Brand
+                </h2>
+                <p className="text-gray-600">
+                    Fornisci le informazioni di base per la configurazione del monitoring
+                </p>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Nome Brand *
+                    </label>
+                    <input
+                        type="text"
+                        value={config.brandName}
+                        onChange={(e) => setConfig({ ...config, brandName: e.target.value })}
+                        placeholder="Es. Business Tuner"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Categoria di Prodotto *
+                    </label>
+                    <input
+                        type="text"
+                        value={config.category}
+                        onChange={(e) => setConfig({ ...config, category: e.target.value })}
+                        placeholder="Es. AI Interview Platform, CRM Software, etc."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Descrizione Breve *
+                    </label>
+                    <textarea
+                        value={config.description}
+                        onChange={(e) => setConfig({ ...config, description: e.target.value })}
+                        placeholder="Descrivi brevemente cosa fa il tuo prodotto e quali problemi risolve..."
+                        rows={4}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Lingua *
+                        </label>
+                        <select
+                            value={config.language || 'it'}
+                            onChange={(e) => setConfig({ ...config, language: e.target.value })}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                            <option value="it">🇮🇹 Italiano</option>
+                            <option value="en">🇬🇧 English</option>
+                            <option value="es">🇪🇸 Español</option>
+                            <option value="fr">🇫🇷 Français</option>
+                            <option value="de">🇩🇪 Deutsch</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Target Territoriale *
+                        </label>
+                        <select
+                            value={config.territory || 'IT'}
+                            onChange={(e) => setConfig({ ...config, territory: e.target.value })}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                            <option value="IT">🇮🇹 Italia</option>
+                            <option value="US">🇺🇸 USA</option>
+                            <option value="UK">🇬🇧 UK</option>
+                            <option value="ES">🇪🇸 España</option>
+                            <option value="FR">🇫🇷 France</option>
+                            <option value="DE">🇩🇪 Deutschland</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                    <strong>💡 Suggerimento:</strong> La lingua e il territorio influenzeranno la generazione dei prompts e le query agli LLM per risultati localizzati.
+                </p>
+            </div>
+        </div>
+    );
+}

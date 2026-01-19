@@ -63,6 +63,12 @@ export async function registerUser(prevState: string | undefined, formData: Form
                             status: 'TRIALING',
                             currentPeriodEnd: trialEnd,
                         }
+                    },
+                    projects: {
+                        create: {
+                            name: 'My First Project',
+                            ownerId: user.id
+                        }
                     }
                 },
             });

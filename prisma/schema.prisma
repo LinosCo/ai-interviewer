@@ -104,6 +104,8 @@ model GlobalConfig {
   id                       String   @id @default("default")
   openaiApiKey             String?
   anthropicApiKey          String?
+  geminiApiKey             String?
+  googleSerpApiKey         String?
   stripeSecretKey          String?
   stripeWebhookSecret      String?
   stripePriceStarter       String?

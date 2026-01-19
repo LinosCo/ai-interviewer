@@ -64,6 +64,16 @@ export default async function PlatformSettingsPage() {
                                 ? (globalConfig?.anthropicApiKey || '')
                                 : (user.platformAnthropicApiKey || '')
                         }
+                        platformGeminiApiKey={
+                            user.role === 'ADMIN'
+                                ? (globalConfig?.geminiApiKey || '')
+                                : ''
+                        }
+                        googleSerpApiKey={
+                            user.role === 'ADMIN'
+                                ? (globalConfig?.googleSerpApiKey || '')
+                                : ''
+                        }
                         stripeSecretKey={globalConfig?.stripeSecretKey || ''}
                         stripeWebhookSecret={globalConfig?.stripeWebhookSecret || ''}
                         stripePriceStarter={globalConfig?.stripePriceStarter || ''}

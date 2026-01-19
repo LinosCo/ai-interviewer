@@ -13,8 +13,10 @@ export async function POST(req: NextRequest) {
             userId,
             settingsId,
             methodologyKnowledge,
-            openaiApiKey,
-            anthropicApiKey,
+            platformOpenaiApiKey,
+            platformAnthropicApiKey,
+            platformGeminiApiKey,
+            googleSerpApiKey,
             stripeSecretKey,
             stripeWebhookSecret,
             stripePriceStarter,
@@ -45,8 +47,10 @@ export async function POST(req: NextRequest) {
         // If Admin, update Global Config API Keys and Stripe Config
         if (user.role === 'ADMIN') {
             const updateData: any = {
-                openaiApiKey: openaiApiKey || null,
-                anthropicApiKey: anthropicApiKey || null,
+                openaiApiKey: platformOpenaiApiKey || null,
+                anthropicApiKey: platformAnthropicApiKey || null,
+                geminiApiKey: platformGeminiApiKey || null,
+                googleSerpApiKey: googleSerpApiKey || null,
                 stripeSecretKey: stripeSecretKey || null,
                 stripeWebhookSecret: stripeWebhookSecret || null,
                 stripePriceStarter: stripePriceStarter || null,

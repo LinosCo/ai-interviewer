@@ -5,7 +5,7 @@ import { VisibilityEngine } from "@/lib/visibility/visibility-engine";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
-export async function runVisibilityScan(category: string, brandName: string) {
+export async function runVisibilityScan() {
     const session = await auth();
     if (!session || !session.user || !session.user.id) {
         throw new Error("Unauthorized");
@@ -21,15 +21,21 @@ export async function runVisibilityScan(category: string, brandName: string) {
         throw new Error("No organization found");
     }
 
+    // Find the visibility config for this organization
+    const config = await prisma.visibilityConfig.findUnique({
+        where: { organizationId: orgId }
+    });
 
-    const engine = new VisibilityEngine();
+    if (!config) {
+        throw new Error("No visibility configuration found. Please set up your visibility tracking first.");
+    }
 
     // In a real app, this should likely be a background job (Queue) because it takes time.
     // For MVP, we run it and await (might timeout Vercel functions > 10s).
     // Better: Start it, return "Started", and let client poll.
     // For this demo: await (assuming few prompts).
 
-    await engine.runAnalysis(orgId, brandName, category);
+    await VisibilityEngine.runScan(config.id);
 
     revalidatePath("/dashboard/visibility");
 }

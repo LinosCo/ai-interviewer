@@ -30,9 +30,12 @@ export class CrossChannelSync {
         });
 
         // Visibility Data (Negative sentiment or low rank)
+        // VisibilityPrompt connects to VisibilityConfig which has organizationId
         const visibilityIssues = await prisma.visibilityResponse.findMany({
             where: {
-                prompt: { organizationId: orgId },
+                prompt: {
+                    visibilityConfig: { organizationId: orgId }
+                },
                 brandPosition: { gt: 3 } // Not in top 3
             },
             include: { prompt: true },
@@ -50,7 +53,7 @@ export class CrossChannelSync {
         ${gaps.map(g => `- Topic: ${g.topic} (${g.priority})`).join('\n')}
 
         Visibility Issues (Rank > 3):
-        ${visibilityIssues.map(v => `- Query: "${v.prompt.text}" on ${v.platform} ranked #${v.brandPosition}`).join('\n')}
+        ${visibilityIssues.map(v => `- Query: "${v.prompt?.text || 'unknown'}" on ${v.platform} ranked #${v.brandPosition}`).join('\n')}
         `;
 
         try {
@@ -59,7 +62,7 @@ export class CrossChannelSync {
                 schema: UnifiedInsightSchema,
                 prompt: `Analyze the following data from different channels and generate unified strategic insights.
                 Look for patterns. E.g., if users ask about a feature (Gap) and we rank low for that feature (Visibility), that's a Critical Cross-Channel Insight.
-                
+
                 Data:
                 ${promptContext}`
             });

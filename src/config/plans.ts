@@ -6,6 +6,20 @@ export enum PlanType {
     PARTNER = 'partner'
 }
 
+// Map SubscriptionTier (Prisma) to PlanType (config)
+// SubscriptionTier: FREE, STARTER, PRO, BUSINESS, ENTERPRISE
+// PlanType: TRIAL, STARTER, PRO, BUSINESS, PARTNER
+export function subscriptionTierToPlanType(tier: string): PlanType {
+    const mapping: Record<string, PlanType> = {
+        'FREE': PlanType.TRIAL,
+        'STARTER': PlanType.STARTER,
+        'PRO': PlanType.PRO,
+        'BUSINESS': PlanType.BUSINESS,
+        'ENTERPRISE': PlanType.BUSINESS, // Enterprise maps to Business config
+    };
+    return mapping[tier] || PlanType.TRIAL;
+}
+
 export interface PlanFeatures {
     // Creazione interviste
     aiGeneration: boolean;
@@ -259,7 +273,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.STARTER,
         name: 'Starter',
         price: 69,
-        priceYearly: 55,  // ~20% discount
+        priceYearly: 49,
 
         responsesPerMonth: 300,
         activeInterviews: 5,
@@ -322,10 +336,11 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxCompetitorsTracked: 0
         },
         marketingFeatures: [
-            '5 interviste attive',
+            '5 progetti attivi',
             '300 risposte/mese',
-            'Analytics base',
-            'Export PDF',
+            'Chatbot (1 bot)',
+            '2.000 conversazioni',
+            'Logo custom',
             '2 utenti inclusi'
         ],
 
@@ -337,7 +352,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.PRO,
         name: 'Pro',
         price: 199,
-        priceYearly: 159,  // ~20% discount
+        priceYearly: 149,
 
         responsesPerMonth: 1000,
         activeInterviews: 20,
@@ -400,14 +415,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxCompetitorsTracked: 5
         },
         marketingFeatures: [
-            '20 interviste attive',
             '1.000 risposte/mese',
-            'Fino a 3 Chatbot AI',
-            'Data Collection Mode (Recruitment/Lead)',
-            'Custom Branding & Logo',
-            'Knowledge Base & Knowledge Gaps',
-            'AI Analysis Avanzata',
-            'Export CSV + Webhook'
+            '15 progetti attivi',
+            'Chatbot (3 bot)',
+            '10.000 conversazioni',
+            'Visibility (1 brand)',
+            'Cross-Channel (50 insights)',
+            'Analytics avanzati',
+            '5 utenti inclusi'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_PRO,
@@ -418,7 +433,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.BUSINESS,
         name: 'Business',
         price: 399,
-        priceYearly: 319,  // ~20% discount
+        priceYearly: 299,
 
         responsesPerMonth: 3000,
         activeInterviews: -1,  // Illimitate
@@ -481,13 +496,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxCompetitorsTracked: 15
         },
         marketingFeatures: [
-            'Interviste illimitate',
             '3.000 risposte/mese',
-            'Chatbot illimitati',
-            'Visibility AI & Web',
-            'Cross-Channel Insights',
-            'Full White Label',
-            'Success Manager dedicato'
+            'Progetti illimitati',
+            'Chatbot (10 bot)',
+            '30.000 conversazioni',
+            'Visibility (3 brand)',
+            'Visibility Giornaliera',
+            'Cross-Channel Illimitato',
+            'White Label & Priority Support'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_BUSINESS,

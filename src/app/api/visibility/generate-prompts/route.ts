@@ -5,7 +5,7 @@ import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getOrCreateSubscription } from '@/lib/usage';
-import { PLANS } from '@/config/plans';
+import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
 
 const PromptGenerationSchema = z.object({
     prompts: z.array(z.string()).describe("Array of monitoring prompts in the specified language")
@@ -53,7 +53,11 @@ export async function POST(request: Request) {
 
         // Check plan limits
         const subscription = await getOrCreateSubscription(organizationId);
-        const plan = PLANS[subscription.tier];
+        if (!subscription) {
+            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
+        }
+        const planType = subscriptionTierToPlanType(subscription.tier);
+        const plan = PLANS[planType];
         const maxPrompts = plan.limits.maxVisibilityPrompts;
 
         if (maxPrompts === 0) {

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
+import { generateText } from 'ai';
 
 /**
  * Get admin-configured API key from GlobalConfig
@@ -10,12 +11,12 @@ export async function getAdminApiKey(provider: 'GEMINI' | 'GOOGLE_SERP'): Promis
     try {
         const globalConfig = await prisma.globalConfig.findUnique({
             where: { id: "default" }
-        });
+        }) as any; // Type assertion - schema has these fields but TS cache may be stale
 
         if (!globalConfig) return null;
 
-        if (provider === 'GEMINI') return globalConfig.geminiApiKey;
-        if (provider === 'GOOGLE_SERP') return globalConfig.googleSerpApiKey;
+        if (provider === 'GEMINI') return globalConfig.geminiApiKey ?? null;
+        if (provider === 'GOOGLE_SERP') return globalConfig.googleSerpApiKey ?? null;
 
         return null;
     } catch (error) {
@@ -25,61 +26,20 @@ export async function getAdminApiKey(provider: 'GEMINI' | 'GOOGLE_SERP'): Promis
 }
 
 /**
- * Get configured LLM provider model
- */
-export async function getVisibilityLLMProvider(provider: 'openai' | 'anthropic' | 'gemini') {
-    switch (provider) {
-        case 'openai':
-            return openai('gpt-4o-mini');
-
-        case 'anthropic':
-            return anthropic('claude-3-5-haiku-20241022');
-
-        case 'gemini': {
-            // Try to get admin-configured Gemini API key
-            const geminiKey = await getAdminApiKey('GEMINI');
-
-            if (geminiKey) {
-                // Use admin key
-                return google('gemini-2.0-flash-exp', {
-                    apiKey: geminiKey
-                });
-            }
-
-            // Fallback to env var
-            if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-                return google('gemini-2.0-flash-exp');
-            }
-
-            throw new Error('Gemini API key not configured. Please configure it in admin settings.');
-        }
-
-        default:
-            throw new Error(`Unknown provider: ${provider}`);
-    }
-}
-
-/**
  * Configuration for visibility tracking LLM providers
  */
 export const VISIBILITY_PROVIDERS = {
     openai: {
         model: 'gpt-4o-mini',
-        displayName: 'OpenAI GPT-4o',
-        maxTokens: 2000,
-        temperature: 0.3
+        displayName: 'OpenAI GPT-4o'
     },
     anthropic: {
         model: 'claude-3-5-haiku-20241022',
-        displayName: 'Claude 3.5 Haiku',
-        maxTokens: 2000,
-        temperature: 0.3
+        displayName: 'Claude 3.5 Haiku'
     },
     gemini: {
         model: 'gemini-2.0-flash-exp',
-        displayName: 'Gemini 2.0 Flash',
-        maxTokens: 2000,
-        temperature: 0.3
+        displayName: 'Gemini 2.0 Flash'
     }
 } as const;
 
@@ -94,18 +54,6 @@ export async function queryVisibilityLLM(
     territory: string = 'US'
 ): Promise<{ text: string; usage: { promptTokens: number; completionTokens: number } } | null> {
     try {
-        const { generateText } = await import('ai');
-
-        let model;
-        try {
-            model = await getVisibilityLLMProvider(provider);
-        } catch (error) {
-            console.warn(`Skipping ${provider}: Provider not configured or unavailable.`);
-            return null;
-        }
-
-        const config = VISIBILITY_PROVIDERS[provider];
-
         // Language-specific system prompt
         const languageInstructions: Record<string, string> = {
             it: 'Rispondi in italiano.',
@@ -115,26 +63,60 @@ export async function queryVisibilityLLM(
             de: 'Antworte auf Deutsch.'
         };
 
-        const systemPrompt = `You are an AI assistant helping users discover software solutions and services. 
-Provide a helpful, unbiased list of the top solutions for the user's query. 
+        const systemPrompt = `You are an AI assistant helping users discover software solutions and services.
+Provide a helpful, unbiased list of the top solutions for the user's query.
 Include specific product/service names and brief descriptions.
 Format as a numbered list when appropriate.
 ${languageInstructions[language] || languageInstructions.en}
 Target market: ${territory}`;
 
-        const result = await generateText({
-            model,
-            system: systemPrompt,
-            prompt,
-            maxTokens: config.maxTokens,
-            temperature: config.temperature
-        });
+        let result;
 
+        // Handle each provider separately
+        switch (provider) {
+            case 'openai':
+                result = await generateText({
+                    model: openai('gpt-4o-mini'),
+                    system: systemPrompt,
+                    prompt
+                });
+                break;
+
+            case 'anthropic':
+                result = await generateText({
+                    model: anthropic('claude-3-5-haiku-20241022'),
+                    system: systemPrompt,
+                    prompt
+                });
+                break;
+
+            case 'gemini': {
+                // Check if Gemini is configured
+                const geminiKey = await getAdminApiKey('GEMINI');
+                if (!geminiKey && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+                    console.warn('Gemini not configured, skipping.');
+                    return null;
+                }
+                result = await generateText({
+                    // Type assertion needed due to version mismatch between @ai-sdk/google and ai
+                    model: google('gemini-2.0-flash-exp') as any,
+                    system: systemPrompt,
+                    prompt
+                });
+                break;
+            }
+
+            default:
+                throw new Error(`Unknown provider: ${provider}`);
+        }
+
+        // Extract usage - handle different API versions
+        const usage = result.usage as any;
         return {
             text: result.text,
             usage: {
-                promptTokens: result.usage.promptTokens,
-                completionTokens: result.usage.completionTokens
+                promptTokens: usage?.promptTokens ?? usage?.inputTokens ?? 0,
+                completionTokens: usage?.completionTokens ?? usage?.outputTokens ?? 0
             }
         };
     } catch (error) {

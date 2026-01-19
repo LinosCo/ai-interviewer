@@ -3,24 +3,26 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import Script from 'next/script';
-import { colors, gradients } from '@/lib/design-system';
+import { motion, AnimatePresence } from 'framer-motion';
+import { colors, gradients, shadows, radius } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { PLANS, PlanType } from '@/config/plans';
+
+// --- Components ---
 
 const WaveSeparator = ({
     position = 'bottom',
     color = '#FFFBEB',
     height = 60,
     className = '',
-    style = {}
+    flip = false,
 }: {
     position?: 'top' | 'bottom' | 'relative',
     color?: string,
     height?: number,
     className?: string,
-    style?: React.CSSProperties
+    flip?: boolean
 }) => {
     const isAbsolute = position !== 'relative';
     return (
@@ -38,9 +40,8 @@ const WaveSeparator = ({
                 }),
                 height: `${height}px`,
                 zIndex: isAbsolute ? 0 : undefined,
-                transform: position === 'top' ? 'rotate(180deg)' : 'none',
+                transform: `${position === 'top' ? 'rotate(180deg)' : ''} ${flip ? 'scaleX(-1)' : ''}`,
                 pointerEvents: 'none',
-                ...style
             }}
         >
             <svg
@@ -58,763 +59,777 @@ const WaveSeparator = ({
     );
 };
 
-// --- Components ---
-
-const SectionLabel = ({ text, color = colors.amberDark, bg = 'rgba(251,191,36,0.1)' }: { text: string, color?: string, bg?: string }) => (
-    <span className="inline-block text-xs font-bold uppercase tracking-widest py-2 px-4 rounded-full mb-6" style={{ color, background: bg }}>
+const SectionLabel = ({ text, color = colors.amberDark, bg = 'rgba(245, 158, 11, 0.1)' }: { text: string, color?: string, bg?: string }) => (
+    <motion.span
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="inline-block text-xs font-bold uppercase tracking-widest py-2 px-4 rounded-full mb-6"
+        style={{ color, background: bg }}
+    >
         {text}
-    </span>
+    </motion.span>
 );
+
+const FeatureIcon = ({ icon: Icon, color = colors.amber }: { icon: any, color?: string }) => (
+    <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-stone-100 bg-white" style={{ color }}>
+        <Icon size={24} />
+    </div>
+);
+
+// --- Sections ---
 
 export default function LandingPage() {
     const { data: session } = useSession();
-    const [mounted, setMounted] = useState(false);
-    const [scrollY, setScrollY] = useState(0);
-    const [typewriterText, setTypewriterText] = useState('');
-    const [typewriterIndex, setTypewriterIndex] = useState(0);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [isYearly, setIsYearly] = useState(false);
-
-    const words = ["il mercato", "la filiera", "i reparti", "i dipendenti", "gli stakeholder"];
-    const speed = isDeleting ? 50 : 150;
-
-    useEffect(() => {
-        setMounted(true);
-        const handleScroll = () => setScrollY(window.scrollY);
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
-    useEffect(() => {
-        const handleTyping = () => {
-            const currentWord = words[typewriterIndex % words.length];
-            if (!isDeleting) {
-                setTypewriterText(currentWord.substring(0, typewriterText.length + 1));
-                if (typewriterText === currentWord) {
-                    setTimeout(() => setIsDeleting(true), 1500);
-                }
-            } else {
-                setTypewriterText(currentWord.substring(0, typewriterText.length - 1));
-                if (typewriterText === '') {
-                    setIsDeleting(false);
-                    setTypewriterIndex(typewriterIndex + 1);
-                }
-            }
-        };
-
-        const timer = setTimeout(handleTyping, speed);
-        return () => clearTimeout(timer);
-    }, [typewriterText, isDeleting, typewriterIndex]);
+    const [isYearly, setIsYearly] = useState(true);
 
     return (
-        <div className="min-h-screen font-sans bg-white overflow-x-hidden">
-
-            {/* Styles for animation */}
+        <div className="bg-white overflow-x-hidden">
             <style jsx global>{`
-                @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-                @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-                @keyframes waveTyping { 0%, 100% { transform: scaleY(0.4); opacity: 0.5; } 50% { transform: scaleY(1); opacity: 1; } }
-                @keyframes equalizer {
-                    0%, 100% { height: 100%; }
-                    50% { height: 40%; }
+                .glass {
+                    background: rgba(255, 255, 255, 0.7);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                }
+                .text-gradient {
+                    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
                 }
             `}</style>
 
-            {/* --- MOVING EQUALIZER SEPARATOR --- */}
-            <div className="absolute top-0 left-0 right-0 h-1 z-30 flex items-end justify-center gap-[6px] opacity-15 pointer-events-none">
-                {Array.from({ length: 60 }).map((_, i) => (
-                    <div
-                        key={i}
-                        className="w-[6px] bg-amber-400 rounded-t-lg"
-                        style={{
-                            height: `${30 + Math.random() * 40}%`,
-                            animation: `equalizer ${4 + Math.random() * 4}s ease-in-out infinite`,
-                            animationDelay: `${Math.random() * 5}s`
-                        }}
-                    />
-                ))}
-            </div>
+            {/* 1. HERO SECTION */}
+            <section className="relative pt-20 pb-40 lg:pt-32 lg:pb-60 bg-gradient-to-b from-white to-amber-50/30 overflow-hidden">
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="text-center max-w-4xl mx-auto">
+                        <SectionLabel text="Piattaforma di Business Intelligence Qualitativa" />
 
-            {/* --- HERO SECTION (White) --- */}
-            <section className="relative z-10 pt-20 pb-32 lg:pt-32 lg:pb-64 min-h-screen flex flex-col bg-gradient-to-b from-white to-amber-50/30">
-                {/* Background Mesh (Subtle) */}
-                <div
-                    className="absolute inset-0 pointer-events-none opacity-60"
-                    style={{
-                        background: `
-                            radial-gradient(ellipse 80% 50% at 50% -20%, ${colors.peach}40 0%, transparent 50%),
-                            radial-gradient(ellipse 60% 40% at 100% 30%, ${colors.rose}20 0%, transparent 40%)
-                        `
-                    }}
-                />
-
-                <div className="container mx-auto px-6 max-w-7xl relative z-50">
-                    <div className="grid lg:grid-cols-2 gap-16 items-center">
-
-                        {/* Content */}
-                        <div
-                            className={`transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
+                        <motion.h1
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-5xl lg:text-8xl font-black text-stone-900 leading-[1] mb-8 tracking-tighter"
                         >
-                            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-md border border-amber-500/30 rounded-full mb-8 shadow-sm">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                <span className="text-sm font-semibold text-amber-900 tracking-tight">
-                                    Interviste qualitative con AI
-                                </span>
+                            Ascolta il mercato. <br />
+                            <span className="text-gradient">Decidi meglio.</span>
+                        </motion.h1>
+
+                        <motion.p
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 }}
+                            className="text-xl lg:text-2xl text-stone-600 leading-relaxed mb-12 max-w-3xl mx-auto"
+                        >
+                            Interviste AI, chatbot intelligente e monitoraggio reputazione in un'unica piattaforma. Per PMI che vogliono capire clienti, mercato e concorrenza.
+                        </motion.p>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
+                        >
+                            <Link href="/register">
+                                <Button size="lg" withShimmer className="px-10 py-7 text-lg h-auto rounded-full">
+                                    Inizia gratis <Icons.ArrowRight className="ml-2" />
+                                </Button>
+                            </Link>
+                            <Link href="/onboarding/preview">
+                                <Button variant="secondary" size="lg" className="px-10 py-7 text-lg h-auto rounded-full bg-stone-100 hover:bg-stone-200 border-transparent text-stone-900">
+                                    <Icons.Play className="mr-2" /> Guarda la demo
+                                </Button>
+                            </Link>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4 }}
+                            className="flex flex-wrap justify-center gap-8 text-stone-400 text-sm font-medium"
+                        >
+                            <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Setup in 5 minuti</span>
+                            <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 50 interviste gratis</span>
+                            <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Nessuna carta richiesta</span>
+                        </motion.div>
+
+                        {/* Integration Diagram */}
+                        <motion.div
+                            initial={{ opacity: 0, y: 40 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.6 }}
+                            className="mt-24 relative max-w-2xl mx-auto"
+                        >
+                            <div className="flex justify-between items-center relative z-10">
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
+                                        <Icons.MessageSquare size={32} className="text-amber-500" />
+                                    </div>
+                                    <span className="text-xs font-bold text-stone-500 tracking-wider">INTERVIEW</span>
+                                </div>
+
+                                <div className="h-0.5 flex-1 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 mx-4 relative">
+                                    <Icons.ArrowRight className="absolute -right-2 -top-2 text-amber-200" size={16} />
+                                </div>
+
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
+                                        <Icons.Bot size={32} className="text-amber-500" />
+                                    </div>
+                                    <span className="text-xs font-bold text-stone-500 tracking-wider">CHATBOT</span>
+                                </div>
+
+                                <div className="h-0.5 flex-1 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 mx-4 relative">
+                                    <Icons.ArrowRight className="absolute -right-2 -top-2 text-amber-200" size={16} />
+                                </div>
+
+                                <div className="flex flex-col items-center gap-3">
+                                    <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
+                                        <Icons.Search size={32} className="text-amber-500" />
+                                    </div>
+                                    <span className="text-xs font-bold text-stone-500 tracking-wider">VISIBILITY</span>
+                                </div>
                             </div>
 
-                            <h1 className="text-5xl lg:text-7xl font-bold text-stone-900 tracking-tight leading-[1.1] mb-8 min-h-[220px]">
-                                Ascolta <br />
-                                <span className="text-amber-600 inline-block">
-                                    {typewriterText}
-                                    <span className="animate-pulse">|</span>
-                                </span> <br />
-                                <span className="text-stone-900">decidi meglio.</span>
-                            </h1>
+                            <div className="mt-12 flex flex-col items-center">
+                                <div className="w-0.5 h-12 bg-amber-100 relative">
+                                    <Icons.ArrowRight className="absolute -bottom-2 -left-2 rotate-90 text-amber-200" size={16} />
+                                </div>
+                                <div className="bg-gradient-to-br from-stone-900 to-stone-800 text-white rounded-[2rem] p-6 px-12 shadow-2xl mt-4 border border-stone-700 flex items-center gap-4 group hover:scale-105 transition-transform duration-500">
+                                    <Icons.Layers size={24} className="text-amber-500" />
+                                    <span className="text-lg font-bold tracking-tight">Unified Insight Hub</span>
+                                </div>
+                            </div>
 
-                            <p className="text-xl text-stone-600 leading-relaxed mb-10 max-w-lg">
-                                Raccogli feedback dai tuoi stakeholder con conversazioni guidate dall'AI. Più profondo di un form. Più scalabile di un'intervista.
+                            {/* Decorative Blobs */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-amber-500/5 blur-[120px] -z-10 rounded-full" />
+                        </motion.div>
+                    </div>
+                </div>
+            </section>
+
+            {/* 2. PROBLEM / SOLUTION */}
+            <section className="py-32 bg-white relative">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="grid lg:grid-cols-2 gap-24 items-center">
+                        <div>
+                            <SectionLabel text="Il problema delle PMI" />
+                            <h2 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-8 tracking-tight">
+                                Perché ascoltare il mercato costa così tanto?
+                            </h2>
+                            <p className="text-lg text-stone-600 mb-12 leading-relaxed">
+                                Le grandi aziende spendono oltre €50.000 all'anno in strumenti isolati.
+                                Le PMI hanno le stesse esigenze ma non possono permettersi budget enterprise o team di analisti dedicati.
                             </p>
 
-                            <div className="flex flex-col sm:flex-row gap-4 mb-12">
-                                <Link href="/register">
-                                    <Button withShimmer className="w-full sm:w-auto text-lg px-8 py-6 h-auto">
-                                        Inizia gratis <Icons.ArrowRight className="ml-2" size={20} />
-                                    </Button>
-                                </Link>
-                                <Link href="/onboarding/preview">
-                                    <Button variant="secondary" className="w-full sm:w-auto text-lg px-8 py-6 h-auto bg-stone-100 hover:bg-stone-200 text-stone-800 border-transparent">
-                                        <Icons.Play className="mr-2" size={20} /> Prova la demo
-                                    </Button>
-                                </Link>
-                            </div>
-
-                            {/* Use Cases Pills */}
-                            <div className="flex flex-wrap gap-3">
+                            <div className="space-y-6">
                                 {[
-                                    'Customer Feedback', 'Exit Interview', 'Clima Aziendale', 'NPS Qualitativo', 'Win/Loss Analysis'
-                                ].map((label, i) => (
-                                    <span key={i} className="px-4 py-2 bg-stone-100 text-stone-600 rounded-full text-sm font-medium hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-default border border-transparent hover:border-amber-200">
-                                        {label}
-                                    </span>
+                                    { label: 'Feedback Clienti', traditional: '€5.000-20.000 / anno', tuner: 'Incluso' },
+                                    { label: 'Supporto AI', traditional: '€200+ / mese', tuner: 'Incluso' },
+                                    { label: 'Reputazione & Visibility', traditional: '€150+ / mese', tuner: 'Incluso' },
+                                ].map((item, i) => (
+                                    <div key={i} className="flex items-center justify-between p-4 px-6 bg-stone-50 rounded-2xl border border-stone-100">
+                                        <span className="font-bold text-stone-800">{item.label}</span>
+                                        <div className="text-right">
+                                            <div className="text-xs text-stone-400 line-through mb-1">{item.traditional}</div>
+                                            <div className="text-amber-600 font-black">{item.tuner}</div>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Typeform-Style Interview Demo */}
-                        <div
-                            className={`relative hidden lg:block transition-all duration-1000 delay-200 ease-out ${mounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'}`}
-                        >
-                            {/* Interview Card */}
-                            <div className="relative z-10 bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-stone-100 animate-[float_6s_ease-in-out_infinite]">
-                                {/* Orange Header */}
-                                <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                                            <Icons.MessageSquare size={20} />
-                                        </div>
+                        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden">
+                            <div className="relative z-10">
+                                <h3 className="text-3xl font-bold mb-8">Business Tuner: Tutto Integrato</h3>
+                                <p className="text-amber-50 mb-10 text-lg">
+                                    Un unico ecosistema che automatizza la raccolta dati e li trasforma in azioni.
+                                </p>
+
+                                <ul className="space-y-6">
+                                    <li className="flex items-start gap-4">
+                                        <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0"><Icons.Check size={20} /></div>
                                         <div>
-                                            <h3 className="font-bold text-lg">Feedback Clienti Q4</h3>
-                                            <p className="text-sm text-white/80">Target: Clienti Premium</p>
+                                            <div className="font-bold">Interview AI: 70%+ completion</div>
+                                            <div className="text-sm text-amber-100">Conversazioni profonde, non semplici form.</div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                {/* Interview Content */}
-                                <div className="p-6 space-y-6">
-                                    {/* Question 1 */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                                                <Icons.MessageSquare size={16} className="text-amber-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="text-stone-700 font-medium mb-3">
-                                                    Cosa ti ha portato a scegliere il nostro servizio rispetto ai competitor?
-                                                </p>
-                                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
-                                                    <p className="text-amber-900 text-sm">
-                                                        Cercavo più flessibilità. I competitor avevano contratti rigidi che non si adattavano alla stagionalità del mio business.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Question 2 */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                                                <Icons.Users size={16} className="text-stone-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="text-stone-700 font-medium">
-                                                    L'utente risponde...
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Insight Section */}
-                                    <div className="mt-6 pt-6 border-t border-stone-100">
-                                        <div className="flex items-start gap-3 bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-                                            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <Icons.Zap size={16} className="text-white" />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-emerald-900 text-sm mb-1">Insight Trovato</p>
-                                                <p className="text-emerald-800 text-sm">
-                                                    Il <span className="font-bold">67%</span> dei clienti cita la "flessibilità contrattuale" come driver d'acquisto.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Decorative glow */}
-                            <div className="absolute -inset-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-[3rem] blur-2xl -z-10" />
-                        </div>
-                    </div>
-                </div>
-
-
-                <div className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
-                    <div className="flex items-end justify-center gap-[6px] h-32 opacity-20 px-4">
-                        {Array.from({ length: 60 }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="w-[8px] bg-white rounded-t-xl"
-                                style={{
-                                    height: `${20 + Math.sin(i / 5) * 30 + Math.random() * 30}%`,
-                                    animation: `equalizer ${3 + Math.random() * 5}s ease-in-out infinite`,
-                                    animationDelay: `${Math.random() * 5}s`
-                                }}
-                            />
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            <WaveSeparator color="#FFFBEB" height={80} />
-
-            {/* --- STATS (Light Warm Background) --- */}
-            <section className="relative z-20 bg-[#FFFBEB] py-8 lg:py-12">
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center divide-y md:divide-y-0 md:divide-x divide-amber-500/10">
-                        {[
-                            { value: '70%+', label: 'Rate di completamento' },
-                            { value: '10x', label: 'Più economico e veloce' },
-                            { value: '∞', label: 'Scalabilità immediata' }
-                        ].map((stat, i) => (
-                            <div key={i} className="pt-8 md:pt-0 px-4">
-                                <div className="text-5xl lg:text-6xl font-bold text-amber-500 mb-2 font-display tracking-tight">
-                                    {stat.value}
-                                </div>
-                                <div className="text-stone-600 font-medium uppercase tracking-wide text-sm">{stat.label}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            {/* --- WHAT IS (Light Warm Background) --- */}
-            <section className="relative z-20 bg-[#FFFBEB] py-16 lg:py-24 overflow-hidden">
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="grid lg:grid-cols-2 gap-16 items-center">
-                        <div>
-                            <SectionLabel text="Cos'è Business Tuner" />
-                            <h2 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-8 tracking-tight">
-                                Un nuovo modo di <span className="text-amber-600">raccogliere feedback</span>
-                            </h2>
-                            <p className="text-xl text-stone-600 leading-relaxed mb-8">
-                                Business Tuner non è un questionario e non è un'intervista tradizionale.
-                            </p>
-                            <p className="text-lg text-stone-600 leading-relaxed mb-8">
-                                È una <strong className="text-amber-900 font-bold underline decoration-amber-500/30 decoration-4 underline-offset-4">conversazione guidata</strong> che si adatta a chi risponde: fa domande aperte, approfondisce quando serve, e ti restituisce insight organizzati.
-                            </p>
-                            <p className="text-lg text-stone-600 leading-relaxed">
-                                Funziona come un collaboratore che fa le domande giuste al posto tuo, senza i costi e i tempi di una ricerca tradizionale.
-                            </p>
-                            <div className="mt-10">
-                                <Link href="/methodology">
-                                    <button className="flex items-center gap-2 text-amber-700 font-bold hover:gap-3 transition-all underline decoration-amber-500/30 decoration-2 underline-offset-4">
-                                        Scopri la nostra metodologia <Icons.ArrowRight size={20} />
-                                    </button>
-                                </Link>
-                            </div>
-                        </div>
-
-                        {/* Typeform-Style Interview Demo */}
-                        <div className="relative">
-                            {/* Interview Card */}
-                            <div className="bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-amber-100 relative z-10">
-                                {/* Orange Header */}
-                                <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                                            <Icons.MessageSquare size={20} />
-                                        </div>
+                                    </li>
+                                    <li className="flex items-start gap-4">
+                                        <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0"><Icons.Check size={20} /></div>
                                         <div>
-                                            <h3 className="font-bold text-lg">UX Research - Checkout</h3>
-                                            <p className="text-sm text-white/80">Target: E-commerce Users</p>
+                                            <div className="font-bold">Chatbot Intelligence</div>
+                                            <div className="text-sm text-amber-100">Rileva lacune e suggerisce FAQ in automatico.</div>
                                         </div>
-                                    </div>
-                                </div>
+                                    </li>
+                                    <li className="flex items-start gap-4">
+                                        <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0"><Icons.Check size={20} /></div>
+                                        <div>
+                                            <div className="font-bold">Visibility Tracker</div>
+                                            <div className="text-sm text-amber-100">Cosa dicono di te ChatGPT e i forum di settore.</div>
+                                        </div>
+                                    </li>
+                                </ul>
 
-                                {/* Interview Content */}
-                                <div className="p-6 space-y-6">
-                                    {/* Question 1 */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                                                <Icons.MessageSquare size={16} className="text-amber-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="text-stone-700 font-medium mb-3">
-                                                    Benvenuto! Raccontami della tua esperienza con il checkout.
-                                                </p>
-                                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
-                                                    <p className="text-amber-900 text-sm">
-                                                        Il form è troppo lungo, ho abbandonato a metà.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Question 2 */}
-                                    <div className="space-y-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                                                <Icons.Users size={16} className="text-stone-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="text-stone-700 font-medium mb-3">
-                                                    Quale campo specifico ti è sembrato più superfluo?
-                                                </p>
-                                                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
-                                                    <p className="text-amber-900 text-sm">
-                                                        Mi chiedeva il CAP due volte, una per fatturazione e una per spedizione.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Insight Section */}
-                                    <div className="mt-6 pt-6 border-t border-stone-100">
-                                        <div className="flex items-start gap-3 bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-                                            <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <Icons.Zap size={16} className="text-white" />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-emerald-900 text-sm mb-1">Insight Trovato</p>
-                                                <p className="text-emerald-800 text-sm">
-                                                    Il <span className="font-bold">43%</span> degli utenti abbandona per campi duplicati o ridondanti.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div className="mt-12 pt-12 border-t border-white/20">
+                                    <div className="text-sm text-amber-200 uppercase font-black tracking-widest mb-2">Prezzo unico</div>
+                                    <div className="text-5xl font-black">da €49<span className="text-xl font-medium">/mese</span></div>
                                 </div>
                             </div>
-
-                            {/* Decorative glow */}
-                            <div className="absolute -inset-4 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-[3rem] blur-2xl -z-10" />
+                            <Icons.Logo className="absolute -bottom-20 -right-20 opacity-10" size={400} />
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* --- HOW IT WORKS (Light Warm Background) --- */}
-            <section className="relative z-20 bg-[#FFFBEB] py-24 lg:py-32">
+            <WaveSeparator color="#FAFAF8" height={100} />
 
-                <div id="how-it-works" className="container mx-auto px-6 max-w-7xl">
-                    <div className="text-center max-w-3xl mx-auto mb-20">
-                        <SectionLabel text="Come Funziona" />
-                        <h2 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-6 tracking-tight">
-                            Da zero a insight in <span className="text-amber-600">4 passi</span>
+            {/* 3. THE THREE TOOLS SECTION */}
+            <section className="py-32 bg-[#FAFAF8] relative">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="text-center max-w-3xl mx-auto mb-24">
+                        <SectionLabel text="I nostri strumenti" />
+                        <h2 className="text-4xl lg:text-6xl font-black text-stone-900 mb-6 tracking-tight">
+                            Tre motori per la tua <span className="text-gradient">intelligenza aziendale</span>
                         </h2>
-                        <p className="text-xl text-stone-600">
-                            Non servono competenze tecniche. Tu metti l'obiettivo, l'AI fa il resto.
-                        </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {[
-                            { num: '01', title: 'Definisci l\'obiettivo', desc: 'Descrivi cosa vuoi scoprire in linguaggio naturale.' },
-                            { num: '02', title: 'L\'AI crea l\'intervista', desc: 'Generazione automatica di domande, tono e logica.' },
-                            { num: '03', title: 'Condividi il link', desc: 'Invia via email, social o incorpora nel tuo sito.' },
-                            { num: '04', title: 'Ottieni insight', desc: 'Analisi automatica di temi, sentiment e pattern.' }
-                        ].map((step, i) => (
-                            <div key={i} className="bg-white rounded-3xl p-8 shadow-xl shadow-amber-900/5 border border-amber-900/5 relative group hover:-translate-y-1 transition-transform duration-300">
-                                <div className="text-6xl font-bold text-amber-100 mb-6 font-display absolute top-4 right-6 select-none group-hover:text-amber-200 transition-colors">
-                                    {step.num}
+                    {/* Tool 1: Interview AI */}
+                    <div className="grid lg:grid-cols-2 gap-20 items-center mb-40">
+                        <div>
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.MessageSquare size={24} /></div>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Interview AI</h3>
+                            </div>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Conversazioni che vanno in profondità.</h4>
+                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                L'AI conduce interviste strutturate ma flessibili. Fa follow-up intelligenti, adatta il tono all'interlocutore e non ripete mai la stessa domanda.
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-6 mb-8">
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
+                                    <div className="text-3xl font-black text-amber-500 mb-1">70%+</div>
+                                    <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">Completion Rate</div>
                                 </div>
-                                <div className="relative z-10">
-                                    <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 mb-6 group-hover:scale-110 transition-transform duration-300">
-                                        <Icons.ArrowRight size={24} className={i === 3 ? '' : '-rotate-45'} />
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
+                                    <div className="text-3xl font-black text-amber-500 mb-1">10x</div>
+                                    <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">Più economico</div>
+                                </div>
+                            </div>
+
+                            <ul className="space-y-4 mb-10">
+                                {['Generazione automatica domande da obiettivo', 'Memory Manager: evita ripetizioni frustranti', 'Tone Analyzer: formale, amichevole, diretto'].map((f, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
+                                        <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0"><Icons.Check size={12} /></div>
+                                        {f}
+                                    </li>
+                                ))}
+                            </ul>
+
+                            <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Free Plan</span></div>
+                        </div>
+
+                        <div className="relative">
+                            <div className="bg-stone-900 rounded-[2.5rem] p-8 shadow-2xl relative z-10 text-white border border-stone-800">
+                                <div className="flex items-center gap-3 mb-8 pb-4 border-b border-white/10">
+                                    <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center"><Icons.Bot size={16} /></div>
+                                    <span className="font-bold">Interview AI</span>
+                                </div>
+                                <div className="space-y-6">
+                                    <div className="flex flex-col gap-2">
+                                        <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">AI: Domanda</div>
+                                        <div className="bg-stone-800 p-4 rounded-2xl rounded-tl-none border border-stone-700 leading-relaxed">
+                                            "Cosa ti ha portato a scegliere il nostro servizio?"
+                                        </div>
                                     </div>
-                                    <h3 className="text-xl font-bold text-stone-900 mb-3">{step.title}</h3>
-                                    <p className="text-stone-600 leading-relaxed">{step.desc}</p>
+                                    <div className="flex flex-col gap-2 items-end">
+                                        <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">Utente</div>
+                                        <div className="bg-amber-500 p-4 rounded-2xl rounded-tr-none font-medium leading-relaxed">
+                                            "Cercavo più flessibilità..."
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">AI: Deep Probe</div>
+                                        <div className="bg-stone-800 p-4 rounded-2xl rounded-tl-none border border-stone-700 leading-relaxed border-l-2 border-l-amber-500">
+                                            "In che senso flessibilità? Puoi farmi un esempio di una situazione in cui ne hai avuto bisogno?"
+                                        </div>
+                                    </div>
                                 </div>
+                            </div>
+                            {/* Decorative shadow */}
+                            <div className="absolute -inset-10 bg-amber-500/10 blur-[80px] -z-10 rounded-full" />
+                        </div>
+                    </div>
+
+                    {/* Tool 2: Chatbot Intelligence */}
+                    <div className="grid lg:grid-cols-2 gap-20 items-center mb-40">
+                        <div className="order-2 lg:order-1 relative">
+                            <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-amber-100 overflow-hidden">
+                                <div className="bg-amber-50/50 -mx-8 -mt-8 p-6 border-b border-amber-100 mb-8">
+                                    <div className="flex justify-between items-center">
+                                        <div className="font-bold text-amber-900">Analytics Insights</div>
+                                        <div className="text-xs font-black text-amber-600 bg-amber-100 px-3 py-1 rounded-full uppercase">Real-time</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-8">
+                                    <div>
+                                        <div className="flex justify-between mb-4">
+                                            <span className="text-sm font-bold text-stone-400 uppercase">Top Domande</span>
+                                            <span className="text-sm font-bold text-stone-400 uppercase">Gaps</span>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-stone-400 font-bold">1.</span>
+                                                    <span className="font-bold text-stone-800">"Quanto costa?"</span>
+                                                </div>
+                                                <Icons.Check className="text-green-500" size={16} />
+                                            </div>
+                                            <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-stone-400 font-bold">2.</span>
+                                                    <span className="font-bold text-stone-800">"Shopify?"</span>
+                                                </div>
+                                                <div className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded">GAP</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center"><Icons.Bot size={16} /></div>
+                                            <div className="font-bold text-amber-900 text-sm">FAQ Suggerita</div>
+                                        </div>
+                                        <p className="text-xs text-amber-800 mb-6 italic">"Questa settimana 23 persone hanno chiesto dell'integrazione Shopify. Vuoi che generi una risposta basata su..."</p>
+                                        <div className="flex gap-2">
+                                            <button className="flex-1 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors">✅ Approva</button>
+                                            <button className="flex-1 py-2 rounded-lg bg-white text-amber-600 text-xs font-bold border border-amber-200 hover:bg-amber-50">Modifica</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="absolute -inset-10 bg-amber-500/5 blur-[80px] -z-10 rounded-full" />
+                        </div>
+
+                        <div className="order-1 lg:order-2">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Bot size={24} /></div>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Chatbot Intelligence</h3>
+                            </div>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Supporto clienti che impara dai silenzi.</h4>
+                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                Molto più di un assistente AI. Business Tuner identifica cosa non sa rispondere e ti suggerisce come migliorare la knowledge base analizzando i trend reali.
+                            </p>
+
+                            <ul className="space-y-6 mb-10">
+                                <li className="flex items-start gap-4">
+                                    <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-1"><Icons.Check size={14} /></div>
+                                    <div>
+                                        <div className="font-bold text-stone-900 uppercase text-xs tracking-widest mb-1">Knowledge Gap Detection</div>
+                                        <div className="text-sm text-stone-500 leading-relaxed">Analisi semantica dei messaggi senza risposta. Nessuna domanda va persa.</div>
+                                    </div>
+                                </li>
+                                <li className="flex items-start gap-4">
+                                    <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-1"><Icons.Check size={14} /></div>
+                                    <div>
+                                        <div className="font-bold text-stone-900 uppercase text-xs tracking-widest mb-1">FAQ Proattive</div>
+                                        <div className="text-sm text-stone-500 leading-relaxed">Trasforma le richieste ricorrenti in risorse knowledge base in un click.</div>
+                                    </div>
+                                </li>
+                            </ul>
+
+                            <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Starter Plan (€49/mo)</span></div>
+                        </div>
+                    </div>
+
+                    {/* Tool 3: Visibility Tracker */}
+                    <div className="grid lg:grid-cols-2 gap-20 items-center">
+                        <div>
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Search size={24} /></div>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Visibility Tracker</h3>
+                            </div>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Cosa dicono di te online e sull'AI.</h4>
+                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
+                                Monitora come appari su ChatGPT, Claude, forum e blog. Se qualcuno chiede una soluzione nel tuo settore, assicurati di essere menzionato.
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-4 mb-10">
+                                <div className="p-4 bg-white rounded-2xl border border-stone-100 shadow-sm">
+                                    <div className="font-bold text-stone-900 text-sm mb-2">AI Perception</div>
+                                    <div className="text-xs text-stone-500">ChatGPT, Claude, Gemini, Perplexity</div>
+                                </div>
+                                <div className="p-4 bg-white rounded-2xl border border-stone-100 shadow-sm">
+                                    <div className="font-bold text-stone-900 text-sm mb-2">Web Presence</div>
+                                    <div className="text-xs text-stone-500">Google News, Reddit, Forum di settore</div>
+                                </div>
+                            </div>
+
+                            <p className="text-sm text-stone-500 italic mb-10">
+                                "Il 40% delle ricerche B2B oggi inizia su un'interfaccia AI. Se ChatGPT non ti conosce, non esisti."
+                            </p>
+
+                            <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Pro Plan (€149/mo)</span></div>
+                        </div>
+
+                        <div className="relative">
+                            <div className="bg-stone-50 rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-stone-200">
+                                <div className="grid grid-cols-2 gap-6 mb-8">
+                                    <div className="space-y-4">
+                                        <div className="text-[10px] font-black tracking-widest text-stone-400 uppercase">AI Perception</div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between text-xs font-bold p-2 bg-white rounded-lg border border-stone-200">
+                                                <span>ChatGPT</span>
+                                                <span className="text-amber-600">Pos. #2</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs font-bold p-2 bg-white rounded-lg border border-stone-200">
+                                                <span>Claude</span>
+                                                <span className="text-amber-600">Pos. #1</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs font-bold p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                                                <span>Gemini</span>
+                                                <span className="text-red-500">N.C. ⚠️</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="text-[10px] font-black tracking-widest text-stone-400 uppercase">Web mentions</div>
+                                        <div className="space-y-2">
+                                            <div className="p-2 bg-white rounded-lg border border-stone-200">
+                                                <div className="text-[10px] text-stone-400 uppercase">Reddit</div>
+                                                <div className="text-[11px] font-bold text-stone-800 line-clamp-1">"Miglior software per..."</div>
+                                            </div>
+                                            <div className="p-2 bg-white rounded-lg border border-stone-200">
+                                                <div className="text-[10px] text-stone-400 uppercase">Google News</div>
+                                                <div className="text-[11px] font-bold text-stone-800 line-clamp-1">"Startup innovativa..."</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-stone-900 rounded-2xl p-4 text-white">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <div className="text-[10px] font-bold text-stone-500 uppercase">Report Settimanale</div>
+                                        <Icons.ArrowRight size={14} className="text-amber-500" />
+                                    </div>
+                                    <div className="text-sm font-bold mb-1">🔥 Opportunità</div>
+                                    <p className="text-[11px] text-stone-400">3 blog post parlano del Tuo Competitor X ma non di te. Vuoi che generi un prompt per contattarli?</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* 4. CROSS-CHANNEL INSIGHT SECTION */}
+            <section className="py-40 bg-white overflow-hidden relative">
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="grid lg:grid-cols-2 gap-24 items-center">
+                        <div className="relative">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center justify-center text-center group hover:bg-amber-100 transition-colors cursor-default">
+                                    <Icons.MessageSquare size={32} className="text-amber-500 mb-4" />
+                                    <div className="text-xs font-black text-amber-900 uppercase">Interviews</div>
+                                    <div className="text-stone-500 text-[10px] mt-1 italic">"Il checkout è lungo"</div>
+                                </div>
+                                <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center justify-center text-center group hover:bg-amber-100 transition-colors cursor-default">
+                                    <Icons.Bot size={32} className="text-amber-500 mb-4" />
+                                    <div className="text-xs font-black text-amber-900 uppercase">Chatbot</div>
+                                    <div className="text-stone-500 text-[10px] mt-1 italic">47 domande sul checkout</div>
+                                </div>
+                                <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center justify-center text-center group hover:bg-amber-100 transition-colors cursor-default">
+                                    <Icons.Search size={32} className="text-amber-500 mb-4" />
+                                    <div className="text-xs font-black text-amber-900 uppercase">Visibility</div>
+                                    <div className="text-stone-500 text-[10px] mt-1 italic">Competitor parla di checkout</div>
+                                </div>
+                                <div className="bg-amber-50 p-6 rounded-[2rem] border border-stone-200 flex flex-col items-center justify-center text-center group hover:scale-105 transition-transform">
+                                    <div className="text-3xl font-black text-amber-600">!</div>
+                                    <div className="text-xs font-black text-amber-900 uppercase">Topic Hub</div>
+                                </div>
+                            </div>
+
+                            <motion.div
+                                animate={{ y: [0, -10, 0] }}
+                                transition={{ repeat: Infinity, duration: 4 }}
+                                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-4 px-8 bg-stone-900 text-white rounded-full shadow-2xl border border-stone-700 font-bold tracking-tight text-center whitespace-nowrap"
+                            >
+                                <span className="text-amber-500 mr-2">Critical Insight:</span> "Problema Checkout"
+                            </motion.div>
+                        </div>
+
+                        <div>
+                            <SectionLabel text="Cross-Channel Insights" color="#F59E0B" bg="rgba(245, 158, 11, 0.05)" />
+                            <h2 className="text-4xl lg:text-5xl font-black text-stone-900 mb-8 tracking-tight">
+                                Quando i tuoi strumenti <br /><span className="text-gradient">parlano tra loro</span>
+                            </h2>
+                            <p className="text-xl text-stone-600 mb-12 leading-relaxed">
+                                Il vero differenziatore: colleghiamo i puntini per te. Se un tema emerge ovunque, te lo segnaliamo con priorità alta e azioni concrete suggerite in tempo reale.
+                            </p>
+
+                            <div className="space-y-6">
+                                {[
+                                    { t: 'Priorità unificata', d: 'Più un tema appare su diversi canali, più il sistema lo spinge in alto.' },
+                                    { t: 'Azioni suggerite', d: 'Ti suggeriamo FAQ, script per post social o nuovi prompt visibility.' },
+                                ].map((item, i) => (
+                                    <div key={i} className="flex gap-4 p-6 bg-stone-50 rounded-2xl border border-stone-100 cursor-default hover:bg-amber-50 hover:border-amber-200 transition-colors">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><Icons.Zap size={18} /></div>
+                                        <div>
+                                            <div className="font-bold text-stone-900 mb-1">{item.t}</div>
+                                            <div className="text-sm text-stone-500">{item.d}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-amber-50/20 to-transparent -z-10" />
+            </section>
+
+            {/* 5. HOW IT WORKS */}
+            <section id="how-it-works" className="py-32 bg-[#FAFAF8]">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="text-center max-w-3xl mx-auto mb-20">
+                        <SectionLabel text="Workflow" />
+                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight mb-4">Inizia in 3 passi</h2>
+                        <p className="text-stone-500 text-lg">La potenza dell'AI al servizio del tuo business, senza complessità.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+                        {/* Connecting Line (Desktop) */}
+                        <div className="hidden md:block absolute top-12 left-20 right-20 h-0.5 bg-dashed bg-stone-200 -z-0"
+                            style={{ backgroundImage: 'linear-gradient(to right, #e5e5e5 50%, transparent 50%)', backgroundSize: '10px 1px' }} />
+
+                        {[
+                            { step: '①', title: 'Configura', desc: 'Scegli un template o crea da zero il tuo osservatorio in 5 minuti.' },
+                            { step: '②', title: 'Raccogli', desc: 'Condividi il link o incorpora il widget. L\'AI lavora h24 per te.' },
+                            { step: '③', title: 'Agisci', desc: 'Ricevi insight automatici e azioni suggerite pronte da approvare.' },
+                        ].map((s, i) => (
+                            <div key={i} className="flex flex-col items-center text-center relative z-10">
+                                <div className="w-16 h-16 rounded-3xl bg-white shadow-xl flex items-center justify-center text-2xl font-black text-amber-500 mb-8 border border-stone-100 group hover:scale-110 transition-transform">
+                                    {s.step}
+                                </div>
+                                <h3 className="text-xl font-bold text-stone-900 mb-3">{s.title}</h3>
+                                <p className="text-stone-500 leading-relaxed text-sm max-w-[240px]">{s.desc}</p>
                             </div>
                         ))}
                     </div>
                 </div>
-
             </section>
 
-            {/* --- USE CASES (White) --- */}
-            <section id="use-cases" className="relative z-20 bg-white py-24 lg:py-32">
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="flex flex-col md:flex-row gap-16 items-start">
+            {/* 7. COMPETITOR COMPARISON */}
+            <section className="py-32 bg-white">
+                <div className="container mx-auto px-6 max-w-5xl">
+                    <div className="text-center mb-16">
+                        <SectionLabel text="Confronto" />
+                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight">Perché scegliere noi?</h2>
+                    </div>
 
-                        <div className="md:w-1/3 sticky top-32">
-                            <SectionLabel text="Casi d'uso" />
-                            <h2 className="text-4xl font-bold text-stone-900 mb-6 tracking-tight">Per chi è Business Tuner?</h2>
-                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                La flessibilità dell'intervistatore AI si adatta a ogni esigenza di ricerca qualitativa, dal prodotto alle risorse umane.
-                            </p>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b-2 border-stone-100">
+                                    <th className="py-6 px-4 text-stone-400 font-bold uppercase text-[10px] tracking-widest">Feature</th>
+                                    <th className="py-6 px-4 bg-amber-50/50 rounded-t-2xl font-black text-amber-600 text-center">Business Tuner</th>
+                                    <th className="py-6 px-4 text-stone-400 text-center font-bold">Competitor</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stone-50">
+                                {[
+                                    { f: 'Interview AI Qualitativo', tuner: true, other: 'Parziale' },
+                                    { f: 'Chatbot con Gap Detection', tuner: true, other: false },
+                                    { f: 'Visibility Tracker (AI + Web)', tuner: true, other: false },
+                                    { f: 'Cross-channel Insights', tuner: true, other: false },
+                                    { f: 'Setup < 5 Minuti', tuner: true, other: true },
+                                    { f: 'Supporto Italiano Nativo', tuner: true, other: 'Limited' },
+                                ].map((row, i) => (
+                                    <tr key={i} className="group hover:bg-stone-50 transition-colors">
+                                        <td className="py-5 px-4 font-bold text-stone-700 text-sm">{row.f}</td>
+                                        <td className="py-5 px-4 bg-amber-50/50 text-center">
+                                            {typeof row.tuner === 'boolean' ? (row.tuner ? <Icons.Check className="mx-auto text-amber-500" size={20} /> : <Icons.X className="mx-auto text-stone-300" size={20} />) : <span className="text-amber-600 font-bold text-sm">{row.tuner}</span>}
+                                        </td>
+                                        <td className="py-5 px-4 text-center">
+                                            {typeof row.other === 'boolean' ? (row.other ? <Icons.Check className="mx-auto text-stone-400" size={20} /> : <Icons.X className="mx-auto text-stone-300" size={20} />) : <span className="text-stone-400 font-bold text-sm">{row.other}</span>}
+                                        </td>
+                                    </tr>
+                                ))}
+                                <tr>
+                                    <td className="py-8 px-4 font-black text-stone-900">Prezzo</td>
+                                    <td className="py-8 px-4 bg-amber-50/50 rounded-b-2xl text-center">
+                                        <div className="text-2xl font-black text-amber-600">da €49</div>
+                                        <div className="text-[10px] text-stone-400 font-bold uppercase tracking-tight">Tutto incluso</div>
+                                    </td>
+                                    <td className="py-8 px-4 text-center">
+                                        <div className="text-2xl font-black text-stone-400">€300+</div>
+                                        <div className="text-[10px] text-stone-400 font-bold uppercase tracking-tight">Stack separato</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            {/* 6. PRICING SECTION */}
+            <section id="pricing" className="py-32 bg-stone-50">
+                <div className="container mx-auto px-6 max-w-7xl">
+                    <div className="text-center max-w-3xl mx-auto mb-16">
+                        <SectionLabel text="Prezzi" />
+                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight mb-6">Piani semplici, valore reale</h2>
+
+                        {/* Toggle */}
+                        <div className="flex items-center justify-center gap-4 bg-white p-1 rounded-full border border-stone-200 w-fit mx-auto shadow-sm">
+                            <button
+                                onClick={() => setIsYearly(false)}
+                                className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${!isYearly ? 'bg-amber-500 text-white shadow-md' : 'text-stone-400'}`}
+                            >
+                                Mensile
+                            </button>
+                            <button
+                                onClick={() => setIsYearly(true)}
+                                className={`px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${isYearly ? 'bg-amber-500 text-white shadow-md' : 'text-stone-400'}`}
+                            >
+                                Annuale <span className="text-[10px] ml-1 bg-white/20 px-1.5 py-0.5 rounded">-25%</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+                        {/* Plan: FREE */}
+                        <div className="bg-white rounded-3xl p-8 border border-stone-100 flex flex-col hover:shadow-xl transition-shadow">
+                            <h3 className="text-xl font-bold mb-1">Free</h3>
+                            <div className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">Per iniziare</div>
+                            <div className="mb-8"><span className="text-4xl font-black">€0</span><span className="text-stone-400 text-sm">/mese</span></div>
+                            <ul className="space-y-4 mb-10 flex-1">
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 50 interviste / mese</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1 Progetto</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Analytics base</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 opacity-30"><Icons.X size={16} /> Chatbot Intelligence</li>
+                            </ul>
                             <Link href="/register">
-                                <Button variant="secondary" className="border-stone-200">
-                                    Esplora tutti i casi <Icons.ArrowRight size={16} className="ml-2" />
-                                </Button>
+                                <Button fullWidth variant="secondary" className="border-stone-200">Per sempre gratis</Button>
                             </Link>
                         </div>
 
-                        <div className="md:w-2/3 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            {[
-                                { icon: Icons.Building, title: 'B2B & SaaS', desc: 'Indaga churn, valida feature e capisci i decision maker.' },
-                                { icon: Icons.Cart, title: 'E-commerce', desc: 'Feedback post-acquisto, test pricing e packaging.' },
-                                { icon: Icons.Users, title: 'HR & Interne', desc: 'Exit interview anonime, clima aziendale e feedback sui manager.' },
-                                { icon: Icons.Settings, title: 'Operations', desc: 'Qualifica fornitori, audit di sicurezza e incident reporting.' }
-                            ].map((uc, i) => (
-                                <div key={i} className="p-8 rounded-3xl bg-stone-50 border border-stone-100 hover:bg-amber-50/50 hover:border-amber-100 transition-colors duration-300">
-                                    <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-stone-900 mb-6">
-                                        <uc.icon size={24} />
-                                    </div>
-                                    <h3 className="text-xl font-bold text-stone-900 mb-3">{uc.title}</h3>
-                                    <p className="text-stone-600 text-sm leading-relaxed">{uc.desc}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <WaveSeparator color="#FFFFFF" height={80} />
-
-            {/* --- DASHBOARD & ANALYTICS PREVIEW (Amber-50) --- */}
-            <section className="relative z-20 bg-amber-50 py-24 lg:py-32 overflow-hidden">
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="text-center max-w-3xl mx-auto mb-20">
-                        <SectionLabel text="Potenza Lab" />
-                        <h2 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-6 tracking-tight">
-                            Una dashboard per <span className="text-amber-600">tutto il team</span>
-                        </h2>
-                        <p className="text-xl text-stone-600">
-                            Gestisci i tuoi bot, analizza i risultati in tempo reale e trasforma i dati in decisioni.
-                        </p>
-                    </div>
-
-                    <div className="space-y-32">
-                        {/* Dashboard Feature */}
-                        <div className="grid lg:grid-cols-2 gap-16 items-center">
-                            <div className="order-2 lg:order-1">
-                                <div className="bg-white rounded-3xl p-4 shadow-2xl border border-amber-100 transform -rotate-2">
-                                    <div className="bg-stone-50 rounded-2xl overflow-hidden border border-stone-100 aspect-[16/10] relative">
-                                        {/* Mockup Dashboard Content */}
-                                        <div className="p-6 bg-white border-b border-stone-100 flex items-center justify-between">
-                                            <div className="flex gap-4">
-                                                <div className="w-3 h-3 rounded-full bg-red-400" />
-                                                <div className="w-3 h-3 rounded-full bg-amber-400" />
-                                                <div className="w-3 h-3 rounded-full bg-green-400" />
-                                            </div>
-                                            <div className="h-6 w-40 bg-stone-100 rounded-full" />
-                                        </div>
-                                        <div className="p-8 grid grid-cols-2 gap-6">
-                                            <div className="space-y-6">
-                                                <div className="h-32 bg-amber-50 rounded-2xl border border-amber-100 p-6 flex flex-col justify-end">
-                                                    <div className="text-amber-800 font-bold text-2xl">42</div>
-                                                    <div className="text-amber-600 text-sm">Interviste Attive</div>
-                                                </div>
-                                                <div className="h-32 bg-stone-100 rounded-2xl p-6" />
-                                            </div>
-                                            <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
-                                                <div className="h-4 w-1/2 bg-stone-100 rounded mb-4" />
-                                                <div className="space-y-3">
-                                                    {[1, 2, 3, 4].map(i => (
-                                                        <div key={i} className="h-3 bg-stone-50 rounded" />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="order-1 lg:order-2">
-                                <h3 className="text-3xl font-bold text-stone-900 mb-6">Centralizza la tua ricerca</h3>
-                                <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                    Crea progetti dedicati per diversi reparti o obiettivi. Invita i colleghi, monitora i progressi e gestisci la libreria dei tuoi bot da un unico posto.
-                                </p>
-                                <ul className="space-y-4">
-                                    {[
-                                        'Gestione progetti granulare',
-                                        'Accesso multi-utente',
-                                        'Template personalizzati',
-                                        'Webhook & Integrazioni'
-                                    ].map((item, i) => (
-                                        <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
-                                            <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center">
-                                                <Icons.Check size={14} />
-                                            </div>
-                                            {item}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-
-                        {/* Analytics Feature */}
-                        <div className="grid lg:grid-cols-2 gap-16 items-center">
-                            <div>
-                                <h3 className="text-3xl font-bold text-stone-900 mb-6">Risultati, non dati grezzi</h3>
-                                <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                    Non perdere tempo a leggere centinaia di trascrizioni. La nostra AI identifica automaticamente i temi ricorrenti e trasforma il rumore in insight azionabili.
-                                </p>
-                                <ul className="space-y-4">
-                                    {[
-                                        { t: 'Temi ricorrenti', d: 'Identifica pattern e raggruppa le risposte per tema.' },
-                                        { t: 'Citazioni chiave', d: 'Le frasi più significative, già estratte e categorizzate.' },
-                                        { t: 'Sentiment analysis', d: 'Capisci l\'umore generale e le aree critiche.' },
-                                        { t: 'Export flessibile', d: 'CSV per i numeri, report PDF per la presentazione.' }
-                                    ].map((item, i) => (
-                                        <li key={i} className="flex items-start gap-3 text-stone-700">
-                                            <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                                                <Icons.Check size={14} />
-                                            </div>
-                                            <div>
-                                                <div className="font-bold">{item.t}</div>
-                                                <div className="text-sm text-stone-500">{item.d}</div>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div>
-                                <div className="bg-white rounded-3xl p-4 shadow-2xl border border-amber-100 transform rotate-2">
-                                    <div className="bg-stone-50 rounded-2xl overflow-hidden border border-stone-100 p-8 aspect-[16/10] relative">
-                                        <div className="flex justify-between items-end h-full gap-4">
-                                            {[40, 70, 45, 90, 65, 80, 55].map((h, i) => (
-                                                <div key={i} className="w-full bg-amber-200 rounded-t-lg transition-all duration-1000" style={{ height: `${h}%` }} />
-                                            ))}
-                                        </div>
-                                        <div className="absolute top-8 left-8 right-8">
-                                            <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white">
-                                                    <Icons.Zap size={20} />
-                                                </div>
-                                                <div className="font-bold text-stone-800">Insight Extraction</div>
-                                            </div>
-                                            <div className="bg-white p-4 rounded-xl shadow-sm border border-stone-100">
-                                                <div className="text-xs text-amber-600 font-black uppercase mb-1">Punto Critico</div>
-                                                <div className="text-sm text-stone-800 italic">"Il processo di checkout richiede troppi passaggi inutili."</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* --- NEW FEATURE SPOTLIGHT: RECRUITING & BRANDING (White) --- */}
-            <section className="relative z-20 bg-white py-24 lg:py-32 overflow-hidden">
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="grid lg:grid-cols-2 gap-20 items-center mb-32">
-                        {/* Recruitment Mode */}
-                        <div className="order-2 lg:order-1 relative">
-                            <div className="absolute inset-0 bg-blue-500/5 rounded-[3rem] transform -rotate-3 scale-105" />
-                            <div className="bg-white border border-blue-100 rounded-[2.5rem] p-8 shadow-2xl relative">
-                                {/* Mock Profile Card */}
-                                <div className="flex items-start gap-4 border-b border-stone-100 pb-6 mb-6">
-                                    <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center text-2xl">👤</div>
-                                    <div>
-                                        <div className="font-bold text-lg text-stone-900">Marco Rossi</div>
-                                        <div className="text-sm text-stone-500">marco.rossi@example.com</div>
-                                        <div className="flex gap-2 mt-2">
-                                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded">Culture Fit: 9/10</span>
-                                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded">Senior</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="space-y-4">
-                                    <div>
-                                        <div className="text-xs font-bold text-stone-400 uppercase mb-1">Hard Skills Rilevate</div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {['React', 'Node.js', 'System Design', 'CI/CD'].map((s, i) => (
-                                                <span key={i} className="px-2 py-1 bg-stone-50 border border-stone-100 text-stone-600 text-xs rounded-md">{s}</span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs font-bold text-stone-400 uppercase mb-1">Recruiter Notes (AI)</div>
-                                        <p className="text-sm text-stone-600 leading-relaxed bg-blue-50 p-3 rounded-lg border border-blue-100 italic">
-                                            "Marco ha dimostrato una profonda conoscenza dell'architettura a microservizi. Ottima comunicazione, anche se potrebbe migliorare nella gestione dei tempi."
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="order-1 lg:order-2">
-                            <SectionLabel text="Novità Pro" color="#2563EB" bg="#EFF6FF" />
-                            <h3 className="text-4xl font-bold text-stone-900 mb-6">Colloqui automatici,<br />profili pronti.</h3>
-                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                Attiva la <strong>Recruitment Mode</strong> e lascia che l'AI conduca il primo colloquio conoscitivo per te.
-                            </p>
-                            <ul className="space-y-4">
-                                {[
-                                    'Intervista tecnica o attitudinale',
-                                    'Raccolta automatica dati contatto',
-                                    'Estrazione Skills & Culture Fit',
-                                    'Ranking automatico dei candidati'
-                                ].map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
-                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                                            <Icons.Check size={14} />
-                                        </div>
-                                        {item}
-                                    </li>
-                                ))}
+                        {/* Plan: STARTER */}
+                        <div className="bg-white rounded-3xl p-8 border border-stone-100 flex flex-col hover:shadow-xl transition-shadow">
+                            <h3 className="text-xl font-bold mb-1">Starter</h3>
+                            <div className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">Per professionisti</div>
+                            <div className="mb-8"><span className="text-4xl font-black">€{isYearly ? 49 : 69}</span><span className="text-stone-400 text-sm">/mese</span></div>
+                            <ul className="space-y-4 mb-10 flex-1">
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 300 interviste / mese</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 5 Progetti</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1 Chatbot Intelligence</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Custom Logo</li>
                             </ul>
+                            <Link href="/register?plan=STARTER">
+                                <Button fullWidth variant="secondary" className="bg-stone-50 border-stone-200 text-stone-900">Prova 14gg gratis</Button>
+                            </Link>
                         </div>
-                    </div>
 
-                    <div className="grid lg:grid-cols-2 gap-20 items-center">
-                        {/* Branding */}
-                        <div>
-                            <SectionLabel text="Business Identity" color="#D97706" bg="#FFFBEB" />
-                            <h3 className="text-4xl font-bold text-stone-900 mb-6">Il tuo Brand,<br />la tua esperienza.</h3>
-                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                L'intervistatore è tuo, e deve sembrarlo. Personalizza ogni dettaglio per offrire un'esperienza coerente con la tua azienda.
-                            </p>
-                            <ul className="space-y-4">
-                                {[
-                                    'Landing Page su misura (Logo, Video, Testi)',
-                                    'Dominio personalizzato (es. interview.tuaazienda.com)',
-                                    'Colori e Tone of Voice aziendale',
-                                    'Rimozione branding "Business Tuner"'
-                                ].map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
-                                        <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
-                                            <Icons.Check size={14} />
-                                        </div>
-                                        {item}
-                                    </li>
-                                ))}
+                        {/* Plan: PRO (Highlighted) */}
+                        <div className="bg-white rounded-3xl p-8 border-2 border-amber-500 flex flex-col shadow-2xl relative lg:scale-105 z-10 transform translate-y--4">
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full">Popolare</div>
+                            <h3 className="text-xl font-bold mb-1">Pro</h3>
+                            <div className="text-xs text-amber-500 font-black uppercase tracking-widest mb-6">Per PMI e agenzie</div>
+                            <div className="mb-8"><span className="text-4xl font-black">€{isYearly ? 149 : 199}</span><span className="text-stone-400 text-sm">/mese</span></div>
+                            <ul className="space-y-4 mb-10 flex-1">
+                                <li className="text-sm font-black text-stone-900 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1.000 interviste / mese</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 15 Progetti</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 3 Bot (lacune & FAQ)</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 text-amber-600 font-bold"><Icons.Check className="text-amber-500" size={16} /> Visibility Tracker</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 text-amber-600 font-bold"><Icons.Check className="text-amber-500" size={16} /> Insight Hub (Cross)</li>
                             </ul>
+                            <Link href="/register?plan=PRO">
+                                <Button fullWidth withShimmer>Prova 14gg gratis</Button>
+                            </Link>
                         </div>
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-gradient-to-tr from-amber-500 to-purple-600 rounded-[2rem] transform rotate-2 blur opacity-20" />
-                            <div className="bg-stone-900 rounded-[2rem] p-8 shadow-2xl relative border border-stone-800 text-white overflow-hidden">
-                                {/* Mock Branding UI */}
-                                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-stone-800 to-transparent pointer-events-none" />
-                                <div className="text-center mt-8 mb-8">
-                                    <div className="w-16 h-16 bg-white rounded-xl mx-auto mb-4 flex items-center justify-center text-stone-900 font-bold text-2xl shadow-lg shadow-white/20">A</div>
-                                    <h4 className="text-2xl font-bold">Acme Corp Careers</h4>
-                                    <p className="text-stone-400 text-sm">Tech Lead Interview</p>
-                                </div>
-                                <div className="bg-stone-800/50 backdrop-blur rounded-xl p-4 border border-stone-700">
-                                    <div className="flex gap-2 mb-2">
-                                        <div className="w-3 h-3 rounded-full bg-red-500" />
-                                        <div className="w-3 h-3 rounded-full bg-amber-500" />
-                                        <div className="w-3 h-3 rounded-full bg-green-500" />
-                                    </div>
-                                    <div className="h-2 bg-stone-700 rounded w-1/3 mb-2" />
-                                    <div className="h-2 bg-stone-700 rounded w-1/2" />
-                                </div>
-                            </div>
+
+                        {/* Plan: BUSINESS */}
+                        <div className="bg-stone-900 rounded-3xl p-8 border border-stone-800 flex flex-col text-white">
+                            <h3 className="text-xl font-bold mb-1">Business</h3>
+                            <div className="text-xs text-stone-500 font-bold uppercase tracking-widest mb-6">Per grandi aziende</div>
+                            <div className="mb-8"><span className="text-4xl font-black">€{isYearly ? 299 : 399}</span><span className="text-stone-500 text-sm">/mese</span></div>
+                            <ul className="space-y-4 mb-10 flex-1">
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 3.000+ interviste</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Illimitati Progetti</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Visibility Giornaliera</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Automazioni complete</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> White Label & API</li>
+                            </ul>
+                            <Link href="/contact">
+                                <Button fullWidth variant="secondary" className="bg-white text-stone-900 border-transparent hover:bg-stone-100">Contattaci</Button>
+                            </Link>
                         </div>
                     </div>
                 </div>
             </section>
-            <section className="relative z-20 bg-white py-24 lg:py-32">
+
+            {/* 8. SOCIAL PROOF */}
+            <section className="py-32 bg-white">
                 <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="grid md:grid-cols-2 gap-16">
-                        {/* Per chi è */}
-                        <div className="space-y-12">
-                            <div>
-                                <h2 className="text-4xl font-bold text-stone-900 mb-8 tracking-tight">Perfetto quando...</h2>
-                                <div className="space-y-8">
-                                    {[
-                                        { title: 'Hai bisogno di capire il "perché"', desc: 'I numeri dicono cosa succede, non perché. Business Tuner raccoglie le motivazioni, le frustrazioni e i suggerimenti.' },
-                                        { title: 'I form non bastano più', desc: 'Le risposte a crocette non ti danno abbastanza profondità. Ma non hai budget per interviste uno-a-uno.' },
-                                        { title: 'Vuoi scalare senza perdere qualità', desc: 'Devi parlare con 50, 100 o 500 persone. Impossibile farlo manualmente, deprimente farlo con un form standard.' },
-                                        { title: 'Il tempo è poco', desc: 'Lanci un\'intervista in 10 minuti. I risultati arrivano in giorni, non settimane.' }
-                                    ].map((item, i) => (
-                                        <div key={i}>
-                                            <h4 className="text-xl font-bold text-stone-900 mb-2">{item.title}</h4>
-                                            <p className="text-stone-600 leading-relaxed text-lg">{item.desc}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Cosa non è */}
-                        <div className="bg-stone-50 rounded-[3rem] p-12 lg:p-16 border border-stone-100">
-                            <h2 className="text-4xl font-bold text-stone-900 mb-8 tracking-tight">Trasparenza prima di tutto</h2>
-                            <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                Business Tuner è uno strumento potente, ma non sostituisce tutto. Ecco cosa <strong>non</strong> può fare:
-                            </p>
-                            <div className="space-y-8">
-                                {[
-                                    { title: 'Non sostituisce interviste professionali', desc: 'Per ricerche che richiedono rapport umano, sensibilità culturale o approfondimenti etnografici complessi, serve un ricercatore qualificato.' },
-                                    { title: 'Non produce campioni statistici', desc: 'I risultati sono qualitativi. Se cerchi significatività statistica decimale, usa strumenti quantitativi.' },
-                                    { title: 'Non legge la mente', desc: 'L\'AI fa domande intelligenti, ma la qualità degli insight dipende da come progetti l\'intervista e da chi la riceve.' }
-                                ].map((item, i) => (
-                                    <div key={i} className="flex gap-4">
-                                        <div className="mt-1"><Icons.X size={20} className="text-red-500" /></div>
-                                        <div>
-                                            <h4 className="text-lg font-bold text-stone-900 mb-1">{item.title}</h4>
-                                            <p className="text-stone-600 text-sm leading-relaxed">{item.desc}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* --- FAQ SECTION (Amber-50) --- */}
-            <section className="relative z-20 bg-amber-50 py-24 lg:py-32">
-                <div className="container mx-auto px-6 max-w-4xl">
-                    <title>Business Tuner - Analytics ed Insights qualitativi</title>
-                    <meta name="description" content="La piattaforma AI per interviste qualitative automatizzate" />
-                    <div className="text-center mb-16">
-                        <SectionLabel text="Domande Frequenti" />
-                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight">Hai dubbi? Abbiamo risposte.</h2>
+                    <div className="text-center mb-20">
+                        <SectionLabel text="Testimonianze" />
+                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight">PMI italiane che ascoltano meglio</h2>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {[
-                            { q: "Cos'è esattamente il feedback conversazionale?", a: "È un approccio ibrido che usa l'AI per condurre interviste strutturate ma flessibili. L'AI capisce la risposta dell'utente e, se necessario, pone domande di approfondimento per chiarire i concetti." },
-                            { q: "Qual è la differenza rispetto a un Typeform o Google Form?", a: "In un form le domande sono fisse. Con Business Tuner, se un utente dice 'Il prodotto è difficile da usare', l'AI chiederà 'In quale parte specifica hai trovato difficoltà?'. Questo permette di raccogliere dettagli che andrebbero persi." },
-                            { q: "Posso esportare i dati?", a: "Certamente. Puoi esportare le trascrizioni complete, i temi estratti in CSV o generare un report PDF pronto da presentare agli stakeholder." },
-                            { q: "L'AI è sicura e rispetta la privacy?", a: "Sì. Implementiamo livelli di anonimizzazione configurabili e i dati vengono utilizzati esclusivamente per generare i tuoi report. Non vendiamo dati a terzi." },
-                            { q: "Quanto tempo serve per creare un bot?", a: "Meno di 10 minuti. Puoi descrivere il tuo obiettivo in linguaggio naturale e l'AI genererà per te l'intero flusso di domande e argomenti." },
-                            { q: "Come faccio a fidarmi delle risposte?", a: "La qualità degli insight dipende da tre fattori: come progetti l'intervista, chi la riceve, e come la presenti. Ti forniamo template collaudati e strumenti per calibrare tono e domande, ma come ogni ricerca qualitativa, il contesto è fondamentale." },
-                            { q: "È statisticamente significativo?", a: "No, e non deve esserlo. Business Tuner raccoglie insight qualitativi: il 'perché', non il 'quanto'. Se ti serve sapere che il 73% dei clienti preferisce un'opzione, usa un survey quantitativo. Se vuoi capire perché lo preferiscono, usa Business Tuner." },
-                            { q: "L'AI può davvero capire le risposte?", a: "L'AI è molto brava a identificare pattern, estrarre temi ricorrenti e riconoscere sentiment. Per sfumature culturali o emozioni complesse, puoi sempre leggere le trascrizioni originali e complete fornite nei report." }
+                            { quote: "Abbiamo scoperto perché il 30% dei clienti ci lasciava. Informazioni che non avremmo mai ottenuto con un survey.", author: "Marco R.", role: "CEO SaaS B2B", tool: "Interview AI" },
+                            { quote: "Il chatbot ha ridotto le richieste di supporto del 40%. E ora sappiamo esattamente cosa aggiungere alla knowledge base.", author: "Giulia M.", role: "Customer Success Manager", tool: "Chatbot Intelligence" },
+                            { quote: "Non sapevamo che ChatGPT ci menzionava male. Abbiamo corretto i contenuti e ora siamo in prima posizione.", author: "Andrea B.", role: "Marketing Manager", tool: "Visibility Tracker" },
+                            { quote: "Il vero valore è vedere tutto insieme. Un tema che emerge ovunque è impossibile da ignorare e richiede azione rapida.", author: "Laura F.", role: "Head of Product", tool: "Cross-Channel Insights" },
+                        ].map((t, i) => (
+                            <div key={i} className="p-10 rounded-[2.5rem] bg-stone-50 border border-stone-100 relative group hover:-translate-y-1 transition-all">
+                                <Icons.Quote className="absolute top-6 right-8 text-stone-100 group-hover:text-amber-100 transition-colors" size={60} />
+                                <div className="text-xs font-black text-amber-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                    <Icons.Check size={14} /> {t.tool}
+                                </div>
+                                <p className="text-xl text-stone-700 leading-relaxed mb-8 italic">"{t.quote}"</p>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center font-bold text-amber-600 uppercase">
+                                        {t.author[0]}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-stone-900">{t.author}</div>
+                                        <div className="text-xs text-stone-400 font-medium">{t.role}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-20 pt-20 border-t border-stone-100 grid grid-cols-2 md:grid-cols-4 gap-8 text-center opacity-40 grayscale hover:grayscale-0 transition-all duration-700 cursor-default">
+                        <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 1</div>
+                        <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 2</div>
+                        <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 3</div>
+                        <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 4</div>
+                    </div>
+                </div>
+            </section>
+
+            {/* 9. FAQ SECTION */}
+            <section className="py-32 bg-[#FAFAF8]">
+                <div className="container mx-auto px-6 max-w-4xl">
+                    <div className="text-center mb-16">
+                        <SectionLabel text="FAQ" />
+                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight">Dubbi? Risposte.</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        {[
+                            { q: "Quanto tempo serve per iniziare?", a: "5 minuti. Scegli un template, personalizzalo e condividi il link. L'AI fa il resto." },
+                            { q: "Devo avere competenze tecniche?", a: "No. L'interfaccia è pensata per imprenditori e manager, non per sviluppatori. Tutto è drag-and-drop o prompt-based." },
+                            { q: "I dati sono sicuri?", a: "Assolutamente. Server EU (Germania/Irlanda), GDPR compliant, crittografia end-to-end. I tuoi dati non vengono mai usati per addestrare modelli AI pubblici." },
+                            { q: "Cos'è l'Insight Hub?", a: "È la dashboard che unisce i dati di tutti e tre gli strumenti. Se un tema emerge nelle interviste, nel chatbot E nella visibility, te lo segnaliamo con priorità alta." },
+                            { q: "Posso esportare i dati?", a: "Sì. Trascrizioni, insight in CSV o report PDF completi pronti da condividere." },
                         ].map((faq, i) => (
-                            <details key={i} className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm">
+                            <details key={i} className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                                 <summary className="flex items-center justify-between p-6 cursor-pointer list-none">
                                     <h4 className="font-bold text-stone-900 pr-4">{faq.q}</h4>
-                                    <Icons.ArrowRight size={20} className="text-amber-500 transform group-open:rotate-90 transition-transform duration-300" />
+                                    <div className="text-amber-500 transition-transform duration-300 group-open:rotate-45">
+                                        <Icons.Plus size={20} />
+                                    </div>
                                 </summary>
-                                <div className="px-6 pb-6 text-stone-600 leading-relaxed border-t border-stone-50 pt-4">
+                                <div className="px-6 pb-6 text-stone-600 leading-relaxed border-t border-stone-50 pt-4 text-sm">
                                     {faq.a}
                                 </div>
                             </details>
@@ -823,138 +838,32 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* --- PRICING (Bold Amber) --- */}
-            <section id="pricing" className="relative z-20 bg-[#F59E0B] py-24 lg:py-32 text-white overflow-hidden">
-                {/* Background Pattern */}
-                <div className="absolute inset-0 opacity-10"
-                    style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '40px 40px' }}
-                />
-
-                <div className="container mx-auto px-6 max-w-7xl relative z-10">
-                    <div className="text-center max-w-3xl mx-auto mb-12">
-                        <span className="inline-block text-xs font-bold uppercase tracking-widest py-2 px-4 rounded-full mb-6 bg-white/20 text-white">
-                            Prezzi Semplici
-                        </span>
-                        <h2 className="text-4xl lg:text-5xl font-bold mb-6 tracking-tight">
-                            Investi nella qualità dei dati
-                        </h2>
-                        <p className="text-xl text-amber-100 mb-10">
-                            Piani trasparenti. Scala quando vuoi. Disdici quando vuoi.
-                        </p>
-
-                        {/* Billing Toggle */}
-                        <div className="flex items-center justify-center gap-4 mb-8">
-                            <span className={`text-sm font-bold ${isYearly ? 'text-amber-200' : 'text-white'}`}>Mensile</span>
-                            <button
-                                onClick={() => setIsYearly(!isYearly)}
-                                className="w-16 h-8 bg-white/20 rounded-full relative p-1 transition-all"
-                            >
-                                <div className={`w-6 h-6 bg-white rounded-full shadow-md transform transition-all ${isYearly ? 'translate-x-8' : 'translate-x-0'}`} />
-                            </button>
-                            <span className={`text-sm font-bold ${isYearly ? 'text-white' : 'text-amber-200'}`}>Annuale <span className="text-[10px] bg-white text-amber-600 px-2 py-0.5 rounded-full ml-1">-20%</span></span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center max-w-6xl mx-auto">
-                        {/* Starter */}
-                        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
-                            <h3 className="text-xl font-bold mb-2">{PLANS[PlanType.STARTER].name}</h3>
-                            <p className="text-amber-100 text-sm mb-6">Per professionisti e freelance</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? PLANS[PlanType.STARTER].priceYearly : PLANS[PlanType.STARTER].price}</span><span className="text-amber-200">/mese</span></div>
-                            <ul className="space-y-4 mb-8 text-sm">
-                                {PLANS[PlanType.STARTER].marketingFeatures.map((f, i) => (
-                                    <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
-                                ))}
-                            </ul>
-                            <Link href={session ? '/dashboard/billing/plans' : `/register?plan=STARTER${isYearly ? '&billing=yearly' : ''}`}>
-                                <Button fullWidth variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-transparent">Prova 14 giorni gratis</Button>
-                            </Link>
-                        </div>
-
-                        {/* Pro (Highlighted) */}
-                        <div className="bg-white rounded-[2rem] p-8 shadow-2xl transform lg:scale-105 relative">
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-stone-900 text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-wider">
-                                Consigliato
-                            </div>
-                            <h3 className="text-xl font-bold text-stone-900 mb-2">{PLANS[PlanType.PRO].name}</h3>
-                            <p className="text-stone-500 text-sm mb-6">Per PMI e agenzie</p>
-                            <div className="mb-6"><span className="text-5xl font-bold text-stone-900">€{isYearly ? PLANS[PlanType.PRO].priceYearly : PLANS[PlanType.PRO].price}</span><span className="text-stone-500">/mese</span></div>
-                            <ul className="space-y-4 mb-8 text-sm text-stone-700">
-                                {PLANS[PlanType.PRO].marketingFeatures.map((f, i) => (
-                                    <li key={i} className="flex items-center gap-3"><span className="text-amber-500"><Icons.Check size={18} /></span> {f}</li>
-                                ))}
-                            </ul>
-                            <Link href={session ? '/dashboard/billing/plans' : `/register?plan=PRO${isYearly ? '&billing=yearly' : ''}`}>
-                                <Button fullWidth className="bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/30">Prova 14 giorni gratis</Button>
-                            </Link>
-                        </div>
-
-                        {/* Business */}
-                        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 text-white">
-                            <h3 className="text-xl font-bold mb-2">{PLANS[PlanType.BUSINESS].name}</h3>
-                            <p className="text-amber-100 text-sm mb-6">Per grandi aziende</p>
-                            <div className="mb-6"><span className="text-4xl font-bold">€{isYearly ? PLANS[PlanType.BUSINESS].priceYearly : PLANS[PlanType.BUSINESS].price}</span><span className="text-amber-200">/mese</span></div>
-                            <ul className="space-y-4 mb-8 text-sm">
-                                {PLANS[PlanType.BUSINESS].marketingFeatures.map((f, i) => (
-                                    <li key={i} className="flex items-center gap-3"><Icons.Check size={16} /> {f}</li>
-                                ))}
-                            </ul>
-                            <Link href={session ? '/dashboard/billing/plans' : '/register?plan=BUSINESS'}>
-                                <Button fullWidth variant="secondary" className="bg-white text-amber-600 border-transparent hover:bg-amber-50">Contattaci</Button>
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-
-            </section>
-
-            {/* --- TESTIMONIALS & FINAL CTA (White) --- */}
-            <section className="relative z-20 bg-white py-24 lg:py-32">
-                <div className="container mx-auto px-6 max-w-4xl text-center">
-
-                    {/* Testimonial */}
-                    <div className="mb-24">
-                        <div className="flex justify-center gap-1 mb-6 text-amber-400">
-                            {[0, 1, 2, 3, 4].map(i => <Icons.Star key={i} size={24} fill="currentColor" />)}
-                        </div>
-                        <blockquote className="text-2xl md:text-3xl font-medium text-stone-900 leading-normal mb-8">
-                            "Abbiamo raccolto più insight qualitativi in una settimana con Business Tuner che in sei mesi di survey tradizionali."
-                        </blockquote>
-                        <div className="flex items-center justify-center gap-4">
-                            <div className="w-12 h-12 bg-stone-200 rounded-full overflow-hidden">
-                                {/* Check if image exists or use initials */}
-                                <div className="w-full h-full flex items-center justify-center bg-stone-800 text-white font-bold">MR</div>
-                            </div>
-                            <div className="text-left">
-                                <div className="font-bold text-stone-900">Marco Rossi</div>
-                                <div className="text-sm text-stone-500">Head of Product, TechCorp</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* CTA */}
-                    <div className="bg-stone-900 rounded-[2.5rem] p-12 md:p-20 relative overflow-hidden text-center text-white">
-                        <div className="absolute inset-0 bg-gradient-to-br from-stone-800 to-black z-0" />
-                        <div className="absolute top-0 right-0 p-12 opacity-10">
-                            <Icons.Logo size={200} />
-                        </div>
-
-                        <div className="relative z-10 max-w-2xl mx-auto">
-                            <h2 className="text-4xl md:text-5xl font-bold mb-6">Pronto a sintonizzarti?</h2>
-                            <p className="text-lg text-stone-400 mb-10">
-                                Inizia la tua prova gratuita di 14 giorni. Nessuna carta di credito richiesta.
+            {/* 10. FINAL CTA */}
+            <section className="py-20 bg-white">
+                <div className="container mx-auto px-6 max-w-5xl">
+                    <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[3rem] p-12 lg:p-24 text-center text-white relative overflow-hidden shadow-3xl">
+                        <div className="relative z-10">
+                            <h2 className="text-4xl lg:text-5xl font-black mb-8 tracking-tight">Pronto ad ascoltare <br />il tuo mercato?</h2>
+                            <p className="text-xl text-amber-50 mb-12 max-w-2xl mx-auto">
+                                Inizia gratis oggi. 50 interviste incluse ogni mese.
+                                Nessun limite di tempo, nessuna carta richiesta.
                             </p>
-                            <Link href={session ? '/dashboard' : '/register'}>
-                                <Button size="lg" className="bg-white text-stone-900 hover:bg-stone-100 border-none px-10 py-6 text-lg h-auto">
-                                    {session ? 'Vai alla Dashboard' : 'Inizia ora'} <Icons.ArrowRight className="ml-2" />
-                                </Button>
-                            </Link>
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                                <Link href="/register">
+                                    <Button size="lg" className="bg-white text-stone-900 hover:bg-stone-50 border-none px-12 py-7 rounded-full text-lg h-auto shadow-xl">
+                                        Inizia gratis ora <Icons.ArrowRight className="ml-2" />
+                                    </Button>
+                                </Link>
+                                <Link href="/contact">
+                                    <button className="text-amber-50 font-bold hover:text-white transition-colors">Prenota una demo personalizzata</button>
+                                </Link>
+                            </div>
                         </div>
+                        <Icons.Logo className="absolute -bottom-20 -left-20 opacity-10" size={300} />
+                        <Icons.Logo className="absolute -top-20 -right-20 opacity-10" size={300} />
                     </div>
-
                 </div>
             </section>
-
-        </div >
+        </div>
     );
 }

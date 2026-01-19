@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { VisibilityEngine } from '@/lib/visibility/visibility-engine';
 import { getOrCreateSubscription } from '@/lib/usage';
-import { PLANS } from '@/config/plans';
+import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
 
 export async function POST(request: Request) {
     try {
@@ -30,7 +30,11 @@ export async function POST(request: Request) {
 
         // Check plan limits (max scans per month)
         const subscription = await getOrCreateSubscription(organizationId);
-        const plan = PLANS[subscription.tier];
+        if (!subscription) {
+            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
+        }
+        const planType = subscriptionTierToPlanType(subscription.tier);
+        const plan = PLANS[planType];
 
         const config = await prisma.visibilityConfig.findUnique({
             where: { organizationId },
@@ -41,12 +45,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        // Check monthly scan limit
-        if (config.organization.responsesUsedThisMonth >= plan.limits.maxVisibilityScans) { // Assuming reuse of this field or similar
-            // Note: maxVisibilityScans usually refers to full scans, responsesUsed refers to individual queries. 
-            // Let's assume we check against maxVisibilityScans for now. 
-            // Ideally we should track "scans ran this month".
-            // For now, let's proceed.
+        // Check weekly scan limit
+        // Note: For now we allow scans if visibilityScansPerWeek > 0
+        // A more robust implementation would track scans per week in the database
+        if (plan.limits.visibilityScansPerWeek === 0) {
+            return NextResponse.json(
+                { error: 'Visibility scans not available in your plan' },
+                { status: 403 }
+            );
         }
 
         // Run the scan

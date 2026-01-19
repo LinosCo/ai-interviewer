@@ -2,7 +2,8 @@ export enum PlanType {
     TRIAL = 'trial',
     STARTER = 'starter',
     PRO = 'pro',
-    BUSINESS = 'business'
+    BUSINESS = 'business',
+    PARTNER = 'partner'
 }
 
 export interface PlanFeatures {
@@ -98,13 +99,13 @@ export interface PlanConfig {
 export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.TRIAL]: {
         id: PlanType.TRIAL,
-        name: 'Trial (Partner)',
+        name: 'Free Trial',
         price: 0,
         priceYearly: 0,
 
-        responsesPerMonth: -1, // Illimitate per partner
-        activeInterviews: -1,  // Illimitate per partner
-        users: 1,              // Senza gestione altri utenti
+        responsesPerMonth: 300,
+        activeInterviews: 1,
+        users: 1,
 
         features: {
             aiGeneration: true,
@@ -112,14 +113,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedTemplates: true,
             manualEdit: true,
             knowledgeBase: true,
-            conditionalLogic: false,    // TODO: Not implemented
-            customTemplates: false,     // TODO: Not implemented
+            conditionalLogic: false,
+            customTemplates: false,
 
             watermark: false,
             customColor: true,
             customLogo: true,
-            customDomain: true,
-            whiteLabel: true,
+            customDomain: false,
+            whiteLabel: false,
 
             basicStats: true,
             transcripts: true,
@@ -128,15 +129,15 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             keyQuotes: true,
             trends: true,
             comparison: true,
-            segmentation: false,        // TODO: Not implemented
-            customDashboards: false,    // TODO: Not implemented
+            segmentation: false,
+            customDashboards: false,
 
             exportPdf: true,
             exportCsv: true,
             webhooks: true,
-            apiAccess: false,           // TODO: Not implemented
-            zapier: false,              // TODO: Not implemented
-            sso: false,                 // Gestione utenti disabilitato
+            apiAccess: false,
+            zapier: false,
+            sso: false,
 
             supportLevel: 'priority'
         },
@@ -148,23 +149,95 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             inactivityTimeoutMinutes: 60,
 
             maxQuestionsPerInterview: 20,
-            maxKnowledgeBaseChars: 500000,
-            maxKnowledgeBaseFiles: 20,
+            maxKnowledgeBaseChars: 100000,
+            maxKnowledgeBaseFiles: 10,
 
             simulationsPerDayPerBot: 50,
             aiRegenerationsPerDay: 100,
 
             maxParallelInterviews: 100,
             messageCooldownSeconds: 0.5,
-            monthlyTokenBudget: 50000,
-            maxActiveChatbots: -1
+            monthlyTokenBudget: 500000,
+            maxActiveChatbots: 1
         },
         marketingFeatures: [
-            'Partner Full Access',
-            'Illimitate interviste',
-            'Full AI Features',
-            'Solo uso personale',
-            'No multi-user admin'
+            '14 giorni di prova gratuita',
+            'Accesso a tutte le funzioni PRO',
+            'Supporto prioritario',
+        ],
+
+        stripePriceId: undefined,
+        stripePriceIdYearly: undefined
+    },
+
+    [PlanType.PARTNER]: {
+        id: PlanType.PARTNER,
+        name: 'Partner (Lifetime)',
+        price: 0,
+        priceYearly: 0,
+
+        responsesPerMonth: 1000, // Same as PRO
+        activeInterviews: 20,
+        users: 5,
+
+        features: {
+            aiGeneration: true,
+            basicTemplates: true,
+            advancedTemplates: true,
+            manualEdit: true,
+            knowledgeBase: true,
+            conditionalLogic: false,
+            customTemplates: false,
+
+            watermark: false,
+            customColor: true,
+            customLogo: true,
+            customDomain: false,
+            whiteLabel: false,
+
+            basicStats: true,
+            transcripts: true,
+            sentiment: true,
+            themeExtraction: true,
+            keyQuotes: true,
+            trends: true,
+            comparison: true,
+            segmentation: false,
+            customDashboards: false,
+
+            exportPdf: true,
+            exportCsv: true,
+            webhooks: true,
+            apiAccess: false,
+            zapier: false,
+            sso: false,
+
+            supportLevel: 'priority'
+        },
+
+        limits: {
+            maxExchangesPerInterview: 30,
+            maxTokensPerInterview: 100000,
+            maxCharsPerUserMessage: 5000,
+            inactivityTimeoutMinutes: 45,
+
+            maxQuestionsPerInterview: 20,
+            maxKnowledgeBaseChars: 100000,
+            maxKnowledgeBaseFiles: 10,
+
+            simulationsPerDayPerBot: 25,
+            aiRegenerationsPerDay: 50,
+
+            maxParallelInterviews: 50,
+            messageCooldownSeconds: 1,
+            monthlyTokenBudget: 1000000,
+            maxActiveChatbots: 3
+        },
+        marketingFeatures: [
+            'Piano Partner Gratuito',
+            'Tutte le funzioni PRO incluse',
+            'Gestione multi-utente (5)',
+            'Attivabile solo da amministratore'
         ],
 
         stripePriceId: undefined,
@@ -174,12 +247,12 @@ export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.STARTER]: {
         id: PlanType.STARTER,
         name: 'Starter',
-        price: 49,
-        priceYearly: 39,  // -20%
+        price: 69,
+        priceYearly: 55,  // ~20% discount
 
-        responsesPerMonth: 100,
-        activeInterviews: 3,
-        users: 1,
+        responsesPerMonth: 300,
+        activeInterviews: 5,
+        users: 2,
 
         features: {
             aiGeneration: true,
@@ -217,29 +290,29 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         },
 
         limits: {
-            maxExchangesPerInterview: 15,
-            maxTokensPerInterview: 50000,
-            maxCharsPerUserMessage: 2000,
+            maxExchangesPerInterview: 20,
+            maxTokensPerInterview: 60000,
+            maxCharsPerUserMessage: 3000,
             inactivityTimeoutMinutes: 30,
 
-            maxQuestionsPerInterview: 10,
+            maxQuestionsPerInterview: 12,
             maxKnowledgeBaseChars: 0,
             maxKnowledgeBaseFiles: 0,
 
-            simulationsPerDayPerBot: 5,
-            aiRegenerationsPerDay: 10,
+            simulationsPerDayPerBot: 10,
+            aiRegenerationsPerDay: 20,
 
-            maxParallelInterviews: 10,
+            maxParallelInterviews: 15,
             messageCooldownSeconds: 2,
             monthlyTokenBudget: 200000,
             maxActiveChatbots: 0
         },
         marketingFeatures: [
-            '3 interviste attive',
-            '100 risposte/mese',
+            '5 interviste attive',
+            '300 risposte/mese',
             'Analytics base',
             'Export PDF',
-            '1 utente incluso'
+            '2 utenti inclusi'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_STARTER,
@@ -249,11 +322,11 @@ export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.PRO]: {
         id: PlanType.PRO,
         name: 'Pro',
-        price: 149,
-        priceYearly: 119,  // -20%
+        price: 199,
+        priceYearly: 159,  // ~20% discount
 
-        responsesPerMonth: 300,
-        activeInterviews: 10,
+        responsesPerMonth: 1000,
+        activeInterviews: 20,
         users: 5,
 
         features: {
@@ -261,13 +334,13 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             basicTemplates: true,
             advancedTemplates: true,
             manualEdit: true,
-            knowledgeBase: true,        // ⭐ Da Pro (IMPLEMENTED)
-            conditionalLogic: false,    // TODO: Not implemented
-            customTemplates: false,     // TODO: Not implemented
+            knowledgeBase: true,
+            conditionalLogic: false,
+            customTemplates: false,
 
-            watermark: false,           // ⭐ Rimosso da Pro
+            watermark: false,
             customColor: true,
-            customLogo: true,           // ⭐ Da Pro
+            customLogo: true,
             customDomain: false,
             whiteLabel: false,
 
@@ -276,45 +349,46 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             sentiment: true,
             themeExtraction: true,
             keyQuotes: true,
-            trends: true,               // ⭐ Da Pro (IMPLEMENTED)
-            comparison: true,           // ⭐ Da Pro (Partial)
-            segmentation: false,        // TODO: Not implemented
-            customDashboards: false,    // TODO: Not implemented
+            trends: true,
+            comparison: true,
+            segmentation: false,
+            customDashboards: false,
 
             exportPdf: true,
-            exportCsv: true,            // ⭐ Da Pro
-            webhooks: true,             // ⭐ Da Pro (IMPLEMENTED)
-            apiAccess: false,           // TODO: Not implemented
-            zapier: false,              // TODO: Not implemented
-            sso: false,                 // TODO: Not implemented
+            exportCsv: true,
+            webhooks: true,
+            apiAccess: false,
+            zapier: false,
+            sso: false,
 
             supportLevel: 'priority'
         },
 
         limits: {
-            maxExchangesPerInterview: 20,
-            maxTokensPerInterview: 70000,
-            maxCharsPerUserMessage: 3000,
+            maxExchangesPerInterview: 30,
+            maxTokensPerInterview: 100000,
+            maxCharsPerUserMessage: 5000,
             inactivityTimeoutMinutes: 45,
 
-            maxQuestionsPerInterview: 15,
-            maxKnowledgeBaseChars: 50000,
-            maxKnowledgeBaseFiles: 3,
+            maxQuestionsPerInterview: 20,
+            maxKnowledgeBaseChars: 100000,
+            maxKnowledgeBaseFiles: 10,
 
-            simulationsPerDayPerBot: 10,
-            aiRegenerationsPerDay: 25,
+            simulationsPerDayPerBot: 25,
+            aiRegenerationsPerDay: 50,
 
-            maxParallelInterviews: 30,
+            maxParallelInterviews: 50,
             messageCooldownSeconds: 1,
             monthlyTokenBudget: 1000000,
-            maxActiveChatbots: 1
+            maxActiveChatbots: 3
         },
         marketingFeatures: [
-            '10 interviste attive',
-            '300 risposte/mese',
+            '20 interviste attive',
+            '1.000 risposte/mese',
+            'Fino a 3 Chatbot AI',
             'Data Collection Mode (Recruitment/Lead)',
             'Custom Branding & Logo',
-            'Knowledge Base',
+            'Knowledge Base & Knowledge Gaps',
             'AI Analysis Avanzata',
             'Export CSV + Webhook'
         ],
@@ -326,10 +400,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
     [PlanType.BUSINESS]: {
         id: PlanType.BUSINESS,
         name: 'Business',
-        price: 299,
-        priceYearly: 239,  // -20%
+        price: 399,
+        priceYearly: 319,  // ~20% discount
 
-        responsesPerMonth: 1000,
+        responsesPerMonth: 3000,
         activeInterviews: -1,  // Illimitate
         users: 15,
 
@@ -339,14 +413,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             advancedTemplates: true,
             manualEdit: true,
             knowledgeBase: true,
-            conditionalLogic: false,    // TODO: Not implemented
-            customTemplates: false,     // TODO: Not implemented
+            conditionalLogic: false,
+            customTemplates: false,
 
             watermark: false,
             customColor: true,
             customLogo: true,
-            customDomain: true,         // ⭐ Solo Business (IMPLEMENTED)
-            whiteLabel: true,           // ⭐ Solo Business (IMPLEMENTED)
+            customDomain: true,
+            whiteLabel: true,
 
             basicStats: true,
             transcripts: true,
@@ -355,45 +429,45 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             keyQuotes: true,
             trends: true,
             comparison: true,
-            segmentation: false,        // TODO: Not implemented
-            customDashboards: false,    // TODO: Not implemented
+            segmentation: false,
+            customDashboards: false,
 
             exportPdf: true,
             exportCsv: true,
             webhooks: true,
-            apiAccess: false,           // TODO: Not implemented
-            zapier: false,              // TODO: Not implemented
-            sso: false,                 // TODO: Not implemented
+            apiAccess: false,
+            zapier: false,
+            sso: false,
 
             supportLevel: 'dedicated'
         },
 
         limits: {
-            maxExchangesPerInterview: 25,
-            maxTokensPerInterview: 100000,
-            maxCharsPerUserMessage: 5000,
+            maxExchangesPerInterview: 40,
+            maxTokensPerInterview: 200000,
+            maxCharsPerUserMessage: 8000,
             inactivityTimeoutMinutes: 60,
 
-            maxQuestionsPerInterview: 20,
-            maxKnowledgeBaseChars: 200000,
-            maxKnowledgeBaseFiles: 10,
+            maxQuestionsPerInterview: 30,
+            maxKnowledgeBaseChars: 500000,
+            maxKnowledgeBaseFiles: 25,
 
-            simulationsPerDayPerBot: 20,
-            aiRegenerationsPerDay: 50,
+            simulationsPerDayPerBot: 50,
+            aiRegenerationsPerDay: 100,
 
-            maxParallelInterviews: 100,
+            maxParallelInterviews: 200,
             messageCooldownSeconds: 0.5,
             monthlyTokenBudget: 5000000,
             maxActiveChatbots: -1
         },
         marketingFeatures: [
             'Interviste illimitate',
-            '1.000+ risposte/mese',
-            'Data Collection illimitata',
+            '3.000 risposte/mese',
+            'Chatbot illimitati',
+            'Visibility AI & Web',
+            'Cross-Channel Insights',
             'Full White Label',
-            'Webhook integrations',
-            'Supporto prioritario',
-            '15 utenti inclusi'
+            'Success Manager dedicato'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_BUSINESS,

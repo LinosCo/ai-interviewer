@@ -59,3 +59,36 @@ export async function deleteBotAction(botId: string) {
         return { success: false, error: "Failed to delete bot" };
     }
 }
+
+export async function toggleBotStatusAction(botId: string) {
+    const session = await auth();
+    if (!session?.user?.email) {
+        return { success: false, error: "Unauthorized" };
+    }
+
+    try {
+        const bot = await prisma.bot.findUnique({
+            where: { id: botId },
+            select: { id: true, status: true, projectId: true }
+        });
+
+        if (!bot) return { success: false, error: "Bot not found" };
+
+        const newStatus = bot.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED';
+
+        await prisma.bot.update({
+            where: { id: botId },
+            data: { status: newStatus }
+        });
+
+        revalidatePath('/dashboard');
+        revalidatePath('/dashboard/bots');
+        revalidatePath('/dashboard/interviews');
+        revalidatePath(`/dashboard/bots/${botId}`);
+
+        return { success: true, status: newStatus };
+    } catch (error) {
+        console.error("Error toggling bot status:", error);
+        return { success: false, error: "Failed to toggle status" };
+    }
+}

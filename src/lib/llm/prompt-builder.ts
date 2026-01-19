@@ -333,6 +333,13 @@ The scheduled interview time is almost up, but we have some deeper follow-up que
 
             // ========== START_DEEP ==========
             // Transitioning to DEEP phase after SCAN is complete
+            if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
+                const lang = bot?.language || 'en';
+                return lang === 'it'
+                    ? "## FASE: OFFERTA APPROFONDIMENTO\nAbbiamo quasi esaurito il tempo del colloquio. Offri all'utente la possibilità di approfondire i temi trattati con qualche altra domanda, o di concludere qui.\n**ESEMPIO**: \"Abbiamo quasi finito il tempo a disposizione. Vorresti approfondire qualche argomento con qualche altra domanda, oppure preferisci concludere?\""
+                    : "## PHASE: DEEP OFFER\nWe're almost out of interview time. Offer the user the choice to explore topics in more depth with a few more questions, or to wrap up here.\n**EXAMPLE**: \"We're almost out of time. Would you like to explore some topics in more depth with a few more questions, or would you prefer to wrap up?\"";
+            }
+
             if (supervisorInsight.status === 'START_DEEP') {
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
@@ -344,36 +351,25 @@ Abbiamo completato la panoramica generale di tutti i temi.
 Ora approfondiamo alcuni punti interessanti, partendo da: "${focusTopic}".
 
 **ISTRUZIONI**:
-1. Fai una breve transizione naturale ("Grazie per questa panoramica. Ora vorrei approfondire alcuni punti...")
-2. Torna al tema "${focusTopic}" e fai una domanda specifica di approfondimento
-3. Cita un dettaglio specifico che l'utente ha menzionato prima su questo tema
-4. La domanda deve essere SPECIFICA, non generica
+1. Fai una breve transizione naturale riconoscendo che l'utente ha accettato di continuare.
+2. **IMPORTANTE**: Di' chiaramente che continuerai ad approfondire ma che l'utente può fermarti in qualsiasi momento se si stanca o se si annoia.
+3. Torna al tema "${focusTopic}" e fai una domanda specifica di approfondimento.
+4. Cita un dettaglio specifico che l'utente ha menzionato prima su questo tema.
 
 **ESEMPIO**:
-"Grazie per questi spunti! Tornando a ${focusTopic}, hai menzionato [dettaglio specifico]. Puoi dirmi di più su [aspetto specifico]?"
-
-**DIVIETI**:
-- NON chiedere "c'è altro da aggiungere?"
-- NON fare domande generiche
-- NON ripetere domande già fatte in SCAN
+"Ottimo! Continuo con qualche domanda di approfondimento allora. Dimmi pure se ti stanchi o se preferisci fermarti. Tornando a ${focusTopic}, hai menzionato [dettaglio]. Mi spieghi meglio...?"
 ` : `
 ## PHASE: START DEEP DIVE
 We have completed the general overview of all topics.
 Now we dive deeper into interesting points, starting with: "${focusTopic}".
 
 **INSTRUCTIONS**:
-1. Make a brief natural transition ("Thanks for this overview. Now I'd like to explore some points more deeply...")
-2. Return to "${focusTopic}" and ask a specific follow-up question
-3. Reference a specific detail the user mentioned before about this topic
-4. The question must be SPECIFIC, not generic
+1. Make a brief natural transition acknowledging the user's agreement to continue.
+2. **IMPORTANT**: Explicitly tell the user that you'll continue with deeper questions but they should let you know if they get tired or bored and want to stop.
+3. Return to "${focusTopic}" and ask a specific follow-up question referencing a previous detail.
 
 **EXAMPLE**:
-"Thank you for these insights! Going back to ${focusTopic}, you mentioned [specific detail]. Can you tell me more about [specific aspect]?"
-
-**PROHIBITIONS**:
-- DO NOT ask "is there anything else to add?"
-- DO NOT ask generic questions
-- DO NOT repeat questions already asked in SCAN
+"Great! I'll continue with some deeper questions then. Just let me know if you get tired or bored and want to move on. Going back to ${focusTopic}, you mentioned [detail]. Can you elaborate on...?"
 `;
                 return startDeepPrompt.trim();
             }
@@ -394,60 +390,47 @@ Il tuo messaggio deve contenere ESATTAMENTE UN PUNTO INTERROGATIVO.
 NON fare domande sui contenuti dell'intervista. L'intervista è FINITA.
 
 **ISTRUZIONI**:
-1. Ringrazia sinceramente l'utente per il tempo e le risposte
-2. Spiega che l'intervista è conclusa
-3. Chiedi il PERMESSO di raccogliere i dati di contatto
-4. Spiega brevemente PERCHÉ (per restare in contatto / per follow-up)
+1. Ringrazia sinceramente l'utente per il tempo e le risposte.
+2. **MOLTO IMPORTANTE**: Spega chiaramente che l'intervista è conclusa (completed).
+3. Chiedi se puoi fare alcune domande per raccogliere i dati di contatto per restare in contatto.
 
-**STRUTTURA ESEMPIO**:
-"Ti ringrazio molto per questa conversazione, è stata davvero interessante! Siamo arrivati alla fine. Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?"
-
-**DIVIETI ASSOLUTI**:
-- NON fare domande sui topic dell'intervista (es. "Quali implicazioni vedi?")
-- NON chiedere "Come ti chiami?" in questo messaggio
-- NON chiedere email, telefono o altri campi specifici
-- NON fare DUE domande nello stesso messaggio
-- CHIEDI SOLO IL PERMESSO per i contatti
-- Attendi la conferma dell'utente prima di procedere
-
-**ESEMPIO SBAGLIATO** (DUE DOMANDE - VIETATO):
-"Quali implicazioni vedi per la formazione? Prima di concludere, posso chiederti i contatti?"
-
-**ESEMPIO CORRETTO** (UNA DOMANDA):
-"Grazie mille per tutti questi spunti interessanti! Siamo arrivati alla fine dell'intervista. Posso chiederti i tuoi contatti per restare in contatto?"
+**ESEMPIO**:
+"Ti ringrazio molto per questa conversazione, è stata davvero interessante! L'intervista è conclusa. Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?"
 ` : `
 ## PHASE: DATA COLLECTION CONSENT
 The content interview is complete.
 Now you must ask for PERMISSION to collect contact data.
 
-**CRITICAL RULE - ONE QUESTION ONLY**:
-Your message must contain EXACTLY ONE question mark.
-DO NOT ask questions about interview content. The interview is OVER.
-
 **INSTRUCTIONS**:
-1. Sincerely thank the user for their time and answers
-2. Explain that the interview is concluded
-3. Ask for PERMISSION to collect contact details
-4. Briefly explain WHY (to stay in touch / for follow-up)
+1. Sincerely thank the user for their time and answers.
+2. **VERY IMPORTANT**: Explicitly state that the interview is completed.
+3. Ask if you can ask for some contact details to stay in touch.
 
-**EXAMPLE STRUCTURE**:
-"Thank you so much for this conversation, it was really insightful! We've reached the end. Before we say goodbye, may I ask for your contact details so we can stay in touch?"
-
-**ABSOLUTE PROHIBITIONS**:
-- DO NOT ask questions about interview topics (e.g., "What implications do you see?")
-- DO NOT ask "What is your name?" in this message
-- DO NOT ask for email, phone or other specific fields
-- DO NOT ask TWO questions in the same message
-- ONLY ASK FOR PERMISSION for contact details
-- Wait for user confirmation before proceeding
-
-**BAD EXAMPLE** (TWO QUESTIONS - FORBIDDEN):
-"What implications do you see for training? Before we wrap up, may I ask for your contact details?"
-
-**CORRECT EXAMPLE** (ONE QUESTION):
-"Thank you so much for all these interesting insights! We've reached the end of the interview. May I ask for your contact details to stay in touch?"
+**EXAMPLE**:
+"Thank you so much for this conversation! The interview is completed. Before we go, can I ask you for some contact details to stay in touch?"
 `;
                 return consentPrompt.trim();
+            }
+
+            if (supervisorInsight.status === 'COMPLETE_WITHOUT_DATA') {
+                const lang = bot?.language || 'en';
+                return lang === 'it'
+                    ? "## FASE: CONCLUSIONE\nL'intervista è finita. Ringrazia calorosamente e saluta. Non fare altre domande. Aggiungi alla fine del messaggio: INTERVIEW_COMPLETED\n**ESEMPIO**: \"Grazie mille per il tuo tempo! L'intervista è conclusa. Ti auguro una buona giornata! INTERVIEW_COMPLETED\""
+                    : "## PHASE: COMPLETION\nThe interview is over. Warmly thank the user and say goodbye. Do not ask any more questions. Add at the end of the message: INTERVIEW_COMPLETED\n**EXAMPLE**: \"Thank you so much for your time! The interview is complete. Have a great day! INTERVIEW_COMPLETED\"";
+            }
+
+            if (supervisorInsight.status === 'FINAL_GOODBYE') {
+                const lang = bot?.language || 'en';
+                return lang === 'it'
+                    ? "## FASE: SALUTO FINALE\nHai raccolto tutte le informazioni necessarie. Ringrazia l'utente per la collaborazione e saluta cordialmente. Di' che verranno ricontattati presto. Aggiungi alla fine: INTERVIEW_COMPLETED\n**ESEMPIO**: \"Grazie mille per tutte le informazioni. L'intervista è conclusa, ti contatteremo presto! INTERVIEW_COMPLETED\""
+                    : "## PHASE: FINAL GOODBYE\nYou have collected all necessary information. Thank the user for their cooperation and say goodbye cordially. Mention they will be contacted soon. Add at the end: INTERVIEW_COMPLETED\n**EXAMPLE**: \"Thank you for all the information. The interview is complete, we will contact you soon! INTERVIEW_COMPLETED\"";
+            }
+
+            if (supervisorInsight.status === 'CONFIRM_STOP') {
+                const lang = bot?.language || 'en';
+                return lang === 'it'
+                    ? "## FASE: CONFERMA CHIUSURA\nHai notato che l'utente potrebbe essere stanco o ha detto 'no/basta'. Rileva questo sentimento con empatia e chiedi conferma se desidera concludere l'intervista ora o se preferisce continuare. NON concludere ancora.\n**ESEMPIO**: \"Capisco, forse siamo andati un po' per le lunghe. Vorresti concludere qui l'intervista o preferisci rispondere ancora a qualche domanda?\""
+                    : "## PHASE: CONFIRM STOP\nYou noticed the user might be tired or said 'no/enough'. Acknowledge this with empathy and ask for confirmation if they want to conclude the interview now or if they'd like to continue. DO NOT conclude yet.\n**EXAMPLE**: \"I understand, maybe we've been going on for a bit. Would you like to wrap up the interview here, or would you prefer to answer a few more questions?\"";
             }
 
             // ========== DATA_COLLECTION ==========
@@ -457,7 +440,7 @@ DO NOT ask questions about interview content. The interview is OVER.
                 const isItalian = lang === 'it';
 
                 const rawFields = (bot?.candidateDataFields as any[]) || ['name', 'email'];
-                const fieldIds = rawFields.map((f: any) => typeof f === 'string' ? f : f.field);
+                const fieldIds = rawFields.map((f: any) => typeof f === 'string' ? f : (f.id || f.field));
                 console.log("📝 [PromptBuilder] Configured Fields:", fieldIds);
                 const formattedChecklist = fieldIds.map(id => {
                     const label = FIELD_LABELS[id];
@@ -874,10 +857,10 @@ ${specificPrompt}
 
         ---
 ## FINAL REMINDER(CRITICAL):
-        - EVERY response MUST end with a question mark(?).
+- EVERY response MUST end with a question mark(?), UNLESS you are concluding the interview.
 - If you are transitioning, ask the first question of the new topic immediately.
-- If you are probe - deepening, ask for a specific detail.
-- NEVER end with a statement or a "Thank you" alone.Always follow with "?".
+- If you are probe-deepening, ask for a specific detail.
+- If you are concluding (INTERVIEW_COMPLETED), do NOT add a question mark at the end.
 `.trim();
     }
 }

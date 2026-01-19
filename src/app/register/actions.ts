@@ -40,10 +40,16 @@ export async function registerUser(prevState: string | undefined, formData: Form
                 },
             });
 
+            // Set default trial ending in 14 days
+            const trialDays = 14;
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + trialDays);
+
             const org = await tx.organization.create({
                 data: {
                     name: companyName,
                     vatId: vatId || null,
+                    plan: 'PRO', // Start as PRO for trial
                     slug: `org-${Math.random().toString(36).substring(2, 10)}`,
                     members: {
                         create: {
@@ -51,6 +57,13 @@ export async function registerUser(prevState: string | undefined, formData: Form
                             role: 'OWNER',
                         },
                     },
+                    subscription: {
+                        create: {
+                            tier: 'PRO',
+                            status: 'TRIALING',
+                            currentPeriodEnd: trialEnd,
+                        }
+                    }
                 },
             });
 

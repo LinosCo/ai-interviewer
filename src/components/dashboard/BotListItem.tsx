@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MessageSquare, Bot, Trash2, ExternalLink, MoreVertical, Loader2, Users } from 'lucide-react';
 import { deleteBotAction } from '@/actions/bot-actions';
+import { BotStatusToggle } from './BotStatusToggle';
 
 interface BotListItemProps {
     bot: {
@@ -64,33 +65,39 @@ export function BotListItem({ bot, compact = false }: BotListItemProps) {
                 </div>
             </Link>
 
-            <div className="flex items-center gap-2">
-                {compact ? (
-                    // Compact view (Dashboard recent)
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md max-md:hidden">
-                        {completedCount} risp.
-                    </span>
-                ) : (
-                    // Full view actions can go here
-                    <Link
-                        href={`/dashboard/bots/${bot.id}/profiles`}
-                        className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                        title="Profili & Lead"
-                    >
-                        <Users className="w-4 h-4" />
-                    </Link>
+            <div className="flex items-center gap-4">
+                {!compact && (
+                    <BotStatusToggle botId={bot.id} initialStatus={(bot as any).status} />
                 )}
 
-                <div className="w-px h-4 bg-gray-200 mx-1" />
+                <div className="flex items-center gap-2">
+                    {compact ? (
+                        // Compact view (Dashboard recent)
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-md max-md:hidden">
+                            {completedCount} risp.
+                        </span>
+                    ) : (
+                        // Full view actions can go here
+                        <Link
+                            href={`/dashboard/bots/${bot.id}/profiles`}
+                            className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Profili & Lead"
+                        >
+                            <Users className="w-4 h-4" />
+                        </Link>
+                    )}
 
-                <button
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Elimina"
-                >
-                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                </button>
+                    <div className="w-px h-4 bg-gray-200 mx-1" />
+
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Elimina"
+                    >
+                        {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    </button>
+                </div>
             </div>
         </div>
     );

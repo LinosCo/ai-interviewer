@@ -11,21 +11,23 @@ export async function getOrCreateSubscription(organizationId: string) {
     });
 
     if (!subscription) {
-        // Create default free subscription
+        // Create default PRO trial
         const now = new Date();
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const trialEnd = new Date();
+        trialEnd.setDate(trialEnd.getDate() + 14);
+
         const plans = await getPricingPlans();
 
         subscription = await prisma.subscription.create({
             data: {
                 organizationId,
-                tier: 'FREE',
-                status: 'ACTIVE',
-                maxActiveBots: plans.FREE.features.maxActiveBots,
-                maxInterviewsPerMonth: plans.FREE.features.maxInterviewsPerMonth,
-                maxUsers: plans.FREE.features.maxUsers,
+                tier: 'PRO',
+                status: 'TRIALING',
+                maxActiveBots: plans.PRO.features.maxActiveBots,
+                maxInterviewsPerMonth: plans.PRO.features.maxInterviewsPerMonth,
+                maxUsers: plans.PRO.features.maxUsers,
                 currentPeriodStart: now,
-                currentPeriodEnd: endOfMonth,
+                currentPeriodEnd: trialEnd,
             }
         });
     }
@@ -33,10 +35,27 @@ export async function getOrCreateSubscription(organizationId: string) {
     return subscription;
 }
 
+// Subscription status check helper
+export function checkSubscriptionValid(subscription: any): { allowed: boolean; reason?: string } {
+    if (subscription.status === 'PAST_DUE') {
+        return { allowed: false, reason: 'Il tuo abbonamento è scaduto o il pagamento è fallito. Aggiorna i dati di fatturazione.' };
+    }
+    if (subscription.status === 'TRIALING' && subscription.currentPeriodEnd < new Date()) {
+        return { allowed: false, reason: 'La tua prova gratuita PRO è terminata. Attiva un piano per continuare.' };
+    }
+    if (subscription.status === 'CANCELED') {
+        return { allowed: false, reason: 'Il tuo abbonamento è stato annullato.' };
+    }
+    return { allowed: true };
+}
+
 // Check if user can create/publish a new bot
 export async function canPublishBot(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);
     if (!subscription) return { allowed: true }; // Fallback if no org/subscription found
+
+    const statusCheck = checkSubscriptionValid(subscription);
+    if (!statusCheck.allowed) return statusCheck;
 
     // Unlimited bots for Business/Enterprise
     if (subscription.maxActiveBots === -1) {
@@ -63,6 +82,9 @@ export async function canPublishBot(organizationId: string): Promise<{ allowed: 
 export async function canCreateChatbot(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);
     if (!subscription) return { allowed: true };
+
+    const statusCheck = checkSubscriptionValid(subscription);
+    if (!statusCheck.allowed) return statusCheck;
 
     const plans = await getPricingPlans();
     // @ts-ignore - access hidden limits
@@ -102,6 +124,9 @@ export async function canCreateChatbot(organizationId: string): Promise<{ allowe
 export async function canStartInterview(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);
     if (!subscription) return { allowed: true };
+
+    const statusCheck = checkSubscriptionValid(subscription);
+    if (!statusCheck.allowed) return statusCheck;
 
     // Unlimited for Enterprise
     if (subscription.maxInterviewsPerMonth === -1) {

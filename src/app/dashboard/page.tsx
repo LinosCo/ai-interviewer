@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { MessageSquare, Plus, TrendingUp, Users, Clock, ArrowRight, Sparkles, Bell, Bot, BarChart3, Lock } from 'lucide-react';
-import { canCreateChatbot, canPublishBot } from '@/lib/usage';
+import { canCreateChatbot, canPublishBot, getUsageStats } from '@/lib/usage';
 
 export default async function DashboardPage() {
     const session = await auth();
@@ -14,7 +14,11 @@ export default async function DashboardPage() {
         include: {
             ownedProjects: {
                 include: {
-                    organization: true, // Needed for usage checks
+                    organization: {
+                        include: {
+                            subscription: true
+                        }
+                    }, // Needed for usage checks
                     bots: {
                         include: {
                             conversations: {
@@ -63,7 +67,7 @@ export default async function DashboardPage() {
         })))
         .filter(c => c.completedAt)
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
-        .slice(5);
+        .slice(0, 5);
 
     // Get active interviews (with responses in last 7 days)
     const weekAgo = new Date();
@@ -73,8 +77,52 @@ export default async function DashboardPage() {
         bot.conversations.some(c => c.completedAt && new Date(c.completedAt) > weekAgo)
     );
 
+    // Fetch usage and subscription data
+    const usage = organizationId ? await getUsageStats(organizationId) : null;
+    const subscription = project?.organization?.subscription;
+    const status = subscription?.status || 'ACTIVE';
+    const trialDaysLeft = usage?.currentPeriodEnd ? Math.ceil((new Date(usage.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+
     return (
         <div className="space-y-8">
+            {/* Subscription & Trial Warnings */}
+            {status === 'TRIALING' && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-500 rounded-full text-white animate-pulse">
+                            <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-amber-900">Sei in prova gratuita PRO</p>
+                            <p className="text-sm text-amber-700">Ti rimangono <span className="font-bold">{trialDaysLeft} giorni</span> per testare tutte le funzionalità avanzate.</p>
+                        </div>
+                    </div>
+                    <Link
+                        href="/dashboard/settings/billing"
+                        className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all shadow-md active:scale-95"
+                    >
+                        Attiva Piano Pro
+                    </Link>
+                </div>
+            )}
+
+            {status === 'PAST_DUE' && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-500 rounded-full text-white">
+                            <Lock className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-red-900">Pagamento Fallito</p>
+                            <p className="text-sm text-red-700">Il tuo abbonamento è sospeso. Aggiorna il metodo di pagamento per riattivare i tuoi bot.</p>
+                        </div>
+                    </div>
+                    <Link href="/dashboard/settings/billing" className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">
+                        Risolvi Ora
+                    </Link>
+                </div>
+            )}
+
             {/* Welcome Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -83,81 +131,106 @@ export default async function DashboardPage() {
                     </h1>
                     <p className="text-gray-500 mt-1">Ecco una panoramica dei tuoi progetti e assistenti AI.</p>
                 </div>
-                {projectId && (
+                <div className="flex items-center gap-2">
+                    {projectId && (
+                        <Link
+                            href={`/dashboard/projects/${projectId}/analytics`}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors font-medium text-sm"
+                        >
+                            <BarChart3 className="w-4 h-4" />
+                            Unified Analytics
+                        </Link>
+                    )}
                     <Link
-                        href={`/dashboard/projects/${projectId}/analytics`}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors font-medium text-sm"
+                        href="/dashboard/settings/billing"
+                        className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
                     >
-                        <BarChart3 className="w-4 h-4" />
-                        Unified Analytics
+                        <TrendingUp className="w-4 h-4" />
+                        Upgrade
                     </Link>
-                )}
+                </div>
             </div>
 
             {/* Stats Cards Row */}
             <div className="grid md:grid-cols-4 gap-4">
                 {/* Interviews Stats */}
                 <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <MessageSquare className="w-16 h-16" />
-                    </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-amber-100 rounded-lg">
                             <MessageSquare className="w-5 h-5 text-amber-600" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-gray-900">{totalInterviews}</p>
-                            <p className="text-sm text-gray-500">Interviste</p>
-                        </div>
+                        <span className="text-xs font-bold text-gray-400">Interviste Mensili</span>
                     </div>
-                    <div className="mt-3 text-xs text-gray-400">
-                        {totalResponses} risposte totali
+                    <div>
+                        <div className="flex items-end justify-between mb-2">
+                            <p className="text-2xl font-bold text-gray-900">{usage?.interviews.used || 0}</p>
+                            <p className="text-xs text-gray-500">di {usage?.interviews.limit === -1 ? '∞' : usage?.interviews.limit || 0}</p>
+                        </div>
+                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                            <div
+                                className={`h-full transition-all duration-500 ${usage && usage.interviews.percentage > 90 ? 'bg-red-500' : 'bg-amber-500'}`}
+                                style={{ width: `${Math.min(usage?.interviews.percentage || 0, 100)}%` }}
+                            />
+                        </div>
                     </div>
                 </div>
 
                 {/* Chatbots Stats */}
                 <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group">
-                    <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                        <Bot className="w-16 h-16" />
-                    </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-blue-100 rounded-lg">
                             <Bot className="w-5 h-5 text-blue-600" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-gray-900">{totalChatbots}</p>
-                            <p className="text-sm text-gray-500">Chatbot Attivi</p>
-                        </div>
+                        <span className="text-xs font-bold text-gray-400">Bot Attivi</span>
                     </div>
-                    <div className="mt-3 text-xs text-gray-400">
-                        {totalChatSessions} sessioni totali
+                    <div>
+                        <div className="flex items-end justify-between mb-2">
+                            <p className="text-2xl font-bold text-gray-900">{usage?.activeBots.used || 0}</p>
+                            <p className="text-xs text-gray-500">di {usage?.activeBots.limit === -1 ? '∞' : usage?.activeBots.limit || 0}</p>
+                        </div>
+                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-blue-500 transition-all duration-500"
+                                style={{ width: `${Math.min(usage?.activeBots.percentage || 0, 100)}%` }}
+                            />
+                        </div>
                     </div>
                 </div>
 
-                {/* Active Weekly */}
+                {/* Tokens Stats */}
                 <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
-                            <TrendingUp className="w-5 h-5 text-green-600" />
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                            <Sparkles className="w-5 h-5 text-purple-600" />
                         </div>
-                        <div>
-                            <p className="text-2xl font-bold text-gray-900">{activeInterviews.length}</p>
-                            <p className="text-sm text-gray-500">Attività Recente (7gg)</p>
+                        <span className="text-xs font-bold text-gray-400">Token AI (Budget)</span>
+                    </div>
+                    <div>
+                        <div className="flex items-end justify-between mb-2">
+                            <p className="text-2xl font-bold text-gray-900">{(usage?.tokens.used || 0) > 1000 ? `${Math.round(usage!.tokens.used / 1000)}k` : usage?.tokens.used || 0}</p>
+                            <p className="text-xs text-gray-500">di {(usage?.tokens.limit || 0) >= 1000000 ? `${(usage!.tokens.limit / 1000000).toFixed(1)}M` : `${Math.round((usage?.tokens.limit || 0) / 1000)}k`}</p>
+                        </div>
+                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-purple-500 transition-all duration-500"
+                                style={{ width: `${Math.min(usage?.tokens.percentage || 0, 100)}%` }}
+                            />
                         </div>
                     </div>
                 </div>
 
-                {/* Unified Score (Mini) */}
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-5 border border-none shadow-sm text-white">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-white/20 rounded-lg">
-                            <Sparkles className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <p className="text-2xl font-bold">Good</p>
-                            <p className="text-sm text-indigo-100">Reputation Score</p>
-                        </div>
+                {/* Buy More Card */}
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-5 text-white flex flex-col justify-between">
+                    <div>
+                        <p className="font-bold text-sm mb-1 text-indigo-100">Hai bisogno di più?</p>
+                        <p className="text-xs text-indigo-100/80">Acquista pacchetti extra senza abbonamento.</p>
                     </div>
+                    <Link
+                        href="/dashboard/settings/billing#packages"
+                        className="mt-3 flex items-center justify-center gap-2 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-all"
+                    >
+                        Compra Pacchetti <ArrowRight className="w-3 h-3" />
+                    </Link>
                 </div>
             </div>
 
@@ -318,3 +391,4 @@ export default async function DashboardPage() {
         </div>
     );
 }
+

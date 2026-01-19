@@ -6,7 +6,7 @@ import { PLANS, PlanType, PlanFeatures } from '@/config/plans';
 let _stripe: Stripe | null = null;
 
 export const PRICING_CONSTANTS = {
-    PLANS: ['FREE', 'STARTER', 'PRO', 'BUSINESS', 'ENTERPRISE'] as const,
+    PLANS: ['TRIAL', 'FREE', 'STARTER', 'PRO', 'BUSINESS', 'PARTNER', 'ENTERPRISE'] as const,
 };
 
 export type PlanKey = (typeof PRICING_CONSTANTS.PLANS)[number];
@@ -93,6 +93,19 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
     };
 
     return {
+        TRIAL: {
+            name: PLANS[PlanType.TRIAL].name,
+            price: PLANS[PlanType.TRIAL].price,
+            priceId: null,
+            priceYearly: 0,
+            priceIdYearly: null,
+            features: {
+                maxActiveBots: PLANS[PlanType.TRIAL].activeInterviews,
+                maxInterviewsPerMonth: PLANS[PlanType.TRIAL].responsesPerMonth,
+                maxUsers: PLANS[PlanType.TRIAL].users,
+                ...PLANS[PlanType.TRIAL].features,
+            },
+        } as PriceConfig,
         FREE: {
             name: PLANS[PlanType.TRIAL].name,
             price: PLANS[PlanType.TRIAL].price,
@@ -145,6 +158,19 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 ...PLANS[PlanType.BUSINESS].features,
             },
         } as PriceConfig,
+        PARTNER: {
+            name: PLANS[PlanType.PARTNER].name,
+            price: PLANS[PlanType.PARTNER].price,
+            priceId: null,
+            priceYearly: 0,
+            priceIdYearly: null,
+            features: {
+                maxActiveBots: PLANS[PlanType.PARTNER].activeInterviews,
+                maxInterviewsPerMonth: PLANS[PlanType.PARTNER].responsesPerMonth,
+                maxUsers: PLANS[PlanType.PARTNER].users,
+                ...PLANS[PlanType.PARTNER].features,
+            },
+        } as PriceConfig,
         ENTERPRISE: {
             name: 'Enterprise',
             price: null,
@@ -155,7 +181,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxActiveBots: -1,
                 maxInterviewsPerMonth: -1,
                 maxUsers: -1,
-                ...PLANS[PlanType.BUSINESS].features, // Fallback to business features for enterprise
+                ...PLANS[PlanType.BUSINESS].features,
             },
         } as PriceConfig,
     };

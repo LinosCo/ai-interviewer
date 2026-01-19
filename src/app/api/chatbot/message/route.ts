@@ -40,9 +40,9 @@ export async function POST(req: Request) {
         let candidateProfile = (conversation.candidateProfile as any) || {};
         let nextMissingField = null;
 
-        // Check what's missing
+        // Check what's missing (both required and optional)
         for (const field of candidateFields) {
-            if (!candidateProfile[field.field] && field.required) {
+            if (!candidateProfile[field.field]) {
                 nextMissingField = field;
                 break;
             }
@@ -77,6 +77,8 @@ export async function POST(req: Request) {
             (triggerStrategy === 'smart'); // Smart is handled by LLM "shouldCapture" flag previously, but here we enforce.
 
         // If we have a missing field and triggered
+        let justExtractedField = null;  // Track what we just extracted THIS turn
+
         if (nextMissingField && shouldCollect) {
             isLeadGenTurn = true;
 
@@ -105,7 +107,13 @@ export async function POST(req: Request) {
 
             if (extraction.object[nextMissingField.field] && extraction.object.isRelevantAnswer) {
                 // Saved!
-                candidateProfile = { ...candidateProfile, [nextMissingField.field]: extraction.object[nextMissingField.field] };
+                const extractedValue = extraction.object[nextMissingField.field];
+                justExtractedField = {
+                    field: nextMissingField.field,
+                    value: extractedValue
+                };
+
+                candidateProfile = { ...candidateProfile, [nextMissingField.field]: extractedValue };
                 await prisma.conversation.update({
                     where: { id: conversationId },
                     data: { candidateProfile } as any
@@ -114,7 +122,7 @@ export async function POST(req: Request) {
                 // Move to NEXT field
                 nextMissingField = null;
                 for (const field of candidateFields) {
-                    if (!candidateProfile[field.field] && field.required) {
+                    if (!candidateProfile[field.field]) {
                         nextMissingField = field;
                         break;
                     }
@@ -123,50 +131,84 @@ export async function POST(req: Request) {
         }
 
         // 4. Generate Response
-        // If we still have a missing field and we are in collection mode -> ASK IT
+        // We ALWAYS generate a response, but the context changes based on whether we're collecting data
+
+        const schema = z.object({
+            response: z.string().describe('Response to user'),
+        });
+
+        let systemPrompt = systemPromptBase;
+
+        // If we have a missing field and should collect
         if (nextMissingField && shouldCollect) {
-            // We force the bot to ask the question
             const fieldLabel = nextMissingField.field;
             const fieldQuestion = nextMissingField.question || `Qual è la tua ${fieldLabel}?`;
+            const isRequired = nextMissingField.required || false;
 
-            const schema = z.object({
-                response: z.string().describe('Response to user'),
-            });
+            // Check if user just provided data (we extracted it above in THIS turn)
+            const justExtracted = justExtractedField && justExtractedField.field === fieldLabel ? justExtractedField.value : null;
 
-            const result = await generateObject({
-                model: openai('gpt-4o-mini'),
-                schema,
-                system: `
+            if (justExtracted) {
+                // User just provided the data - acknowledge and move to next field
+                // Find the NEXT missing field
+                let nextNextField = null;
+                for (const field of candidateFields) {
+                    if (!candidateProfile[field.field]) {
+                        nextNextField = field;
+                        break;
+                    }
+                }
+
+                if (nextNextField) {
+                    // Ask for the next field
+                    systemPrompt = `
+                        ${systemPromptBase}
+                        
+                        IMPORTANT: The user just provided their ${fieldLabel}: "${justExtracted}".
+                        Acknowledge this briefly and naturally, then ask for: "${nextNextField.question || nextNextField.field}".
+                        ${nextNextField.required ? 'This field is REQUIRED.' : 'This field is optional - if they refuse, accept gracefully.'}
+                        Keep it conversational and helpful.
+                    `;
+                } else {
+                    // All fields collected!
+                    systemPrompt = `
+                        ${systemPromptBase}
+                        
+                        IMPORTANT: The user just provided their ${fieldLabel}: "${justExtracted}".
+                        Thank them warmly for providing all the information.
+                        Continue helping them with their original question about the products/services.
+                    `;
+                }
+            } else {
+                // User hasn't provided the data yet - ask for it
+                systemPrompt = `
                     ${systemPromptBase}
                     
-                    IMPORTANT: You need to collect the user's information for the field: "${fieldLabel}".
+                    IMPORTANT: You need to collect the user's ${fieldLabel}.
                     The user just said: "${message}".
-                    Acknowledge what they said briefly (if relevant), then ask for this information: "${fieldQuestion}".
+                    ${message.toLowerCase().includes('no') || message.toLowerCase().includes('non') ?
+                        (isRequired ?
+                            `The user seems hesitant, but this field is REQUIRED. Politely explain why you need it and ask again: "${fieldQuestion}"` :
+                            `The user declined. This field is optional, so accept gracefully and continue the conversation normally.`
+                        ) :
+                        `Acknowledge what they said briefly (if relevant), then naturally ask: "${fieldQuestion}"`
+                    }
                     Maintain a natural, helpful, and professional persona.
-                    DO NOT ask for more than one piece of information at a time.
-                `,
-                messages: conversation.messages.map((m: any) => ({
-                    role: m.role as 'user' | 'assistant',
-                    content: m.content
-                })).slice(-10).concat({ role: 'user', content: message }),
-            });
-
-            finalResponse = result.object.response;
-
-        } else {
-            // Normal conversational flow
-            const schema = z.object({
-                response: z.string(),
-            });
-
-            const result = await generateObject({
-                model: openai('gpt-4o-mini'),
-                schema,
-                system: systemPromptBase,
-                messages: conversation.messages.slice(-10).map((m: any) => ({ role: m.role as any, content: m.content })).concat({ role: 'user', content: message }),
-            });
-            finalResponse = result.object.response;
+                `;
+            }
         }
+
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            system: systemPrompt,
+            messages: conversation.messages.slice(-10).map((m: any) => ({
+                role: m.role as any,
+                content: m.content
+            })).concat({ role: 'user', content: message }),
+        });
+
+        finalResponse = result.object.response;
 
         // 5. Save and Return
         await prisma.message.create({

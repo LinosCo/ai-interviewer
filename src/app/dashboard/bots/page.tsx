@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Bot, Plus, ArrowRight, Code } from 'lucide-react';
+import { BotStatusToggle } from '@/components/dashboard/BotStatusToggle';
 
 export default async function ChatbotsPage() {
     const session = await auth();
@@ -125,9 +126,7 @@ export default async function ChatbotsPage() {
                                             <p className="text-xs text-gray-500">Creato il {new Date(bot.createdAt).toLocaleDateString('it-IT')}</p>
                                         </div>
                                     </div>
-                                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${bot.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                        {bot.status === 'PUBLISHED' ? 'Attivo' : 'Bozza'}
-                                    </span>
+                                    <BotStatusToggle botId={bot.id} initialStatus={bot.status} />
                                 </div>
 
                                 <p className="text-sm text-gray-600 mb-6 line-clamp-2 min-h-[40px]">
@@ -160,7 +159,8 @@ export default async function ChatbotsPage() {
                         );
                     })}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }

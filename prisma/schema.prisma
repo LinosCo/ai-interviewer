@@ -139,7 +139,7 @@ model Organization {
   subscription           Subscription?
   tokenUsage             TokenUsage?
   usageLogs              UsageLog[]
-  visibilityPrompts      VisibilityPrompt[]
+  visibilityConfig       VisibilityConfig?
 }
 
 model Subscription {
@@ -578,38 +578,6 @@ model FaqSuggestion {
   bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
-model VisibilityPrompt {
-  id                String               @id @default(cuid())
-  organizationId    String
-  text              String
-  category          String
-  variables         Json
-  languages         String[]
-  platforms         String[]
-  frequency         String
-  isActive          Boolean              @default(true)
-  isSystemGenerated Boolean              @default(false)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  organization      Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  responses         VisibilityResponse[]
-}
-
-model VisibilityResponse {
-  id                  String           @id @default(cuid())
-  promptId            String
-  platform            String
-  language            String
-  responseText        String
-  brandPosition       Int?
-  competitorPositions Json
-  sourcesCited        String[]
-  executedAt          DateTime         @default(now())
-  tokenUsage          Json
-  sentiment           String?
-  prompt              VisibilityPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
-}
-
 model CrossChannelInsight {
   id                String       @id @default(cuid())
   organizationId    String
@@ -629,6 +597,78 @@ model CrossChannelInsight {
 
   @@index([organizationId, status])
   @@index([organizationId, priorityScore])
+}
+
+model VisibilityConfig {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  brandName      String
+  category       String
+  description    String?
+  language       String   @default("it")
+  territory      String   @default("IT")
+  
+  isActive       Boolean  @default(true)
+  nextScanAt     DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  prompts        VisibilityPrompt[]
+  competitors    Competitor[]
+  scans          VisibilityScan[]
+}
+
+model VisibilityPrompt {
+  id                String           @id @default(cuid())
+  configId          String
+  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  
+  text              String
+  enabled           Boolean          @default(true)
+  orderIndex        Int              @default(0)
+  generatedByAI     Boolean          @default(false)
+  lastEditedAt      DateTime         @default(now())
+  
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model Competitor {
+  id                String           @id @default(cuid())
+  configId          String
+  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  
+  name              String
+  website           String?
+  enabled           Boolean          @default(true)
+  
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model VisibilityScan {
+  id                String           @id @default(cuid())
+  configId          String
+  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  
+  startedAt         DateTime         @default(now())
+  completedAt       DateTime?
+  status            String           @default("pending")
+  
+  metrics           VisibilityScanMetric[]
+}
+
+model VisibilityScanMetric {
+  id              String         @id @default(cuid())
+  scanId          String
+  scan            VisibilityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  
+  metricType      String
+  value           Float
+  dimensions      Json?
 }
 
 enum UserRole {

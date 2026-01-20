@@ -1,20 +1,22 @@
 import { prisma } from '@/lib/prisma';
-import { openai } from '@ai-sdk/openai';
-import { anthropic } from '@ai-sdk/anthropic';
-import { google } from '@ai-sdk/google';
+import { createOpenAI, openai } from '@ai-sdk/openai';
+import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
 import { generateText } from 'ai';
 
 /**
  * Get admin-configured API key from GlobalConfig
  */
-export async function getAdminApiKey(provider: 'GEMINI' | 'GOOGLE_SERP'): Promise<string | null> {
+export async function getAdminApiKey(provider: 'OPENAI' | 'ANTHROPIC' | 'GEMINI' | 'GOOGLE_SERP'): Promise<string | null> {
     try {
         const globalConfig = await prisma.globalConfig.findUnique({
             where: { id: "default" }
-        }) as any; // Type assertion - schema has these fields but TS cache may be stale
+        }) as any;
 
         if (!globalConfig) return null;
 
+        if (provider === 'OPENAI') return globalConfig.openaiApiKey ?? null;
+        if (provider === 'ANTHROPIC') return globalConfig.anthropicApiKey ?? null;
         if (provider === 'GEMINI') return globalConfig.geminiApiKey ?? null;
         if (provider === 'GOOGLE_SERP') return globalConfig.googleSerpApiKey ?? null;
 
@@ -23,6 +25,59 @@ export async function getAdminApiKey(provider: 'GEMINI' | 'GOOGLE_SERP'): Promis
         console.error(`Error fetching ${provider} API key:`, error);
         return null;
     }
+}
+
+/**
+ * Get configured model instance for a provider
+ */
+export async function getLLMProvider(provider: 'openai' | 'anthropic' | 'gemini') {
+    const adminKey = await getAdminApiKey(provider.toUpperCase() as any);
+
+    if (provider === 'openai') {
+        const apiKey = adminKey || process.env.OPENAI_API_KEY;
+        if (!apiKey) throw new Error('OpenAI API key missing');
+        return createOpenAI({ apiKey });
+    }
+
+    if (provider === 'anthropic') {
+        const apiKey = adminKey || process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error('Anthropic API key missing');
+        return createAnthropic({ apiKey });
+    }
+
+    if (provider === 'gemini') {
+        const apiKey = adminKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        if (!apiKey) throw new Error('Gemini API key missing');
+        return createGoogleGenerativeAI({ apiKey });
+    }
+
+    throw new Error(`Unsupported provider: ${provider}`);
+}
+
+/**
+ * Get any available configured LLM provider for internal tasks
+ * Tries OpenAI first, then Anthropic, then Gemini
+ */
+export async function getSystemLLM() {
+    const providers: ('openai' | 'anthropic' | 'gemini')[] = ['openai', 'anthropic', 'gemini'];
+
+    for (const provider of providers) {
+        try {
+            const config = await checkProviderConfiguration(provider);
+            if (config.configured) {
+                const modelProvider = await getLLMProvider(provider);
+                const modelName = VISIBILITY_PROVIDERS[provider].model;
+                return {
+                    model: modelProvider(modelName) as any,
+                    provider
+                };
+            }
+        } catch (e) {
+            continue;
+        }
+    }
+
+    throw new Error('No LLM providers configured. Please set at least one API key in admin settings.');
 }
 
 /**
@@ -74,32 +129,30 @@ Target market: ${territory}`;
 
         // Handle each provider separately
         switch (provider) {
-            case 'openai':
+            case 'openai': {
+                const openaiProvider = await getLLMProvider('openai');
                 result = await generateText({
-                    model: openai('gpt-4o-mini'),
+                    model: openaiProvider('gpt-4o-mini') as any,
                     system: systemPrompt,
                     prompt
                 });
                 break;
+            }
 
-            case 'anthropic':
+            case 'anthropic': {
+                const anthropicProvider = await getLLMProvider('anthropic');
                 result = await generateText({
-                    model: anthropic('claude-3-5-haiku-20241022'),
+                    model: anthropicProvider('claude-3-5-haiku-20241022') as any,
                     system: systemPrompt,
                     prompt
                 });
                 break;
+            }
 
             case 'gemini': {
-                // Check if Gemini is configured
-                const geminiKey = await getAdminApiKey('GEMINI');
-                if (!geminiKey && !process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-                    console.warn('Gemini not configured, skipping.');
-                    return null;
-                }
+                const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    // Type assertion needed due to version mismatch between @ai-sdk/google and ai
-                    model: google('gemini-2.0-flash-exp') as any,
+                    model: geminiProvider('gemini-2.0-flash-exp') as any,
                     system: systemPrompt,
                     prompt
                 });
@@ -135,18 +188,20 @@ export async function checkProviderConfiguration(provider: 'openai' | 'anthropic
 }> {
     try {
         switch (provider) {
-            case 'openai':
+            case 'openai': {
+                const adminKey = await getAdminApiKey('OPENAI');
                 return {
-                    configured: !!process.env.OPENAI_API_KEY,
-                    source: process.env.OPENAI_API_KEY ? 'env' : 'none'
+                    configured: !!(adminKey || process.env.OPENAI_API_KEY),
+                    source: adminKey ? 'admin' : (process.env.OPENAI_API_KEY ? 'env' : 'none')
                 };
-
-            case 'anthropic':
+            }
+            case 'anthropic': {
+                const adminKey = await getAdminApiKey('ANTHROPIC');
                 return {
-                    configured: !!process.env.ANTHROPIC_API_KEY,
-                    source: process.env.ANTHROPIC_API_KEY ? 'env' : 'none'
+                    configured: !!(adminKey || process.env.ANTHROPIC_API_KEY),
+                    source: adminKey ? 'admin' : (process.env.ANTHROPIC_API_KEY ? 'env' : 'none')
                 };
-
+            }
             case 'gemini': {
                 const adminKey = await getAdminApiKey('GEMINI');
                 if (adminKey) {

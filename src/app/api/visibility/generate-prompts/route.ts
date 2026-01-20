@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { getOrCreateSubscription } from '@/lib/usage';
 import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
 
@@ -114,8 +115,10 @@ Examples of good prompt types:
 - "Free vs paid ${category}"
 - "${category} for small business"`;
 
+        // Generate prompts using AI
+        const { model } = await getSystemLLM();
         const { object } = await generateObject({
-            model: openai('gpt-4o-mini'),
+            model,
             system: systemPrompt,
             prompt: userPrompt,
             schema: PromptGenerationSchema,

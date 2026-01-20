@@ -6,6 +6,7 @@ import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 
 const CompetitorSuggestionSchema = z.object({
     suggestions: z.array(z.string()).describe("List of competitor names")
@@ -52,8 +53,9 @@ export async function POST(request: Request) {
                 // Default limit for suggestions if config not present
                 const suggestionLimit = 5;
 
+                const { model } = await getSystemLLM();
                 const { object } = await generateObject({
-                    model: openai('gpt-4o-mini'),
+                    model,
                     schema: CompetitorSuggestionSchema,
                     prompt: `Generate a list of ${suggestionLimit} main competitors for "${brandName}" in the "${category}" category.
                     

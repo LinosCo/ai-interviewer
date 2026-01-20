@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { queryVisibilityLLM } from './llm-providers';
+import { queryVisibilityLLM, getSystemLLM } from './llm-providers';
 import { generateObject } from 'ai';
-import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 
 const AnalysisSchema = z.object({
@@ -127,8 +126,9 @@ export class VisibilityEngine {
      */
     private static async analyzeResponse(text: string, brandName: string, competitors: string[]) {
         try {
+            const { model } = await getSystemLLM();
             const { object } = await generateObject({
-                model: openai('gpt-4o-mini'),
+                model,
                 schema: AnalysisSchema,
                 prompt: `Analyze the following text which represents an LLM's response to a user query.
                 

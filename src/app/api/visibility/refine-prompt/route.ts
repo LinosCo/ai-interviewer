@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 
 const RefinePromptSchema = z.object({
     refinedPrompt: z.string().describe("The improved version of the original prompt"),
@@ -68,8 +69,9 @@ Target market: ${territoryContext}
 Refine this prompt to make it more effective for monitoring how AI assistants talk about brands in this category.
 Keep the same intent but improve clarity, naturalness, and effectiveness.`;
 
+        const { model } = await getSystemLLM();
         const { object } = await generateObject({
-            model: openai('gpt-4o-mini'),
+            model,
             system: systemPrompt,
             prompt: userPrompt,
             schema: RefinePromptSchema,

@@ -76,7 +76,7 @@ Return only the company/product names, without descriptions.`,
             }
         }
 
-        const config = await prisma.visibilityConfig.findUnique({
+        const config = await prisma.visibilityConfig.findFirst({
             where: { organizationId },
             include: {
                 competitors: {

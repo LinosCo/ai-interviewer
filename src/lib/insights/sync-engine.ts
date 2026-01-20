@@ -44,7 +44,7 @@ const SyncResultSchema = z.object({
 export class CrossChannelSyncEngine {
     static async sync(organizationId: string) {
         // 1. Fetch visibility data
-        const visibilityConfig = await prisma.visibilityConfig.findUnique({
+        const visibilityConfig = await prisma.visibilityConfig.findFirst({
             where: { organizationId },
             include: {
                 scans: {

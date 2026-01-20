@@ -45,6 +45,9 @@ interface GeneratedConfig {
 
 export default function PreviewPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const projectIdParam = searchParams.get('projectId');
+
     const [config, setConfig] = useState<GeneratedConfig | null>(null);
     const [editingName, setEditingName] = useState(false);
     const [editingGoal, setEditingGoal] = useState(false);
@@ -57,7 +60,7 @@ export default function PreviewPage() {
     const [copied, setCopied] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
     const [projects, setProjects] = useState<{ id: string, name: string }[]>([]);
-    const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+    const [selectedProjectId, setSelectedProjectId] = useState<string>(projectIdParam || '');
     const [isRefining, setIsRefining] = useState<string | null>(null);
 
     useEffect(() => {
@@ -66,10 +69,15 @@ export default function PreviewPage() {
             .then(res => res.ok ? res.json() : [])
             .then(data => {
                 setProjects(data);
-                if (data.length > 0) setSelectedProjectId(data[0].id);
+                // Only auto-select if no param is provided and we have projects
+                if (data.length > 0 && !projectIdParam) {
+                    setSelectedProjectId(data[0].id);
+                } else if (projectIdParam) {
+                    setSelectedProjectId(projectIdParam);
+                }
             })
             .catch(() => { });
-    }, []);
+    }, [projectIdParam]);
 
     useEffect(() => {
         const stored = sessionStorage.getItem('generatedConfig');

@@ -23,6 +23,7 @@ function GenerateContent() {
 
     const goal = searchParams.get('goal');
     const templateSlug = searchParams.get('template');
+    const projectId = searchParams.get('projectId');
 
     useEffect(() => {
         const generateInterview = async () => {
@@ -80,7 +81,8 @@ function GenerateContent() {
 
                 // Store config in sessionStorage and navigate to preview
                 sessionStorage.setItem('generatedConfig', JSON.stringify(configToUse));
-                router.push('/onboarding/preview');
+                const projectQuery = projectId ? `?projectId=${projectId}` : '';
+                router.push(`/onboarding/preview${projectQuery}`);
 
             } catch (err: any) {
                 setError(err.message || 'Errore sconosciuto');
@@ -88,7 +90,7 @@ function GenerateContent() {
         };
 
         generateInterview();
-    }, [goal, templateSlug, router]);
+    }, [goal, templateSlug, router, projectId]);
 
     if (error) {
         return (

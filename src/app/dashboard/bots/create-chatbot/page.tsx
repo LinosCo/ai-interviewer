@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import WizardStepPrompt from './wizard/WizardStepPrompt';
 import WizardStepConfig from './wizard/WizardStepConfig';
 import WizardStepKnowledge from './wizard/WizardStepKnowledge';
@@ -12,6 +12,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CreateChatbotPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const projectId = searchParams.get('projectId');
+
     const [step, setStep] = useState(1);
     const [config, setConfig] = useState<any>(null);
 
@@ -103,6 +106,7 @@ export default function CreateChatbotPage() {
                             <WizardStepPreview
                                 key="step6"
                                 config={config}
+                                projectId={projectId || undefined}
                                 onBack={prevStep}
                             />
                         )}

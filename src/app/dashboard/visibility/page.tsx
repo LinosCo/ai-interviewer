@@ -29,7 +29,7 @@ export default async function VisibilityPage({
     if (!orgId) redirect("/login");
 
     // 1. Check if config exists
-    const config = await prisma.visibilityConfig.findUnique({
+    const config = await prisma.visibilityConfig.findFirst({
         where: { organizationId: orgId },
         include: { prompts: true }
     });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Sparkles, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { WizardStepBrand } from './wizard/WizardStepBrand';
 import { WizardStepPrompts } from './wizard/WizardStepPrompts';
@@ -14,6 +14,7 @@ export interface VisibilityConfig {
     description: string;
     language: string;
     territory: string;
+    projectId?: string;
     prompts: Array<{
         id: string;
         text: string;
@@ -34,6 +35,9 @@ const STEPS = [
 
 export default function CreateVisibilityWizardPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const projectIdParam = searchParams.get('projectId');
+
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
@@ -44,6 +48,7 @@ export default function CreateVisibilityWizardPage() {
         description: '',
         language: 'it',
         territory: 'IT',
+        projectId: projectIdParam || undefined,
         prompts: [],
         competitors: []
     });
@@ -61,6 +66,7 @@ export default function CreateVisibilityWizardPage() {
                             description: data.config.description || '',
                             language: data.config.language || 'it',
                             territory: data.config.territory || 'IT',
+                            projectId: data.config.projectId || projectIdParam || undefined,
                             prompts: data.config.prompts?.map((p: any) => ({
                                 id: p.id,
                                 text: p.text,
@@ -79,7 +85,7 @@ export default function CreateVisibilityWizardPage() {
             }
         };
         loadConfig();
-    }, []);
+    }, [projectIdParam]);
 
     const handleNext = () => {
         if (currentStep < STEPS.length) {
@@ -107,7 +113,11 @@ export default function CreateVisibilityWizardPage() {
                 throw new Error(errData.error || 'Failed to save');
             }
 
-            router.push('/dashboard/visibility');
+            if (config.projectId) {
+                router.push(`/dashboard/projects/${config.projectId}`);
+            } else {
+                router.push('/dashboard/visibility');
+            }
         } catch (error: any) {
             console.error('Save error:', error);
             alert(error.message || 'Errore nel salvataggio. Riprova.');

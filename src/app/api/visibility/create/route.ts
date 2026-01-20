@@ -43,7 +43,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { brandName, category, description, language, territory, prompts, competitors } = body;
+        const { brandName, category, description, language, territory, prompts, competitors, projectId } = body;
 
         if (!brandName || !category) {
             return NextResponse.json(
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         }
 
         // Check if config already exists
-        const existingConfig = await prisma.visibilityConfig.findUnique({
+        const existingConfig = await prisma.visibilityConfig.findFirst({
             where: { organizationId }
         });
 
@@ -92,6 +92,7 @@ export async function POST(request: Request) {
                 language: language || 'it',
                 territory: territory || 'IT',
                 isActive: true,
+                projectId: projectId || null,
                 // Schedule first scan for 1 week from now
                 nextScanAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                 prompts: {
@@ -160,7 +161,7 @@ export async function GET(request: Request) {
 
         const organizationId = user.memberships[0].organizationId;
 
-        const config = await prisma.visibilityConfig.findUnique({
+        const config = await prisma.visibilityConfig.findFirst({
             where: { organizationId },
             include: {
                 prompts: {
@@ -221,10 +222,10 @@ export async function PATCH(request: Request) {
         const organizationId = user.memberships[0].organizationId;
 
         const body = await request.json();
-        const { brandName, category, description, language, territory, isActive, prompts, competitors } = body;
+        const { brandName, category, description, language, territory, isActive, prompts, competitors, projectId } = body;
 
         // Check if config exists
-        const existingConfig = await prisma.visibilityConfig.findUnique({
+        const existingConfig = await prisma.visibilityConfig.findFirst({
             where: { organizationId }
         });
 
@@ -235,7 +236,7 @@ export async function PATCH(request: Request) {
         // Use a transaction to ensure atomic updates
         const updatedConfig = await prisma.$transaction(async (tx) => {
             // 1. Update basic info
-            const config = await tx.visibilityConfig.update({
+            const config = await tx.visibilityConfig.updateMany({
                 where: { organizationId },
                 data: {
                     ...(brandName && { brandName }),
@@ -243,7 +244,8 @@ export async function PATCH(request: Request) {
                     ...(description !== undefined && { description }),
                     ...(language && { language }),
                     ...(territory && { territory }),
-                    ...(isActive !== undefined && { isActive })
+                    ...(isActive !== undefined && { isActive }),
+                    ...(projectId !== undefined && { projectId })
                 }
             });
 

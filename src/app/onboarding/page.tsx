@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { TEMPLATES, Template } from '@/lib/onboarding-templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
 import { colors, gradients } from '@/lib/design-system';
@@ -18,6 +18,9 @@ const examplePrompts = [
 
 export default function OnboardingPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const projectId = searchParams.get('projectId');
+
     const [goal, setGoal] = useState('');
     const [showTemplates, setShowTemplates] = useState(false);
     const [isRefining, setIsRefining] = useState(false);
@@ -25,12 +28,14 @@ export default function OnboardingPage() {
     const handleGenerate = () => {
         if (!goal.trim()) return;
         const encoded = encodeURIComponent(goal);
-        router.push(`/onboarding/generate?goal=${encoded}`);
+        const projectQuery = projectId ? `&projectId=${projectId}` : '';
+        router.push(`/onboarding/generate?goal=${encoded}${projectQuery}`);
     };
 
     const handleTemplateSelect = (template: Template) => {
         const encoded = encodeURIComponent(template.id);
-        router.push(`/onboarding/generate?template=${encoded}`);
+        const projectQuery = projectId ? `&projectId=${projectId}` : '';
+        router.push(`/onboarding/generate?template=${encoded}${projectQuery}`);
     };
 
     return (

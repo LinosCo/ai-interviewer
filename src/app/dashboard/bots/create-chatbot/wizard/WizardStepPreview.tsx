@@ -7,10 +7,11 @@ import { useRouter } from 'next/navigation';
 
 interface WizardStepPreviewProps {
     config: any;
+    projectId?: string;
     onBack: () => void;
 }
 
-export default function WizardStepPreview({ config, onBack }: WizardStepPreviewProps) {
+export default function WizardStepPreview({ config, projectId, onBack }: WizardStepPreviewProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -26,6 +27,7 @@ export default function WizardStepPreview({ config, onBack }: WizardStepPreviewP
                 body: JSON.stringify({
                     name: config.name,
                     botType: 'chatbot',
+                    projectId: projectId,
                     config: {
                         description: config.description,
                         tone: config.tone,

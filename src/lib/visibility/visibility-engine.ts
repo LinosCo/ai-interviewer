@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { queryVisibilityLLM, getSystemLLM } from './llm-providers';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { CrossChannelSyncEngine } from '../insights/sync-engine';
 
 const AnalysisSchema = z.object({
     brandMentioned: z.boolean(),
@@ -108,6 +109,13 @@ export class VisibilityEngine {
                     score: totalScore
                 }
             });
+
+            // 6. Trigger Cross-Channel Sync
+            try {
+                await CrossChannelSyncEngine.sync(config.organizationId);
+            } catch (e) {
+                console.error('Cross-channel sync failed but scan completed:', e);
+            }
 
             return { success: true, scanId: scan.id, partial: results.length < (config.prompts.length * providers.length) };
 

@@ -139,7 +139,7 @@ model Organization {
   subscription           Subscription?
   tokenUsage             TokenUsage?
   usageLogs              UsageLog[]
-  visibilityConfigs       VisibilityConfig[]
+  visibilityConfig       VisibilityConfig?
 }
 
 model Subscription {
@@ -602,7 +602,7 @@ model CrossChannelInsight {
 
 model VisibilityConfig {
   id             String   @id @default(cuid())
-  organizationId String
+  organizationId String   @unique
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   projectId      String?
   project        Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)

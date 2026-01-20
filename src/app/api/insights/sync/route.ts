@@ -20,12 +20,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
 
-        const insights = await CrossChannelSyncEngine.sync(orgId);
+        const result = await CrossChannelSyncEngine.sync(orgId);
 
         return NextResponse.json({
             success: true,
-            count: insights.length,
-            insights
+            count: result.insights.length,
+            insights: result.insights,
+            healthReport: result.healthReport
         });
 
     } catch (error) {

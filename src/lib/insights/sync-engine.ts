@@ -4,7 +4,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 const ActionSchema = z.object({
-    type: z.enum(['add_faq', 'add_interview_topic', 'add_visibility_prompt', 'create_content']),
+    type: z.enum(['add_faq', 'add_interview_topic', 'add_visibility_prompt', 'create_content', 'modify_content']),
     target: z.enum(['chatbot', 'interview', 'visibility', 'website']),
     title: z.string().optional(),
     body: z.string(),
@@ -18,8 +18,27 @@ const InsightSchema = z.object({
     priorityScore: z.number().min(0).max(100)
 });
 
-const MultiInsightSchema = z.object({
-    insights: z.array(InsightSchema)
+const HealthReportSchema = z.object({
+    chatbotSatisfaction: z.object({
+        score: z.number(), // 0-100
+        summary: z.string(),
+        trend: z.enum(['improving', 'stable', 'declining'])
+    }),
+    websiteEffectiveness: z.object({
+        score: z.number(),
+        feedbackSummary: z.string(),
+        contentGaps: z.array(z.string())
+    }),
+    brandVisibility: z.object({
+        score: z.number(),
+        competitorInsights: z.string(),
+        serpStatus: z.string()
+    })
+});
+
+const SyncResultSchema = z.object({
+    insights: z.array(InsightSchema),
+    healthReport: HealthReportSchema
 });
 
 export class CrossChannelSyncEngine {
@@ -37,70 +56,115 @@ export class CrossChannelSyncEngine {
             }
         });
 
-        // 2. Fetch Interview themes (from ConversationAnalysis)
+        // 2. Fetch Interview themes
         const analyses = await prisma.conversationAnalysis.findMany({
             where: {
                 conversation: {
-                    bot: { organizationId },
-                    chatbotSession: null // Only interviews
+                    bot: { project: { organizationId } },
+                    chatbotSession: null
                 }
             },
             take: 20,
             orderBy: { createdAt: 'desc' }
         });
 
-        // 3. Fetch Chatbot Gaps (from Analytics or specific unanswered questions)
+        // 3. Fetch Website Content (Knowledge Sources)
+        const knowledgeSources = await prisma.knowledgeSource.findMany({
+            where: { bot: { project: { organizationId } } },
+            take: 15,
+            orderBy: { createdAt: 'desc' },
+            select: { title: true, type: true, content: true }
+        });
+
+        // 4. Fetch Chatbot Analytics
         const chatbotAnalytics = await prisma.chatbotAnalytics.findMany({
-            where: {
-                bot: { organizationId }
-            },
+            where: { bot: { project: { organizationId } } },
             take: 5,
             orderBy: { createdAt: 'desc' }
         });
 
-        // 4. Summarize data for LLM
+        // 5. Summarize data for LLM
         const visibilitySummary = visibilityConfig?.scans[0]?.responses.map(r => ({
-            prompt: r.platform + ": " + r.responseText.substring(0, 100),
+            platform: r.platform,
+            responseText: r.responseText.substring(0, 300),
             brandMentioned: r.brandMentioned,
             competitors: r.competitorPositions
         })) || [];
 
         const interviewSummary = analyses.map(a => ({
             themes: a.themes,
-            quotes: a.keyQuotes
+            quotes: (a.keyQuotes as string[] || []).slice(0, 3),
+            sentiment: a.sentiment
+        }));
+
+        const websiteSummary = knowledgeSources.map(s => ({
+            title: s.title,
+            type: s.type,
+            contentSnippet: s.content.substring(0, 400)
         }));
 
         const chatbotSummary = chatbotAnalytics.map(a => ({
             gaps: a.knowledgeGaps,
-            clusters: a.questionClusters
+            sentiment: a.sentiment,
+            clusters: a.questionClusters,
+            leads: a.leadsCollected
         }));
 
-        // 5. Query LLM to find cross-channel insights
+        // 6. Query LLM for Unified Evaluation
         const { model } = await getSystemLLM();
         const { object } = await generateObject({
             model,
-            schema: MultiInsightSchema,
-            prompt: `Tu sei l'Analista Cross-Channel di Business Tuner. Il tuo compito è trovare correlazioni tra diverse fonti di dati e suggerire azioni concrete per migliorare il posizionamento del brand.
-            
-            DATI VISIBILITY (Ranking su LLM):
-            ${JSON.stringify(visibilitySummary)}
-            
-            DATI INTERVISTE (Feedback diretti clienti):
-            ${JSON.stringify(interviewSummary)}
-            
-            DATI CHATBOT (Lacune conoscenza e domande frequenti):
+            schema: SyncResultSchema,
+            prompt: `Sei l'Analista Cross-Channel di Business Tuner. Il tuo compito è valutare l'efficacia del brand e dei contenuti web integrando fonti multiple.
+
+            CONTENT SITO WEB (Conoscenza attuale):
+            ${JSON.stringify(websiteSummary)}
+
+            DATI CHATBOT (Sentiment utenti e lacune):
             ${JSON.stringify(chatbotSummary)}
-            
-            Analizza questi dati e identifica i 3-5 macro-temi più urgenti.
-            Per ogni tema:
-            1. Spiega la correlazione (es: "I clienti chiedono X nelle interviste, ma il chatbot non sa rispondere e gli LLM citano i competitor per questo tema").
-            2. Suggerisci azioni specifiche (nuove FAQ, contenuti sito, nuovi prompt di tracking).
-            3. Assegna un punteggio di priorità (0-100).`,
-            temperature: 0.2
+
+            FEEDBACK INTERVISTE (Feedback su comunicazione/brand):
+            ${JSON.stringify(interviewSummary)}
+
+            VISIBILITY TRACKER (Come gli LLM ti posizionano):
+            ${JSON.stringify(visibilitySummary)}
+
+            OBIETTIVI DELL'ANALISI:
+            1. Valuta la soddisfazione degli utenti del chatbot (punteggio 0-100 basato sul sentiment).
+            2. Analizza l'efficacia del sito nel rispondere alle problematiche emerse nelle interviste.
+            3. Valuta la presenza del brand negli LLM e coerenza con i contenuti del sito.
+            4. Identifica i gap dove gli LLM non ti citano (o ti citano male) NONOSTANTE il contenuto sia presente sul sito.
+            5. Suggerisci contenuti da creare (create_content) o modificare (modify_content).
+
+            Restituisci un Health Report e gli Insight dettagliati.`,
+            temperature: 0.1
         });
 
-        // 6. Save insights to DB
-        const savedInsights = [];
+        // 7. Save to DB
+        // Save the summary report as a special record
+        const healthInsight = await prisma.crossChannelInsight.create({
+            data: {
+                organizationId,
+                topicName: "Health Report: Brand & Sito",
+                visibilityData: { report: object.healthReport } as any,
+                interviewData: interviewSummary as any,
+                chatbotData: chatbotSummary as any,
+                crossChannelScore: 100,
+                priorityScore: 0,
+                suggestedActions: [
+                    {
+                        type: 'create_content',
+                        target: 'website',
+                        title: "Analisi Efficacia Brand & Sito",
+                        body: `Soddisfazione Chatbot: ${object.healthReport.chatbotSatisfaction.score}%. Efficacia Sito: ${object.healthReport.websiteEffectiveness.score}%. Visibilità Brand: ${object.healthReport.brandVisibility.score}%.`,
+                        reasoning: object.healthReport.websiteEffectiveness.feedbackSummary
+                    }
+                ],
+                status: 'new'
+            }
+        });
+
+        const savedInsights = [healthInsight];
         for (const rawInsight of object.insights) {
             const insight = await prisma.crossChannelInsight.create({
                 data: {
@@ -109,7 +173,7 @@ export class CrossChannelSyncEngine {
                     visibilityData: visibilitySummary as any,
                     interviewData: interviewSummary as any,
                     chatbotData: chatbotSummary as any,
-                    crossChannelScore: 100, // Heuristic for now
+                    crossChannelScore: 100,
                     priorityScore: rawInsight.priorityScore,
                     suggestedActions: rawInsight.suggestedActions as any,
                     status: 'new'
@@ -118,6 +182,9 @@ export class CrossChannelSyncEngine {
             savedInsights.push(insight);
         }
 
-        return savedInsights;
+        return {
+            insights: savedInsights,
+            healthReport: object.healthReport
+        };
     }
 }

@@ -236,8 +236,8 @@ export async function PATCH(request: Request) {
         // Use a transaction to ensure atomic updates
         const updatedConfig = await prisma.$transaction(async (tx) => {
             // 1. Update basic info
-            const config = await tx.visibilityConfig.updateMany({
-                where: { organizationId },
+            const config = await tx.visibilityConfig.update({
+                where: { id: existingConfig.id },
                 data: {
                     ...(brandName && { brandName }),
                     ...(category && { category }),

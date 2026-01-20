@@ -12,13 +12,13 @@ export const Icons = {
     Logo: ({ size = 48, ...props }: IconProps) => (
         <svg width={size} height={size} viewBox="0 0 48 48" fill="none" {...props}>
             <defs>
-                <linearGradient id="logoGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                <linearGradient id="btLogoGradient" x1="0%" y1="100%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor={colors.amberDark} />
                     <stop offset="50%" stopColor={colors.amber} />
                     <stop offset="100%" stopColor={colors.gold} />
                 </linearGradient>
             </defs>
-            <rect width="48" height="48" rx="14" fill="url(#logoGradient)" />
+            <rect width="48" height="48" rx="14" fill="url(#btLogoGradient)" />
             <g fill="white" opacity="0.9">
                 <rect x="8" y="28" width="5" height="12" rx="2" opacity="0.4" />
                 <rect x="15" y="24" width="5" height="16" rx="2" opacity="0.55" />

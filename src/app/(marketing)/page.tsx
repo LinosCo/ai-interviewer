@@ -839,12 +839,14 @@ export default function LandingPage() {
                         ))}
                     </div>
 
+                    {/* 
                     <div className="mt-20 pt-20 border-t border-stone-100 grid grid-cols-2 md:grid-cols-4 gap-8 text-center opacity-40 grayscale hover:grayscale-0 transition-all duration-700 cursor-default">
                         <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 1</div>
                         <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 2</div>
                         <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 3</div>
                         <div className="text-2xl font-black text-stone-900 flex items-center justify-center gap-2">Logo 4</div>
-                    </div>
+                    </div> 
+                    */}
                 </div>
             </section>
 
@@ -907,8 +909,6 @@ export default function LandingPage() {
                                 <a href="mailto:info@voler.ai" className="text-amber-50 font-bold hover:text-white transition-colors">Prenota una demo personalizzata</a>
                             </div>
                         </div>
-                        <Icons.Logo className="absolute -bottom-20 -left-20 opacity-10" size={300} />
-                        <Icons.Logo className="absolute -top-20 -right-20 opacity-10" size={300} />
                     </div>
                 </div>
             </section>

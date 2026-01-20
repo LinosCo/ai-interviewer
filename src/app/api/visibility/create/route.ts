@@ -221,23 +221,80 @@ export async function PATCH(request: Request) {
         const organizationId = user.memberships[0].organizationId;
 
         const body = await request.json();
-        const { brandName, category, description, language, territory, isActive } = body;
+        const { brandName, category, description, language, territory, isActive, prompts, competitors } = body;
 
-        const config = await prisma.visibilityConfig.update({
-            where: { organizationId },
-            data: {
-                ...(brandName && { brandName }),
-                ...(category && { category }),
-                ...(description !== undefined && { description }),
-                ...(language && { language }),
-                ...(territory && { territory }),
-                ...(isActive !== undefined && { isActive })
+        // Check if config exists
+        const existingConfig = await prisma.visibilityConfig.findUnique({
+            where: { organizationId }
+        });
+
+        if (!existingConfig) {
+            return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
+        }
+
+        // Use a transaction to ensure atomic updates
+        const updatedConfig = await prisma.$transaction(async (tx) => {
+            // 1. Update basic info
+            const config = await tx.visibilityConfig.update({
+                where: { organizationId },
+                data: {
+                    ...(brandName && { brandName }),
+                    ...(category && { category }),
+                    ...(description !== undefined && { description }),
+                    ...(language && { language }),
+                    ...(territory && { territory }),
+                    ...(isActive !== undefined && { isActive })
+                }
+            });
+
+            // 2. Sync Prompts if provided
+            if (prompts) {
+                // Delete existing
+                await tx.visibilityPrompt.deleteMany({
+                    where: { configId: config.id }
+                });
+
+                // Create new
+                if (prompts.length > 0) {
+                    await tx.visibilityPrompt.createMany({
+                        data: prompts.map((p: any, index: number) => ({
+                            configId: config.id,
+                            text: p.text,
+                            enabled: p.enabled ?? true,
+                            orderIndex: index,
+                            generatedByAI: p.generatedByAI ?? false,
+                            lastEditedAt: new Date()
+                        }))
+                    });
+                }
             }
+
+            // 3. Sync Competitors if provided
+            if (competitors) {
+                // Delete existing
+                await tx.competitor.deleteMany({
+                    where: { configId: config.id }
+                });
+
+                // Create new
+                if (competitors.length > 0) {
+                    await tx.competitor.createMany({
+                        data: competitors.map((c: any) => ({
+                            configId: config.id,
+                            name: c.name,
+                            website: c.website || null,
+                            enabled: c.enabled ?? true
+                        }))
+                    });
+                }
+            }
+
+            return config;
         });
 
         return NextResponse.json({
             success: true,
-            config
+            config: updatedConfig
         });
 
     } catch (error) {

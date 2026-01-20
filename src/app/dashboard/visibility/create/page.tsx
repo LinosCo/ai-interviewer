@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sparkles, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { WizardStepBrand } from './wizard/WizardStepBrand';
@@ -36,6 +36,7 @@ export default function CreateVisibilityWizardPage() {
     const router = useRouter();
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [isEdit, setIsEdit] = useState(false);
 
     const [config, setConfig] = useState<VisibilityConfig>({
         brandName: '',
@@ -46,6 +47,39 @@ export default function CreateVisibilityWizardPage() {
         prompts: [],
         competitors: []
     });
+
+    useEffect(() => {
+        const loadConfig = async () => {
+            try {
+                const res = await fetch('/api/visibility/create');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.config) {
+                        setConfig({
+                            brandName: data.config.brandName || '',
+                            category: data.config.category || '',
+                            description: data.config.description || '',
+                            language: data.config.language || 'it',
+                            territory: data.config.territory || 'IT',
+                            prompts: data.config.prompts?.map((p: any) => ({
+                                id: p.id,
+                                text: p.text,
+                                enabled: p.enabled
+                            })) || [],
+                            competitors: data.config.competitors?.map((c: any) => ({
+                                id: c.id,
+                                name: c.name
+                            })) || []
+                        });
+                        setIsEdit(true);
+                    }
+                }
+            } catch (err) {
+                console.error("Error loading config:", err);
+            }
+        };
+        loadConfig();
+    }, []);
 
     const handleNext = () => {
         if (currentStep < STEPS.length) {
@@ -63,17 +97,20 @@ export default function CreateVisibilityWizardPage() {
         setLoading(true);
         try {
             const response = await fetch('/api/visibility/create', {
-                method: 'POST',
+                method: isEdit ? 'PATCH' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(config)
             });
 
-            if (!response.ok) throw new Error('Failed to save');
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Failed to save');
+            }
 
             router.push('/dashboard/visibility');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Save error:', error);
-            alert('Errore nel salvataggio. Riprova.');
+            alert(error.message || 'Errore nel salvataggio. Riprova.');
         } finally {
             setLoading(false);
         }
@@ -90,7 +127,7 @@ export default function CreateVisibilityWizardPage() {
                         </div>
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                        Configura Visibility Tracking
+                        {isEdit ? 'Modifica Visibility Tracking' : 'Configura Visibility Tracking'}
                     </h1>
                     <p className="text-gray-600">
                         Monitora come i principali LLM parlano del tuo brand
@@ -173,7 +210,7 @@ export default function CreateVisibilityWizardPage() {
                             disabled={loading}
                             className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
                         >
-                            {loading ? 'Salvataggio...' : 'Salva e Avvia'}
+                            {loading ? 'Salvataggio...' : (isEdit ? 'Salva Modifiche' : 'Salva e Avvia')}
                             <Check className="w-5 h-5" />
                         </button>
                     )}

@@ -18,13 +18,13 @@ export function Header() {
                 <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}>
                     <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
                         <defs>
-                            <linearGradient id="logoGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                            <linearGradient id="btLogoGradientHeader" x1="0%" y1="100%" x2="100%" y2="0%">
                                 <stop offset="0%" stopColor="#D97706" />
                                 <stop offset="50%" stopColor="#F59E0B" />
                                 <stop offset="100%" stopColor="#FBBF24" />
                             </linearGradient>
                         </defs>
-                        <rect width="48" height="48" rx="14" fill="url(#logoGradient)" />
+                        <rect width="48" height="48" rx="14" fill="url(#btLogoGradientHeader)" />
                         <g fill="white" opacity="0.9">
                             <rect x="8" y="28" width="5" height="12" rx="2" opacity="0.4" />
                             <rect x="15" y="24" width="5" height="16" rx="2" opacity="0.55" />

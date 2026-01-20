@@ -31,7 +31,11 @@ export function ScanForm() {
                 showToast("Scansione completata con successo!");
             }
 
-            router.refresh();
+            if (data.scanId) {
+                router.push(`/dashboard/visibility?scanId=${data.scanId}`);
+            } else {
+                router.refresh();
+            }
         } catch (e) {
             console.error(e);
             showToast("Errore durante l'esecuzione della scansione", 'error');

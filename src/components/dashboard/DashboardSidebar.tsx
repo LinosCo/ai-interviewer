@@ -42,8 +42,8 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
             {/* Sidebar content */}
             <div className={`
                 fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out bg-white md:bg-transparent
-                md:relative md:translate-x-0 md:z-20 md:flex md:flex-col p-6
-                ${isOpen ? 'translate-x-0 overflow-y-auto' : '-translate-x-full'}
+                md:relative md:translate-x-0 md:z-20 md:flex md:flex-col p-6 h-full overflow-hidden
+                ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
             `}>
                 <div className="hidden md:block absolute inset-6 bg-white/65 backdrop-blur-md border border-white/40 shadow-md rounded-[24px] -z-1" />
 
@@ -63,7 +63,7 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
                     <span>Nuova intervista</span>
                 </Link>
 
-                <nav className="flex flex-col gap-2 flex-1">
+                <nav className="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-hide pr-2 -mr-2">
                     <DashboardLink href="/dashboard" icon={<Icons.Home size={20} />} label="Home" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/interviews" icon={<Icons.MessageSquare size={20} />} label="Le mie interviste" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />

@@ -227,7 +227,7 @@ export default function LandingPage() {
                                     <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
                                         <Icons.Search size={32} className="text-amber-500" />
                                     </div>
-                                    <span className="text-xs font-bold text-stone-500 tracking-wider">VISIBILITY</span>
+                                    <span className="text-xs font-bold text-stone-500 tracking-wider">PRESENZA ONLINE</span>
                                 </div>
                             </div>
 
@@ -237,12 +237,9 @@ export default function LandingPage() {
                                 </div>
                                 <div className="bg-gradient-to-br from-stone-900 to-stone-800 text-white rounded-[2rem] p-6 px-12 shadow-2xl mt-4 border border-stone-700 flex items-center gap-4 group hover:scale-105 transition-transform duration-500">
                                     <Icons.Layers size={24} className="text-amber-500" />
-                                    <span className="text-lg font-bold tracking-tight">Unified Insight Hub</span>
+                                    <span className="text-lg font-bold tracking-tight">Centro Insight Unificato</span>
                                 </div>
                             </div>
-
-                            {/* Decorative Blobs */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] h-[140%] bg-amber-500/5 blur-[120px] -z-10 rounded-full" />
                         </motion.div>
                     </div>
                 </div>
@@ -266,7 +263,7 @@ export default function LandingPage() {
                                 {[
                                     { label: 'Feedback Clienti', traditional: '€5.000-20.000 / anno', tuner: 'Incluso' },
                                     { label: 'Supporto AI', traditional: '€200+ / mese', tuner: 'Incluso' },
-                                    { label: 'Reputazione & Visibility', traditional: '€150+ / mese', tuner: 'Incluso' },
+                                    { label: 'Reputazione & Presenza Online', traditional: '€150+ / mese', tuner: 'Incluso' },
                                 ].map((item, i) => (
                                     <div key={i} className="flex items-center justify-between p-4 px-6 bg-stone-50 rounded-2xl border border-stone-100">
                                         <span className="font-bold text-stone-800">{item.label}</span>
@@ -281,7 +278,7 @@ export default function LandingPage() {
 
                         <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[3rem] p-12 text-white shadow-2xl relative overflow-hidden">
                             <div className="relative z-10">
-                                <h3 className="text-3xl font-bold mb-8">Business Tuner: Tutto Integrato</h3>
+                                <h3 className="text-3xl font-bold mb-8">Business Tuner: tutto integrato</h3>
                                 <p className="text-amber-50 mb-10 text-lg">
                                     Un unico ecosistema che automatizza la raccolta dati e li trasforma in azioni.
                                 </p>
@@ -487,7 +484,7 @@ export default function LandingPage() {
                         <div>
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Search size={24} /></div>
-                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Visibility Tracker</h3>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Analisi Presenza Online</h3>
                             </div>
                             <h4 className="text-xl text-stone-900 font-bold mb-6">Cosa dicono di te online e sull'AI.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
@@ -579,7 +576,7 @@ export default function LandingPage() {
                                 </div>
                                 <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center justify-center text-center group hover:bg-amber-100 transition-colors cursor-default">
                                     <Icons.Search size={32} className="text-amber-500 mb-4" />
-                                    <div className="text-xs font-black text-amber-900 uppercase">Visibility</div>
+                                    <div className="text-xs font-black text-amber-900 uppercase">Analisi Presenza</div>
                                     <div className="text-stone-500 text-[10px] mt-1 italic">Competitor parla di checkout</div>
                                 </div>
                                 <div className="bg-amber-50 p-6 rounded-[2rem] border border-stone-200 flex flex-col items-center justify-center text-center group hover:scale-105 transition-transform">
@@ -863,7 +860,7 @@ export default function LandingPage() {
                             { q: "Quanto tempo serve per iniziare?", a: "5 minuti. Scegli un template, personalizzalo e condividi il link. L'AI fa il resto." },
                             { q: "Devo avere competenze tecniche?", a: "No. L'interfaccia è pensata per imprenditori e manager, non per sviluppatori. Tutto è drag-and-drop o prompt-based." },
                             { q: "I dati sono sicuri?", a: "Assolutamente. Server EU (Germania/Irlanda), GDPR compliant, crittografia end-to-end. I tuoi dati non vengono mai usati per addestrare modelli AI pubblici." },
-                            { q: "Cos'è l'Insight Hub?", a: "È la dashboard che unisce i dati di tutti e tre gli strumenti. Se un tema emerge nelle interviste, nel chatbot E nella visibility, te lo segnaliamo con priorità alta." },
+                            { q: "Cos'è l'Insight Hub?", a: "È la dashboard che unisce i dati di tutti e tre gli strumenti. Se un tema emerge nelle interviste, nel chatbot e nella presenza online, te lo segnaliamo con priorità alta." },
                             { q: "Posso esportare i dati?", a: "Sì. Trascrizioni, insight in CSV o report PDF completi pronti da condividere." },
                         ].map((faq, i) => (
                             <details key={i} className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">

@@ -12,7 +12,8 @@ import {
     Calendar,
     ArrowRight,
     Users,
-    Zap
+    Zap,
+    Search
 } from "lucide-react";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -179,13 +180,15 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         )}
                     </section>
 
-                    {/* Visibility Tracker Section */}
-                    <section className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
-                                <Eye className="w-5 h-5 text-purple-500" />
-                                Visibility Trackers
-                            </h3>
+                    {/* Sezione Presenza Online */}
+                    <div className="bg-white rounded-[2rem] border border-stone-100 p-8 shadow-sm">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h3 className="text-xl font-bold text-stone-900 flex items-center gap-2">
+                                    <Eye className="w-5 h-5 text-purple-500" />
+                                    Analisi presenza
+                                </h3>
+                            </div>
                             <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
                                 <Button variant="ghost" size="sm" className="text-purple-600 font-bold hover:bg-purple-50 rounded-lg">
                                     <Plus className="w-4 h-4 mr-1" /> Nuovo
@@ -193,14 +196,15 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             </Link>
                         </div>
                         {trackers.length === 0 ? (
-                            <Card className="border-dashed bg-slate-50/50">
-                                <CardContent className="py-10 text-center">
-                                    <p className="text-sm text-slate-500 mb-4">Monitora come gli LLM vedono il tuo brand in questo progetto.</p>
-                                    <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
-                                        <Button size="sm" variant="outline" className="rounded-xl font-bold">Attiva Visibility Tracker</Button>
-                                    </Link>
-                                </CardContent>
-                            </Card>
+                            <div className="text-center py-10 bg-stone-50 rounded-2xl border border-stone-100">
+                                <Search className="w-10 h-10 text-stone-300 mx-auto mb-4" />
+                                <p className="text-stone-500 mb-6">
+                                    Configura almeno un un <strong>monitoraggio presenza</strong> per iniziare a ricevere insights unificati su questo progetto.
+                                </p>
+                                <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
+                                    <Button size="sm" variant="outline" className="rounded-xl font-bold">Attiva monitoraggio</Button>
+                                </Link>
+                            </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {trackers.map(config => (
@@ -223,7 +227,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                                 ))}
                             </div>
                         )}
-                    </section>
+                    </div>
                 </div>
 
                 {/* Right Column: Project Info & Quick Tools */}
@@ -269,7 +273,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             <div className="flex gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
                                 <Zap className="w-5 h-5 text-amber-600 flex-shrink-0" />
                                 <p className="text-xs text-amber-800 leading-relaxed">
-                                    Configura almeno un un <strong>Visibility Tracker</strong> per iniziare a ricevere insights unificati su questo progetto.
+                                    Configura almeno un un <strong>monitoraggio presenza</strong> per iniziare a ricevere insights unificati su questo progetto.
                                 </p>
                             </div>
                         </CardContent>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TEMPLATES, Template } from '@/lib/onboarding-templates';
 import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react';
@@ -17,6 +17,14 @@ const examplePrompts = [
 ];
 
 export default function OnboardingPage() {
+    return (
+        <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Caricamento...</div>}>
+            <OnboardingPageContent />
+        </Suspense>
+    );
+}
+
+function OnboardingPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const projectId = searchParams.get('projectId');

@@ -37,9 +37,9 @@ export const Button = ({
     };
 
     const sizeStyles = {
-        sm: { padding: '0.5rem 1rem', fontSize: '0.8125rem', fontWeight: 500 },
-        md: { padding: '0.875rem 1.5rem', fontSize: '1rem', fontWeight: 600 },
-        lg: { padding: '1rem 2rem', fontSize: '1.125rem', fontWeight: 600 },
+        sm: { padding: '0.4rem 0.8rem', fontSize: '0.75rem', fontWeight: 500 },
+        md: { padding: '0.75rem 1.25rem', fontSize: '0.9375rem', fontWeight: 600 },
+        lg: { padding: '0.875rem 1.75rem', fontSize: '1.0625rem', fontWeight: 600 },
     };
 
     const variantStyles = {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     Check,
@@ -44,6 +44,14 @@ interface GeneratedConfig {
 }
 
 export default function PreviewPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Caricamento...</div>}>
+            <PreviewPageContent />
+        </Suspense>
+    );
+}
+
+function PreviewPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const projectIdParam = searchParams.get('projectId');

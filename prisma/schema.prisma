@@ -622,6 +622,7 @@ model VisibilityConfig {
   prompts        VisibilityPrompt[]
   competitors    Competitor[]
   scans          VisibilityScan[]
+  serpScans      SerpMonitoringScan[]
 }
 
 model VisibilityPrompt {
@@ -692,10 +693,82 @@ model VisibilityScanMetric {
   id              String         @id @default(cuid())
   scanId          String
   scan            VisibilityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
-  
+
   metricType      String
   value           Float
   dimensions      Json?
+}
+
+// SERP Monitoring - Google Search Results for Brand Mentions
+model SerpMonitoringScan {
+  id              String           @id @default(cuid())
+  configId        String
+  visibilityConfig VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  scanType        String           @default("manual") // manual, scheduled, weekly
+  query           String           // Search query used (brand name + filters)
+  dateRange       String           @default("last_week") // last_week, last_month, last_day
+  totalResults    Int              @default(0)
+
+  // Aggregate metrics
+  positiveCount   Int              @default(0)
+  negativeCount   Int              @default(0)
+  neutralCount    Int              @default(0)
+  avgImportance   Float            @default(0)
+
+  startedAt       DateTime         @default(now())
+  completedAt     DateTime?
+  status          String           @default("pending") // pending, running, completed, failed
+
+  results         SerpResult[]
+
+  @@index([configId, startedAt])
+}
+
+model SerpResult {
+  id              String           @id @default(cuid())
+  scanId          String
+  scan            SerpMonitoringScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  // Raw SERP data
+  title           String
+  url             String
+  snippet         String           @db.Text
+  displayedLink   String?
+  publishedDate   DateTime?
+  position        Int              // Position in search results
+
+  // Source analysis
+  sourceDomain    String           // e.g., "ilsole24ore.com"
+  sourceType      String           // news, blog, forum, social, corporate, government
+  sourceReputation Float           @default(50) // 0-100 reputation score
+
+  // AI Analysis
+  sentiment       String           // positive, negative, neutral, mixed
+  sentimentScore  Float            // -1 to 1 continuous score
+  relevanceScore  Float            // 0-100 how relevant to brand
+  importanceScore Float            // 0-100 overall importance (combines all factors)
+
+  // Content analysis
+  brandMentionType String          // direct, indirect, competitor_comparison, industry_mention
+  topicCategory   String?          // product, service, leadership, controversy, award, partnership
+  keyEntities     Json?            // People, companies, products mentioned
+  contentSummary  String?          @db.Text // AI-generated summary
+
+  // Cross-channel correlation
+  relatedToLLMVisibility Boolean   @default(false) // Does this affect LLM recommendations?
+  suggestedActions Json?           // AI-suggested responses/actions
+
+  // Status
+  isReviewed      Boolean          @default(false)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  flagged         Boolean          @default(false) // Manual flag for attention
+
+  createdAt       DateTime         @default(now())
+
+  @@index([scanId, importanceScore])
+  @@index([scanId, sentiment])
 }
 
 enum UserRole {

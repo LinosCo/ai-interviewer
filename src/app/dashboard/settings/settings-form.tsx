@@ -40,6 +40,7 @@ export default function PlatformSettingsForm({
     stripePriceProYearly = ''
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
+    const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
     const [openaiKey, setOpenaiKey] = useState('');
     const [anthropicKey, setAnthropicKey] = useState('');
@@ -189,17 +190,45 @@ export default function PlatformSettingsForm({
 
             {/* Interview Methodology Section */}
             <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-semibold mb-4">Interview Methodology</h2>
-                <p className="text-sm text-gray-600 mb-4">
-                    This knowledge base is automatically included in all chatbot prompts.
-                    Customize it to match your organization's interview methodology.
-                </p>
-                <textarea
-                    value={knowledge}
-                    onChange={(e) => setKnowledge(e.target.value)}
-                    className="w-full h-96 border border-gray-300 rounded-lg px-4 py-3 font-mono text-sm"
-                    placeholder="Enter interview methodology knowledge..."
-                />
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">Metodologia interviste</h2>
+                    <button
+                        onClick={() => setIsKnowledgeOpen(!isKnowledgeOpen)}
+                        className="text-sm text-amber-600 font-bold hover:underline"
+                    >
+                        {isKnowledgeOpen ? 'Nascondi editor' : 'Modifica metodologia'}
+                    </button>
+                </div>
+
+                {!isKnowledgeOpen ? (
+                    <div className="p-4 bg-stone-50 rounded-lg border border-stone-100">
+                        <p className="text-sm text-stone-500 italic">
+                            La metodologia di intervista definisce come l'AI si comporta durante le conversazioni.
+                            Clicca su "Modifica metodologia" per visualizzare e cambiare il testo.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Questa base di conoscenza è inclusa automaticamente in tutti i prompt dei chatbot.
+                            Personalizzala per adattarla alla metodologia di intervista della tua organizzazione.
+                        </p>
+                        <textarea
+                            value={knowledge}
+                            onChange={(e) => setKnowledge(e.target.value)}
+                            className="w-full h-96 border border-gray-300 rounded-lg px-4 py-3 font-mono text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                            placeholder="Inserisci la metodologia di intervista..."
+                        />
+                        <div className="mt-4 flex justify-start">
+                            <button
+                                onClick={handleReset}
+                                className="text-xs text-stone-400 hover:text-stone-600 underline"
+                            >
+                                Ripristina metodologia predefinita
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Admin Only: Stripe Configuration */}
@@ -291,19 +320,13 @@ export default function PlatformSettingsForm({
             )}
 
             {/* Save Buttons */}
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
                 <button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20 active:scale-[0.98] transition-all"
                 >
-                    {isSaving ? 'Saving...' : 'Save All Settings'}
-                </button>
-                <button
-                    onClick={handleReset}
-                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                >
-                    Reset Methodology to Default
+                    {isSaving ? 'Salvataggio...' : 'Salva tutte le impostazioni'}
                 </button>
             </div>
         </div>

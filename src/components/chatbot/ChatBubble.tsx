@@ -52,7 +52,7 @@ export default function ChatBubble({
         : 'origin-bottom-left';
 
     return (
-        <div className={`fixed ${positionClasses} z-[9999] flex flex-col items-end gap-4`}>
+        <div className={`fixed ${positionClasses} z-[10000] flex flex-col items-end gap-4`}>
             {/* Chat Window Container would go here - handled by parent or separate component */}
 
             {/* Welcome Message Tooltip */}
@@ -94,7 +94,7 @@ export default function ChatBubble({
             <motion.button
                 layout
                 onClick={handleToggle}
-                className="relative group w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-purple-500/20"
+                className="relative group w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-purple-500/20"
                 style={{ backgroundColor: primaryColor }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -110,7 +110,7 @@ export default function ChatBubble({
                             exit={{ opacity: 0, rotate: 90 }}
                             transition={{ duration: 0.2 }}
                         >
-                            <ChevronDown className="w-8 h-8 text-white" />
+                            <ChevronDown className="w-6 h-6 sm:w-8 sm:h-8 text-white stroke-[3px]" />
                         </motion.div>
                     ) : (
                         <motion.div
@@ -120,7 +120,7 @@ export default function ChatBubble({
                             exit={{ opacity: 0, rotate: -90 }}
                             transition={{ duration: 0.2 }}
                         >
-                            <MessageSquare className="w-7 h-7 text-white" />
+                            <MessageSquare className="w-6 h-6 sm:w-7 sm:h-7 text-white fill-white/20 stroke-[2.5px]" />
                         </motion.div>
                     )}
                 </AnimatePresence>

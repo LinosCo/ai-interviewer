@@ -11,6 +11,10 @@
         {
             "path": "/api/cron/sync-insights",
             "schedule": "0 4 * * 1"
+        },
+        {
+            "path": "/api/cron/serp-monitoring",
+            "schedule": "0 8 * * 1"
         }
     ]
 }

@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { ScanForm } from "./ScanForm";
 import { ScanResults } from "@/components/visibility/ScanResults";
+import { SerpMonitoringSection } from "./SerpMonitoringSection";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Settings, History, Calendar } from "lucide-react";
+import { Settings, History, Calendar, Newspaper } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default async function VisibilityPage({
     searchParams
@@ -107,8 +109,8 @@ export default async function VisibilityPage({
         <div className="space-y-8 p-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Visibility Tracker</h2>
-                    <p className="text-muted-foreground">Analisi della presenza del brand nelle risposte degli LLM.</p>
+                    <h2 className="text-3xl font-bold tracking-tight">Analisi presenza online</h2>
+                    <p className="text-muted-foreground">Monitora come il tuo brand appare negli LLM e nelle ricerche Google.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Link href="/dashboard/visibility/create">
@@ -121,64 +123,89 @@ export default async function VisibilityPage({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Main Content (3/4) */}
-                <div className="lg:col-span-3">
-                    <ScanResults scan={scanData} totalScans={totalScans} />
-                </div>
+            <Tabs defaultValue="llm" className="space-y-6">
+                <TabsList className="bg-stone-100">
+                    <TabsTrigger value="llm" className="data-[state=active]:bg-white">
+                        Visibilità LLM
+                    </TabsTrigger>
+                    <TabsTrigger value="serp" className="data-[state=active]:bg-white flex items-center gap-2">
+                        <Newspaper className="w-4 h-4" />
+                        Google News
+                    </TabsTrigger>
+                </TabsList>
 
-                {/* Sidebar History (1/4) */}
-                <div className="space-y-4">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                <History className="w-4 h-4 text-amber-600" />
-                                Cronologia Scansioni
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-2">
-                            <div className="space-y-1">
-                                {allScans.length > 0 ? (
-                                    allScans.map((s) => (
-                                        <Link
-                                            key={s.id}
-                                            href={`/dashboard/visibility?scanId=${s.id}`}
-                                            className={`flex items-center justify-between p-3 rounded-lg text-sm transition-colors ${activeScan?.id === s.id ? 'bg-amber-50 border-amber-200 border' : 'hover:bg-slate-50 border border-transparent'}`}
-                                        >
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-slate-900">
-                                                    {s.completedAt?.toLocaleDateString()}
-                                                </span>
-                                                <span className="text-[10px] text-slate-500 flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3" />
-                                                    {s.completedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
+                {/* LLM Visibility Tab */}
+                <TabsContent value="llm" className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                        {/* Main Content (3/4) */}
+                        <div className="lg:col-span-3">
+                            <ScanResults scan={scanData} totalScans={totalScans} />
+                        </div>
+
+                        {/* Sidebar History (1/4) */}
+                        <div className="space-y-4">
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                        <History className="w-4 h-4 text-amber-600" />
+                                        Cronologia Scansioni
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="px-2">
+                                    <div className="space-y-1">
+                                        {allScans.length > 0 ? (
+                                            allScans.map((s) => (
+                                                <Link
+                                                    key={s.id}
+                                                    href={`/dashboard/visibility?scanId=${s.id}`}
+                                                    className={`flex items-center justify-between p-3 rounded-lg text-sm transition-colors ${activeScan?.id === s.id ? 'bg-amber-50 border-amber-200 border' : 'hover:bg-slate-50 border border-transparent'}`}
+                                                >
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium text-slate-900">
+                                                            {s.completedAt?.toLocaleDateString()}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                                            <Calendar className="w-3 h-3" />
+                                                            {s.completedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                    <Badge variant={s.score > 50 ? 'default' : 'secondary'} className={s.score > 50 ? 'bg-green-600' : ''}>
+                                                        {s.score}%
+                                                    </Badge>
+                                                </Link>
+                                            ))
+                                        ) : (
+                                            <div className="p-4 text-center text-xs text-muted-foreground">
+                                                Nessuna scansione completata
                                             </div>
-                                            <Badge variant={s.score > 50 ? 'default' : 'secondary'} className={s.score > 50 ? 'bg-green-600' : ''}>
-                                                {s.score}%
-                                            </Badge>
-                                        </Link>
-                                    ))
-                                ) : (
-                                    <div className="p-4 text-center text-xs text-muted-foreground">
-                                        Nessuna scansione completata
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                </CardContent>
+                            </Card>
 
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                        <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-2">Prossima Scansione</h4>
-                        <p className="text-sm text-blue-700">
-                            {config.nextScanAt
-                                ? `Programmata per il ${config.nextScanAt.toLocaleDateString()}`
-                                : 'Non programmata automatica'
-                            }
-                        </p>
+                            {/* Sezione Presenza Online */}
+                            <div className="bg-white rounded-[2rem] border border-stone-100 p-8 shadow-sm">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-stone-900">Analisi presenza</h3>
+                                        <p className="text-sm text-stone-500">
+                                            {config.nextScanAt
+                                                ? `Programmata per il ${config.nextScanAt.toLocaleDateString()}`
+                                                : 'Non programmata automatica'
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
+                </TabsContent>
+
+                {/* Google SERP Monitoring Tab */}
+                <TabsContent value="serp">
+                    <SerpMonitoringSection />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

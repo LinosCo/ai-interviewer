@@ -138,7 +138,7 @@ export default async function DashboardPage() {
                             className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors font-medium text-sm"
                         >
                             <BarChart3 className="w-4 h-4" />
-                            Unified Analytics
+                            Insight unificati
                         </Link>
                     )}
                     <Link
@@ -241,7 +241,7 @@ export default async function DashboardPage() {
                 <div className="space-y-4">
                     <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-gray-400" />
-                        Azioni Rapide
+                        Azioni rapide
                     </h2>
 
                     {/* Create Interview */}
@@ -252,7 +252,7 @@ export default async function DashboardPage() {
                         >
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <h3 className="text-xl font-semibold mb-2">Crea Nuova Intervista</h3>
+                                    <h3 className="text-xl font-semibold mb-2">Crea nuova intervista</h3>
                                     <p className="text-orange-100 text-sm">
                                         Genera un'intervista strutturata per HR, Product o Feedback.
                                     </p>
@@ -288,7 +288,7 @@ export default async function DashboardPage() {
                         >
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <h3 className="text-xl font-semibold mb-2">Crea Chatbot AI</h3>
+                                    <h3 className="text-xl font-semibold mb-2">Crea chatbot AI</h3>
                                     <p className="text-blue-100 text-sm">
                                         Assistente virtuale addestrato sulla tua Knowledge Base.
                                     </p>
@@ -326,7 +326,7 @@ export default async function DashboardPage() {
                                     <Sparkles className="w-4 h-4 text-gray-600" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-gray-900 text-sm">Esplora Template</h3>
+                                    <h3 className="font-semibold text-gray-900 text-sm">Esplora template</h3>
                                     <p className="text-gray-500 text-xs">Modelli pronti all'uso per ogni settore</p>
                                 </div>
                             </div>
@@ -340,7 +340,7 @@ export default async function DashboardPage() {
                     <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                             <Bell className="w-4 h-4 text-gray-400" />
-                            Attività Recente
+                            Attività recente
                         </h2>
                         <Link href="/dashboard/interviews" className="text-sm text-indigo-600 hover:text-indigo-700">
                             Vedi tutto →

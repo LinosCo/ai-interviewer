@@ -56,17 +56,17 @@ export function CookieConsent() {
                             </button>
                         </div>
 
-                        <div className="flex gap-3 mt-6">
+                        <div className="flex flex-col sm:flex-row gap-3 mt-6">
                             <Button
                                 onClick={handleAccept}
-                                className="flex-1 rounded-full py-6"
+                                className="flex-1 rounded-full py-4 sm:py-6 text-sm sm:text-base"
                             >
                                 Accetta tutti
                             </Button>
                             <Button
                                 onClick={handleDecline}
                                 variant="outline"
-                                className="flex-1 rounded-full py-6 border-stone-200"
+                                className="flex-1 rounded-full py-4 sm:py-6 text-sm sm:text-base border-stone-200"
                             >
                                 Solo necessari
                             </Button>

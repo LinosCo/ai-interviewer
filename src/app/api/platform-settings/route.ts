@@ -46,18 +46,18 @@ export async function POST(req: NextRequest) {
 
         // If Admin, update Global Config API Keys and Stripe Config
         if (user.role === 'ADMIN') {
-            const updateData: any = {
-                openaiApiKey: platformOpenaiApiKey || null,
-                anthropicApiKey: platformAnthropicApiKey || null,
-                geminiApiKey: platformGeminiApiKey || null,
-                googleSerpApiKey: googleSerpApiKey || null,
-                stripeSecretKey: stripeSecretKey || null,
-                stripeWebhookSecret: stripeWebhookSecret || null,
-                stripePriceStarter: stripePriceStarter || null,
-                stripePriceStarterYearly: stripePriceStarterYearly || null,
-                stripePricePro: stripePricePro || null,
-                stripePriceProYearly: stripePriceProYearly || null,
-            };
+            const updateData: any = {};
+
+            if (platformOpenaiApiKey !== undefined) updateData.openaiApiKey = platformOpenaiApiKey || null;
+            if (platformAnthropicApiKey !== undefined) updateData.anthropicApiKey = platformAnthropicApiKey || null;
+            if (platformGeminiApiKey !== undefined) updateData.geminiApiKey = platformGeminiApiKey || null;
+            if (googleSerpApiKey !== undefined) updateData.googleSerpApiKey = googleSerpApiKey || null;
+            if (stripeSecretKey !== undefined) updateData.stripeSecretKey = stripeSecretKey || null;
+            if (stripeWebhookSecret !== undefined) updateData.stripeWebhookSecret = stripeWebhookSecret || null;
+            if (stripePriceStarter !== undefined) updateData.stripePriceStarter = stripePriceStarter || null;
+            if (stripePriceStarterYearly !== undefined) updateData.stripePriceStarterYearly = stripePriceStarterYearly || null;
+            if (stripePricePro !== undefined) updateData.stripePricePro = stripePricePro || null;
+            if (stripePriceProYearly !== undefined) updateData.stripePriceProYearly = stripePriceProYearly || null;
 
             await prisma.globalConfig.upsert({
                 where: { id: "default" },

@@ -324,7 +324,7 @@ export default function LandingPage() {
             <WaveSeparator color="#FAFAF8" height={100} />
 
             {/* 3. THE THREE TOOLS SECTION */}
-            <section className="py-32 bg-[#FAFAF8] relative">
+            <section id="use-cases" className="py-32 bg-[#FAFAF8] relative">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="text-center max-w-3xl mx-auto mb-24">
                         <SectionLabel text="I nostri strumenti" />
@@ -877,6 +877,14 @@ export default function LandingPage() {
                             </details>
                         ))}
                     </div>
+
+                    <div className="mt-12 text-center">
+                        <Link href="/faq">
+                            <Button variant="secondary" className="px-8 rounded-full border-stone-200">
+                                Leggi tutte le FAQ <Icons.ArrowRight className="ml-2" />
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
             </section>
 
@@ -896,9 +904,7 @@ export default function LandingPage() {
                                         Inizia gratis ora <Icons.ArrowRight className="ml-2" />
                                     </Button>
                                 </Link>
-                                <Link href="/contact">
-                                    <button className="text-amber-50 font-bold hover:text-white transition-colors">Prenota una demo personalizzata</button>
-                                </Link>
+                                <a href="mailto:info@voler.ai" className="text-amber-50 font-bold hover:text-white transition-colors">Prenota una demo personalizzata</a>
                             </div>
                         </div>
                         <Icons.Logo className="absolute -bottom-20 -left-20 opacity-10" size={300} />

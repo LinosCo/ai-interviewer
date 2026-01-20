@@ -130,6 +130,8 @@ Target market: ${territory}`;
         // Handle each provider separately
         switch (provider) {
             case 'openai': {
+                const config = await checkProviderConfiguration('openai');
+                if (!config.configured) return null;
                 const openaiProvider = await getLLMProvider('openai');
                 result = await generateText({
                     model: openaiProvider('gpt-4o-mini') as any,
@@ -140,6 +142,8 @@ Target market: ${territory}`;
             }
 
             case 'anthropic': {
+                const config = await checkProviderConfiguration('anthropic');
+                if (!config.configured) return null;
                 const anthropicProvider = await getLLMProvider('anthropic');
                 result = await generateText({
                     model: anthropicProvider('claude-3-5-haiku-20241022') as any,
@@ -150,6 +154,8 @@ Target market: ${territory}`;
             }
 
             case 'gemini': {
+                const config = await checkProviderConfiguration('gemini');
+                if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
                     model: geminiProvider('gemini-2.0-flash-exp') as any,

@@ -1,9 +1,11 @@
-'use client'
+'use client';
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { ScanProgress } from "@/components/visibility/ScanProgress";
+import { showToast } from "@/components/toast";
 
 export function ScanForm() {
     const [loading, setLoading] = useState(false);
@@ -24,30 +26,34 @@ export function ScanForm() {
             const data = await response.json();
 
             if (data.partial) {
-                alert("Scan completato parzialmente. Alcuni provider non sono configurati o hanno fallito.");
+                showToast("Scansione completata parzialmente. Alcuni provider non sono configurati.");
             } else {
-                alert("Scan completato con successo!");
+                showToast("Scansione completata con successo!");
             }
 
             router.refresh();
         } catch (e) {
             console.error(e);
-            alert("Errore durante l'esecuzione dello scan");
+            showToast("Errore durante l'esecuzione della scansione", 'error');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Button onClick={handleScan} disabled={loading}>
-            {loading ? (
-                <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Scanning...
-                </>
-            ) : (
-                "Esegui Nuova Scansione"
-            )}
-        </Button>
+        <>
+            <Button onClick={handleScan} disabled={loading} className="rounded-full px-6">
+                {loading ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Scansione in corso...
+                    </>
+                ) : (
+                    "Esegui Nuova Scansione"
+                )}
+            </Button>
+
+            <ScanProgress isOpen={loading} onComplete={() => router.refresh()} />
+        </>
     );
 }

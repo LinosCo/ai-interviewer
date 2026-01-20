@@ -23,6 +23,8 @@ export const metadata: Metadata = {
   description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
 };
 
+import { CookieConsent } from "@/components/CookieConsent";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -39,6 +41,7 @@ export default function RootLayout({
         <Providers>
           {children}
           <ToastContainer />
+          <CookieConsent />
         </Providers>
         <SpeedInsights />
       </body>

@@ -22,7 +22,7 @@ export async function runVisibilityScan() {
     }
 
     // Find the visibility config for this organization
-    const config = await prisma.visibilityConfig.findUnique({
+    const config = await prisma.visibilityConfig.findFirst({
         where: { organizationId: orgId }
     });
 

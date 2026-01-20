@@ -24,7 +24,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
         <div className="space-y-6 p-6 max-w-4xl mx-auto">
             <div className="flex items-center gap-4">
                 <Link href="/dashboard/projects">
-                    <Button variant="ghost" size="icon" className="rounded-full">
+                    <Button variant="ghost" size="sm" className="rounded-full p-2">
                         <ChevronLeft className="w-5 h-5" />
                     </Button>
                 </Link>

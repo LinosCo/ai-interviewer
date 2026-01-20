@@ -148,7 +148,7 @@ export default async function ProjectsDashboardPage() {
                                     <div className="flex gap-2">
                                         {project.isOwner && (
                                             <Link href={`/dashboard/projects/${project.id}/settings`}>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:text-amber-600 hover:bg-amber-50">
+                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full text-slate-400 hover:text-amber-600 hover:bg-amber-50">
                                                     <Settings2 className="w-4 h-4" />
                                                 </Button>
                                             </Link>

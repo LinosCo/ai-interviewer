@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         const planType = subscriptionTierToPlanType(subscription.tier);
         const plan = PLANS[planType];
 
-        const config = await prisma.visibilityConfig.findUnique({
+        const config = await prisma.visibilityConfig.findFirst({
             where: { organizationId },
             include: {
                 prompts: {

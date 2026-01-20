@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 export default async function ProjectCockpitPage({ params }: { params: Promise<{ projectId: string }> }) {
     const session = await auth();
     if (!session?.user?.id) redirect('/login');
+    const userId = session.user.id;
 
     const { projectId } = await params;
 
@@ -44,7 +45,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
     if (!project) notFound();
 
     // Verify access
-    const hasAccess = project.ownerId === session.user.id || project.accessList.some(a => a.userId === session.user.id);
+    const hasAccess = project.ownerId === userId || project.accessList.some(a => a.userId === userId);
     if (!hasAccess) redirect('/dashboard/projects');
 
     const interviews = project.bots.filter(b => (b as any).botType === 'interview' || !(b as any).botType);

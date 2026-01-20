@@ -4,6 +4,7 @@ import "./globals.css";
 import { ToastContainer } from "@/components/toast";
 import { Providers } from "@/components/Providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +45,7 @@ export default function RootLayout({
           <CookieConsent />
         </Providers>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );

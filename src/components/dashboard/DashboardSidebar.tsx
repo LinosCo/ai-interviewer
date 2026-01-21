@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { colors, gradients, shadows } from '@/lib/design-system';
-import { ProjectSelector } from './ProjectSelector';
+import GlobalProjectSelector from './GlobalProjectSelector';
 
 interface DashboardSidebarProps {
     isAdmin: boolean;
@@ -55,7 +55,7 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
 
                 {/* Project Selector */}
                 <div className="mb-6">
-                    <ProjectSelector />
+                    <GlobalProjectSelector />
                 </div>
 
                 {/* Quick Create Button */}

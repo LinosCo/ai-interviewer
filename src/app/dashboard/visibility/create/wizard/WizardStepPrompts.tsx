@@ -7,13 +7,16 @@ import { VisibilityConfig } from '../page';
 interface Props {
     config: VisibilityConfig;
     setConfig: (config: VisibilityConfig) => void;
+    maxPrompts?: number;
 }
 
-export function WizardStepPrompts({ config, setConfig }: Props) {
+export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props) {
     const [generating, setGenerating] = useState(false);
     const [refiningId, setRefiningId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
+
+    const isLimitReached = config.prompts.length >= maxPrompts;
 
     const handleGenerate = async () => {
         if (!config.brandName || !config.category) {
@@ -31,14 +34,18 @@ export function WizardStepPrompts({ config, setConfig }: Props) {
                     category: config.category,
                     description: config.description,
                     language: config.language,
-                    territory: config.territory
+                    territory: config.territory,
+                    count: Math.min(5, maxPrompts)
                 })
             });
 
             if (!response.ok) throw new Error('Generation failed');
 
             const data = await response.json();
-            const prompts = data.prompts.map((text: string, index: number) => ({
+            // Truncate if API returns too many
+            const rawPrompts = data.prompts.slice(0, maxPrompts);
+
+            const prompts = rawPrompts.map((text: string, index: number) => ({
                 id: `prompt-${Date.now()}-${index}`,
                 text,
                 enabled: true
@@ -85,6 +92,7 @@ export function WizardStepPrompts({ config, setConfig }: Props) {
     };
 
     const handleAddManual = () => {
+        if (isLimitReached) return;
         const newPrompt = {
             id: `prompt-${Date.now()}`,
             text: '',
@@ -127,9 +135,14 @@ export function WizardStepPrompts({ config, setConfig }: Props) {
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">
                     Prompts di Monitoring
                 </h2>
-                <p className="text-gray-600">
-                    Genera automaticamente o crea manualmente i prompt che verranno utilizzati per interrogare gli LLM
-                </p>
+                <div className="flex justify-between items-start">
+                    <p className="text-gray-600">
+                        Genera automaticamente o crea manualmente i prompt che verranno utilizzati per interrogare gli LLM
+                    </p>
+                    <div className="text-xs font-semibold bg-gray-100 px-3 py-1 rounded-full text-gray-700">
+                        {config.prompts.length} / {maxPrompts} Prompts
+                    </div>
+                </div>
             </div>
 
             {/* Generate Button */}
@@ -235,10 +248,11 @@ export function WizardStepPrompts({ config, setConfig }: Props) {
 
                     <button
                         onClick={handleAddManual}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all"
+                        disabled={isLimitReached}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Plus className="w-5 h-5" />
-                        Aggiungi Prompt Manuale
+                        {isLimitReached ? "Limite Raggiunto" : "Aggiungi Prompt Manuale"}
                     </button>
 
                     {config.prompts.length > 0 && (

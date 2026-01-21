@@ -24,13 +24,26 @@ export async function GET(req: NextRequest) {
                 memberships: {
                     include: {
                         organization: {
-                            select: {
-                                id: true,
-                                name: true,
-                                plan: true,
-                                billingCycle: true,
-                                responsesUsedThisMonth: true,
-                                monthlyResetDate: true
+                            include: {
+                                subscription: true,
+                                bots: {
+                                    where: { status: 'PUBLISHED' },
+                                    select: { id: true }
+                                },
+                                visibilityConfig: {
+                                    include: {
+                                        scans: {
+                                            where: {
+                                                startedAt: {
+                                                    gte: new Date(new Date().setDate(new Date().getDate() - 7))
+                                                }
+                                            }
+                                        },
+                                        competitors: { where: { enabled: true } },
+                                        prompts: { where: { enabled: true } }
+                                    }
+                                },
+                                tokenUsage: true
                             }
                         }
                     }

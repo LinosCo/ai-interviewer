@@ -233,6 +233,34 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
+        // Check plan limits for validation
+        const subscription = await getOrCreateSubscription(organizationId);
+        if (!subscription) {
+            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
+        }
+        const planType = subscriptionTierToPlanType(subscription.tier);
+        const plan = PLANS[planType];
+
+        if (prompts) {
+            const enabledPrompts = prompts.filter((p: any) => p.enabled);
+            if (enabledPrompts.length > plan.limits.maxVisibilityPrompts) {
+                return NextResponse.json(
+                    { error: `Your plan allows a maximum of ${plan.limits.maxVisibilityPrompts} prompts` },
+                    { status: 400 }
+                );
+            }
+        }
+
+        if (competitors) {
+            const enabledCompetitors = competitors.filter((c: any) => c.enabled);
+            if (enabledCompetitors.length > plan.limits.maxCompetitorsTracked) {
+                return NextResponse.json(
+                    { error: `Your plan allows a maximum of ${plan.limits.maxCompetitorsTracked} competitors` },
+                    { status: 400 }
+                );
+            }
+        }
+
         // Use a transaction to ensure atomic updates
         const updatedConfig = await prisma.$transaction(async (tx) => {
             // 1. Update basic info

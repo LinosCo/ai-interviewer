@@ -24,11 +24,17 @@ export async function GET() {
                             }
                         }
                     }
+                },
+                memberships: {
+                    select: { role: true }
                 }
             }
         });
 
         if (!user) return new Response('User not found', { status: 404 });
+
+        // Check if user is ADMIN or OWNER in organization
+        const isOrgAdmin = user.memberships.some(m => ['OWNER', 'ADMIN'].includes(m.role));
 
         // Map projects with role information
         const projects = user.projectAccess.map(pa => ({
@@ -43,7 +49,7 @@ export async function GET() {
             return a.name.localeCompare(b.name);
         });
 
-        return Response.json(projects);
+        return Response.json({ projects, isOrgAdmin });
 
     } catch (error) {
         console.error('Fetch Projects Error:', error);

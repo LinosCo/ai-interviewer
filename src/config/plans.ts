@@ -122,70 +122,72 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         price: 0,
         priceYearly: 0,
 
-        responsesPerMonth: 300,
+        responsesPerMonth: 10,
         activeInterviews: 1,
         users: 1,
 
         features: {
             aiGeneration: true,
             basicTemplates: true,
-            advancedTemplates: true,
+            advancedTemplates: false,
             manualEdit: true,
-            knowledgeBase: true,
+            knowledgeBase: false,
             conditionalLogic: false,
             customTemplates: false,
 
-            watermark: false,
-            customColor: true,
-            customLogo: true,
+            watermark: true,
+            customColor: false,
+            customLogo: false,
             customDomain: false,
             whiteLabel: false,
 
             basicStats: true,
             transcripts: true,
-            sentiment: true,
-            themeExtraction: true,
-            keyQuotes: true,
-            trends: true,
-            comparison: true,
+            sentiment: false,
+            themeExtraction: false,
+            keyQuotes: false,
+            trends: false,
+            comparison: false,
             segmentation: false,
             customDashboards: false,
 
             exportPdf: true,
-            exportCsv: true,
-            webhooks: true,
+            exportCsv: false,
+            webhooks: false,
             apiAccess: false,
             zapier: false,
             sso: false,
 
-            supportLevel: 'priority'
+            supportLevel: 'community'
         },
 
         limits: {
-            maxExchangesPerInterview: 30,
-            maxTokensPerInterview: 150000,
-            maxCharsPerUserMessage: 5000,
-            inactivityTimeoutMinutes: 60,
+            maxExchangesPerInterview: 10,
+            maxTokensPerInterview: 50000,
+            maxCharsPerUserMessage: 2000,
+            inactivityTimeoutMinutes: 30,
 
-            maxQuestionsPerInterview: 20,
-            maxKnowledgeBaseChars: 100000,
-            maxKnowledgeBaseFiles: 10,
+            maxQuestionsPerInterview: 10,
+            maxKnowledgeBaseChars: 0,
+            maxKnowledgeBaseFiles: 0,
 
-            simulationsPerDayPerBot: 50,
-            aiRegenerationsPerDay: 100,
+            simulationsPerDayPerBot: 5,
+            aiRegenerationsPerDay: 10,
 
-            maxParallelInterviews: 100,
-            messageCooldownSeconds: 0.5,
-            monthlyTokenBudget: 500000,
-            maxActiveChatbots: 1,
-            maxVisibilityPrompts: 5,
-            visibilityScansPerWeek: 1,
-            maxCompetitorsTracked: 2
+            maxParallelInterviews: 10,
+            messageCooldownSeconds: 3,
+            monthlyTokenBudget: 0,
+            maxActiveChatbots: 0,
+            maxVisibilityPrompts: 0,
+            visibilityScansPerWeek: 0,
+            maxCompetitorsTracked: 0
         },
         marketingFeatures: [
-            '14 giorni di prova gratuita',
-            'Accesso a tutte le funzioni PRO',
-            'Supporto prioritario',
+            '10 interviste/mese',
+            '1 Progetto',
+            'Analytics base',
+            'Nessun Chatbot',
+            'Supporto Community'
         ],
 
         stripePriceId: undefined,
@@ -245,7 +247,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxQuestionsPerInterview: 20,
             maxKnowledgeBaseChars: 100000,
-            maxKnowledgeBaseFiles: 10,
+            maxKnowledgeBaseFiles: 50,
 
             simulationsPerDayPerBot: 25,
             aiRegenerationsPerDay: 50,
@@ -254,8 +256,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             messageCooldownSeconds: 1,
             monthlyTokenBudget: 1000000,
             maxActiveChatbots: 3,
-            maxVisibilityPrompts: 15,
-            visibilityScansPerWeek: 1,
+            maxVisibilityPrompts: 45,
+            visibilityScansPerWeek: 7, // Allow daily
             maxCompetitorsTracked: 5
         },
         marketingFeatures: [
@@ -284,13 +286,13 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             basicTemplates: true,
             advancedTemplates: true,
             manualEdit: true,
-            knowledgeBase: false,
+            knowledgeBase: true, // Activated for KB sources
             conditionalLogic: false,
             customTemplates: false,
 
             watermark: true,
             customColor: true,
-            customLogo: false,
+            customLogo: true,
             customDomain: false,
             whiteLabel: false,
 
@@ -321,27 +323,28 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             inactivityTimeoutMinutes: 30,
 
             maxQuestionsPerInterview: 12,
-            maxKnowledgeBaseChars: 0,
-            maxKnowledgeBaseFiles: 0,
+            maxKnowledgeBaseChars: 100000,
+            maxKnowledgeBaseFiles: 10,
 
             simulationsPerDayPerBot: 10,
             aiRegenerationsPerDay: 20,
 
             maxParallelInterviews: 15,
             messageCooldownSeconds: 2,
-            monthlyTokenBudget: 200000,
-            maxActiveChatbots: 0,
+            monthlyTokenBudget: 200000, // ~2000 conversations approx depending on length, simplified token budget
+            maxActiveChatbots: 1,
             maxVisibilityPrompts: 0,
             visibilityScansPerWeek: 0,
             maxCompetitorsTracked: 0
         },
         marketingFeatures: [
-            '5 progetti attivi',
-            '300 risposte/mese',
-            'Chatbot (1 bot)',
-            '2.000 conversazioni',
-            'Logo custom',
-            '2 utenti inclusi'
+            '300 interviste/mese',
+            '5 Progetti attivi',
+            'Analytics completi',
+            '1 Chatbot (2.000 conv/mese)',
+            '10 Knowledge Sources',
+            'No Visibility',
+            'No AI Tips'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_STARTER,
@@ -355,7 +358,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         priceYearly: 149,
 
         responsesPerMonth: 1000,
-        activeInterviews: 20,
+        activeInterviews: 15,
         users: 5,
 
         features: {
@@ -400,29 +403,29 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             inactivityTimeoutMinutes: 45,
 
             maxQuestionsPerInterview: 20,
-            maxKnowledgeBaseChars: 100000,
-            maxKnowledgeBaseFiles: 10,
+            maxKnowledgeBaseChars: 500000,
+            maxKnowledgeBaseFiles: 50,
 
             simulationsPerDayPerBot: 25,
             aiRegenerationsPerDay: 50,
 
             maxParallelInterviews: 50,
             messageCooldownSeconds: 1,
-            monthlyTokenBudget: 1000000,
+            monthlyTokenBudget: 1000000, // ~10000 conversations
             maxActiveChatbots: 3,
-            maxVisibilityPrompts: 15,
-            visibilityScansPerWeek: 1,
-            maxCompetitorsTracked: 5
+            maxVisibilityPrompts: 45,
+            visibilityScansPerWeek: 7, // Daily manual limit handled in logic, here we set weekly frequency for automated
+            maxCompetitorsTracked: 3 // +3 Brands handled by clusters logic
         },
         marketingFeatures: [
-            '1.000 risposte/mese',
-            '15 progetti attivi',
-            'Chatbot (3 bot)',
-            '10.000 conversazioni',
-            'Visibility (1 brand)',
-            'Cross-Channel (50 insights)',
-            'Analytics avanzati',
-            '5 utenti inclusi'
+            '1.000 interviste/mese',
+            '15 Progetti attivi',
+            '3 Chatbot (10.000 conv/mese)',
+            '50 Knowledge Sources',
+            'AI Tips inclusi',
+            'Visibility: 3 Brand + 3 Competitor',
+            '45 Prompt Visibility',
+            'Scan Settimanale automatico'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_PRO,
@@ -481,28 +484,26 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             inactivityTimeoutMinutes: 60,
 
             maxQuestionsPerInterview: 30,
-            maxKnowledgeBaseChars: 500000,
-            maxKnowledgeBaseFiles: 25,
+            maxKnowledgeBaseChars: 1000000,
+            maxKnowledgeBaseFiles: 100,
 
             simulationsPerDayPerBot: 50,
             aiRegenerationsPerDay: 100,
 
             maxParallelInterviews: 200,
             messageCooldownSeconds: 0.5,
-            monthlyTokenBudget: 5000000,
-            maxActiveChatbots: -1,
-            maxVisibilityPrompts: 50,
-            visibilityScansPerWeek: 1,
-            maxCompetitorsTracked: 15
+            monthlyTokenBudget: 3000000, // ~30000 conversations
+            maxActiveChatbots: 10,
+            maxVisibilityPrompts: 75,
+            visibilityScansPerWeek: 7, // Keeping structure, but logic will separate auto vs manual
+            maxCompetitorsTracked: 10 // +5 Brands
         },
         marketingFeatures: [
-            '3.000 risposte/mese',
+            '3.000 interviste/mese',
             'Progetti illimitati',
-            'Chatbot (10 bot)',
-            '30.000 conversazioni',
-            'Visibility (3 brand)',
-            'Visibility Giornaliera',
-            'Cross-Channel Illimitato',
+            '10 Chatbot (30.000 conv/mese)',
+            'Visibility: 5 Brand + 10 Competitor',
+            '75 Prompt Visibility',
             'White Label & Priority Support'
         ],
 

@@ -6,13 +6,16 @@ import { Plus, Trash2, Globe, Search } from 'lucide-react';
 interface WizardStepCompetitorsProps {
     config: VisibilityConfig;
     setConfig: (config: VisibilityConfig) => void;
+    maxCompetitors?: number;
 }
 
-export function WizardStepCompetitors({ config, setConfig }: WizardStepCompetitorsProps) {
+export function WizardStepCompetitors({ config, setConfig, maxCompetitors = 5 }: WizardStepCompetitorsProps) {
     const [newCompetitor, setNewCompetitor] = useState('');
+    const isLimitReached = config.competitors.length >= maxCompetitors;
 
     const addCompetitor = () => {
         if (!newCompetitor.trim()) return;
+        if (isLimitReached) return;
 
         const updatedCompetitors = [
             ...config.competitors,
@@ -46,8 +49,10 @@ export function WizardStepCompetitors({ config, setConfig }: WizardStepCompetito
                     <h3 className="font-semibold text-blue-900 text-sm">Monitora i Competitor</h3>
                     <p className="text-blue-700 text-sm">
                         Aggiungi i tuoi principali concorrenti per confrontare la loro visibilità con la tua.
-                        Analizzeremo come gli LLM rispondono quando vengono chiesti confronti nel tuo settore.
                     </p>
+                    <div className="mt-2 text-xs font-semibold text-blue-800">
+                        Limite piano: {config.competitors.length} / {maxCompetitors}
+                    </div>
                 </div>
             </div>
 
@@ -65,19 +70,25 @@ export function WizardStepCompetitors({ config, setConfig }: WizardStepCompetito
                             value={newCompetitor}
                             onChange={(e) => setNewCompetitor(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
-                            placeholder="Es. Competitor X, Inc."
+                            disabled={isLimitReached}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            placeholder={isLimitReached ? "Limite raggiunto" : "Es. Competitor X, Inc."}
                         />
                     </div>
                     <button
                         onClick={addCompetitor}
-                        disabled={!newCompetitor.trim()}
+                        disabled={!newCompetitor.trim() || isLimitReached}
                         className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />
                         Aggiungi
                     </button>
                 </div>
+                {isLimitReached && (
+                    <p className="text-xs text-red-500 mt-2">
+                        Hai raggiunto il numero massimo di competitor per il tuo piano.
+                    </p>
+                )}
             </div>
 
             {/* List */}

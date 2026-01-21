@@ -9,12 +9,22 @@ interface Project {
     role: 'OWNER' | 'MEMBER';
 }
 
+// Special "All Projects" option for admins
+export const ALL_PROJECTS_OPTION: Project = {
+    id: '__ALL__',
+    name: 'Tutti i progetti',
+    isPersonal: false,
+    role: 'OWNER'
+};
+
 interface ProjectContextType {
     projects: Project[];
     selectedProject: Project | null;
-    setSelectedProject: (project: Project) => void;
+    setSelectedProject: (project: Project | null) => void;
     loading: boolean;
     refetchProjects: () => Promise<void>;
+    isOrgAdmin: boolean;
+    isAllProjectsSelected: boolean;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -25,24 +35,35 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProject, setSelectedProjectState] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isOrgAdmin, setIsOrgAdmin] = useState(false);
 
     const fetchProjects = async () => {
         try {
             const res = await fetch('/api/projects');
             if (res.ok) {
                 const data = await res.json();
-                setProjects(data);
+                const projectsList = data.projects || data; // Support both old and new API format
+                const adminStatus = data.isOrgAdmin || false;
+
+                setProjects(projectsList);
+                setIsOrgAdmin(adminStatus);
 
                 // Restore selected project from localStorage or use first project
                 const savedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
-                const savedProject = data.find((p: Project) => p.id === savedProjectId);
 
-                if (savedProject) {
-                    setSelectedProjectState(savedProject);
-                } else if (data.length > 0) {
-                    // Default to first project (personal project since it's sorted first)
-                    setSelectedProjectState(data[0]);
-                    localStorage.setItem(SELECTED_PROJECT_KEY, data[0].id);
+                // Handle "All Projects" selection for admins
+                if (savedProjectId === ALL_PROJECTS_OPTION.id && adminStatus) {
+                    setSelectedProjectState(ALL_PROJECTS_OPTION);
+                } else {
+                    const savedProject = projectsList.find((p: Project) => p.id === savedProjectId);
+
+                    if (savedProject) {
+                        setSelectedProjectState(savedProject);
+                    } else if (projectsList.length > 0) {
+                        // Default to first project (personal project since it's sorted first)
+                        setSelectedProjectState(projectsList[0]);
+                        localStorage.setItem(SELECTED_PROJECT_KEY, projectsList[0].id);
+                    }
                 }
             }
         } catch (error) {
@@ -56,9 +77,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         fetchProjects();
     }, []);
 
-    const setSelectedProject = (project: Project) => {
+    const setSelectedProject = (project: Project | null) => {
         setSelectedProjectState(project);
-        localStorage.setItem(SELECTED_PROJECT_KEY, project.id);
+        if (project) {
+            localStorage.setItem(SELECTED_PROJECT_KEY, project.id);
+        }
     };
 
     const refetchProjects = async () => {
@@ -66,13 +89,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         await fetchProjects();
     };
 
+    const isAllProjectsSelected = selectedProject?.id === ALL_PROJECTS_OPTION.id;
+
     return (
         <ProjectContext.Provider value={{
             projects,
             selectedProject,
             setSelectedProject,
             loading,
-            refetchProjects
+            refetchProjects,
+            isOrgAdmin,
+            isAllProjectsSelected
         }}>
             {children}
         </ProjectContext.Provider>

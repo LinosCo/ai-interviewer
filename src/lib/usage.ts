@@ -384,17 +384,19 @@ export async function checkVisibilityLimits(organizationId: string) {
         where: { configId: visibilityConfig.id, enabled: true }
     });
 
-    // 3. Check Scans (Weekly)
-    // Find scans in the last 7 days
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    // 3. Check Scans
+    // Check Daily Limit (Manual)
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    const scansLastWeek = await prisma.visibilityScan.count({
+    const scansLast24h = await prisma.visibilityScan.count({
         where: {
             configId: visibilityConfig.id,
-            startedAt: { gte: oneWeekAgo }
+            startedAt: { gte: oneDayAgo }
         }
     });
+
+    const manualDailyLimit = subscription.tier === 'PRO' ? 10 : (subscription.tier === 'BUSINESS' || subscription.tier === 'ENTERPRISE') ? 50 : 0;
 
     return {
         competitors: {
@@ -408,9 +410,9 @@ export async function checkVisibilityLimits(organizationId: string) {
             allowed: limits.maxVisibilityPrompts > promptCount
         },
         scans: {
-            used: scansLastWeek,
-            limit: limits.visibilityScansPerWeek,
-            allowed: limits.visibilityScansPerWeek > scansLastWeek
+            used: scansLast24h,
+            limit: manualDailyLimit,
+            allowed: manualDailyLimit > scansLast24h
         }
     };
 }

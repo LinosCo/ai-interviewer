@@ -45,7 +45,7 @@ export function UsageDashboard() {
             if (data.memberships?.[0]?.organization) {
                 const org = data.memberships[0].organization;
                 const planKey = org.plan as PlanType;
-                const planConfig = PLANS[planKey] || PLANS.TRIAL; // Default or fallback
+                const planConfig = PLANS[planKey] || PLANS[PlanType.TRIAL]; // Default or fallback
 
                 // Calculate Visibility Usage
                 const visibilityConfig = org.visibilityConfig;
@@ -53,11 +53,14 @@ export function UsageDashboard() {
                 const competitorsUsed = visibilityConfig?.competitors?.length || 0;
                 const promptsUsed = visibilityConfig?.prompts?.length || 0;
 
+                // Count bots from projects
+                const botsCount = org.projects?.reduce((sum: number, p: any) => sum + (p.bots?.length || 0), 0) || 0;
+
                 setUsage({
                     plan: planKey,
                     responsesUsed: org.responsesUsedThisMonth,
                     responsesLimit: planConfig.responsesPerMonth,
-                    activeBots: org.bots?.length || 0, // Using bots length as active check for now
+                    activeBots: botsCount, // Count bots from all projects
                     botsLimit: planConfig.limits.maxActiveChatbots,
                     chatbots: {
                         // TODO: Fetch real conversation usage from tokenUsage or specific conversational log

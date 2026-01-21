@@ -26,9 +26,13 @@ export async function GET(req: NextRequest) {
                         organization: {
                             include: {
                                 subscription: true,
-                                bots: {
-                                    where: { status: 'PUBLISHED' },
-                                    select: { id: true }
+                                projects: {
+                                    include: {
+                                        bots: {
+                                            where: { status: 'PUBLISHED' },
+                                            select: { id: true }
+                                        }
+                                    }
                                 },
                                 visibilityConfig: {
                                     include: {

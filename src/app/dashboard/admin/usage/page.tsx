@@ -3,20 +3,21 @@ import { Card } from '@/components/ui/business-tuner/Card';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { Prisma } from '@prisma/client';
 
-type OrganizationWithUsage = Prisma.OrganizationGetPayload<{
-    include: {
-        subscription: true;
-        _count: {
-            select: {
-                members: true;
-                projects: true;
-                bots: true;
-            };
-        };
+interface OrganizationWithUsage {
+    id: string;
+    name: string;
+    plan: string;
+    subscription: {
+        status: string;
+        interviewsUsedThisMonth: number;
+    } | null;
+    _count: {
+        members: number;
+        projects: number;
     };
-}>;
+    botCount: number;
+}
 
 export default async function AdminUsagePage() {
     const session = await auth();
@@ -30,19 +31,35 @@ export default async function AdminUsagePage() {
         return <div className="p-8">Access Denied</div>;
     }
 
-    const organizations: OrganizationWithUsage[] = await prisma.organization.findMany({
+    const orgs = await prisma.organization.findMany({
         include: {
             subscription: true,
+            projects: {
+                include: {
+                    _count: {
+                        select: { bots: true }
+                    }
+                }
+            },
             _count: {
                 select: {
                     members: true,
-                    projects: true,
-                    bots: true
+                    projects: true
                 }
             }
         },
         orderBy: { createdAt: 'desc' }
     });
+
+    // Transform to include bot count
+    const organizations: OrganizationWithUsage[] = orgs.map(org => ({
+        id: org.id,
+        name: org.name,
+        plan: org.plan,
+        subscription: org.subscription,
+        _count: org._count,
+        botCount: org.projects.reduce((sum, p) => sum + p._count.bots, 0)
+    }));
 
     return (
         <div className="p-8 space-y-8">
@@ -76,7 +93,7 @@ export default async function AdminUsagePage() {
                             </div>
                             <div className="p-3 bg-gray-50 rounded-lg">
                                 <p className="text-gray-500 mb-1">Bot Totali</p>
-                                <p className="font-semibold text-lg">{org._count.bots}</p>
+                                <p className="font-semibold text-lg">{org.botCount}</p>
                             </div>
                             <div className="p-3 bg-gray-50 rounded-lg">
                                 <p className="text-gray-500 mb-1">Utenti</p>

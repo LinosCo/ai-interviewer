@@ -14,7 +14,9 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
             owner: true,
             bots: {
                 orderBy: { createdAt: 'desc' }
-            }
+            },
+            visibilityConfigs: true, // Fetch currently associated configs
+            organization: true
         }
     });
 
@@ -25,5 +27,50 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
         select: { id: true, name: true }
     });
 
-    return <ProjectDetailView project={project} allProjects={allProjects} />;
+    let availableBots: any[] = [];
+    let availableVisibilityConfigs: any[] = [];
+
+    if (project.organizationId) {
+        // Fetch bots from other projects in the same organization
+        availableBots = await prisma.bot.findMany({
+            where: {
+                project: {
+                    organizationId: project.organizationId
+                },
+                projectId: {
+                    not: project.id
+                }
+            },
+            include: {
+                project: {
+                    select: { name: true }
+                }
+            }
+        });
+
+        // Fetch visibility configs in the organization not already in this project
+        availableVisibilityConfigs = await prisma.visibilityConfig.findMany({
+            where: {
+                organizationId: project.organizationId,
+                OR: [
+                    { projectId: null },
+                    { projectId: { not: project.id } }
+                ]
+            },
+            include: {
+                project: {
+                    select: { name: true }
+                }
+            }
+        });
+    }
+
+    return (
+        <ProjectDetailView
+            project={project}
+            allProjects={allProjects}
+            availableBots={availableBots}
+            availableVisibilityConfigs={availableVisibilityConfigs}
+        />
+    );
 }

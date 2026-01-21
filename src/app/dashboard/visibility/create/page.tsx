@@ -53,6 +53,7 @@ export default function CreateVisibilityWizardPage() {
         competitors: []
     });
 
+    const [projects, setProjects] = useState<Array<{ id: string, name: string }>>([]);
     const [limits, setLimits] = useState({ maxCompetitors: 0, maxPrompts: 0 });
 
     useEffect(() => {
@@ -84,19 +85,16 @@ export default function CreateVisibilityWizardPage() {
                     }
                 }
 
-                // Load Limits
+                // Load Limits and Projects
                 const limitRes = await fetch('/api/user/settings');
                 if (limitRes.ok) {
                     const limitData = await limitRes.json();
-                    // Basic limit logic extraction, similar to other components
-                    // In a real app, API should return these explicitly to avoid duplication
+
+                    // Extract projects
+                    const orgProjects = limitData.memberships?.[0]?.organization?.projects || [];
+                    setProjects(orgProjects.map((p: any) => ({ id: p.id, name: p.name })));
+
                     const plan = limitData.memberships?.[0]?.organization?.plan || 'TRIAL';
-                    // Hardcoding for now based on known plan structure or fetching from a dedicated limits API would be better
-                    // But we can approximate efficiently here or let the child component handle it if we pass the plan.
-                    // Let's pass the raw numbers if possible.
-                    // actually, let's just pass the PLAN string or fetch specific limits.
-                    // For now, I'll allow the UI to receive these props.
-                    // PRO: 3 comp, 45 prompts. BUSINESS: 10 comp, 75 prompts.
                     let maxComp = 2; // Trial default
                     let maxPrompts = 5;
 
@@ -208,7 +206,7 @@ export default function CreateVisibilityWizardPage() {
                 {/* Step Content */}
                 <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
                     {currentStep === 1 && (
-                        <WizardStepBrand config={config} setConfig={setConfig} />
+                        <WizardStepBrand config={config} setConfig={setConfig} projects={projects} />
                     )}
                     {currentStep === 2 && (
                         // @ts-ignore

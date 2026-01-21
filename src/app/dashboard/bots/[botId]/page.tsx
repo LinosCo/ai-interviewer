@@ -7,7 +7,7 @@ import KnowledgeSourcesEditor from './knowledge-sources';
 import LegalPrivacyEditor from './legal-privacy-editor';
 import RewardEditor from './reward-editor';
 import LandingPageEditor from './landing-page-editor';
-import ProjectSelector from './project-selector';
+import ProjectSelector from '@/components/dashboard/ProjectSelector';
 import Link from 'next/link';
 import CopyLinkButton from '@/components/copy-link-button';
 import ChatbotSettings from '@/components/chatbot/ChatbotSettings';
@@ -73,7 +73,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                         </Link>
                     </div>
                 </div>
-                <ChatbotSettings bot={bot} canUseKnowledgeBase={canUseKnowledgeBase} />
+                <ChatbotSettings bot={bot} canUseKnowledgeBase={canUseKnowledgeBase} projects={projects} />
             </div>
         );
     }

@@ -70,17 +70,13 @@ export async function POST(request: Request) {
             );
         }
 
-        // Check if config already exists
+        // If no projectId or specific brand name provided, we might want to check for duplicates
+        // but for now let's allow multiple brands in the same organization
+        /*
         const existingConfig = await prisma.visibilityConfig.findFirst({
-            where: { organizationId }
+            where: { organizationId, brandName }
         });
-
-        if (existingConfig) {
-            return NextResponse.json(
-                { error: 'Visibility configuration already exists. Use PATCH to update.' },
-                { status: 409 }
-            );
-        }
+        */
 
         // Create configuration with prompts and competitors
         const config = await prisma.visibilityConfig.create({
@@ -140,6 +136,10 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const configId = searchParams.get('id');
+        const projectId = searchParams.get('projectId');
+
         const session = await auth();
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -162,7 +162,11 @@ export async function GET(request: Request) {
         const organizationId = user.memberships[0].organizationId;
 
         const config = await prisma.visibilityConfig.findFirst({
-            where: { organizationId },
+            where: {
+                organizationId,
+                ...(configId ? { id: configId } : {}),
+                ...(projectId ? { projectId } : {})
+            },
             include: {
                 prompts: {
                     orderBy: { orderIndex: 'asc' }
@@ -222,11 +226,14 @@ export async function PATCH(request: Request) {
         const organizationId = user.memberships[0].organizationId;
 
         const body = await request.json();
-        const { brandName, category, description, language, territory, isActive, prompts, competitors, projectId } = body;
+        const { id, brandName, category, description, language, territory, isActive, prompts, competitors, projectId } = body;
 
         // Check if config exists
         const existingConfig = await prisma.visibilityConfig.findFirst({
-            where: { organizationId }
+            where: {
+                organizationId,
+                ...(id ? { id } : {})
+            }
         });
 
         if (!existingConfig) {

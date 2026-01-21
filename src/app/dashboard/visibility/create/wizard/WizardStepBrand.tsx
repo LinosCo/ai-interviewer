@@ -5,18 +5,38 @@ import { VisibilityConfig } from '../page';
 interface Props {
     config: VisibilityConfig;
     setConfig: (config: VisibilityConfig) => void;
+    projects: Array<{ id: string, name: string }>;
 }
 
-export function WizardStepBrand({ config, setConfig }: Props) {
+export function WizardStepBrand({ config, setConfig, projects }: Props) {
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    Informazioni sul Brand
-                </h2>
-                <p className="text-gray-600">
-                    Fornisci le informazioni di base per la configurazione del monitoring
-                </p>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        Informazioni sul Brand
+                    </h2>
+                    <p className="text-gray-600">
+                        Fornisci le informazioni di base per la configurazione del monitoring
+                    </p>
+                </div>
+                {projects.length > 0 && (
+                    <div className="w-64">
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 px-1">
+                            Progetto Associato
+                        </label>
+                        <select
+                            value={config.projectId || ''}
+                            onChange={(e) => setConfig({ ...config, projectId: e.target.value || undefined })}
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                        >
+                            <option value="">Nessun Progetto</option>
+                            {projects.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-4">

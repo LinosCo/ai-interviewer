@@ -1,7 +1,7 @@
 'use client';
 
-import { useProject } from '@/contexts/ProjectContext';
-import { Folder, ChevronDown } from 'lucide-react';
+import { useProject, ALL_PROJECTS_OPTION } from '@/contexts/ProjectContext';
+import { Folder, ChevronDown, LayoutGrid } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -35,7 +35,11 @@ export default function GlobalProjectSelector() {
             >
                 <div className="flex items-center gap-3 overflow-hidden">
                     <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
-                        <Folder className="w-4 h-4 text-amber-600" />
+                        {selectedProject?.id === ALL_PROJECTS_OPTION.id ? (
+                            <LayoutGrid className="w-4 h-4 text-amber-600" />
+                        ) : (
+                            <Folder className="w-4 h-4 text-amber-600" />
+                        )}
                     </div>
                     <div className="flex flex-col items-start overflow-hidden">
                         <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Progetto Attivo</span>
@@ -55,6 +59,24 @@ export default function GlobalProjectSelector() {
                         exit={{ opacity: 0, y: -10, scale: 0.95 }}
                         className="absolute top-full left-0 right-0 mt-2 p-2 bg-white border border-gray-100 shadow-xl rounded-[24px] z-50 max-h-64 overflow-y-auto"
                     >
+                        {isOrgAdmin && (
+                            <button
+                                onClick={() => {
+                                    setSelectedProject(ALL_PROJECTS_OPTION);
+                                    setIsOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-black transition-all mb-1 ${selectedProject?.id === ALL_PROJECTS_OPTION.id
+                                    ? 'bg-amber-600 text-white'
+                                    : 'text-amber-600 hover:bg-amber-50'
+                                    }`}
+                            >
+                                <LayoutGrid className="w-4 h-4" />
+                                <span className="truncate uppercase tracking-tight">{ALL_PROJECTS_OPTION.name}</span>
+                            </button>
+                        )}
+
+                        {isOrgAdmin && <div className="h-px bg-gray-100 my-1 mx-2" />}
+
                         {projects.map((project) => (
                             <button
                                 key={project.id}
@@ -63,8 +85,8 @@ export default function GlobalProjectSelector() {
                                     setIsOpen(false);
                                 }}
                                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${selectedProject?.id === project.id
-                                        ? 'bg-amber-50 text-amber-900'
-                                        : 'text-gray-600 hover:bg-gray-50'
+                                    ? 'bg-amber-50 text-amber-900'
+                                    : 'text-gray-600 hover:bg-gray-50'
                                     }`}
                             >
                                 <Folder className={`w-4 h-4 ${selectedProject?.id === project.id ? 'text-amber-600' : 'text-gray-400'}`} />

@@ -69,7 +69,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                         </Link>
                         <Link href={`/dashboard/bots/${bot.id}/embed`} className="px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 font-medium flex items-center gap-2">
                             <Icons.Settings2 className="w-4 h-4" />
-                            Anteprima Widget
+                            Installa
                         </Link>
                     </div>
                 </div>

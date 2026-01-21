@@ -246,6 +246,7 @@ model Bot {
   privacyNotice         String?
   dataUsageInfo         String?
   consentText           String?
+  privacyPolicyUrl      String?
   showAnonymityInfo     Boolean              @default(true)
   showDataUsageInfo     Boolean              @default(true)
   createdAt             DateTime             @default(now())

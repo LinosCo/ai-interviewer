@@ -52,6 +52,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
         logoUrl: bot.logoUrl || '',
         boundaries: (bot.boundaries as string[]) || [],
         backgroundColor: bot.backgroundColor, // Add background color support
+        privacyPolicyUrl: bot.privacyPolicyUrl || '',
     });
     const [isSaving, setIsSaving] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(true); // Toggle for mobile maybe
@@ -73,6 +74,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                     primaryColor: config.primaryColor,
                     backgroundColor: config.backgroundColor,
                     logoUrl: config.logoUrl,
+                    privacyPolicyUrl: config.privacyPolicyUrl,
                     botType: 'chatbot'
                 })
             });
@@ -224,6 +226,25 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                 onChange={(e) => setConfig({ ...config, fallbackMessage: e.target.value })}
                                                 placeholder="Mi dispiace, ma non ho informazioni su questo. Posso aiutarti con altro?"
                                                 className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-purple-500 min-h-[120px] font-medium p-4 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm space-y-8">
+                                        <div className="space-y-2">
+                                            <h3 className="text-lg font-black text-gray-900">Privacy & Legal</h3>
+                                            <p className="text-sm text-gray-500 font-medium">Configura i link alle policy per la conformità GDPR.</p>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">URL Privacy Policy</label>
+                                            <p className="text-xs text-gray-500 font-medium mb-2">Link alla tua privacy policy. Verrà mostrato nella schermata di benvenuto del chatbot.</p>
+                                            <Input
+                                                type="url"
+                                                value={config.privacyPolicyUrl}
+                                                onChange={(e) => setConfig({ ...config, privacyPolicyUrl: e.target.value })}
+                                                placeholder="https://tuosito.com/privacy-policy"
+                                                className="rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-purple-500 h-12 font-medium px-4"
                                             />
                                         </div>
                                     </div>
@@ -424,7 +445,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                         <div className="w-8 h-8 rounded-xl flex-shrink-0 bg-gray-200 flex items-center justify-center text-gray-500 text-[10px] font-black">
                                             U
                                         </div>
-                                        <div className="p-4 rounded-3xl rounded-tr-none shadow-sm text-sm leading-relaxed bg-purple-600 text-white max-w-[85%] font-medium">
+                                        <div className="p-4 rounded-3xl rounded-tr-none shadow-sm text-sm leading-relaxed text-white max-w-[85%] font-medium" style={{ backgroundColor: config.primaryColor }}>
                                             Ciao, vorrei maggiori informazioni sui vostri servizi.
                                         </div>
                                     </div>

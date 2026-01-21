@@ -16,6 +16,7 @@ const updateSchema = z.object({
     backgroundColor: z.string().optional(),
     textColor: z.string().optional(),
     logoUrl: z.string().optional(),
+    privacyPolicyUrl: z.string().optional(),
 
     // Landing Page Fields
     landingTitle: z.string().optional(),

@@ -22,7 +22,7 @@ export default function ChatbotAnalyticsView({ bot, sessions, gaps }: any) {
         const date = new Date();
         date.setDate(date.getDate() - (13 - i));
         const dateStr = date.toISOString().split('T')[0];
-        const daySessions = sessions.filter((s: any) => s.startedAt.split('T')[0] === dateStr);
+        const daySessions = sessions.filter((s: any) => new Date(s.startedAt).toISOString().split('T')[0] === dateStr);
         return {
             date: date.toLocaleDateString('it-IT', { month: 'short', day: 'numeric' }),
             sessions: daySessions.length,

@@ -59,6 +59,8 @@ export default function WidgetPreview({ bot }: WidgetPreviewProps) {
                         botName={bot.name}
                         primaryColor={bot.primaryColor || '#7C3AED'}
                         welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
+                        privacyPolicyUrl={bot.privacyPolicyUrl || ''}
+                        companyName={bot.name}
                     />
                 </>
             )}

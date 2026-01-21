@@ -65,7 +65,7 @@ export function ChatbotsList() {
                 <p className="text-gray-500 mb-6">Crea il tuo primo assistente AI da integrare nel tuo sito</p>
                 <Link
                     href="/dashboard/bots/create-chatbot"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
                 >
                     <Plus className="w-5 h-5" />
                     Crea Chatbot
@@ -88,7 +88,7 @@ export function ChatbotsList() {
                             <div className="flex items-center gap-3">
                                 <div
                                     className="w-12 h-12 rounded-xl flex items-center justify-center text-white"
-                                    style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #C026D3 100%)' }}
+                                    style={{ background: 'linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%)' }}
                                 >
                                     <Bot className="w-6 h-6" />
                                 </div>
@@ -114,7 +114,7 @@ export function ChatbotsList() {
                             <div className="flex gap-2">
                                 <Link
                                     href={`/dashboard/bots/${bot.id}/embed`}
-                                    className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                     title="Codice Embed"
                                 >
                                     <Code className="w-4 h-4" />

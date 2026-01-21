@@ -6,21 +6,23 @@ import { ScanResults } from "@/components/visibility/ScanResults";
 import { SerpMonitoringSection } from "./SerpMonitoringSection";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Settings, History, Calendar, Newspaper } from "lucide-react";
+import { Settings, History, Calendar, Newspaper, Plus, Building2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VisibilityProjectFilter } from "./VisibilityProjectFilter";
 
 export default async function VisibilityPage({
     searchParams
 }: {
-    searchParams: Promise<{ scanId?: string }>
+    searchParams: Promise<{ scanId?: string; projectId?: string }>
 }) {
     const session = await auth();
     if (!session?.user?.id) redirect("/login");
 
     const params = await searchParams;
     const selectedScanId = params.scanId;
+    const projectIdFilter = params.projectId;
 
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
@@ -30,11 +32,51 @@ export default async function VisibilityPage({
     const orgId = user?.memberships[0]?.organizationId;
     if (!orgId) redirect("/login");
 
-    // 1. Check if config exists
+    // 1. Check if config exists (optionally filtered by project)
     const config = await prisma.visibilityConfig.findFirst({
-        where: { organizationId: orgId },
-        include: { prompts: true }
+        where: {
+            organizationId: orgId,
+            ...(projectIdFilter && projectIdFilter !== '__ALL__' ? { projectId: projectIdFilter } : {})
+        },
+        include: { prompts: true, project: { select: { id: true, name: true } } }
     });
+
+    // If no config at all, redirect to create
+    const anyConfig = await prisma.visibilityConfig.findFirst({
+        where: { organizationId: orgId }
+    });
+
+    if (!anyConfig) {
+        redirect("/dashboard/visibility/create");
+    }
+
+    // If filtering by project but no config for that project
+    if (!config && projectIdFilter && projectIdFilter !== '__ALL__') {
+        return (
+            <div className="space-y-8 p-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold tracking-tight">Monitor visibilità online</h2>
+                        <p className="text-muted-foreground">Monitora come il tuo brand appare negli LLM e nelle ricerche Google.</p>
+                    </div>
+                    <VisibilityProjectFilter currentProjectId={projectIdFilter} />
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+                    <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun brand configurato per questo progetto</h3>
+                    <p className="text-gray-500 mb-6">Configura il monitoraggio della visibilità per questo progetto</p>
+                    <Link
+                        href={`/dashboard/visibility/create?projectId=${projectIdFilter}`}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                        <Plus className="w-5 h-5" />
+                        Configura Brand
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     if (!config) {
         redirect("/dashboard/visibility/create");
@@ -111,10 +153,18 @@ export default async function VisibilityPage({
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight">Monitor visibilità online</h2>
-                    <p className="text-muted-foreground">Monitora come il tuo brand appare negli LLM e nelle ricerche Google.</p>
+                    <p className="text-muted-foreground">
+                        {config.brandName && (
+                            <span className="font-medium text-amber-600">{config.brandName}</span>
+                        )}
+                        {config.project && (
+                            <span className="text-gray-400 ml-2">• {config.project.name}</span>
+                        )}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Link href="/dashboard/visibility/create">
+                    <VisibilityProjectFilter currentProjectId={projectIdFilter || config.projectId || undefined} />
+                    <Link href={`/dashboard/visibility/create${config.projectId ? `?projectId=${config.projectId}` : ''}`}>
                         <Button variant="outline" size="sm" className="gap-2">
                             <Settings className="h-4 w-4" />
                             Impostazioni

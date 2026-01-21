@@ -90,7 +90,7 @@ export default function PreviewPage() {
                         {/* Identity Card */}
                         <section className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
                             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <Bot className="w-5 h-5 text-purple-600" /> Identità & Comportamento
+                                <Bot className="w-5 h-5 text-blue-600" /> Identità & Comportamento
                             </h2>
                             <div className="space-y-4">
                                 <div>

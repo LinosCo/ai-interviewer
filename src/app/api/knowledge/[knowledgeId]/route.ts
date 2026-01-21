@@ -4,9 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 interface Params {
-    params: {
+    params: Promise<{
         knowledgeId: string;
-    };
+    }>;
 }
 
 export async function GET(req: Request, { params }: Params) {
@@ -16,7 +16,7 @@ export async function GET(req: Request, { params }: Params) {
             return new Response('Unauthorized', { status: 401 });
         }
 
-        const { knowledgeId } = params;
+        const { knowledgeId } = await params;
 
         if (!knowledgeId) {
             return new Response('Missing knowledgeId', { status: 400 });
@@ -68,7 +68,7 @@ export async function DELETE(req: Request, { params }: Params) {
             return new Response('Unauthorized', { status: 401 });
         }
 
-        const { knowledgeId } = params;
+        const { knowledgeId } = await params;
 
         // Verify ownership
         const source = await prisma.knowledgeSource.findUnique({

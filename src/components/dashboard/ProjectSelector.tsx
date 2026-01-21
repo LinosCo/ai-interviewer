@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useProject, ALL_PROJECTS_OPTION } from '@/contexts/ProjectContext';
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
 
 export function ProjectSelector() {
@@ -41,7 +42,7 @@ export function ProjectSelector() {
             >
                 <div className="flex items-center gap-2 min-w-0">
                     {isAllProjectsSelected ? (
-                        <Icons.LayoutGrid size={18} className="text-amber-500 flex-shrink-0" />
+                        <LayoutGrid size={18} className="text-amber-500 flex-shrink-0" />
                     ) : (
                         <Icons.FolderKanban size={18} className="text-amber-500 flex-shrink-0" />
                     )}
@@ -80,7 +81,7 @@ export function ProjectSelector() {
                                         isAllProjectsSelected ? 'bg-amber-50' : ''
                                     }`}
                                 >
-                                    <Icons.LayoutGrid
+                                    <LayoutGrid
                                         size={16}
                                         className={isAllProjectsSelected ? 'text-amber-500' : 'text-gray-400'}
                                     />

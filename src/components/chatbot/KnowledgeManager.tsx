@@ -164,7 +164,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                 {/* URL / Sitemap Input */}
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
                     <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-purple-600" />
+                        <Globe className="w-4 h-4 text-blue-600" />
                         URL o Sitemap
                     </h3>
                     <div className="flex gap-2">
@@ -174,7 +174,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                                 value={url}
                                 onChange={(e) => setUrl(e.target.value)}
                                 placeholder="https://sito.it/sitemap.xml o pagina"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none pr-8"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none pr-8"
                             />
                             {url.toLowerCase().includes('sitemap') && (
                                 <Map className="absolute right-2.5 top-2.5 w-4 h-4 text-amber-500" />
@@ -183,7 +183,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                         <Button
                             onClick={handleScrape}
                             disabled={!url || isScraping || isSitemapProcessing}
-                            className="bg-purple-600 hover:bg-purple-700 text-white min-w-[100px]"
+                            className="bg-blue-600 hover:bg-blue-700 text-white min-w-[100px]"
                         >
                             {isScraping || isSitemapProcessing ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -200,7 +200,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                 {/* File Upload */}
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
                     <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-purple-600" />
+                        <FileText className="w-4 h-4 text-blue-600" />
                         Carica Documenti
                     </h3>
                     <div className="relative">
@@ -211,12 +211,12 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             disabled={isUploading}
                         />
-                        <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center hover:bg-purple-50/30 transition-colors">
+                        <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center hover:bg-blue-50/30 transition-colors">
                             {isUploading ? (
-                                <Loader2 className="w-5 h-5 animate-spin mx-auto text-purple-600" />
+                                <Loader2 className="w-5 h-5 animate-spin mx-auto text-blue-600" />
                             ) : (
                                 <div className="text-sm text-gray-600">
-                                    <span className="text-purple-600 font-medium">Scegli un file</span> o trascina qui
+                                    <span className="text-blue-600 font-medium">Scegli un file</span> o trascina qui
                                     <p className="text-xs text-gray-400 mt-1">
                                         Supportati: .txt, .md, .json, .pdf
                                     </p>
@@ -255,7 +255,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                 ) : (
                     <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
                         {sources.map((source) => (
-                            <div key={source.id} className="p-4 flex items-center justify-between group hover:bg-purple-50/20 transition-colors">
+                            <div key={source.id} className="p-4 flex items-center justify-between group hover:bg-blue-50/20 transition-colors">
                                 <div className="flex items-center gap-3 overflow-hidden">
                                     <div className={`p-2 rounded-lg ${source.type === 'url' ? 'bg-blue-50 text-blue-600' :
                                         source.type === 'file' ? 'bg-orange-50 text-orange-600' :
@@ -278,7 +278,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                                 </button>
                                 <button
                                     onClick={() => handleView(source)}
-                                    className="p-2 text-gray-300 hover:text-purple-600 hover:bg-purple-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all mr-1"
+                                    className="p-2 text-gray-300 hover:text-blue-600 hover:bg-purple-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all mr-1"
                                     title="Visualizza contenuto"
                                 >
                                     <Eye className="w-4 h-4" />
@@ -309,7 +309,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                             <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
                                 {isLoadingContent ? (
                                     <div className="flex justify-center py-12">
-                                        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                                        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                                     </div>
                                 ) : (
                                     <pre className="whitespace-pre-wrap font-mono text-xs text-gray-700 bg-white p-4 rounded-lg border border-gray-200 shadow-sm leading-relaxed">

@@ -102,7 +102,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all duration-300 relative whitespace-nowrap font-semibold ${isActive
-                                    ? 'bg-white text-purple-700 shadow-sm border-b-2 border-purple-600'
+                                    ? 'bg-white text-blue-700 shadow-sm border-b-2 border-blue-600'
                                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                                     }`}
                             >
@@ -132,7 +132,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                             <Button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6 font-bold shadow-lg shadow-purple-200 transition-all hover:scale-105 active:scale-95"
+                                className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 font-bold shadow-lg shadow-blue-200 transition-all hover:scale-105 active:scale-95"
                             >
                                 {isSaving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                                 Salva
@@ -163,7 +163,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                     value={config.name}
                                                     onChange={(e) => setConfig({ ...config, name: e.target.value })}
                                                     placeholder="es. Supporto AI"
-                                                    className="rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-purple-500 h-12 font-medium px-4"
+                                                    className="rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-blue-500 h-12 font-medium px-4"
                                                 />
                                             </div>
                                             <div className="space-y-2">
@@ -171,7 +171,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                 <select
                                                     value={config.tone}
                                                     onChange={(e) => setConfig({ ...config, tone: e.target.value })}
-                                                    className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-purple-500 font-medium p-4 outline-none appearance-none"
+                                                    className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-blue-500 font-medium p-4 outline-none appearance-none"
                                                 >
                                                     <option value="professional">Professionale & Formale</option>
                                                     <option value="friendly">Amichevole & Informale</option>
@@ -187,7 +187,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                 value={config.welcomeMessage}
                                                 onChange={(e) => setConfig({ ...config, welcomeMessage: e.target.value })}
                                                 placeholder="Ciao! Come posso aiutarti oggi?"
-                                                className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-purple-500 min-h-[100px] font-medium p-4 outline-none"
+                                                className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-blue-500 min-h-[100px] font-medium p-4 outline-none"
                                             />
                                             <p className="text-[10px] text-gray-400 font-bold italic ml-1">* Questo è il primo messaggio che l'utente vedrà quando apre la chat.</p>
                                         </div>
@@ -225,7 +225,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                 value={config.fallbackMessage}
                                                 onChange={(e) => setConfig({ ...config, fallbackMessage: e.target.value })}
                                                 placeholder="Mi dispiace, ma non ho informazioni su questo. Posso aiutarti con altro?"
-                                                className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-purple-500 min-h-[120px] font-medium p-4 outline-none"
+                                                className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-blue-500 min-h-[120px] font-medium p-4 outline-none"
                                             />
                                         </div>
                                     </div>
@@ -244,7 +244,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                 value={config.privacyPolicyUrl}
                                                 onChange={(e) => setConfig({ ...config, privacyPolicyUrl: e.target.value })}
                                                 placeholder="https://tuosito.com/privacy-policy"
-                                                className="rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-purple-500 h-12 font-medium px-4"
+                                                className="rounded-2xl border-gray-100 bg-gray-50/50 focus:ring-blue-500 h-12 font-medium px-4"
                                             />
                                         </div>
                                     </div>
@@ -264,7 +264,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                             <select
                                                 value={config.leadCaptureStrategy}
                                                 onChange={e => setConfig({ ...config, leadCaptureStrategy: e.target.value })}
-                                                className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 focus:ring-2 focus:ring-purple-500 outline-none font-medium appearance-none"
+                                                className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 focus:ring-2 focus:ring-blue-500 outline-none font-medium appearance-none"
                                             >
                                                 <option value="immediate">Inizio Conversazione (Subito)</option>
                                                 <option value="after_3_msgs">Dopo 3 messaggi (Consigliato)</option>
@@ -306,7 +306,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                                 }
                                                             }}
                                                             className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 ${isSelected
-                                                                ? 'bg-purple-50 border-purple-200 shadow-sm ring-1 ring-purple-200'
+                                                                ? 'bg-blue-50 border-blue-200 shadow-sm ring-1 ring-blue-200'
                                                                 : 'bg-white border-gray-100 hover:border-gray-200'
                                                                 }`}
                                                         >
@@ -322,9 +322,9 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                                         return <Icon className="w-4 h-4" />;
                                                                     })()}
                                                                 </div>
-                                                                <span className={`text-sm font-bold ${isSelected ? 'text-purple-700' : 'text-gray-600'}`}>{field.label}</span>
+                                                                <span className={`text-sm font-bold ${isSelected ? 'text-blue-700' : 'text-gray-600'}`}>{field.label}</span>
                                                             </div>
-                                                            {isSelected && <Check className="w-4 h-4 text-purple-600" />}
+                                                            {isSelected && <Check className="w-4 h-4 text-blue-600" />}
                                                         </button>
                                                     );
                                                 })}
@@ -349,7 +349,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                     <button
                                                         key={color}
                                                         onClick={() => setConfig({ ...config, primaryColor: color })}
-                                                        className={`w-10 h-10 rounded-2xl border-4 transition-all duration-300 hover:scale-110 shadow-sm ${config.primaryColor === color ? 'border-white ring-2 ring-purple-500 scale-110' : 'border-transparent'
+                                                        className={`w-10 h-10 rounded-2xl border-4 transition-all duration-300 hover:scale-110 shadow-sm ${config.primaryColor === color ? 'border-white ring-2 ring-blue-500 scale-110' : 'border-transparent'
                                                             }`}
                                                         style={{ backgroundColor: color }}
                                                     />

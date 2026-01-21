@@ -218,12 +218,22 @@ export default function ChatbotAnalyticsView({ bot, sessions, gaps }: any) {
 
             {/* Recent Sessions */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-200">
+                <div className="p-6 border-b border-slate-200 flex justify-between items-center">
                     <h3 className="text-lg font-semibold">Sessioni Recenti</h3>
+                    <Link
+                        href={`/dashboard/bots/${bot.id}/conversations`}
+                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                        Vedi tutte →
+                    </Link>
                 </div>
                 <div className="divide-y divide-slate-100">
                     {sessions.slice(0, 10).map((session: any) => (
-                        <div key={session.id} className="p-4 hover:bg-slate-50 transition-colors">
+                        <Link
+                            key={session.id}
+                            href={`/dashboard/bots/${bot.id}/conversations/${session.id}`}
+                            className="p-4 hover:bg-slate-50 transition-colors block"
+                        >
                             <div className="flex justify-between items-start">
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -235,21 +245,35 @@ export default function ChatbotAnalyticsView({ bot, sessions, gaps }: any) {
                                                 Lead
                                             </span>
                                         )}
+                                        <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                                            session.status === 'COMPLETED'
+                                                ? 'bg-blue-100 text-blue-700'
+                                                : session.status === 'ABANDONED'
+                                                    ? 'bg-red-100 text-red-700'
+                                                    : 'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                            {session.status === 'COMPLETED' ? 'Completata' : session.status === 'ABANDONED' ? 'Abbandonata' : 'In corso'}
+                                        </span>
                                     </div>
                                     <p className="text-xs text-slate-400 mt-1">
                                         {new Date(session.startedAt).toLocaleString('it-IT')}
                                     </p>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-sm text-slate-600">
-                                        {session.durationSeconds ? `${Math.round(session.durationSeconds / 60)}m` : '-'}
-                                    </p>
-                                    <p className="text-xs text-slate-400">
-                                        {session.messages?.length || 0} messaggi
-                                    </p>
+                                <div className="text-right flex items-center gap-4">
+                                    <div>
+                                        <p className="text-sm text-slate-600">
+                                            {session.durationSeconds ? `${Math.round(session.durationSeconds / 60)}m` : '-'}
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                            {session.messages?.length || 0} messaggi
+                                        </p>
+                                    </div>
+                                    <span className="text-blue-600 text-sm font-medium">
+                                        Leggi →
+                                    </span>
                                 </div>
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
             </div>

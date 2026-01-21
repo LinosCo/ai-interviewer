@@ -795,26 +795,161 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 }
             }
 
+            // Helper to get field label
+            const getFieldLabel = (field: string, lang: string) => {
+                const labels: Record<string, { it: string; en: string }> = {
+                    fullName: { it: 'il tuo nome', en: 'your name' },
+                    email: { it: 'la tua email', en: 'your email' },
+                    phone: { it: 'il tuo numero di telefono', en: 'your phone number' },
+                    company: { it: 'la tua azienda', en: 'your company' },
+                    linkedin: { it: 'il tuo profilo LinkedIn', en: 'your LinkedIn profile' },
+                    role: { it: 'il tuo ruolo', en: 'your role' },
+                };
+                return labels[field]?.[lang as 'it' | 'en'] || field;
+            };
+
             // CONSENT PHASE: bot should ask for permission
             if (nextState.consentGiven === false && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isVagueDataRequest)) {
-                console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. (No override to respect AI Reasoning)`);
+                console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
+
+                // Varied consent questions
+                const consentMessages = language === 'it' ? [
+                    `Ti ringrazio molto per questa conversazione, è stata davvero interessante! L'intervista è conclusa. Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?`,
+                    `Grazie per il tempo dedicato, mi hai dato spunti preziosi! L'intervista è finita. Posso chiederti i tuoi contatti per eventuali follow-up?`,
+                    `È stato un piacere parlare con te! Abbiamo concluso l'intervista. Ti andrebbe di lasciarmi i tuoi dati per restare in contatto?`,
+                ] : [
+                    `Thank you so much for this conversation, it was really interesting! The interview is complete. Before we go, may I ask for your contact details to stay in touch?`,
+                    `Thanks for your time, you've given me valuable insights! The interview is done. May I ask for your contact info for any follow-ups?`,
+                    `It was a pleasure talking with you! We've finished the interview. Would you like to leave your details to stay in touch?`,
+                ];
+
+                responseText = consentMessages[Math.floor(Math.random() * consentMessages.length)];
             }
             // FIELD COLLECTION PHASE: bot should ask for specific field
             else if (nextState.consentGiven === true && missingField) {
-                console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". (No override to respect AI Reasoning)`);
+                // Only override if the response doesn't already ask for this field
+                const fieldMentioned = responseText.toLowerCase().includes(missingField.toLowerCase()) ||
+                    (missingField === 'fullName' && /\b(nome|name)\b/i.test(responseText)) ||
+                    (missingField === 'email' && /\b(email|mail)\b/i.test(responseText)) ||
+                    (missingField === 'phone' && /\b(telefono|phone|numero)\b/i.test(responseText));
+
+                if (!fieldMentioned || hasNoQuestion) {
+                    console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". OVERRIDING with field question.`);
+                    const fieldLabel = getFieldLabel(missingField, language);
+
+                    // Varied field questions
+                    const fieldQuestions = language === 'it' ? [
+                        `Perfetto! Qual è ${fieldLabel}?`,
+                        `Ottimo! Mi dici ${fieldLabel}?`,
+                        `Benissimo! Puoi darmi ${fieldLabel}?`,
+                    ] : [
+                        `Perfect! What is ${fieldLabel}?`,
+                        `Great! Can you tell me ${fieldLabel}?`,
+                        `Excellent! May I have ${fieldLabel}?`,
+                    ];
+
+                    responseText = fieldQuestions[Math.floor(Math.random() * fieldQuestions.length)];
+                }
             }
             // ALL FIELDS COLLECTED but bot didn't complete
             else if (!missingField && !responseText.includes('INTERVIEW_COMPLETED')) {
                 console.log(`✅ [SUPERVISOR] All fields collected, adding completion tag.`);
-                responseText += " INTERVIEW_COMPLETED";
+
+                // Varied completion messages
+                const completionMessages = language === 'it' ? [
+                    `Grazie mille per tutte le informazioni! Ti contatteremo presto.`,
+                    `Perfetto, ho tutto! Grazie per la disponibilità, a presto!`,
+                    `Ottimo, abbiamo finito! Grazie per il tuo tempo, ci sentiamo presto.`,
+                ] : [
+                    `Thank you so much for all the information! We will contact you soon.`,
+                    `Perfect, I have everything! Thanks for your availability, talk soon!`,
+                    `Great, we're done! Thanks for your time, we'll be in touch soon.`,
+                ];
+
+                responseText = completionMessages[Math.floor(Math.random() * completionMessages.length)] + " INTERVIEW_COMPLETED";
             }
         }
-        // Other phases - OVERRIDE if bot tries to close OR asks for contacts prematurely
+        // Other phases - SOFT OVERRIDE if bot tries to close OR asks for contacts prematurely
+        // Strategy: Preserve useful content, only add question if missing
         else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isPrematureContactRequest)) {
-            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. (No override to respect AI Reasoning)`);
+            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Applying SOFT override.`);
+            console.log(`   Original response: "${responseText.substring(0, 100)}..."`);
+
+            const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
+            const topicLabel = targetTopic?.label || 'questo argomento';
+            const currentSubGoal = supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || topicLabel;
+
+            // SOFT OVERRIDE: Try to salvage useful content first
+            let cleanedResponse = responseText
+                .replace(goodbyePattern, '')
+                .replace(contactRequestPattern, '')
+                .replace(/\?+\s*$/, '') // Remove trailing question marks
+                .trim();
+
+            // If there's substantial content (>20 chars), append a question
+            // Otherwise, generate a fresh response with variation
+            if (cleanedResponse.length > 20) {
+                // Append a contextual question to the cleaned response
+                const appendQuestions = language === 'it' ? [
+                    `Puoi dirmi di più su questo aspetto?`,
+                    `Come hai vissuto questa situazione?`,
+                    `Cosa ne pensi?`,
+                    `Puoi farmi un esempio concreto?`,
+                ] : [
+                    `Can you tell me more about this?`,
+                    `How did you experience this?`,
+                    `What do you think about it?`,
+                    `Can you give me a concrete example?`,
+                ];
+                const randomQuestion = appendQuestions[Math.floor(Math.random() * appendQuestions.length)];
+                responseText = `${cleanedResponse} ${randomQuestion}`;
+                console.log(`   ✓ Soft override: preserved content + added question`);
+            } else {
+                // Generate varied follow-up questions to avoid repetition
+                const scanQuestions = language === 'it' ? [
+                    `Parlando di ${topicLabel}, qual è stata la tua esperienza diretta?`,
+                    `Riguardo a ${topicLabel}, cosa ti ha colpito di più?`,
+                    `Su ${topicLabel}, quali aspetti consideri più rilevanti?`,
+                    `Come descriveresti la tua esperienza con ${topicLabel}?`,
+                ] : [
+                    `Speaking of ${topicLabel}, what has been your direct experience?`,
+                    `Regarding ${topicLabel}, what struck you the most?`,
+                    `On ${topicLabel}, which aspects do you consider most relevant?`,
+                    `How would you describe your experience with ${topicLabel}?`,
+                ];
+
+                const deepQuestions = language === 'it' ? [
+                    `Tornando a ${topicLabel}, puoi approfondire un aspetto che ti sta a cuore?`,
+                    `Su ${topicLabel}, c'è qualcosa che vorresti esplorare più nel dettaglio?`,
+                    `Riguardo a ${topicLabel}, quali sfide hai incontrato?`,
+                    `Come hai affrontato ${currentSubGoal}?`,
+                ] : [
+                    `Going back to ${topicLabel}, can you elaborate on an aspect that matters to you?`,
+                    `On ${topicLabel}, is there something you'd like to explore in more detail?`,
+                    `Regarding ${topicLabel}, what challenges have you encountered?`,
+                    `How have you dealt with ${currentSubGoal}?`,
+                ];
+
+                const questions = nextState.phase === 'SCAN' ? scanQuestions : deepQuestions;
+                responseText = questions[Math.floor(Math.random() * questions.length)];
+                console.log(`   ✓ Full override: generated new question`);
+            }
         }
         else if (nextState.phase === 'DEEP_OFFER' && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion)) {
-            console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. (No override to respect AI Reasoning)`);
+            console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. OVERRIDING with offer question.`);
+
+            // Varied deep offer messages
+            const deepOfferMessages = language === 'it' ? [
+                `Grazie per queste risposte! Il tempo previsto sta per terminare, ma se hai ancora qualche minuto, avrei alcune domande di approfondimento. Ti va di continuare?`,
+                `Molto interessante quello che mi hai raccontato! Abbiamo quasi finito, ma se vuoi possiamo approfondire alcuni punti. Che ne dici?`,
+                `Grazie per il tuo tempo! Prima di concludere, se hai qualche minuto in più, potremmo esplorare alcuni temi più nel dettaglio. Ti andrebbe?`,
+            ] : [
+                `Thank you for these answers! Our scheduled time is almost up, but if you have a few more minutes, I'd love to ask some deeper follow-up questions. Would you like to continue?`,
+                `Very interesting what you've shared! We're almost done, but if you'd like, we can dive deeper into some points. What do you think?`,
+                `Thanks for your time! Before we wrap up, if you have a few extra minutes, we could explore some topics in more detail. Would you be interested?`,
+            ];
+
+            responseText = deepOfferMessages[Math.floor(Math.random() * deepOfferMessages.length)];
         }
 
         // Check for completion tag - only valid if we're actually done
@@ -832,12 +967,20 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             });
 
             if (shouldCollectData && !allFieldsCollected && nextState.consentGiven !== false) {
-                // Not done yet! Remove the tag and continue
-                console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but fields are missing. Removing tag.`);
-                responseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
-                if (!responseText.includes('?')) {
-                    console.log(`⚠️ [SUPERVISOR] Bot ending without question during completion check. (No override to respect AI Reasoning)`);
-                }
+                // Not done yet! Override with data collection consent question
+                console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but fields are missing. OVERRIDING with consent question.`);
+
+                const consentMessages = language === 'it' ? [
+                    `Ti ringrazio molto per questa conversazione! Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?`,
+                    `Grazie per il tempo dedicato! L'intervista è finita, ma mi piacerebbe restare in contatto. Posso chiederti i tuoi dati?`,
+                    `È stato un piacere! Abbiamo concluso, ma vorrei poterti ricontattare. Ti andrebbe di lasciarmi i tuoi contatti?`,
+                ] : [
+                    `Thank you so much for this conversation! Before we go, may I ask for your contact details to stay in touch?`,
+                    `Thanks for your time! The interview is done, but I'd love to stay in touch. May I ask for your details?`,
+                    `It was a pleasure! We're finished, but I'd like to follow up. Would you mind sharing your contact info?`,
+                ];
+
+                responseText = consentMessages[Math.floor(Math.random() * consentMessages.length)];
             } else {
                 // Actually complete
                 await completeInterview(conversationId, messages, openAIKey, currentProfileForCompletion || {});

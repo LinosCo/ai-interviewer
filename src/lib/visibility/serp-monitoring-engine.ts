@@ -272,12 +272,21 @@ export class SerpMonitoringEngine {
             const domain = this.extractDomain(url);
             const sourceInfo = this.getSourceInfo(domain);
 
+            // Validate publishedDate - only use if it creates a valid Date
+            let publishedDate: Date | undefined = undefined;
+            if (item.date) {
+                const parsedDate = new Date(item.date);
+                if (!isNaN(parsedDate.getTime())) {
+                    publishedDate = parsedDate;
+                }
+            }
+
             return {
                 title: item.title || '',
                 url,
                 snippet: item.snippet || item.description || '',
                 displayedLink: item.displayed_link || domain,
-                publishedDate: item.date ? new Date(item.date) : undefined,
+                publishedDate,
                 position: index + 1,
                 sourceDomain: domain,
                 sourceType: sourceInfo.type,

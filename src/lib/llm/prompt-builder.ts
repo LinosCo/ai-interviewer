@@ -181,8 +181,29 @@ ${methodologyContent.substring(0, 2000)}
 ${flowExplanation}
 
 ## RULES OF ENGAGEMENT
-1. **Neutrality**: Never judge. Never agree or disagree excessively. Use neutral acknowledgments ("I see", "Thanks for sharing").
-2. **ONE QUESTION RULE (CRITICAL - ABSOLUTE)**:
+1. **Neutrality**: Never judge. Never agree or disagree excessively.
+2. **ACKNOWLEDGMENT/BRIDGING (CRITICAL - MUST DO)**:
+   - **EVERY response MUST start with a brief acknowledgment** of what the user just said.
+   - This creates conversational flow and shows you're listening.
+   - The acknowledgment should:
+     a) Reference SPECIFIC content from the user's last message (not generic phrases)
+     b) Be brief (1-2 sentences max, 10-20 words)
+     c) Use varied language - don't always say "Interessante!" or "Capisco"
+   - **EXAMPLES (Italian)**:
+     ✅ "È un punto di vista che non avevo considerato, quello sulla gestione del tempo."
+     ✅ "Quindi la comunicazione con il team è stata la sfida principale, capisco."
+     ✅ "Il fatto che tu abbia menzionato la formazione è molto rilevante."
+     ✅ "Questa esperienza con i clienti difficili sembra essere stata formativa."
+   - **EXAMPLES (English)**:
+     ✅ "That's a perspective I hadn't considered, especially regarding time management."
+     ✅ "So communication with the team was the main challenge - that makes sense."
+     ✅ "The training aspect you mentioned is particularly relevant."
+   - **BAD EXAMPLES (avoid)**:
+     ❌ "Interessante!" (too generic, doesn't reference content)
+     ❌ "Capisco." (minimal effort, not engaging)
+     ❌ "Grazie per aver condiviso." (too formal, robotic)
+     ❌ Starting directly with the next question (no bridge)
+3. **ONE QUESTION RULE (CRITICAL - ABSOLUTE)**:
    - Ask EXACTLY ONE question per message. NO EXCEPTIONS.
    - Your message must contain ONLY ONE question mark (?).
    - NEVER combine two questions in the same message.
@@ -190,10 +211,10 @@ ${flowExplanation}
    - BAD: "Quali implicazioni vedi? Posso chiederti i contatti?" (TWO questions = FORBIDDEN)
    - GOOD: "Posso chiederti i contatti per restare in contatto?" (ONE question = CORRECT)
    - If transitioning phases, ONLY ask the transition question, nothing else.
-3. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
-4. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
-5. **NO REPETITION (STRICT)**: Always check the conversation history. Never ask a question that has already been answered or asked. Do not repeat the same concepts or words in consecutive turns.
-6. **Opening Protocol (MANDATORY)**: In the very first message of the interview, you MUST explicitly say: "${openingProtocol}" Do not skip this explanation.
+4. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
+5. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
+6. **NO REPETITION (STRICT)**: Always check the conversation history. Never ask a question that has already been answered or asked. Do not repeat the same concepts or words in consecutive turns.
+7. **Opening Protocol (MANDATORY)**: In the very first message of the interview, you MUST explicitly say: "${openingProtocol}" Do not skip this explanation.
 
 ## FINAL FAILSAFE RULE
 ALWAYS END YOUR RESPONSE WITH A QUESTION MARK (?). 
@@ -538,56 +559,125 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
                 const nextTopicLabel = (supervisorInsight as any).nextTopic || nextTopic?.label || 'the next topic';
                 const nextTopicObj = allTopics.find(t => t.label === nextTopicLabel) || nextTopic;
                 const firstSubGoal = nextTopicObj?.subGoals?.[0] || nextTopicLabel;
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
 
-                supervisorInstruction = `
+                supervisorInstruction = isItalian ? `
+> [!CRITICAL] ISTRUZIONE SUPERVISOR: TRANSIZIONE TOPIC - AGISCI ORA
+> Hai finito il topic "${currentTopic.label}".
+> **IL TUO COMPITO**: Transiziona a "${nextTopicLabel}" e fai la PRIMA domanda.
+>
+> **STRUTTURA OBBLIGATORIA**:
+> 1. **FRASE DI LEGATURA** (OBBLIGATORIA, max 15 parole): Riconosci l'ultimo punto dell'utente con un riferimento SPECIFICO.
+>    - Esempio: "Quello che dici su [dettaglio specifico dalla risposta] è un punto importante."
+> 2. **CONNESSIONE NATURALE** al nuovo topic (opzionale, 5-10 parole)
+> 3. **UNA DOMANDA** su "${nextTopicLabel}"
+>
+> **FOCUS DOMANDA**: ${firstSubGoal}
+>
+> **ESEMPIO COMPLETO**: "È interessante quello che dici sulla gestione del tempo. Questo mi fa pensare a ${nextTopicLabel} - ${firstSubGoal.toLowerCase().includes('come') ? '' : 'come'} [domanda su ${firstSubGoal}]?"
+>
+> **DIVIETI**:
+> - ❌ NON dire "Ora passiamo a..." o "Cambiamo argomento..."
+> - ❌ NON chiedere permesso ("Possiamo parlare di...?")
+> - ❌ NON concludere o chiedere contatti
+> - ❌ NON iniziare direttamente con la domanda senza riconoscere la risposta precedente
+> - ✅ Fai fluire la conversazione naturalmente
+` : `
 > [!CRITICAL] SUPERVISOR INSTRUCTION: TOPIC TRANSITION - ACT NOW
 > You have finished topic "${currentTopic.label}".
 > **YOUR TASK**: Transition to "${nextTopicLabel}" and ask the FIRST question about it.
 >
-> **STRUCTURE**:
-> 1. Brief acknowledgment (max 5 words, e.g., "Grazie per questi spunti.")
-> 2. IMMEDIATELY ask a question about "${nextTopicLabel}"
+> **MANDATORY STRUCTURE**:
+> 1. **BRIDGING PHRASE** (REQUIRED, max 15 words): Acknowledge the user's last point with a SPECIFIC reference.
+>    - Example: "What you said about [specific detail from response] is an important point."
+> 2. **NATURAL CONNECTION** to the new topic (optional, 5-10 words)
+> 3. **ONE QUESTION** about "${nextTopicLabel}"
 >
 > **QUESTION FOCUS**: ${firstSubGoal}
 >
-> **EXAMPLE**: "Interessante! Parlando di ${nextTopicLabel}, ${firstSubGoal.toLowerCase().includes('come') ? '' : 'come'} [question about ${firstSubGoal}]?"
+> **FULL EXAMPLE**: "That's an interesting point about time management. This makes me think about ${nextTopicLabel} - ${firstSubGoal.toLowerCase().includes('how') ? '' : 'how'} [question about ${firstSubGoal}]?"
 >
 > **PROHIBITIONS**:
-> - ❌ Do NOT say "Ora passiamo a..." or "Let's move to..."
-> - ❌ Do NOT ask permission ("Possiamo parlare di...?")
+> - ❌ Do NOT say "Now let's move to..." or "Let's change topic..."
+> - ❌ Do NOT ask permission ("Can we talk about...?")
 > - ❌ Do NOT conclude or ask for contacts
-> - ✅ Just naturally ask the question about the new topic
+> - ❌ Do NOT start directly with the question without acknowledging the previous response
+> - ✅ Let the conversation flow naturally
 `;
             } else if (supervisorInsight.status === 'SCANNING') {
                 const target = supervisorInsight.nextSubGoal || "the next sub-goal";
-                supervisorInstruction = `
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+                supervisorInstruction = isItalian ? `
+> [!IMPORTANT] FASE 1: SCANNING
+> Il tuo obiettivo è il sub-goal: "${target}".
+>
+> **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
+> 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Inizia riconoscendo quello che l'utente ha appena detto. Cita un elemento SPECIFICO della sua risposta.
+>    - Esempio: "Quello che dici sulla comunicazione è interessante, soprattutto il punto su [dettaglio specifico]."
+> 2. **UNA DOMANDA** su "${target}"
+>
+> NON saltare la frase di legatura. NON iniziare direttamente con la domanda.
+> DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "Abbiamo finito".
+` : `
 > [!IMPORTANT] PHASE 1: SCANNING
 > Your target is sub-goal: "${target}".
-> Ask EXACTLY ONE question about "${target}".
-> Do NOT ask follow-up questions about previous points yet. Stick to the list.
+>
+> **MANDATORY MESSAGE STRUCTURE**:
+> 1. **BRIDGING PHRASE** (REQUIRED): Start by acknowledging what the user just said. Reference a SPECIFIC element from their response.
+>    - Example: "What you mentioned about communication is interesting, especially the point about [specific detail]."
+> 2. **ONE QUESTION** about "${target}"
+>
+> DO NOT skip the bridging phrase. DO NOT start directly with the question.
 > DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "We are done".
 `;
-                primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode).";
+                primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode). Remember to start with an acknowledgment of the user's previous answer.";
             } else if (supervisorInsight.status === 'DEEPENING') {
                 const focus = supervisorInsight.focusPoint || "their last point";
                 const subGoalsList = currentTopic.subGoals?.join(', ') || 'various aspects';
-                supervisorInstruction = `
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+                supervisorInstruction = isItalian ? `
+> [!IMPORTANT] FASE 2: DEEPENING - Topic: "${currentTopic.label}"
+> Sei nella fase di APPROFONDIMENTO del topic "${currentTopic.label}".
+> Focus suggerito: "${focus}".
+> Sub-goal disponibili: ${subGoalsList}
+>
+> **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
+> 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Riconosci quello che l'utente ha appena detto con una frase specifica.
+>    - Cita un dettaglio concreto dalla risposta dell'utente
+>    - Esempi: "Quello che dici su [X] mi fa pensare...", "È interessante quello che hai detto su [Y]..."
+> 2. **UNA DOMANDA** di approfondimento
+>
+> **IL TUO OBIETTIVO** (scegli UNO):
+> 1. **Chiarire una risposta interessante**: "Hai menzionato X prima, puoi dirmi di più...?"
+> 2. **Esplorare un sub-goal mancante**: Se un sub-goal non è stato discusso, affrontalo ora
+> 3. **Variare l'angolazione**: Chiedi esempi concreti, implicazioni pratiche
+>
+> **DIVIETI**:
+> - ❌ Domande generiche ("C'è altro?", "Dimmi di più", "Altri pensieri?")
+> - ❌ Ripetere domande già fatte in SCAN
+> - ❌ Cambiare topic da solo - aspetta TRANSITION del SUPERVISOR
+> - ❌ Concludere o chiedere contatti
+` : `
 > [!IMPORTANT] PHASE 2: DEEPENING - Topic: "${currentTopic.label}"
 > You are in DEEP DIVE phase exploring topic "${currentTopic.label}" more thoroughly.
 > Suggested focus for this turn: "${focus}".
 > Available sub-goals for this topic: ${subGoalsList}
 >
+> **MANDATORY MESSAGE STRUCTURE**:
+> 1. **BRIDGING PHRASE** (REQUIRED): Acknowledge what the user just said with a specific phrase.
+>    - Reference a concrete detail from the user's response
+>    - Examples: "What you said about [X] makes me think...", "It's interesting what you mentioned about [Y]..."
+> 2. **ONE QUESTION** for deeper exploration
+>
 > **YOUR OBJECTIVE** (pick ONE):
-> 1. **Clarify an interesting SCAN response**: If the user said something noteworthy about "${currentTopic.label}" earlier, ask them to elaborate ("You mentioned X earlier, can you tell me more about...?")
+> 1. **Clarify an interesting SCAN response**: "You mentioned X earlier, can you tell me more about...?"
 > 2. **Explore a missing sub-goal**: If a sub-goal hasn't been discussed yet, ask about it now
-> 3. **Vary the angle**: Ask for concrete examples, practical implications, or a different perspective on "${focus}"
+> 3. **Vary the angle**: Ask for concrete examples, practical implications, or a different perspective
 >
-> **WHAT YOU MUST DO**:
-> - Ask ONE specific question (not generic)
-> - Reference something from the conversation when possible
-> - Focus on "${currentTopic.label}" - don't drift to other topics
->
-> **WHAT YOU MUST NOT DO**:
+> **PROHIBITIONS**:
 > - ❌ Generic questions ("Is there anything else?", "Tell me more", "Any other thoughts?")
 > - ❌ Repeat questions already asked in SCAN
 > - ❌ Transition to another topic yourself - wait for SUPERVISOR's TRANSITION
@@ -595,7 +685,7 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 >
 > **FLOW**: The SUPERVISOR manages topic transitions. Keep probing "${currentTopic.label}" until you receive a TRANSITION instruction.
 `;
-                primaryInstruction = `Probe deeply into "${currentTopic.label}". Clarify interesting responses, explore missing sub-goals, or vary the angle.`;
+                primaryInstruction = `Probe deeply into "${currentTopic.label}". Start with a bridging phrase that acknowledges the user's response, then ask your question.`;
             }
         }
 

@@ -4,6 +4,42 @@ import { scrapeUrl } from '@/lib/scraping';
 import { NextResponse } from 'next/server';
 import Sitemapper from 'sitemapper';
 
+
+function getMainLanguageUrls(urls: string[]): string[] {
+    const buckets: Record<string, string[]> = { root: [] };
+
+    for (const url of urls) {
+        try {
+            const pathname = new URL(url).pathname;
+            // Match /en/, /it/, /fr-CA/ etc. at start of path
+            const match = pathname.match(/^\/([a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?)(\/|$)/);
+            if (match) {
+                const lang = match[1].toLowerCase();
+                if (!buckets[lang]) buckets[lang] = [];
+                buckets[lang].push(url);
+            } else {
+                buckets.root.push(url);
+            }
+        } catch (e) {
+            buckets.root.push(url);
+        }
+    }
+
+    // Find the largest bucket - assuming it represents the main language
+    let bestLang = 'root';
+    let maxCount = buckets.root.length;
+
+    Object.entries(buckets).forEach(([lang, items]) => {
+        if (lang === 'root') return;
+        if (items.length > maxCount) {
+            bestLang = lang;
+            maxCount = items.length;
+        }
+    });
+
+    return buckets[bestLang];
+}
+
 export async function POST(req: Request) {
     try {
         const session = await auth();
@@ -47,8 +83,11 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Nessun URL trovato nella sitemap' }, { status: 400 });
         }
 
-        // Limit to prevent abuse in demo/MVP
-        const limitedSites = sites.slice(0, 50);
+        // Filter for main language
+        const filteredSites = getMainLanguageUrls(sites);
+
+        // Limit to prevent abuse in demo/MVP (increased to 100)
+        const limitedSites = filteredSites.slice(0, 100);
 
         // Process sequentially (or in small batches) to avoid rate limits/overload
         // For MVP we just trigger scraping for the first few and return success

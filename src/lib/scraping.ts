@@ -23,7 +23,7 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
         const $ = cheerio.load(html);
 
         // Remove script, style, and navigation elements to clean up text
-        $('script, style, nav, footer, header, aside, .ad, .cookie-banner').remove();
+        $('script, style, nav, footer, header, aside, .ad, .cookie-banner, .popup, .modal, .sidebar, .widget, iframe').remove();
 
         const title = $('title').text().trim() || $('h1').first().text().trim() || url;
         const description = $('meta[name="description"]').attr('content')?.trim();
@@ -43,6 +43,7 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
         $('p, h1, h2, h3, h4, h5, h6, li, tr').after('\n');
 
         const content = contentEl.text()
+            .replace(/\[\/?[\w-]+.*?\]/g, '') // Remove WordPress-style shortcodes
             .replace(/\s\s+/g, ' ') // Collapse multiple spaces
             .replace(/\n\s*\n/g, '\n\n') // Collapse multiple newlines
             .trim();

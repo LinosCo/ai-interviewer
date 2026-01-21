@@ -51,7 +51,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
         primaryColor: bot.primaryColor || '#7C3AED',
         logoUrl: bot.logoUrl || '',
         boundaries: (bot.boundaries as string[]) || [],
-        backgroundColor: bot.backgroundColor, // Add background color support
+        backgroundColor: bot.backgroundColor || '', // Ensure consistent value for hydration
         privacyPolicyUrl: bot.privacyPolicyUrl || '',
     });
     const [isSaving, setIsSaving] = useState(false);

@@ -17,6 +17,7 @@ const updateSchema = z.object({
     textColor: z.string().optional(),
     logoUrl: z.string().optional(),
     privacyPolicyUrl: z.string().optional(),
+    botType: z.string().optional(), // Added to accept botType from client
 
     // Landing Page Fields
     landingTitle: z.string().optional(),
@@ -76,12 +77,20 @@ export async function PATCH(
             }
         }
 
+        // Remove botType from data before updating (it's not a DB field)
+        // Also filter out undefined/null values that could cause issues
+        const { botType, backgroundColor, ...restData } = data;
+
+        const updateData: Record<string, any> = { ...restData };
+
+        // Only include backgroundColor if it's a non-empty string
+        if (backgroundColor && typeof backgroundColor === 'string') {
+            updateData.backgroundColor = backgroundColor;
+        }
+
         const updatedBot = await prisma.bot.update({
             where: { id: botId },
-            data: {
-                ...data,
-                // Explicit mappings if needed, but spread handles most schema-matching fields
-            }
+            data: updateData
         });
 
         return NextResponse.json(updatedBot);

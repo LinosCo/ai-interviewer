@@ -62,7 +62,7 @@ export default function ChatBubble({
                         initial={{ opacity: 0, y: 10, scale: 0.9 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        className={`absolute bottom-20 ${position === 'bottom-right' ? 'right-0' : 'left-0'} max-w-xs p-4 bg-white rounded-2xl shadow-2xl border border-gray-100 cursor-pointer z-50`}
+                        className={`absolute bottom-20 ${position === 'bottom-right' ? 'right-0' : 'left-0'} max-w-xs p-4 bg-white rounded-2xl shadow-2xl border border-gray-100 cursor-pointer z-[10001]`}
                         onClick={() => {
                             if (!isControlled) setInternalIsOpen(true);
                             onToggle?.(true);

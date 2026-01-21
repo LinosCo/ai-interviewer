@@ -67,8 +67,8 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
                     <DashboardLink href="/dashboard" icon={<Icons.Home size={20} />} label="Home" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/interviews" icon={<Icons.MessageSquare size={20} />} label="Le mie interviste" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />
-                    <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Analisi Presenza" onClick={() => setIsOpen(false)} />
-                    <DashboardLink href="/dashboard/insights" icon={<Icons.Layers size={20} />} label="Insight Unificati" onClick={() => setIsOpen(false)} />
+                    <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Monitor Visibilità" onClick={() => setIsOpen(false)} />
+                    <DashboardLink href="/dashboard/insights" icon={<Icons.Layers size={20} />} label="AI Tips" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/templates" icon={<Icons.LayoutTemplate size={20} />} label="Template" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
 

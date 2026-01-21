@@ -186,7 +186,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             <div>
                                 <h3 className="text-xl font-bold text-stone-900 flex items-center gap-2">
                                     <Eye className="w-5 h-5 text-purple-500" />
-                                    Analisi presenza
+                                    Monitor visibilità
                                 </h3>
                             </div>
                             <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
@@ -199,7 +199,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             <div className="text-center py-10 bg-stone-50 rounded-2xl border border-stone-100">
                                 <Search className="w-10 h-10 text-stone-300 mx-auto mb-4" />
                                 <p className="text-stone-500 mb-6">
-                                    Configura almeno un un <strong>monitoraggio presenza</strong> per iniziare a ricevere insights unificati su questo progetto.
+                                    Configura almeno un un <strong>monitoraggio visibilità</strong> per iniziare a ricevere insights unificati su questo progetto.
                                 </p>
                                 <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
                                     <Button size="sm" variant="outline" className="rounded-xl font-bold">Attiva monitoraggio</Button>
@@ -273,7 +273,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             <div className="flex gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
                                 <Zap className="w-5 h-5 text-amber-600 flex-shrink-0" />
                                 <p className="text-xs text-amber-800 leading-relaxed">
-                                    Configura almeno un un <strong>monitoraggio presenza</strong> per iniziare a ricevere insights unificati su questo progetto.
+                                    Configura almeno un un <strong>monitoraggio visibilità</strong> per iniziare a ricevere insights unificati su questo progetto.
                                 </p>
                             </div>
                         </CardContent>

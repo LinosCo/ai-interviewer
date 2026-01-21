@@ -5,11 +5,27 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 const ActionSchema = z.object({
-    type: z.enum(['add_faq', 'add_interview_topic', 'add_visibility_prompt', 'create_content', 'modify_content', 'respond_to_press', 'monitor_competitor']),
-    target: z.enum(['chatbot', 'interview', 'visibility', 'website', 'pr', 'serp']),
-    title: z.string().optional(),
-    body: z.string(),
-    reasoning: z.string()
+    // Operational actions (can be automated)
+    // - add_faq: Add FAQ to chatbot knowledge base
+    // - add_interview_topic: Add new interview topic to collect more feedback
+    // - add_visibility_prompt: Add new monitoring query
+    // Strategic actions (require consultation)
+    // - create_content / modify_content: Website content changes
+    // - respond_to_press: PR response needed
+    // - monitor_competitor: Competitor activity detected
+    // - strategic_recommendation: High-level business strategy suggestion
+    // - pricing_change: Pricing or offer adjustments
+    // - product_improvement: Product/service enhancement ideas
+    // - marketing_campaign: Marketing initiative suggestions
+    type: z.enum([
+        'add_faq', 'add_interview_topic', 'add_visibility_prompt',
+        'create_content', 'modify_content', 'respond_to_press', 'monitor_competitor',
+        'strategic_recommendation', 'pricing_change', 'product_improvement', 'marketing_campaign'
+    ]),
+    target: z.enum(['chatbot', 'interview', 'visibility', 'website', 'pr', 'serp', 'strategy', 'product', 'marketing']),
+    title: z.string().describe('Titolo breve e chiaro dell\'azione suggerita'),
+    body: z.string().describe('Descrizione dettagliata dell\'azione da compiere'),
+    reasoning: z.string().describe('Spiegazione del perché questa azione è importante basata sui dati raccolti')
 });
 
 const InsightSchema = z.object({
@@ -44,6 +60,12 @@ const SyncResultSchema = z.object({
 
 export class CrossChannelSyncEngine {
     static async sync(organizationId: string) {
+        // 0. Fetch Organization strategy
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { strategicVision: true, valueProposition: true }
+        });
+
         // 1. Fetch visibility data
         const visibilityConfig = await prisma.visibilityConfig.findFirst({
             where: { organizationId },
@@ -56,6 +78,8 @@ export class CrossChannelSyncEngine {
                 }
             }
         });
+
+        // 2-6 ... (skipping for BREVITY in replacement targetContent/content)
 
         // 2. Fetch Interview themes
         const analyses = await prisma.conversationAnalysis.findMany({
@@ -88,7 +112,7 @@ export class CrossChannelSyncEngine {
         const serpSummary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId);
 
         // 6. Summarize data for LLM
-        const visibilitySummary = visibilityConfig?.scans[0]?.responses.map(r => ({
+        const visibilitySummary = visibilityConfig?.scans[0]?.responses?.map(r => ({
             platform: r.platform,
             responseText: r.responseText.substring(0, 300),
             brandMentioned: r.brandMentioned,
@@ -119,23 +143,27 @@ export class CrossChannelSyncEngine {
         const { object } = await generateObject({
             model,
             schema: SyncResultSchema,
-            prompt: `Sei l'Analista Cross-Channel di Business Tuner. Il tuo compito è valutare l'efficacia del brand e dei contenuti web integrando TUTTE le fonti disponibili.
+            prompt: `Sei un consulente strategico per PMI. Analizza i dati raccolti e fornisci suggerimenti PRATICI e AZIONABILI.
 
-            === FONTI DATI ===
+            === STRATEGIA AZIENDALE (Il tuo faro) ===
+            Visione Strategica: ${org?.strategicVision || 'Nessuna visione specifica definita'}
+            Value Proposition: ${org?.valueProposition || 'Nessuna value proposition specifica definita'}
 
-            1. CONTENT SITO WEB (Conoscenza attuale del chatbot):
+            === DATI DISPONIBILI ===
+
+            1. CONTENUTI DEL SITO (cosa sa il chatbot):
             ${JSON.stringify(websiteSummary)}
 
-            2. DATI CHATBOT (Sentiment utenti e lacune nella conoscenza):
+            2. DOMANDE DEI CLIENTI AL CHATBOT (cosa chiedono e cosa manca):
             ${JSON.stringify(chatbotSummary)}
 
-            3. FEEDBACK INTERVISTE (Feedback diretto su comunicazione/brand):
+            3. FEEDBACK DALLE INTERVISTE (cosa pensano i clienti):
             ${JSON.stringify(interviewSummary)}
 
-            4. VISIBILITY TRACKER LLM (Come gli LLM ti posizionano nelle risposte):
+            4. REPUTAZIONE ONLINE SU AI (ChatGPT, Claude, etc.):
             ${JSON.stringify(visibilitySummary)}
 
-            5. SERP MONITORING - GOOGLE NEWS/SEARCH (Menzioni recenti del brand su Google):
+            5. MENZIONI SU GOOGLE NEWS/SEARCH:
             ${serpSummary ? JSON.stringify({
                 totalMentions: serpSummary.totalMentions,
                 sentimentBreakdown: serpSummary.sentimentBreakdown,
@@ -144,32 +172,42 @@ export class CrossChannelSyncEngine {
                 recentAlerts: serpSummary.recentAlerts
             }) : 'Nessun dato SERP disponibile'}
 
-            === OBIETTIVI DELL'ANALISI ===
+            === ANALIZZA E SUGGERISCI ===
 
-            1. SODDISFAZIONE CHATBOT (0-100): Valuta il sentiment degli utenti che usano il chatbot.
+            HEALTH REPORT:
+            1. SODDISFAZIONE (0-100): Come si sentono i clienti che usano il chatbot?
+            2. EFFICACIA SITO (0-100): Il sito risponde ai bisogni emersi dai feedback?
+            3. REPUTAZIONE ONLINE (0-100): Come ti percepiscono online (AI + Google)?
 
-            2. EFFICACIA SITO WEB (0-100): Il sito risponde alle problematiche emerse nelle interviste e colma le lacune del chatbot?
+            SUGGERIMENTI - Genera insight con azioni di DUE tipi:
 
-            3. VISIBILITÀ BRAND (0-100): Combina:
-               - Come gli LLM ti posizionano (Visibility Tracker)
-               - Come appari nelle ricerche Google (SERP Monitoring)
-               - Il sentiment generale delle menzioni online
+            A) AZIONI OPERATIVE (applicabili subito):
+               - add_faq → Aggiungi risposta al chatbot (es. "I clienti chiedono spesso X, aggiungi FAQ")
+               - add_interview_topic → Raccogli più feedback su un tema specifico
+               - add_visibility_prompt → Monitora una nuova query sugli AI
 
-            4. CORRELAZIONI CROSS-CHANNEL:
-               - Se i clienti nelle interviste lamentano X, il chatbot sa rispondere a X?
-               - Se il sito parla di Y, gli LLM ti citano per Y?
-               - Se c'è una notizia negativa su Google, il chatbot/sito sono preparati?
+            B) AZIONI STRATEGICHE (richiedono consulenza):
+               - product_improvement → Miglioramenti al prodotto/servizio
+                 Es: "I clienti lamentano che il checkout è lento → considera di semplificarlo"
+               - pricing_change → Revisione prezzi/offerte
+                 Es: "Molti chiedono sconti volume → valuta un piano business"
+               - marketing_campaign → Idee per campagne marketing
+                 Es: "Il competitor X è citato più di te su ChatGPT → considera una campagna di content marketing"
+               - strategic_recommendation → Consigli strategici generali
+                 Es: "Il sentiment sulle recensioni sta calando → analizza le cause"
+               - create_content / modify_content → Modifiche importanti al sito
+               - respond_to_press → Risposta a notizie/articoli
+               - monitor_competitor → Alert su attività competitor
 
-            5. AZIONI SUGGERITE (usa i nuovi tipi se appropriato):
-               - create_content / modify_content → per il sito
-               - add_faq → per il chatbot
-               - add_interview_topic → per raccogliere più feedback
-               - add_visibility_prompt → per monitorare nuove query sugli LLM
-               - respond_to_press → se ci sono notizie che richiedono una risposta PR
-               - monitor_competitor → se i competitor appaiono in contesti rilevanti
-
-            Restituisci un Health Report completo e Insight dettagliati con priorità.`,
-            temperature: 0.1
+            IMPORTANTE:
+            - Ogni insight deve avere ALMENO un'azione operativa E una strategica se possibile
+            - I titoli devono essere chiari e in italiano (es. "Aggiungi FAQ sui prezzi" non "add_faq")
+            - Il body deve spiegare COSA fare concretamente
+            - Il reasoning deve spiegare PERCHÉ, citando i dati specifici
+            - Priorità alta (80-100) per problemi urgenti o opportunità immediate
+            - Priorità media (50-79) per miglioramenti importanti
+            - Priorità bassa (0-49) per ottimizzazioni nice-to-have`,
+            temperature: 0.2
         });
 
         // 8. Save to DB

@@ -41,9 +41,11 @@ export default async function DashboardPage() {
     const organizationId = project?.organization?.id;
     const projectId = project?.id;
 
+    const isAdmin = user.role === 'ADMIN';
+
     // Check limits
-    const canCreateInterview = organizationId ? await canPublishBot(organizationId) : { allowed: true };
-    const canCreateChatbotCheck = organizationId ? await canCreateChatbot(organizationId) : { allowed: true };
+    const canCreateInterview = organizationId && !isAdmin ? await canPublishBot(organizationId) : { allowed: true };
+    const canCreateChatbotCheck = organizationId && !isAdmin ? await canCreateChatbot(organizationId) : { allowed: true };
 
     // Get bots and split by type
     const allBots = user.ownedProjects.flatMap(p => p.bots);

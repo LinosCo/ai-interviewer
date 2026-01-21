@@ -31,12 +31,12 @@ export function CookieConsent() {
         <AnimatePresence>
             {isVisible && (
                 <motion.div
-                    initial={{ y: 100, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 100, opacity: 0 }}
-                    className="fixed bottom-6 left-6 w-[calc(100%-3rem)] md:w-[400px] z-[9999]"
+                    initial={{ y: -100, opacity: 0, x: '-50%' }}
+                    animate={{ y: 0, opacity: 1, x: '-50%' }}
+                    exit={{ y: -100, opacity: 0, x: '-50%' }}
+                    className="fixed top-6 left-1/2 -translate-x-1/2 w-[95%] md:w-[600px] z-[99999]"
                 >
-                    <div className="bg-white rounded-[2rem] shadow-2xl border border-stone-100 p-6 md:p-8">
+                    <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-stone-200/50 p-4 md:p-6">
                         <div className="flex items-start gap-4 mb-4">
                             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center flex-shrink-0">
                                 <ShieldCheck size={24} />

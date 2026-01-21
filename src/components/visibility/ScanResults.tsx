@@ -14,6 +14,7 @@ interface ScanData {
     responses: {
         id: string;
         platform: string;
+        model: string;
         promptText: string;
         brandMentioned: boolean;
         brandPosition: number | null;
@@ -104,11 +105,11 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Platform Coverage</CardTitle>
+                        <CardTitle className="text-sm font-medium">Copertura Piattaforme</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{platformScores.length} / 3</div>
-                        <p className="text-xs text-muted-foreground">Provider AI attivi</p>
+                        <p className="text-xs text-muted-foreground">Motori AI attivi</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -203,7 +204,7 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <div>
-                            <CardTitle className="text-lg">Analisi Dettagliata Risposte</CardTitle>
+                            <CardTitle className="text-lg">Monitor Dettagliato Risposte</CardTitle>
                             <CardDescription>Visualizza le risposte complete generate dagli LLM</CardDescription>
                         </div>
                     </div>
@@ -227,7 +228,7 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                                         <div className="flex-1 space-y-1">
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="outline" className="capitalize bg-slate-50 border-slate-200">
-                                                    {res.platform}
+                                                    {res.platform} <span className="text-slate-400 ml-1 text-[10px]">({res.model})</span>
                                                 </Badge>
                                                 {res.sentiment && (
                                                     <Badge variant={

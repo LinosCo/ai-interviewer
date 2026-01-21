@@ -3,11 +3,13 @@ import { notFound } from 'next/navigation';
 import { checkAdmin } from '@/lib/admin-auth';
 import ProjectDetailView from './project-detail-view';
 
-export default async function AdminProjectDetailPage({ params }: { params: { projectId: string } }) {
+export default async function AdminProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
     if (!await checkAdmin()) return <div>Access Denied</div>;
 
+    const { projectId } = await params;
+
     const project = await prisma.project.findUnique({
-        where: { id: params.projectId },
+        where: { id: projectId },
         include: {
             owner: true,
             bots: {

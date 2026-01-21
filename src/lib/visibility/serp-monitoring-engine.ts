@@ -266,7 +266,9 @@ export class SerpMonitoringEngine {
         const results = data.news_results || data.organic_results || [];
 
         return results.map((item: any, index: number) => {
-            const url = item.link || item.url || '';
+            let url = item.link || item.url || '';
+            // Ensure URL has protocol to avoid parsing errors
+            if (url && !url.startsWith('http')) url = 'https://' + url;
             const domain = this.extractDomain(url);
             const sourceInfo = this.getSourceInfo(domain);
 

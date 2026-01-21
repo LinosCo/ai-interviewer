@@ -94,6 +94,7 @@ export default async function VisibilityPage({
             responses: activeScan.responses.map(r => ({
                 id: r.id,
                 platform: r.platform,
+                model: r.model,
                 promptText: r.prompt.text,
                 brandMentioned: r.brandMentioned,
                 brandPosition: r.brandPosition,
@@ -109,7 +110,7 @@ export default async function VisibilityPage({
         <div className="space-y-8 p-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight">Analisi presenza online</h2>
+                    <h2 className="text-3xl font-bold tracking-tight">Monitor visibilità online</h2>
                     <p className="text-muted-foreground">Monitora come il tuo brand appare negli LLM e nelle ricerche Google.</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -187,7 +188,7 @@ export default async function VisibilityPage({
                             <div className="bg-white rounded-[2rem] border border-stone-100 p-8 shadow-sm">
                                 <div className="flex items-center justify-between mb-8">
                                     <div>
-                                        <h3 className="text-xl font-bold text-stone-900">Analisi presenza</h3>
+                                        <h3 className="text-xl font-bold text-stone-900">Monitor visibilità</h3>
                                         <p className="text-sm text-stone-500">
                                             {config.nextScanAt
                                                 ? `Programmata per il ${config.nextScanAt.toLocaleDateString()}`

@@ -79,46 +79,52 @@ const FeatureIcon = ({ icon: Icon, color = colors.amber }: { icon: any, color?: 
 
 // --- Sections ---
 
-const TYPING_WORDS = [
-    'i tuoi clienti',
-    'il mercato',
-    'i prospect',
-    'i dipendenti',
-    'i partner',
-    'gli utenti',
+// Hero rotating phrases - slide animation (positive/opportunity-focused)
+const HERO_PHRASES = [
+    'i clienti sono soddisfatti',
+    'il team è motivato',
+    'il mercato ti apprezza',
+    'la comunicazione funziona',
+    'stai crescendo come vorresti',
 ];
 
 export default function LandingPage() {
     const { data: session } = useSession();
     const [isYearly, setIsYearly] = useState(true);
-    const [currentWordIndex, setCurrentWordIndex] = useState(0);
-    const [displayText, setDisplayText] = useState('');
-    const [isDeleting, setIsDeleting] = useState(false);
+    const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+
+    // Auto-rotate phrases every 3 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentPhraseIndex((prev) => (prev + 1) % HERO_PHRASES.length);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const [showStickyCTA, setShowStickyCTA] = useState(false);
+    const [showDemoForm, setShowDemoForm] = useState(false);
+    const [demoEmail, setDemoEmail] = useState('');
+    const [demoSubmitted, setDemoSubmitted] = useState(false);
 
     useEffect(() => {
-        const currentWord = TYPING_WORDS[currentWordIndex];
-        const typingSpeed = isDeleting ? 50 : 100;
-        const pauseTime = 2000;
+        const handleScroll = () => {
+            setShowStickyCTA(window.scrollY > 600);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
-        const timeout = setTimeout(() => {
-            if (!isDeleting) {
-                if (displayText.length < currentWord.length) {
-                    setDisplayText(currentWord.slice(0, displayText.length + 1));
-                } else {
-                    setTimeout(() => setIsDeleting(true), pauseTime);
-                }
-            } else {
-                if (displayText.length > 0) {
-                    setDisplayText(displayText.slice(0, -1));
-                } else {
-                    setIsDeleting(false);
-                    setCurrentWordIndex((prev) => (prev + 1) % TYPING_WORDS.length);
-                }
-            }
-        }, typingSpeed);
-
-        return () => clearTimeout(timeout);
-    }, [displayText, isDeleting, currentWordIndex]);
+    const handleDemoSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        // In production, this would send to an API
+        console.log('Demo requested for:', demoEmail);
+        setDemoSubmitted(true);
+        setTimeout(() => {
+            setShowDemoForm(false);
+            setDemoSubmitted(false);
+            setDemoEmail('');
+        }, 3000);
+    };
 
     return (
         <div className="bg-white overflow-x-hidden">
@@ -135,24 +141,142 @@ export default function LandingPage() {
                 }
             `}</style>
 
+            {/* Sticky CTA Bar - Floating Pill Design */}
+            <AnimatePresence>
+                {showStickyCTA && (
+                    <motion.div
+                        initial={{ y: 100, opacity: 0, x: '-50%' }}
+                        animate={{ y: 0, opacity: 1, x: '-50%' }}
+                        exit={{ y: 100, opacity: 0, x: '-50%' }}
+                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-4xl"
+                    >
+                        <div className="bg-white/90 backdrop-blur-xl border border-stone-200/50 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-3xl md:rounded-full py-3 px-6 md:py-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div className="text-center md:text-left hidden sm:block">
+                                <p className="font-bold text-stone-900 leading-tight">Pronto a capire meglio i tuoi clienti?</p>
+                                <p className="text-xs text-stone-500 font-medium">50 interviste gratis, nessuna carta richiesta</p>
+                            </div>
+
+                            {/* Mobile-only text (shorter) */}
+                            <div className="text-center sm:hidden">
+                                <p className="font-bold text-stone-900 text-sm">Inizia a raccogliere feedback gratis</p>
+                            </div>
+
+                            <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end pr-0 md:pr-0">
+                                <button
+                                    onClick={() => setShowDemoForm(true)}
+                                    className="flex-1 md:flex-none px-6 py-2.5 rounded-full border border-stone-200 text-stone-700 font-bold text-xs md:text-sm hover:bg-stone-50 transition-colors bg-white/50"
+                                >
+                                    Richiedi demo
+                                </button>
+                                <Link href="/register" className="flex-1 md:flex-none">
+                                    <Button size="sm" withShimmer className="w-full md:w-auto px-8 rounded-full py-2.5 shadow-lg shadow-amber-200">
+                                        Inizia gratis
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Global style to nudge the external chatbot bubble and other fixed elements */}
+            <style jsx global>{`
+                /* Nudge the Voler.ai chatbot bubble and common widget containers up when they appear */
+                #bt-chatbot-iframe,
+                [id^="voler-"],
+                .voler-widget-bubble,
+                .fixed.bottom-4.right-4,
+                .fixed.bottom-6.right-6 {
+                    bottom: ${showStickyCTA ? '100px' : '24px'} !important;
+                    transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                }
+                
+                @media (max-width: 768px) {
+                    #bt-chatbot-iframe,
+                    [id^="voler-"] {
+                        bottom: ${showStickyCTA ? '140px' : '20px'} !important;
+                    }
+                }
+            `}</style>
+
+            {/* Demo Request Modal */}
+            <AnimatePresence>
+                {showDemoForm && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4"
+                        onClick={() => setShowDemoForm(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            {!demoSubmitted ? (
+                                <>
+                                    <h3 className="text-2xl font-bold text-stone-900 mb-2">Richiedi una demo</h3>
+                                    <p className="text-stone-500 mb-6">Ti mostreremo come Business Tuner può aiutare la tua azienda.</p>
+                                    <form onSubmit={handleDemoSubmit} className="space-y-4">
+                                        <input
+                                            type="email"
+                                            value={demoEmail}
+                                            onChange={(e) => setDemoEmail(e.target.value)}
+                                            placeholder="La tua email aziendale"
+                                            required
+                                            className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                                        />
+                                        <Button type="submit" fullWidth withShimmer className="py-3">
+                                            Richiedi demo gratuita
+                                        </Button>
+                                    </form>
+                                    <p className="text-xs text-stone-400 mt-4 text-center">Ti contatteremo entro 24 ore lavorative</p>
+                                </>
+                            ) : (
+                                <div className="text-center py-8">
+                                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Icons.Check className="text-green-600" size={32} />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-stone-900 mb-2">Richiesta inviata!</h3>
+                                    <p className="text-stone-500">Ti contatteremo presto per organizzare la demo.</p>
+                                </div>
+                            )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* 1. HERO SECTION */}
             <section className="relative pt-20 pb-40 lg:pt-32 lg:pb-60 bg-gradient-to-b from-white to-amber-50/30 overflow-hidden">
                 <div className="container mx-auto px-6 max-w-7xl relative z-10">
                     <div className="text-center max-w-4xl mx-auto">
-                        <SectionLabel text="Piattaforma di Business Intelligence Qualitativa" />
+                        <SectionLabel text="Per PMI e professionisti" />
 
                         <motion.h1
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-5xl lg:text-8xl font-black text-stone-900 leading-[1] mb-8 tracking-tighter"
+                            className="text-5xl lg:text-7xl font-black text-stone-900 leading-[1.1] mb-8 tracking-tighter"
                         >
-                            Ascolta{' '}
-                            <span className="text-gradient inline-block min-w-[280px] lg:min-w-[450px] text-left">
-                                {displayText}
-                                <span className="animate-pulse">|</span>
-                            </span>
+                            Scopri se
                             <br />
-                            <span className="text-stone-900">Decidi meglio.</span>
+                            {/* Sliding text container - fixed height for animation */}
+                            <span className="relative inline-block min-h-[1.3em] w-full">
+                                <AnimatePresence mode="wait">
+                                    <motion.span
+                                        key={currentPhraseIndex}
+                                        initial={{ y: 50, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        exit={{ y: -50, opacity: 0 }}
+                                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                                        className="text-gradient block text-center"
+                                    >
+                                        {HERO_PHRASES[currentPhraseIndex]}
+                                    </motion.span>
+                                </AnimatePresence>
+                            </span>
                         </motion.h1>
 
                         <motion.p
@@ -161,7 +285,7 @@ export default function LandingPage() {
                             transition={{ delay: 0.1 }}
                             className="text-xl lg:text-2xl text-stone-600 leading-relaxed mb-12 max-w-3xl mx-auto"
                         >
-                            Interviste AI, chatbot intelligente e monitoraggio reputazione in un'unica piattaforma. Per PMI che vogliono capire clienti, mercato e concorrenza.
+                            La piattaforma che ascolta clienti, dipendenti e mercato. <strong>Raccoglie insight</strong>, <strong>identifica problemi</strong> e ti guida verso <strong>decisioni migliori</strong>.
                         </motion.p>
 
                         <motion.div
@@ -205,7 +329,7 @@ export default function LandingPage() {
                                     <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
                                         <Icons.MessageSquare size={32} className="text-amber-500" />
                                     </div>
-                                    <span className="text-xs font-bold text-stone-500 tracking-wider">INTERVIEW</span>
+                                    <span className="text-xs font-bold text-stone-500 tracking-wider">RACCOGLI FEEDBACK</span>
                                 </div>
 
                                 <div className="h-0.5 flex-1 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 mx-4 relative">
@@ -216,7 +340,7 @@ export default function LandingPage() {
                                     <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
                                         <Icons.Bot size={32} className="text-amber-500" />
                                     </div>
-                                    <span className="text-xs font-bold text-stone-500 tracking-wider">CHATBOT</span>
+                                    <span className="text-xs font-bold text-stone-500 tracking-wider">RISPONDI AI CLIENTI</span>
                                 </div>
 
                                 <div className="h-0.5 flex-1 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 mx-4 relative">
@@ -227,7 +351,7 @@ export default function LandingPage() {
                                     <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
                                         <Icons.Search size={32} className="text-amber-500" />
                                     </div>
-                                    <span className="text-xs font-bold text-stone-500 tracking-wider">PRESENZA ONLINE</span>
+                                    <span className="text-xs font-bold text-stone-500 tracking-wider">MONITORA LA REPUTAZIONE</span>
                                 </div>
                             </div>
 
@@ -237,7 +361,7 @@ export default function LandingPage() {
                                 </div>
                                 <div className="bg-gradient-to-br from-stone-900 to-stone-800 text-white rounded-[2rem] p-6 px-12 shadow-2xl mt-4 border border-stone-700 flex items-center gap-4 group hover:scale-105 transition-transform duration-500">
                                     <Icons.Layers size={24} className="text-amber-500" />
-                                    <span className="text-lg font-bold tracking-tight">Centro Insight Unificato</span>
+                                    <span className="text-lg font-bold tracking-tight">Suggerimenti & Consulenza</span>
                                 </div>
                             </div>
                         </motion.div>
@@ -324,9 +448,9 @@ export default function LandingPage() {
             <section id="use-cases" className="py-32 bg-[#FAFAF8] relative">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="text-center max-w-3xl mx-auto mb-24">
-                        <SectionLabel text="I nostri strumenti" />
+                        <SectionLabel text="Cosa fa per te" />
                         <h2 className="text-4xl lg:text-6xl font-black text-stone-900 mb-6 tracking-tight">
-                            Tre motori per la tua <span className="text-gradient">intelligenza aziendale</span>
+                            Tre strumenti per <span className="text-gradient">capire e migliorare</span>
                         </h2>
                     </div>
 
@@ -335,11 +459,11 @@ export default function LandingPage() {
                         <div>
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.MessageSquare size={24} /></div>
-                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Interview AI</h3>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Raccogli Feedback</h3>
                             </div>
-                            <h4 className="text-xl text-stone-900 font-bold mb-6">Conversazioni che vanno in profondità.</h4>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Scopri perché i clienti comprano, abbandonano o esitano.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                L'AI conduce interviste strutturate ma flessibili. Fa follow-up intelligenti, adatta il tono all'interlocutore e non ripete mai la stessa domanda.
+                                Un'intelligenza artificiale che intervista i tuoi clienti come farebbe un consulente esperto. Ti fa capire cosa pensano davvero, senza form noiosi che nessuno compila.
                             </p>
 
                             <div className="grid grid-cols-2 gap-6 mb-8">
@@ -354,7 +478,7 @@ export default function LandingPage() {
                             </div>
 
                             <ul className="space-y-4 mb-10">
-                                {['Generazione automatica domande da obiettivo', 'Memory Manager: evita ripetizioni frustranti', 'Tone Analyzer: formale, amichevole, diretto'].map((f, i) => (
+                                {['Scrivi cosa vuoi capire, l\'AI crea le domande', 'L\'AI fa domande di approfondimento, come un vero intervistatore', 'Risultati chiari: cosa migliorare nel prodotto, servizio o comunicazione'].map((f, i) => (
                                     <li key={i} className="flex items-center gap-3 text-stone-700 font-medium">
                                         <div className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0"><Icons.Check size={12} /></div>
                                         {f}
@@ -451,26 +575,26 @@ export default function LandingPage() {
                         <div className="order-1 lg:order-2">
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Bot size={24} /></div>
-                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Chatbot Intelligence</h3>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Assistente Clienti AI</h3>
                             </div>
-                            <h4 className="text-xl text-stone-900 font-bold mb-6">Supporto clienti che impara dai silenzi.</h4>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Rispondi ai clienti 24/7 e scopri cosa non sanno.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                Molto più di un assistente AI. Business Tuner identifica cosa non sa rispondere e ti suggerisce come migliorare la knowledge base analizzando i trend reali.
+                                Un assistente che risponde alle domande dei tuoi clienti e ti dice cosa non trova sul tuo sito. Così sai esattamente cosa aggiungere o migliorare.
                             </p>
 
                             <ul className="space-y-6 mb-10">
                                 <li className="flex items-start gap-4">
                                     <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-1"><Icons.Check size={14} /></div>
                                     <div>
-                                        <div className="font-bold text-stone-900 uppercase text-xs tracking-widest mb-1">Knowledge Gap Detection</div>
-                                        <div className="text-sm text-stone-500 leading-relaxed">Analisi semantica dei messaggi senza risposta. Nessuna domanda va persa.</div>
+                                        <div className="font-bold text-stone-900 uppercase text-xs tracking-widest mb-1">Rileva le lacune</div>
+                                        <div className="text-sm text-stone-500 leading-relaxed">Ti mostra le domande a cui non ha saputo rispondere. Così sai cosa manca sul sito.</div>
                                     </div>
                                 </li>
                                 <li className="flex items-start gap-4">
                                     <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-1"><Icons.Check size={14} /></div>
                                     <div>
-                                        <div className="font-bold text-stone-900 uppercase text-xs tracking-widest mb-1">FAQ Proattive</div>
-                                        <div className="text-sm text-stone-500 leading-relaxed">Trasforma le richieste ricorrenti in risorse knowledge base in un click.</div>
+                                        <div className="font-bold text-stone-900 uppercase text-xs tracking-widest mb-1">Suggerisce le risposte</div>
+                                        <div className="text-sm text-stone-500 leading-relaxed">Ti propone le risposte da aggiungere con un click. Meno lavoro per te.</div>
                                     </div>
                                 </li>
                             </ul>
@@ -484,26 +608,26 @@ export default function LandingPage() {
                         <div>
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Search size={24} /></div>
-                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Analisi Presenza Online</h3>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Monitora la Reputazione</h3>
                             </div>
-                            <h4 className="text-xl text-stone-900 font-bold mb-6">Cosa dicono di te online e sull'AI.</h4>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Cosa dicono di te su Google e quando ti chiedono all'AI.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                Monitora come appari su ChatGPT, Claude, forum e blog. Se qualcuno chiede una soluzione nel tuo settore, assicurati di essere menzionato.
+                                Scopri se quando qualcuno chiede a ChatGPT o Google un prodotto come il tuo, ti menzionano o no. Se non lo fanno, ti diciamo come migliorare.
                             </p>
 
                             <div className="grid grid-cols-2 gap-4 mb-10">
                                 <div className="p-4 bg-white rounded-2xl border border-stone-100 shadow-sm">
-                                    <div className="font-bold text-stone-900 text-sm mb-2">AI Perception</div>
+                                    <div className="font-bold text-stone-900 text-sm mb-2">Cosa dice l'AI di te</div>
                                     <div className="text-xs text-stone-500">ChatGPT, Claude, Gemini, Perplexity</div>
                                 </div>
                                 <div className="p-4 bg-white rounded-2xl border border-stone-100 shadow-sm">
-                                    <div className="font-bold text-stone-900 text-sm mb-2">Web Presence</div>
-                                    <div className="text-xs text-stone-500">Google News, Reddit, Forum di settore</div>
+                                    <div className="font-bold text-stone-900 text-sm mb-2">Cosa dice il web di te</div>
+                                    <div className="text-xs text-stone-500">Google News, articoli, forum</div>
                                 </div>
                             </div>
 
                             <p className="text-sm text-stone-500 italic mb-10">
-                                "Il 40% delle ricerche B2B oggi inizia su un'interfaccia AI. Se ChatGPT non ti conosce, non esisti."
+                                "Il 40% delle ricerche B2B oggi inizia chiedendo a un'AI. Se ChatGPT non ti conosce, perdi opportunità."
                             </p>
 
                             <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Pro Plan (€149/mo)</span></div>
@@ -576,7 +700,7 @@ export default function LandingPage() {
                                 </div>
                                 <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center justify-center text-center group hover:bg-amber-100 transition-colors cursor-default">
                                     <Icons.Search size={32} className="text-amber-500 mb-4" />
-                                    <div className="text-xs font-black text-amber-900 uppercase">Analisi Presenza</div>
+                                    <div className="text-xs font-black text-amber-900 uppercase">Monitor Visibilità</div>
                                     <div className="text-stone-500 text-[10px] mt-1 italic">Competitor parla di checkout</div>
                                 </div>
                                 <div className="bg-amber-50 p-6 rounded-[2rem] border border-stone-200 flex flex-col items-center justify-center text-center group hover:scale-105 transition-transform">
@@ -595,18 +719,18 @@ export default function LandingPage() {
                         </div>
 
                         <div>
-                            <SectionLabel text="Cross-Channel Insights" color="#F59E0B" bg="rgba(245, 158, 11, 0.05)" />
+                            <SectionLabel text="Suggerimenti & Consulenza" color="#F59E0B" bg="rgba(245, 158, 11, 0.05)" />
                             <h2 className="text-4xl lg:text-5xl font-black text-stone-900 mb-8 tracking-tight">
-                                Quando i tuoi strumenti <br /><span className="text-gradient">parlano tra loro</span>
+                                Consigli pratici su <br /><span className="text-gradient">cosa migliorare</span>
                             </h2>
                             <p className="text-xl text-stone-600 mb-12 leading-relaxed">
-                                Il vero differenziatore: colleghiamo i puntini per te. Se un tema emerge ovunque, te lo segnaliamo con priorità alta e azioni concrete suggerite in tempo reale.
+                                La piattaforma collega feedback, domande dei clienti e reputazione online. Ti dice cosa migliorare nel prodotto, nel marketing o nel servizio. E se serve aiuto, <strong>puoi richiedere una consulenza</strong>.
                             </p>
 
                             <div className="space-y-6">
                                 {[
-                                    { t: 'Priorità unificata', d: 'Più un tema appare su diversi canali, più il sistema lo spinge in alto.' },
-                                    { t: 'Azioni suggerite', d: 'Ti suggeriamo FAQ, script per post social o nuovi prompt visibility.' },
+                                    { t: 'Suggerimenti automatici', d: 'Ti diciamo cosa fare: aggiungere una FAQ, modificare un testo sul sito, rispondere a una recensione.' },
+                                    { t: 'Consulenza su richiesta', d: 'Per le decisioni strategiche (pricing, posizionamento, nuove funzionalità), puoi chiedere una consulenza dedicata.' },
                                 ].map((item, i) => (
                                     <div key={i} className="flex gap-4 p-6 bg-stone-50 rounded-2xl border border-stone-100 cursor-default hover:bg-amber-50 hover:border-amber-200 transition-colors">
                                         <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0"><Icons.Zap size={18} /></div>
@@ -860,7 +984,7 @@ export default function LandingPage() {
                             { q: "Quanto tempo serve per iniziare?", a: "5 minuti. Scegli un template, personalizzalo e condividi il link. L'AI fa il resto." },
                             { q: "Devo avere competenze tecniche?", a: "No. L'interfaccia è pensata per imprenditori e manager, non per sviluppatori. Tutto è drag-and-drop o prompt-based." },
                             { q: "I dati sono sicuri?", a: "Assolutamente. Server EU (Germania/Irlanda), GDPR compliant, crittografia end-to-end. I tuoi dati non vengono mai usati per addestrare modelli AI pubblici." },
-                            { q: "Cos'è l'Insight Hub?", a: "È la dashboard che unisce i dati di tutti e tre gli strumenti. Se un tema emerge nelle interviste, nel chatbot e nella presenza online, te lo segnaliamo con priorità alta." },
+                            { q: "Come funzionano i suggerimenti?", a: "La piattaforma analizza feedback, domande dei clienti e reputazione online. Ti propone azioni concrete: aggiungere una FAQ, modificare un testo, rispondere a una recensione. Per le decisioni strategiche, puoi richiedere una consulenza." },
                             { q: "Posso esportare i dati?", a: "Sì. Trascrizioni, insight in CSV o report PDF completi pronti da condividere." },
                         ].map((faq, i) => (
                             <details key={i} className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">

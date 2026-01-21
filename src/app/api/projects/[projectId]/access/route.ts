@@ -2,6 +2,16 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+// Helper to check if user is OWNER of project
+async function isProjectOwner(userId: string, projectId: string): Promise<boolean> {
+    const access = await prisma.projectAccess.findUnique({
+        where: {
+            userId_projectId: { userId, projectId }
+        }
+    });
+    return access?.role === 'OWNER';
+}
+
 export async function GET(
     req: Request,
     { params }: { params: Promise<{ projectId: string }> }
@@ -12,23 +22,54 @@ export async function GET(
 
         const { projectId } = await params;
 
-        // Verify if user is owner or has access
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            include: {
-                accessList: {
-                    include: { user: { select: { id: true, email: true, name: true } } }
+        // Verify user has access to this project
+        const userAccess = await prisma.projectAccess.findUnique({
+            where: {
+                userId_projectId: {
+                    userId: session.user.id,
+                    projectId
                 }
             }
         });
 
-        if (!project || (project.ownerId !== session.user.id)) {
-            return new Response('Unauthorized or Project not found', { status: 403 });
+        if (!userAccess) {
+            return new Response('Access denied', { status: 403 });
         }
 
-        return NextResponse.json(project.accessList);
+        // Get project with access list
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            include: {
+                accessList: {
+                    include: {
+                        user: { select: { id: true, email: true, name: true } }
+                    }
+                }
+            }
+        });
+
+        if (!project) {
+            return new Response('Project not found', { status: 404 });
+        }
+
+        // Return access list with roles
+        const members = project.accessList.map(pa => ({
+            id: pa.id,
+            userId: pa.userId,
+            email: pa.user.email,
+            name: pa.user.name,
+            role: pa.role,
+            createdAt: pa.createdAt
+        }));
+
+        return NextResponse.json({
+            members,
+            isPersonal: project.isPersonal,
+            currentUserRole: userAccess.role
+        });
 
     } catch (error) {
+        console.error('Get Project Access Error:', error);
         return new Response('Internal Server Error', { status: 500 });
     }
 }
@@ -46,43 +87,64 @@ export async function POST(
 
         if (!email) return new Response('Email is required', { status: 400 });
 
-        // Verify ownership
+        // Check project exists and get info
         const project = await prisma.project.findUnique({
             where: { id: projectId }
         });
 
-        if (!project || project.ownerId !== session.user.id) {
-            return new Response('Only owners can share projects', { status: 403 });
+        if (!project) {
+            return new Response('Project not found', { status: 404 });
         }
 
-        // Find user to share with
-        const userToShare = await prisma.user.findUnique({
+        // Cannot invite to personal projects
+        if (project.isPersonal) {
+            return new Response('Non puoi invitare membri al progetto personale', { status: 403 });
+        }
+
+        // Verify user is OWNER
+        if (!(await isProjectOwner(session.user.id, projectId))) {
+            return new Response('Solo il proprietario può invitare membri', { status: 403 });
+        }
+
+        // Find user to invite
+        const userToInvite = await prisma.user.findUnique({
             where: { email }
         });
 
-        if (!userToShare) {
+        if (!userToInvite) {
             return NextResponse.json({ error: 'Utente non trovato su Business Tuner.' }, { status: 404 });
         }
 
-        // Create access
+        // Create access with MEMBER role
         const access = await prisma.projectAccess.upsert({
             where: {
                 userId_projectId: {
-                    userId: userToShare.id,
+                    userId: userToInvite.id,
                     projectId: projectId
                 }
             },
             update: {},
             create: {
-                userId: userToShare.id,
-                projectId: projectId
+                userId: userToInvite.id,
+                projectId: projectId,
+                role: 'MEMBER'
+            },
+            include: {
+                user: { select: { id: true, email: true, name: true } }
             }
         });
 
-        return NextResponse.json(access);
+        return NextResponse.json({
+            id: access.id,
+            userId: access.userId,
+            email: access.user.email,
+            name: access.user.name,
+            role: access.role,
+            createdAt: access.createdAt
+        });
 
     } catch (error) {
-        console.error('Share Project Error:', error);
+        console.error('Invite to Project Error:', error);
         return new Response('Internal Server Error', { status: 500 });
     }
 }
@@ -97,31 +159,63 @@ export async function DELETE(
 
         const { projectId } = await params;
         const { searchParams } = new URL(req.url);
-        const userId = searchParams.get('userId');
+        let userId = searchParams.get('userId');
 
         if (!userId) return new Response('UserId is required', { status: 400 });
 
-        // Verify ownership
+        // Handle "self" as current user
+        if (userId === 'self') {
+            userId = session.user.id;
+        }
+
+        // Get project info
         const project = await prisma.project.findUnique({
             where: { id: projectId }
         });
 
-        if (!project || project.ownerId !== session.user.id) {
-            return new Response('Only owners can manage access', { status: 403 });
+        if (!project) {
+            return new Response('Project not found', { status: 404 });
+        }
+
+        // Get target user's access
+        const targetAccess = await prisma.projectAccess.findUnique({
+            where: {
+                userId_projectId: { userId, projectId }
+            }
+        });
+
+        if (!targetAccess) {
+            return new Response('User not in this project', { status: 404 });
+        }
+
+        // Cannot remove OWNER
+        if (targetAccess.role === 'OWNER') {
+            return new Response('Non puoi rimuovere il proprietario del progetto', { status: 403 });
+        }
+
+        // Check if current user is OWNER or is removing themselves (leave)
+        const isOwner = await isProjectOwner(session.user.id, projectId);
+        const isSelf = userId === session.user.id;
+
+        if (!isOwner && !isSelf) {
+            return new Response('Solo il proprietario può rimuovere membri', { status: 403 });
+        }
+
+        // If user is leaving their personal project, deny
+        if (isSelf && project.isPersonal) {
+            return new Response('Non puoi abbandonare il tuo progetto personale', { status: 403 });
         }
 
         await prisma.projectAccess.delete({
             where: {
-                userId_projectId: {
-                    userId,
-                    projectId
-                }
+                userId_projectId: { userId, projectId }
             }
         });
 
         return NextResponse.json({ success: true });
 
     } catch (error) {
+        console.error('Remove from Project Error:', error);
         return new Response('Internal Server Error', { status: 500 });
     }
 }

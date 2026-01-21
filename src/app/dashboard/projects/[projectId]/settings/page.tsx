@@ -14,11 +14,25 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
 
     const project = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { id: true, name: true, ownerId: true }
+        select: { id: true, name: true, ownerId: true, isPersonal: true }
     });
 
     if (!project) notFound();
-    if (project.ownerId !== session.user.id) redirect('/dashboard/projects');
+
+    // Check user has access (via ProjectAccess with OWNER role)
+    const userAccess = await prisma.projectAccess.findUnique({
+        where: {
+            userId_projectId: {
+                userId: session.user.id,
+                projectId
+            }
+        }
+    });
+
+    // Only OWNER can access settings
+    if (!userAccess || userAccess.role !== 'OWNER') {
+        redirect('/dashboard/projects');
+    }
 
     return (
         <div className="space-y-6 p-6 max-w-4xl mx-auto">

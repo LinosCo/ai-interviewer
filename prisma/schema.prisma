@@ -32,14 +32,20 @@ model User {
 }
 
 model ProjectAccess {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   userId    String
   projectId String
-  createdAt DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      ProjectRole @default(MEMBER)
+  createdAt DateTime    @default(now())
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
+}
+
+enum ProjectRole {
+  OWNER
+  MEMBER
 }
 
 model Account {
@@ -210,6 +216,7 @@ model Project {
   name           String
   organizationId String?
   ownerId        String?
+  isPersonal     Boolean         @default(false)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   bots           Bot[]

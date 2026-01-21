@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { colors, gradients, shadows } from '@/lib/design-system';
+import { ProjectSelector } from './ProjectSelector';
 
 interface DashboardSidebarProps {
     isAdmin: boolean;
@@ -47,10 +48,15 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
             `}>
                 <div className="hidden md:block absolute inset-6 bg-white/65 backdrop-blur-md border border-white/40 shadow-md rounded-[24px] -z-1" />
 
-                <Link href="/dashboard" className="mb-8 hidden md:flex items-center gap-2 px-3">
+                <Link href="/dashboard" className="mb-4 hidden md:flex items-center gap-2 px-3">
                     <Icons.Logo size={32} />
                     <span className="font-bold text-xl text-gray-900 tracking-tight">Business Tuner</span>
                 </Link>
+
+                {/* Project Selector */}
+                <div className="mb-6">
+                    <ProjectSelector />
+                </div>
 
                 {/* Quick Create Button */}
                 <Link

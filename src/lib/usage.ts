@@ -368,7 +368,7 @@ export async function checkVisibilityLimits(organizationId: string) {
     // @ts-ignore
     const limits = plans[subscription.tier]?.limits || plans.FREE.limits;
 
-    const visibilityConfig = await prisma.visibilityConfig.findUnique({
+    const visibilityConfig = await prisma.visibilityConfig.findFirst({
         where: { organizationId }
     });
 

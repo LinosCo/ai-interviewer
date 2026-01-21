@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
                                         }
                                     }
                                 },
-                                visibilityConfig: {
+                                visibilityConfigs: {
                                     include: {
                                         scans: {
                                             where: {

@@ -10,6 +10,10 @@ export function CookieConsent() {
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
+        // Don't show cookie consent if we're in an iframe (widget context)
+        const isInIframe = window.self !== window.top;
+        if (isInIframe) return;
+
         const consent = localStorage.getItem('cookie-consent');
         if (!consent) {
             const timer = setTimeout(() => setIsVisible(true), 1500);
@@ -20,23 +24,27 @@ export function CookieConsent() {
     const handleAccept = () => {
         localStorage.setItem('cookie-consent', 'accepted');
         setIsVisible(false);
+        // Trigger storage event manually for same-tab detection
+        window.dispatchEvent(new Event('storage'));
     };
 
     const handleDecline = () => {
         localStorage.setItem('cookie-consent', 'declined');
         setIsVisible(false);
+        // Trigger storage event manually for same-tab detection
+        window.dispatchEvent(new Event('storage'));
     };
 
     return (
         <AnimatePresence>
             {isVisible && (
                 <motion.div
-                    initial={{ y: -100, opacity: 0, x: '-50%' }}
-                    animate={{ y: 0, opacity: 1, x: '-50%' }}
-                    exit={{ y: -100, opacity: 0, x: '-50%' }}
-                    className="fixed top-6 left-1/2 -translate-x-1/2 w-[95%] md:w-[600px] z-[99999]"
+                    initial={{ x: -50, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: -50, opacity: 0 }}
+                    className="fixed bottom-4 left-4 right-4 md:right-auto md:w-[380px] z-[999999]"
                 >
-                    <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-stone-200/50 p-4 md:p-6">
+                    <div className="bg-white/95 backdrop-blur-xl rounded-[1.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-stone-200 p-4 md:p-5">
                         <div className="flex items-start gap-4 mb-4">
                             <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center flex-shrink-0">
                                 <ShieldCheck size={24} />

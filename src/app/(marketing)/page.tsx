@@ -105,6 +105,28 @@ export default function LandingPage() {
     const [showDemoForm, setShowDemoForm] = useState(false);
     const [demoEmail, setDemoEmail] = useState('');
     const [demoSubmitted, setDemoSubmitted] = useState(false);
+    const [cookieConsent, setCookieConsent] = useState<string | null>(null);
+
+    // Check cookie consent on mount
+    useEffect(() => {
+        const consent = localStorage.getItem('cookie-consent');
+        setCookieConsent(consent);
+
+        // Listen for cookie consent changes
+        const handleStorage = () => {
+            const newConsent = localStorage.getItem('cookie-consent');
+            setCookieConsent(newConsent);
+        };
+
+        window.addEventListener('storage', handleStorage);
+        // Also check periodically in case of same-tab changes
+        const interval = setInterval(handleStorage, 500);
+
+        return () => {
+            window.removeEventListener('storage', handleStorage);
+            clearInterval(interval);
+        };
+    }, []);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -141,35 +163,36 @@ export default function LandingPage() {
                 }
             `}</style>
 
-            {/* Sticky CTA Bar - Floating Pill Design */}
+            {/* Sticky CTA Bar - Floating Pill Design (only show after cookie consent) */}
             <AnimatePresence>
-                {showStickyCTA && (
+                {showStickyCTA && cookieConsent && (
                     <motion.div
                         initial={{ y: 100, opacity: 0, x: '-50%' }}
                         animate={{ y: 0, opacity: 1, x: '-50%' }}
                         exit={{ y: 100, opacity: 0, x: '-50%' }}
-                        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-4xl"
+                        style={{ left: '50%' }}
+                        className="fixed bottom-6 z-[100] w-[90%] max-w-4xl"
                     >
-                        <div className="bg-white/90 backdrop-blur-xl border border-stone-200/50 shadow-[0_20px_50px_rgba(0,0,0,0.15)] rounded-3xl md:rounded-full py-3 px-6 md:py-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="bg-stone-900/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-3xl md:rounded-full py-3 px-6 md:py-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-4">
                             <div className="text-center md:text-left hidden sm:block">
-                                <p className="font-bold text-stone-900 leading-tight">Pronto a capire meglio i tuoi clienti?</p>
-                                <p className="text-xs text-stone-500 font-medium">50 interviste gratis, nessuna carta richiesta</p>
+                                <p className="font-bold text-white leading-tight">Pronto a capire meglio i tuoi clienti?</p>
+                                <p className="text-xs text-stone-400 font-medium">50 interviste gratis, nessuna carta richiesta</p>
                             </div>
 
                             {/* Mobile-only text (shorter) */}
                             <div className="text-center sm:hidden">
-                                <p className="font-bold text-stone-900 text-sm">Inizia a raccogliere feedback gratis</p>
+                                <p className="font-bold text-white text-sm">Inizia a raccogliere feedback gratis</p>
                             </div>
 
-                            <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end pr-0 md:pr-0">
+                            <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-center md:justify-end">
                                 <button
                                     onClick={() => setShowDemoForm(true)}
-                                    className="flex-1 md:flex-none px-6 py-2.5 rounded-full border border-stone-200 text-stone-700 font-bold text-xs md:text-sm hover:bg-stone-50 transition-colors bg-white/50"
+                                    className="flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-full border border-white/20 text-white font-bold text-xs md:text-sm hover:bg-white/10 transition-colors bg-transparent"
                                 >
                                     Richiedi demo
                                 </button>
                                 <Link href="/register" className="flex-1 md:flex-none">
-                                    <Button size="sm" withShimmer className="w-full md:w-auto px-8 rounded-full py-2.5 shadow-lg shadow-amber-200">
+                                    <Button size="sm" withShimmer className="w-full md:w-auto px-8 rounded-full py-2.5 shadow-lg shadow-amber-500/20 bg-amber-500 hover:bg-amber-600 border-none">
                                         Inizia gratis
                                     </Button>
                                 </Link>
@@ -179,22 +202,29 @@ export default function LandingPage() {
                 )}
             </AnimatePresence>
 
-            {/* Global style to nudge the external chatbot bubble and other fixed elements */}
+            {/* Global style to nudge the external chatbot bubble and hide its redundant components */}
             <style jsx global>{`
-                /* Nudge the Voler.ai chatbot bubble and common widget containers up when they appear */
+                /* Target the Voler.ai chatbot bubble and containers */
                 #bt-chatbot-iframe,
                 [id^="voler-"],
                 .voler-widget-bubble,
                 .fixed.bottom-4.right-4,
                 .fixed.bottom-6.right-6 {
-                    bottom: ${showStickyCTA ? '100px' : '24px'} !important;
+                    bottom: ${showStickyCTA ? '110px' : '30px'} !important;
                     transition: bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                }
+
+                /* Hide redundant cookie/consent windows from the external widget */
+                [id^="voler-"] [class*="consent"],
+                [id^="voler-"] [class*="cookie"],
+                .voler-consent-banner {
+                    display: none !important;
                 }
                 
                 @media (max-width: 768px) {
                     #bt-chatbot-iframe,
                     [id^="voler-"] {
-                        bottom: ${showStickyCTA ? '140px' : '20px'} !important;
+                        bottom: ${showStickyCTA ? '160px' : '20px'} !important;
                     }
                 }
             `}</style>

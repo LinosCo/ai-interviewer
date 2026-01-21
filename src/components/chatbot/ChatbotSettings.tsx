@@ -9,7 +9,7 @@ import { KnowledgeManager } from '@/components/chatbot/KnowledgeManager';
 import ChatWindow from '@/components/chatbot/ChatWindow';
 import {
     Bot, Zap, LayoutTemplate, Save, MessageSquare, Shield,
-    Palette, BookOpen, ExternalLink, RefreshCw, Send, Settings, Eye, Check, User, Mail, Phone, Building, Briefcase, MapPin
+    Palette, BookOpen, ExternalLink, RefreshCw, Send, Settings, Eye, Check, User, Mail, Phone, Building, Briefcase, MapPin, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -88,77 +88,52 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-120px)] lg:flex-row gap-8 overflow-hidden">
-            {/* Left Sidebar / Tabs */}
-            <div className="lg:w-72 flex-shrink-0 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto pb-2 lg:pb-0 scrollbar-hide">
-                <div className="hidden lg:block mb-4 px-4">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Configurazioni</h3>
-                </div>
-                {TABS.map(tab => {
-                    const Icon = tab.icon;
-                    const isActive = activeTab === tab.id;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 relative group overflow-hidden ${isActive
-                                ? 'bg-white shadow-md text-purple-700 font-bold'
-                                : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'
-                                }`}
-                        >
-                            {isActive && (
-                                <motion.div
-                                    layoutId="activeTab"
-                                    className="absolute inset-0 bg-gradient-to-r from-purple-50 to-white -z-10"
-                                />
-                            )}
-                            <div className={`p-2 rounded-xl transition-colors ${isActive ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
+        <div className="flex flex-col h-[calc(100vh-120px)] gap-6 overflow-hidden">
+            {/* Horizontal Tabs Navigation */}
+            <div className="flex-shrink-0">
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-gray-200">
+                    {TABS.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-2 px-6 py-3 rounded-t-xl transition-all duration-300 relative whitespace-nowrap font-semibold ${isActive
+                                    ? 'bg-white text-purple-700 shadow-sm border-b-2 border-purple-600'
+                                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                    }`}
+                            >
                                 <Icon className="w-4 h-4" />
-                            </div>
-                            <span className="whitespace-nowrap">{tab.label}</span>
-                            {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-purple-600" />}
-                        </button>
-                    );
-                })}
+                                <span>{tab.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex gap-8 overflow-hidden relative">
+            {/* Two Column Layout: Settings (Left) + Preview (Right) */}
+            <div className="flex-1 flex gap-6 overflow-hidden">
                 {/* Form Area */}
-                <div className="flex-1 overflow-y-auto pr-2 space-y-6 pb-24 lg:pb-0 scrollbar-hide">
-                    {/* Floating Form Header */}
-                    <div className="flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-md z-20 py-4 -mx-2 px-2 border-b border-gray-100/50">
-                        <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-purple-100 text-purple-600 rounded-2xl">
-                                {(() => {
-                                    const tab = TABS.find(t => t.id === activeTab);
-                                    const Icon = tab?.icon || Settings;
-                                    return <Icon className="w-5 h-5" />;
-                                })()}
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-black text-gray-900 leading-tight">
-                                    {TABS.find(t => t.id === activeTab)?.label}
-                                </h2>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-0.5">Configurazione Chatbot</p>
-                            </div>
-                        </div>
+                <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-hide">
+                    {/* Save Button - Sticky */}
+                    <div className="flex justify-end items-center sticky top-0 bg-white/90 backdrop-blur-md z-20 py-3 -mx-2 px-2">
                         <div className="flex items-center gap-3">
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                                className="lg:hidden rounded-full font-bold border-gray-200"
+                                className="xl:hidden rounded-full font-bold border-gray-200"
                             >
                                 <Eye className="w-4 h-4 mr-2" /> {isPreviewOpen ? 'Nascondi' : 'Anteprima'}
                             </Button>
                             <Button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6 font-bold shadow-lg shadow-purple-200 transition-all hover:scale-105 active:scale-95 h-10 sm:h-11"
+                                className="bg-purple-600 hover:bg-purple-700 text-white rounded-full px-6 font-bold shadow-lg shadow-purple-200 transition-all hover:scale-105 active:scale-95"
                             >
                                 {isSaving ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                                Salva Modifiche
+                                Salva
                             </Button>
                         </div>
                     </div>
@@ -179,7 +154,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                             <p className="text-sm text-gray-500 font-medium">Definisci come l'assistente si presenta ai tuoi utenti.</p>
                                         </div>
 
-                                        <div className="grid md:grid-cols-2 gap-8">
+                                        <div className="flex flex-col gap-6">
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Nome Assistente</label>
                                                 <Input
@@ -194,7 +169,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                                                 <select
                                                     value={config.tone}
                                                     onChange={(e) => setConfig({ ...config, tone: e.target.value })}
-                                                    className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 focus:ring-2 focus:ring-purple-500 outline-none font-medium appearance-none"
+                                                    className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-purple-500 font-medium p-4 outline-none appearance-none"
                                                 >
                                                     <option value="professional">Professionale & Formale</option>
                                                     <option value="friendly">Amichevole & Informale</option>
@@ -375,20 +350,19 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase }: ChatbotSet
                     </AnimatePresence>
                 </div>
 
-                {/* Live Preview Panel */}
-                <div className={`xl:w-[450px] flex-shrink-0 bg-gray-50/50 flex flex-col transition-all duration-500 rounded-[3rem] my-4 mr-4 overflow-hidden border border-white shadow-2xl ${isPreviewOpen ? 'translate-x-0 fixed inset-4 z-50 lg:relative lg:inset-auto' : 'translate-x-full fixed right-0 h-full z-50 xl:relative xl:translate-x-0 xl:block hidden'
-                    } xl:flex`}>
-                    <div className="p-6 border-b border-gray-100 bg-white/80 backdrop-blur-sm flex justify-between items-center">
+                {/* Live Preview Panel - 40% width on desktop, full screen modal on mobile */}
+                <div className={`xl:w-[40%] xl:min-w-[400px] flex-shrink-0 bg-gray-50/50 flex flex-col transition-all duration-500 rounded-2xl overflow-hidden border border-gray-200 shadow-lg ${isPreviewOpen ? 'fixed inset-4 z-50 xl:relative xl:inset-auto' : 'hidden xl:flex'}`}>
+                    <div className="p-4 border-b border-gray-200 bg-white/80 backdrop-blur-sm flex justify-between items-center">
                         <div>
-                            <h3 className="font-black text-gray-900">Anteprima Live</h3>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Desktop View</p>
+                            <h3 className="font-bold text-gray-900 text-sm">Anteprima Live</h3>
+                            <p className="text-xs text-gray-500">Come apparirà il chatbot</p>
                         </div>
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                                className="lg:hidden p-2 rounded-full bg-gray-100 text-gray-500"
+                                className="xl:hidden p-2 rounded-full hover:bg-gray-100 text-gray-500"
                             >
-                                <Icons.X className="w-4 h-4" />
+                                <X className="w-4 h-4" />
                             </button>
                             <div className="px-3 py-1 rounded-full bg-green-50 text-green-600 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 ring-1 ring-green-100">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>

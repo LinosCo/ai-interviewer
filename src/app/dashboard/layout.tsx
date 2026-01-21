@@ -35,6 +35,14 @@ export default async function DashboardLayout({
                     {children}
                 </div>
             </div>
+
+            {/* Chatbot Widget for Dashboard Support */}
+            <script
+                id="bt-dashboard-chatbot"
+                src="https://businesstuner.voler.ai/embed/chatbot.js"
+                data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
+                async
+            />
         </div>
     );
 }

@@ -141,7 +141,7 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
 
     return (
         <div className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
                 {/* URL / Sitemap Input */}
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
                     <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -239,8 +239,8 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                             <div key={source.id} className="p-4 flex items-center justify-between group hover:bg-purple-50/20 transition-colors">
                                 <div className="flex items-center gap-3 overflow-hidden">
                                     <div className={`p-2 rounded-lg ${source.type === 'url' ? 'bg-blue-50 text-blue-600' :
-                                            source.type === 'file' ? 'bg-orange-50 text-orange-600' :
-                                                'bg-amber-50 text-amber-600'
+                                        source.type === 'file' ? 'bg-orange-50 text-orange-600' :
+                                            'bg-amber-50 text-amber-600'
                                         }`}>
                                         {source.type === 'url' ? <Globe className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
                                     </div>

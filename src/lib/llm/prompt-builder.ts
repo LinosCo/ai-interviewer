@@ -352,6 +352,107 @@ The scheduled interview time is almost up, but we have some deeper follow-up que
                 return offerPrompt.trim();
             }
 
+            // ========== TIME_UP_DECLARATION ==========
+            // Time is up - declare it explicitly and offer to continue on specific topics
+            if (supervisorInsight.status === 'TIME_UP_DECLARATION') {
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+                const suggestedTopics = (supervisorInsight as any).suggestedTopics || [];
+                const topicLabels = suggestedTopics.map((t: any) => t.label).join(isItalian ? ' e ' : ' and ');
+
+                const timeUpPrompt = isItalian ? `
+## FASE: DICHIARAZIONE TEMPO CONCLUSO
+
+**IL TEMPO È CONCLUSO.** Devi comunicarlo chiaramente all'utente.
+
+**ISTRUZIONI OBBLIGATORIE**:
+1. **DICHIARA** esplicitamente che il tempo dell'intervista è concluso
+   - Usa la frase: "Il tempo a disposizione è concluso" o simile
+2. **RINGRAZIA** brevemente per le risposte interessanti
+3. **OFFRI** la possibilità di continuare brevemente su 1-2 argomenti specifici che hanno suscitato interesse
+   - Argomenti suggeriti: ${topicLabels || 'gli argomenti emersi'}
+4. **ATTENDI** la risposta dell'utente (sì/no)
+
+**STRUTTURA ESEMPIO**:
+"Il tempo a disposizione è concluso. Grazie per le tue risposte, sono state molto interessanti! Se hai ancora qualche minuto, potremmo approfondire ${topicLabels ? `"${topicLabels}"` : 'alcuni temi che hai menzionato'}. Ti andrebbe di continuare brevemente, oppure preferisci concludere qui?"
+
+**DIVIETI**:
+- NON chiedere dati di contatto ora
+- NON saltare la dichiarazione del tempo concluso
+- NON fare domande sui topic
+- SOLO offri la scelta di continuare o concludere
+` : `
+## PHASE: TIME UP DECLARATION
+
+**TIME IS UP.** You must clearly communicate this to the user.
+
+**MANDATORY INSTRUCTIONS**:
+1. **DECLARE** explicitly that the interview time is up
+   - Use the phrase: "Our scheduled time is up" or similar
+2. **THANK** briefly for the interesting answers
+3. **OFFER** the possibility to continue briefly on 1-2 specific topics that sparked interest
+   - Suggested topics: ${topicLabels || 'the topics that emerged'}
+4. **WAIT** for the user's response (yes/no)
+
+**EXAMPLE STRUCTURE**:
+"Our scheduled time is up. Thank you for your answers, they've been very insightful! If you have a few more minutes, we could dive deeper into ${topicLabels ? `"${topicLabels}"` : 'some topics you mentioned'}. Would you like to continue briefly, or would you prefer to wrap up here?"
+
+**PROHIBITIONS**:
+- DO NOT ask for contact details now
+- DO NOT skip the time up declaration
+- DO NOT ask topic questions
+- ONLY offer the choice to continue or conclude
+`;
+                return timeUpPrompt.trim();
+            }
+
+            // ========== START_DEEP_BRIEF ==========
+            // Starting brief extension after TIME_UP_OFFER accepted
+            if (supervisorInsight.status === 'START_DEEP_BRIEF') {
+                const lang = bot?.language || 'en';
+                const isItalian = lang === 'it';
+                const topicLabel = allTopics[0]?.label || (isItalian ? 'il tema' : 'the topic');
+
+                const startDeepBriefPrompt = isItalian ? `
+## FASE: APPROFONDIMENTO BREVE (ESTENSIONE TEMPO)
+L'utente ha accettato di continuare brevemente.
+Ora approfondiamo il tema: "${topicLabel}".
+
+**ISTRUZIONI**:
+1. Riconosci brevemente che l'utente ha scelto di continuare (es. "Perfetto, grazie!")
+2. **IMPORTANTE**: Ricorda che questo è un approfondimento breve - 1-2 domande per tema
+3. Fai una domanda specifica di approfondimento su "${topicLabel}"
+4. Cita un dettaglio che l'utente ha menzionato prima
+
+**ESEMPIO**:
+"Perfetto, grazie per voler continuare! Tornando a ${topicLabel}, mi hai parlato di [dettaglio]. Puoi dirmi di più su...?"
+
+**DIVIETI**:
+- NON fare lunghe introduzioni
+- NON chiedere dati di contatto
+- VAI DRITTO alla domanda di approfondimento
+` : `
+## PHASE: BRIEF DEEP DIVE (TIME EXTENSION)
+The user has agreed to continue briefly.
+Now we dive deeper into: "${topicLabel}".
+
+**INSTRUCTIONS**:
+1. Briefly acknowledge that the user chose to continue (e.g., "Perfect, thank you!")
+2. **IMPORTANT**: Remember this is a brief extension - 1-2 questions per topic
+3. Ask a specific follow-up question about "${topicLabel}"
+4. Reference a detail the user mentioned before
+
+**EXAMPLE**:
+"Great, thanks for continuing! Going back to ${topicLabel}, you mentioned [detail]. Can you tell me more about...?"
+
+**PROHIBITIONS**:
+- DO NOT make long introductions
+- DO NOT ask for contact details
+- GO STRAIGHT to the follow-up question
+`;
+                return startDeepBriefPrompt.trim();
+            }
+
             // ========== START_DEEP ==========
             // Transitioning to DEEP phase after SCAN is complete
             if (supervisorInsight.status === 'DEEP_OFFER_ASK') {

@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
-import { Bot, FileText, Globe, Loader2, Trash2, Map, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Bot, FileText, Globe, Loader2, Trash2, Map, CheckCircle2, AlertCircle, Eye, X } from 'lucide-react';
 
 interface KnowledgeSource {
     id: string;
     title: string | null;
     type: string;
     createdAt: Date;
+    content?: string;
 }
 
 interface KnowledgeManagerProps {
@@ -26,6 +27,8 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
     const [isSitemapProcessing, setIsSitemapProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [viewingSource, setViewingSource] = useState<KnowledgeSource | null>(null);
+    const [isLoadingContent, setIsLoadingContent] = useState(false);
 
     const handleScrape = async () => {
         if (!url) return;
@@ -136,6 +139,22 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
             await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
         } catch (err) {
             console.error(err);
+        }
+    };
+
+    const handleView = async (source: KnowledgeSource) => {
+        setViewingSource(source);
+        setIsLoadingContent(true);
+        try {
+            const res = await fetch(`/api/knowledge/${source.id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setViewingSource(prev => prev ? { ...prev, content: data.content } : null);
+            }
+        } catch (err) {
+            console.error("Failed to load content", err);
+        } finally {
+            setIsLoadingContent(false);
         }
     };
 
@@ -257,11 +276,56 @@ export function KnowledgeManager({ botId, initialSources = [], onSourceAdded }: 
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>
+                                <button
+                                    onClick={() => handleView(source)}
+                                    className="p-2 text-gray-300 hover:text-purple-600 hover:bg-purple-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all mr-1"
+                                    title="Visualizza contenuto"
+                                >
+                                    <Eye className="w-4 h-4" />
+                                </button>
                             </div>
                         ))}
                     </div>
                 )}
             </div>
-        </div>
+
+            {/* Content Viewer Modal */}
+            {
+                viewingSource && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-in zoom-in-95">
+                            <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-gray-900">{viewingSource.title || 'Contenuto Indicizzato'}</h3>
+                                    <p className="text-xs text-gray-500">{viewingSource.type} • {new Date(viewingSource.createdAt).toLocaleString()}</p>
+                                </div>
+                                <button
+                                    onClick={() => setViewingSource(null)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                                >
+                                    <X className="w-5 h-5 text-gray-500" />
+                                </button>
+                            </div>
+                            <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
+                                {isLoadingContent ? (
+                                    <div className="flex justify-center py-12">
+                                        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                                    </div>
+                                ) : (
+                                    <pre className="whitespace-pre-wrap font-mono text-xs text-gray-700 bg-white p-4 rounded-lg border border-gray-200 shadow-sm leading-relaxed">
+                                        {viewingSource.content || 'Nessun contenuto disponibile.'}
+                                    </pre>
+                                )}
+                            </div>
+                            <div className="p-4 border-t border-gray-100 flex justify-end bg-white rounded-b-2xl">
+                                <Button variant="outline" onClick={() => setViewingSource(null)}>
+                                    Chiudi
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }

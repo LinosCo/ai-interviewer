@@ -251,7 +251,19 @@ function PreviewPageContent() {
 
         return (
             <div className="min-h-screen flex flex-col" style={{ background: gradients.mesh }}>
-                {/* Header Removed for Preview */}
+                {/* Simple Header with Back to Home */}
+                <header className="w-full px-6 py-4 flex items-center justify-between max-w-3xl mx-auto">
+                    <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                        <Icons.Logo size={28} />
+                        <span className="font-bold text-gray-900 hidden sm:inline">Business Tuner</span>
+                    </a>
+                    <a
+                        href="/"
+                        className="text-sm text-gray-500 hover:text-amber-600 transition-colors font-medium flex items-center gap-1"
+                    >
+                        ← Torna alla home
+                    </a>
+                </header>
                 <main className="flex-1 flex items-center justify-center p-6">
                     <div style={{
                         maxWidth: '500px',
@@ -311,7 +323,19 @@ function PreviewPageContent() {
     // Preview & Edit View
     return (
         <div className="min-h-screen flex flex-col" style={{ background: gradients.mesh }}>
-            {/* Header Removed for Preview */}
+            {/* Simple Header with Back to Home */}
+            <header className="w-full px-6 py-4 flex items-center justify-between max-w-3xl mx-auto">
+                <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                    <Icons.Logo size={28} />
+                    <span className="font-bold text-gray-900 hidden sm:inline">Business Tuner</span>
+                </a>
+                <a
+                    href="/"
+                    className="text-sm text-gray-500 hover:text-amber-600 transition-colors font-medium flex items-center gap-1"
+                >
+                    ← Torna alla home
+                </a>
+            </header>
 
             <main className="max-w-3xl mx-auto p-6 space-y-8 pb-32 w-full flex-1">
                 {/* Back Button */}

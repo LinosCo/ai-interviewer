@@ -184,15 +184,14 @@ export default function LandingPage() {
                                 <p className="font-bold text-white text-sm">Inizia a raccogliere feedback gratis</p>
                             </div>
 
-                            <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-center md:justify-end">
-                                <button
-                                    onClick={() => setShowDemoForm(true)}
-                                    className="flex-1 md:flex-none px-4 md:px-6 py-2.5 rounded-full border border-white/20 text-white font-bold text-xs md:text-sm hover:bg-white/10 transition-colors bg-transparent"
-                                >
-                                    Richiedi demo
-                                </button>
+                            <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end">
+                                <Link href="/onboarding/preview" className="flex-1 md:flex-none">
+                                    <button className="w-full px-6 py-2.5 rounded-full border border-white/20 text-white font-bold text-sm hover:bg-white/10 transition-colors bg-transparent">
+                                        Demo Intervista
+                                    </button>
+                                </Link>
                                 <Link href="/register" className="flex-1 md:flex-none">
-                                    <Button size="sm" withShimmer className="w-full md:w-auto px-8 rounded-full py-2.5 shadow-lg shadow-amber-500/20 bg-amber-500 hover:bg-amber-600 border-none">
+                                    <Button size="sm" withShimmer className="w-full px-6 rounded-full py-2.5 shadow-lg shadow-amber-500/20 bg-amber-500 hover:bg-amber-600 border-none">
                                         Inizia gratis
                                     </Button>
                                 </Link>
@@ -315,7 +314,7 @@ export default function LandingPage() {
                             transition={{ delay: 0.1 }}
                             className="text-xl lg:text-2xl text-stone-600 leading-relaxed mb-12 max-w-3xl mx-auto"
                         >
-                            La piattaforma che ascolta clienti, dipendenti e mercato. <strong>Raccoglie insight</strong>, <strong>identifica problemi</strong> e ti guida verso <strong>decisioni migliori</strong>.
+                            La piattaforma di business intelligence che ascolta continuativamente clienti, dipendenti e filiera. Raccoglie feedback, identifica problemi e ti guida verso decisioni migliori.
                         </motion.p>
 
                         <motion.div
@@ -331,7 +330,7 @@ export default function LandingPage() {
                             </Link>
                             <Link href="/onboarding/preview">
                                 <Button variant="secondary" size="lg" className="px-10 py-7 text-lg h-auto rounded-full bg-stone-100 hover:bg-stone-200 border-transparent text-stone-900">
-                                    <Icons.Play className="mr-2" /> Guarda la demo
+                                    <Icons.Play className="mr-2" /> Demo Intervista
                                 </Button>
                             </Link>
                         </motion.div>
@@ -629,7 +628,7 @@ export default function LandingPage() {
                                 </li>
                             </ul>
 
-                            <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Starter Plan (€49/mo)</span></div>
+                            <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Starter Plan (€69/mo)</span></div>
                         </div>
                     </div>
 
@@ -660,7 +659,7 @@ export default function LandingPage() {
                                 "Il 40% delle ricerche B2B oggi inizia chiedendo a un'AI. Se ChatGPT non ti conosce, perdi opportunità."
                             </p>
 
-                            <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Pro Plan (€149/mo)</span></div>
+                            <div className="text-sm font-bold text-amber-600">Disponibile da: <span className="px-2 py-1 bg-amber-50 rounded">Pro Plan (€199/mo)</span></div>
                         </div>
 
                         <div className="relative">
@@ -966,7 +965,7 @@ export default function LandingPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {[
-                            { quote: "Abbiamo scoperto perché il 30% dei clienti ci lasciava. Informazioni che non avremmo mai ottenuto con un survey.", author: "Marco R.", role: "CEO SaaS B2B", tool: "Interview AI" },
+                            { quote: "Abbiamo scoperto perché il 30% dei clienti ci lasciava. Informazioni che non avremmo mai ottenuto con un survey.", author: "Marco R.", role: "CEO SaaS B2B", tool: "AI Interviews" },
                             { quote: "Il chatbot ha ridotto le richieste di supporto del 40%. E ora sappiamo esattamente cosa aggiungere alla knowledge base.", author: "Giulia M.", role: "Customer Success Manager", tool: "Chatbot Intelligence" },
                             { quote: "Non sapevamo che ChatGPT ci menzionava male. Abbiamo corretto i contenuti e ora siamo in prima posizione.", author: "Andrea B.", role: "Marketing Manager", tool: "Visibility Tracker" },
                             { quote: "Il vero valore è vedere tutto insieme. Un tema che emerge ovunque è impossibile da ignorare e richiede azione rapida.", author: "Laura F.", role: "Head of Product", tool: "Cross-Channel Insights" },

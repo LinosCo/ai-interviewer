@@ -359,3 +359,59 @@ export async function isFeatureEnabled(organizationId: string, featureKey: strin
 
     return !!planFeatures[featureKey];
 }
+
+export async function checkVisibilityLimits(organizationId: string) {
+    const subscription = await getOrCreateSubscription(organizationId);
+    if (!subscription) return { allowed: false, reason: 'Subscription not found' };
+
+    const plans = await getPricingPlans();
+    // @ts-ignore
+    const limits = plans[subscription.tier]?.limits || plans.FREE.limits;
+
+    const visibilityConfig = await prisma.visibilityConfig.findUnique({
+        where: { organizationId }
+    });
+
+    if (!visibilityConfig) return { allowed: true }; // Should initiate config first
+
+    // 1. Check Competitors
+    const competitorCount = await prisma.competitor.count({
+        where: { configId: visibilityConfig.id, enabled: true }
+    });
+
+    // 2. Check Prompts
+    const promptCount = await prisma.visibilityPrompt.count({
+        where: { configId: visibilityConfig.id, enabled: true }
+    });
+
+    // 3. Check Scans (Weekly)
+    // Find scans in the last 7 days
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const scansLastWeek = await prisma.visibilityScan.count({
+        where: {
+            configId: visibilityConfig.id,
+            startedAt: { gte: oneWeekAgo }
+        }
+    });
+
+    return {
+        competitors: {
+            used: competitorCount,
+            limit: limits.maxCompetitorsTracked,
+            allowed: limits.maxCompetitorsTracked > competitorCount
+        },
+        prompts: {
+            used: promptCount,
+            limit: limits.maxVisibilityPrompts,
+            allowed: limits.maxVisibilityPrompts > promptCount
+        },
+        scans: {
+            used: scansLastWeek,
+            limit: limits.visibilityScansPerWeek,
+            allowed: limits.visibilityScansPerWeek > scansLastWeek
+        }
+    };
+}
+

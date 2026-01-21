@@ -81,7 +81,7 @@ export class CrossChannelSyncEngine {
 
         // 2-6 ... (skipping for BREVITY in replacement targetContent/content)
 
-        // 2. Fetch Interview themes
+        // 2. Fetch Interview themes with conversation details for citations
         const analyses = await prisma.conversationAnalysis.findMany({
             where: {
                 conversation: {
@@ -90,7 +90,19 @@ export class CrossChannelSyncEngine {
                 }
             },
             take: 20,
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
+            include: {
+                conversation: {
+                    select: {
+                        id: true,
+                        candidateProfile: true,
+                        startedAt: true,
+                        bot: {
+                            select: { name: true }
+                        }
+                    }
+                }
+            }
         });
 
         // 3. Fetch Website Content (Knowledge Sources)
@@ -111,7 +123,7 @@ export class CrossChannelSyncEngine {
         // 5. Fetch SERP Monitoring Data (Google News/Search)
         const serpSummary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId);
 
-        // 6. Summarize data for LLM
+        // 6. Summarize data for LLM with specific identifiers for citations
         const visibilitySummary = visibilityConfig?.scans[0]?.responses?.map(r => ({
             platform: r.platform,
             responseText: r.responseText.substring(0, 300),
@@ -119,11 +131,25 @@ export class CrossChannelSyncEngine {
             competitors: r.competitorPositions
         })) || [];
 
-        const interviewSummary = analyses.map(a => ({
-            themes: a.themes,
-            quotes: (a.keyQuotes as string[] || []).slice(0, 3),
-            sentiment: a.sentiment
-        }));
+        // Include conversation IDs, dates, and candidate names for specific citations
+        const interviewSummary = analyses.map(a => {
+            const candidate = a.conversation?.candidateProfile as any;
+            const candidateName = candidate?.nome || candidate?.name || 'Anonimo';
+            const candidateCompany = candidate?.azienda || candidate?.company || '';
+            const dateStr = a.conversation?.startedAt
+                ? new Date(a.conversation.startedAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })
+                : '';
+            const interviewName = a.conversation?.bot?.name || 'Intervista';
+
+            return {
+                id: a.conversation?.id?.slice(-4) || 'N/A', // Last 4 chars of ID for citation
+                source: `${interviewName} - ${candidateName}${candidateCompany ? ` (${candidateCompany})` : ''} - ${dateStr}`,
+                themes: a.themes,
+                quotes: (a.keyQuotes as string[] || []).slice(0, 3),
+                sentiment: a.sentiment,
+                nps: (a as any).npsScore
+            };
+        });
 
         const websiteSummary = knowledgeSources.map(s => ({
             title: s.title,
@@ -140,74 +166,119 @@ export class CrossChannelSyncEngine {
 
         // 7. Query LLM for Unified Evaluation
         const { model } = await getSystemLLM();
+
+        // Build a strong strategic context for the LLM
+        const hasStrategicContext = org?.strategicVision || org?.valueProposition;
+        const strategicContext = hasStrategicContext
+            ? `
+            🎯 VISIONE STRATEGICA del Brand:
+            "${org?.strategicVision}"
+            
+            💎 VALUE PROPOSITION:
+            "${org?.valueProposition}"
+            
+            ⚠️ IMPORTANTE: Ogni suggerimento DEVE essere direttamente collegato a questa visione.
+            Se un suggerimento non supporta la visione strategica, NON includerlo.`
+            : `
+            ⚠️ L'utente non ha ancora definito una visione strategica.
+            Fornisci suggerimenti generali basati sui dati disponibili, ma invitalo a definire una vision.`;
+
         const { object } = await generateObject({
             model,
             schema: SyncResultSchema,
-            prompt: `Sei un consulente strategico per PMI. Analizza i dati raccolti e fornisci suggerimenti PRATICI e AZIONABILI.
+            prompt: `Sei un consulente strategico senior specializzato in PMI italiane. Il tuo compito è analizzare TUTTI i dati raccolti sul brand e generare suggerimenti PRATICI, SPECIFICI e ALLINEATI ALLA VISIONE STRATEGICA.
 
-            === STRATEGIA AZIENDALE (Il tuo faro) ===
-            Visione Strategica: ${org?.strategicVision || 'Nessuna visione specifica definita'}
-            Value Proposition: ${org?.valueProposition || 'Nessuna value proposition specifica definita'}
+=============================================================
+🎯 CONTESTO STRATEGICO (questo guida OGNI suggerimento)
+=============================================================
+${strategicContext}
 
-            === DATI DISPONIBILI ===
+=============================================================
+📊 DATI RACCOLTI DAL BRAND
+=============================================================
 
-            1. CONTENUTI DEL SITO (cosa sa il chatbot):
-            ${JSON.stringify(websiteSummary)}
+1️⃣ KNOWLEDGE BASE DEL CHATBOT (cosa risponde il chatbot):
+${JSON.stringify(websiteSummary, null, 2)}
 
-            2. DOMANDE DEI CLIENTI AL CHATBOT (cosa chiedono e cosa manca):
-            ${JSON.stringify(chatbotSummary)}
+2️⃣ ANALISI CHATBOT (gap, domande frequenti, sentiment):
+${JSON.stringify(chatbotSummary, null, 2)}
 
-            3. FEEDBACK DALLE INTERVISTE (cosa pensano i clienti):
-            ${JSON.stringify(interviewSummary)}
+3️⃣ FEEDBACK DALLE INTERVISTE (con ID per citazioni):
+${JSON.stringify(interviewSummary, null, 2)}
 
-            4. REPUTAZIONE ONLINE SU AI (ChatGPT, Claude, etc.):
-            ${JSON.stringify(visibilitySummary)}
+4️⃣ REPUTAZIONE SUGLI AI (ChatGPT, Claude, Perplexity):
+${JSON.stringify(visibilitySummary, null, 2)}
 
-            5. MENZIONI SU GOOGLE NEWS/SEARCH:
-            ${serpSummary ? JSON.stringify({
+5️⃣ MENZIONI SU GOOGLE/NEWS:
+${serpSummary ? JSON.stringify({
                 totalMentions: serpSummary.totalMentions,
                 sentimentBreakdown: serpSummary.sentimentBreakdown,
-                avgImportance: serpSummary.avgImportance,
                 topCategories: serpSummary.topCategories,
                 recentAlerts: serpSummary.recentAlerts
-            }) : 'Nessun dato SERP disponibile'}
+            }, null, 2) : 'Nessun dato SERP disponibile'}
 
-            === ANALIZZA E SUGGERISCI ===
+=============================================================
+📈 HEALTH REPORT RICHIESTO
+=============================================================
+Valuta queste 3 metriche (0-100) basandoti sui dati:
 
-            HEALTH REPORT:
-            1. SODDISFAZIONE (0-100): Come si sentono i clienti che usano il chatbot?
-            2. EFFICACIA SITO (0-100): Il sito risponde ai bisogni emersi dai feedback?
-            3. REPUTAZIONE ONLINE (0-100): Come ti percepiscono online (AI + Google)?
+1. SODDISFAZIONE CLIENTI: Come percepiscono il brand? (dagli interviste + chatbot)
+2. EFFICACIA COMUNICAZIONE: Il sito/chatbot risponde ai bisogni reali?
+3. REPUTAZIONE ONLINE: Come si posiziona vs competitor sugli AI e Google?
 
-            SUGGERIMENTI - Genera insight con azioni di DUE tipi:
+=============================================================
+🔧 TIPI DI AZIONI DA GENERARE
+=============================================================
 
-            A) AZIONI OPERATIVE (applicabili subito):
-               - add_faq → Aggiungi risposta al chatbot (es. "I clienti chiedono spesso X, aggiungi FAQ")
-               - add_interview_topic → Raccogli più feedback su un tema specifico
-               - add_visibility_prompt → Monitora una nuova query sugli AI
+AZIONI AUTOMATIZZABILI (l'utente può applicarle con un click):
+• add_faq → Aggiungi FAQ al chatbot
+• add_interview_topic → Aggiungi domanda/tema alle interviste
 
-            B) AZIONI STRATEGICHE (richiedono consulenza):
-               - product_improvement → Miglioramenti al prodotto/servizio
-                 Es: "I clienti lamentano che il checkout è lento → considera di semplificarlo"
-               - pricing_change → Revisione prezzi/offerte
-                 Es: "Molti chiedono sconti volume → valuta un piano business"
-               - marketing_campaign → Idee per campagne marketing
-                 Es: "Il competitor X è citato più di te su ChatGPT → considera una campagna di content marketing"
-               - strategic_recommendation → Consigli strategici generali
-                 Es: "Il sentiment sulle recensioni sta calando → analizza le cause"
-               - create_content / modify_content → Modifiche importanti al sito
-               - respond_to_press → Risposta a notizie/articoli
-               - monitor_competitor → Alert su attività competitor
+AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
+• product_improvement → Miglioramento prodotto/servizio
+• pricing_change → Revisione pricing/offerte
+• marketing_campaign → Campagna marketing
+• strategic_recommendation → Consiglio strategico
+• create_content → Creazione contenuto importante
+• modify_content → Modifica contenuto esistente
+• respond_to_press → Risposta a notizie/articoli
+• monitor_competitor → Alert competitor
 
-            IMPORTANTE:
-            - Ogni insight deve avere ALMENO un'azione operativa E una strategica se possibile
-            - I titoli devono essere chiari e in italiano (es. "Aggiungi FAQ sui prezzi" non "add_faq")
-            - Il body deve spiegare COSA fare concretamente
-            - Il reasoning deve spiegare PERCHÉ, citando i dati specifici
-            - Priorità alta (80-100) per problemi urgenti o opportunità immediate
-            - Priorità media (50-79) per miglioramenti importanti
-            - Priorità bassa (0-49) per ottimizzazioni nice-to-have`,
-            temperature: 0.2
+=============================================================
+⚠️ REGOLE OBBLIGATORIE
+=============================================================
+
+1. COLLEGAMENTO ALLA VISIONE:
+   Ogni suggerimento DEVE spiegare come supporta la visione strategica.
+   ❌ "Migliora i social"
+   ✓ "Per raggiungere l'obiettivo di 'diventare leader nel settore X', pubblica un case study sul cliente Y che ha ottenuto Z risultati"
+
+2. CITAZIONI CON FONTE:
+   Ogni body DEVE citare la fonte specifica dei dati.
+   ✓ "Dall'intervista #${interviewSummary[0]?.id || 'XXXX'} (${interviewSummary[0]?.source || 'cliente'}): '[citazione]'"
+   ✓ "Il chatbot ha ricevuto N domande su 'argomento X' → gap nella knowledge base"
+   ✓ "Su ChatGPT, il brand è menzionato nel X% delle risposte vs competitor Y al Z%"
+
+3. AZIONI CONCRETE:
+   Il body deve dire ESATTAMENTE cosa fare, non suggerimenti vaghi.
+   ❌ "Migliora la comunicazione del pricing"
+   ✓ "Aggiungi al chatbot la FAQ: 'Quanto costa?' → Risposta consigliata: 'I piani partono da €99/mese. Offriamo 14 giorni gratis senza carta.'"
+
+4. REASONING CON NUMERI:
+   Spiega PERCHÉ con dati numerici.
+   ✓ "5 clienti su 8 intervistati lamentano tempi di risposta lenti → priorità alta"
+   ✓ "Sentiment negativo 40% su Google News questa settimana → intervenire"
+
+5. PRIORITÀ CORRETTA:
+   90-100: Crisi / opportunità immediata (es. articolo negativo, competitor che ti supera)
+   70-89: Importante per la vision (es. gap critico nella knowledge)
+   50-69: Miglioramento significativo
+   30-49: Ottimizzazione
+   0-29: Nice-to-have
+
+6. MAX 5-7 INSIGHTS:
+   Genera solo i suggerimenti più impattanti e rilevanti.`,
+            temperature: 0.15
         });
 
         // 8. Save to DB

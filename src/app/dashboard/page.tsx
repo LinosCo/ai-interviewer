@@ -36,9 +36,26 @@ export default async function DashboardPage() {
 
     if (!user) return <div>Utente non trovato.</div>;
 
-    // Assuming single organization context for simplicity in dashboard
+    // Get organization from memberships first (more reliable)
+    const userWithMembership = await prisma.user.findUnique({
+        where: { id: user.id },
+        include: {
+            memberships: {
+                take: 1,
+                include: {
+                    organization: {
+                        include: {
+                            subscription: true
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Fallback chain for organizationId
     const project = user.ownedProjects[0];
-    const organizationId = project?.organization?.id;
+    const organizationId = userWithMembership?.memberships[0]?.organizationId || project?.organization?.id;
     const projectId = project?.id;
 
     const isAdmin = user.role === 'ADMIN';
@@ -79,9 +96,9 @@ export default async function DashboardPage() {
         bot.conversations.some(c => c.completedAt && new Date(c.completedAt) > weekAgo)
     );
 
-    // Fetch usage and subscription data
+    // Fetch usage and subscription data - always try to get it if organizationId exists
     const usage = organizationId ? await getUsageStats(organizationId) : null;
-    const subscription = project?.organization?.subscription;
+    const subscription = userWithMembership?.memberships[0]?.organization?.subscription || project?.organization?.subscription;
     const status = subscription?.status || 'ACTIVE';
     const trialDaysLeft = usage?.currentPeriodEnd ? Math.ceil((new Date(usage.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
 

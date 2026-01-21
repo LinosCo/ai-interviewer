@@ -139,7 +139,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
 
                     <div className="w-full max-w-md h-[600px] shadow-2xl rounded-2xl overflow-hidden bg-white border border-gray-300 relative">
                         <iframe
-                            src={`/i/${bot.slug}?mode=embed`}
+                            src={`/w/${bot.id}?full=true`}
                             className="w-full h-full border-none"
                             title="Bot Preview"
                         />

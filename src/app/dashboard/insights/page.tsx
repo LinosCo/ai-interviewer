@@ -45,11 +45,11 @@ interface Insight {
     status: string;
 }
 
-// Helper: determine if action is strategic (needs consultation) vs operational (can be auto-applied)
-const isStrategicAction = (type: string, target: string): boolean => {
-    const strategicTypes = ['create_content', 'modify_content', 'respond_to_press', 'monitor_competitor', 'strategic_recommendation', 'pricing_change', 'product_improvement', 'marketing_campaign'];
-    const strategicTargets = ['website', 'pr', 'serp', 'strategy', 'product', 'marketing'];
-    return strategicTypes.includes(type) || strategicTargets.includes(target);
+// Helper: determine if action can be auto-applied (only FAQ and interview topics) or needs consultation
+const canBeAutoApplied = (type: string): boolean => {
+    // Only these two types can be applied automatically
+    const automaticTypes = ['add_faq', 'add_interview_topic'];
+    return automaticTypes.includes(type);
 };
 
 // Helper: get human-readable action type label in Italian
@@ -175,10 +175,27 @@ export default function InsightHubPage() {
     };
 
     const handleConsultation = (action: Action) => {
-        // Open mailto with pre-filled subject
-        const subject = encodeURIComponent(`Richiesta consulenza: ${action.title || action.type}`);
-        const body = encodeURIComponent(`Ciao,\n\nVorrei richiedere una consulenza riguardo a:\n\n${action.body}\n\nMotivazione: ${action.reasoning}\n\nGrazie`);
-        window.open(`mailto:consulenza@businesstuner.com?subject=${subject}&body=${body}`);
+        // Open mailto with pre-filled subject and body including tip details
+        const subject = encodeURIComponent(`[AI Tips] Richiesta consulenza: ${action.title || action.type}`);
+        const body = encodeURIComponent(
+            `Buongiorno,
+
+Vorrei richiedere una consulenza per implementare il seguente suggerimento generato dall'AI:
+
+📌 SUGGERIMENTO:
+${action.title || action.type}
+
+📝 DETTAGLI:
+${action.body}
+
+💡 MOTIVAZIONE (dall'analisi AI):
+${action.reasoning}
+
+---
+Rimango in attesa di un vostro riscontro.
+Grazie`
+        );
+        window.open(`mailto:info@voler.ai?subject=${subject}&body=${body}`);
         showToast("Email di richiesta consulenza aperta");
     };
 
@@ -421,13 +438,13 @@ export default function InsightHubPage() {
                                         </h4>
                                         <div className="grid gap-4">
                                             {insight.suggestedActions.map((action, idx) => {
-                                                const strategic = isStrategicAction(action.type, action.target);
+                                                const canApply = canBeAutoApplied(action.type);
                                                 return (
-                                                    <div key={idx} className={`flex flex-col md:flex-row md:items-start justify-between gap-4 p-5 rounded-2xl border group/action hover:shadow-lg transition-all duration-300 ${strategic ? 'bg-purple-50/50 border-purple-100 hover:bg-white hover:border-purple-300' : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-green-300'}`}>
+                                                    <div key={idx} className={`flex flex-col md:flex-row md:items-start justify-between gap-4 p-5 rounded-2xl border group/action hover:shadow-lg transition-all duration-300 ${canApply ? 'bg-slate-50 border-slate-100 hover:bg-white hover:border-green-300' : 'bg-purple-50/50 border-purple-100 hover:bg-white hover:border-purple-300'}`}>
                                                         <div className="flex-1 space-y-2">
                                                             <div className="flex items-center gap-2 flex-wrap">
                                                                 {/* Action type indicator */}
-                                                                <div className={`w-2 h-2 rounded-full ${strategic ? 'bg-purple-500' : 'bg-green-500'}`} title={strategic ? 'Richiede consulenza' : 'Applicabile automaticamente'} />
+                                                                <div className={`w-2 h-2 rounded-full ${canApply ? 'bg-green-500' : 'bg-purple-500'}`} title={canApply ? 'Applicabile automaticamente' : 'Richiede consulenza'} />
                                                                 <Badge className={`${action.target === 'website' || action.target === 'strategy' ? 'bg-blue-100 text-blue-700' :
                                                                     action.target === 'chatbot' || action.target === 'interview' ? 'bg-green-100 text-green-700' :
                                                                         action.target === 'product' ? 'bg-indigo-100 text-indigo-700' :
@@ -436,7 +453,7 @@ export default function InsightHubPage() {
                                                                     } hover:bg-opacity-80 border-none px-2.5 py-0.5 font-bold uppercase text-[9px]`}>
                                                                     {getTargetLabel(action.target)}
                                                                 </Badge>
-                                                                <Badge variant="outline" className={`text-[9px] uppercase font-bold ${strategic ? 'border-purple-200 bg-purple-50' : 'border-green-200 bg-green-50'}`}>
+                                                                <Badge variant="outline" className={`text-[9px] uppercase font-bold ${canApply ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50'}`}>
                                                                     {getActionTypeLabel(action.type)}
                                                                 </Badge>
                                                             </div>
@@ -454,7 +471,15 @@ export default function InsightHubPage() {
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-2 md:pt-1">
-                                                            {strategic ? (
+                                                            {canApply ? (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-green-200 text-green-700 hover:border-green-500 hover:bg-green-50 group/btn transition-all"
+                                                                >
+                                                                    Applica <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
+                                                                </Button>
+                                                            ) : (
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
@@ -462,14 +487,6 @@ export default function InsightHubPage() {
                                                                     className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-purple-200 text-purple-700 hover:border-purple-500 hover:bg-purple-50 group/btn transition-all"
                                                                 >
                                                                     <Phone className="h-3.5 w-3.5" /> Richiedi consulenza
-                                                                </Button>
-                                                            ) : (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-green-200 text-green-700 hover:border-green-500 hover:bg-green-50 group/btn transition-all"
-                                                                >
-                                                                    Applica <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
                                                                 </Button>
                                                             )}
                                                         </div>

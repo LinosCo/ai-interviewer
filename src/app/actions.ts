@@ -110,8 +110,13 @@ export async function createBotAction(projectId: string, formData: FormData) {
 export async function createProjectAction(formData: FormData) {
     const session = await auth();
     if (!session?.user?.email) throw new Error("Unauthorized");
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: { memberships: { take: 1 } }
+    });
     if (!user) throw new Error("User not found");
+
+    const organizationId = user.memberships[0]?.organizationId;
 
     const name = formData.get('name') as string;
     if (!name) throw new Error("Name required");
@@ -119,7 +124,8 @@ export async function createProjectAction(formData: FormData) {
     await prisma.project.create({
         data: {
             name,
-            ownerId: user.id
+            ownerId: user.id,
+            organizationId: organizationId // Link to organization
         }
     });
 

@@ -30,7 +30,18 @@ export async function GET() {
         }
 
         const organization = user.memberships[0].organization;
-        const stripe = await getStripeClient();
+        let stripe;
+        try {
+            stripe = await getStripeClient();
+        } catch (stripeErr) {
+            // Stripe not configured - return friendly error
+            console.error('Stripe not configured:', stripeErr);
+            return NextResponse.json({
+                error: 'STRIPE_NOT_CONFIGURED',
+                message: 'Stripe non è ancora configurato. Contatta l\'amministratore.',
+                redirect: '/dashboard/billing'
+            }, { status: 503 });
+        }
 
         // 1. Find or create stripe customer if missing from subscription record
         let customerId = organization.subscription?.stripeCustomerId;

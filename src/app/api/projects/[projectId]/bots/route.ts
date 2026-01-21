@@ -24,13 +24,22 @@ export async function GET(
             }
         });
 
+        // Check if user is the project owner
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { ownerId: true }
+        });
+
         // Admin can access all
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: { role: true }
         });
 
-        if (!access && user?.role !== 'ADMIN') {
+        const isOwner = project?.ownerId === session.user.id;
+        const isAdmin = user?.role === 'ADMIN';
+
+        if (!access && !isOwner && !isAdmin) {
             return new Response('Access denied', { status: 403 });
         }
 

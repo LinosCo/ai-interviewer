@@ -19,6 +19,14 @@ export interface UnifiedStats {
     avgDuration: number; // in seconds
     completionRate: number;
     trends: MetricTrend[];
+    // New enhanced stats
+    interviewCount: number;
+    chatbotCount: number;
+    avgNpsScore: number | null;
+    topThemes: { name: string; count: number; sentiment: number }[];
+    knowledgeGaps: string[];
+    leadsCaptured: number;
+    avgResponseLength: number;
 }
 
 export interface MetricTrend {
@@ -112,6 +120,54 @@ export class AnalyticsEngine {
             sentiment: data.sentimentCount > 0 ? (data.sentimentSum / data.sentimentCount) * 100 : 0
         }));
 
+        // --- Calculate Enhanced Stats ---
+        const interviewCount = interviewConversations.length;
+        const chatbotCount = chatbotConversations.length;
+
+        // NPS Score (from interview analyses)
+        const npsScores = interviewConversations
+            .map(c => (c.analysis as any)?.npsScore)
+            .filter((s: any) => s !== undefined && s !== null) as number[];
+        const avgNpsScore = npsScores.length > 0
+            ? npsScores.reduce((a, b) => a + b, 0) / npsScores.length
+            : null;
+
+        // Top Themes (combined)
+        const allThemes = this.extractThemes(allConversations);
+        const topThemes = allThemes
+            .sort((a, b) => b.frequency - a.frequency)
+            .slice(0, 5)
+            .map(t => ({ name: t.name, count: t.frequency, sentiment: t.sentiment }));
+
+        // Knowledge Gaps (from chatbot analytics)
+        const chatbotAnalytics = await prisma.chatbotAnalytics.findMany({
+            where: { bot: { projectId } },
+            orderBy: { createdAt: 'desc' },
+            take: 5
+        });
+        const knowledgeGaps = chatbotAnalytics
+            .flatMap(a => (a.knowledgeGaps as string[]) || [])
+            .filter((gap, idx, arr) => arr.indexOf(gap) === idx)
+            .slice(0, 5);
+
+        // Leads Captured
+        const leadsCaptured = chatbotConversations.filter(c => {
+            const profile = c.candidateProfile as any;
+            return profile?.email || profile?.phone || profile?.name;
+        }).length;
+
+        // Average Response Length (user messages)
+        const allMessages = await prisma.message.findMany({
+            where: {
+                conversation: { bot: { projectId } },
+                role: 'user',
+                createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+            },
+            select: { content: true }
+        });
+        const avgResponseLength = allMessages.length > 0
+            ? allMessages.reduce((acc, m) => acc + m.content.length, 0) / allMessages.length
+            : 0;
 
         // --- Generate Insights ---
         const insights: UnifiedInsight[] = [];
@@ -176,7 +232,15 @@ export class AnalyticsEngine {
                 avgSentiment: avgSentiment * 100, // Scale to 0-100
                 avgDuration,
                 completionRate,
-                trends
+                trends,
+                // Enhanced stats
+                interviewCount,
+                chatbotCount,
+                avgNpsScore,
+                topThemes,
+                knowledgeGaps,
+                leadsCaptured,
+                avgResponseLength
             },
             insights
         };

@@ -35,10 +35,22 @@ export async function POST(request: Request) {
         const planType = subscriptionTierToPlanType(subscription.tier);
         const plan = PLANS[planType];
 
-        if (plan.limits.maxVisibilityPrompts === 0) {
+        if (plan.limits.maxVisibilityPrompts === 0 && plan.limits.maxBrandsTracked === 0) {
             return NextResponse.json(
                 { error: 'Visibility tracking not available in your plan' },
                 { status: 403 }
+            );
+        }
+
+        // Check brand limit
+        const existingBrands = await prisma.visibilityConfig.count({
+            where: { organizationId }
+        });
+
+        if (existingBrands >= plan.limits.maxBrandsTracked) {
+            return NextResponse.json(
+                { error: `Limite brand raggiunto (${plan.limits.maxBrandsTracked}). Passa a un piano superiore per monitorare più brand.` },
+                { status: 400 }
             );
         }
 

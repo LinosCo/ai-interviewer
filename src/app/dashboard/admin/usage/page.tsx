@@ -1,8 +1,7 @@
 import { prisma } from '@/lib/prisma';
-import { Card } from '@/components/ui/business-tuner/Card';
-import { Button } from '@/components/ui/business-tuner/Button';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
+import { AdminOrgCard } from './AdminOrgCard';
 
 interface OrganizationWithUsage {
     id: string;
@@ -11,12 +10,19 @@ interface OrganizationWithUsage {
     subscription: {
         status: string;
         interviewsUsedThisMonth: number;
+        customLimits?: any;
     } | null;
     _count: {
         members: number;
         projects: number;
     };
     botCount: number;
+    visibilityCount: number;
+    customLimits?: {
+        maxInterviews?: number;
+        maxChatbots?: number;
+        maxProjects?: number;
+    };
 }
 
 export default async function AdminUsagePage() {
@@ -41,6 +47,9 @@ export default async function AdminUsagePage() {
                     }
                 }
             },
+            visibilityConfigs: {
+                select: { id: true }
+            },
             _count: {
                 select: {
                     members: true,
@@ -51,64 +60,64 @@ export default async function AdminUsagePage() {
         orderBy: { createdAt: 'desc' }
     });
 
-    // Transform to include bot count
+    // Transform to include counts
     const organizations: OrganizationWithUsage[] = orgs.map(org => ({
         id: org.id,
         name: org.name,
         plan: org.plan,
         subscription: org.subscription,
         _count: org._count,
-        botCount: org.projects.reduce((sum, p) => sum + p._count.bots, 0)
+        botCount: org.projects.reduce((sum, p) => sum + p._count.bots, 0),
+        visibilityCount: org.visibilityConfigs.length,
+        customLimits: (org.subscription?.customLimits as any) || undefined
     }));
+
+    // Summary stats
+    const totalOrgs = organizations.length;
+    const totalBots = organizations.reduce((sum, o) => sum + o.botCount, 0);
+    const totalInterviews = organizations.reduce((sum, o) => sum + (o.subscription?.interviewsUsedThisMonth || 0), 0);
+    const planCounts = organizations.reduce((acc, o) => {
+        acc[o.plan] = (acc[o.plan] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
 
     return (
         <div className="p-8 space-y-8">
-            <h1 className="text-2xl font-bold">Monitoraggio Consumi Utenti (Admin)</h1>
+            <div>
+                <h1 className="text-2xl font-bold text-gray-900">Monitoraggio Consumi (Admin)</h1>
+                <p className="text-gray-500 mt-1">Visualizza e modifica i limiti delle organizzazioni</p>
+            </div>
 
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
+                    <p className="text-blue-100 text-sm">Organizzazioni</p>
+                    <p className="text-3xl font-bold">{totalOrgs}</p>
+                </div>
+                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white">
+                    <p className="text-green-100 text-sm">Bot Totali</p>
+                    <p className="text-3xl font-bold">{totalBots}</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white">
+                    <p className="text-purple-100 text-sm">Interviste Mese</p>
+                    <p className="text-3xl font-bold">{totalInterviews}</p>
+                </div>
+                <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-4 text-white">
+                    <p className="text-amber-100 text-sm">Piani Attivi</p>
+                    <div className="flex gap-2 mt-1 flex-wrap">
+                        {Object.entries(planCounts).map(([plan, count]) => (
+                            <span key={plan} className="text-xs bg-white/20 px-2 py-0.5 rounded">
+                                {plan}: {count}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Organization List */}
             <div className="grid gap-6">
                 {organizations.map((org) => (
-                    <Card key={org.id} className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="text-xl font-semibold">{org.name}</h3>
-                                <p className="text-sm text-gray-500">{org.id}</p>
-                            </div>
-                            <div className="flex flex-col items-end">
-                                <span className={`px-2 py-1 rounded text-xs font-bold ${org.plan === 'BUSINESS' ? 'bg-purple-100 text-purple-800' :
-                                        org.plan === 'PRO' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
-                                    }`}>
-                                    {org.plan}
-                                </span>
-                                <span className="text-xs text-gray-500 mt-1">
-                                    Sub Status: {org.subscription?.status || 'N/A'}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-                            <div className="p-3 bg-gray-50 rounded-lg">
-                                <p className="text-gray-500 mb-1">Interviste Mese</p>
-                                <p className="font-semibold text-lg">{org.subscription?.interviewsUsedThisMonth || 0}</p>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded-lg">
-                                <p className="text-gray-500 mb-1">Bot Totali</p>
-                                <p className="font-semibold text-lg">{org.botCount}</p>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded-lg">
-                                <p className="text-gray-500 mb-1">Utenti</p>
-                                <p className="font-semibold text-lg">{org._count.members}</p>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded-lg">
-                                <p className="text-gray-500 mb-1">Progetti</p>
-                                <p className="font-semibold text-lg">{org._count.projects}</p>
-                            </div>
-                        </div>
-
-                        <div className="mt-4 flex justify-end gap-2">
-                            <Button variant="outline" size="sm">Modifica Limiti (Coming Soon)</Button>
-                        </div>
-                    </Card>
+                    <AdminOrgCard key={org.id} org={org} />
                 ))}
             </div>
         </div>

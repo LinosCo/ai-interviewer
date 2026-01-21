@@ -150,12 +150,18 @@ export async function deleteUser(userId: string) {
 
 export async function createProject(name: string, ownerId: string) {
     await requireAdmin();
-    console.log(`[AdminAction] Create Project: name=${name} ownerId=${ownerId}`);
+    // Get owner's organization
+    const owner = await prisma.user.findUnique({
+        where: { id: ownerId },
+        include: { memberships: { take: 1 } }
+    });
+    const organizationId = owner?.memberships[0]?.organizationId;
 
     const project = await prisma.project.create({
         data: {
             name,
             ownerId,
+            organizationId,
             // Also add owner to access list for clarity
             accessList: {
                 create: {

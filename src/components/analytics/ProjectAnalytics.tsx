@@ -7,7 +7,8 @@ import {
 } from 'recharts';
 import {
     ArrowRight, Sparkles, MessageSquare, Users, Zap,
-    Lightbulb, TrendingUp, AlertTriangle, Megaphone, FileText, Bot, Check
+    Lightbulb, TrendingUp, AlertTriangle, Megaphone, FileText, Bot, Check,
+    Mic, Clock, UserPlus, HelpCircle, Hash
 } from 'lucide-react';
 import { UnifiedInsight, UnifiedStats } from '@/lib/analytics/AnalyticsEngine';
 
@@ -61,8 +62,12 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
         return <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div></div>;
     }
 
-    const { avgSentiment, totalMessages, completionRate, trends } = stats || {
-        avgSentiment: 0, totalMessages: 0, completionRate: 0, trends: []
+    const {
+        avgSentiment, totalMessages, completionRate, trends,
+        interviewCount, chatbotCount, avgNpsScore, topThemes, knowledgeGaps, leadsCaptured, avgResponseLength
+    } = stats || {
+        avgSentiment: 0, totalMessages: 0, completionRate: 0, trends: [],
+        interviewCount: 0, chatbotCount: 0, avgNpsScore: null, topThemes: [], knowledgeGaps: [], leadsCaptured: 0, avgResponseLength: 0
     };
 
     return (
@@ -157,6 +162,144 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                     <div>
                         <div className="text-3xl font-bold text-gray-900">{completionRate.toFixed(1)}%</div>
                         <div className="text-sm text-gray-500 mt-1">Engagement Utenti</div>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Enhanced Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card padding="1rem" className="bg-blue-50 border-blue-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                            <Mic className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-blue-900">{interviewCount}</div>
+                            <div className="text-xs text-blue-600">Interviste</div>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card padding="1rem" className="bg-green-50 border-green-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 rounded-lg">
+                            <MessageSquare className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-green-900">{chatbotCount}</div>
+                            <div className="text-xs text-green-600">Chat Assistente</div>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card padding="1rem" className="bg-amber-50 border-amber-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                            <UserPlus className="w-5 h-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-amber-900">{leadsCaptured}</div>
+                            <div className="text-xs text-amber-600">Lead Acquisiti</div>
+                        </div>
+                    </div>
+                </Card>
+
+                <Card padding="1rem" className="bg-purple-50 border-purple-100">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                            <Hash className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                            <div className="text-2xl font-bold text-purple-900">
+                                {avgNpsScore !== null ? avgNpsScore.toFixed(0) : 'N/A'}
+                            </div>
+                            <div className="text-xs text-purple-600">NPS Medio</div>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Top Themes & Knowledge Gaps */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {topThemes.length > 0 && (
+                    <Card padding="1.5rem">
+                        <CardHeader
+                            title={(
+                                <span className="flex items-center gap-2 text-lg">
+                                    <TrendingUp className="w-5 h-5 text-purple-500" /> Temi Principali
+                                </span>
+                            )}
+                            style={{ marginBottom: '1rem' }}
+                        />
+                        <div className="space-y-3">
+                            {topThemes.map((theme, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-bold text-gray-400">#{idx + 1}</span>
+                                        <span className="font-medium text-gray-900">{theme.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs text-gray-500">{theme.count} menzioni</span>
+                                        <span className={`text-xs px-2 py-1 rounded-full ${theme.sentiment > 0 ? 'bg-green-100 text-green-700' : theme.sentiment < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+                                            {theme.sentiment > 0 ? '+' : ''}{(theme.sentiment * 100).toFixed(0)}%
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                )}
+
+                {knowledgeGaps.length > 0 && (
+                    <Card padding="1.5rem">
+                        <CardHeader
+                            title={(
+                                <span className="flex items-center gap-2 text-lg">
+                                    <HelpCircle className="w-5 h-5 text-orange-500" /> Knowledge Gaps
+                                </span>
+                            )}
+                            subtitle="Domande frequenti senza risposta adeguata"
+                            style={{ marginBottom: '1rem' }}
+                        />
+                        <div className="space-y-2">
+                            {knowledgeGaps.map((gap, idx) => (
+                                <div key={idx} className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-100">
+                                    <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                                    <span className="text-sm text-orange-900">{gap}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                )}
+            </div>
+
+            {/* Response Quality Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card padding="1.5rem" className="bg-gradient-to-br from-slate-50 to-slate-100">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-sm font-medium text-slate-500 mb-1">Lunghezza Media Risposta</div>
+                            <div className="text-3xl font-bold text-slate-900">{Math.round(avgResponseLength)}</div>
+                            <div className="text-xs text-slate-500">caratteri per messaggio utente</div>
+                        </div>
+                        <div className="p-3 bg-white rounded-xl shadow-sm">
+                            <Clock className="w-8 h-8 text-slate-400" />
+                        </div>
+                    </div>
+                </Card>
+
+                <Card padding="1.5rem" className="bg-gradient-to-br from-emerald-50 to-emerald-100">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-sm font-medium text-emerald-600 mb-1">Engagement Score</div>
+                            <div className="text-3xl font-bold text-emerald-900">
+                                {((completionRate * 0.4) + (avgSentiment * 0.4) + (avgResponseLength > 100 ? 20 : avgResponseLength / 5)).toFixed(0)}
+                            </div>
+                            <div className="text-xs text-emerald-600">indice combinato qualità interazioni</div>
+                        </div>
+                        <div className="p-3 bg-white rounded-xl shadow-sm">
+                            <Zap className="w-8 h-8 text-emerald-400" />
+                        </div>
                     </div>
                 </Card>
             </div>

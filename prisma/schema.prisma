@@ -173,6 +173,7 @@ model Subscription {
   codiceFiscale           String?
   pecEmail                String?
   sdiCode                 String?
+  customLimits            Json?              // Admin-overridable limits { maxInterviews, maxChatbots, maxProjects }
   invoices                Invoice[]
   organization            Organization       @relation(fields: [organizationId], references: [id])
 }
@@ -258,6 +259,7 @@ model Bot {
   showDataUsageInfo     Boolean              @default(true)
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
+  boundaries            Json?
   analyticsMetadata     Json?
   formatExplanation     String?
   progressBarStyle      String               @default("semantic")

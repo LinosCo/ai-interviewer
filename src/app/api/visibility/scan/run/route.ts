@@ -45,13 +45,62 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        // Check weekly scan limit
-        // Note: For now we allow scans if visibilityScansPerWeek > 0
-        // A more robust implementation would track scans per week in the database
-        if (plan.limits.visibilityScansPerWeek === 0) {
+        // Check if visibility is available in plan
+        if (plan.limits.visibilityScansPerWeek === 0 && plan.limits.maxManualScansPerDay === 0) {
             return NextResponse.json(
                 { error: 'Visibility scans not available in your plan' },
                 { status: 403 }
+            );
+        }
+
+        // Check 24h cooldown - find last scan for this config
+        const lastScan = await prisma.visibilityScan.findFirst({
+            where: { configId: config.id },
+            orderBy: { startedAt: 'desc' }
+        });
+
+        if (lastScan) {
+            const hoursSinceLastScan = (Date.now() - new Date(lastScan.startedAt).getTime()) / (1000 * 60 * 60);
+            if (hoursSinceLastScan < 24) {
+                const hoursRemaining = Math.ceil(24 - hoursSinceLastScan);
+                return NextResponse.json(
+                    {
+                        error: `Cooldown attivo. Prossimo scan disponibile tra ${hoursRemaining} ore.`,
+                        cooldownRemaining: hoursRemaining,
+                        nextAvailable: new Date(new Date(lastScan.startedAt).getTime() + 24 * 60 * 60 * 1000).toISOString()
+                    },
+                    { status: 429 }
+                );
+            }
+        }
+
+        // Check daily manual scan limit
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Get all config IDs for this organization
+        const orgConfigs = await prisma.visibilityConfig.findMany({
+            where: { organizationId },
+            select: { id: true }
+        });
+        const configIds = orgConfigs.map(c => c.id);
+
+        const todayScans = await prisma.visibilityScan.count({
+            where: {
+                configId: { in: configIds },
+                startedAt: { gte: today },
+                scanType: 'manual'
+            }
+        });
+
+        if (todayScans >= plan.limits.maxManualScansPerDay) {
+            return NextResponse.json(
+                {
+                    error: `Limite giornaliero raggiunto (${plan.limits.maxManualScansPerDay} scan/giorno). Riprova domani.`,
+                    dailyLimit: plan.limits.maxManualScansPerDay,
+                    scansUsedToday: todayScans
+                },
+                { status: 429 }
             );
         }
 

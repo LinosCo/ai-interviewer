@@ -87,7 +87,12 @@ export interface PlanLimits {
     // Visibility tracking limits
     maxVisibilityPrompts: number;
     visibilityScansPerWeek: number;
+    maxManualScansPerDay: number;
+    maxBrandsTracked: number;
     maxCompetitorsTracked: number;
+
+    // AI Features
+    aiTipsEnabled: boolean;
 }
 
 export interface PlanConfig {
@@ -180,13 +185,17 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxActiveChatbots: 0,
             maxVisibilityPrompts: 0,
             visibilityScansPerWeek: 0,
-            maxCompetitorsTracked: 0
+            maxManualScansPerDay: 0,
+            maxBrandsTracked: 0,
+            maxCompetitorsTracked: 0,
+            aiTipsEnabled: false
         },
         marketingFeatures: [
             '10 interviste/mese',
             '1 Progetto',
             'Analytics base',
             'Nessun Chatbot',
+            'No AI Tips',
             'Supporto Community'
         ],
 
@@ -257,8 +266,11 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             monthlyTokenBudget: 1000000,
             maxActiveChatbots: 3,
             maxVisibilityPrompts: 45,
-            visibilityScansPerWeek: 7, // Allow daily
-            maxCompetitorsTracked: 5
+            visibilityScansPerWeek: 7,
+            maxManualScansPerDay: 10,
+            maxBrandsTracked: 3,
+            maxCompetitorsTracked: 5,
+            aiTipsEnabled: true
         },
         marketingFeatures: [
             'Piano Partner Gratuito',
@@ -331,11 +343,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 15,
             messageCooldownSeconds: 2,
-            monthlyTokenBudget: 200000, // ~2000 conversations approx depending on length, simplified token budget
+            monthlyTokenBudget: 200000,
             maxActiveChatbots: 1,
             maxVisibilityPrompts: 0,
             visibilityScansPerWeek: 0,
-            maxCompetitorsTracked: 0
+            maxManualScansPerDay: 0,
+            maxBrandsTracked: 0,
+            maxCompetitorsTracked: 0,
+            aiTipsEnabled: false
         },
         marketingFeatures: [
             '300 interviste/mese',
@@ -411,11 +426,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 50,
             messageCooldownSeconds: 1,
-            monthlyTokenBudget: 1000000, // ~10000 conversations
+            monthlyTokenBudget: 1000000,
             maxActiveChatbots: 3,
             maxVisibilityPrompts: 45,
-            visibilityScansPerWeek: 7, // Daily manual limit handled in logic, here we set weekly frequency for automated
-            maxCompetitorsTracked: 3 // +3 Brands handled by clusters logic
+            visibilityScansPerWeek: 1,
+            maxManualScansPerDay: 10,
+            maxBrandsTracked: 3,
+            maxCompetitorsTracked: 3,
+            aiTipsEnabled: true
         },
         marketingFeatures: [
             '1.000 interviste/mese',
@@ -425,7 +443,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             'AI Tips inclusi',
             'Visibility: 3 Brand + 3 Competitor',
             '45 Prompt Visibility',
-            'Scan Settimanale automatico'
+            'Scan Settimanale + 10 manuali/giorno'
         ],
 
         stripePriceId: process.env.STRIPE_PRICE_PRO,
@@ -492,11 +510,14 @@ export const PLANS: Record<PlanType, PlanConfig> = {
 
             maxParallelInterviews: 200,
             messageCooldownSeconds: 0.5,
-            monthlyTokenBudget: 3000000, // ~30000 conversations
+            monthlyTokenBudget: 3000000,
             maxActiveChatbots: 10,
             maxVisibilityPrompts: 75,
-            visibilityScansPerWeek: 7, // Keeping structure, but logic will separate auto vs manual
-            maxCompetitorsTracked: 10 // +5 Brands
+            visibilityScansPerWeek: 1,
+            maxManualScansPerDay: 20,
+            maxBrandsTracked: 5,
+            maxCompetitorsTracked: 10,
+            aiTipsEnabled: true
         },
         marketingFeatures: [
             '3.000 interviste/mese',

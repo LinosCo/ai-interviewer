@@ -14,6 +14,15 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // Check if we are in "full" mode (straight to chat window)
+    const isFullMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('full') === 'true';
+
+    useEffect(() => {
+        if (isFullMode) {
+            setIsOpen(true);
+        }
+    }, [isFullMode]);
+
     useEffect(() => {
         async function fetchBot() {
             try {
@@ -44,6 +53,37 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
     if (loading) return null;
     if (!bot) return null;
 
+    if (isFullMode) {
+        return (
+            <div className="w-full h-screen bg-white overflow-hidden">
+                <ChatWindow
+                    botId={botId}
+                    isOpen={true}
+                    onClose={() => { }} // No close in full mode
+                    botName={bot.name}
+                    primaryColor={bot.primaryColor || '#7C3AED'}
+                    welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
+                    privacyPolicyUrl={bot.privacyPolicyUrl}
+                />
+                <style jsx global>{`
+                    body { margin: 0; padding: 0; overflow: hidden; }
+                    /* Override the fixed positioning of ChatWindow when in full mode */
+                    div[class*="fixed"] {
+                        position: relative !important;
+                        bottom: auto !important;
+                        right: auto !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                        max-width: none !important;
+                        max-height: none !important;
+                        border: none !important;
+                        border-radius: 0 !important;
+                    }
+                `}</style>
+            </div>
+        );
+    }
+
     return (
         <div className="relative w-full h-full min-h-screen bg-transparent">
             <ChatBubble
@@ -61,6 +101,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                 botName={bot.name}
                 primaryColor={bot.primaryColor || '#7C3AED'}
                 welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
+                privacyPolicyUrl={bot.privacyPolicyUrl}
             />
             {/* Minimal styles for the iframe body */}
             <style jsx global>{`

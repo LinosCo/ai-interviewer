@@ -2,20 +2,31 @@
 
 import { useState } from 'react';
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { showToast } from '@/components/toast';
 
 export default function BillingClient() {
     const [isLoading, setIsLoading] = useState(false);
+    const [stripeError, setStripeError] = useState<string | null>(null);
 
     const handleManageBilling = async () => {
         setIsLoading(true);
+        setStripeError(null);
         try {
             const res = await fetch('/api/stripe/portal');
             const data = await res.json();
+
+            if (data.error === 'STRIPE_NOT_CONFIGURED') {
+                setStripeError(data.message);
+                showToast('Il portale di fatturazione non è ancora disponibile.', 'info');
+                return;
+            }
+
             if (data.url) {
                 window.location.href = data.url;
             }
         } catch (error) {
             console.error('Error opening portal:', error);
+            showToast('Errore durante l\'apertura del portale.', 'error');
         } finally {
             setIsLoading(false);
         }

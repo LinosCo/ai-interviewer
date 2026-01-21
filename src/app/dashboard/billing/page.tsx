@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType } from '@/config/plans';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import BillingClient from './billing-client';
+import { UsageDashboard } from '@/components/dashboard/UsageDashboard';
 
 export default async function BillingPage() {
     const session = await auth();
@@ -99,6 +100,11 @@ export default async function BillingPage() {
                         <Icons.Logo size={40} className="opacity-20" />
                     </div>
                 </div>
+            </div>
+
+            {/* Usage Dashboard */}
+            <div className="mt-8">
+                <UsageDashboard />
             </div>
         </div>
     );

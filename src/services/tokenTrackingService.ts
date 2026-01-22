@@ -159,5 +159,98 @@ export class TokenTrackingService {
         }
 
         return { allowed: true };
+
+    /**
+     * Ottiene statistiche globali della piattaforma (per admin)
+     */
+    static async getGlobalStats() {
+        const [
+            totalOrganizations,
+            totalTokensUsed,
+            totalInterviews,
+            totalChatbotSessions,
+            recentLogs
+        ] = await Promise.all([
+            prisma.organization.count(),
+            prisma.subscription.aggregate({ _sum: { tokensUsedThisMonth: true } }),
+            prisma.subscription.aggregate({ _sum: { interviewsUsedThisMonth: true } }),
+            prisma.subscription.aggregate({ _sum: { chatbotSessionsUsedThisMonth: true } }),
+            prisma.tokenLog.findMany({
+                take: 50,
+                orderBy: { createdAt: 'desc' },
+                include: { organization: { select: { name: true } } }
+            })
+        ]);
+
+        const organizations = await prisma.organization.findMany({
+            include: { subscription: true }
+        });
+
+        const byTier: Record<string, number> = {};
+        organizations.forEach(org => {
+            const tier = org.subscription?.tier || 'FREE';
+            byTier[tier] = (byTier[tier] || 0) + 1;
+        });
+
+        return {
+            totalOrganizations,
+            totalTokensUsed: totalTokensUsed._sum.tokensUsedThisMonth || 0,
+            totalInterviews: totalInterviews._sum.interviewsUsedThisMonth || 0,
+            totalChatbotSessions: totalChatbotSessions._sum.chatbotSessionsUsedThisMonth || 0,
+            byTier,
+            recentLogs
+        };
+    }
+
+    /**
+     * Ottiene statistiche di utilizzo per una specifica organizzazione
+     */
+    static async getUsageStats(organizationId: string) {
+        const sub = await prisma.subscription.findUnique({
+            where: { organizationId }
+        });
+
+        if (!sub) return null;
+
+        const plan = PLANS[sub.tier as PlanType] || PLANS[PlanType.FREE];
+
+        return {
+            tokens: {
+                used: sub.tokensUsedThisMonth,
+                limit: plan.limits.monthlyTokenBudget,
+                extra: sub.extraTokens
+            },
+            interviews: {
+                used: sub.interviewsUsedThisMonth,
+                limit: plan.limits.maxInterviewsPerMonth,
+                extra: sub.extraInterviews
+            },
+            chatbot: {
+                used: sub.chatbotSessionsUsedThisMonth,
+                limit: plan.limits.maxChatbotSessionsPerMonth,
+                extra: sub.extraChatbotSessions
+            }
+        };
+    }
+
+    /**
+     * Resetta i contatori mensili (per admin o webhook)
+     */
+    static async resetMonthlyCounters(organizationId: string) {
+        return await prisma.subscription.update({
+            where: { organizationId },
+            data: {
+                tokensUsedThisMonth: 0,
+                interviewsUsedThisMonth: 0,
+                chatbotSessionsUsedThisMonth: 0,
+                visibilityQueriesUsedThisMonth: 0,
+                aiSuggestionsUsedThisMonth: 0,
+                interviewTokensUsed: 0,
+                chatbotTokensUsed: 0,
+                visibilityTokensUsed: 0,
+                suggestionTokensUsed: 0,
+                systemTokensUsed: 0
+            }
+        });
     }
 }

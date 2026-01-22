@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { tokenTrackingService } from '@/services/tokenTrackingService';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 /**
  * GET /api/admin/stats
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         }
 
         // Get global stats from token tracking service
-        const globalStats = await tokenTrackingService.getGlobalStats();
+        const globalStats = await TokenTrackingService.getGlobalStats();
 
         // Get additional detailed statistics
         const [

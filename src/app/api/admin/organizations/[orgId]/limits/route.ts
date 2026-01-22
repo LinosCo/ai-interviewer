@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { tokenTrackingService } from '@/services/tokenTrackingService';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 /**
  * GET /api/admin/organizations/[orgId]/limits
@@ -29,7 +29,7 @@ export async function GET(
         const { orgId } = await params;
 
         // Get detailed usage stats
-        const usageStats = await tokenTrackingService.getUsageStats(orgId);
+        const usageStats = await TokenTrackingService.getUsageStats(orgId);
 
         // Get organization with subscription
         const org = await prisma.organization.findUnique({
@@ -178,7 +178,7 @@ export async function PATCH(
 
         // Reset usage counters if requested
         if (resetUsage) {
-            await tokenTrackingService.resetMonthlyCounters(orgId);
+            await TokenTrackingService.resetMonthlyCounters(orgId);
         }
 
         return NextResponse.json({ success: true });

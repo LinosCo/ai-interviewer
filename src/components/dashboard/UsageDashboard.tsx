@@ -77,7 +77,7 @@ export function UsageDashboard() {
                     responsesUsed: org.responsesUsedThisMonth || 0,
                     responsesLimit: planConfig.responsesPerMonth,
                     activeBots: botsCount,
-                    botsLimit: planConfig.limits.maxActiveChatbots,
+                    botsLimit: planConfig.limits.maxActiveBots,
                     chatbots: {
                         conversationsUsed: org.tokenUsage?.chatbotConversations || 0,
                         conversationsLimit: planKey === PlanType.STARTER ? 2000 : planKey === PlanType.PRO ? 10000 : planKey === PlanType.BUSINESS ? 30000 : 0

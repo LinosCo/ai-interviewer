@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { ProjectAccessManager } from '../../access-manager';
+import { ProjectBrandManager } from './ProjectBrandManager';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, LayoutGrid, Settings } from "lucide-react";
 import Link from 'next/link';
@@ -56,6 +57,9 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
             <div className="grid gap-8">
                 {/* Sharing Manager */}
                 <ProjectAccessManager projectId={projectId} />
+
+                {/* Brand Manager */}
+                <ProjectBrandManager projectId={projectId} projectName={project.name} />
 
                 {/* Additional Settings could go here (Rename, Delete) */}
                 <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-4">

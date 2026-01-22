@@ -6,7 +6,7 @@ import { PLANS, PlanType, PlanFeatures, PlanLimits } from '@/config/plans';
 let _stripe: Stripe | null = null;
 
 export const PRICING_CONSTANTS = {
-    PLANS: ['TRIAL', 'FREE', 'STARTER', 'PRO', 'BUSINESS', 'PARTNER', 'ENTERPRISE'] as const,
+    PLANS: ['TRIAL', 'FREE', 'STARTER', 'PRO', 'BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'] as const,
 };
 
 export type PlanKey = (typeof PRICING_CONSTANTS.PLANS)[number];
@@ -179,7 +179,7 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
             limits: PLANS[PlanType.PARTNER].limits,
         } as PriceConfig,
         ENTERPRISE: {
-            name: 'Enterprise',
+            name: PLANS[PlanType.ENTERPRISE].name,
             price: null,
             priceId: null,
             priceYearly: null,
@@ -188,14 +188,23 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
                 maxActiveBots: -1,
                 maxInterviewsPerMonth: -1,
                 maxUsers: -1,
-                ...PLANS[PlanType.BUSINESS].features,
+                ...PLANS[PlanType.ENTERPRISE].features,
             },
-            // Inherit business limits or maximize them
-            limits: {
-                ...PLANS[PlanType.BUSINESS].limits,
-                monthlyTokenBudget: 10000000,
-                maxActiveChatbots: 999
+            limits: PLANS[PlanType.ENTERPRISE].limits,
+        } as PriceConfig,
+        ADMIN: {
+            name: PLANS[PlanType.ADMIN].name,
+            price: 0,
+            priceId: null,
+            priceYearly: 0,
+            priceIdYearly: null,
+            features: {
+                maxActiveBots: -1,
+                maxInterviewsPerMonth: -1,
+                maxUsers: -1,
+                ...PLANS[PlanType.ADMIN].features,
             },
+            limits: PLANS[PlanType.ADMIN].limits,
         } as PriceConfig,
     };
 }

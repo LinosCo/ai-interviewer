@@ -87,7 +87,8 @@ export async function canCreateChatbot(organizationId: string): Promise<{ allowe
     if (!statusCheck.allowed) return statusCheck;
 
     const plans = await getPricingPlans();
-    const limit = plans[subscription.tier]?.limits?.maxActiveChatbots;
+    const planConfig = plans[subscription.tier as PlanKey];
+    const limit = planConfig?.limits?.maxActiveBots;
     const isUnlimited = subscription.maxActiveBots === -1 || limit === undefined || limit === -1;
 
     // undefined means unlimited (legacy/fallback), -1 means unlimited

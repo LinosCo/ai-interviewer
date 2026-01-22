@@ -155,6 +155,7 @@ model Subscription {
   organizationId          String             @unique
   tier                    SubscriptionTier   @default(FREE)
   status                  SubscriptionStatus @default(ACTIVE)
+  isPartner               Boolean            @default(false)  // Flag partner lifetime
   stripeCustomerId        String?
   stripeSubscriptionId    String?
   stripePriceId           String?
@@ -163,7 +164,22 @@ model Subscription {
   maxUsers                Int                @default(1)
   currentPeriodStart      DateTime           @default(now())
   currentPeriodEnd        DateTime
+  trialEndsAt             DateTime?          // Fine periodo trial
   interviewsUsedThisMonth Int                @default(0)
+
+  // Contatori uso mensile aggiuntivi
+  chatbotSessionsUsedThisMonth  Int          @default(0)
+  visibilityQueriesUsedThisMonth Int         @default(0)
+  aiSuggestionsUsedThisMonth    Int          @default(0)
+  tokensUsedThisMonth           Int          @default(0)
+  purchasedTokens               Int          @default(0)  // Token extra acquistati
+
+  // Risorse extra acquistate (non-token)
+  extraInterviews        Int                 @default(0)
+  extraChatbotSessions   Int                 @default(0)
+  extraVisibilityQueries Int                 @default(0)
+  extraUsers             Int                 @default(0)
+
   billingEmail            String?
   billingName             String?
   vatNumber               String?
@@ -544,6 +560,82 @@ model TokenUsage {
   purchasedTokens Int          @default(0)
   updatedAt       DateTime     @updatedAt
   organization    Organization @relation(fields: [organizationId], references: [id])
+
+  // Breakdown per categoria
+  interviewTokens    Int       @default(0)
+  chatbotTokens      Int       @default(0)
+  visibilityTokens   Int       @default(0)
+  suggestionTokens   Int       @default(0)
+  systemTokens       Int       @default(0)
+
+  // Contatori risorse
+  interviewsUsed        Int    @default(0)
+  chatbotSessionsUsed   Int    @default(0)
+  visibilityQueriesUsed Int    @default(0)
+  aiSuggestionsUsed     Int    @default(0)
+}
+
+// Token Log dettagliato per ogni operazione
+model TokenLog {
+  id              String        @id @default(cuid())
+  organizationId  String
+  userId          String?
+
+  category        TokenCategory
+  operation       String        // es: "interview_message", "chatbot_reply", "visibility_scan"
+  inputTokens     Int
+  outputTokens    Int
+  totalTokens     Int
+
+  resourceType    String?       // es: "bot", "conversation", "scan"
+  resourceId      String?
+  model           String        @default("gpt-4o-mini")
+
+  fromAddOn       Boolean       @default(false)
+  addOnId         String?
+
+  createdAt       DateTime      @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, category])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+// Pacchetti extra acquistati
+model PurchasedAddOn {
+  id              String    @id @default(cuid())
+  organizationId  String
+
+  addOnId         String    // es: "tokens_5m", "interviews_50"
+  type            AddOnType
+  quantity        Int       // Quantità acquistata
+  remaining       Int       // Quantità rimanente
+
+  price           Float     // Prezzo pagato
+  stripePaymentId String?
+
+  purchasedAt     DateTime  @default(now())
+  expiresAt       DateTime? // Null = non scade, altrimenti fine mese
+
+  @@index([organizationId])
+  @@index([organizationId, type])
+}
+
+enum TokenCategory {
+  INTERVIEW
+  CHATBOT
+  VISIBILITY
+  SUGGESTION
+  SYSTEM
+}
+
+enum AddOnType {
+  TOKENS
+  INTERVIEWS
+  CHATBOT
+  VISIBILITY
+  USERS
 }
 
 model ChatbotAnalytics {
@@ -804,10 +896,13 @@ enum BillingCycle {
 
 enum SubscriptionTier {
   FREE
+  TRIAL
   STARTER
   PRO
   BUSINESS
   ENTERPRISE
+  PARTNER
+  ADMIN
 }
 
 enum SubscriptionStatus {

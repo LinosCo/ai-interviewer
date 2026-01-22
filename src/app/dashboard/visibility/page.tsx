@@ -15,7 +15,7 @@ import { VisibilityProjectFilter } from "./VisibilityProjectFilter";
 export default async function VisibilityPage({
     searchParams
 }: {
-    searchParams: Promise<{ scanId?: string; projectId?: string }>
+    searchParams: Promise<{ scanId?: string; projectId?: string; brandId?: string }>
 }) {
     const session = await auth();
     if (!session?.user?.id) redirect("/login");
@@ -23,6 +23,7 @@ export default async function VisibilityPage({
     const params = await searchParams;
     const selectedScanId = params.scanId;
     const projectIdFilter = params.projectId;
+    const brandIdFilter = params.brandId;
 
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
@@ -32,14 +33,22 @@ export default async function VisibilityPage({
     const orgId = user?.memberships[0]?.organizationId;
     if (!orgId) redirect("/login");
 
-    // 1. Check if config exists (optionally filtered by project)
+    // 1. Check if config exists (optionally filtered by project or brandId)
     const config = await prisma.visibilityConfig.findFirst({
         where: {
             organizationId: orgId,
-            ...(projectIdFilter && projectIdFilter !== '__ALL__' ? { projectId: projectIdFilter } : {})
+            ...(brandIdFilter ? { id: brandIdFilter } : {}),
+            ...(projectIdFilter && projectIdFilter !== '__ALL__' && !brandIdFilter ? { projectId: projectIdFilter } : {})
         },
         include: { prompts: true, project: { select: { id: true, name: true } } }
     });
+
+    // Count all brands for this org
+    const allBrands = await prisma.visibilityConfig.findMany({
+        where: { organizationId: orgId },
+        select: { id: true, brandName: true, projectId: true }
+    });
+    const totalBrands = allBrands.length;
 
     // If no config at all, redirect to create
     const anyConfig = await prisma.visibilityConfig.findFirst({
@@ -163,8 +172,16 @@ export default async function VisibilityPage({
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {totalBrands > 1 && (
+                        <Link href="/dashboard/visibility/brands">
+                            <Button variant="outline" size="sm" className="gap-2">
+                                <Building2 className="h-4 w-4" />
+                                {totalBrands} Brand
+                            </Button>
+                        </Link>
+                    )}
                     <VisibilityProjectFilter currentProjectId={projectIdFilter || config.projectId || undefined} />
-                    <Link href={`/dashboard/visibility/create${config.projectId ? `?projectId=${config.projectId}` : ''}`}>
+                    <Link href={`/dashboard/visibility/create?configId=${config.id}`}>
                         <Button variant="outline" size="sm" className="gap-2">
                             <Settings className="h-4 w-4" />
                             Impostazioni

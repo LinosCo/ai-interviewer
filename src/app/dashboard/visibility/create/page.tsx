@@ -41,6 +41,7 @@ export default function CreateVisibilityWizardPage() {
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
+    const [configId, setConfigId] = useState<string | null>(null);
 
     const [config, setConfig] = useState<VisibilityConfig>({
         brandName: '',
@@ -59,29 +60,33 @@ export default function CreateVisibilityWizardPage() {
     useEffect(() => {
         const loadConfig = async () => {
             try {
-                // Load Config
-                const res = await fetch('/api/visibility/create');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.config) {
-                        setConfig({
-                            brandName: data.config.brandName || '',
-                            category: data.config.category || '',
-                            description: data.config.description || '',
-                            language: data.config.language || 'it',
-                            territory: data.config.territory || 'IT',
-                            projectId: data.config.projectId || projectIdParam || undefined,
-                            prompts: data.config.prompts?.map((p: any) => ({
-                                id: p.id,
-                                text: p.text,
-                                enabled: p.enabled
-                            })) || [],
-                            competitors: data.config.competitors?.map((c: any) => ({
-                                id: c.id,
-                                name: c.name
-                            })) || []
-                        });
-                        setIsEdit(true);
+                // Only load existing config if configId is provided (edit mode)
+                const configIdParam = searchParams.get('configId');
+                if (configIdParam) {
+                    const res = await fetch(`/api/visibility/create?id=${configIdParam}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.config) {
+                            setConfig({
+                                brandName: data.config.brandName || '',
+                                category: data.config.category || '',
+                                description: data.config.description || '',
+                                language: data.config.language || 'it',
+                                territory: data.config.territory || 'IT',
+                                projectId: data.config.projectId || projectIdParam || undefined,
+                                prompts: data.config.prompts?.map((p: any) => ({
+                                    id: p.id,
+                                    text: p.text,
+                                    enabled: p.enabled
+                                })) || [],
+                                competitors: data.config.competitors?.map((c: any) => ({
+                                    id: c.id,
+                                    name: c.name
+                                })) || []
+                            });
+                            setIsEdit(true);
+                            setConfigId(configIdParam);
+                        }
                     }
                 }
 
@@ -129,7 +134,7 @@ export default function CreateVisibilityWizardPage() {
             const response = await fetch('/api/visibility/create', {
                 method: isEdit ? 'PATCH' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(config)
+                body: JSON.stringify(isEdit ? { ...config, id: configId } : config)
             });
 
             if (!response.ok) {

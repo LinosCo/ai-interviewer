@@ -81,11 +81,11 @@ const FeatureIcon = ({ icon: Icon, color = colors.amber }: { icon: any, color?: 
 
 // Hero rotating phrases - slide animation (positive/opportunity-focused)
 const HERO_PHRASES = [
-    'i clienti sono soddisfatti',
-    'il team è motivato',
-    'il mercato ti apprezza',
-    'la comunicazione funziona',
-    'stai crescendo come vorresti',
+    'cosa migliorare subito',
+    'dove butti budget',
+    'perché i clienti comprano',
+    'cosa dicono i competitor',
+    'come scalare velocemente',
 ];
 
 export default function LandingPage() {
@@ -176,7 +176,7 @@ export default function LandingPage() {
                         <div className="bg-stone-900/95 backdrop-blur-xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-3xl md:rounded-full py-3 px-6 md:py-4 md:px-10 flex flex-col md:flex-row items-center justify-between gap-4">
                             <div className="text-center md:text-left hidden sm:block">
                                 <p className="font-bold text-white leading-tight">Pronto a capire meglio i tuoi clienti?</p>
-                                <p className="text-xs text-stone-400 font-medium">50 interviste gratis, nessuna carta richiesta</p>
+                                <p className="text-xs text-stone-400 font-medium">Prova gratuitamente la potenza di Business Tuner</p>
                             </div>
 
                             {/* Mobile-only text (shorter) */}
@@ -289,7 +289,8 @@ export default function LandingPage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="text-5xl lg:text-7xl font-black text-stone-900 leading-[1.1] mb-8 tracking-tighter"
                         >
-                            Scopri se
+                            Business Intelligence <br className="hidden lg:block" />
+                            Che ti dice
                             <br />
                             {/* Sliding text container - fixed height for animation */}
                             <span className="relative inline-block min-h-[1.3em] w-full">
@@ -342,7 +343,7 @@ export default function LandingPage() {
                             className="flex flex-wrap justify-center gap-8 text-stone-400 text-sm font-medium"
                         >
                             <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Setup in 5 minuti</span>
-                            <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 50 interviste gratis</span>
+                            <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 20 interviste/mese gratis per sempre</span>
                             <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Nessuna carta richiesta</span>
                         </motion.div>
 
@@ -454,7 +455,7 @@ export default function LandingPage() {
                                     <li className="flex items-start gap-4">
                                         <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0"><Icons.Check size={20} /></div>
                                         <div>
-                                            <div className="font-bold">Visibility Tracker</div>
+                                            <div className="font-bold">Brand Monitor</div>
                                             <div className="text-sm text-amber-100">Cosa dicono di te ChatGPT e i forum di settore.</div>
                                         </div>
                                     </li>
@@ -637,7 +638,7 @@ export default function LandingPage() {
                         <div>
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Search size={24} /></div>
-                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Monitora la Reputazione</h3>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Brand Monitor</h3>
                             </div>
                             <h4 className="text-xl text-stone-900 font-bold mb-6">Cosa dicono di te su Google e quando ti chiedono all'AI.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
@@ -729,7 +730,7 @@ export default function LandingPage() {
                                 </div>
                                 <div className="bg-amber-50 p-6 rounded-[2rem] border border-amber-100 flex flex-col items-center justify-center text-center group hover:bg-amber-100 transition-colors cursor-default">
                                     <Icons.Search size={32} className="text-amber-500 mb-4" />
-                                    <div className="text-xs font-black text-amber-900 uppercase">Monitor Visibilità</div>
+                                    <div className="text-xs font-black text-amber-900 uppercase">Brand Monitor</div>
                                     <div className="text-stone-500 text-[10px] mt-1 italic">Competitor parla di checkout</div>
                                 </div>
                                 <div className="bg-amber-50 p-6 rounded-[2rem] border border-stone-200 flex flex-col items-center justify-center text-center group hover:scale-105 transition-transform">
@@ -774,6 +775,60 @@ export default function LandingPage() {
                     </div>
                 </div>
                 <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-amber-50/20 to-transparent -z-10" />
+            </section>
+
+            {/* NEW SECTION: DATA & CMS AUTOMATION */}
+            <section className="py-32 bg-stone-900 text-white relative overflow-hidden">
+                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#F59E0B_1px,transparent_1px)] [background-size:24px_24px]"></div>
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="grid lg:grid-cols-2 gap-20 items-center">
+                        <div className="order-2 lg:order-1">
+                            <SectionLabel text="Integrazioni & Automazioni" color="#F59E0B" bg="rgba(255,255,255,0.1)" />
+                            <h2 className="text-4xl lg:text-5xl font-black mb-8 tracking-tight">
+                                Agisci subito, <br /><span className="text-amber-500">senza toccare codice</span>
+                            </h2>
+                            <p className="text-xl text-stone-400 mb-10 leading-relaxed">
+                                Quando l'AI scopre una lacuna o un'opportunità, non ti dà solo un report PDF.
+                                Si connette al tuo sito e ai tuoi processi per risolvere il problema.
+                            </p>
+
+                            <ul className="space-y-8">
+                                <li className="flex gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center flex-shrink-0 text-amber-500 font-bold">01</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-white mb-2">CMS Sync</h4>
+                                        <p className="text-stone-400 text-sm">Aggiorna FAQ e descrizioni prodotto sul tuo sito (Shopify, WordPress) basandosi sulle domande reali dei clienti.</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center flex-shrink-0 text-amber-500 font-bold">02</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-white mb-2">Workflow Automizzati</h4>
+                                        <p className="text-stone-400 text-sm">Notifica il supporto su Slack se un cliente è arrabbiato, o crea un ticket su Jira se emerge un bug ricorrente.</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                        <div className="order-1 lg:order-2 bg-stone-800 rounded-3xl p-8 border border-stone-700 shadow-2xl relative">
+                            {/* Mockup of an automation interface */}
+                            <div className="space-y-4 font-mono text-sm">
+                                <div className="flex items-center gap-2 text-green-400 mb-4 bg-black/20 p-2 rounded w-fit">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    <span>Automation Active</span>
+                                </div>
+                                <div className="p-4 bg-black/30 rounded-xl border border-stone-600">
+                                    <div className="text-stone-500 text-xs uppercase mb-2">Trigger</div>
+                                    <div className="text-white">Se {'>'} 5 clienti chiedono "Spedite in Svizzera?"</div>
+                                </div>
+                                <div className="flex justify-center"><Icons.ArrowRight className="rotate-90 text-stone-500" /></div>
+                                <div className="p-4 bg-amber-500/20 rounded-xl border border-amber-500/50">
+                                    <div className="text-amber-500 text-xs uppercase mb-2">Action: Update CMS</div>
+                                    <div className="text-white">Aggiungi a /faq: <br /> <span className="text-amber-300">"Sì, spediamo in Svizzera con dazi inclusi..."</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             {/* 5. HOW IT WORKS */}
@@ -826,17 +881,17 @@ export default function LandingPage() {
                             </thead>
                             <tbody className="divide-y divide-stone-50">
                                 {[
-                                    { f: 'Interview AI Qualitativo', tuner: true, other: 'Parziale' },
-                                    { f: 'Chatbot con Gap Detection', tuner: true, other: false },
-                                    { f: 'Visibility Tracker (AI + Web)', tuner: true, other: false },
-                                    { f: 'Cross-channel Insights', tuner: true, other: false },
-                                    { f: 'Setup < 5 Minuti', tuner: true, other: true },
-                                    { f: 'Supporto Italiano Nativo', tuner: true, other: 'Limited' },
+                                    { f: 'Features', tuner: true, other: false }, // Header placeholder
+                                    { f: 'Interview AI + Deep Probing', tuner: true, other: 'Solo Form' },
+                                    { f: 'Brand Monitor (LLM + Web)', tuner: true, other: 'Solo Web' },
+                                    { f: 'Strategic Copilot (AI Tips)', tuner: true, other: false },
+                                    { f: 'CMS & Data Automation', tuner: true, other: false },
+                                    { f: 'Supporto Italiano Nativo', tuner: true, other: 'No' },
                                 ].map((row, i) => (
                                     <tr key={i} className="group hover:bg-stone-50 transition-colors">
                                         <td className="py-5 px-4 font-bold text-stone-700 text-sm">{row.f}</td>
                                         <td className="py-5 px-4 bg-amber-50/50 text-center">
-                                            {typeof row.tuner === 'boolean' ? (row.tuner ? <Icons.Check className="mx-auto text-amber-500" size={20} /> : <Icons.X className="mx-auto text-stone-300" size={20} />) : <span className="text-amber-600 font-bold text-sm">{row.tuner}</span>}
+                                            {typeof row.tuner === 'boolean' ? (row.tuner ? <Icons.Check className="mx-auto text-amber-500" size={20} /> : <span className="text-xs font-bold text-stone-300 invisible">.</span>) : <span className="text-amber-600 font-bold text-sm text-center block">{row.tuner}</span>}
                                         </td>
                                         <td className="py-5 px-4 text-center">
                                             {typeof row.other === 'boolean' ? (row.other ? <Icons.Check className="mx-auto text-stone-400" size={20} /> : <Icons.X className="mx-auto text-stone-300" size={20} />) : <span className="text-stone-400 font-bold text-sm">{row.other}</span>}
@@ -891,7 +946,7 @@ export default function LandingPage() {
                             <div className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">Per iniziare</div>
                             <div className="mb-8"><span className="text-4xl font-black">€0</span><span className="text-stone-400 text-sm">/mese</span></div>
                             <ul className="space-y-4 mb-10 flex-1">
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 50 interviste / mese</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 20 interviste / mese</li>
                                 <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1 Progetto</li>
                                 <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Analytics base</li>
                                 <li className="text-sm font-medium text-stone-600 flex items-center gap-2 opacity-30"><Icons.X size={16} /> Chatbot Intelligence</li>
@@ -907,10 +962,10 @@ export default function LandingPage() {
                             <div className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">Per professionisti</div>
                             <div className="mb-8"><span className="text-4xl font-black">€{isYearly ? 49 : 69}</span><span className="text-stone-400 text-sm">/mese</span></div>
                             <ul className="space-y-4 mb-10 flex-1">
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 300 interviste / mese</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 5 Progetti</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1 Chatbot Intelligence</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Custom Logo</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 100 interviste / mese</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 3 Progetti</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1 Chatbot (500 sessioni)</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 opacity-50"><Icons.X size={16} /> Brand Monitor</li>
                             </ul>
                             <Link href="/register?plan=STARTER">
                                 <Button fullWidth variant="secondary" className="bg-stone-50 border-stone-200 text-stone-900">Prova 14gg gratis</Button>
@@ -924,11 +979,11 @@ export default function LandingPage() {
                             <div className="text-xs text-amber-500 font-black uppercase tracking-widest mb-6">Per PMI e agenzie</div>
                             <div className="mb-8"><span className="text-4xl font-black">€{isYearly ? 149 : 199}</span><span className="text-stone-400 text-sm">/mese</span></div>
                             <ul className="space-y-4 mb-10 flex-1">
-                                <li className="text-sm font-black text-stone-900 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1.000 interviste / mese</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 15 Progetti</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 3 Bot (lacune & FAQ)</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 text-amber-600 font-bold"><Icons.Check className="text-amber-500" size={16} /> Visibility Tracker</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 text-amber-600 font-bold"><Icons.Check className="text-amber-500" size={16} /> Insight Hub (Cross)</li>
+                                <li className="text-sm font-black text-stone-900 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 400 interviste / mese</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 10 Progetti</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 3 Bot (4.000 sessioni)</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 text-amber-600 font-bold"><Icons.Check className="text-amber-500" size={16} /> Brand Monitor (800 query)</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 text-amber-600 font-bold"><Icons.Check className="text-amber-500" size={16} /> AI Tips & Suggestions</li>
                             </ul>
                             <Link href="/register?plan=PRO">
                                 <Button fullWidth withShimmer>Prova 14gg gratis</Button>
@@ -938,17 +993,35 @@ export default function LandingPage() {
                         {/* Plan: BUSINESS */}
                         <div className="bg-stone-900 rounded-3xl p-8 border border-stone-800 flex flex-col text-white">
                             <h3 className="text-xl font-bold mb-1">Business</h3>
-                            <div className="text-xs text-stone-500 font-bold uppercase tracking-widest mb-6">Per grandi aziende</div>
+                            <div className="text-xs text-stone-500 font-bold uppercase tracking-widest mb-6">Per aziende strutturate</div>
                             <div className="mb-8"><span className="text-4xl font-black">€{isYearly ? 299 : 399}</span><span className="text-stone-500 text-sm">/mese</span></div>
                             <ul className="space-y-4 mb-10 flex-1">
-                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 3.000+ interviste</li>
-                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Illimitati Progetti</li>
-                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Visibility Giornaliera</li>
-                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Automazioni complete</li>
-                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> White Label & API</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1.000 interviste / mese</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Progetti Illimitati</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 10 Bot (12.000 sessioni)</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Brand Monitor (4.000 query)</li>
+                                <li className="text-sm font-medium text-stone-400 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Priority Support</li>
                             </ul>
+                            <Link href="/register?plan=BUSINESS">
+                                <Button fullWidth variant="secondary" className="bg-white text-stone-900 border-transparent hover:bg-stone-100">Prova gratis</Button>
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* ENTERPRISE SECTION */}
+                    <div className="mt-12 bg-white rounded-3xl p-8 border-2 border-dashed border-stone-200 flex flex-col md:flex-row items-center justify-between gap-8">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="text-xs font-black bg-stone-900 text-white px-3 py-1 rounded-full uppercase">Enterprise</div>
+                                <h3 className="text-2xl font-bold text-stone-900">Hai esigenze specifiche?</h3>
+                            </div>
+                            <p className="text-stone-500 max-w-xl">
+                                Per grandi organizzazioni offriamo soluzioni su misura: risorse dedicate, funzionalità custom, Webhook e API avanzate per integrare i dati nei tuoi sistemi aziendali.
+                            </p>
+                        </div>
+                        <div className="flex-shrink-0">
                             <Link href="/contact">
-                                <Button fullWidth variant="secondary" className="bg-white text-stone-900 border-transparent hover:bg-stone-100">Contattaci</Button>
+                                <Button variant="secondary" className="px-8 border-stone-300 hover:border-stone-900 hover:bg-stone-50">Parla con noi</Button>
                             </Link>
                         </div>
                     </div>
@@ -965,10 +1038,10 @@ export default function LandingPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {[
-                            { quote: "Abbiamo scoperto perché il 30% dei clienti ci lasciava. Informazioni che non avremmo mai ottenuto con un survey.", author: "Marco R.", role: "CEO SaaS B2B", tool: "AI Interviews" },
-                            { quote: "Il chatbot ha ridotto le richieste di supporto del 40%. E ora sappiamo esattamente cosa aggiungere alla knowledge base.", author: "Giulia M.", role: "Customer Success Manager", tool: "Chatbot Intelligence" },
-                            { quote: "Non sapevamo che ChatGPT ci menzionava male. Abbiamo corretto i contenuti e ora siamo in prima posizione.", author: "Andrea B.", role: "Marketing Manager", tool: "Visibility Tracker" },
-                            { quote: "Il vero valore è vedere tutto insieme. Un tema che emerge ovunque è impossibile da ignorare e richiede azione rapida.", author: "Laura F.", role: "Head of Product", tool: "Cross-Channel Insights" },
+                            { quote: "Il nostro eCommerce di arredamento perdeva carrelli. L'AI ha scoperto che i clienti svizzeri non capivano i dazi. Abbiamo corretto con CMS Automation e recuperato il 15% di fatturato.", author: "Davide C.", role: "Founder, ArredoDesign", tool: "CMS Automation" },
+                            { quote: "Come agenzia, monitorare 20 clienti su ChatGPT era impossibile. Con Brand Monitor vediamo in un attimo chi sta perdendo visibilità e interveniamo.", author: "Elisa M.", role: "Digital Strategist", tool: "Brand Monitor" },
+                            { quote: "Le survey classiche ci davano voti alti, ma il churn restava. Interview AI ha fatto emergere il vero problema: l'assistenza post-vendita era lenta.", author: "Marco R.", role: "CEO SaaS B2B", tool: "AI Interviews" },
+                            { quote: "Prima aprivamo 10 tool diversi. Ora con Strategic Copilot ho ogni lunedì la lista delle 3 cose da fare per migliorare.", author: "Laura F.", role: "Marketing Manager", tool: "Strategic Copilot" },
                         ].map((t, i) => (
                             <div key={i} className="p-10 rounded-[2.5rem] bg-stone-50 border border-stone-100 relative group hover:-translate-y-1 transition-all">
                                 <Icons.Quote className="absolute top-6 right-8 text-stone-100 group-hover:text-amber-100 transition-colors" size={60} />
@@ -998,10 +1071,10 @@ export default function LandingPage() {
                     </div> 
                     */}
                 </div>
-            </section>
+            </section >
 
             {/* 9. FAQ SECTION */}
-            <section className="py-32 bg-[#FAFAF8]">
+            < section className="py-32 bg-[#FAFAF8]" >
                 <div className="container mx-auto px-6 max-w-4xl">
                     <div className="text-center mb-16">
                         <SectionLabel text="FAQ" />
@@ -1011,9 +1084,10 @@ export default function LandingPage() {
                     <div className="space-y-4">
                         {[
                             { q: "Quanto tempo serve per iniziare?", a: "5 minuti. Scegli un template, personalizzalo e condividi il link. L'AI fa il resto." },
-                            { q: "Devo avere competenze tecniche?", a: "No. L'interfaccia è pensata per imprenditori e manager, non per sviluppatori. Tutto è drag-and-drop o prompt-based." },
-                            { q: "I dati sono sicuri?", a: "Assolutamente. Server EU (Germania/Irlanda), GDPR compliant, crittografia end-to-end. I tuoi dati non vengono mai usati per addestrare modelli AI pubblici." },
-                            { q: "Come funzionano i suggerimenti?", a: "La piattaforma analizza feedback, domande dei clienti e reputazione online. Ti propone azioni concrete: aggiungere una FAQ, modificare un testo, rispondere a una recensione. Per le decisioni strategiche, puoi richiedere una consulenza." },
+                            { q: "Devo avere competenze tecniche?", a: "Zero. Business Tuner è fatto per imprenditori, non per tecnici. Se sai usare WhatsApp, sai configurare il tuo primo osservatorio in 5 minuti." },
+                            { q: "I dati sono sicuri?", a: "Sì. Usiamo server in Europa, criptiamo tutto e non usiamo MAI i tuoi dati per addestrare modelli pubblici. La tua proprietà intellettuale resta tua." },
+                            { q: "Cosa succede se supero i limiti?", a: "Nessun blocco improvviso. Ti avvisiamo prima e puoi acquistare pacchetti extra di token o interviste con un click, senza dover per forza passare al piano superiore." },
+                            { q: "Come funzionano i suggerimenti?", a: "L'AI analizza i buchi nelle tue FAQ, le lamentele ricorrenti nelle interviste e cosa dicono i competitor online. Poi ti propone azioni: 'Aggiungi questa risposta', 'Modifica questo prezzo'. Tu clicchi approva e procedi." },
                             { q: "Posso esportare i dati?", a: "Sì. Trascrizioni, insight in CSV o report PDF completi pronti da condividere." },
                         ].map((faq, i) => (
                             <details key={i} className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
@@ -1038,16 +1112,16 @@ export default function LandingPage() {
                         </Link>
                     </div>
                 </div>
-            </section>
+            </section >
 
             {/* 10. FINAL CTA */}
-            <section className="py-20 bg-white">
+            < section className="py-20 bg-white" >
                 <div className="container mx-auto px-6 max-w-5xl">
                     <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[3rem] p-12 lg:p-24 text-center text-white relative overflow-hidden shadow-3xl">
                         <div className="relative z-10">
                             <h2 className="text-4xl lg:text-5xl font-black mb-8 tracking-tight">Pronto ad ascoltare <br />il tuo mercato?</h2>
                             <p className="text-xl text-amber-50 mb-12 max-w-2xl mx-auto">
-                                Inizia gratis oggi. 50 interviste incluse ogni mese.
+                                Inizia gratis con la Trial. 50 interviste e tutte le funzionalità Pro incluse per 14 giorni.
                                 Nessun limite di tempo, nessuna carta richiesta.
                             </p>
                             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -1061,7 +1135,7 @@ export default function LandingPage() {
                         </div>
                     </div>
                 </div>
-            </section>
-        </div>
+            </section >
+        </div >
     );
 }

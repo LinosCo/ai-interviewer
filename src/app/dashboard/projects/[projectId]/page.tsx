@@ -11,7 +11,6 @@ import {
     BarChart3,
     Calendar,
     ArrowRight,
-    Users,
     Zap,
     Search
 } from "lucide-react";
@@ -19,6 +18,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { ProjectUserManagementDialog } from './user-management-dialog';
 
 export default async function ProjectCockpitPage({ params }: { params: Promise<{ projectId: string }> }) {
     const session = await auth();
@@ -69,12 +69,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                     </h1>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link href={`/dashboard/projects/${projectId}/settings`}>
-                        <Button variant="outline" size="sm" className="rounded-xl font-bold bg-white text-slate-700 border-slate-200 hover:border-amber-500 transition-all">
-                            <Users className="w-4 h-4 mr-2" />
-                            Gestisci Accessi
-                        </Button>
-                    </Link>
+                    <ProjectUserManagementDialog projectId={projectId} />
                     <Link href={`/dashboard/projects/${projectId}/analytics`}>
                         <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md font-bold transition-all px-5">
                             <BarChart3 className="w-4 h-4 mr-2" />

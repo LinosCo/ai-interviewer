@@ -14,11 +14,13 @@ interface BotListItemProps {
         botType: string;
         conversations: { id: string; status: string; completedAt: string | null }[];
         updatedAt: string;
+        project?: { id: string; name: string } | null;
     };
     compact?: boolean;
+    showProject?: boolean;
 }
 
-export function BotListItem({ bot, compact = false }: BotListItemProps) {
+export function BotListItem({ bot, compact = false, showProject = false }: BotListItemProps) {
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -61,6 +63,12 @@ export function BotListItem({ bot, compact = false }: BotListItemProps) {
                         <span>{new Date(bot.updatedAt).toLocaleDateString('it-IT')}</span>
                         <span>•</span>
                         <span>{completedCount} risposte</span>
+                        {showProject && bot.project?.name && (
+                            <>
+                                <span>•</span>
+                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{bot.project.name}</span>
+                            </>
+                        )}
                     </div>
                 </div>
             </Link>

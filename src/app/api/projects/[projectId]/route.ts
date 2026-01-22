@@ -109,9 +109,13 @@ export async function DELETE(
 
         const { projectId } = await params;
 
-        // Get project
+        // Get project with its bots and visibility configs
         const project = await prisma.project.findUnique({
-            where: { id: projectId }
+            where: { id: projectId },
+            include: {
+                bots: { select: { id: true } },
+                visibilityConfigs: { select: { id: true } }
+            }
         });
 
         if (!project) {
@@ -128,12 +132,44 @@ export async function DELETE(
             return new Response('Solo il proprietario può eliminare il progetto', { status: 403 });
         }
 
-        // Delete project (cascade will handle accessList)
-        await prisma.project.delete({
-            where: { id: projectId }
+        // Find the owner's personal project to transfer tools
+        const personalProject = await prisma.project.findFirst({
+            where: {
+                ownerId: session.user.id,
+                isPersonal: true
+            }
         });
 
-        return NextResponse.json({ success: true });
+        if (!personalProject) {
+            return new Response('Progetto personale non trovato', { status: 500 });
+        }
+
+        // Transfer all bots and visibility configs to personal project, then delete
+        await prisma.$transaction([
+            // Transfer bots to personal project
+            prisma.bot.updateMany({
+                where: { projectId },
+                data: { projectId: personalProject.id }
+            }),
+            // Unlink visibility configs (they become available for linking to other projects)
+            prisma.visibilityConfig.updateMany({
+                where: { projectId },
+                data: { projectId: null }
+            }),
+            // Delete project access entries
+            prisma.projectAccess.deleteMany({
+                where: { projectId }
+            }),
+            // Delete the project
+            prisma.project.delete({
+                where: { id: projectId }
+            })
+        ]);
+
+        return NextResponse.json({
+            success: true,
+            message: 'Progetto eliminato. I tool sono stati spostati nel tuo progetto personale.'
+        });
 
     } catch (error) {
         console.error('Delete Project Error:', error);

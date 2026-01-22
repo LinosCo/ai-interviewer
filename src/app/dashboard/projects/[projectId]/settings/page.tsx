@@ -3,8 +3,10 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import { ProjectAccessManager } from '../../access-manager';
 import { ProjectBrandManager } from './ProjectBrandManager';
+import { ProjectToolsManager } from './ProjectToolsManager';
+import { ProjectDeleteSection } from './ProjectDeleteSection';
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, LayoutGrid, Settings } from "lucide-react";
+import { ChevronLeft, LayoutGrid } from "lucide-react";
 import Link from 'next/link';
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -58,17 +60,16 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
                 {/* Sharing Manager */}
                 <ProjectAccessManager projectId={projectId} />
 
+                {/* Tools Manager - Associate bots */}
+                <ProjectToolsManager projectId={projectId} projectName={project.name} />
+
                 {/* Brand Manager */}
                 <ProjectBrandManager projectId={projectId} projectName={project.name} />
 
-                {/* Additional Settings could go here (Rename, Delete) */}
-                <div className="p-6 rounded-2xl bg-white border border-slate-200 space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Settings className="w-5 h-5 text-slate-400" />
-                        <h3 className="font-bold text-slate-900">Configurazioni Base</h3>
-                    </div>
-                    <p className="text-sm text-slate-500">In questa sezione potrai rinominare o eliminare definitivamente il progetto (disponibile a breve).</p>
-                </div>
+                {/* Delete Project Section - only for non-personal projects */}
+                {!project.isPersonal && (
+                    <ProjectDeleteSection projectId={projectId} projectName={project.name} />
+                )}
             </div>
         </div>
     );

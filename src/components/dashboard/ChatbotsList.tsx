@@ -20,10 +20,11 @@ interface ChatBot {
     status: string;
     createdAt: string;
     conversations: Conversation[];
+    project?: { id: string; name: string } | null;
 }
 
 export function ChatbotsList() {
-    const { selectedProject } = useProject();
+    const { selectedProject, isAllProjectsSelected } = useProject();
     const { data: bots, loading, error } = useProjectData<ChatBot[]>({
         endpoint: 'bots',
         queryParams: { type: 'chatbot' }
@@ -96,6 +97,9 @@ export function ChatbotsList() {
                                     <h3 className="font-semibold text-gray-900">{bot.name}</h3>
                                     <p className="text-xs text-gray-500">
                                         Creato il {new Date(bot.createdAt).toLocaleDateString('it-IT')}
+                                        {isAllProjectsSelected && bot.project?.name && (
+                                            <span className="ml-2 bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{bot.project.name}</span>
+                                        )}
                                     </p>
                                 </div>
                             </div>

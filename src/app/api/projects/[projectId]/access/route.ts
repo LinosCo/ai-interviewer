@@ -149,6 +149,82 @@ export async function POST(
     }
 }
 
+export async function PATCH(
+    req: Request,
+    { params }: { params: Promise<{ projectId: string }> }
+) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+
+        const { projectId } = await params;
+        const { action, targetUserId } = await req.json();
+
+        if (action !== 'transfer_ownership' || !targetUserId) {
+            return new Response('Invalid request', { status: 400 });
+        }
+
+        // Verify caller is OWNER
+        if (!(await isProjectOwner(session.user.id, projectId))) {
+            return new Response('Solo il proprietario può trasferire la proprietà', { status: 403 });
+        }
+
+        // Get project info
+        const project = await prisma.project.findUnique({
+            where: { id: projectId }
+        });
+
+        if (!project) {
+            return new Response('Project not found', { status: 404 });
+        }
+
+        // Cannot transfer personal projects
+        if (project.isPersonal) {
+            return new Response('Non puoi trasferire un progetto personale', { status: 403 });
+        }
+
+        // Verify target user has access to this project
+        const targetAccess = await prisma.projectAccess.findUnique({
+            where: {
+                userId_projectId: { userId: targetUserId, projectId }
+            }
+        });
+
+        if (!targetAccess) {
+            return new Response('L\'utente selezionato non è membro del progetto', { status: 404 });
+        }
+
+        // Perform ownership transfer in a transaction
+        await prisma.$transaction([
+            // Demote current owner to member
+            prisma.projectAccess.update({
+                where: {
+                    userId_projectId: { userId: session.user.id, projectId }
+                },
+                data: { role: 'MEMBER' }
+            }),
+            // Promote target user to owner
+            prisma.projectAccess.update({
+                where: {
+                    userId_projectId: { userId: targetUserId, projectId }
+                },
+                data: { role: 'OWNER' }
+            }),
+            // Update project owner reference
+            prisma.project.update({
+                where: { id: projectId },
+                data: { ownerId: targetUserId }
+            })
+        ]);
+
+        return NextResponse.json({ success: true, message: 'Proprietà trasferita con successo' });
+
+    } catch (error) {
+        console.error('Transfer Ownership Error:', error);
+        return new Response('Internal Server Error', { status: 500 });
+    }
+}
+
 export async function DELETE(
     req: Request,
     { params }: { params: Promise<{ projectId: string }> }

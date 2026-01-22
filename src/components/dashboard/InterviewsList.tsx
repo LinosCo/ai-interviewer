@@ -19,6 +19,7 @@ interface Interview {
     updatedAt: string;
     botType: string;
     conversations: Conversation[];
+    project?: { id: string; name: string } | null;
 }
 
 export function InterviewsList() {
@@ -161,6 +162,7 @@ export function InterviewsList() {
                                         completedAt: c.completedAt || null
                                     }))
                                 }}
+                                showProject={isAllProjectsSelected}
                             />
                         ))}
                     </div>

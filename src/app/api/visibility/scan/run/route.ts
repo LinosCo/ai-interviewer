@@ -2,8 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { VisibilityEngine } from '@/lib/visibility/visibility-engine';
-import { getOrCreateSubscription } from '@/lib/usage';
-import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
+import { checkResourceAccess } from '@/lib/guards/resourceGuard';
 
 export async function POST(request: Request) {
     try {
@@ -28,13 +27,14 @@ export async function POST(request: Request) {
 
         const organizationId = user.memberships[0].organizationId;
 
-        // Check plan limits (max scans per month)
-        const subscription = await getOrCreateSubscription(organizationId);
-        if (!subscription) {
-            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
+        // Check plan limits via ResourceGuard
+        const access = await checkResourceAccess('VISIBILITY_QUERY');
+        if (!access.allowed) {
+            return NextResponse.json(
+                { error: access.error },
+                { status: access.status }
+            );
         }
-        const planType = subscriptionTierToPlanType(subscription.tier);
-        const plan = PLANS[planType];
 
         const config = await prisma.visibilityConfig.findFirst({
             where: { organizationId },
@@ -43,14 +43,6 @@ export async function POST(request: Request) {
 
         if (!config) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
-        }
-
-        // Check if visibility is available in plan
-        if (plan.limits.visibilityScansPerWeek === 0 && plan.limits.maxManualScansPerDay === 0) {
-            return NextResponse.json(
-                { error: 'Visibility scans not available in your plan' },
-                { status: 403 }
-            );
         }
 
         // Check 24h cooldown - find last scan for this config
@@ -74,35 +66,9 @@ export async function POST(request: Request) {
             }
         }
 
-        // Check daily manual scan limit
+        // Create today date range
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
-        // Get all config IDs for this organization
-        const orgConfigs = await prisma.visibilityConfig.findMany({
-            where: { organizationId },
-            select: { id: true }
-        });
-        const configIds = orgConfigs.map(c => c.id);
-
-        const todayScans = await prisma.visibilityScan.count({
-            where: {
-                configId: { in: configIds },
-                startedAt: { gte: today },
-                scanType: 'manual'
-            }
-        });
-
-        if (todayScans >= plan.limits.maxManualScansPerDay) {
-            return NextResponse.json(
-                {
-                    error: `Limite giornaliero raggiunto (${plan.limits.maxManualScansPerDay} scan/giorno). Riprova domani.`,
-                    dailyLimit: plan.limits.maxManualScansPerDay,
-                    scansUsedToday: todayScans
-                },
-                { status: 429 }
-            );
-        }
 
         // Run the scan
         const result = await VisibilityEngine.runScan(config.id);

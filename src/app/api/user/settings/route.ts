@@ -25,7 +25,14 @@ export async function GET(req: NextRequest) {
                     include: {
                         organization: {
                             include: {
-                                subscription: true,
+                                subscription: {
+                                    select: {
+                                        id: true,
+                                        status: true,
+                                        tier: true,
+                                        currentPeriodEnd: true
+                                    }
+                                },
                                 projects: {
                                     include: {
                                         bots: {

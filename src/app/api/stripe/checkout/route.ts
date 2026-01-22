@@ -1,317 +1,131 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { getStripeClient, getPricingPlans, PlanKey } from '@/lib/stripe';
-import { getOrCreateSubscription } from '@/lib/usage';
-import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import { PLANS, PlanType } from '@/config/plans';
 
-export async function GET(req: NextRequest) {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: '2023-10-16'
+});
+
+export async function POST(req: NextRequest) {
     try {
-        const searchParams = req.nextUrl.searchParams;
-        const tier = searchParams.get('tier');
-        const billing = searchParams.get('billing'); // 'monthly' or 'yearly'
-        const successUrl = searchParams.get('successUrl');
-        const cancelUrl = searchParams.get('cancelUrl');
-
         const session = await auth();
-
         if (!session?.user?.email) {
-            return new NextResponse('Unauthorized', { status: 401 });
+            return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
         }
 
-        // Validate tier
-        const normalizedTier = tier?.toUpperCase();
-        if (!normalizedTier || !['STARTER', 'PRO'].includes(normalizedTier)) {
-            return new NextResponse('Invalid tier', { status: 400 });
-        }
-        const tierKey = normalizedTier as PlanKey;
+        const { tier, billingPeriod = 'monthly' } = await req.json();
 
-        const stripe = await getStripeClient();
-        const plans = await getPricingPlans();
-        const plan = plans[tierKey];
-
-        const priceId = billing === 'yearly' ? plan.priceIdYearly : plan.priceId;
-
-        if (!plan || !priceId) {
-            return new NextResponse('Price not configured or invalid plan', { status: 500 });
+        // Valida tier
+        const plan = PLANS[tier as PlanType];
+        if (!plan || plan.monthlyPrice === 0) {
+            return NextResponse.json({ error: 'Piano non valido' }, { status: 400 });
         }
 
-        // Get user and organization
+        // Ottieni subscription esistente
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
             include: {
                 memberships: {
-                    include: { organization: true },
+                    include: {
+                        organization: {
+                            include: {
+                                subscription: {
+                                    select: {
+                                        id: true,
+                                        status: true,
+                                        stripeCustomerId: true
+                                    }
+                                }
+                            }
+                        }
+                    },
                     take: 1
                 }
             }
         });
 
-        if (!user) {
-            return new Response('User not found', { status: 404 });
+        const subscription = user?.memberships[0]?.organization?.subscription;
+        const organizationId = user?.memberships[0]?.organizationId;
+
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organizzazione non trovata' }, { status: 404 });
         }
 
-        // Get or create organization
-        let organization = user.memberships[0]?.organization;
-        if (!organization) {
-            // Create personal organization for the user
-            organization = await prisma.organization.create({
-                data: {
-                    name: `${user.name || user.email}'s Workspace`,
-                    slug: `org-${user.id.slice(0, 8)}`,
-                    members: {
-                        create: {
-                            userId: user.id,
-                            role: 'OWNER'
-                        }
-                    }
-                }
-            });
+        // Determina price ID
+        const priceId = billingPeriod === 'yearly'
+            ? plan.stripePriceIdYearly
+            : plan.stripePriceIdMonthly;
+
+        if (!priceId) {
+            return NextResponse.json({ error: 'Prezzo non configurato' }, { status: 500 });
         }
 
-        // Get or create subscription
-        const subscription = await getOrCreateSubscription(organization.id);
-        if (!subscription) {
-            return new Response('Failed to get subscription', { status: 500 });
-        }
-
-        // Create or get Stripe customer
+        // Crea o recupera Stripe customer
         let customerId = subscription?.stripeCustomerId;
 
         if (!customerId) {
             const customer = await stripe.customers.create({
-                email: user.email,
-                name: organization.name,
-                address: {
-                    country: 'IT',
-                },
+                email: session.user.email,
+                name: user?.name || undefined,
                 metadata: {
-                    organizationId: organization.id,
-                    userId: user.id
+                    organizationId,
+                    userId: user?.id || ''
                 }
             });
             customerId = customer.id;
 
-            // Save customer ID
-            await prisma.subscription.update({
-                where: { id: subscription.id },
-                data: { stripeCustomerId: customerId }
-            });
+            // Salva customer ID
+            if (subscription) {
+                await prisma.subscription.update({
+                    where: { id: subscription.id },
+                    data: { stripeCustomerId: customerId }
+                });
+            }
         }
 
-        // Create checkout session
+        // Crea checkout session
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: customerId,
             mode: 'subscription',
             payment_method_types: ['card'],
-            line_items: [
-                {
-                    price: priceId!,
-                    quantity: 1
-                }
-            ],
-            success_url: successUrl || `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/dashboard?upgrade=success`,
-            cancel_url: cancelUrl || `https://${process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || 'localhost:3000'}/pricing?upgrade=canceled`,
-            metadata: {
-                organizationId: organization.id,
-                tier
-            },
+            line_items: [{
+                price: priceId,
+                quantity: 1
+            }],
             subscription_data: {
-                trial_period_days: 14,
+                trial_period_days: subscription?.status === 'TRIALING' ? undefined : 14,
                 metadata: {
-                    organizationId: organization.id,
+                    organizationId,
                     tier
                 }
             },
+            success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true`,
+            cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?canceled=true`,
             allow_promotion_codes: true,
             billing_address_collection: 'required',
-            tax_id_collection: { enabled: true },
             customer_update: {
                 address: 'auto',
-                name: 'auto',
+                name: 'auto'
             },
-            automatic_tax: { enabled: true },
-            custom_fields: [
-                {
-                    key: 'sdi_code',
-                    label: {
-                        type: 'custom',
-                        custom: 'Codice SDI (Facoltativo)',
-                    },
-                    type: 'text',
-                    optional: true,
-                },
-                {
-                    key: 'pec_email',
-                    label: {
-                        type: 'custom',
-                        custom: 'Email PEC (Facoltativa)',
-                    },
-                    type: 'text',
-                    optional: true,
-                },
-            ],
-        });
-
-        // Redirect for GET requests
-        if (checkoutSession.url) {
-            return NextResponse.redirect(checkoutSession.url);
-        } else {
-            return new NextResponse('Failed to create Stripe session URL', { status: 500 });
-        }
-
-    } catch (error: any) {
-        console.error('Checkout GET Error:', error);
-        return new Response(error.message || 'Checkout failed', { status: 500 });
-    }
-}
-
-export async function POST(req: Request) { // Changed NextRequest to Request
-    try {
-        const { tier, billing, successUrl, cancelUrl } = await req.json();
-        const session = await auth();
-
-        if (!session?.user?.email) {
-            return new NextResponse('Unauthorized', { status: 401 });
-        }
-
-        // Validate tier
-        const normalizedTier = tier?.toUpperCase();
-        if (!normalizedTier || !['STARTER', 'PRO'].includes(normalizedTier)) {
-            return new NextResponse('Invalid tier', { status: 400 });
-        }
-        const tierKey = normalizedTier as PlanKey;
-
-        const stripe = await getStripeClient();
-        const plans = await getPricingPlans();
-        const plan = plans[tierKey];
-
-        const priceId = billing === 'yearly' ? plan.priceIdYearly : plan.priceId;
-
-        if (!plan || !priceId) {
-            return new NextResponse('Price not configured or invalid plan', { status: 500 });
-        }
-
-        // Get user and organization
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
-                memberships: {
-                    include: { organization: true },
-                    take: 1
-                }
+            tax_id_collection: {
+                enabled: true
+            },
+            metadata: {
+                organizationId,
+                tier,
+                billingPeriod
             }
         });
 
-        if (!user) {
-            return new Response('User not found', { status: 404 });
-        }
+        return NextResponse.json({ url: checkoutSession.url });
 
-        // Get or create organization
-        let organization = user.memberships[0]?.organization;
-        if (!organization) {
-            // Create personal organization for the user
-            organization = await prisma.organization.create({
-                data: {
-                    name: `${user.name || user.email}'s Workspace`,
-                    slug: `org-${user.id.slice(0, 8)}`,
-                    members: {
-                        create: {
-                            userId: user.id,
-                            role: 'OWNER'
-                        }
-                    }
-                }
-            });
-        }
-
-        // Get or create subscription
-        const subscription = await getOrCreateSubscription(organization.id);
-        if (!subscription) {
-            return new Response('Failed to get subscription', { status: 500 });
-        }
-
-        // Create or get Stripe customer
-        let customerId = subscription?.stripeCustomerId;
-
-        if (!customerId) {
-            const customer = await stripe.customers.create({
-                email: user.email,
-                name: organization.name,
-                address: {
-                    country: 'IT',
-                },
-                metadata: {
-                    organizationId: organization.id,
-                    userId: user.id
-                }
-            });
-            customerId = customer.id;
-
-            // Save customer ID
-            await prisma.subscription.update({
-                where: { id: subscription.id },
-                data: { stripeCustomerId: customerId }
-            });
-        }
-
-        // Create checkout session
-        const checkoutSession = await stripe.checkout.sessions.create({
-            customer: customerId,
-            mode: 'subscription',
-            payment_method_types: ['card'],
-            line_items: [
-                {
-                    price: priceId!,
-                    quantity: 1
-                }
-            ],
-            success_url: successUrl || `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?upgrade=success`,
-            cancel_url: cancelUrl || `${process.env.NEXT_PUBLIC_APP_URL}/pricing?upgrade=canceled`,
-            metadata: {
-                organizationId: organization.id,
-                tier
-            },
-            subscription_data: {
-                trial_period_days: 14,
-                metadata: {
-                    organizationId: organization.id,
-                    tier
-                }
-            },
-            allow_promotion_codes: true,
-            billing_address_collection: 'required',
-            tax_id_collection: { enabled: true },
-            customer_update: {
-                address: 'auto',
-                name: 'auto',
-            },
-            automatic_tax: { enabled: true },
-            custom_fields: [
-                {
-                    key: 'sdi_code',
-                    label: {
-                        type: 'custom',
-                        custom: 'Codice SDI (Facoltativo)',
-                    },
-                    type: 'text',
-                    optional: true,
-                },
-                {
-                    key: 'pec_email',
-                    label: {
-                        type: 'custom',
-                        custom: 'Email PEC (Facoltativa)',
-                    },
-                    type: 'text',
-                    optional: true,
-                },
-            ],
-        });
-
-        return Response.json({ url: checkoutSession.url });
-
-    } catch (error: any) {
-        console.error('Checkout Error:', error);
-        return new Response(error.message || 'Checkout failed', { status: 500 });
+    } catch (error) {
+        console.error('Checkout error:', error);
+        return NextResponse.json(
+            { error: 'Errore durante il checkout' },
+            { status: 500 }
+        );
     }
 }

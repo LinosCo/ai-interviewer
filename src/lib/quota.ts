@@ -1,137 +1,92 @@
 import { prisma } from "@/lib/prisma";
 import { PlanType } from "@prisma/client";
+import { PLANS, isUnlimited } from "@/config/plans";
 
-export const TIER_LIMITS = {
-    [PlanType.TRIAL]: { // Mapping TRIAL to FREE
-        interviews: 50,
-        chatbot: 0,
-        visibility: 0,
-        suggestions: 0,
-        maxActiveBots: 1, // Added from docs
-        maxUsers: 1 // Added from docs
-    },
-    [PlanType.STARTER]: {
-        interviews: 300,
-        chatbot: 2000,
-        visibility: 0,
-        suggestions: 0,
-        maxActiveBots: 1,
-        maxUsers: 2
-    },
-    [PlanType.PRO]: {
-        interviews: 1000,
-        chatbot: 10000,
-        visibility: 240,
-        suggestions: 50,
-        maxActiveBots: 3,
-        maxUsers: 5
-    },
-    [PlanType.BUSINESS]: {
-        interviews: 3000,
-        chatbot: 30000,
-        visibility: 6000,
-        suggestions: Infinity,
-        maxActiveBots: 10,
-        maxUsers: 15
-    }
-};
-
-type ResourceType = 'interviews' | 'chatbot' | 'visibility' | 'suggestions';
-
-/**
- * Checks if an organization has enough quota for a specific resource.
- */
 export async function checkQuota(
     orgId: string,
-    resource: ResourceType
+    resource: 'interviews' | 'chatbot' | 'visibility' | 'suggestions'
 ): Promise<{ allowed: boolean; remaining: number; limit: number; used: number }> {
 
-    const org = await prisma.organization.findUnique({
-        where: { id: orgId },
-        select: {
-            plan: true,
-            responsesUsedThisMonth: true, // Interviews
-            // visibilityQueriesThisMonth: true, // Need to verify if this field exists or needs adding
-            // chatbotConvsThisMonth: true,     // Need to verify
-            // aiSuggestionsThisMonth: true     // Need to verify
-        }
+    const sub = await prisma.subscription.findUnique({
+        where: { organizationId: orgId }
     });
 
-    if (!org) throw new Error("Organization not found");
+    if (!sub) throw new Error("Subscription not found");
 
-    const limits = TIER_LIMITS[org.plan];
-
-    // Determine usage based on resource
-    // Note: schema.prisma showed `responsesUsedThisMonth` for interviews.
-    // Other fields (`chatbotConvsThisMonth`, etc.) were NOT in the schema read I did earlier.
-    // I need to fetch them or assume they are managed via `UsageLog` aggregation in real-time or added columns.
-    // The docs proposed adding them to schema. I only added Sprint 2/3 tables.
-    // I should rely on UsageLog or add the columns. 
-    // For now, I will assume we might need to query UsageLogs if columns don't exist, 
-    // OR simpler: just return the limit for now and TODO the usage tracking if columns missing.
-
-    // Let's implement correct usage counting assuming we will add the columns or query logs.
-    // Efficient way: use the columns if present.
-    // My schema update step DID NOT add `interviewsThisMonth` etc to Organization.
-    // It only added `responsesUsedThisMonth` (existing).
-
-    // I will assume `responsesUsedThisMonth` == interviews.
-    // For others, I'll default to 0 for now to unblock, but add a TODO.
+    const plan = PLANS[sub.tier as PlanType] || PLANS[PlanType.FREE];
 
     let used = 0;
-    if (resource === 'interviews') {
-        used = org.responsesUsedThisMonth;
-    }
-    // TODO: implement usage tracking for other resources
+    let limit = 0;
+    let extra = 0;
 
-    const limit = limits[resource];
-    // Handle Infinity
-    const remaining = limit === Infinity ? Infinity : Math.max(0, limit - used);
-    const allowed = limit === Infinity ? true : used < limit;
+    switch (resource) {
+        case 'interviews':
+            used = sub.interviewsUsedThisMonth;
+            limit = plan.limits.maxInterviewsPerMonth;
+            extra = sub.extraInterviews || 0;
+            break;
+        case 'chatbot':
+            used = sub.chatbotSessionsUsedThisMonth;
+            limit = plan.limits.maxChatbotSessionsPerMonth;
+            extra = sub.extraChatbotSessions || 0;
+            break;
+        case 'visibility':
+            used = sub.visibilityQueriesUsedThisMonth;
+            limit = plan.limits.maxVisibilityQueriesPerMonth;
+            extra = sub.extraVisibilityQueries || 0;
+            break;
+        case 'suggestions':
+            used = sub.aiSuggestionsUsedThisMonth;
+            limit = plan.limits.maxAiSuggestionsPerMonth;
+            extra = sub.extraAiSuggestions || 0;
+            break;
+    }
+
+    const totalLimit = isUnlimited(limit) ? -1 : limit + extra;
+    const remaining = isUnlimited(totalLimit) ? Infinity : Math.max(0, totalLimit - used);
+    const allowed = isUnlimited(totalLimit) ? true : used < totalLimit;
 
     return {
         allowed,
         remaining,
-        limit,
+        limit: isUnlimited(totalLimit) ? -1 : totalLimit,
         used
     };
 }
 
-/**
- * Helper to check limits that are not accumulated monthly but static (e.g. max users)
- */
 export async function checkStaticLimit(
     orgId: string,
     limitType: 'maxActiveBots' | 'maxUsers'
 ): Promise<{ allowed: boolean; limit: number; current: number }> {
-    const org = await prisma.organization.findUnique({
-        where: { id: orgId },
-        include: {
-            members: true,
-            projects: {
-                include: {
-                    bots: {
-                        where: { status: 'PUBLISHED' }
-                    }
-                }
-            }
-        }
+    const sub = await prisma.subscription.findUnique({
+        where: { organizationId: orgId }
     });
 
-    if (!org) throw new Error("Organization not found");
+    if (!sub) throw new Error("Subscription not found");
 
-    const limit = TIER_LIMITS[org.plan][limitType];
+    const plan = PLANS[sub.tier as PlanType] || PLANS[PlanType.FREE];
 
+    let limit = 0;
     let current = 0;
+
     if (limitType === 'maxUsers') {
-        current = org.members.length;
+        limit = plan.limits.maxUsers;
+        current = await prisma.membership.count({ where: { organizationId: orgId } });
     } else if (limitType === 'maxActiveBots') {
-        current = org.projects.reduce((sum, project) => sum + project.bots.length, 0);
+        limit = plan.limits.maxChatbots;
+        current = await prisma.bot.count({
+            where: {
+                project: { organizationId: orgId },
+                status: 'PUBLISHED'
+            }
+        });
     }
 
+    const totalLimit = isUnlimited(limit) ? -1 : limit;
+
     return {
-        allowed: current < limit,
-        limit,
+        allowed: isUnlimited(totalLimit) ? true : current < totalLimit,
+        limit: totalLimit,
         current
     };
 }

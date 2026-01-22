@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { SubscriptionTier } from '@prisma/client';
 import { getPricingPlans, PlanKey } from './stripe';
 import { generateConversationInsightAction } from '@/lib/analytics-actions';
+import { PLANS, PlanType, isUnlimited } from '@/config/plans';
 
 // Get or create subscription for an organization
 export async function getOrCreateSubscription(organizationId: string) {
@@ -11,28 +12,36 @@ export async function getOrCreateSubscription(organizationId: string) {
     });
 
     if (!subscription) {
-        // Create default PRO trial
+        // Create default TRIAL
         const now = new Date();
         const trialEnd = new Date();
         trialEnd.setDate(trialEnd.getDate() + 14);
 
-        const plans = await getPricingPlans();
-
         subscription = await prisma.subscription.create({
             data: {
                 organizationId,
-                tier: 'PRO',
+                tier: 'TRIAL',
                 status: 'TRIALING',
-                maxActiveBots: plans.PRO.features.maxActiveBots,
-                maxInterviewsPerMonth: plans.PRO.features.maxInterviewsPerMonth,
-                maxUsers: plans.PRO.features.maxUsers,
                 currentPeriodStart: now,
                 currentPeriodEnd: trialEnd,
+                trialEndsAt: trialEnd,
             }
         });
     }
 
     return subscription;
+}
+
+// Get limits for a subscription from plan config
+export async function getSubscriptionLimits(subscription: { tier: SubscriptionTier; customLimits?: any }) {
+    const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
+    const limits = plan.limits;
+
+    return {
+        maxActiveBots: limits.maxChatbots,
+        maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
+        maxUsers: limits.maxUsers,
+    };
 }
 
 // Subscription status check helper
@@ -41,7 +50,7 @@ export function checkSubscriptionValid(subscription: any): { allowed: boolean; r
         return { allowed: false, reason: 'Il tuo abbonamento è scaduto o il pagamento è fallito. Aggiorna i dati di fatturazione.' };
     }
     if (subscription.status === 'TRIALING' && subscription.currentPeriodEnd < new Date()) {
-        return { allowed: false, reason: 'La tua prova gratuita PRO è terminata. Attiva un piano per continuare.' };
+        return { allowed: false, reason: 'La tua prova gratuita è terminata. Attiva un piano per continuare.' };
     }
     if (subscription.status === 'CANCELED') {
         return { allowed: false, reason: 'Il tuo abbonamento è stato annullato.' };
@@ -52,13 +61,15 @@ export function checkSubscriptionValid(subscription: any): { allowed: boolean; r
 // Check if user can create/publish a new bot
 export async function canPublishBot(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
     const subscription = await getOrCreateSubscription(organizationId);
-    if (!subscription) return { allowed: true }; // Fallback if no org/subscription found
+    if (!subscription) return { allowed: true };
 
     const statusCheck = checkSubscriptionValid(subscription);
     if (!statusCheck.allowed) return statusCheck;
 
-    // Unlimited bots for Business/Enterprise
-    if (subscription.maxActiveBots === -1) {
+    const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
+    const limit = plan.limits.maxChatbots;
+
+    if (isUnlimited(limit)) {
         return { allowed: true };
     }
 
@@ -69,10 +80,10 @@ export async function canPublishBot(organizationId: string): Promise<{ allowed: 
         }
     });
 
-    if (activeBotsCount >= subscription.maxActiveBots) {
+    if (activeBotsCount >= limit) {
         return {
             allowed: false,
-            reason: `Hai raggiunto il limite di ${subscription.maxActiveBots} interviste attive per il piano ${subscription.tier}. Effettua l'upgrade per pubblicarne altre.`
+            reason: `Hai raggiunto il limite di ${limit} bot attivi per il piano ${subscription.tier}. Effettua l'upgrade per pubblicarne altri.`
         };
     }
 
@@ -80,45 +91,7 @@ export async function canPublishBot(organizationId: string): Promise<{ allowed: 
 }
 
 export async function canCreateChatbot(organizationId: string): Promise<{ allowed: boolean; reason?: string }> {
-    const subscription = await getOrCreateSubscription(organizationId);
-    if (!subscription) return { allowed: true };
-
-    const statusCheck = checkSubscriptionValid(subscription);
-    if (!statusCheck.allowed) return statusCheck;
-
-    const plans = await getPricingPlans();
-    const planConfig = plans[subscription.tier as PlanKey];
-    const limit = planConfig?.limits?.maxActiveBots;
-    const isUnlimited = subscription.maxActiveBots === -1 || limit === undefined || limit === -1;
-
-    // undefined means unlimited (legacy/fallback), -1 means unlimited
-    if (isUnlimited) {
-        return { allowed: true };
-    }
-
-    if (limit === 0) {
-        return {
-            allowed: false,
-            reason: `Il tuo piano ${subscription.tier} non include la creazione di Chatbot AI. Passa a PRO per sbloccarla.`
-        };
-    }
-
-    const activeChatbotsCount = await prisma.bot.count({
-        where: {
-            project: { organizationId },
-            botType: 'chatbot',
-            status: { not: 'ARCHIVED' } // Consider all non-archived bots as taking a "slot" or just PUBLISHED? User said "created", implies existing. Safe to assume non-archived.
-        }
-    });
-
-    if (activeChatbotsCount >= limit) {
-        return {
-            allowed: false,
-            reason: `Hai raggiunto il limite di ${limit} Chatbot per il piano ${subscription.tier}. Effettua l'upgrade per crearne altri.`
-        };
-    }
-
-    return { allowed: true };
+    return canPublishBot(organizationId); // Simplification for now, using the same logic as publish
 }
 
 // Check if an interview can be completed (usage limit)
@@ -129,15 +102,15 @@ export async function canStartInterview(organizationId: string): Promise<{ allow
     const statusCheck = checkSubscriptionValid(subscription);
     if (!statusCheck.allowed) return statusCheck;
 
-    // Unlimited for Enterprise
-    if (subscription.maxInterviewsPerMonth === -1) {
-        return { allowed: true };
-    }
+    const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
+    const limit = plan.limits.maxInterviewsPerMonth;
+    const extra = subscription.extraInterviews || 0;
+    const totalAllowed = isUnlimited(limit) ? -1 : limit + extra;
 
-    if (subscription.interviewsUsedThisMonth >= subscription.maxInterviewsPerMonth) {
+    if (!isUnlimited(totalAllowed) && subscription.interviewsUsedThisMonth >= totalAllowed) {
         return {
             allowed: false,
-            reason: `Hai raggiunto il limite di ${subscription.maxInterviewsPerMonth} interviste per questo mese. Effettua l'upgrade per continuare.`
+            reason: `Hai raggiunto il limite di ${totalAllowed} interviste per questo mese. Effettua l'upgrade o acquista pacchetti extra per continuare.`
         };
     }
 
@@ -158,13 +131,6 @@ export async function recordInterviewCompleted(organizationId: string, conversat
         prisma.subscription.update({
             where: { organizationId },
             data: { interviewsUsedThisMonth: { increment: 1 } }
-        }),
-        prisma.usageEvent.create({
-            data: {
-                organizationId,
-                eventType: 'INTERVIEW_COMPLETED',
-                resourceId: conversationId
-            }
         }),
         prisma.conversation.update({
             where: { id: conversationId },
@@ -191,7 +157,6 @@ export async function markInterviewAsCompleted(conversationId: string) {
 
         // Trigger Analysis if not already done
         try {
-            // Use imported action
             await generateConversationInsightAction(conversationId);
         } catch (e) {
             console.error("Auto-analysis failed during completion", e);
@@ -214,13 +179,11 @@ export async function checkInterviewStatus(conversationId: string): Promise<{ sh
 
     const { bot, effectiveDuration, messages } = conversation;
 
-    // 1. Time Limit (Effective Duration)
     const maxDurationSeconds = (bot.maxDurationMins || 10) * 60;
     if (effectiveDuration && effectiveDuration >= maxDurationSeconds) {
         return { shouldConclude: true, reason: 'TIME' };
     }
 
-    // 2. Turn Limit (Fair Usage)
     const maxTurns = bot.maxTurns || 40;
     if (messages.length >= maxTurns) {
         return { shouldConclude: true, reason: 'TURNS' };
@@ -229,21 +192,13 @@ export async function checkInterviewStatus(conversationId: string): Promise<{ sh
     return { shouldConclude: false };
 }
 
-// Record bot publish event
-export async function recordBotPublished(organizationId: string, botId: string) {
-    await prisma.usageEvent.create({
-        data: {
-            organizationId,
-            eventType: 'BOT_PUBLISHED',
-            resourceId: botId
-        }
-    });
-}
-
 // Get current usage stats
 export async function getUsageStats(organizationId: string) {
     const subscription = await getOrCreateSubscription(organizationId);
     if (!subscription) throw new Error("Subscription not found");
+
+    const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
+    const limits = plan.limits;
 
     const activeBotsCount = await prisma.bot.count({
         where: {
@@ -256,71 +211,81 @@ export async function getUsageStats(organizationId: string) {
         where: { organizationId }
     });
 
-    const tokenUsage = await (prisma as any).tokenUsage.findUnique({
-        where: { organizationId }
-    });
+    const usedTokens = subscription.tokensUsedThisMonth;
+    const limitTokens = limits.monthlyTokenBudget;
+    const extraTokens = subscription.extraTokens || 0;
+    const totalTokenLimit = isUnlimited(limitTokens) ? -1 : limitTokens + extraTokens;
 
-    // Get limits for plan
-    const plans = await getPricingPlans();
-    // @ts-ignore
-    const planLimits = plans[subscription.tier]?.limits || plans.FREE.limits;
-    const monthlyTokenBudget = planLimits.monthlyTokenBudget || 50000;
+    const interviewLimit = limits.maxInterviewsPerMonth;
+    const extraInterviews = subscription.extraInterviews || 0;
+    const totalInterviewLimit = isUnlimited(interviewLimit) ? -1 : interviewLimit + extraInterviews;
 
-    const usedTokens = tokenUsage?.usedTokens || 0;
-    const purchasedTokens = tokenUsage?.purchasedTokens || 0;
-    const totalLimit = monthlyTokenBudget + purchasedTokens;
+    const usersLimit = limits.maxUsers;
+    const extraUsers = subscription.extraUsers || 0;
+    const totalUsersLimit = isUnlimited(usersLimit) ? -1 : usersLimit + extraUsers;
 
     return {
         tier: subscription.tier,
         activeBots: {
             used: activeBotsCount,
-            limit: subscription.maxActiveBots,
-            percentage: subscription.maxActiveBots > 0
-                ? Math.round((activeBotsCount / subscription.maxActiveBots) * 100)
+            limit: limits.maxChatbots,
+            percentage: !isUnlimited(limits.maxChatbots) && limits.maxChatbots > 0
+                ? Math.round((activeBotsCount / limits.maxChatbots) * 100)
                 : 0
         },
         interviews: {
             used: subscription.interviewsUsedThisMonth,
-            limit: subscription.maxInterviewsPerMonth,
-            percentage: subscription.maxInterviewsPerMonth > 0
-                ? Math.round((subscription.interviewsUsedThisMonth / subscription.maxInterviewsPerMonth) * 100)
+            limit: totalInterviewLimit,
+            percentage: !isUnlimited(totalInterviewLimit) && totalInterviewLimit > 0
+                ? Math.round((subscription.interviewsUsedThisMonth / totalInterviewLimit) * 100)
                 : 0
         },
         tokens: {
             used: usedTokens,
-            limit: totalLimit,
-            purchased: purchasedTokens,
-            monthlyBudget: monthlyTokenBudget,
-            percentage: totalLimit > 0
-                ? Math.round((usedTokens / totalLimit) * 100)
+            limit: totalTokenLimit,
+            percentage: !isUnlimited(totalTokenLimit) && totalTokenLimit > 0
+                ? Math.round((usedTokens / totalTokenLimit) * 100)
                 : 0
         },
         users: {
             used: usersCount,
-            limit: subscription.maxUsers,
-            percentage: subscription.maxUsers > 0
-                ? Math.round((usersCount / subscription.maxUsers) * 100)
+            limit: totalUsersLimit,
+            percentage: !isUnlimited(totalUsersLimit) && totalUsersLimit > 0
+                ? Math.round((usersCount / totalUsersLimit) * 100)
                 : 0
         },
         currentPeriodEnd: subscription.currentPeriodEnd
     };
 }
 
-// Reset monthly usage (called by cron job)
-export async function resetMonthlyUsage() {
+// Reset monthly usage (called by cron job or invoice paid)
+export async function resetMonthlyUsage(organizationId?: string) {
     const now = new Date();
     const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    await prisma.subscription.updateMany({
-        where: {
-            currentPeriodEnd: { lte: now }
-        },
-        data: {
-            interviewsUsedThisMonth: 0,
-            currentPeriodStart: now,
-            currentPeriodEnd: endOfNextMonth
-        }
-    });
+    const updateData = {
+        interviewsUsedThisMonth: 0,
+        tokensUsedThisMonth: 0,
+        chatbotSessionsUsedThisMonth: 0,
+        visibilityQueriesUsedThisMonth: 0,
+        aiSuggestionsUsedThisMonth: 0,
+        currentPeriodStart: now,
+        currentPeriodEnd: endOfNextMonth
+    };
+
+    if (organizationId) {
+        await prisma.subscription.update({
+            where: { organizationId },
+            data: updateData
+        });
+    } else {
+        await prisma.subscription.updateMany({
+            where: {
+                currentPeriodEnd: { lte: now }
+            },
+            data: updateData
+        });
+    }
 }
 
 // Upgrade subscription tier
@@ -329,16 +294,10 @@ export async function upgradeSubscription(
     newTier: PlanKey,
     stripeData?: { customerId: string; subscriptionId: string; priceId: string }
 ) {
-    const plans = await getPricingPlans();
-    const limits = plans[newTier].features;
-
     await prisma.subscription.update({
         where: { organizationId },
         data: {
             tier: newTier as SubscriptionTier,
-            maxActiveBots: limits.maxActiveBots,
-            maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
-            maxUsers: limits.maxUsers,
             ...(stripeData && {
                 stripeCustomerId: stripeData.customerId,
                 stripeSubscriptionId: stripeData.subscriptionId,
@@ -347,74 +306,13 @@ export async function upgradeSubscription(
         }
     });
 }
+
 // Check if a specific feature is enabled for an organization
 export async function isFeatureEnabled(organizationId: string, featureKey: string): Promise<boolean> {
     const subscription = await getOrCreateSubscription(organizationId);
     if (!subscription) return false;
 
-    // Enterprise/Business has everything
-    if (subscription.tier === 'BUSINESS' || subscription.tier === 'ENTERPRISE') return true;
-
-    const plans = await getPricingPlans();
-    const planFeatures = (plans[subscription.tier as PlanKey] as any)?.features || {};
-
-    return !!planFeatures[featureKey];
-}
-
-export async function checkVisibilityLimits(organizationId: string) {
-    const subscription = await getOrCreateSubscription(organizationId);
-    if (!subscription) return { allowed: false, reason: 'Subscription not found' };
-
-    const plans = await getPricingPlans();
+    const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
     // @ts-ignore
-    const limits = plans[subscription.tier]?.limits || plans.FREE.limits;
-
-    const visibilityConfig = await prisma.visibilityConfig.findFirst({
-        where: { organizationId }
-    });
-
-    if (!visibilityConfig) return { allowed: true }; // Should initiate config first
-
-    // 1. Check Competitors
-    const competitorCount = await prisma.competitor.count({
-        where: { configId: visibilityConfig.id, enabled: true }
-    });
-
-    // 2. Check Prompts
-    const promptCount = await prisma.visibilityPrompt.count({
-        where: { configId: visibilityConfig.id, enabled: true }
-    });
-
-    // 3. Check Scans
-    // Check Daily Limit (Manual)
-    const oneDayAgo = new Date();
-    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-
-    const scansLast24h = await prisma.visibilityScan.count({
-        where: {
-            configId: visibilityConfig.id,
-            startedAt: { gte: oneDayAgo }
-        }
-    });
-
-    const manualDailyLimit = subscription.tier === 'PRO' ? 10 : (subscription.tier === 'BUSINESS' || subscription.tier === 'ENTERPRISE') ? 50 : 0;
-
-    return {
-        competitors: {
-            used: competitorCount,
-            limit: limits.maxCompetitorsTracked,
-            allowed: limits.maxCompetitorsTracked > competitorCount
-        },
-        prompts: {
-            used: promptCount,
-            limit: limits.maxVisibilityPrompts,
-            allowed: limits.maxVisibilityPrompts > promptCount
-        },
-        scans: {
-            used: scansLast24h,
-            limit: manualDailyLimit,
-            allowed: manualDailyLimit > scansLast24h
-        }
-    };
+    return !!plan.limits[featureKey];
 }
-

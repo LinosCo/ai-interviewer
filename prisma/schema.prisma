@@ -143,6 +143,7 @@ model Organization {
   members                Membership[]
   projects               Project[]
   subscription           Subscription?
+  tokenLogs              TokenLog[]
   tokenUsage             TokenUsage?
   usageLogs              UsageLog[]
   visibilityConfigs      VisibilityConfig[]
@@ -155,47 +156,76 @@ model Organization {
 }
 
 model Subscription {
-  id                      String             @id @default(cuid())
-  organizationId          String             @unique
-  tier                    SubscriptionTier   @default(FREE)
-  status                  SubscriptionStatus @default(ACTIVE)
-  isPartner               Boolean            @default(false)  // Flag partner lifetime
-  stripeCustomerId        String?
-  stripeSubscriptionId    String?
-  stripePriceId           String?
-  maxActiveBots           Int                @default(1)
-  maxInterviewsPerMonth   Int                @default(30)
-  maxUsers                Int                @default(1)
-  currentPeriodStart      DateTime           @default(now())
-  currentPeriodEnd        DateTime
-  trialEndsAt             DateTime?          // Fine periodo trial
-  interviewsUsedThisMonth Int                @default(0)
-
-  // Contatori uso mensile aggiuntivi
-  chatbotSessionsUsedThisMonth  Int          @default(0)
-  visibilityQueriesUsedThisMonth Int         @default(0)
-  aiSuggestionsUsedThisMonth    Int          @default(0)
-  tokensUsedThisMonth           Int          @default(0)
-  purchasedTokens               Int          @default(0)  // Token extra acquistati
-
-  // Risorse extra acquistate (non-token)
-  extraInterviews        Int                 @default(0)
-  extraChatbotSessions   Int                 @default(0)
-  extraVisibilityQueries Int                 @default(0)
-  extraUsers             Int                 @default(0)
-
-  billingEmail            String?
-  billingName             String?
-  vatNumber               String?
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
-  canceledAt              DateTime?
-  codiceFiscale           String?
-  pecEmail                String?
-  sdiCode                 String?
-  customLimits            Json?              // Admin-overridable limits { maxInterviews, maxChatbots, maxProjects }
-  invoices                Invoice[]
-  organization            Organization       @relation(fields: [organizationId], references: [id])
+  id                String   @id @default(cuid())
+  organizationId    String   @unique
+  
+  // Tier e stato
+  tier              SubscriptionTier @default(TRIAL)
+  status            SubscriptionStatus @default(TRIALING)
+  isPartner         Boolean  @default(false)
+  
+  // Stripe IDs
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
+  stripePriceId         String?
+  
+  // ═══════════════════════════════════════════════════════════
+  // CONTATORI UTILIZZO MENSILE (resettati ogni mese)
+  // ═══════════════════════════════════════════════════════════
+  tokensUsedThisMonth           Int @default(0)
+  interviewsUsedThisMonth       Int @default(0)
+  chatbotSessionsUsedThisMonth  Int @default(0)
+  visibilityQueriesUsedThisMonth Int @default(0)
+  aiSuggestionsUsedThisMonth    Int @default(0)
+  
+  // Breakdown token per categoria
+  interviewTokensUsed    Int @default(0)
+  chatbotTokensUsed      Int @default(0)
+  visibilityTokensUsed   Int @default(0)
+  suggestionTokensUsed   Int @default(0)
+  systemTokensUsed       Int @default(0)
+  
+  // ═══════════════════════════════════════════════════════════
+  // RISORSE EXTRA DA ADD-ON (sommate ai limiti piano)
+  // ═══════════════════════════════════════════════════════════
+  extraTokens            Int @default(0)
+  extraInterviews        Int @default(0)
+  extraChatbotSessions   Int @default(0)
+  extraVisibilityQueries Int @default(0)
+  extraAiSuggestions     Int @default(0)
+  extraUsers             Int @default(0)
+  
+  // ═══════════════════════════════════════════════════════════
+  // PERIODO E TRIAL
+  // ═══════════════════════════════════════════════════════════
+  currentPeriodStart  DateTime @default(now())
+  currentPeriodEnd    DateTime?
+  trialEndsAt         DateTime?
+  canceledAt          DateTime?
+  cancelAtPeriodEnd   Boolean  @default(false)
+  
+  // ═══════════════════════════════════════════════════════════
+  // FATTURAZIONE ITALIANA
+  // ═══════════════════════════════════════════════════════════
+  billingName         String?
+  billingEmail        String?
+  vatNumber           String?   // Partita IVA
+  codiceFiscale       String?
+  sdiCode             String?   // Codice SDI
+  pecEmail            String?   // PEC
+  billingAddress      Json?     // { street, city, zip, province, country }
+  
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  purchasedAddOns     PurchasedAddOn[]
+  invoices            Invoice[]
+  
+  customLimits        Json?     // Admin-overridable limits
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model Invoice {
@@ -579,51 +609,75 @@ model TokenUsage {
   aiSuggestionsUsed     Int    @default(0)
 }
 
-// Token Log dettagliato per ogni operazione
+// ═══════════════════════════════════════════════════════════════
+// TOKEN LOG MODEL - Per tracking dettagliato
+// ═══════════════════════════════════════════════════════════════
+
 model TokenLog {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   organizationId  String
   userId          String?
-
+  
+  // Categorizzazione
   category        TokenCategory
-  operation       String        // es: "interview_message", "chatbot_reply", "visibility_scan"
+  operation       String    // es: "interview_response", "chatbot_message", "visibility_scan"
+  
+  // Conteggio token
   inputTokens     Int
   outputTokens    Int
   totalTokens     Int
-
-  resourceType    String?       // es: "bot", "conversation", "scan"
-  resourceId      String?
-  model           String        @default("gpt-4o-mini")
-
-  fromAddOn       Boolean       @default(false)
-  addOnId         String?
-
-  createdAt       DateTime      @default(now())
-
+  
+  // Riferimenti
+  resourceType    String?   // es: "interview", "chatbot", "visibility"
+  resourceId      String?   // ID della risorsa specifica
+  
+  // Modello usato
+  model           String    // es: "gpt-4o-mini", "claude-sonnet"
+  
+  // Flag source
+  usedExtraTokens Boolean   @default(false)
+  addOnId         String?   // Se usato da add-on specifico
+  
+  createdAt       DateTime  @default(now())
+  
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
   @@index([organizationId, createdAt])
   @@index([organizationId, category])
-  @@index([userId, createdAt])
   @@index([createdAt])
 }
 
-// Pacchetti extra acquistati
+// ═══════════════════════════════════════════════════════════════
+// PURCHASED ADD-ON MODEL - Nuovo
+// ═══════════════════════════════════════════════════════════════
+
 model PurchasedAddOn {
-  id              String    @id @default(cuid())
-  organizationId  String
-
-  addOnId         String    // es: "tokens_5m", "interviews_50"
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  
+  // Tipo e quantità
   type            AddOnType
-  quantity        Int       // Quantità acquistata
-  remaining       Int       // Quantità rimanente
-
-  price           Float     // Prezzo pagato
-  stripePaymentId String?
-
-  purchasedAt     DateTime  @default(now())
-  expiresAt       DateTime? // Null = non scade, altrimenti fine mese
-
-  @@index([organizationId])
-  @@index([organizationId, type])
+  stripeProductId String?
+  stripePriceId   String?
+  stripePaymentIntentId String?
+  
+  // Quantità
+  quantity        Int      // Quantità acquistata
+  remaining       Int      // Quantità rimanente (decrementata ad ogni uso)
+  
+  // Prezzo pagato
+  amountPaid      Int      // In centesimi
+  currency        String   @default("eur")
+  
+  // Validità
+  purchasedAt     DateTime @default(now())
+  expiresAt       DateTime?  // Null = non scade, altrimenti fine periodo
+  isActive        Boolean  @default(true)
+  
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  
+  @@index([subscriptionId])
+  @@index([subscriptionId, type, isActive])
 }
 
 enum TokenCategory {
@@ -637,9 +691,10 @@ enum TokenCategory {
 enum AddOnType {
   TOKENS
   INTERVIEWS
-  CHATBOT
-  VISIBILITY
-  USERS
+  CHATBOT_SESSIONS
+  VISIBILITY_QUERIES
+  AI_SUGGESTIONS
+  EXTRA_USERS
 }
 
 model ChatbotAnalytics {

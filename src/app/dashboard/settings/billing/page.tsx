@@ -1,243 +1,174 @@
-import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
-import { redirect } from 'next/navigation';
-import { getUsageStats } from '@/lib/usage';
-import { getPricingPlans } from '@/lib/stripe';
+'use client';
 
+import { useState, useEffect } from 'react';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+    CreditCard,
+    ExternalLink,
+    Receipt,
+    ShieldCheck,
+    Zap,
+    CheckCircle2
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { CreditCard, ArrowUpRight, FileText, AlertCircle } from 'lucide-react';
 
-import { TokenUsageCard } from '@/components/billing/TokenUsageCard';
+export default function BillingSettingsPage() {
+    const [usage, setUsage] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [isPortalLoading, setIsPortalLoading] = useState(false);
 
-export default async function BillingPage() {
-    const session = await auth();
-    if (!session?.user?.email) redirect('/login');
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            memberships: {
-                include: {
-                    organization: {
-                        include: {
-                            subscription: {
-                                include: {
-                                    invoices: {
-                                        orderBy: { createdAt: 'desc' },
-                                        take: 5
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                take: 1
+    useEffect(() => {
+        async function fetchUsage() {
+            try {
+                const res = await fetch('/api/usage');
+                const data = await res.json();
+                setUsage(data);
+            } catch (err) {
+                console.error('Error fetching billing info:', err);
+            } finally {
+                setLoading(false);
             }
         }
-    });
+        fetchUsage();
+    }, []);
 
-    const organization = user?.memberships[0]?.organization;
-    const subscription = organization?.subscription;
+    const openStripePortal = async () => {
+        setIsPortalLoading(true);
+        try {
+            const res = await fetch('/api/stripe/portal');
+            const data = await res.json();
+            if (data.url) {
+                window.location.href = data.url;
+            }
+        } catch (err) {
+            console.error('Error opening portal:', err);
+        } finally {
+            setIsPortalLoading(false);
+        }
+    };
 
-    // If no org/subscription, show upgrade prompt
-    if (!organization || !subscription) {
-        return (
-            <div className="space-y-6">
-                <h1 className="text-2xl font-bold text-gray-900">Piano e fatturazione</h1>
-                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-                    <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h2 className="text-lg font-semibold text-gray-900 mb-2">Nessun piano attivo</h2>
-                    <p className="text-gray-500 mb-6">Scegli un piano per sbloccare tutte le funzionalità</p>
-                    <Link
-                        href="/pricing"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                    >
-                        Vedi i piani
-                        <ArrowUpRight className="w-4 h-4" />
-                    </Link>
-                </div>
-            </div>
-        );
-    }
-
-
-
-    // ... imports ...
-
-    const usage = await getUsageStats(organization.id);
-    const plans = await getPricingPlans(); // Fetch plans
-    const currentPlan = plans[subscription.tier as keyof typeof plans]; // Access plan
+    if (loading) return <div className="p-8">Caricamento billing...</div>;
 
     return (
-        <div className="space-y-8">
-            <h1 className="text-2xl font-bold text-gray-900">Piano e fatturazione</h1>
-
-            {/* Token Usage Card - Prominent */}
-            <TokenUsageCard
-                usage={usage.tokens}
-            />
-
-            {/* Current Plan */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-lg font-semibold text-gray-900">Piano attuale</h2>
-                            <p className="text-gray-500 text-sm">Gestisci il tuo abbonamento</p>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-2xl font-bold text-gray-900">{currentPlan.name}</span>
-                            {currentPlan.price && (
-                                <p className="text-gray-500 text-sm">€{currentPlan.price}/mese</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-6 space-y-4">
-                    {/* Usage Bars */}
-                    <div className="space-y-4">
-                        <UsageBar
-                            label="Interviste attive"
-                            used={usage.activeBots.used}
-                            limit={usage.activeBots.limit}
-                            percentage={usage.activeBots.percentage}
-                        />
-                        <UsageBar
-                            label="Risposte questo mese"
-                            used={usage.interviews.used}
-                            limit={usage.interviews.limit}
-                            percentage={usage.interviews.percentage}
-                        />
-                        <UsageBar
-                            label="Utenti"
-                            used={usage.users.used}
-                            limit={usage.users.limit}
-                            percentage={usage.users.percentage}
-                        />
-                    </div>
-
-                    {/* Period Info */}
-                    <p className="text-sm text-gray-500">
-                        Il periodo attuale scade il {new Date(usage.currentPeriodEnd).toLocaleDateString('it-IT', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                        })}
-                    </p>
-                </div>
-
-                <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-4">
-                    {subscription.tier === 'FREE' ? (
-                        <Link
-                            href="/pricing"
-                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                        >
-                            Effettua l'upgrade
-                        </Link>
-                    ) : (
-                        <form action="/api/stripe/portal" method="POST">
-                            <button
-                                type="submit"
-                                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg transition-colors"
-                            >
-                                Gestisci abbonamento
-                            </button>
-                        </form>
-                    )}
-                    <Link
-                        href="/pricing"
-                        className="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
-                    >
-                        Vedi tutti i piani
-                    </Link>
-                </div>
+        <div className="p-6 md:p-8 space-y-8 max-w-4xl mx-auto">
+            <div className="space-y-1">
+                <h1 className="text-3xl font-black text-slate-900">Configurazione Billing</h1>
+                <p className="text-slate-500 font-medium">Gestisci il tuo abbonamento, i metodi di pagamento e le fatture.</p>
             </div>
 
-            {/* Invoices */}
-            {subscription.invoices.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200">
-                    <div className="p-6 border-b border-gray-100">
-                        <h2 className="text-lg font-semibold text-gray-900">Fatture recenti</h2>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                        {subscription.invoices.map((invoice) => (
-                            <div key={invoice.id} className="p-4 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <FileText className="w-5 h-5 text-gray-400" />
-                                    <div>
-                                        <p className="font-medium text-gray-900">
-                                            €{(invoice.amountPaid / 100).toFixed(2)}
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            {new Date(invoice.createdAt).toLocaleDateString('it-IT')}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <span className={`px-2 py-1 text-xs rounded-full ${invoice.status === 'paid'
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'bg-yellow-100 text-yellow-700'
-                                        }`}>
-                                        {invoice.status === 'paid' ? 'Pagata' : invoice.status}
-                                    </span>
-                                    {invoice.pdfUrl && (
-                                        <a
-                                            href={invoice.pdfUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-purple-600 hover:text-purple-700 text-sm"
-                                        >
-                                            Scarica PDF
-                                        </a>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Warning for past due */}
-            {subscription.status === 'PAST_DUE' && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            {/* Piano Attuale */}
+            <Card className="border-slate-100 shadow-sm overflow-hidden">
+                <div className="h-2 bg-gradient-to-r from-blue-600 to-indigo-600" />
+                <CardHeader className="flex flex-row items-center justify-between pb-4">
                     <div>
-                        <h3 className="font-medium text-red-800">Pagamento in sospeso</h3>
-                        <p className="text-red-600 text-sm mt-1">
-                            Il pagamento del tuo abbonamento non è andato a buon fine.
-                            Aggiorna il metodo di pagamento per evitare interruzioni del servizio.
-                        </p>
+                        <CardTitle className="text-xl font-bold">Il tuo Piano</CardTitle>
+                        <CardDescription>Attività e stato del piano attuale</CardDescription>
                     </div>
-                </div>
-            )}
-        </div>
-    );
-}
+                    <Badge className="bg-blue-50 text-blue-700 border-blue-100 px-3 py-1 font-bold">
+                        {usage?.tier || 'FREE'}
+                    </Badge>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                {usage?.status === 'ACTIVE' ? (
+                                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                ) : (
+                                    <ShieldCheck className="w-5 h-5 text-amber-500" />
+                                )}
+                                <span className="font-bold text-slate-900">
+                                    Stato: {usage?.status === 'ACTIVE' ? 'Sottoscrizione Attiva' : 'Periodo di Prova'}
+                                </span>
+                            </div>
+                            <p className="text-sm text-slate-500 font-medium">
+                                Il tuo prossimo rinnovo è previsto per il <span className="text-slate-900 font-bold">{new Date(usage?.period.end).toLocaleDateString('it-IT')}</span>.
+                            </p>
+                        </div>
 
-function UsageBar({ label, used, limit, percentage }: {
-    label: string;
-    used: number;
-    limit: number;
-    percentage: number;
-}) {
-    const isUnlimited = limit === -1;
-    const isWarning = percentage >= 80 && !isUnlimited;
+                        <div className="flex flex-col gap-2">
+                            <Button
+                                onClick={openStripePortal}
+                                disabled={isPortalLoading}
+                                className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 rounded-xl font-bold shadow-sm"
+                            >
+                                {isPortalLoading ? 'Caricamento...' : 'Gestisci su Stripe'}
+                                <ExternalLink className="w-4 h-4 ml-2" />
+                            </Button>
+                            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold">
+                                <Link href="/pricing">Modifica Piano</Link>
+                            </Button>
+                        </div>
+                    </div>
 
-    return (
-        <div>
-            <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">{label}</span>
-                <span className={isWarning ? 'text-orange-600 font-medium' : 'text-gray-900'}>
-                    {used} / {isUnlimited ? '∞' : limit}
-                </span>
+                    {/* Dettagli Fiscali Reminder */}
+                    <div className="flex items-start gap-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                        <Receipt className="w-5 h-5 text-blue-600 mt-0.5" />
+                        <div className="space-y-1">
+                            <p className="text-sm font-bold text-blue-900">Dati di fatturazione</p>
+                            <p className="text-xs text-blue-700 leading-relaxed font-medium">
+                                Puoi aggiornare la tua Partita IVA, il Codice SDI e l'indirizzo di fatturazione direttamente dal portale Stripe. Le fatture verranno generate automaticamente e inviate alla tua email.
+                            </p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Add-on & Extra */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-slate-100 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-lg font-bold flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-amber-500" />
+                            Acquista Add-on
+                        </CardTitle>
+                        <CardDescription>Risorse extra istantanee</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-slate-600 mb-6 font-medium">
+                            Hai bisogno di più token o interviste per questo mese senza cambiare piano?
+                        </p>
+                        <Button variant="outline" className="w-full rounded-xl font-bold border-slate-200" asChild>
+                            <Link href="/pricing#addons">Vedi Pacchetti Extra</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-slate-100 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-lg font-bold flex items-center gap-2">
+                            <Receipt className="w-5 h-5 text-slate-400" />
+                            Storico Fatture
+                        </CardTitle>
+                        <CardDescription>Scarica e visualizza</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-slate-600 mb-6 font-medium">
+                            Accedi allo storico completo dei tuoi pagamenti e scarica le fatture in formato PDF.
+                        </p>
+                        <Button variant="outline" onClick={openStripePortal} className="w-full rounded-xl font-bold border-slate-200">
+                            Visualizza Fatture
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                    className={`h-full rounded-full transition-all ${isWarning ? 'bg-orange-500' : 'bg-purple-500'
-                        }`}
-                    style={{ width: isUnlimited ? '10%' : `${Math.min(percentage, 100)}%` }}
-                />
+
+            <div className="pt-8 border-t border-slate-100 flex items-center justify-between">
+                <p className="text-xs text-slate-400 font-medium">
+                    Sicurezza garantita da Stripe Payments. Nessun dato della carta viene salvato sui nostri sistemi.
+                </p>
+                <div className="flex items-center gap-4 opacity-30 grayscale">
+                    <CreditCard className="w-6 h-6" />
+                    <Receipt className="w-6 h-6" />
+                </div>
             </div>
         </div>
     );

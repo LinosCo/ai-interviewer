@@ -16,9 +16,16 @@ export default async function DashboardPage() {
                 include: {
                     organization: {
                         include: {
-                            subscription: true
+                            subscription: {
+                                select: {
+                                    id: true,
+                                    status: true,
+                                    currentPeriodEnd: true,
+                                    tier: true
+                                }
+                            }
                         }
-                    }, // Needed for usage checks
+                    },
                     bots: {
                         include: {
                             conversations: {
@@ -45,7 +52,14 @@ export default async function DashboardPage() {
                 include: {
                     organization: {
                         include: {
-                            subscription: true
+                            subscription: {
+                                select: {
+                                    id: true,
+                                    status: true,
+                                    currentPeriodEnd: true,
+                                    tier: true
+                                }
+                            }
                         }
                     }
                 }
@@ -66,17 +80,6 @@ export default async function DashboardPage() {
 
     // Get bots and split by type
     const allBots = user.ownedProjects.flatMap(p => p.bots);
-    const interviews = allBots.filter((b: any) => b.botType === 'interview' || !b.botType); // Default to interview
-    const chatbots = allBots.filter((b: any) => b.botType === 'chatbot');
-
-    // Calculate stats
-    const totalInterviews = interviews.length;
-    const totalResponses = interviews.reduce((sum, bot) => sum + bot.conversations.length, 0);
-
-    const totalChatbots = chatbots.length;
-    const totalChatSessions = chatbots.reduce((sum, bot) => sum + bot.conversations.length, 0);
-
-    // Get recent responses (mixed)
     const recentResponses = allBots
         .flatMap(bot => bot.conversations.map(c => ({
             ...c,
@@ -88,19 +91,12 @@ export default async function DashboardPage() {
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
         .slice(0, 5);
 
-    // Get active interviews (with responses in last 7 days)
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-
-    const activeInterviews = interviews.filter(bot =>
-        bot.conversations.some(c => c.completedAt && new Date(c.completedAt) > weekAgo)
-    );
-
-    // Fetch usage and subscription data - always try to get it if organizationId exists
+    // Fetch usage and subscription data
     const usage = organizationId ? await getUsageStats(organizationId) : null;
     const subscription = userWithMembership?.memberships[0]?.organization?.subscription || project?.organization?.subscription;
     const status = subscription?.status || 'ACTIVE';
-    const trialDaysLeft = usage?.currentPeriodEnd ? Math.ceil((new Date(usage.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+    const trialDaysLeft = subscription?.currentPeriodEnd ? Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+
 
     return (
         <div className="space-y-8">

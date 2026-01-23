@@ -63,21 +63,21 @@ export function UpgradeModal({
                         <div className="text-sm text-gray-600 mb-1">Piano Attuale</div>
                         <div className="text-xl font-bold mb-2">{current.name}</div>
                         <div className="text-2xl font-bold text-gray-900 mb-4">
-                            €{current.price}
+                            €{current.monthlyPrice}
                             <span className="text-sm font-normal text-gray-600">/mese</span>
                         </div>
                         <ul className="space-y-2 text-sm">
                             <li className="flex items-center gap-2">
                                 <Icons.Check className="w-4 h-4 text-gray-400" />
-                                {current.responsesPerMonth} risposte/mese
+                                {current.limits.maxInterviewsPerMonth === -1 ? 'Illimitate' : current.limits.maxInterviewsPerMonth} interviste/mese
                             </li>
                             <li className="flex items-center gap-2">
                                 <Icons.Check className="w-4 h-4 text-gray-400" />
-                                {current.activeInterviews === -1 ? 'Illimitate' : current.activeInterviews} interviste
+                                {current.limits.maxChatbots === -1 ? 'Illimitati' : current.limits.maxChatbots} chatbot
                             </li>
                             <li className="flex items-center gap-2">
                                 <Icons.Check className="w-4 h-4 text-gray-400" />
-                                {current.users} utent{current.users === 1 ? 'e' : 'i'}
+                                {current.limits.maxUsers === -1 ? 'Illimitati' : current.limits.maxUsers} utenti
                             </li>
                         </ul>
                     </div>
@@ -92,32 +92,32 @@ export function UpgradeModal({
                         <div className="text-sm text-amber-600 mb-1">Passa a</div>
                         <div className="text-xl font-bold mb-2">{required.name}</div>
                         <div className="text-2xl font-bold text-amber-600 mb-4">
-                            €{required.price}
+                            €{required.monthlyPrice}
                             <span className="text-sm font-normal text-gray-600">/mese</span>
                         </div>
                         <ul className="space-y-2 text-sm">
                             <li className="flex items-center gap-2">
                                 <Icons.Check className="w-4 h-4 text-green-600" />
-                                {required.responsesPerMonth} risposte/mese
+                                {required.limits.maxInterviewsPerMonth === -1 ? 'Illimitate' : required.limits.maxInterviewsPerMonth} interviste/mese
                             </li>
                             <li className="flex items-center gap-2">
                                 <Icons.Check className="w-4 h-4 text-green-600" />
-                                {required.activeInterviews === -1 ? 'Illimitate' : required.activeInterviews} interviste
+                                {required.limits.maxChatbots === -1 ? 'Illimitati' : required.limits.maxChatbots} chatbot
                             </li>
                             <li className="flex items-center gap-2">
                                 <Icons.Check className="w-4 h-4 text-green-600" />
-                                {required.users} utent{required.users === 1 ? 'e' : 'i'}
+                                {required.limits.maxUsers === -1 ? 'Illimitati' : required.limits.maxUsers} utenti
                             </li>
-                            {required.features.knowledgeBase && (
+                            {required.limits.visibilityEnabled && (
                                 <li className="flex items-center gap-2">
                                     <Icons.Check className="w-4 h-4 text-green-600" />
-                                    Knowledge Base
+                                    Brand Monitor
                                 </li>
                             )}
-                            {required.features.sentiment && (
+                            {required.limits.aiTipsEnabled && (
                                 <li className="flex items-center gap-2">
                                     <Icons.Check className="w-4 h-4 text-green-600" />
-                                    Analytics Avanzate
+                                    AI Tips
                                 </li>
                             )}
                         </ul>

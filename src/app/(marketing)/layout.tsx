@@ -12,7 +12,7 @@ export default async function MarketingLayout({
     const session = await auth();
 
     return (
-        <div className="min-h-screen bg-[#FAFAF8] flex flex-col">
+        <div className="min-h-screen bg-stone-950 flex flex-col">
             <MarketingNav session={session} />
 
             {/* Main Content */}

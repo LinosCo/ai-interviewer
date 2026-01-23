@@ -89,10 +89,11 @@ Return only the company/product names, without descriptions.`,
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        // Check if limit is reached
-        if (config.competitors.length >= plan.limits.maxCompetitorsTracked) {
+        // Check if limit is reached (default 10 competitors if visibility enabled)
+        const maxCompetitors = plan.limits.visibilityEnabled ? 10 : 0;
+        if (config.competitors.length >= maxCompetitors) {
             return NextResponse.json(
-                { error: `Maximum competitors limit (${plan.limits.maxCompetitorsTracked}) reached for your plan` },
+                { error: `Maximum competitors limit (${maxCompetitors}) reached for your plan` },
                 { status: 400 }
             );
         }

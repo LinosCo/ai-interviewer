@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import Stripe from 'stripe';
+import { getStripeClient } from '@/lib/stripe';
 import { getAddOnById } from '@/config/addons';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2023-10-16'
-});
 
 export async function POST(req: NextRequest) {
     try {
@@ -55,6 +51,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Crea checkout session per add-on
+        const stripe = await getStripeClient();
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: subscription.stripeCustomerId,
             mode: addOn.recurring ? 'subscription' : 'payment',

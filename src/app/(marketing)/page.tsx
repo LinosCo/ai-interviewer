@@ -8,6 +8,10 @@ import { colors, gradients, shadows, radius } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { PLANS, PlanType } from '@/config/plans';
+import { SpotlightCard } from '@/components/ui/visual-effects/SpotlightCard';
+import { TiltCard } from '@/components/ui/visual-effects/TiltCard';
+import { ParallaxElement } from '@/components/ui/visual-effects/ParallaxElement';
+import { FloatingElement } from '@/components/ui/visual-effects/FloatingElement';
 
 // --- Components ---
 
@@ -81,20 +85,39 @@ const FeatureIcon = ({ icon: Icon, color = colors.amber }: { icon: any, color?: 
 
 // Hero rotating phrases - slide animation (positive/opportunity-focused)
 const HERO_PHRASES = [
-    'cosa pensano i clienti',
-    'se il team è motivato',
-    'come parlano di te online',
-    'dove ottimizzare il budget',
-    'se l\'assistenza funziona',
-    'come ti vede la filiera',
-    'perché i clienti comprano',
-    'cosa cercano i talenti',
-    'come migliorare il prodotto',
-    'se i prezzi sono giusti',
-    'cosa fanno i competitor',
-    'come comunicare meglio',
-    'come migliorare il servizio',
+    'cosa pensano i clienti?',
+    'se il team è motivato?',
+    'come parlano di te online?',
+    'dove ottimizzare il budget?',
+    'se l\'assistenza funziona?',
+    'come ti vede la filiera?',
+    'perché i clienti comprano?',
+    'cosa cercano i talenti?',
+    'come migliorare il prodotto?',
+    'se i prezzi sono giusti?',
+    'cosa fanno i competitor?',
+    'come comunicare meglio?',
+    'come migliorare il servizio?',
 ];
+
+const SectionDivider = ({
+    position = "bottom",
+    gradient = "to-b",
+    height = "h-32"
+}: {
+    position?: "top" | "bottom"
+    gradient?: "to-b" | "to-t"
+    height?: string
+}) => {
+    return (
+        <div
+            className={`absolute left-0 right-0 z-10 pointer-events-none ${height} ${position === "bottom" ? "bottom-0" : "top-0"} bg-gradient-to-b from-transparent to-stone-950`}
+            style={{
+                background: `linear-gradient(${gradient === "to-b" ? "180deg" : "0deg"}, rgba(12,10,9,0) 0%, rgba(12,10,9,1) 100%)`
+            }}
+        />
+    )
+}
 
 export default function LandingPage() {
     const { data: session } = useSession();
@@ -160,9 +183,18 @@ export default function LandingPage() {
         <div className="bg-white overflow-x-hidden">
             <style jsx global>{`
                 .glass {
-                    background: rgba(255, 255, 255, 0.7);
-                    backdrop-filter: blur(10px);
-                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    background: rgba(255, 255, 255, 0.1);
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+                }
+                .glass-dark {
+                    background: rgba(17, 24, 39, 0.7);
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
                 }
                 .text-gradient {
                     background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
@@ -287,59 +319,88 @@ export default function LandingPage() {
             </AnimatePresence>
 
             {/* 1. HERO SECTION */}
-            <section className="relative pt-20 pb-20 lg:pt-32 lg:pb-32 bg-gradient-to-b from-white to-amber-50/30 overflow-hidden">
+            <section className="relative pt-0 pb-20 lg:pb-32 bg-stone-950 overflow-hidden min-h-screen flex flex-col justify-center">
+                {/* Aurora Background Effect - WARN TONES ONLY */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                    <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-stone-800/20 rounded-full blur-[120px] mix-blend-screen" />
+                    <div className="absolute top-[10%] right-[-10%] w-[50%] h-[50%] bg-amber-900/10 rounded-full blur-[120px] mix-blend-screen" />
+                    <div className="absolute bottom-[-10%] left-[20%] w-[60%] h-[40%] bg-orange-900/10 rounded-full blur-[120px] mix-blend-screen" />
+                </div>
+
+                {/* Floating Blobs */}
+                <FloatingElement className="absolute top-20 left-10 z-0" duration={8} yOffset={30}>
+                    <div className="w-64 h-64 bg-amber-500/5 rounded-full blur-[80px]" />
+                </FloatingElement>
+                <FloatingElement className="absolute bottom-20 right-10 z-0" duration={10} yOffset={-30} delay={2}>
+                    <div className="w-80 h-80 bg-orange-500/5 rounded-full blur-[100px]" />
+                </FloatingElement>
+
                 <div className="container mx-auto px-6 max-w-7xl relative z-10">
                     <div className="text-center max-w-4xl mx-auto">
-                        <SectionLabel text="Per PMI e professionisti" />
+                        <SectionLabel text="Per PMI e professionisti" color="#F59E0B" bg="rgba(255,255,255,0.05)" />
 
-                        <motion.h1
+                        <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-5xl lg:text-7xl font-black text-stone-900 leading-[1.1] mb-8 tracking-tighter"
+                            className="mb-6"
                         >
-                            L'intelligenza artificiale <br className="hidden lg:block" />
-                            che ascolta per te e ti dice
-                            <br />
-                            {/* Sliding text container - fixed height for animation */}
-                            <span className="relative inline-block min-h-[1.3em] w-full">
-                                <AnimatePresence mode="wait">
-                                    <motion.span
-                                        key={currentPhraseIndex}
-                                        initial={{ y: 50, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        exit={{ y: -50, opacity: 0 }}
-                                        transition={{ duration: 0.5, ease: "easeInOut" }}
-                                        className="text-gradient block text-center"
-                                    >
-                                        {HERO_PHRASES[currentPhraseIndex]}
-                                    </motion.span>
-                                </AnimatePresence>
+                            {/* PRE-HEADER: Uppercase, smaller, less emphasis */}
+                            <span className="text-lg lg:text-xl font-bold uppercase tracking-widest text-stone-500 block mb-4">
+                                Ti piacerebbe sapere
                             </span>
-                        </motion.h1>
 
-                        <motion.p
+                            {/* HEADLINE: Equal weight for rotating and static part */}
+                            <h1 className="text-5xl lg:text-7xl font-black text-white leading-[1.1] tracking-tighter">
+                                <span className="block mb-2">se il team è </span>
+                                <span className="relative inline-block min-h-[1.3em] text-gradient">
+                                    <AnimatePresence mode="wait">
+                                        <motion.span
+                                            key={currentPhraseIndex}
+                                            initial={{ y: 40, opacity: 0, scale: 0.95 }}
+                                            animate={{ y: 0, opacity: 1, scale: 1 }}
+                                            exit={{ y: -40, opacity: 0, scale: 0.95 }}
+                                            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                                            className="block"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #F59E0B 0%, #F97316 50%, #D97706 100%)',
+                                                WebkitBackgroundClip: 'text',
+                                                WebkitTextFillColor: 'transparent'
+                                            }}
+                                        >
+                                            {HERO_PHRASES[currentPhraseIndex]}
+                                        </motion.span>
+                                    </AnimatePresence>
+                                </span>
+                            </h1>
+                        </motion.div>
+
+                        {/* Subheadline - constrained to White text, no gray */}
+                        <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 }}
-                            className="text-xl lg:text-2xl text-stone-600 leading-relaxed mb-12 max-w-3xl mx-auto"
+                            className="mb-12 max-w-3xl mx-auto"
                         >
-                            La piattaforma di business intelligence che ascolta continuativamente clienti, dipendenti e filiera. Raccoglie feedback, identifica problemi e ti guida verso decisioni migliori.
-                        </motion.p>
+                            <p className="text-2xl lg:text-3xl text-white font-medium leading-relaxed mb-4 opacity-90">
+                                La piattaforma di business intelligence che ascolta{' '}
+                                <span className="text-orange-400 font-bold">mercato, dipendenti e filiera</span>.
+                            </p>
+                        </motion.div>
 
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2 }}
-                            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
+                            className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-16"
                         >
                             <Link href="/register">
-                                <Button size="lg" withShimmer className="px-10 py-7 text-lg h-auto rounded-full">
+                                <Button size="lg" withShimmer className="px-10 py-6 text-lg h-auto rounded-2xl shadow-[0_0_40px_-10px_rgba(245,158,11,0.5)] hover:shadow-[0_0_60px_-10px_rgba(245,158,11,0.6)] transition-all bg-gradient-to-br from-amber-500 to-orange-600 border-none">
                                     Inizia gratis <Icons.ArrowRight className="ml-2" />
                                 </Button>
                             </Link>
                             <Link href="/onboarding/preview">
-                                <Button variant="secondary" size="lg" className="px-10 py-7 text-lg h-auto rounded-full bg-stone-100 hover:bg-stone-200 border-transparent text-stone-900">
-                                    <Icons.Play className="mr-2" /> Demo Intervista
+                                <Button variant="white" size="lg" className="px-10 py-6 text-lg h-auto rounded-2xl text-stone-900 shadow-xl hover:scale-105 transition-transform">
+                                    <Icons.Play className="mr-2 text-amber-600" /> Demo Intervista
                                 </Button>
                             </Link>
                         </motion.div>
@@ -348,66 +409,193 @@ export default function LandingPage() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.4 }}
-                            className="flex flex-wrap justify-center gap-8 text-stone-400 text-sm font-medium"
+                            className="flex flex-wrap justify-center gap-8 text-white/60 text-sm font-medium"
                         >
                             <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Setup in 5 minuti</span>
                             <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 20 interviste/mese gratis per sempre</span>
                             <span className="flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Nessuna carta richiesta</span>
                         </motion.div>
 
-                        {/* Integration Diagram */}
+                        {/* Integration Diagram - Refined with Tilt and Glass */}
                         <motion.div
                             initial={{ opacity: 0, y: 40 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.6 }}
                             className="mt-24 relative max-w-2xl mx-auto"
                         >
-                            <div className="flex justify-between items-center relative z-10">
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
-                                        <Icons.MessageSquare size={32} className="text-amber-500" />
+                            <div className="flex justify-between items-center relative z-10 px-4">
+                                <TiltCard className="flex flex-col items-center gap-4 group cursor-default">
+                                    <div className="w-24 h-24 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-2xl group-hover:bg-white/10 group-hover:border-amber-500/30 transition-all duration-300">
+                                        <Icons.MessageSquare size={32} className="text-amber-500 group-hover:scale-110 transition-transform" />
                                     </div>
-                                    <span className="text-xs font-bold text-stone-500 tracking-wider">RACCOGLI FEEDBACK</span>
+                                    <span className="text-xs font-bold text-white/50 tracking-widest group-hover:text-amber-400 transition-colors">RACCOGLI</span>
+                                </TiltCard>
+
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent mx-2 relative">
+                                    <div className="absolute top-[-4px] left-[50%] w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)] animate-pulse" />
                                 </div>
 
-                                <div className="h-0.5 flex-1 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 mx-4 relative">
-                                    <Icons.ArrowRight className="absolute -right-2 -top-2 text-amber-200" size={16} />
-                                </div>
-
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
-                                        <Icons.Bot size={32} className="text-amber-500" />
+                                <TiltCard className="flex flex-col items-center gap-4 group cursor-default">
+                                    <div className="w-24 h-24 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-2xl group-hover:bg-white/10 group-hover:border-amber-500/30 transition-all duration-300 relative">
+                                        <div className="absolute inset-0 bg-amber-500/10 rounded-3xl blur-xl group-hover:bg-amber-500/20 transition-all" />
+                                        <Icons.Bot size={40} className="text-amber-500 group-hover:scale-110 transition-transform relative z-10" />
                                     </div>
-                                    <span className="text-xs font-bold text-stone-500 tracking-wider">RISPONDI AI CLIENTI</span>
+                                    <span className="text-xs font-bold text-white/50 tracking-widest group-hover:text-amber-400 transition-colors">ANALIZZA</span>
+                                </TiltCard>
+
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/20 to-transparent mx-2 relative">
+                                    <div className="absolute top-[-4px] left-[50%] w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)] animate-pulse" />
                                 </div>
 
-                                <div className="h-0.5 flex-1 bg-gradient-to-r from-amber-100 via-amber-200 to-amber-100 mx-4 relative">
-                                    <Icons.ArrowRight className="absolute -right-2 -top-2 text-amber-200" size={16} />
-                                </div>
-
-                                <div className="flex flex-col items-center gap-3">
-                                    <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center border border-amber-100 group hover:scale-110 transition-transform cursor-default">
-                                        <Icons.Search size={32} className="text-amber-500" />
+                                <TiltCard className="flex flex-col items-center gap-4 group cursor-default">
+                                    <div className="w-24 h-24 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 flex items-center justify-center shadow-2xl group-hover:bg-white/10 group-hover:border-amber-500/30 transition-all duration-300">
+                                        <Icons.Search size={32} className="text-amber-500 group-hover:scale-110 transition-transform" />
                                     </div>
-                                    <span className="text-xs font-bold text-stone-500 tracking-wider">MONITORA LA REPUTAZIONE</span>
-                                </div>
+                                    <span className="text-xs font-bold text-white/50 tracking-widest group-hover:text-amber-400 transition-colors">MONITORA</span>
+                                </TiltCard>
                             </div>
 
-                            <div className="mt-12 flex flex-col items-center">
-                                <div className="w-0.5 h-12 bg-amber-100 relative">
-                                    <Icons.ArrowRight className="absolute -bottom-2 -left-2 rotate-90 text-amber-200" size={16} />
-                                </div>
-                                <div className="bg-gradient-to-br from-stone-900 to-stone-800 text-white rounded-[2rem] p-6 px-12 shadow-2xl mt-4 border border-stone-700 flex items-center gap-4 group hover:scale-105 transition-transform duration-500">
-                                    <Icons.Layers size={24} className="text-amber-500" />
-                                    <span className="text-lg font-bold tracking-tight">Suggerimenti & Consulenza</span>
-                                </div>
+                            <div className="mt-16 flex flex-col items-center relative z-20">
+                                <div className="w-px h-16 bg-gradient-to-b from-white/20 to-amber-500/50 relative"></div>
+                                <TiltCard className="mt-4">
+                                    <div className="bg-gradient-to-br from-amber-500 to-orange-700 text-white rounded-[2rem] p-6 px-12 shadow-[0_20px_60px_-15px_rgba(245,158,11,0.4)] border-t border-white/20 flex items-center gap-4 hover:scale-[1.02] transition-transform duration-300">
+                                        <div className="bg-white/20 p-2 rounded-lg">
+                                            <Icons.Layers size={24} className="text-white" />
+                                        </div>
+                                        <div>
+                                            <span className="text-lg font-bold tracking-tight block">Azioni Concrete</span>
+                                            <span className="text-sm text-white/80">Suggerimenti pronti da applicare</span>
+                                        </div>
+                                    </div>
+                                </TiltCard>
                             </div>
                         </motion.div>
                     </div>
                 </div>
             </section>
 
-            {/* 2. PROBLEM / SOLUTION */}
+            {/* 2. HOW IT WORKS - DARK to ORANGE GRADIENT FLOW */}
+            <section id="how-it-works" className="py-32 relative overflow-hidden">
+                {/* Background Gradient: Dark Stone -> Rich Orange */}
+                <div className="absolute inset-0 z-0 bg-gradient-to-b from-stone-950 via-amber-900 to-orange-600" />
+
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="text-center max-w-3xl mx-auto mb-20">
+                        <SectionLabel text="Come funziona" color="#F59E0B" bg="rgba(245,158,11,0.1)" />
+                        <h2 className="text-4xl lg:text-5xl font-black tracking-tight mb-4 text-white">
+                            Crea il tuo osservatorio <br /> <span className="text-stone-500">in pochi minuti</span>
+                        </h2>
+                        <p className="text-stone-400 text-xl font-medium">L'AI lavora 24/7 su tre fronti per darti risposte.</p>
+                    </div>
+
+                    <motion.div
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: "-100px" }}
+                        variants={{
+                            hidden: { opacity: 0 },
+                            visible: {
+                                opacity: 1,
+                                transition: { staggerChildren: 0.15 }
+                            }
+                        }}
+                        className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12"
+                    >
+                        {/* Step 1: Configura */}
+                        <TiltCard className="h-full" rotationFactor={3}>
+                            <motion.div
+                                variants={{
+                                    hidden: { opacity: 0, y: 30 },
+                                    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 40 } }
+                                }}
+                                className="bg-stone-900/40 backdrop-blur-xl h-full rounded-3xl p-8 border border-white/5 hover:bg-stone-900/60 transition-colors group"
+                            >
+                                <div className="text-8xl font-black text-white/5 mb-4 leading-none select-none group-hover:text-amber-500/10 transition-colors">01</div>
+                                <h3 className="text-2xl font-bold text-white mb-6">Configura</h3>
+                                <ul className="space-y-4 text-sm text-stone-400">
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Check size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span>Descrivi in una frase cosa ti interessa sapere</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Check size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span>Definisci i target: clienti, dipendenti, fornitori</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Check size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span>Personalizza tono e stile dell'AI</span>
+                                    </li>
+                                </ul>
+                            </motion.div>
+                        </TiltCard>
+
+                        {/* Step 2: Ascolta */}
+                        <TiltCard className="h-full" rotationFactor={3}>
+                            <motion.div
+                                variants={{
+                                    hidden: { opacity: 0, y: 30 },
+                                    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 40 } }
+                                }}
+                                className="bg-stone-900/40 backdrop-blur-xl h-full rounded-3xl p-8 border border-white/5 hover:bg-stone-900/60 transition-colors group"
+                            >
+                                <div className="text-8xl font-black text-white/5 mb-4 leading-none select-none group-hover:text-amber-500/10 transition-colors">02</div>
+                                <h3 className="text-2xl font-bold text-white mb-6">Ascolta</h3>
+                                <ul className="space-y-4 text-sm text-stone-400">
+                                    <li className="flex items-start gap-3">
+                                        <Icons.MessageSquare size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span><strong>Interviste:</strong> raccogli feedback profondi</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Bot size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span><strong>Chatbot:</strong> scopri lacune nel tuo supporto</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Search size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span><strong>Monitor:</strong> traccia reputazione su AI e Web</span>
+                                    </li>
+                                </ul>
+                            </motion.div>
+                        </TiltCard>
+
+                        {/* Step 3: Agisci */}
+                        <TiltCard className="h-full" rotationFactor={3}>
+                            <motion.div
+                                variants={{
+                                    hidden: { opacity: 0, y: 30 },
+                                    visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 40 } }
+                                }}
+                                className="bg-stone-900/40 backdrop-blur-xl h-full rounded-3xl p-8 border border-white/5 hover:bg-stone-900/60 transition-colors group relative overflow-hidden"
+                            >
+                                {/* Subtle highlight for the final step */}
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-amber-500/20 to-transparent rounded-bl-full" />
+
+                                <div className="text-8xl font-black text-white/5 mb-4 leading-none select-none group-hover:text-amber-500/10 transition-colors">03</div>
+                                <h3 className="text-2xl font-bold text-white mb-4">Agisci</h3>
+                                <p className="text-amber-500/80 text-sm mb-4 italic">Suggerimenti pronti all'uso:</p>
+                                <ul className="space-y-4 text-sm text-stone-400">
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Zap size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span>Aggiorna FAQ o contenuti del sito</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Zap size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span>Correggi prezzi o descrizioni errate</span>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <Icons.Zap size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                        <span>Intervieni su clienti a rischio churn</span>
+                                    </li>
+                                </ul>
+                            </motion.div>
+                        </TiltCard>
+                    </motion.div>
+                </div>
+
+                {/* Transition to Light Section - Smooth Gradient FADE */}
+                <div className="absolute left-0 right-0 bottom-0 h-64 bg-gradient-to-t from-stone-50 via-orange-500/10 to-transparent z-20 pointer-events-none" />
+            </section>
+
+            {/* 3. PROBLEM / SOLUTION */}
             <section className="py-20 bg-white relative">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="grid lg:grid-cols-2 gap-24 items-center">
@@ -427,13 +615,15 @@ export default function LandingPage() {
                                     { label: 'Supporto AI', traditional: '€200+ / mese', tuner: 'Incluso' },
                                     { label: 'Reputazione & Presenza Online', traditional: '€150+ / mese', tuner: 'Incluso' },
                                 ].map((item, i) => (
-                                    <div key={i} className="flex items-center justify-between p-4 px-6 bg-stone-50 rounded-2xl border border-stone-100">
-                                        <span className="font-bold text-stone-800">{item.label}</span>
-                                        <div className="text-right">
-                                            <div className="text-xs text-stone-400 line-through mb-1">{item.traditional}</div>
-                                            <div className="text-amber-600 font-black">{item.tuner}</div>
+                                    <SpotlightCard key={i} className="rounded-2xl border border-stone-200 bg-stone-50/50" spotlightColor="rgba(245, 158, 11, 0.2)">
+                                        <div className="flex items-center justify-between p-4 px-6 relative z-10">
+                                            <span className="font-bold text-stone-800">{item.label}</span>
+                                            <div className="text-right">
+                                                <div className="text-xs text-stone-400 line-through mb-1">{item.traditional}</div>
+                                                <div className="text-amber-600 font-black">{item.tuner}</div>
+                                            </div>
                                         </div>
-                                    </div>
+                                    </SpotlightCard>
                                 ))}
                             </div>
                         </div>
@@ -482,9 +672,12 @@ export default function LandingPage() {
 
             <WaveSeparator color="#FAFAF8" height={100} />
 
-            {/* 3. THE THREE TOOLS SECTION */}
-            <section id="use-cases" className="py-32 bg-[#FAFAF8] relative">
-                <div className="container mx-auto px-6 max-w-7xl">
+            {/* 4. THE THREE TOOLS SECTION */}
+            <section id="use-cases" className="py-32 bg-white relative overflow-hidden">
+                {/* Background Pattern - Dot Matrix */}
+                <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#444 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
                     <div className="text-center max-w-3xl mx-auto mb-24">
                         <SectionLabel text="Cosa fa per te" />
                         <h2 className="text-4xl lg:text-6xl font-black text-stone-900 mb-6 tracking-tight">
@@ -499,19 +692,27 @@ export default function LandingPage() {
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.MessageSquare size={24} /></div>
                                 <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Raccogli Feedback</h3>
                             </div>
-                            <h4 className="text-xl text-stone-900 font-bold mb-6">Scopri perché i clienti comprano, abbandonano o esitano.</h4>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Scopri cosa pensano davvero clienti, dipendenti e fornitori.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                Un'intelligenza artificiale che intervista i tuoi clienti come farebbe un consulente esperto. Ti fa capire cosa pensano davvero, senza form noiosi che nessuno compila.
+                                Un'intelligenza artificiale che intervista <strong>clienti, dipendenti o fornitori</strong> con la stessa facilità. Ti fa capire cosa pensano davvero, senza form noiosi che nessuno compila.
                             </p>
 
-                            <div className="grid grid-cols-2 gap-6 mb-8">
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
-                                    <div className="text-3xl font-black text-amber-500 mb-1">70%+</div>
-                                    <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">Completion Rate</div>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100">
+                                    <div className="text-2xl font-black text-amber-500 mb-1">70%+</div>
+                                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Completion Rate</div>
                                 </div>
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-100">
-                                    <div className="text-3xl font-black text-amber-500 mb-1">10x</div>
-                                    <div className="text-xs font-bold text-stone-400 uppercase tracking-wider">Più economico</div>
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100">
+                                    <div className="text-2xl font-black text-amber-500 mb-1">10x</div>
+                                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Più economico</div>
+                                </div>
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100">
+                                    <div className="text-2xl font-black text-amber-500 mb-1">+25%</div>
+                                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Team Engagement</div>
+                                </div>
+                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-stone-100">
+                                    <div className="text-2xl font-black text-amber-500 mb-1">-40%</div>
+                                    <div className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Tempo Risposta</div>
                                 </div>
                             </div>
 
@@ -528,32 +729,34 @@ export default function LandingPage() {
                         </div>
 
                         <div className="relative">
-                            <div className="bg-stone-900 rounded-[2.5rem] p-8 shadow-2xl relative z-10 text-white border border-stone-800">
-                                <div className="flex items-center gap-3 mb-8 pb-4 border-b border-white/10">
-                                    <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center"><Icons.Bot size={16} /></div>
-                                    <span className="font-bold">Interview AI</span>
+                            <ParallaxElement offset={40} className="relative z-10">
+                                <div className="bg-stone-900 rounded-[2.5rem] p-8 shadow-2xl text-white border border-stone-800">
+                                    <div className="flex items-center gap-3 mb-8 pb-4 border-b border-white/10">
+                                        <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center"><Icons.Bot size={16} /></div>
+                                        <span className="font-bold">Interview AI</span>
+                                    </div>
+                                    <div className="space-y-6">
+                                        <div className="flex flex-col gap-2">
+                                            <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">AI: Domanda</div>
+                                            <div className="bg-stone-800 p-4 rounded-2xl rounded-tl-none border border-stone-700 leading-relaxed">
+                                                "Come valuti la comunicazione interna del team?"
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col gap-2 items-end">
+                                            <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">Dipendente</div>
+                                            <div className="bg-amber-500 p-4 rounded-2xl rounded-tr-none font-medium leading-relaxed">
+                                                "A volte le informazioni non arrivano in tempo..."
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">AI: Deep Probe</div>
+                                            <div className="bg-stone-800 p-4 rounded-2xl rounded-tl-none border border-stone-700 leading-relaxed border-l-2 border-l-amber-500">
+                                                "Puoi farmi un esempio recente di una situazione in cui questo ha creato problemi?"
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-6">
-                                    <div className="flex flex-col gap-2">
-                                        <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">AI: Domanda</div>
-                                        <div className="bg-stone-800 p-4 rounded-2xl rounded-tl-none border border-stone-700 leading-relaxed">
-                                            "Cosa ti ha portato a scegliere il nostro servizio?"
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-2 items-end">
-                                        <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">Utente</div>
-                                        <div className="bg-amber-500 p-4 rounded-2xl rounded-tr-none font-medium leading-relaxed">
-                                            "Cercavo più flessibilità..."
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-2">
-                                        <div className="text-xs text-stone-400 uppercase font-bold tracking-widest">AI: Deep Probe</div>
-                                        <div className="bg-stone-800 p-4 rounded-2xl rounded-tl-none border border-stone-700 leading-relaxed border-l-2 border-l-amber-500">
-                                            "In che senso flessibilità? Puoi farmi un esempio di una situazione in cui ne hai avuto bisogno?"
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            </ParallaxElement>
                             {/* Decorative shadow */}
                             <div className="absolute -inset-10 bg-amber-500/10 blur-[80px] -z-10 rounded-full" />
                         </div>
@@ -562,62 +765,64 @@ export default function LandingPage() {
                     {/* Tool 2: Chatbot Intelligence */}
                     <div className="grid lg:grid-cols-2 gap-20 items-center mb-40">
                         <div className="order-2 lg:order-1 relative">
-                            <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-amber-100 overflow-hidden">
-                                <div className="bg-amber-50/50 -mx-8 -mt-8 p-6 border-b border-amber-100 mb-8">
-                                    <div className="flex justify-between items-center">
-                                        <div className="font-bold text-amber-900">Analytics Insights</div>
-                                        <div className="text-xs font-black text-amber-600 bg-amber-100 px-3 py-1 rounded-full uppercase">Real-time</div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-8">
-                                    <div>
-                                        <div className="flex justify-between mb-4">
-                                            <span className="text-sm font-bold text-stone-400 uppercase">Top Domande</span>
-                                            <span className="text-sm font-bold text-stone-400 uppercase">Gaps</span>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-stone-400 font-bold">1.</span>
-                                                    <span className="font-bold text-stone-800">"Quanto costa?"</span>
-                                                </div>
-                                                <Icons.Check className="text-green-500" size={16} />
-                                            </div>
-                                            <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-stone-400 font-bold">2.</span>
-                                                    <span className="font-bold text-stone-800">"Tempi di consegna?"</span>
-                                                </div>
-                                                <div className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded">GAP</div>
-                                            </div>
+                            <ParallaxElement offset={-40} className="relative z-10">
+                                <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl border border-amber-100 overflow-hidden">
+                                    <div className="bg-amber-50/50 -mx-8 -mt-8 p-6 border-b border-amber-100 mb-8">
+                                        <div className="flex justify-between items-center">
+                                            <div className="font-bold text-amber-900">Analytics Insights</div>
+                                            <div className="text-xs font-black text-amber-600 bg-amber-100 px-3 py-1 rounded-full uppercase">Real-time</div>
                                         </div>
                                     </div>
 
-                                    <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center"><Icons.Bot size={16} /></div>
-                                            <div className="font-bold text-amber-900 text-sm">FAQ Suggerita</div>
+                                    <div className="space-y-8">
+                                        <div>
+                                            <div className="flex justify-between mb-4">
+                                                <span className="text-sm font-bold text-stone-400 uppercase">Top Domande</span>
+                                                <span className="text-sm font-bold text-stone-400 uppercase">Gaps</span>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-stone-400 font-bold">1.</span>
+                                                        <span className="font-bold text-stone-800">"Quanto costa?"</span>
+                                                    </div>
+                                                    <Icons.Check className="text-green-500" size={16} />
+                                                </div>
+                                                <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-stone-400 font-bold">2.</span>
+                                                        <span className="font-bold text-stone-800">"Tempi di consegna?"</span>
+                                                    </div>
+                                                    <div className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded">GAP</div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-amber-800 mb-6 italic">"Questa settimana 18 clienti hanno chiesto dei tempi di consegna. Vuoi che generi una risposta basata su..."</p>
-                                        <div className="flex gap-2">
-                                            <button className="flex-1 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors">✅ Approva</button>
-                                            <button className="flex-1 py-2 rounded-lg bg-white text-amber-600 text-xs font-bold border border-amber-200 hover:bg-amber-50">Modifica</button>
+
+                                        <div className="bg-amber-50 p-5 rounded-2xl border border-amber-200">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center"><Icons.Bot size={16} /></div>
+                                                <div className="font-bold text-amber-900 text-sm">FAQ Suggerita</div>
+                                            </div>
+                                            <p className="text-xs text-amber-800 mb-6 italic">"Questa settimana 12 dipendenti hanno chiesto informazioni sui benefit aziendali. Vuoi che aggiunga una pagina dedicata?"</p>
+                                            <div className="flex gap-2">
+                                                <button className="flex-1 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors">✅ Approva</button>
+                                                <button className="flex-1 py-2 rounded-lg bg-white text-amber-600 text-xs font-bold border border-amber-200 hover:bg-amber-50">Modifica</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            </ParallaxElement>
                             <div className="absolute -inset-10 bg-amber-500/5 blur-[80px] -z-10 rounded-full" />
                         </div>
 
                         <div className="order-1 lg:order-2">
                             <div className="flex items-center gap-4 mb-6">
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Bot size={24} /></div>
-                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Assistente Clienti AI</h3>
+                                <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Assistente AI</h3>
                             </div>
-                            <h4 className="text-xl text-stone-900 font-bold mb-6">Rispondi ai clienti 24/7 e scopri cosa non sanno.</h4>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Rispondi a clienti e dipendenti 24/7. Scopri cosa non trovano.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
-                                Un assistente che risponde alle domande dei tuoi clienti e ti dice cosa non trova sul tuo sito. Così sai esattamente cosa aggiungere o migliorare.
+                                Un assistente che risponde alle domande di <strong>clienti, prospect e dipendenti</strong> e ti dice cosa non trova. Così sai esattamente cosa aggiungere o migliorare.
                             </p>
 
                             <ul className="space-y-6 mb-10">
@@ -672,49 +877,51 @@ export default function LandingPage() {
                         </div>
 
                         <div className="relative">
-                            <div className="bg-stone-50 rounded-[2.5rem] p-8 shadow-2xl relative z-10 border border-stone-200">
-                                <div className="grid grid-cols-2 gap-6 mb-8">
-                                    <div className="space-y-4">
-                                        <div className="text-[10px] font-black tracking-widest text-stone-400 uppercase">AI Perception</div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between text-xs font-bold p-2 bg-white rounded-lg border border-stone-200">
-                                                <span>ChatGPT</span>
-                                                <span className="text-amber-600">Pos. #2</span>
+                            <ParallaxElement offset={40} className="relative z-10">
+                                <div className="bg-stone-50 rounded-[2.5rem] p-8 shadow-2xl border border-stone-200">
+                                    <div className="grid grid-cols-2 gap-6 mb-8">
+                                        <div className="space-y-4">
+                                            <div className="text-[10px] font-black tracking-widest text-stone-400 uppercase">AI Perception</div>
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between text-xs font-bold p-2 bg-white rounded-lg border border-stone-200">
+                                                    <span>ChatGPT</span>
+                                                    <span className="text-amber-600">Pos. #2</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-xs font-bold p-2 bg-white rounded-lg border border-stone-200">
+                                                    <span>Claude</span>
+                                                    <span className="text-amber-600">Pos. #1</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-xs font-bold p-2 bg-amber-50 border border-amber-200 rounded-lg">
+                                                    <span>Gemini</span>
+                                                    <span className="text-red-500">N.C. ⚠️</span>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center justify-between text-xs font-bold p-2 bg-white rounded-lg border border-stone-200">
-                                                <span>Claude</span>
-                                                <span className="text-amber-600">Pos. #1</span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs font-bold p-2 bg-amber-50 border border-amber-200 rounded-lg">
-                                                <span>Gemini</span>
-                                                <span className="text-red-500">N.C. ⚠️</span>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="text-[10px] font-black tracking-widest text-stone-400 uppercase">Web mentions</div>
+                                            <div className="space-y-2">
+                                                <div className="p-2 bg-white rounded-lg border border-stone-200">
+                                                    <div className="text-[10px] text-stone-400 uppercase">Reddit</div>
+                                                    <div className="text-[11px] font-bold text-stone-800 line-clamp-1">"Miglior software per..."</div>
+                                                </div>
+                                                <div className="p-2 bg-white rounded-lg border border-stone-200">
+                                                    <div className="text-[10px] text-stone-400 uppercase">Google News</div>
+                                                    <div className="text-[11px] font-bold text-stone-800 line-clamp-1">"Startup innovativa..."</div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-4">
-                                        <div className="text-[10px] font-black tracking-widest text-stone-400 uppercase">Web mentions</div>
-                                        <div className="space-y-2">
-                                            <div className="p-2 bg-white rounded-lg border border-stone-200">
-                                                <div className="text-[10px] text-stone-400 uppercase">Reddit</div>
-                                                <div className="text-[11px] font-bold text-stone-800 line-clamp-1">"Miglior software per..."</div>
-                                            </div>
-                                            <div className="p-2 bg-white rounded-lg border border-stone-200">
-                                                <div className="text-[10px] text-stone-400 uppercase">Google News</div>
-                                                <div className="text-[11px] font-bold text-stone-800 line-clamp-1">"Startup innovativa..."</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <div className="bg-stone-900 rounded-2xl p-4 text-white">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div className="text-[10px] font-bold text-stone-500 uppercase">Report Settimanale</div>
-                                        <Icons.ArrowRight size={14} className="text-amber-500" />
+                                    <div className="bg-stone-900 rounded-2xl p-4 text-white">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="text-[10px] font-bold text-stone-500 uppercase">Report Settimanale</div>
+                                            <Icons.ArrowRight size={14} className="text-amber-500" />
+                                        </div>
+                                        <div className="text-sm font-bold mb-1">🔥 Opportunità</div>
+                                        <p className="text-[11px] text-stone-400">3 blog post parlano del Tuo Competitor X ma non di te. Vuoi che generi un prompt per contattarli?</p>
                                     </div>
-                                    <div className="text-sm font-bold mb-1">🔥 Opportunità</div>
-                                    <p className="text-[11px] text-stone-400">3 blog post parlano del Tuo Competitor X ma non di te. Vuoi che generi un prompt per contattarli?</p>
                                 </div>
-                            </div>
+                            </ParallaxElement>
                         </div>
                     </div>
                 </div>
@@ -785,145 +992,92 @@ export default function LandingPage() {
                 <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-amber-50/20 to-transparent -z-10" />
             </section>
 
-            {/* 5. HOW IT WORKS */}
-            <section id="how-it-works" className="py-32 bg-stone-900 text-white relative overflow-hidden">
+            {/* 6. FUNZIONALITÀ AVANZATE - Dark background */}
+            <section className="py-32 bg-stone-900 text-white relative overflow-hidden">
                 <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#F59E0B_1px,transparent_1px)] [background-size:24px_24px]"></div>
+                <motion.div
+                    animate={{ y: [0, -15, 0] }}
+                    transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+                    className="absolute top-10 right-10 w-60 h-60 bg-amber-500/10 rounded-full blur-[100px]"
+                />
                 <div className="container mx-auto px-6 max-w-7xl relative z-10">
                     <div className="text-center max-w-3xl mx-auto mb-20">
-                        <SectionLabel text="Come funziona" color="#F59E0B" bg="rgba(255,255,255,0.1)" />
-                        <h2 className="text-4xl lg:text-5xl font-black tracking-tight mb-4">Inizia in 3 passi</h2>
-                        <p className="text-stone-400 text-lg">La potenza dell'AI al servizio del tuo business, senza complessità.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
-                        {/* Step 1 */}
-                        <div className="bg-stone-800/50 rounded-3xl p-8 border border-stone-700 hover:border-amber-500/50 transition-colors">
-                            <div className="text-7xl font-black text-amber-500 mb-6">01</div>
-                            <h3 className="text-2xl font-bold text-white mb-4">Configura</h3>
-                            <p className="text-stone-400 leading-relaxed mb-4">
-                                Crea il tuo osservatorio in pochi minuti:
-                            </p>
-                            <ul className="space-y-2 text-sm">
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Check size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span>Scegli un template o parti da zero</span>
-                                </li>
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Check size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span>Definisci chi vuoi ascoltare: clienti, dipendenti, fornitori, prospect</span>
-                                </li>
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Check size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span>Personalizza domande e tono di voce dell'AI</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        {/* Step 2 */}
-                        <div className="bg-stone-800/50 rounded-3xl p-8 border border-stone-700 hover:border-amber-500/50 transition-colors">
-                            <div className="text-7xl font-black text-amber-500 mb-6">02</div>
-                            <h3 className="text-2xl font-bold text-white mb-4">Ascolta</h3>
-                            <p className="text-stone-400 leading-relaxed mb-4">
-                                L'AI lavora 24/7 su tre fronti:
-                            </p>
-                            <ul className="space-y-2 text-sm">
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.MessageSquare size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span><strong>Interviste:</strong> raccogli i feedback che ti interessano da chi vuoi</span>
-                                </li>
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Bot size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span><strong>Chatbot:</strong> scopri cosa cercano i visitatori del tuo sito</span>
-                                </li>
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Search size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span><strong>Brand Monitor:</strong> monitora cosa dice l'AI e il web di te e dei competitor</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        {/* Step 3 */}
-                        <div className="bg-stone-800/50 rounded-3xl p-8 border border-stone-700 hover:border-amber-500/50 transition-colors">
-                            <div className="text-7xl font-black text-amber-500 mb-6">03</div>
-                            <h3 className="text-2xl font-bold text-white mb-4">Agisci</h3>
-                            <p className="text-stone-400 leading-relaxed mb-4">
-                                Ricevi suggerimenti concreti pronti da approvare:
-                            </p>
-                            <ul className="space-y-2 text-sm">
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Zap size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span>Aggiungi una FAQ che manca sul sito</span>
-                                </li>
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Zap size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span>Correggi un prezzo o una descrizione</span>
-                                </li>
-                                <li className="flex items-start gap-2 text-stone-300">
-                                    <Icons.Zap size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-                                    <span>Rispondi a una recensione o contatta un cliente insoddisfatto</span>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 6. FUNZIONALITÀ AVANZATE */}
-            <section className="py-32 bg-white">
-                <div className="container mx-auto px-6 max-w-7xl">
-                    <div className="text-center max-w-3xl mx-auto mb-20">
-                        <SectionLabel text="Funzionalità avanzate" />
-                        <h2 className="text-4xl lg:text-5xl font-black text-stone-900 mb-6 tracking-tight">
+                        <SectionLabel text="Funzionalità avanzate" color="#F59E0B" bg="rgba(255,255,255,0.1)" />
+                        <h2 className="text-4xl lg:text-5xl font-black text-white mb-6 tracking-tight">
                             Tecnologia che <span className="text-gradient">fa la differenza</span>
                         </h2>
-                        <p className="text-lg text-stone-500">
+                        <p className="text-lg text-stone-400">
                             Dietro l'interfaccia semplice, funzionalità avanzate che rendono Business Tuner unico.
                         </p>
                     </div>
 
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.1 }}
+                            className="bg-white/5 backdrop-blur-lg p-8 rounded-3xl border border-white/10 hover:bg-white/10 hover:scale-[1.02] transition-all duration-300"
+                        >
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6 shadow-lg shadow-amber-500/20">
                                 <Icons.Brain size={24} />
                             </div>
-                            <h3 className="text-lg font-bold text-stone-900 mb-3">Memory Manager</h3>
-                            <p className="text-sm text-stone-500 leading-relaxed">
+                            <h3 className="text-lg font-bold text-white mb-3">Memory Manager</h3>
+                            <p className="text-sm text-stone-400 leading-relaxed">
                                 L'AI ricorda le risposte precedenti e costruisce un profilo dell'intervistato per domande più pertinenti.
                             </p>
-                        </div>
+                        </motion.div>
 
-                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.2 }}
+                            className="bg-white/5 backdrop-blur-lg p-8 rounded-3xl border border-white/10 hover:bg-white/10 hover:scale-[1.02] transition-all duration-300"
+                        >
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6 shadow-lg shadow-amber-500/20">
                                 <Icons.Timer size={24} />
                             </div>
-                            <h3 className="text-lg font-bold text-stone-900 mb-3">Rilevamento fatica</h3>
-                            <p className="text-sm text-stone-500 leading-relaxed">
+                            <h3 className="text-lg font-bold text-white mb-3">Rilevamento fatica</h3>
+                            <p className="text-sm text-stone-400 leading-relaxed">
                                 Monitora i segnali di stanchezza dell'utente e adatta la lunghezza dell'intervista di conseguenza.
                             </p>
-                        </div>
+                        </motion.div>
 
-                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow">
-                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.3 }}
+                            className="bg-white/5 backdrop-blur-lg p-8 rounded-3xl border border-white/10 hover:bg-white/10 hover:scale-[1.02] transition-all duration-300"
+                        >
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6 shadow-lg shadow-amber-500/20">
                                 <Icons.FileText size={24} />
                             </div>
-                            <h3 className="text-lg font-bold text-stone-900 mb-3">Prompt trasparenti</h3>
-                            <p className="text-sm text-stone-500 leading-relaxed">
+                            <h3 className="text-lg font-bold text-white mb-3">Prompt trasparenti</h3>
+                            <p className="text-sm text-stone-400 leading-relaxed">
                                 Visualizza e modifica i prompt usati dall'AI. Pieno controllo su come l'intelligenza artificiale lavora.
                             </p>
-                        </div>
+                        </motion.div>
 
-                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow relative overflow-hidden">
-                            <div className="absolute top-4 right-4 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.4 }}
+                            className="bg-white/5 backdrop-blur-lg p-8 rounded-3xl border border-white/10 hover:bg-white/10 hover:scale-[1.02] transition-all duration-300 relative overflow-hidden"
+                        >
+                            <div className="absolute top-4 right-4 text-[10px] font-bold bg-amber-500/20 text-amber-400 px-2 py-1 rounded-full border border-amber-500/30">
                                 Per clienti Voler.ai
                             </div>
-                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6 shadow-lg shadow-amber-500/20">
                                 <Icons.Globe size={24} />
                             </div>
-                            <h3 className="text-lg font-bold text-stone-900 mb-3">CMS Automation</h3>
-                            <p className="text-sm text-stone-500 leading-relaxed">
+                            <h3 className="text-lg font-bold text-white mb-3">CMS Automation</h3>
+                            <p className="text-sm text-stone-400 leading-relaxed">
                                 Aggiorna automaticamente FAQ e contenuti sul tuo sito basandosi sui feedback raccolti.
                             </p>
-                        </div>
+                        </motion.div>
                     </div>
                 </div>
             </section>
@@ -981,8 +1135,8 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* 6. PRICING SECTION */}
-            <section id="pricing" className="py-32 bg-stone-50">
+            {/* 8. PRICING SECTION */}
+            <section id="pricing" className="py-32 bg-white">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="text-center max-w-3xl mx-auto mb-16">
                         <SectionLabel text="Prezzi" />
@@ -1253,28 +1407,37 @@ export default function LandingPage() {
                 </div>
             </section >
 
-            {/* 10. FINAL CTA */}
-            < section className="py-20 bg-white" >
-                <div className="container mx-auto px-6 max-w-5xl">
-                    <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-[3rem] p-12 lg:p-24 text-center text-white relative overflow-hidden shadow-3xl">
-                        <div className="relative z-10">
-                            <h2 className="text-4xl lg:text-5xl font-black mb-8 tracking-tight">Pronto ad ascoltare <br />il tuo mercato?</h2>
-                            <p className="text-xl text-amber-50 mb-12 max-w-2xl mx-auto">
-                                Inizia gratis con la Trial. 50 interviste e tutte le funzionalità Pro incluse per 14 giorni.
-                                Nessun limite di tempo, nessuna carta richiesta.
-                            </p>
-                            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                                <Link href="/register">
-                                    <Button size="lg" className="bg-white text-stone-900 hover:bg-stone-50 border-none px-12 py-7 rounded-full text-lg h-auto shadow-xl">
-                                        Inizia gratis ora <Icons.ArrowRight className="ml-2" />
-                                    </Button>
-                                </Link>
-                                <a href="mailto:info@voler.ai" className="text-amber-50 font-bold hover:text-white transition-colors">Prenota una demo personalizzata</a>
-                            </div>
+            {/* 10. FINAL CTA - Full Orange Gradient */}
+            <section className="py-32 bg-gradient-to-br from-amber-500 to-orange-600 text-white relative overflow-hidden">
+                {/* Decorative floating elements */}
+                <motion.div
+                    animate={{ y: [0, -20, 0], scale: [1, 1.1, 1] }}
+                    transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+                    className="absolute top-10 left-10 w-60 h-60 bg-white/10 rounded-full blur-[80px]"
+                />
+                <motion.div
+                    animate={{ y: [0, 15, 0], scale: [1, 0.9, 1] }}
+                    transition={{ repeat: Infinity, duration: 8, ease: "easeInOut" }}
+                    className="absolute bottom-10 right-10 w-80 h-80 bg-orange-300/20 rounded-full blur-[100px]"
+                />
+                <div className="container mx-auto px-6 max-w-5xl relative z-10">
+                    <div className="text-center">
+                        <h2 className="text-4xl lg:text-6xl font-black mb-8 tracking-tight">Pronto ad ascoltare <br />il tuo mercato?</h2>
+                        <p className="text-xl lg:text-2xl text-amber-50 mb-12 max-w-2xl mx-auto leading-relaxed">
+                            Inizia gratis con la Trial. 50 interviste e tutte le funzionalità Pro incluse per 14 giorni.
+                            Nessun limite di tempo, nessuna carta richiesta.
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                            <Link href="/register">
+                                <Button size="lg" className="bg-white text-stone-900 hover:bg-stone-50 border-none px-12 py-7 rounded-full text-lg h-auto shadow-2xl shadow-black/20 hover:scale-105 transition-transform">
+                                    Inizia gratis ora <Icons.ArrowRight className="ml-2" />
+                                </Button>
+                            </Link>
+                            <a href="mailto:info@voler.ai" className="text-white font-bold hover:text-amber-100 transition-colors underline underline-offset-4">Prenota una demo personalizzata</a>
                         </div>
                     </div>
                 </div>
-            </section >
+            </section>
         </div >
     );
 }

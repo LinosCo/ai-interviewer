@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { ADD_ON_PACKAGES, getAvailableAddOns, getAddOnById } from '@/config/addons';
+import { ADD_ONS, getAddOnsForTier, getAddOnById } from '@/config/addons';
 import { subscriptionTierToPlanType, PLANS } from '@/config/plans';
 
 /**
@@ -33,20 +33,22 @@ export async function GET(request: Request) {
         const tier = org.subscription?.tier || 'FREE';
 
         // Get available add-ons for this tier
-        const availableAddOns = getAvailableAddOns(tier);
+        const availableAddOns = getAddOnsForTier(tier);
 
-        // Get purchased add-ons
-        const purchasedAddOns = await prisma.purchasedAddOn.findMany({
-            where: {
-                organizationId: org.id,
-                remaining: { gt: 0 },
-                OR: [
-                    { expiresAt: null },
-                    { expiresAt: { gt: new Date() } }
-                ]
-            },
-            orderBy: { purchasedAt: 'desc' }
-        });
+        // Get purchased add-ons (via subscription)
+        const purchasedAddOns = org.subscription
+            ? await prisma.purchasedAddOn.findMany({
+                where: {
+                    subscriptionId: org.subscription.id,
+                    remaining: { gt: 0 },
+                    OR: [
+                        { expiresAt: null },
+                        { expiresAt: { gt: new Date() } }
+                    ]
+                },
+                orderBy: { purchasedAt: 'desc' }
+            })
+            : [];
 
         return NextResponse.json({
             available: availableAddOns,

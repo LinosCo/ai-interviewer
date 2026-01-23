@@ -1,5 +1,4 @@
-import { PlanType, PlanConfig, PlanFeatures } from '@/config/plans';
-import { PLANS } from '@/config/plans';
+import { PlanType, PlanConfig, PlanLimits, PLANS } from '@/config/plans';
 import { HIDDEN_LIMITS } from '@/config/limits';
 import { prisma as db } from '@/lib/prisma';
 
@@ -28,10 +27,14 @@ export class PlanService {
 
     async checkFeatureAccess(
         orgId: string,
-        feature: keyof PlanFeatures
+        feature: keyof PlanLimits
     ): Promise<boolean> {
         const plan = await this.getOrganizationPlan(orgId);
-        return plan.features[feature] === true;
+        const value = plan.limits[feature];
+        // Boolean features should return true/false, numeric features check if > 0
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'number') return value !== 0;
+        return false;
     }
 
     async checkResponseLimit(orgId: string): Promise<{
@@ -40,16 +43,21 @@ export class PlanService {
         limit: number;
         remaining: number;
     }> {
-        const org = await db.organization.findUnique({
-            where: { id: orgId }
+        const subscription = await db.subscription.findUnique({
+            where: { organizationId: orgId }
         });
 
-        if (!org) throw new Error('Organization not found');
+        if (!subscription) throw new Error('Subscription not found');
 
-        const planKey = org.plan.toLowerCase() as keyof typeof PLANS;
-        const plan = PLANS[planKey];
-        const used = org.responsesUsedThisMonth;
-        const limit = plan.responsesPerMonth;
+        const planKey = subscription.tier as keyof typeof PLANS;
+        const plan = PLANS[planKey] || PLANS.FREE;
+        const used = subscription.interviewsUsedThisMonth;
+        const limit = plan.limits.maxInterviewsPerMonth;
+
+        // -1 means unlimited
+        if (limit === -1) {
+            return { allowed: true, used, limit: -1, remaining: Infinity };
+        }
 
         return {
             allowed: used < limit,
@@ -75,7 +83,7 @@ export class PlanService {
             }
         });
 
-        const limit = plan.activeInterviews;
+        const limit = plan.limits.maxChatbots;
 
         // -1 = illimitate
         if (limit === -1) {
@@ -101,20 +109,22 @@ export class PlanService {
     }
 
     async incrementResponseCount(orgId: string): Promise<void> {
-        await db.organization.update({
-            where: { id: orgId },
+        await db.subscription.update({
+            where: { organizationId: orgId },
             data: {
-                responsesUsedThisMonth: { increment: 1 }
+                interviewsUsedThisMonth: { increment: 1 }
             }
         });
     }
 
     async resetMonthlyCounters(): Promise<void> {
         // Chiamato da cron job mensile
-        await db.organization.updateMany({
+        await db.subscription.updateMany({
             data: {
-                responsesUsedThisMonth: 0,
-                monthlyResetDate: new Date()
+                interviewsUsedThisMonth: 0,
+                chatbotSessionsUsedThisMonth: 0,
+                visibilityQueriesUsedThisMonth: 0,
+                aiSuggestionsUsedThisMonth: 0
             }
         });
     }

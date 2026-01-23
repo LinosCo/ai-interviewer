@@ -51,8 +51,9 @@ export default async function BrandsListPage() {
     // Get plan limits
     const planType = subscription ? subscriptionTierToPlanType(subscription.tier) : PlanType.TRIAL;
     const plan = PLANS[planType];
-    const maxBrands = plan.limits.maxBrandsTracked;
-    const canAddMore = brands.length < maxBrands;
+    // Brand limit: unlimited (-1) if visibility enabled, otherwise 0
+    const maxBrands = plan.limits.visibilityEnabled ? -1 : 0;
+    const canAddMore = maxBrands === -1 || brands.length < maxBrands;
 
     return (
         <div className="space-y-8 p-6 max-w-6xl mx-auto">
@@ -66,7 +67,7 @@ export default async function BrandsListPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Badge variant="outline" className="text-sm py-1 px-3">
-                        {brands.length} / {maxBrands} brand
+                        {brands.length} {maxBrands === -1 ? 'brand' : `/ ${maxBrands} brand`}
                     </Badge>
                     {canAddMore ? (
                         <Link href="/dashboard/visibility/create">

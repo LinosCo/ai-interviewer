@@ -9,13 +9,16 @@ export class TokenTrackingService {
     static async logTokenUsage(params: {
         organizationId: string;
         userId?: string;
-        tokens: number;
+        inputTokens: number;
+        outputTokens: number;
         category: TokenCategory;
         model: string;
-        description: string;
-        metadata?: any;
+        operation: string;
+        resourceType?: string;
+        resourceId?: string;
     }) {
-        const { organizationId, userId, tokens, category, model, description, metadata } = params;
+        const { organizationId, userId, inputTokens, outputTokens, category, model, operation, resourceType, resourceId } = params;
+        const totalTokens = inputTokens + outputTokens;
 
         return await prisma.$transaction(async (tx) => {
             // 1. Crea il log dettagliato
@@ -23,11 +26,14 @@ export class TokenTrackingService {
                 data: {
                     organizationId,
                     userId,
-                    tokens,
+                    inputTokens,
+                    outputTokens,
+                    totalTokens,
                     category,
                     model,
-                    description,
-                    metadata: metadata || {}
+                    operation,
+                    resourceType,
+                    resourceId
                 }
             });
 
@@ -39,7 +45,7 @@ export class TokenTrackingService {
             if (!subscription) return;
 
             const updateData: any = {
-                tokensUsedThisMonth: { increment: tokens }
+                tokensUsedThisMonth: { increment: totalTokens }
             };
 
             // Aggiorna contatore di categoria specifico
@@ -53,7 +59,7 @@ export class TokenTrackingService {
 
             const categoryField = categoryFieldMap[category];
             if (categoryField) {
-                updateData[categoryField] = { increment: tokens };
+                updateData[categoryField] = { increment: totalTokens };
             }
 
             await tx.subscription.update({

@@ -59,9 +59,10 @@ export async function POST(request: Request) {
         }
         const planType = subscriptionTierToPlanType(subscription.tier);
         const plan = PLANS[planType];
-        const maxPrompts = plan.limits.maxVisibilityPrompts;
+        // Default max prompts: 20 if visibility enabled, 0 otherwise
+        const maxPrompts = plan.limits.visibilityEnabled ? 20 : 0;
 
-        if (maxPrompts === 0) {
+        if (!plan.limits.visibilityEnabled) {
             return NextResponse.json(
                 { error: 'Visibility tracking not available in your plan' },
                 { status: 403 }

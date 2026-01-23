@@ -49,10 +49,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        // Check if limit is reached
-        if (config.prompts.length >= plan.limits.maxVisibilityPrompts) {
+        // Check if limit is reached (default 20 prompts if visibility enabled)
+        const maxPrompts = plan.limits.visibilityEnabled ? 20 : 0;
+        if (config.prompts.length >= maxPrompts) {
             return NextResponse.json(
-                { error: `Maximum prompts limit (${plan.limits.maxVisibilityPrompts}) reached for your plan` },
+                { error: `Maximum prompts limit (${maxPrompts}) reached for your plan` },
                 { status: 400 }
             );
         }

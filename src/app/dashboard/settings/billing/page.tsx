@@ -103,9 +103,9 @@ export default function BillingSettingsPage() {
                                 {isPortalLoading ? 'Caricamento...' : 'Gestisci su Stripe'}
                                 <ExternalLink className="w-4 h-4 ml-2" />
                             </Button>
-                            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold">
-                                <Link href="/pricing">Modifica Piano</Link>
-                            </Button>
+                            <Link href="/pricing" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold text-white px-4 py-2 transition-colors">
+                                Modifica Piano
+                            </Link>
                         </div>
                     </div>
 
@@ -136,9 +136,9 @@ export default function BillingSettingsPage() {
                         <p className="text-sm text-slate-600 mb-6 font-medium">
                             Hai bisogno di più token o interviste per questo mese senza cambiare piano?
                         </p>
-                        <Button variant="outline" className="w-full rounded-xl font-bold border-slate-200" asChild>
-                            <Link href="/pricing#addons">Vedi Pacchetti Extra</Link>
-                        </Button>
+                        <Link href="/pricing#addons" className="inline-flex items-center justify-center w-full rounded-xl font-bold border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
+                            Vedi Pacchetti Extra
+                        </Link>
                     </CardContent>
                 </Card>
 

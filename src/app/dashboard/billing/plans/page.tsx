@@ -53,12 +53,12 @@ export default async function PlansPage() {
 
                             <h3 className="text-xl font-bold text-stone-900 mb-2">{plan.name}</h3>
                             <div className="mb-6 flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-stone-900">€{plan.price}</span>
+                                <span className="text-4xl font-black text-stone-900">€{plan.monthlyPrice}</span>
                                 <span className="text-stone-400 text-sm">/mese</span>
                             </div>
 
                             <ul className="space-y-4 mb-10 flex-grow">
-                                {plan.marketingFeatures.map((feature, i) => (
+                                {plan.features.map((feature, i) => (
                                     <li key={i} className="flex items-center gap-3 text-sm text-stone-600">
                                         <Icons.Check size={18} className="text-amber-500 shadow-sm" />
                                         <span>{feature}</span>

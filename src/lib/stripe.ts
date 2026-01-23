@@ -68,7 +68,7 @@ export async function getStripeClient(): Promise<Stripe> {
 
     _stripe = new Stripe(config.secretKey, {
         typescript: true,
-        apiVersion: '2023-10-16', // Updated to a stable version used in other files
+        apiVersion: '2025-12-15.clover', // Updated to a stable version used in other files
     });
 
     return _stripe;

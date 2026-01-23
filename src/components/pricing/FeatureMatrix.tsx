@@ -1,6 +1,6 @@
 'use client';
 
-import { PLANS } from '@/config/plans';
+import { PLANS, PlanType, PlanConfig } from '@/config/plans';
 import { Card } from '@/components/ui/business-tuner/Card';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import React from 'react';
@@ -9,49 +9,37 @@ type Feature = {
     key: string;
     label: string;
     boolean?: boolean;
+    getValue?: (plan: PlanConfig) => string | number | boolean;
 };
 
 const FEATURE_CATEGORIES: Array<{ name: string; features: Feature[] }> = [
     {
         name: 'Interviste',
         features: [
-            { key: 'responsesPerMonth', label: 'Risposte/mese' },
-            { key: 'activeInterviews', label: 'Interviste attive' },
-            { key: 'users', label: 'Utenti' }
+            { key: 'maxInterviewsPerMonth', label: 'Interviste/mese', getValue: (p) => p.limits.maxInterviewsPerMonth === -1 ? 'Illimitate' : p.limits.maxInterviewsPerMonth },
+            { key: 'maxChatbotSessionsPerMonth', label: 'Sessioni Chatbot/mese', getValue: (p) => p.limits.maxChatbotSessionsPerMonth === -1 ? 'Illimitate' : p.limits.maxChatbotSessionsPerMonth },
+            { key: 'maxUsers', label: 'Utenti', getValue: (p) => p.limits.maxUsers === -1 ? 'Illimitati' : p.limits.maxUsers }
         ]
     },
     {
         name: 'Funzionalità Avanzate',
         features: [
-            { key: 'knowledgeBase', label: 'Knowledge Base', boolean: true },
-            { key: 'conditionalLogic', label: 'Logica Condizionale', boolean: true },
-            { key: 'customBranding', label: 'Branding Personalizzato', boolean: true },
-            { key: 'exportData', label: 'Export Dati', boolean: true }
-        ]
-    },
-    {
-        name: 'Analytics',
-        features: [
-            { key: 'sentiment', label: 'Analisi Sentiment', boolean: true },
-            { key: 'themeExtraction', label: 'Estrazione Temi', boolean: true },
-            { key: 'keyQuotes', label: 'Citazioni Chiave', boolean: true },
-            { key: 'trends', label: 'Trend Analysis', boolean: true },
-            { key: 'comparison', label: 'Confronto Interviste', boolean: true }
+            { key: 'visibilityEnabled', label: 'Brand Monitor', boolean: true, getValue: (p) => p.limits.visibilityEnabled },
+            { key: 'aiTipsEnabled', label: 'AI Tips', boolean: true, getValue: (p) => p.limits.aiTipsEnabled },
+            { key: 'whiteLabelEnabled', label: 'White Label', boolean: true, getValue: (p) => p.limits.whiteLabelEnabled },
+            { key: 'canTransferProjects', label: 'Trasferimento Progetti', boolean: true, getValue: (p) => p.limits.canTransferProjects }
         ]
     },
     {
         name: 'Integrazioni',
         features: [
-            { key: 'webhooks', label: 'Webhooks', boolean: true },
-            { key: 'api', label: 'API Access', boolean: true },
-            { key: 'zapier', label: 'Zapier', boolean: true },
-            { key: 'sso', label: 'SSO', boolean: true }
+            { key: 'apiAccessEnabled', label: 'API Access', boolean: true, getValue: (p) => p.limits.apiAccessEnabled }
         ]
     }
 ];
 
 export function FeatureMatrix() {
-    const planKeys = ['trial', 'starter', 'pro', 'business'] as const;
+    const planKeys = [PlanType.STARTER, PlanType.PRO, PlanType.BUSINESS] as const;
 
     return (
         <div className="overflow-x-auto">
@@ -65,7 +53,7 @@ export function FeatureMatrix() {
                                 <th key={planKey} className="p-4 text-center">
                                     <div className="font-semibold text-lg">{plan.name}</div>
                                     <div className="text-2xl font-bold text-amber-600 mt-1">
-                                        €{plan.price}
+                                        €{plan.monthlyPrice}
                                     </div>
                                     <div className="text-sm text-gray-600">/mese</div>
                                 </th>
@@ -86,9 +74,7 @@ export function FeatureMatrix() {
                                     <td className="p-4 text-gray-700">{feature.label}</td>
                                     {planKeys.map((planKey) => {
                                         const plan = PLANS[planKey];
-                                        const value = feature.boolean
-                                            ? plan.features[feature.key as keyof typeof plan.features]
-                                            : plan[feature.key as keyof typeof plan];
+                                        const value = feature.getValue ? feature.getValue(plan) : null;
 
                                         return (
                                             <td key={planKey} className="p-4 text-center">
@@ -100,7 +86,7 @@ export function FeatureMatrix() {
                                                     )
                                                 ) : (
                                                     <span className="font-medium">
-                                                        {value === -1 ? 'Illimitate' : String(value)}
+                                                        {String(value)}
                                                     </span>
                                                 )}
                                             </td>

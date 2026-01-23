@@ -212,12 +212,12 @@ export default function PricingPage() {
                 <h3 className="text-2xl font-bold mb-4 relative z-10">Pronto a sbloccare l'AI per il tuo Business?</h3>
                 <p className="text-slate-400 mb-8 relative z-10">Unisciti a oltre 500 aziende che usano Voler.ai per crescere.</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-                    <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 py-6 px-10 rounded-2xl font-black shadow-xl shadow-indigo-500/20" asChild>
-                        <Link href="/register">Crea Account Gratis</Link>
-                    </Button>
-                    <Button size="lg" variant="ghost" className="text-white hover:bg-white/10 py-6 px-10 rounded-2xl font-bold" asChild>
-                        <Link href="/sales">Parla con un Esperto</Link>
-                    </Button>
+                    <Link href="/register" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 py-6 px-10 rounded-2xl font-black shadow-xl shadow-indigo-500/20 text-white transition-colors">
+                        Crea Account Gratis
+                    </Link>
+                    <Link href="/sales" className="inline-flex items-center justify-center text-white hover:bg-white/10 py-6 px-10 rounded-2xl font-bold transition-colors">
+                        Parla con un Esperto
+                    </Link>
                 </div>
             </div>
         </div>

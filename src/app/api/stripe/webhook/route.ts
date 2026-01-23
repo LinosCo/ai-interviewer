@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2023-10-16'
-});
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+import { getStripeClient } from '@/lib/stripe';
 
 export async function POST(req: NextRequest) {
     const body = await req.text();
     const signature = (await headers()).get('stripe-signature')!;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
+    const stripe = await getStripeClient();
     let event: Stripe.Event;
 
     try {
@@ -37,7 +34,7 @@ export async function POST(req: NextRequest) {
                 }
                 // Subscription purchase
                 else if (session.mode === 'subscription') {
-                    await handleSubscriptionCreated(session);
+                    await handleSubscriptionCreated(session, stripe);
                 }
                 break;
             }
@@ -82,7 +79,7 @@ export async function POST(req: NextRequest) {
 // HANDLER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════
 
-async function handleSubscriptionCreated(session: Stripe.Checkout.Session) {
+async function handleSubscriptionCreated(session: Stripe.Checkout.Session, stripe: Stripe) {
     const { organizationId, tier } = session.metadata || {};
 
     if (!organizationId || !tier) return;
@@ -98,10 +95,10 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session) {
             status: 'ACTIVE',
             stripeSubscriptionId: stripeSubscription.id,
             stripePriceId: stripeSubscription.items.data[0]?.price.id,
-            currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-            currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
-            trialEndsAt: stripeSubscription.trial_end
-                ? new Date(stripeSubscription.trial_end * 1000)
+            currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+            currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
+            trialEndsAt: (stripeSubscription as any).trial_end
+                ? new Date((stripeSubscription as any).trial_end * 1000)
                 : null,
             // Reset contatori al cambio piano
             tokensUsedThisMonth: 0,
@@ -133,8 +130,8 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
         where: { id: subscription.id },
         data: {
             status: statusMap[stripeSubscription.status] || 'ACTIVE',
-            currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-            currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+            currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+            currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
             cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
             canceledAt: stripeSubscription.canceled_at
                 ? new Date(stripeSubscription.canceled_at * 1000)
@@ -198,9 +195,10 @@ async function handleAddOnPurchase(session: Stripe.Checkout.Session) {
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
     // Reset contatori mensili quando la fattura viene pagata
-    if (invoice.subscription) {
+    const subscriptionId = (invoice as any).subscription;
+    if (subscriptionId) {
         const subscription = await prisma.subscription.findUnique({
-            where: { stripeSubscriptionId: invoice.subscription as string }
+            where: { stripeSubscriptionId: subscriptionId as string }
         });
 
         if (subscription) {
@@ -224,9 +222,10 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-    if (invoice.subscription) {
+    const subscriptionId = (invoice as any).subscription;
+    if (subscriptionId) {
         await prisma.subscription.updateMany({
-            where: { stripeSubscriptionId: invoice.subscription as string },
+            where: { stripeSubscriptionId: subscriptionId as string },
             data: { status: 'PAST_DUE' }
         });
     }

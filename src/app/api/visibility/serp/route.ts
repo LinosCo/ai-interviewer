@@ -83,8 +83,8 @@ export async function POST(request: Request) {
         const planType = subscriptionTierToPlanType(subscription.tier);
         const plan = PLANS[planType];
 
-        // SERP monitoring requires at least PRO plan
-        if (plan.limits.visibilityScansPerWeek === 0) {
+        // SERP monitoring requires visibility feature
+        if (!plan.limits.visibilityEnabled) {
             return NextResponse.json(
                 { error: 'SERP monitoring requires a PRO or higher plan' },
                 { status: 403 }

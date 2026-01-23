@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { planService } from '@/services/planService';
-import { PlanFeatures } from '@/config/plans';
+import { PlanLimits } from '@/config/plans';
 
 /**
  * Feature Guard Middleware
  * Blocks access to features not available in the user's plan
  */
-export function requireFeature(feature: keyof PlanFeatures) {
+export function requireFeature(feature: keyof PlanLimits) {
     return async (req: NextRequest) => {
         try {
             // Get organization ID from request (assuming it's in headers or session)
@@ -50,7 +50,7 @@ export function requireFeature(feature: keyof PlanFeatures) {
  */
 export async function checkFeature(
     orgId: string,
-    feature: keyof PlanFeatures
+    feature: keyof PlanLimits
 ): Promise<{ allowed: boolean; error?: NextResponse }> {
     try {
         const hasAccess = await planService.checkFeatureAccess(orgId, feature);

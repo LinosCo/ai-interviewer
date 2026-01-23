@@ -56,16 +56,16 @@ export default async function BillingPage() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-8 mt-4">
                         <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Risposte/Mese</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.responsesPerMonth}</p>
+                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Interviste/Mese</p>
+                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxInterviewsPerMonth === -1 ? 'Illimitate' : planConfig.limits.maxInterviewsPerMonth}</p>
                         </div>
                         <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Bot Attivi</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.activeInterviews === -1 ? 'Illimitati' : planConfig.activeInterviews}</p>
+                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Chatbot</p>
+                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxChatbots === -1 ? 'Illimitati' : planConfig.limits.maxChatbots}</p>
                         </div>
                         <div className="p-4 bg-stone-50 rounded-2xl">
                             <p className="text-xs text-stone-400 font-bold uppercase mb-1">Utenti</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.users}</p>
+                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxUsers === -1 ? 'Illimitati' : planConfig.limits.maxUsers}</p>
                         </div>
                     </div>
 

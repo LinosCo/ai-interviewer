@@ -35,21 +35,22 @@ export async function POST(request: Request) {
         const planType = subscriptionTierToPlanType(subscription.tier);
         const plan = PLANS[planType];
 
-        if (plan.limits.maxVisibilityPrompts === 0 && plan.limits.maxBrandsTracked === 0) {
+        if (!plan.limits.visibilityEnabled) {
             return NextResponse.json(
                 { error: 'Visibility tracking not available in your plan' },
                 { status: 403 }
             );
         }
 
-        // Check brand limit
+        // Check brand limit (unlimited if visibility enabled)
         const existingBrands = await prisma.visibilityConfig.count({
             where: { organizationId }
         });
 
-        if (existingBrands >= plan.limits.maxBrandsTracked) {
+        const maxBrands = plan.limits.visibilityEnabled ? -1 : 0; // -1 = unlimited
+        if (maxBrands !== -1 && existingBrands >= maxBrands) {
             return NextResponse.json(
-                { error: `Limite brand raggiunto (${plan.limits.maxBrandsTracked}). Passa a un piano superiore per monitorare più brand.` },
+                { error: `Limite brand raggiunto (${maxBrands}). Passa a un piano superiore per monitorare più brand.` },
                 { status: 400 }
             );
         }
@@ -64,20 +65,22 @@ export async function POST(request: Request) {
             );
         }
 
-        // Validate limits
+        // Validate limits (default limits if visibility enabled: 20 prompts, 10 competitors)
         const enabledPrompts = prompts?.filter((p: any) => p.enabled) || [];
         const enabledCompetitors = competitors?.filter((c: any) => c.enabled) || [];
+        const maxPrompts = plan.limits.visibilityEnabled ? 20 : 0;
+        const maxCompetitors = plan.limits.visibilityEnabled ? 10 : 0;
 
-        if (enabledPrompts.length > plan.limits.maxVisibilityPrompts) {
+        if (enabledPrompts.length > maxPrompts) {
             return NextResponse.json(
-                { error: `Your plan allows a maximum of ${plan.limits.maxVisibilityPrompts} prompts` },
+                { error: `Your plan allows a maximum of ${maxPrompts} prompts` },
                 { status: 400 }
             );
         }
 
-        if (enabledCompetitors.length > plan.limits.maxCompetitorsTracked) {
+        if (enabledCompetitors.length > maxCompetitors) {
             return NextResponse.json(
-                { error: `Your plan allows a maximum of ${plan.limits.maxCompetitorsTracked} competitors` },
+                { error: `Your plan allows a maximum of ${maxCompetitors} competitors` },
                 { status: 400 }
             );
         }
@@ -260,11 +263,15 @@ export async function PATCH(request: Request) {
         const planType = subscriptionTierToPlanType(subscription.tier);
         const plan = PLANS[planType];
 
+        // Default limits if visibility enabled: 20 prompts, 10 competitors
+        const maxPrompts = plan.limits.visibilityEnabled ? 20 : 0;
+        const maxCompetitors = plan.limits.visibilityEnabled ? 10 : 0;
+
         if (prompts) {
             const enabledPrompts = prompts.filter((p: any) => p.enabled);
-            if (enabledPrompts.length > plan.limits.maxVisibilityPrompts) {
+            if (enabledPrompts.length > maxPrompts) {
                 return NextResponse.json(
-                    { error: `Your plan allows a maximum of ${plan.limits.maxVisibilityPrompts} prompts` },
+                    { error: `Your plan allows a maximum of ${maxPrompts} prompts` },
                     { status: 400 }
                 );
             }
@@ -272,9 +279,9 @@ export async function PATCH(request: Request) {
 
         if (competitors) {
             const enabledCompetitors = competitors.filter((c: any) => c.enabled);
-            if (enabledCompetitors.length > plan.limits.maxCompetitorsTracked) {
+            if (enabledCompetitors.length > maxCompetitors) {
                 return NextResponse.json(
-                    { error: `Your plan allows a maximum of ${plan.limits.maxCompetitorsTracked} competitors` },
+                    { error: `Your plan allows a maximum of ${maxCompetitors} competitors` },
                     { status: 400 }
                 );
             }

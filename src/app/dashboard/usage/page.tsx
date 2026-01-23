@@ -108,16 +108,12 @@ export default function UsagePage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" asChild className="rounded-xl font-bold">
-                        <Link href="/dashboard/settings/billing">
-                            <CreditCard className="w-4 h-4 mr-2" /> Gestisci Billing
-                        </Link>
-                    </Button>
-                    <Button className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold" asChild>
-                        <Link href="/pricing">
-                            Upgrade Piano
-                        </Link>
-                    </Button>
+                    <Link href="/dashboard/settings/billing" className="inline-flex items-center justify-center rounded-xl font-bold border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
+                        <CreditCard className="w-4 h-4 mr-2" /> Gestisci Billing
+                    </Link>
+                    <Link href="/pricing" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold text-white px-4 py-2 transition-colors">
+                        Upgrade Piano
+                    </Link>
                 </div>
             </div>
 
@@ -258,9 +254,9 @@ export default function UsagePage() {
                     <div>
                         <h3 className="font-bold text-red-900">Risorse quasi esaurite</h3>
                         <p className="text-sm text-red-700">Hai utilizzato oltre l'85% di alcune risorse incluse nel tuo piano. Considera un upgrade o l'acquisto di un add-on per evitare interruzioni.</p>
-                        <Button variant="link" className="text-red-600 p-0 h-auto font-bold text-sm mt-1" asChild>
-                            <Link href="/pricing">Vedi opzioni upgrade →</Link>
-                        </Button>
+                        <Link href="/pricing" className="text-red-600 font-bold text-sm mt-1 hover:underline">
+                            Vedi opzioni upgrade →
+                        </Link>
                     </div>
                 </div>
             )}

@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { PlanType } from "@prisma/client";
-import { PLANS, isUnlimited } from "@/config/plans";
+import { PLANS, isUnlimited, PlanType } from "@/config/plans";
 
 export async function checkQuota(
     orgId: string,

@@ -88,43 +88,53 @@ async function handleCheckoutCompleted(session: any) {
         return;
     }
 
+    // Get the organization's subscription
+    const subscription = await prisma.subscription.findUnique({
+        where: { organizationId }
+    });
+
+    if (!subscription) {
+        console.error('Subscription not found for organization:', organizationId);
+        return;
+    }
+
     const quantityNum = parseInt(quantity || '0', 10);
 
     // Calculate expiration (end of current month or null for non-expiring)
-    const expiresAt = ['TOKENS', 'USERS'].includes(addOnType)
+    const expiresAt = ['TOKENS', 'EXTRA_USERS'].includes(addOnType)
         ? null // Tokens and Users don't expire
         : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59, 999);
 
     // Create purchased add-on record
     await prisma.purchasedAddOn.create({
         data: {
-            organizationId,
-            addOnId,
+            subscriptionId: subscription.id,
             type: addOnType as AddOnType,
+            stripePaymentIntentId: session.payment_intent as string,
+            stripePriceId: addOnPackage.stripePriceId,
             quantity: quantityNum,
             remaining: quantityNum,
-            price: addOnPackage.price,
-            stripePaymentId: session.payment_intent as string,
+            amountPaid: addOnPackage.price,
             expiresAt
         }
     });
 
-    // If it's a USERS add-on, update subscription extra users
-    if (addOnType === 'USERS') {
-        await prisma.subscription.updateMany({
-            where: { organizationId },
+    // If it's a EXTRA_USERS add-on, update subscription extra users
+    if (addOnType === 'EXTRA_USERS') {
+        await prisma.subscription.update({
+            where: { id: subscription.id },
             data: {
                 extraUsers: { increment: quantityNum }
             }
         });
     }
 
-    // If it's TOKENS, also update purchased tokens in subscription
+    // If it's TOKENS, also update extra tokens in subscription
     if (addOnType === 'TOKENS') {
-        await prisma.subscription.updateMany({
-            where: { organizationId },
+        await prisma.subscription.update({
+            where: { id: subscription.id },
             data: {
-                purchasedTokens: { increment: quantityNum }
+                extraTokens: { increment: quantityNum }
             }
         });
     }

@@ -59,7 +59,8 @@ export async function GET(
             ? subscriptionTierToPlanType(org.subscription.tier)
             : 'TRIAL';
         const plan = PLANS[planType as keyof typeof PLANS];
-        const maxBrands = plan.limits.maxBrandsTracked;
+        // Brand tracking limit - allow unlimited (-1) if visibility is enabled, else 0
+        const maxBrands = plan.limits.visibilityEnabled ? -1 : 0;
 
         // Separate linked and unlinked brands
         const linkedBrands = allBrands

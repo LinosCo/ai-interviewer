@@ -61,7 +61,13 @@ export async function GET(request: Request) {
             skip: (page - 1) * limit,
             take: limit,
             orderBy,
-            include: {
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                createdAt: true,
+                plan: true,
+                hasCMSIntegration: true,
                 subscription: true,
                 tokenUsage: true,
                 _count: {
@@ -105,6 +111,7 @@ export async function GET(request: Request) {
                 createdAt: org.createdAt,
                 plan: org.plan,
                 tier,
+                hasCMSIntegration: org.hasCMSIntegration || false,
                 status: org.subscription?.status || 'ACTIVE',
                 isPartner: org.subscription?.isPartner || false,
                 owner: owner ? { email: owner.email, name: owner.name } : null,

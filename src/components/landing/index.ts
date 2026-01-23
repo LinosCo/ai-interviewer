@@ -1,0 +1,12 @@
+export { FluidBackground } from './FluidBackground';
+export { LandingHeader } from './LandingHeader';
+export { HeroSection } from './HeroSection';
+export { ProblemSection } from './ProblemSection';
+export { FeaturesSection } from './FeaturesSection';
+export { AITipsSection } from './AITipsSection';
+export { HowItWorks } from './HowItWorks';
+export { WhySection } from './WhySection';
+export { PricingSection } from './PricingSection';
+export { FAQSection } from './FAQSection';
+export { CTASection } from './CTASection';
+export { LandingFooter } from './LandingFooter';

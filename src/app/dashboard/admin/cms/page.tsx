@@ -125,7 +125,7 @@ export default async function AdminCMSPage() {
                                     <td className="px-6 py-4">
                                         <div>
                                             <p className="font-medium text-gray-900">{conn.name}</p>
-                                            <p className="text-sm text-gray-500">{conn.organization.name}</p>
+                                            <p className="text-sm text-gray-500">{conn.organization?.name || 'Org. non trovata'}</p>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">

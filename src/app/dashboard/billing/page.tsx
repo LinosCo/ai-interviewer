@@ -27,8 +27,8 @@ export default async function BillingPage() {
     if (!user || user.memberships.length === 0) return <div>Organizzazione non trovata.</div>;
 
     const org = user.memberships[0].organization;
-    const currentPlan = (org.plan.toLowerCase() as PlanType) || PlanType.TRIAL;
-    const planConfig = PLANS[currentPlan];
+    const currentPlan = (org.plan as PlanType) || PlanType.TRIAL;
+    const planConfig = PLANS[currentPlan] || PLANS[PlanType.FREE];
 
     return (
         <div className="pb-10">

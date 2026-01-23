@@ -1,35 +1,24 @@
-import Link from 'next/link';
-import Script from 'next/script';
-import { Footer } from '@/components/Footer';
 import { auth } from '@/auth';
-import { MarketingNav } from '@/components/MarketingNav';
+import { LandingHeader, LandingFooter } from '@/components/landing';
 
 export default async function MarketingLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    const session = await auth();
+  const session = await auth();
 
-    return (
-        <div className="min-h-screen bg-stone-950 flex flex-col">
-            <MarketingNav session={session} />
+  return (
+    <div className="min-h-screen flex flex-col">
+      <LandingHeader session={session} />
 
-            {/* Main Content */}
-            <main className="pt-20 flex-1">
-                {children}
-            </main>
+      {/* Main Content */}
+      <div className="flex-1">
+        {children}
+      </div>
 
-            {/* Footer */}
-            <Footer />
-
-            {/* Chatbot Widget for Customer Support (Only on marketing pages) */}
-            <Script
-                id="bt-chatbot-script"
-                src="https://businesstuner.voler.ai/embed/chatbot.js"
-                data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
-                strategy="lazyOnload"
-            />
-        </div>
-    );
+      {/* Footer */}
+      <LandingFooter />
+    </div>
+  );
 }

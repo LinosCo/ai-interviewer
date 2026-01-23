@@ -37,8 +37,10 @@ export default function NewCMSConnectionPage() {
             try {
                 const res = await fetch('/api/admin/organizations');
                 const data = await res.json();
+                // API returns { organizations: [...], pagination: {...} }
+                const orgs = data.organizations || [];
                 // Filter out organizations that already have CMS integration
-                setOrganizations(data.filter((o: Organization) => !o.hasCMSIntegration));
+                setOrganizations(orgs.filter((o: Organization) => !o.hasCMSIntegration));
             } catch (err) {
                 setError('Errore nel caricamento delle organizzazioni');
             } finally {

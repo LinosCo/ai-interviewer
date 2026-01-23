@@ -121,16 +121,24 @@ export async function createProjectAction(formData: FormData) {
     const name = formData.get('name') as string;
     if (!name) throw new Error("Name required");
 
-    await prisma.project.create({
+    // Create project and add owner access in a transaction
+    const project = await prisma.project.create({
         data: {
             name,
             ownerId: user.id,
-            organizationId: organizationId // Link to organization
+            organizationId: organizationId,
+            isPersonal: false, // New projects are not personal
+            accessList: {
+                create: {
+                    userId: user.id,
+                    role: 'OWNER'
+                }
+            }
         }
     });
 
     revalidatePath('/dashboard');
-    redirect('/dashboard');
+    redirect(`/dashboard/projects/${project.id}`);
 }
 
 export async function deleteProjectAction(projectId: string) {

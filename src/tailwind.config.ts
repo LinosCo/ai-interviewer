@@ -23,6 +23,22 @@ const config: Config = {
           800: '#92400E',
           900: '#78350F',
         },
+        // Custom colors for landing page - matches CSS variables
+        coral: {
+          DEFAULT: 'hsl(16 85% 58%)',
+          light: 'hsl(16 85% 68%)',
+          dark: 'hsl(16 85% 48%)',
+        },
+        amber: {
+          DEFAULT: 'hsl(35 90% 55%)',
+          light: 'hsl(35 90% 70%)',
+          dark: 'hsl(35 80% 45%)',
+        },
+        peach: {
+          DEFAULT: 'hsl(25 80% 85%)',
+          light: 'hsl(25 80% 92%)',
+        },
+        cream: 'hsl(30 50% 97%)',
       },
       fontFamily: {
         sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],

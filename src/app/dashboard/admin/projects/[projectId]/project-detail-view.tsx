@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBot } from '@/app/actions/admin';
 import { linkVisibilityConfig, unlinkVisibilityConfig, transferBotToProject } from '@/app/actions/project-tools';
-import { ArrowLeft, Loader2, X, Plus, Link as LinkIcon, Unlink, Bot as BotIcon, Globe, MessageSquare, Search, LayoutGrid, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Plus, Link as LinkIcon, Unlink, Bot as BotIcon, Globe, MessageSquare, Search, LayoutGrid, ChevronRight, Users } from 'lucide-react';
+import { ProjectAccessManager } from '@/app/dashboard/projects/access-manager';
 import { showToast } from '@/components/toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -58,6 +59,7 @@ export default function ProjectDetailView({
     const [targetProjectId, setTargetProjectId] = useState('');
 
     const [isManageToolsOpen, setIsManageToolsOpen] = useState(false);
+    const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     const handleCreate = async () => {
@@ -153,6 +155,13 @@ export default function ProjectDetailView({
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setIsManageUsersOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-bold hover:border-amber-500 hover:bg-amber-50 transition-all text-sm"
+                    >
+                        <Users className="w-4 h-4" />
+                        Gestisci Utenti
+                    </button>
                     <button
                         onClick={() => setIsManageToolsOpen(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-900 text-gray-900 rounded-xl font-bold hover:bg-gray-50 transition-all text-sm"
@@ -454,6 +463,49 @@ export default function ProjectDetailView({
                                         Crea Tool
                                     </button>
                                 </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Manage Users Dialog */}
+            <AnimatePresence>
+                {isManageUsersOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsManageUsersOpen(false)}
+                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col relative z-10"
+                        >
+                            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-3 bg-amber-500 text-white rounded-2xl">
+                                        <Users size={24} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Gestione Utenti</h2>
+                                        <p className="text-sm text-gray-500 font-medium">Invita collaboratori al progetto.</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsManageUsersOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
+                                    <X size={24} />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-8">
+                                <ProjectAccessManager
+                                    projectId={project.id}
+                                    variant="compact"
+                                    onClose={() => setIsManageUsersOpen(false)}
+                                />
                             </div>
                         </motion.div>
                     </div>

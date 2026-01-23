@@ -240,9 +240,9 @@ export default function CookiePolicyPage() {
                 </ul>
 
                 <p className="mt-12 text-sm text-gray-500 border-t pt-6">
-                    <strong>Business Tuner by Voler AI</strong><br />
-                    Via della Tecnologia, 123 - 20100 Milano (MI)<br />
-                    P.IVA: IT12345678901<br />
+                    <strong>Business Tuner by Voler.ai S.r.l.</strong><br />
+                    [INDIRIZZO]<br />
+                    P.IVA: [P.IVA]<br />
                     Email: hello@voler.ai
                 </p>
             </div>

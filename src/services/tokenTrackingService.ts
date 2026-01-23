@@ -159,6 +159,7 @@ export class TokenTrackingService {
         }
 
         return { allowed: true };
+    }
 
     /**
      * Ottiene statistiche globali della piattaforma (per admin)

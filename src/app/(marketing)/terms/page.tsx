@@ -10,7 +10,7 @@ export default function TermsPage() {
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">1. Il Servizio</h2>
                     <p>
-                        Business Tuner ("il Servizio") è un prodotto di [RAGIONE SOCIALE], con sede in [INDIRIZZO], P.IVA [P.IVA], C.F. [C.F.], Iscritta al Registro Imprese di [PROVINCIA], REA [NUMERO], Capitale Sociale Euro [AMMONTARE] i.v.
+                        Business Tuner ("il Servizio") è un prodotto di Voler.ai S.r.l., con sede in [INDIRIZZO], P.IVA [P.IVA], C.F. [C.F.], Iscritta al Registro Imprese di [PROVINCIA], REA [NUMERO], Capitale Sociale Euro [AMMONTARE] i.v.
                     </p>
                 </section>
 
@@ -22,9 +22,9 @@ export default function TermsPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">2. Descrizione del Servizio</h2>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-900">3. Descrizione del Servizio</h2>
                     <p>
-                        Business Tuner fornisce una piattaforma basata su intelligenza artificiale per la conduzione e l'analisi di interviste qualitative.
+                        Business Tuner è una piattaforma di business intelligence che offre: interviste intelligenti basate su AI, assistente chatbot per rispondere ai clienti 24/7, Brand Monitor per tracciare la reputazione online e la percezione sui motori AI, AI Tips e suggerimenti strategici.
                         Ci riserviamo il diritto di modificare, sospendere o interrompere il Servizio in qualsiasi momento.
                     </p>
                 </section>

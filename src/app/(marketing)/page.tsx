@@ -81,11 +81,19 @@ const FeatureIcon = ({ icon: Icon, color = colors.amber }: { icon: any, color?: 
 
 // Hero rotating phrases - slide animation (positive/opportunity-focused)
 const HERO_PHRASES = [
-    'cosa migliorare subito',
-    'dove butti budget',
+    'cosa pensano i clienti',
+    'se il team è motivato',
+    'come parlano di te online',
+    'dove ottimizzare il budget',
+    'se l\'assistenza funziona',
+    'come ti vede la filiera',
     'perché i clienti comprano',
-    'cosa dicono i competitor',
-    'come scalare velocemente',
+    'cosa cercano i talenti',
+    'come migliorare il prodotto',
+    'se i prezzi sono giusti',
+    'cosa fanno i competitor',
+    'come comunicare meglio',
+    'come migliorare il servizio',
 ];
 
 export default function LandingPage() {
@@ -279,7 +287,7 @@ export default function LandingPage() {
             </AnimatePresence>
 
             {/* 1. HERO SECTION */}
-            <section className="relative pt-20 pb-40 lg:pt-32 lg:pb-60 bg-gradient-to-b from-white to-amber-50/30 overflow-hidden">
+            <section className="relative pt-20 pb-20 lg:pt-32 lg:pb-32 bg-gradient-to-b from-white to-amber-50/30 overflow-hidden">
                 <div className="container mx-auto px-6 max-w-7xl relative z-10">
                     <div className="text-center max-w-4xl mx-auto">
                         <SectionLabel text="Per PMI e professionisti" />
@@ -289,8 +297,8 @@ export default function LandingPage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="text-5xl lg:text-7xl font-black text-stone-900 leading-[1.1] mb-8 tracking-tighter"
                         >
-                            Business Intelligence <br className="hidden lg:block" />
-                            Che ti dice
+                            L'intelligenza artificiale <br className="hidden lg:block" />
+                            che ascolta per te e ti dice
                             <br />
                             {/* Sliding text container - fixed height for animation */}
                             <span className="relative inline-block min-h-[1.3em] w-full">
@@ -400,7 +408,7 @@ export default function LandingPage() {
             </section>
 
             {/* 2. PROBLEM / SOLUTION */}
-            <section className="py-32 bg-white relative">
+            <section className="py-20 bg-white relative">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="grid lg:grid-cols-2 gap-24 items-center">
                         <div>
@@ -448,7 +456,7 @@ export default function LandingPage() {
                                     <li className="flex items-start gap-4">
                                         <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0"><Icons.Check size={20} /></div>
                                         <div>
-                                            <div className="font-bold">Chatbot Intelligence</div>
+                                            <div className="font-bold">Assistente Chatbot</div>
                                             <div className="text-sm text-amber-100">Rileva lacune e suggerisce FAQ in automatico.</div>
                                         </div>
                                     </li>
@@ -579,7 +587,7 @@ export default function LandingPage() {
                                             <div className="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100">
                                                 <div className="flex items-center gap-3">
                                                     <span className="text-stone-400 font-bold">2.</span>
-                                                    <span className="font-bold text-stone-800">"Shopify?"</span>
+                                                    <span className="font-bold text-stone-800">"Tempi di consegna?"</span>
                                                 </div>
                                                 <div className="bg-red-100 text-red-600 text-[10px] font-black px-2 py-0.5 rounded">GAP</div>
                                             </div>
@@ -591,7 +599,7 @@ export default function LandingPage() {
                                             <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center"><Icons.Bot size={16} /></div>
                                             <div className="font-bold text-amber-900 text-sm">FAQ Suggerita</div>
                                         </div>
-                                        <p className="text-xs text-amber-800 mb-6 italic">"Questa settimana 23 persone hanno chiesto dell'integrazione Shopify. Vuoi che generi una risposta basata su..."</p>
+                                        <p className="text-xs text-amber-800 mb-6 italic">"Questa settimana 18 clienti hanno chiesto dei tempi di consegna. Vuoi che generi una risposta basata su..."</p>
                                         <div className="flex gap-2">
                                             <button className="flex-1 py-2 rounded-lg bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 transition-colors">✅ Approva</button>
                                             <button className="flex-1 py-2 rounded-lg bg-white text-amber-600 text-xs font-bold border border-amber-200 hover:bg-amber-50">Modifica</button>
@@ -640,7 +648,7 @@ export default function LandingPage() {
                                 <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Icons.Search size={24} /></div>
                                 <h3 className="text-3xl font-bold text-stone-900 tracking-tight">Brand Monitor</h3>
                             </div>
-                            <h4 className="text-xl text-stone-900 font-bold mb-6">Cosa dicono di te su Google e quando ti chiedono all'AI.</h4>
+                            <h4 className="text-xl text-stone-900 font-bold mb-6">Cosa dicono di te su Google e cosa risponde l'AI agli utenti che cercano prodotti o servizi come i tuoi.</h4>
                             <p className="text-lg text-stone-600 mb-8 leading-relaxed">
                                 Scopri se quando qualcuno chiede a ChatGPT o Google un prodotto come il tuo, ti menzionano o no. Se non lo fanno, ti diciamo come migliorare.
                             </p>
@@ -777,93 +785,151 @@ export default function LandingPage() {
                 <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-amber-50/20 to-transparent -z-10" />
             </section>
 
-            {/* NEW SECTION: DATA & CMS AUTOMATION */}
-            <section className="py-32 bg-stone-900 text-white relative overflow-hidden">
-                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#F59E0B_1px,transparent_1px)] [background-size:24px_24px]"></div>
+            {/* 5. HOW IT WORKS */}
+            <section id="how-it-works" className="py-32 bg-stone-900 text-white relative overflow-hidden">
+                <div className="absolute inset-0 opacity-5 bg-[radial-gradient(#F59E0B_1px,transparent_1px)] [background-size:24px_24px]"></div>
                 <div className="container mx-auto px-6 max-w-7xl relative z-10">
-                    <div className="grid lg:grid-cols-2 gap-20 items-center">
-                        <div className="order-2 lg:order-1">
-                            <SectionLabel text="Integrazioni & Automazioni" color="#F59E0B" bg="rgba(255,255,255,0.1)" />
-                            <h2 className="text-4xl lg:text-5xl font-black mb-8 tracking-tight">
-                                Agisci subito, <br /><span className="text-amber-500">senza toccare codice</span>
-                            </h2>
-                            <p className="text-xl text-stone-400 mb-10 leading-relaxed">
-                                Quando l'AI scopre una lacuna o un'opportunità, non ti dà solo un report PDF.
-                                Si connette al tuo sito e ai tuoi processi per risolvere il problema.
-                            </p>
+                    <div className="text-center max-w-3xl mx-auto mb-20">
+                        <SectionLabel text="Come funziona" color="#F59E0B" bg="rgba(255,255,255,0.1)" />
+                        <h2 className="text-4xl lg:text-5xl font-black tracking-tight mb-4">Inizia in 3 passi</h2>
+                        <p className="text-stone-400 text-lg">La potenza dell'AI al servizio del tuo business, senza complessità.</p>
+                    </div>
 
-                            <ul className="space-y-8">
-                                <li className="flex gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center flex-shrink-0 text-amber-500 font-bold">01</div>
-                                    <div>
-                                        <h4 className="text-lg font-bold text-white mb-2">CMS Sync</h4>
-                                        <p className="text-stone-400 text-sm">Aggiorna FAQ e descrizioni prodotto sul tuo sito (Shopify, WordPress) basandosi sulle domande reali dei clienti.</p>
-                                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
+                        {/* Step 1 */}
+                        <div className="bg-stone-800/50 rounded-3xl p-8 border border-stone-700 hover:border-amber-500/50 transition-colors">
+                            <div className="text-7xl font-black text-amber-500 mb-6">01</div>
+                            <h3 className="text-2xl font-bold text-white mb-4">Configura</h3>
+                            <p className="text-stone-400 leading-relaxed mb-4">
+                                Crea il tuo osservatorio in pochi minuti:
+                            </p>
+                            <ul className="space-y-2 text-sm">
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Check size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span>Scegli un template o parti da zero</span>
                                 </li>
-                                <li className="flex gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center flex-shrink-0 text-amber-500 font-bold">02</div>
-                                    <div>
-                                        <h4 className="text-lg font-bold text-white mb-2">Workflow Automizzati</h4>
-                                        <p className="text-stone-400 text-sm">Notifica il supporto su Slack se un cliente è arrabbiato, o crea un ticket su Jira se emerge un bug ricorrente.</p>
-                                    </div>
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Check size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span>Definisci chi vuoi ascoltare: clienti, dipendenti, fornitori, prospect</span>
+                                </li>
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Check size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span>Personalizza domande e tono di voce dell'AI</span>
                                 </li>
                             </ul>
                         </div>
-                        <div className="order-1 lg:order-2 bg-stone-800 rounded-3xl p-8 border border-stone-700 shadow-2xl relative">
-                            {/* Mockup of an automation interface */}
-                            <div className="space-y-4 font-mono text-sm">
-                                <div className="flex items-center gap-2 text-green-400 mb-4 bg-black/20 p-2 rounded w-fit">
-                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                    <span>Automation Active</span>
-                                </div>
-                                <div className="p-4 bg-black/30 rounded-xl border border-stone-600">
-                                    <div className="text-stone-500 text-xs uppercase mb-2">Trigger</div>
-                                    <div className="text-white">Se {'>'} 5 clienti chiedono "Spedite in Svizzera?"</div>
-                                </div>
-                                <div className="flex justify-center"><Icons.ArrowRight className="rotate-90 text-stone-500" /></div>
-                                <div className="p-4 bg-amber-500/20 rounded-xl border border-amber-500/50">
-                                    <div className="text-amber-500 text-xs uppercase mb-2">Action: Update CMS</div>
-                                    <div className="text-white">Aggiungi a /faq: <br /> <span className="text-amber-300">"Sì, spediamo in Svizzera con dazi inclusi..."</span></div>
-                                </div>
-                            </div>
+
+                        {/* Step 2 */}
+                        <div className="bg-stone-800/50 rounded-3xl p-8 border border-stone-700 hover:border-amber-500/50 transition-colors">
+                            <div className="text-7xl font-black text-amber-500 mb-6">02</div>
+                            <h3 className="text-2xl font-bold text-white mb-4">Ascolta</h3>
+                            <p className="text-stone-400 leading-relaxed mb-4">
+                                L'AI lavora 24/7 su tre fronti:
+                            </p>
+                            <ul className="space-y-2 text-sm">
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.MessageSquare size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span><strong>Interviste:</strong> raccogli i feedback che ti interessano da chi vuoi</span>
+                                </li>
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Bot size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span><strong>Chatbot:</strong> scopri cosa cercano i visitatori del tuo sito</span>
+                                </li>
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Search size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span><strong>Brand Monitor:</strong> monitora cosa dice l'AI e il web di te e dei competitor</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        {/* Step 3 */}
+                        <div className="bg-stone-800/50 rounded-3xl p-8 border border-stone-700 hover:border-amber-500/50 transition-colors">
+                            <div className="text-7xl font-black text-amber-500 mb-6">03</div>
+                            <h3 className="text-2xl font-bold text-white mb-4">Agisci</h3>
+                            <p className="text-stone-400 leading-relaxed mb-4">
+                                Ricevi suggerimenti concreti pronti da approvare:
+                            </p>
+                            <ul className="space-y-2 text-sm">
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Zap size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span>Aggiungi una FAQ che manca sul sito</span>
+                                </li>
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Zap size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span>Correggi un prezzo o una descrizione</span>
+                                </li>
+                                <li className="flex items-start gap-2 text-stone-300">
+                                    <Icons.Zap size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                                    <span>Rispondi a una recensione o contatta un cliente insoddisfatto</span>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
             </section>
 
-            {/* 5. HOW IT WORKS */}
-            <section id="how-it-works" className="py-32 bg-[#FAFAF8]">
+            {/* 6. FUNZIONALITÀ AVANZATE */}
+            <section className="py-32 bg-white">
                 <div className="container mx-auto px-6 max-w-7xl">
                     <div className="text-center max-w-3xl mx-auto mb-20">
-                        <SectionLabel text="Workflow" />
-                        <h2 className="text-4xl font-bold text-stone-900 tracking-tight mb-4">Inizia in 3 passi</h2>
-                        <p className="text-stone-500 text-lg">La potenza dell'AI al servizio del tuo business, senza complessità.</p>
+                        <SectionLabel text="Funzionalità avanzate" />
+                        <h2 className="text-4xl lg:text-5xl font-black text-stone-900 mb-6 tracking-tight">
+                            Tecnologia che <span className="text-gradient">fa la differenza</span>
+                        </h2>
+                        <p className="text-lg text-stone-500">
+                            Dietro l'interfaccia semplice, funzionalità avanzate che rendono Business Tuner unico.
+                        </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-                        {/* Connecting Line (Desktop) */}
-                        <div className="hidden md:block absolute top-12 left-20 right-20 h-0.5 bg-dashed bg-stone-200 -z-0"
-                            style={{ backgroundImage: 'linear-gradient(to right, #e5e5e5 50%, transparent 50%)', backgroundSize: '10px 1px' }} />
-
-                        {[
-                            { step: '①', title: 'Configura', desc: 'Scegli un template o crea da zero il tuo osservatorio in 5 minuti.' },
-                            { step: '②', title: 'Raccogli', desc: 'Condividi il link o incorpora il widget. L\'AI lavora h24 per te.' },
-                            { step: '③', title: 'Agisci', desc: 'Ricevi insight automatici e azioni suggerite pronte da approvare.' },
-                        ].map((s, i) => (
-                            <div key={i} className="flex flex-col items-center text-center relative z-10">
-                                <div className="w-16 h-16 rounded-3xl bg-white shadow-xl flex items-center justify-center text-2xl font-black text-amber-500 mb-8 border border-stone-100 group hover:scale-110 transition-transform">
-                                    {s.step}
-                                </div>
-                                <h3 className="text-xl font-bold text-stone-900 mb-3">{s.title}</h3>
-                                <p className="text-stone-500 leading-relaxed text-sm max-w-[240px]">{s.desc}</p>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                                <Icons.Brain size={24} />
                             </div>
-                        ))}
+                            <h3 className="text-lg font-bold text-stone-900 mb-3">Memory Manager</h3>
+                            <p className="text-sm text-stone-500 leading-relaxed">
+                                L'AI ricorda le risposte precedenti e costruisce un profilo dell'intervistato per domande più pertinenti.
+                            </p>
+                        </div>
+
+                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                                <Icons.Timer size={24} />
+                            </div>
+                            <h3 className="text-lg font-bold text-stone-900 mb-3">Rilevamento fatica</h3>
+                            <p className="text-sm text-stone-500 leading-relaxed">
+                                Monitora i segnali di stanchezza dell'utente e adatta la lunghezza dell'intervista di conseguenza.
+                            </p>
+                        </div>
+
+                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                                <Icons.FileText size={24} />
+                            </div>
+                            <h3 className="text-lg font-bold text-stone-900 mb-3">Prompt trasparenti</h3>
+                            <p className="text-sm text-stone-500 leading-relaxed">
+                                Visualizza e modifica i prompt usati dall'AI. Pieno controllo su come l'intelligenza artificiale lavora.
+                            </p>
+                        </div>
+
+                        <div className="bg-stone-50 p-8 rounded-3xl border border-stone-100 hover:shadow-lg transition-shadow relative overflow-hidden">
+                            <div className="absolute top-4 right-4 text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                                Per clienti Voler.ai
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center mb-6">
+                                <Icons.Globe size={24} />
+                            </div>
+                            <h3 className="text-lg font-bold text-stone-900 mb-3">CMS Automation</h3>
+                            <p className="text-sm text-stone-500 leading-relaxed">
+                                Aggiorna automaticamente FAQ e contenuti sul tuo sito basandosi sui feedback raccolti.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </section>
 
             {/* 7. COMPETITOR COMPARISON */}
-            <section className="py-32 bg-white">
+            <section className="py-32 bg-stone-50">
                 <div className="container mx-auto px-6 max-w-5xl">
                     <div className="text-center mb-16">
                         <SectionLabel text="Confronto" />
@@ -937,6 +1003,7 @@ export default function LandingPage() {
                                 Annuale <span className="text-[10px] ml-1 bg-white/20 px-1.5 py-0.5 rounded">-25%</span>
                             </button>
                         </div>
+                        <p className="text-xs text-stone-400 mt-4">I prezzi si riferiscono a un singolo utente. Per team con più utenti, contattaci per un preventivo personalizzato.</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
@@ -949,7 +1016,7 @@ export default function LandingPage() {
                                 <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 20 interviste / mese</li>
                                 <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> 1 Progetto</li>
                                 <li className="text-sm font-medium text-stone-600 flex items-center gap-2"><Icons.Check className="text-amber-500" size={16} /> Analytics base</li>
-                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 opacity-30"><Icons.X size={16} /> Chatbot Intelligence</li>
+                                <li className="text-sm font-medium text-stone-600 flex items-center gap-2 opacity-30"><Icons.X size={16} /> Assistente Chatbot</li>
                             </ul>
                             <Link href="/register">
                                 <Button fullWidth variant="secondary" className="border-stone-200">Per sempre gratis</Button>
@@ -1038,9 +1105,9 @@ export default function LandingPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {[
-                            { quote: "Il nostro eCommerce di arredamento perdeva carrelli. L'AI ha scoperto che i clienti svizzeri non capivano i dazi. Abbiamo corretto con CMS Automation e recuperato il 15% di fatturato.", author: "Davide C.", role: "Founder, ArredoDesign", tool: "CMS Automation" },
+                            { quote: "Il nostro eCommerce di arredamento perdeva carrelli. L'AI ha scoperto che i clienti svizzeri non capivano i dazi. Abbiamo corretto con CMS Automation e recuperato il 15% di fatturato.", author: "Davide C.", role: "Founder, ArredoDesign", tool: "CMS Automation", note: "Funzionalità disponibile per clienti con sito sviluppato da Voler.ai" },
                             { quote: "Come agenzia, monitorare 20 clienti su ChatGPT era impossibile. Con Brand Monitor vediamo in un attimo chi sta perdendo visibilità e interveniamo.", author: "Elisa M.", role: "Digital Strategist", tool: "Brand Monitor" },
-                            { quote: "Le survey classiche ci davano voti alti, ma il churn restava. Interview AI ha fatto emergere il vero problema: l'assistenza post-vendita era lenta.", author: "Marco R.", role: "CEO SaaS B2B", tool: "AI Interviews" },
+                            { quote: "I sondaggi tradizionali ci davano voti alti, ma i clienti continuavano ad andarsene. Le interviste intelligenti hanno fatto emergere il vero problema: l'assistenza post-vendita era lenta.", author: "Marco R.", role: "CEO Software B2B", tool: "Interviste Intelligenti" },
                             { quote: "Prima aprivamo 10 tool diversi. Ora con Strategic Copilot ho ogni lunedì la lista delle 3 cose da fare per migliorare.", author: "Laura F.", role: "Marketing Manager", tool: "Strategic Copilot" },
                         ].map((t, i) => (
                             <div key={i} className="p-10 rounded-[2.5rem] bg-stone-50 border border-stone-100 relative group hover:-translate-y-1 transition-all">
@@ -1049,6 +1116,9 @@ export default function LandingPage() {
                                     <Icons.Check size={14} /> {t.tool}
                                 </div>
                                 <p className="text-xl text-stone-700 leading-relaxed mb-8 italic">"{t.quote}"</p>
+                                {'note' in t && t.note && (
+                                    <p className="text-xs text-stone-400 italic mb-4">* {t.note}</p>
+                                )}
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center font-bold text-amber-600 uppercase">
                                         {t.author[0]}
@@ -1072,6 +1142,75 @@ export default function LandingPage() {
                     */}
                 </div>
             </section >
+
+            {/* VOLER.AI CUSTOM DEVELOPMENT */}
+            <section className="py-32 bg-stone-900 text-white relative overflow-hidden">
+                <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#F59E0B_1px,transparent_1px)] [background-size:24px_24px]"></div>
+                <div className="container mx-auto px-6 max-w-7xl relative z-10">
+                    <div className="grid lg:grid-cols-2 gap-20 items-center">
+                        <div className="order-2 lg:order-1">
+                            <SectionLabel text="Voler.ai Development" color="#F59E0B" bg="rgba(255,255,255,0.1)" />
+                            <h2 className="text-4xl lg:text-5xl font-black mb-4 tracking-tight">
+                                ...e possiamo fare <br /><span className="text-amber-500">anche di più</span>
+                            </h2>
+                            <p className="text-xl text-stone-400 mb-10 leading-relaxed">
+                                Sviluppiamo <strong className="text-white">siti AI Native</strong> con contenuti che si aggiornano in automatico per rispondere alle esigenze reali dei tuoi stakeholder.
+                                Possiamo connettere anche il tuo sito esistente a Business Tuner per automatizzare news, FAQ, blog e molto altro.
+                            </p>
+
+                            <ul className="space-y-8">
+                                <li className="flex gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center flex-shrink-0 text-amber-500 font-bold">01</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-white mb-2">CMS Automation</h4>
+                                        <p className="text-stone-400 text-sm">FAQ, descrizioni prodotto e contenuti del sito si aggiornano automaticamente basandosi sui feedback e sulle domande reali dei clienti.</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center flex-shrink-0 text-amber-500 font-bold">02</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-white mb-2">Workflow su misura</h4>
+                                        <p className="text-stone-400 text-sm">Notifiche su Slack, ticket su Jira, alert via email: costruiamo automazioni personalizzate per i tuoi processi aziendali.</p>
+                                    </div>
+                                </li>
+                                <li className="flex gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-stone-800 border border-stone-700 flex items-center justify-center flex-shrink-0 text-amber-500 font-bold">03</div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-white mb-2">Integrazioni custom</h4>
+                                        <p className="text-stone-400 text-sm">Colleghiamo Business Tuner ai tuoi CRM, ERP o sistemi interni per un flusso dati completamente automatizzato.</p>
+                                    </div>
+                                </li>
+                            </ul>
+
+                            <div className="mt-10">
+                                <Link href="/contact">
+                                    <Button variant="secondary" className="bg-white text-stone-900 border-transparent hover:bg-amber-50">
+                                        Richiedi una consulenza
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                        <div className="order-1 lg:order-2 bg-stone-800 rounded-3xl p-8 border border-stone-700 shadow-2xl relative">
+                            {/* Mockup of an automation interface */}
+                            <div className="space-y-4 font-mono text-sm">
+                                <div className="flex items-center gap-2 text-green-400 mb-4 bg-black/20 p-2 rounded w-fit">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    <span>Automation Active</span>
+                                </div>
+                                <div className="p-4 bg-black/30 rounded-xl border border-stone-600">
+                                    <div className="text-stone-500 text-xs uppercase mb-2">Trigger</div>
+                                    <div className="text-white">Se {'>'} 5 clienti chiedono "Spedite in Svizzera?"</div>
+                                </div>
+                                <div className="flex justify-center"><Icons.ArrowRight className="rotate-90 text-stone-500" /></div>
+                                <div className="p-4 bg-amber-500/20 rounded-xl border border-amber-500/50">
+                                    <div className="text-amber-500 text-xs uppercase mb-2">Action: Update CMS</div>
+                                    <div className="text-white">Aggiungi a /faq: <br /> <span className="text-amber-300">"Sì, spediamo in Svizzera con dazi inclusi..."</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
             {/* 9. FAQ SECTION */}
             < section className="py-32 bg-[#FAFAF8]" >

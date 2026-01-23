@@ -29,6 +29,7 @@ model User {
   reports                 Report[]
   rewardGrants            RewardGrant[]
   sessions                Session[]
+  copilotSessions         CopilotSession[]
 }
 
 model ProjectAccess {
@@ -153,6 +154,9 @@ model Organization {
   // CMS Integration (managed by Voler.ai admin)
   hasCMSIntegration      Boolean               @default(false)
   cmsConnection          CMSConnection?
+
+  // Strategy Copilot
+  copilotSessions        CopilotSession[]
 }
 
 model Subscription {
@@ -275,6 +279,7 @@ model Project {
   owner          User?           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   accessList     ProjectAccess[]
   visibilityConfigs VisibilityConfig[]
+  copilotSessions CopilotSession[]
 }
 
 model Bot {
@@ -601,6 +606,7 @@ model TokenUsage {
   visibilityTokens   Int       @default(0)
   suggestionTokens   Int       @default(0)
   systemTokens       Int       @default(0)
+  copilotTokens      Int       @default(0)  // Strategy Copilot tokens
 
   // Contatori risorse
   interviewsUsed        Int    @default(0)
@@ -1182,4 +1188,30 @@ model WebsiteAnalytics {
 
   @@unique([connectionId, date])
   @@index([connectionId, date])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STRATEGY COPILOT
+// ═══════════════════════════════════════════════════════════════════════════
+
+model CopilotSession {
+  id              String   @id @default(cuid())
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  projectId       String?  // Active project during session (if Pro+)
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  messagesCount   Int      @default(0)
+  tokensUsed      Int      @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([organizationId])
 }

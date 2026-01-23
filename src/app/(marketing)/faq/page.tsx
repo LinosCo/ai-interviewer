@@ -3,59 +3,63 @@ import { colors } from '@/lib/design-system';
 const faqs = [
     {
         question: "Cos'è Business Tuner?",
-        answer: "Business Tuner è una piattaforma di ricerca qualitativa automatizzata. Utilizziamo agenti AI conversazionali per condurre interviste in profondità con clienti, dipendenti o stakeholder, analizzando poi le risposte per estrarre temi ricorrenti, sentiment e insight strategici. Sostituisce i tradizionali questionari con conversazioni naturali guidate dall'AI."
+        answer: "Business Tuner è una piattaforma di business intelligence che ascolta continuativamente clienti, dipendenti e stakeholder. Utilizziamo agenti AI conversazionali per condurre interviste intelligenti, un assistente chatbot per rispondere ai clienti 24/7 e Brand Monitor per tracciare cosa dicono di te i motori AI e il web."
     },
     {
-        question: "Come funziona la generazione automatica delle interviste?",
-        answer: "Partendo dal tuo obiettivo di ricerca e target audience, la nostra AI genera automaticamente una struttura di intervista con domande pertinenti organizzate per topic. Puoi personalizzare ogni domanda, modificare il tono, aggiungere una Knowledge Base di contesto, e testare il flusso prima di pubblicarlo. L'AI si adatta dinamicamente alle risposte dell'utente per approfondire aspetti rilevanti."
+        question: "A chi è rivolto Business Tuner?",
+        answer: "A PMI, professionisti e agenzie che vogliono capire meglio il proprio mercato senza spendere budget enterprise. Business Tuner raccoglie feedback da clienti, dipendenti, fornitori e altri stakeholder per offrirti una visione a 360° del tuo ecosistema."
     },
     {
-        question: "I dati delle interviste sono sicuri e privati?",
-        answer: "Sì. Tutti i dati sono cifrati in transito (TLS 1.3) e a riposo (AES-256). Le API keys sono crittografate nel database. I dati non vengono mai utilizzati per addestrare modelli AI esterni. Sei il proprietario esclusivo dei dati raccolti e puoi esportarli o eliminarli in qualsiasi momento. Siamo conformi al GDPR con Data Processing Agreement (DPA) disponibile su richiesta."
+        question: "Come funzionano le interviste intelligenti?",
+        answer: "Partendo dal tuo obiettivo di ricerca, l'AI genera automaticamente una struttura di intervista con domande pertinenti. Puoi personalizzare ogni domanda, modificare il tono e aggiungere contesto. Durante l'intervista, l'AI fa domande di approfondimento come farebbe un consulente esperto, raggiungendo un completion rate del 70%+ rispetto ai tradizionali form."
     },
     {
-        question: "Quali LLM supportate?",
-        answer: "Supportiamo OpenAI (GPT-4, GPT-4 Turbo) e Anthropic (Claude 3.5 Sonnet). Puoi scegliere il modello per ogni bot. Inoltre, puoi utilizzare le tue API keys personali per controllo completo su costi e compliance, oppure usare le nostre chiavi condivise (incluse nei piani a pagamento)."
+        question: "Cos'è l'Assistente Chatbot?",
+        answer: "È un chatbot AI che risponde alle domande dei tuoi clienti 24/7 basandosi sui contenuti del tuo sito e knowledge base. La cosa più importante: ti mostra le domande a cui non ha saputo rispondere (gap detection) e ti suggerisce le risposte da aggiungere. Così sai esattamente cosa manca sul tuo sito."
+    },
+    {
+        question: "Cos'è Brand Monitor?",
+        answer: "Brand Monitor traccia cosa dicono di te ChatGPT, Perplexity, Claude e altri motori AI, oltre a Google News, forum e articoli online. Scopri se quando qualcuno chiede un prodotto come il tuo, vieni menzionato o no. Se non vieni menzionato, ti diciamo come migliorare la tua visibilità AI."
+    },
+    {
+        question: "I dati delle interviste sono sicuri?",
+        answer: "Sì. Tutti i dati sono cifrati in transito (TLS 1.3) e a riposo (AES-256). I dati non vengono mai utilizzati per addestrare modelli AI esterni. Sei il proprietario esclusivo dei dati raccolti e puoi esportarli o eliminarli in qualsiasi momento. Siamo conformi al GDPR con server in Europa."
     },
     {
         question: "Quanto dura un'intervista tipica?",
-        answer: "La durata media è 8-12 minuti, ma varia in base alla configurazione. Puoi impostare una durata stimata (es. '10 minuti') che viene comunicata agli utenti. L'AI include un sistema di fatigue detection per evitare interviste troppo lunghe e mantenere alta la qualità delle risposte."
+        answer: "La durata media è 8-12 minuti. L'AI include un sistema di rilevamento fatica per evitare interviste troppo lunghe e mantenere alta la qualità delle risposte. Puoi impostare una durata stimata che viene comunicata agli utenti."
     },
     {
-        question: "Posso personalizzare il branding?",
-        answer: "Sì. Dal piano PRO in poi puoi: aggiungere il tuo logo, personalizzare colori primari e background, creare landing page custom per ogni intervista, rimuovere il watermark Business Tuner. Il piano BUSINESS include anche white-label completo e custom domain."
+        question: "Posso usare Business Tuner per ascoltare i dipendenti?",
+        answer: "Assolutamente sì. Le interviste intelligenti sono perfette per survey interne, feedback sul clima aziendale, exit interview automatizzate, onboarding assessment. L'AI garantisce anonimato quando richiesto e genera insight aggregati senza esporre risposte individuali."
     },
     {
-        question: "Come funziona l'analisi AI?",
-        answer: "Dopo ogni intervista, l'AI genera automaticamente: (1) Summary della conversazione, (2) Sentiment score (0-100), (3) Key quotes estratte, (4) Topic coverage per ogni area esplorata. A livello aggregato su tutte le interviste, identifica temi ricorrenti, pattern comuni e genera insight strategici. L'analisi è disponibile da piano STARTER in poi."
-    },
-    {
-        question: "Supportate la modalità Data Collection per recruitment?",
-        answer: "Sì. Puoi attivare la modalità 'Data Collection' per raccogliere profili strutturati (es. candidati per posizioni lavorative, lead qualificati). L'AI estrae automaticamente competenze, esperienze e informazioni rilevanti dalle risposte, salvandole in campi strutturati esportabili. Ideale per HR e team sales."
-    },
-    {
-        question: "Posso integrare Business Tuner con altri tool?",
-        answer: "Sì. Dal piano PRO supportiamo Webhook per inviare dati a sistemi esterni in tempo reale (es. CRM, Slack). Il piano BUSINESS include anche export CSV automatico. API pubblica e integrazione Zapier sono in roadmap ma non ancora disponibili."
-    },
-    {
-        question: "Quali sono i limiti dei vari piani?",
-        answer: "STARTER: 100 risposte/mese, 3 bot attivi, 1 utente. PRO: 300 risposte/mese, 10 bot attivi, 5 utenti, Knowledge Base, Custom branding. BUSINESS: 1000+ risposte/mese, bot illimitati, 15 utenti, White label, Webhook. Tutti i piani includono analytics AI e export PDF. Vedi la pagina Pricing per dettagli completi."
+        question: "Quali sono i limiti dei piani?",
+        answer: "FREE: 20 interviste/mese, 1 progetto. STARTER (€49-69/mese): 100 interviste/mese, 1 chatbot, 3 progetti. PRO (€149-199/mese): 400 interviste/mese, 3 chatbot, Brand Monitor, AI Tips. BUSINESS (€299-399/mese): 1.000 interviste/mese, 10 chatbot, Brand Monitor avanzato, Priority Support."
     },
     {
         question: "Offrite trial gratuito?",
-        answer: "Sì, tutti i piani offrono 14 giorni di prova gratuita senza carta di credito. Durante il trial hai accesso completo alle funzionalità del piano scelto. Puoi annullare in qualsiasi momento senza costi."
+        answer: "Sì! 14 giorni gratis con accesso completo a tutte le funzionalità PRO. Nessuna carta di credito richiesta. Puoi annullare in qualsiasi momento senza costi."
     },
     {
-        question: "Come gestiamo il consenso GDPR nelle interviste?",
-        answer: "Ogni intervista include un checkbox obbligatorio di consenso privacy che l'utente deve accettare prima di iniziare. Puoi personalizzare il testo della privacy notice per ogni bot. Gli utenti hanno sempre il diritto di richiedere accesso, modifica o cancellazione dei propri dati. Forniamo strumenti self-service per gestire DSAR (Data Subject Access Requests)."
+        question: "Cosa sono gli AI Tips?",
+        answer: "È il nostro Strategic Copilot che analizza tutti i dati raccolti (interviste, chat, menzioni web) e ti suggerisce azioni concrete: aggiungere una FAQ, modificare un prezzo, rispondere a una recensione. Tu approvi con un click e il sistema agisce."
     },
     {
-        question: "Posso usare Business Tuner per ricerca accademica?",
-        answer: "Assolutamente sì. Business Tuner è ideale per ricerca qualitativa in ambito accademico, sociologia, UX research. Garantiamo anonimizzazione dei dati quando richiesto e forniamo export completi per analisi esterne. Per progetti accademici di grandi dimensioni, contattaci per piani personalizzati."
+        question: "Come funziona il CMS Automation?",
+        answer: "Per i clienti che affidano lo sviluppo del sito a Voler.ai, offriamo l'integrazione CMS Automation: quando l'AI scopre una lacuna o un'opportunità, può aggiornare automaticamente FAQ e contenuti sul sito senza che tu debba toccare codice."
+    },
+    {
+        question: "Posso integrare Business Tuner con altri tool?",
+        answer: "Dal piano PRO supportiamo Webhook per inviare dati a sistemi esterni in tempo reale (CRM, Slack, sistemi interni). Il piano BUSINESS include API REST complete per integrazione con i tuoi sistemi aziendali."
     },
     {
         question: "Supportate lingue diverse dall'italiano?",
-        answer: "Sì. Le interviste possono essere configurate in qualsiasi lingua supportata dai modelli LLM (oltre 50 lingue). L'interfaccia admin è attualmente disponibile in italiano e inglese. L'AI si adatta automaticamente alla lingua dell'intervista per generare domande e analisi nella lingua corretta."
+        answer: "Sì. Le interviste e il chatbot possono essere configurati in qualsiasi lingua supportata dai modelli AI (oltre 50 lingue). L'AI si adatta automaticamente alla lingua per generare domande, risposte e analisi nella lingua corretta."
+    },
+    {
+        question: "Avete piani enterprise?",
+        answer: "Sì, per volumi superiori o esigenze particolari (SSO, SLA garantito, account manager dedicato) contattaci per un preventivo personalizzato."
     }
 ];
 
@@ -63,7 +67,7 @@ export default function FAQPage() {
     return (
         <div style={{ maxWidth: '800px', margin: '0 auto', padding: '4rem 2rem' }}>
             <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold mb-4" style={{ color: colors.text }}>Domande Frequenti</h1>
+                <h1 className="text-4xl font-bold mb-4" style={{ color: colors.text }}>Domande frequenti</h1>
                 <p className="text-xl text-gray-500">Tutto quello che devi sapere su Business Tuner</p>
             </div>
 

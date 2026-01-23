@@ -13,7 +13,7 @@ export default function SalesTermsPage() {
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">1. Il Servizio</h2>
                     <p>
-                        Business Tuner (di seguito "il Servizio") è una piattaforma SaaS (Software as a Service) fornita da [INSERIRE RAGIONE SOCIALE], con sede legale in [INSERIRE SEDE], P.IVA [INSERIRE P.IVA].
+                        Business Tuner (di seguito "il Servizio") è una piattaforma SaaS (Software as a Service) fornita da Voler.ai S.r.l., con sede legale in [INDIRIZZO], P.IVA [P.IVA].
                         Le presenti Condizioni Generali di Vendita disciplinano l'acquisto e l'utilizzo degli abbonamenti ai piani a pagamento (Starter, Pro, Business).
                     </p>
                 </section>
@@ -65,7 +65,7 @@ export default function SalesTermsPage() {
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">8. Legge Applicabile e Foro Competente</h2>
                     <p>
-                        Le presenti condizioni sono regolate dalla legge italiana. Per ogni controversia sarà competente il Foro di [INSERIRE FORO], fatto salvo il foro inderogabile del consumatore ove applicabile.
+                        Le presenti condizioni sono regolate dalla legge italiana. Per ogni controversia sarà competente il Foro di Milano, fatto salvo il foro inderogabile del consumatore ove applicabile.
                     </p>
                 </section>
             </div>

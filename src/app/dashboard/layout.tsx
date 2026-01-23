@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { gradients } from '@/lib/design-system';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { ProjectProvider } from '@/contexts/ProjectContext';
+import { StrategyCopilot } from '@/components/copilot/StrategyCopilot';
 
 export default async function DashboardLayout({
     children,
@@ -11,6 +12,9 @@ export default async function DashboardLayout({
 }) {
     const session = await auth();
     let isAdmin = false;
+    let userTier = 'TRIAL';
+    let organizationId = '';
+    let hasCMSIntegration = false;
 
     if (session?.user?.email) {
         const user = await prisma.user.findUnique({
@@ -18,6 +22,18 @@ export default async function DashboardLayout({
             select: { role: true }
         });
         isAdmin = user?.role === 'ADMIN';
+
+        // Get organization and subscription for Strategy Copilot
+        const membership = await prisma.membership.findFirst({
+            where: { userId: session.user.id },
+            include: { organization: { include: { subscription: true } } }
+        });
+
+        if (membership) {
+            userTier = membership.organization.subscription?.tier || 'TRIAL';
+            organizationId = membership.organizationId;
+            hasCMSIntegration = membership.organization.hasCMSIntegration || false;
+        }
     }
 
     const signOutAction = async () => {
@@ -29,7 +45,7 @@ export default async function DashboardLayout({
         <ProjectProvider>
             <div className="flex flex-col md:flex-row h-screen overflow-hidden font-sans" style={{ background: gradients.mesh }}>
 
-                <DashboardSidebar isAdmin={isAdmin} signOutAction={signOutAction} />
+                <DashboardSidebar isAdmin={isAdmin} signOutAction={signOutAction} hasCMSIntegration={hasCMSIntegration} />
 
                 {/* Main Content Area */}
                 <div className="flex-grow overflow-y-auto p-4 md:p-8 relative z-10">
@@ -38,12 +54,10 @@ export default async function DashboardLayout({
                     </div>
                 </div>
 
-                {/* Chatbot Widget for Dashboard Support */}
-                <script
-                    id="bt-dashboard-chatbot"
-                    src="/embed/chatbot.js"
-                    data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
-                    async
+                {/* Strategy Copilot - AI Assistant */}
+                <StrategyCopilot
+                    userTier={userTier}
+                    organizationId={organizationId}
                 />
             </div>
         </ProjectProvider>

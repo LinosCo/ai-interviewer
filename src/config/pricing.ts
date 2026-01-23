@@ -13,13 +13,12 @@ export const PRICING_PAGE = {
             cta: 'Inizia 14 giorni gratis',
             highlighted: false,
             features: [
-                '5 AI Interviews attive',
-                '300 risposte/mese',
-                '1 Chatbot Intelligence',
-                '2.000 conversazioni chatbot',
-                'Analytics base',
-                'Logo custom',
-                '2 utenti inclusi',
+                '100 interviste/mese',
+                '3 progetti',
+                '1 Assistente Chatbot',
+                '500 sessioni chatbot',
+                'Analytics completi',
+                'Export PDF/CSV',
                 'Supporto email'
             ]
         },
@@ -33,16 +32,15 @@ export const PRICING_PAGE = {
             highlighted: true,
             badge: '⭐ Più popolare',
             features: [
-                '15 AI Interviews attive',
-                '1.000 risposte/mese',
-                '3 Chatbot Intelligence',
-                '10.000 conversazioni chatbot',
-                '1 Visibility Tracker',
-                '50 Cross-Channel insights',
+                '400 interviste/mese',
+                '10 progetti',
+                '3 Assistenti Chatbot',
+                '4.000 sessioni chatbot',
+                'Brand Monitor (800 query)',
+                'AI Tips & suggerimenti',
                 'Analytics avanzati',
                 'Nessun watermark',
                 'Export CSV + Webhook',
-                '5 utenti inclusi',
                 'Supporto prioritario'
             ]
         },
@@ -55,17 +53,14 @@ export const PRICING_PAGE = {
             cta: 'Contattaci',
             highlighted: false,
             features: [
-                'AI Interviews illimitate',
-                '3.000 risposte/mese',
-                '10 Chatbot Intelligence',
-                '30.000 conversazioni chatbot',
-                '3 Visibility Tracker',
-                'Visibility giornaliera',
-                'Cross-Channel illimitato',
-                'White label completo',
-                'Dominio personalizzato',
+                '1.000 interviste/mese',
+                'Progetti illimitati',
+                '10 Assistenti Chatbot',
+                '12.000 sessioni chatbot',
+                'Brand Monitor (4.000 query)',
+                'AI Tips avanzati',
                 'API REST + Webhook',
-                '15 utenti inclusi',
+                'Priority Support',
                 'Account manager dedicato'
             ]
         }
@@ -73,14 +68,14 @@ export const PRICING_PAGE = {
 
     addons: [
         {
-            name: 'Risposte aggiuntive',
-            price: '€0.25/risposta',
+            name: 'Interviste aggiuntive',
+            price: '€0.25/intervista',
             description: 'Quando superi la soglia mensile'
         },
         {
             name: 'Utenti aggiuntivi',
             price: '€15/utente/mese',
-            description: 'Per Pro e Business'
+            description: 'Per team con più utenti'
         },
         {
             name: 'Chatbot aggiuntivo',
@@ -88,15 +83,15 @@ export const PRICING_PAGE = {
             description: 'Ogni bot oltre il limite del piano'
         },
         {
-            name: 'Visibility Tracker aggiuntivo',
+            name: 'Brand Monitor aggiuntivo',
             price: '€49/mese',
             description: 'Per monitorare brand/competitor extra'
         }
     ],
 
     yearlyDiscount: {
-        percentage: 20,
-        badge: '-20% annuale'
+        percentage: 25,
+        badge: '-25% annuale'
     },
 
     faq: [
@@ -105,15 +100,15 @@ export const PRICING_PAGE = {
             a: 'Sì, upgrade immediato con addebito proporzionale. Downgrade dal mese successivo.'
         },
         {
-            q: 'Cosa succede se supero le risposte mensili?',
-            a: 'Le interviste vanno in pausa. Puoi acquistare risposte extra a €0.25/risposta o fare upgrade.'
+            q: 'Cosa succede se supero le interviste mensili?',
+            a: 'Le interviste vanno in pausa. Puoi acquistare interviste extra a €0.25/intervista o fare upgrade.'
         },
         {
             q: 'Quali sono i tre strumenti inclusi?',
-            a: 'AI Interviews per raccogliere feedback, Chatbot Intelligence per assistenza 24/7 e gap detection, Visibility Tracker per monitorare come i motori AI parlano del tuo brand.'
+            a: 'Interviste Intelligenti per raccogliere feedback, Assistente Chatbot per assistenza 24/7 e gap detection, Brand Monitor per monitorare come i motori AI parlano del tuo brand.'
         },
         {
-            q: 'Le bozze contano come risposte?',
+            q: 'Le bozze contano come interviste?',
             a: 'No, contiamo solo le interviste completate dai rispondenti.'
         },
         {
@@ -121,7 +116,7 @@ export const PRICING_PAGE = {
             a: 'Sì! 14 giorni gratis con accesso completo a tutte le funzionalità PRO. Nessuna carta richiesta.'
         },
         {
-            q: 'Come funziona il Visibility Tracker?',
+            q: 'Come funziona Brand Monitor?',
             a: 'Monitoriamo come ChatGPT, Perplexity e altri motori AI rispondono alle domande sul tuo settore. Ricevi alert quando vieni menzionato o quando la percezione cambia.'
         },
         {

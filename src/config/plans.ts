@@ -171,7 +171,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         features: [
             '400 interviste/mese',
             '3 chatbot (4.000 sessioni)',
-            'Visibility Tracker',
+            'Brand Monitor',
             'AI Tips',
             '10 progetti',
             '5 utenti'

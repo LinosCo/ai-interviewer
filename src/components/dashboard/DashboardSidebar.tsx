@@ -9,9 +9,10 @@ import GlobalProjectSelector from './GlobalProjectSelector';
 interface DashboardSidebarProps {
     isAdmin: boolean;
     signOutAction: () => Promise<void>;
+    hasCMSIntegration?: boolean;
 }
 
-export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarProps) {
+export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = false }: DashboardSidebarProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     const toggleMenu = () => setIsOpen(!isOpen);
@@ -75,6 +76,9 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
                     <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Brand Monitor" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/insights" icon={<Icons.Layers size={20} />} label="AI Tips" onClick={() => setIsOpen(false)} />
+                    {hasCMSIntegration && (
+                        <DashboardLink href="/dashboard/cms" icon={<Icons.Globe size={20} />} label="Sito Web" onClick={() => setIsOpen(false)} />
+                    )}
                     <DashboardLink href="/dashboard/templates" icon={<Icons.LayoutTemplate size={20} />} label="Template" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
 
@@ -83,6 +87,7 @@ export function DashboardSidebar({ isAdmin, signOutAction }: DashboardSidebarPro
                             <span className="text-xs text-amber-600 font-bold uppercase tracking-wider px-4 mb-3 block">Admin</span>
                             <DashboardLink href="/dashboard/admin/users" icon={<Icons.Users size={20} />} label="Gestione utenti" isAdmin onClick={() => setIsOpen(false)} />
                             <DashboardLink href="/dashboard/admin/projects" icon={<Icons.FolderKanban size={20} />} label="Gestione progetti" isAdmin onClick={() => setIsOpen(false)} />
+                            <DashboardLink href="/dashboard/admin/cms" icon={<Icons.Link size={20} />} label="Integrazioni CMS" isAdmin onClick={() => setIsOpen(false)} />
                         </div>
                     )}
                 </nav>

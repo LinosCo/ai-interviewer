@@ -399,7 +399,7 @@ export default function LandingPage() {
                                 </Button>
                             </Link>
                             <Link href="/onboarding/preview">
-                                <Button variant="white" size="lg" className="px-10 py-6 text-lg h-auto rounded-2xl text-stone-900 shadow-xl hover:scale-105 transition-transform">
+                                <Button variant="secondary" size="lg" className="px-10 py-6 text-lg h-auto rounded-2xl bg-white text-stone-900 border-white/20 shadow-xl hover:bg-white/90 hover:scale-105 transition-all">
                                     <Icons.Play className="mr-2 text-amber-600" /> Demo Intervista
                                 </Button>
                             </Link>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { showToast } from '@/components/toast';
 
 interface PlatformSettingsFormProps {
     userId: string;
@@ -102,10 +103,10 @@ export default function PlatformSettingsForm({
             }
 
             router.refresh();
-            alert('Settings saved successfully!');
+            showToast('Impostazioni salvate con successo!');
         } catch (error) {
             console.error('Error saving settings:', error);
-            alert('Failed to save settings. Please try again.');
+            showToast('Errore durante il salvataggio. Riprova.', 'error');
         } finally {
             setIsSaving(false);
         }

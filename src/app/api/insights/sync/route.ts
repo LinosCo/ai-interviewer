@@ -10,6 +10,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const { searchParams } = new URL(request.url);
+        const projectId = searchParams.get('projectId');
+
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             include: { memberships: { take: 1 } }
@@ -20,7 +23,19 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
 
-        const result = await CrossChannelSyncEngine.sync(orgId);
+        // Verify project access if projectId is provided
+        if (projectId) {
+            const access = await prisma.projectAccess.findUnique({
+                where: {
+                    userId_projectId: { userId: session.user.id, projectId }
+                }
+            });
+            if (!access) {
+                return NextResponse.json({ error: 'Project access denied' }, { status: 403 });
+            }
+        }
+
+        const result = await CrossChannelSyncEngine.sync(orgId, projectId || undefined);
 
         return NextResponse.json({
             success: true,

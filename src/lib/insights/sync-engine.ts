@@ -59,16 +59,36 @@ const SyncResultSchema = z.object({
 });
 
 export class CrossChannelSyncEngine {
-    static async sync(organizationId: string) {
-        // 0. Fetch Organization strategy
-        const org = await prisma.organization.findUnique({
-            where: { id: organizationId },
-            select: { strategicVision: true, valueProposition: true }
-        });
+    static async sync(organizationId: string, projectId?: string) {
+        // 0. Fetch strategic context (project-level if available, otherwise org-level)
+        let strategicVision: string | null = null;
+        let valueProposition: string | null = null;
 
-        // 1. Fetch visibility data
+        if (projectId) {
+            const project = await prisma.project.findUnique({
+                where: { id: projectId },
+                select: { strategicVision: true, valueProposition: true }
+            });
+            strategicVision = project?.strategicVision || null;
+            valueProposition = project?.valueProposition || null;
+        }
+
+        // Fallback to org-level if project doesn't have strategy
+        if (!strategicVision && !valueProposition) {
+            const org = await prisma.organization.findUnique({
+                where: { id: organizationId },
+                select: { strategicVision: true, valueProposition: true }
+            });
+            strategicVision = org?.strategicVision || null;
+            valueProposition = org?.valueProposition || null;
+        }
+
+        // 1. Fetch visibility data (filter by project if provided)
         const visibilityConfig = await prisma.visibilityConfig.findFirst({
-            where: { organizationId },
+            where: {
+                organizationId,
+                ...(projectId ? { projectId } : {})
+            },
             include: {
                 scans: {
                     where: { status: 'completed' },
@@ -85,7 +105,12 @@ export class CrossChannelSyncEngine {
         const analyses = await prisma.conversationAnalysis.findMany({
             where: {
                 conversation: {
-                    bot: { project: { organizationId } },
+                    bot: {
+                        project: {
+                            organizationId,
+                            ...(projectId ? { id: projectId } : {})
+                        }
+                    },
                     chatbotSession: null
                 }
             },
@@ -107,7 +132,14 @@ export class CrossChannelSyncEngine {
 
         // 3. Fetch Website Content (Knowledge Sources)
         const knowledgeSources = await prisma.knowledgeSource.findMany({
-            where: { bot: { project: { organizationId } } },
+            where: {
+                bot: {
+                    project: {
+                        organizationId,
+                        ...(projectId ? { id: projectId } : {})
+                    }
+                }
+            },
             take: 15,
             orderBy: { createdAt: 'desc' },
             select: { title: true, type: true, content: true }
@@ -115,7 +147,14 @@ export class CrossChannelSyncEngine {
 
         // 4. Fetch Chatbot Analytics
         const chatbotAnalytics = await prisma.chatbotAnalytics.findMany({
-            where: { bot: { project: { organizationId } } },
+            where: {
+                bot: {
+                    project: {
+                        organizationId,
+                        ...(projectId ? { id: projectId } : {})
+                    }
+                }
+            },
             take: 5,
             orderBy: { createdAt: 'desc' }
         });
@@ -168,15 +207,15 @@ export class CrossChannelSyncEngine {
         const { model } = await getSystemLLM();
 
         // Build a strong strategic context for the LLM
-        const hasStrategicContext = org?.strategicVision || org?.valueProposition;
-        const strategicContext = hasStrategicContext
+        const hasStrategicContext = strategicVision || valueProposition;
+        const strategicContextText = hasStrategicContext
             ? `
             🎯 VISIONE STRATEGICA del Brand:
-            "${org?.strategicVision}"
-            
+            "${strategicVision}"
+
             💎 VALUE PROPOSITION:
-            "${org?.valueProposition}"
-            
+            "${valueProposition}"
+
             ⚠️ IMPORTANTE: Ogni suggerimento DEVE essere direttamente collegato a questa visione.
             Se un suggerimento non supporta la visione strategica, NON includerlo.`
             : `
@@ -191,7 +230,7 @@ export class CrossChannelSyncEngine {
 =============================================================
 🎯 CONTESTO STRATEGICO (questo guida OGNI suggerimento)
 =============================================================
-${strategicContext}
+${strategicContextText}
 
 =============================================================
 📊 DATI RACCOLTI DAL BRAND
@@ -286,6 +325,7 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
         const healthInsight = await prisma.crossChannelInsight.create({
             data: {
                 organizationId,
+                projectId: projectId || null,
                 topicName: "Health Report: Brand & Sito",
                 visibilityData: {
                     report: object.healthReport,
@@ -313,6 +353,7 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             const insight = await prisma.crossChannelInsight.create({
                 data: {
                     organizationId,
+                    projectId: projectId || null,
                     topicName: rawInsight.topicName,
                     visibilityData: visibilitySummary as any,
                     interviewData: interviewSummary as any,

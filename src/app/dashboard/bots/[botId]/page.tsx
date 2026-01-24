@@ -65,7 +65,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                     <h1 className="text-2xl font-bold">Configurazioni: {bot.name}</h1>
                     <div className="flex gap-2">
                         <Link href={`/dashboard/bots/${bot.id}/analytics`} className="px-3 py-2 border rounded hover:bg-gray-50">
-                            Analytics
+                            Statistiche
                         </Link>
                         <Link href={`/dashboard/bots/${bot.id}/embed`} className="px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 font-medium flex items-center gap-2">
                             <Icons.Settings2 className="w-4 h-4" />
@@ -81,19 +81,19 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
     return (
         <div className="space-y-6">
             <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-                <h1 className="text-2xl font-bold">Edit Bot: {bot.name}</h1>
+                <h1 className="text-2xl font-bold">Modifica Bot: {bot.name}</h1>
                 <div className="flex flex-wrap gap-2 sm:gap-4">
                     <Link href={`/dashboard/bots/${bot.id}/analytics`} className="px-3 py-2 sm:px-4 sm:py-2 border rounded hover:bg-gray-50 text-sm sm:text-base">
-                        Analytics
+                        Statistiche
                     </Link>
                     <Link href={`/dashboard/bots/${bot.id}/claims`} className="px-3 py-2 sm:px-4 sm:py-2 border rounded hover:bg-gray-50 bg-green-50 text-green-700 border-green-200 text-sm sm:text-base">
-                        Claims
+                        Richieste premi
                     </Link>
                     <Link href={`/dashboard/bots/${bot.id}/profiles`} className="px-3 py-2 sm:px-4 sm:py-2 border rounded hover:bg-gray-50 bg-purple-50 text-purple-700 border-purple-200 text-sm sm:text-base">
                         Profili
                     </Link>
                     <a href={`/i/${bot.slug}`} target="_blank" className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm sm:text-base">
-                        Public Link
+                        Link Pubblico
                     </a>
                     <CopyLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL || ''}/i/${bot.slug}`} />
                 </div>

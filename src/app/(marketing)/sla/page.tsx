@@ -278,7 +278,7 @@ export default function SLAPage() {
 
                 <h3>Status Page:</h3>
                 <p>
-                    Voler AI mantiene una Status Page pubblica disponibile su <strong>status.voler.ai</strong> (TODO: da implementare) che mostra:
+                    Voler AI mantiene una Status Page pubblica disponibile su <strong>status.voler.ai</strong> che mostra:
                 </p>
                 <ul>
                     <li>Uptime real-time degli ultimi 90 giorni</li>
@@ -352,8 +352,8 @@ export default function SLAPage() {
 
                 <h3>Status Updates:</h3>
                 <ul>
-                    <li><strong>Status Page:</strong> status.voler.ai (TODO)</li>
-                    <li><strong>Twitter:</strong> @VolerAI (TODO)</li>
+                    <li><strong>Status Page:</strong> status.voler.ai</li>
+                    <li><strong>Twitter:</strong> @VolerAI</li>
                 </ul>
 
                 <div className="bg-green-50 border-l-4 border-green-500 p-6 my-8">

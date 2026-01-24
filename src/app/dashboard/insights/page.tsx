@@ -22,9 +22,11 @@ import {
     Search,
     Phone,
     Lightbulb,
-    Save
+    Save,
+    Folder
 } from "lucide-react";
 import { showToast } from "@/components/toast";
+import { useProject } from '@/contexts/ProjectContext';
 
 interface Action {
     type: string;
@@ -87,6 +89,7 @@ const getTargetLabel = (target: string): string => {
 };
 
 export default function InsightHubPage() {
+    const { selectedProject, isAllProjectsSelected } = useProject();
     const [insights, setInsights] = useState<Insight[]>([]);
     const [healthReport, setHealthReport] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -96,9 +99,15 @@ export default function InsightHubPage() {
     const [isSavingStrategy, setIsSavingStrategy] = useState(false);
     const [showStrategyEdit, setShowStrategyEdit] = useState(false);
 
+    // Get the project ID for API calls (null if "All Projects" is selected)
+    const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
+
     const fetchInsights = async () => {
         try {
-            const res = await fetch('/api/insights/sync');
+            const url = projectId
+                ? `/api/insights/sync?projectId=${projectId}`
+                : '/api/insights/sync';
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
                 setInsights(data.insights);
@@ -107,6 +116,8 @@ export default function InsightHubPage() {
                 const hr = data.insights.find((i: any) => i.topicName === "Health Report: Brand & Sito");
                 if (hr && hr.visibilityData?.report) {
                     setHealthReport(hr.visibilityData.report);
+                } else {
+                    setHealthReport(null);
                 }
             }
         } catch (err) {
@@ -118,7 +129,11 @@ export default function InsightHubPage() {
 
     const fetchStrategy = async () => {
         try {
-            const res = await fetch('/api/organization/settings');
+            // Fetch project-level strategy if a project is selected, otherwise org-level
+            const url = projectId
+                ? `/api/projects/${projectId}/settings`
+                : '/api/organization/settings';
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
                 setStrategicVision(data.strategicVision || '');
@@ -129,15 +144,21 @@ export default function InsightHubPage() {
         }
     };
 
+    // Refetch when selected project changes
     useEffect(() => {
+        setLoading(true);
+        setHealthReport(null);
         fetchInsights();
         fetchStrategy();
-    }, []);
+    }, [projectId]);
 
     const handleSync = async () => {
         setSyncing(true);
         try {
-            const res = await fetch('/api/insights/sync', { method: 'POST' });
+            const url = projectId
+                ? `/api/insights/sync?projectId=${projectId}`
+                : '/api/insights/sync';
+            const res = await fetch(url, { method: 'POST' });
             if (res.ok) {
                 showToast("Insights sincronizzati con successo!");
                 fetchInsights();
@@ -155,7 +176,11 @@ export default function InsightHubPage() {
     const handleSaveStrategy = async () => {
         setIsSavingStrategy(true);
         try {
-            const res = await fetch('/api/organization/settings', {
+            // Save to project-level if a project is selected, otherwise org-level
+            const url = projectId
+                ? `/api/projects/${projectId}/settings`
+                : '/api/organization/settings';
+            const res = await fetch(url, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ strategicVision, valueProposition })
@@ -206,8 +231,14 @@ Grazie`
                     <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
                         AI Tips
                     </h2>
-                    <p className="text-muted-foreground font-medium">
+                    <p className="text-muted-foreground font-medium flex items-center gap-2">
                         Analisi cross-channel di interviste, chatbot e visibilità online.
+                        {selectedProject && !isAllProjectsSelected && (
+                            <Badge variant="outline" className="ml-2 gap-1 font-medium">
+                                <Folder className="w-3 h-3" />
+                                {selectedProject.name}
+                            </Badge>
+                        )}
                     </p>
                 </div>
                 <Button
@@ -230,7 +261,11 @@ Grazie`
                             </div>
                             <div>
                                 <CardTitle className="text-lg font-bold">Visione Strategica & Value Prop</CardTitle>
-                                <CardDescription className="text-xs">Definisci la direzione della tua organizzazione per suggerimenti AI più mirati.</CardDescription>
+                                <CardDescription className="text-xs">
+                                    {projectId
+                                        ? `Definisci la strategia per il progetto "${selectedProject?.name}" per suggerimenti AI più mirati.`
+                                        : 'Definisci la direzione della tua organizzazione per suggerimenti AI più mirati.'}
+                                </CardDescription>
                             </div>
                         </div>
                         <Button

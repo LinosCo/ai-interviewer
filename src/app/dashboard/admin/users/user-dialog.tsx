@@ -1,14 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// ...
-// Note: The UserDialog component needs useEffect to update functionality
-// I will address this in the UserDialog file directly.
-
 import { useRouter } from 'next/navigation';
 import { createUser, updateUser, updateUserSubscription } from '@/app/actions/admin';
 import { UserRole } from '@prisma/client';
 import { X } from 'lucide-react';
+import { showToast } from '@/components/toast';
 
 interface Project {
     id: string;
@@ -96,12 +93,12 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                 await updateUserSubscription(targetUserId, tier);
             }
 
-            alert(`User ${user ? 'updated' : 'created'} successfully!`);
+            showToast(`Utente ${user ? 'aggiornato' : 'creato'} con successo!`);
             router.refresh();
             onClose();
         } catch (error) {
             console.error(error);
-            alert('Failed to save user. Check console for details.');
+            showToast('Errore durante il salvataggio. Controlla la console.', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -121,17 +118,18 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+                    aria-label="Chiudi dialog"
                 >
                     <X size={20} />
                 </button>
 
                 <h2 className="text-xl font-bold mb-6">
-                    {user ? 'Edit User' : 'Create New User'}
+                    {user ? 'Modifica Utente' : 'Crea Nuovo Utente'}
                 </h2>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                         <input
                             type="text"
                             value={name}
@@ -154,7 +152,7 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                            {user ? 'New Password (leave blank to keep current)' : 'Password'}
+                            {user ? 'Nuova Password (lascia vuoto per mantenere attuale)' : 'Password'}
                         </label>
                         <input
                             type="password"
@@ -166,19 +164,19 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ruolo</label>
                         <select
                             value={role}
                             onChange={(e) => setRole(e.target.value as UserRole)}
                             className="w-full border rounded-lg px-3 py-2"
                         >
-                            <option value="USER">User (Limited Access)</option>
-                            <option value="ADMIN">Admin (Full Access)</option>
+                            <option value="USER">Utente (Accesso Limitato)</option>
+                            <option value="ADMIN">Admin (Accesso Completo)</option>
                         </select>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Plan</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Piano Abbonamento</label>
                         <select
                             value={tier}
                             onChange={(e) => setTier(e.target.value)}
@@ -190,12 +188,12 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                             <option value="BUSINESS">Business (Enterprise)</option>
                         </select>
                         <p className="text-xs text-amber-600 mt-1 italic">
-                            Manual activation for Enterprise clients.
+                            Attivazione manuale per clienti Enterprise.
                         </p>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Project Access</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Accesso Progetti</label>
                         <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
                             {projects.map(project => (
                                 <label key={project.id} className="flex items-center space-x-2">
@@ -209,11 +207,11 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                                 </label>
                             ))}
                             {projects.length === 0 && (
-                                <p className="text-sm text-gray-500 italic">No projects available</p>
+                                <p className="text-sm text-gray-500 italic">Nessun progetto disponibile</p>
                             )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                            Admins have full access regardless of selection.
+                            Gli Admin hanno accesso completo indipendentemente dalla selezione.
                         </p>
                     </div>
 
@@ -223,14 +221,14 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                             onClick={onClose}
                             className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
                         >
-                            Cancel
+                            Annulla
                         </button>
                         <button
                             type="submit"
                             disabled={isLoading}
                             className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                         >
-                            {isLoading ? 'Saving...' : 'Save User'}
+                            {isLoading ? 'Salvataggio...' : 'Salva Utente'}
                         </button>
                     </div>
                 </form>

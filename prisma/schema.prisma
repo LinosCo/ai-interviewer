@@ -270,12 +270,18 @@ model Project {
   isPersonal     Boolean         @default(false)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+
+  // Strategic context for AI Tips
+  strategicVision   String?
+  valueProposition  String?
+
   bots           Bot[]
   organization   Organization?   @relation(fields: [organizationId], references: [id])
   owner          User?           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   accessList     ProjectAccess[]
   visibilityConfigs VisibilityConfig[]
   copilotSessions CopilotSession[]
+  crossChannelInsights CrossChannelInsight[]
 
   // CMS Integration (managed by admin)
   cmsConnection  CMSConnection?
@@ -750,6 +756,7 @@ model FaqSuggestion {
 model CrossChannelInsight {
   id                String       @id @default(cuid())
   organizationId    String
+  projectId         String?
   topicName         String
   interviewData     Json?
   chatbotData       Json?
@@ -763,9 +770,11 @@ model CrossChannelInsight {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project           Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, status])
   @@index([organizationId, priorityScore])
+  @@index([projectId])
 }
 
 model VisibilityConfig {

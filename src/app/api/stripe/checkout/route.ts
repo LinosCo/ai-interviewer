@@ -128,7 +128,7 @@ export async function GET(req: NextRequest) {
         if ('error' in result) {
             // Redirect to billing page with error
             const errorUrl = new URL('/dashboard/billing', req.url);
-            errorUrl.searchParams.set('error', result.error);
+            errorUrl.searchParams.set('error', result.error || 'checkout_failed');
             return NextResponse.redirect(errorUrl);
         }
 

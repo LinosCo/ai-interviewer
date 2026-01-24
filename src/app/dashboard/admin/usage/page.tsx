@@ -180,7 +180,7 @@ export default async function AdminUsagePage() {
                 <div className="bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl p-4 text-white">
                     <div className="flex items-center gap-2 mb-2">
                         <Eye className="w-5 h-5 text-emerald-200" />
-                        <span className="text-emerald-100 text-sm">Query Visibility</span>
+                        <span className="text-emerald-100 text-sm">Query Visibilità</span>
                     </div>
                     <p className="text-3xl font-bold">{formatNumber(totalVisibilityQueries)}</p>
                     <p className="text-xs text-emerald-200 mt-1">eseguite</p>
@@ -208,8 +208,8 @@ export default async function AdminUsagePage() {
                     {[
                         { label: 'Interviste', value: tokenBreakdown.interview, color: 'bg-amber-500' },
                         { label: 'Chatbot', value: tokenBreakdown.chatbot, color: 'bg-blue-500' },
-                        { label: 'Visibility', value: tokenBreakdown.visibility, color: 'bg-emerald-500' },
-                        { label: 'AI Suggestions', value: tokenBreakdown.suggestion, color: 'bg-purple-500' },
+                        { label: 'Visibilità', value: tokenBreakdown.visibility, color: 'bg-emerald-500' },
+                        { label: 'Suggerimenti AI', value: tokenBreakdown.suggestion, color: 'bg-purple-500' },
                         { label: 'Sistema', value: tokenBreakdown.system, color: 'bg-slate-500' },
                     ].map(item => (
                         <div key={item.label} className="text-center">

@@ -50,8 +50,8 @@ export default function CMSConnectionDetailPage({ params }: { params: Promise<{ 
     const [testing, setTesting] = useState(false);
     const [testResult, setTestResult] = useState<any>(null);
 
-    // Get organization ID from connection
-    const [orgId, setOrgId] = useState<string | null>(null);
+    // Get project ID from connection
+    const [projectId, setProjectId] = useState<string | null>(null);
 
     useEffect(() => {
         loadStatus();
@@ -59,7 +59,7 @@ export default function CMSConnectionDetailPage({ params }: { params: Promise<{ 
 
     async function loadStatus() {
         try {
-            // First get the connection to find the organization
+            // First get the connection to find the project
             const connRes = await fetch(`/api/admin/cms/connections`);
             const connData = await connRes.json();
             const connection = connData.connections?.find((c: any) => c.id === resolvedParams.connectionId);
@@ -70,10 +70,10 @@ export default function CMSConnectionDetailPage({ params }: { params: Promise<{ 
                 return;
             }
 
-            setOrgId(connection.organization.id);
+            setProjectId(connection.project.id);
 
             // Now get the full status
-            const statusRes = await fetch(`/api/admin/organizations/${connection.organization.id}/cms/status`);
+            const statusRes = await fetch(`/api/admin/projects/${connection.project.id}/cms/status`);
             const statusData = await statusRes.json();
 
             if (!statusRes.ok) {
@@ -89,12 +89,12 @@ export default function CMSConnectionDetailPage({ params }: { params: Promise<{ 
     }
 
     async function handleTest() {
-        if (!orgId) return;
+        if (!projectId) return;
         setTesting(true);
         setTestResult(null);
 
         try {
-            const res = await fetch(`/api/admin/organizations/${orgId}/cms/test`, {
+            const res = await fetch(`/api/admin/projects/${projectId}/cms/test`, {
                 method: 'POST'
             });
             const data = await res.json();
@@ -108,10 +108,10 @@ export default function CMSConnectionDetailPage({ params }: { params: Promise<{ 
     }
 
     async function handleConnectGoogle() {
-        if (!orgId) return;
+        if (!projectId) return;
 
         try {
-            const res = await fetch(`/api/admin/organizations/${orgId}/cms/google/auth-url`);
+            const res = await fetch(`/api/admin/projects/${projectId}/cms/google/auth-url`);
             const data = await res.json();
 
             if (data.authUrl) {
@@ -123,10 +123,10 @@ export default function CMSConnectionDetailPage({ params }: { params: Promise<{ 
     }
 
     async function handleDisable() {
-        if (!orgId || !confirm('Vuoi disabilitare questa connessione?')) return;
+        if (!projectId || !confirm('Vuoi disabilitare questa connessione?')) return;
 
         try {
-            await fetch(`/api/admin/organizations/${orgId}/cms/disable`, {
+            await fetch(`/api/admin/projects/${projectId}/cms/disable`, {
                 method: 'POST'
             });
             loadStatus();

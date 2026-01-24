@@ -1,7 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { googleAnalyticsService } from '@/lib/cms/google-analytics.service';
-import { NextResponse } from 'next/server';
 import { redirect } from 'next/navigation';
 
 /**
@@ -41,7 +40,7 @@ export async function GET(request: Request) {
         // Verify connection exists
         const connection = await prisma.cMSConnection.findUnique({
             where: { id: state },
-            include: { organization: true }
+            include: { project: true }
         });
 
         if (!connection) {

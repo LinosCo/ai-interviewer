@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Star } from 'lucide-react';
 import Link from 'next/link';
@@ -8,8 +9,8 @@ const plans = [
   {
     name: 'Free',
     description: 'Per iniziare a esplorare',
-    price: '0',
-    period: '/mese',
+    monthlyPrice: '0',
+    yearlyPrice: '0',
     features: [
       '1 progetto',
       '20 interviste AI/mese',
@@ -24,8 +25,8 @@ const plans = [
   {
     name: 'Starter',
     description: 'Per piccole imprese',
-    price: '49',
-    period: '/mese',
+    monthlyPrice: '49',
+    yearlyPrice: '39',
     features: [
       '3 progetti',
       '100 interviste AI/mese',
@@ -41,8 +42,8 @@ const plans = [
   {
     name: 'Pro',
     description: 'Per PMI in crescita',
-    price: '149',
-    period: '/mese',
+    monthlyPrice: '149',
+    yearlyPrice: '119',
     features: [
       '10 progetti',
       '500 interviste AI/mese',
@@ -59,9 +60,9 @@ const plans = [
   {
     name: 'Enterprise',
     description: 'Per consulenti e agenzie',
-    price: null,
+    monthlyPrice: null,
+    yearlyPrice: null,
     priceLabel: 'Su misura',
-    period: '',
     features: [
       'Progetti illimitati',
       'Interviste illimitate',
@@ -79,6 +80,8 @@ const plans = [
 ];
 
 export function PricingSection() {
+  const [isYearly, setIsYearly] = useState(false);
+
   return (
     <section id="pricing" className="pt-8 pb-20 md:pt-12 md:pb-28 relative">
       {/* White overlay */}
@@ -90,14 +93,39 @@ export function PricingSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-16"
+          className="text-center mb-12"
         >
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
             Prezzi <span className="gradient-text">semplici e trasparenti</span>
           </h2>
-          <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
+          <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto mb-8">
             Nessun costo nascosto. Inizia gratis, scala quando cresci.
           </p>
+
+          {/* Billing toggle */}
+          <div className="flex items-center justify-center gap-4">
+            <span className={`text-sm font-medium transition-colors ${!isYearly ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'}`}>
+              Mensile
+            </span>
+            <button
+              onClick={() => setIsYearly(!isYearly)}
+              className="relative w-14 h-7 rounded-full bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] transition-colors"
+            >
+              <motion.div
+                className="absolute top-1 w-5 h-5 rounded-full gradient-bg shadow-md"
+                animate={{ left: isYearly ? '32px' : '4px' }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              />
+            </button>
+            <span className={`text-sm font-medium transition-colors ${isYearly ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'}`}>
+              Annuale
+            </span>
+            {isYearly && (
+              <span className="px-2 py-1 text-xs font-semibold rounded-full gradient-bg text-white">
+                -20%
+              </span>
+            )}
+          </div>
         </motion.div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -138,10 +166,17 @@ export function PricingSection() {
                 </div>
 
                 <div className="flex items-baseline gap-1 mb-6">
-                  {plan.price !== null ? (
+                  {plan.monthlyPrice !== null ? (
                     <>
-                      <span className="text-4xl font-bold">€{plan.price}</span>
-                      <span className="text-[hsl(var(--muted-foreground))]">{plan.period}</span>
+                      <span className="text-4xl font-bold">
+                        €{isYearly ? plan.yearlyPrice : plan.monthlyPrice}
+                      </span>
+                      <span className="text-[hsl(var(--muted-foreground))]">/mese</span>
+                      {isYearly && plan.monthlyPrice !== '0' && (
+                        <span className="text-sm text-[hsl(var(--muted-foreground))] line-through ml-2">
+                          €{plan.monthlyPrice}
+                        </span>
+                      )}
                     </>
                   ) : (
                     <span className="text-3xl font-bold">{plan.priceLabel}</span>

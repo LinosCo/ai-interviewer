@@ -19,48 +19,40 @@ export async function POST(
 
         const { id } = await params;
 
-        // Get user's organization with CMS connection
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+        // Get suggestion with connection info
+        const suggestion = await prisma.cMSSuggestion.findUnique({
+            where: { id },
             include: {
-                memberships: {
+                connection: {
                     include: {
-                        organization: {
-                            include: {
-                                cmsConnection: true
-                            }
-                        }
+                        project: true
                     }
                 }
             }
-        });
-
-        if (!user || user.memberships.length === 0) {
-            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
-        }
-
-        const org = user.memberships[0].organization;
-
-        if (!org.hasCMSIntegration || !org.cmsConnection) {
-            return NextResponse.json({ error: 'CMS integration not enabled' }, { status: 400 });
-        }
-
-        // Get suggestion
-        const suggestion = await prisma.cMSSuggestion.findUnique({
-            where: { id }
         });
 
         if (!suggestion) {
             return NextResponse.json({ error: 'Suggestion not found' }, { status: 404 });
         }
 
-        // Verify ownership
-        if (suggestion.connectionId !== org.cmsConnection.id) {
+        // Verify user has access to this project
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            include: {
+                memberships: {
+                    where: {
+                        organizationId: suggestion.connection.project.organizationId || undefined
+                    }
+                }
+            }
+        });
+
+        if (!user || user.memberships.length === 0) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         // Check connection status
-        if (org.cmsConnection.status !== 'ACTIVE') {
+        if (suggestion.connection.status !== 'ACTIVE') {
             return NextResponse.json(
                 { error: 'CMS connection is not active. Please verify the connection first.' },
                 { status: 400 }

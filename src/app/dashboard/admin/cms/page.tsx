@@ -16,11 +16,17 @@ export default async function AdminCMSPage() {
 
     const connections = await prisma.cMSConnection.findMany({
         include: {
-            organization: {
+            project: {
                 select: {
                     id: true,
                     name: true,
-                    slug: true
+                    organization: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true
+                        }
+                    }
                 }
             },
             _count: {
@@ -47,7 +53,7 @@ export default async function AdminCMSPage() {
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Integrazioni CMS</h1>
-                    <p className="text-gray-500 mt-1">Gestisci le connessioni CMS per i clienti</p>
+                    <p className="text-gray-500 mt-1">Gestisci le connessioni CMS per i progetti</p>
                 </div>
                 <Link
                     href="/dashboard/admin/cms/new"
@@ -100,7 +106,7 @@ export default async function AdminCMSPage() {
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Nome / Organizzazione
+                                    Nome / Progetto
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Stato
@@ -125,7 +131,12 @@ export default async function AdminCMSPage() {
                                     <td className="px-6 py-4">
                                         <div>
                                             <p className="font-medium text-gray-900">{conn.name}</p>
-                                            <p className="text-sm text-gray-500">{conn.organization?.name || 'Org. non trovata'}</p>
+                                            <p className="text-sm text-gray-500">
+                                                {conn.project?.name || 'Progetto non trovato'}
+                                                {conn.project?.organization?.name && (
+                                                    <span className="text-gray-400"> - {conn.project.organization.name}</span>
+                                                )}
+                                            </p>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">

@@ -17,29 +17,35 @@ export async function GET(req: Request) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
-        // Get all organizations with CMS integration
-        const orgsWithCMS = await prisma.organization.findMany({
+        // Get all projects with active CMS connections
+        const projectsWithCMS = await prisma.project.findMany({
             where: {
-                hasCMSIntegration: true,
                 cmsConnection: {
                     status: { in: ['ACTIVE', 'PARTIAL'] }
                 }
             },
             include: {
-                cmsConnection: true
+                cmsConnection: true,
+                organization: true
             }
         });
 
-        console.log(`[CMS Suggestions] Starting generation for ${orgsWithCMS.length} organizations`);
+        // Group by organization for processing insights (filter out null organizationIds)
+        const orgIds = [...new Set(
+            projectsWithCMS
+                .map(p => p.organizationId)
+                .filter((id): id is string => id !== null)
+        )];
+        console.log(`[CMS Suggestions] Starting generation for ${orgIds.length} organizations with CMS projects`);
 
         const results: { orgId: string; suggestionsGenerated: number; error?: string }[] = [];
 
-        for (const org of orgsWithCMS) {
+        for (const orgId of orgIds) {
             try {
                 // Get recent CrossChannelInsights with content-related actions
                 const recentInsights = await prisma.crossChannelInsight.findMany({
                     where: {
-                        organizationId: org.id,
+                        organizationId: orgId,
                         status: 'new',
                         createdAt: {
                             gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
@@ -77,12 +83,12 @@ export async function GET(req: Request) {
                     }
                 }
 
-                results.push({ orgId: org.id, suggestionsGenerated });
-                console.log(`[CMS Suggestions] Org ${org.id}: ${suggestionsGenerated} suggestions generated`);
+                results.push({ orgId, suggestionsGenerated });
+                console.log(`[CMS Suggestions] Org ${orgId}: ${suggestionsGenerated} suggestions generated`);
 
             } catch (error: any) {
-                console.error(`[CMS Suggestions] Error for org ${org.id}:`, error);
-                results.push({ orgId: org.id, suggestionsGenerated: 0, error: error.message });
+                console.error(`[CMS Suggestions] Error for org ${orgId}:`, error);
+                results.push({ orgId, suggestionsGenerated: 0, error: error.message });
             }
         }
 
@@ -91,7 +97,7 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
             success: true,
-            processed: orgsWithCMS.length,
+            processed: orgIds.length,
             totalSuggestions,
             results
         });

@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 /**
- * GET /api/cms/analytics?range=7d|30d|90d
- * Get aggregated website analytics for the user's organization.
+ * GET /api/cms/analytics?range=7d|30d|90d&projectId=xxx
+ * Get aggregated website analytics for a project with CMS.
  */
 export async function GET(request: Request) {
     try {
@@ -13,7 +13,15 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Get user's organization with CMS connection
+        const url = new URL(request.url);
+        const projectId = url.searchParams.get('projectId');
+        const range = url.searchParams.get('range') || '30d';
+
+        if (!projectId) {
+            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+        }
+
+        // Verify user has access to this project
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
             include: {
@@ -21,7 +29,12 @@ export async function GET(request: Request) {
                     include: {
                         organization: {
                             include: {
-                                cmsConnection: true
+                                projects: {
+                                    where: { id: projectId },
+                                    include: {
+                                        cmsConnection: true
+                                    }
+                                }
                             }
                         }
                     }
@@ -33,14 +46,19 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'No organization found' }, { status: 404 });
         }
 
-        const org = user.memberships[0].organization;
-
-        if (!org.hasCMSIntegration || !org.cmsConnection) {
-            return NextResponse.json({ error: 'CMS integration not enabled' }, { status: 400 });
+        // Find the project with CMS connection
+        let cmsConnection = null;
+        for (const membership of user.memberships) {
+            const project = membership.organization.projects.find(p => p.id === projectId);
+            if (project?.cmsConnection) {
+                cmsConnection = project.cmsConnection;
+                break;
+            }
         }
 
-        const url = new URL(request.url);
-        const range = url.searchParams.get('range') || '30d';
+        if (!cmsConnection) {
+            return NextResponse.json({ error: 'CMS integration not enabled for this project' }, { status: 400 });
+        }
 
         // Calculate date range
         const endDate = new Date();
@@ -59,7 +77,7 @@ export async function GET(request: Request) {
         // Get analytics data
         const analytics = await prisma.websiteAnalytics.findMany({
             where: {
-                connectionId: org.cmsConnection.id,
+                connectionId: cmsConnection.id,
                 date: {
                     gte: startDate,
                     lte: endDate

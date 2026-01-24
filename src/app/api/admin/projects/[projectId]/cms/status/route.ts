@@ -4,13 +4,13 @@ import { CMSConnectionService } from '@/lib/cms/connection.service';
 import { NextResponse } from 'next/server';
 
 /**
- * POST /api/admin/organizations/[orgId]/cms/test
- * Test the CMS connection.
+ * GET /api/admin/projects/[projectId]/cms/status
+ * Get full status of the CMS connection.
  * Admin only.
  */
-export async function POST(
+export async function GET(
     request: Request,
-    { params }: { params: Promise<{ orgId: string }> }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const session = await auth();
@@ -27,29 +27,23 @@ export async function POST(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { orgId } = await params;
+        const { projectId } = await params;
 
-        // Get connection for this organization
-        const connection = await prisma.cMSConnection.findUnique({
-            where: { organizationId: orgId }
-        });
+        const status = await CMSConnectionService.getConnectionStatus(projectId);
 
-        if (!connection) {
+        if (!status) {
             return NextResponse.json(
-                { error: 'CMS connection not found for this organization' },
+                { error: 'CMS connection not found for this project' },
                 { status: 404 }
             );
         }
 
-        // Test connection
-        const result = await CMSConnectionService.testConnection(connection.id);
-
-        return NextResponse.json(result);
+        return NextResponse.json(status);
 
     } catch (error: any) {
-        console.error('Error testing CMS connection:', error);
+        console.error('Error getting CMS status:', error);
         return NextResponse.json(
-            { error: 'Failed to test CMS connection' },
+            { error: 'Failed to get CMS status' },
             { status: 500 }
         );
     }

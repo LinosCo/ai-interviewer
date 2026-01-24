@@ -26,13 +26,29 @@ export default async function DashboardLayout({
         // Get organization and subscription for Strategy Copilot
         const membership = await prisma.membership.findFirst({
             where: { userId: session.user.id },
-            include: { organization: { include: { subscription: true } } }
+            include: {
+                organization: {
+                    include: {
+                        subscription: true,
+                        projects: {
+                            include: {
+                                cmsConnection: {
+                                    select: { id: true, status: true }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         });
 
         if (membership) {
             userTier = membership.organization.subscription?.tier || 'TRIAL';
             organizationId = membership.organizationId;
-            hasCMSIntegration = membership.organization.hasCMSIntegration || false;
+            // Check if any project has an active CMS connection
+            hasCMSIntegration = membership.organization.projects.some(
+                (p: any) => p.cmsConnection?.status === 'ACTIVE'
+            );
         }
     }
 

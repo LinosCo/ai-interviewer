@@ -67,7 +67,6 @@ export async function GET(request: Request) {
                 slug: true,
                 createdAt: true,
                 plan: true,
-                hasCMSIntegration: true,
                 subscription: true,
                 tokenUsage: true,
                 _count: {
@@ -82,6 +81,18 @@ export async function GET(request: Request) {
                     include: {
                         user: {
                             select: { email: true, name: true }
+                        }
+                    }
+                },
+                projects: {
+                    select: {
+                        id: true,
+                        name: true,
+                        owner: {
+                            select: { id: true, name: true, email: true }
+                        },
+                        cmsConnection: {
+                            select: { id: true, status: true }
                         }
                     }
                 }
@@ -104,6 +115,9 @@ export async function GET(request: Request) {
 
             const owner = org.members[0]?.user;
 
+            // Check if any project has CMS integration
+            const hasCMS = org.projects?.some((p: any) => p.cmsConnection?.status === 'ACTIVE') || false;
+
             return {
                 id: org.id,
                 name: org.name,
@@ -111,12 +125,12 @@ export async function GET(request: Request) {
                 createdAt: org.createdAt,
                 plan: org.plan,
                 tier,
-                hasCMSIntegration: org.hasCMSIntegration || false,
+                hasCMSIntegration: hasCMS,
                 status: org.subscription?.status || 'ACTIVE',
                 isPartner: org.subscription?.isPartner || false,
                 owner: owner ? { email: owner.email, name: owner.name } : null,
                 members: org._count.members,
-                projects: org._count.projects,
+                projects: org.projects,
                 usage: {
                     tokens: {
                         used: tokensUsed,

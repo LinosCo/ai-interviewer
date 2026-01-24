@@ -4,13 +4,13 @@ import { CMSConnectionService } from '@/lib/cms/connection.service';
 import { NextResponse } from 'next/server';
 
 /**
- * POST /api/admin/organizations/[orgId]/cms/disable
+ * POST /api/admin/projects/[projectId]/cms/disable
  * Disable the CMS connection.
  * Admin only.
  */
 export async function POST(
     request: Request,
-    { params }: { params: Promise<{ orgId: string }> }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const session = await auth();
@@ -27,16 +27,16 @@ export async function POST(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { orgId } = await params;
+        const { projectId } = await params;
 
-        // Get connection for this organization
+        // Get connection for this project
         const connection = await prisma.cMSConnection.findUnique({
-            where: { organizationId: orgId }
+            where: { projectId }
         });
 
         if (!connection) {
             return NextResponse.json(
-                { error: 'CMS connection not found for this organization' },
+                { error: 'CMS connection not found for this project' },
                 { status: 404 }
             );
         }
@@ -56,13 +56,13 @@ export async function POST(
 }
 
 /**
- * DELETE /api/admin/organizations/[orgId]/cms/disable
+ * DELETE /api/admin/projects/[projectId]/cms/disable
  * Delete the CMS connection entirely.
  * Admin only.
  */
 export async function DELETE(
     request: Request,
-    { params }: { params: Promise<{ orgId: string }> }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const session = await auth();
@@ -79,16 +79,16 @@ export async function DELETE(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { orgId } = await params;
+        const { projectId } = await params;
 
-        // Get connection for this organization
+        // Get connection for this project
         const connection = await prisma.cMSConnection.findUnique({
-            where: { organizationId: orgId }
+            where: { projectId }
         });
 
         if (!connection) {
             return NextResponse.json(
-                { error: 'CMS connection not found for this organization' },
+                { error: 'CMS connection not found for this project' },
                 { status: 404 }
             );
         }

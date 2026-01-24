@@ -4,13 +4,13 @@ import { CMSConnectionService } from '@/lib/cms/connection.service';
 import { NextResponse } from 'next/server';
 
 /**
- * POST /api/admin/organizations/[orgId]/cms/create
- * Create a new CMS connection for an organization.
+ * POST /api/admin/projects/[projectId]/cms/create
+ * Create a new CMS connection for a project.
  * Admin only.
  */
 export async function POST(
     request: Request,
-    { params }: { params: Promise<{ orgId: string }> }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const session = await auth();
@@ -27,7 +27,7 @@ export async function POST(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { orgId } = await params;
+        const { projectId } = await params;
         const body = await request.json();
 
         const { name, cmsApiUrl, cmsDashboardUrl, cmsPublicUrl, notes } = body;
@@ -39,18 +39,18 @@ export async function POST(
             );
         }
 
-        // Verify organization exists
-        const org = await prisma.organization.findUnique({
-            where: { id: orgId }
+        // Verify project exists
+        const project = await prisma.project.findUnique({
+            where: { id: projectId }
         });
 
-        if (!org) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!project) {
+            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
         // Create connection
         const result = await CMSConnectionService.createConnection({
-            organizationId: orgId,
+            projectId,
             name,
             cmsApiUrl,
             cmsDashboardUrl,
@@ -64,7 +64,7 @@ export async function POST(
     } catch (error: any) {
         console.error('Error creating CMS connection:', error);
 
-        if (error.message === 'Organization already has a CMS connection') {
+        if (error.message === 'Project already has a CMS connection') {
             return NextResponse.json({ error: error.message }, { status: 409 });
         }
 

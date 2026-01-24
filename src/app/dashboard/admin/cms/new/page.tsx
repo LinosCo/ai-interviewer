@@ -3,16 +3,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface Organization {
+interface Project {
     id: string;
     name: string;
-    slug: string;
-    hasCMSIntegration: boolean;
+    organizationName: string;
+    ownerName: string | null;
+    ownerEmail: string;
+    hasCMS: boolean;
 }
 
 export default function NewCMSConnectionPage() {
     const router = useRouter();
-    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -24,7 +26,7 @@ export default function NewCMSConnectionPage() {
     } | null>(null);
 
     const [form, setForm] = useState({
-        organizationId: '',
+        projectId: '',
         name: '',
         cmsApiUrl: '',
         cmsDashboardUrl: '',
@@ -33,21 +35,39 @@ export default function NewCMSConnectionPage() {
     });
 
     useEffect(() => {
-        async function loadOrganizations() {
+        async function loadProjects() {
             try {
+                // Fetch all projects from all organizations
                 const res = await fetch('/api/admin/organizations');
                 const data = await res.json();
-                // API returns { organizations: [...], pagination: {...} }
                 const orgs = data.organizations || [];
-                // Filter out organizations that already have CMS integration
-                setOrganizations(orgs.filter((o: Organization) => !o.hasCMSIntegration));
+
+                // Extract all projects with their org/owner info
+                const allProjects: Project[] = [];
+                for (const org of orgs) {
+                    if (org.projects) {
+                        for (const project of org.projects) {
+                            allProjects.push({
+                                id: project.id,
+                                name: project.name,
+                                organizationName: org.name,
+                                ownerName: project.owner?.name || null,
+                                ownerEmail: project.owner?.email || org.owner?.email || 'N/A',
+                                hasCMS: project.cmsConnection != null
+                            });
+                        }
+                    }
+                }
+
+                // Filter out projects that already have CMS
+                setProjects(allProjects.filter(p => !p.hasCMS));
             } catch (err) {
-                setError('Errore nel caricamento delle organizzazioni');
+                setError('Errore nel caricamento dei progetti');
             } finally {
                 setLoading(false);
             }
         }
-        loadOrganizations();
+        loadProjects();
     }, []);
 
     async function handleSubmit(e: React.FormEvent) {
@@ -56,7 +76,7 @@ export default function NewCMSConnectionPage() {
         setSubmitting(true);
 
         try {
-            const res = await fetch(`/api/admin/organizations/${form.organizationId}/cms/create`, {
+            const res = await fetch(`/api/admin/projects/${form.projectId}/cms/create`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -157,25 +177,28 @@ export default function NewCMSConnectionPage() {
             <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Organizzazione *
+                        Progetto *
                     </label>
                     {loading ? (
                         <div className="animate-pulse bg-gray-200 h-10 rounded"></div>
                     ) : (
                         <select
-                            value={form.organizationId}
-                            onChange={(e) => setForm({ ...form, organizationId: e.target.value })}
+                            value={form.projectId}
+                            onChange={(e) => setForm({ ...form, projectId: e.target.value })}
                             required
                             className="w-full border border-gray-300 rounded-lg px-3 py-2"
                         >
-                            <option value="">Seleziona organizzazione...</option>
-                            {organizations.map((org) => (
-                                <option key={org.id} value={org.id}>
-                                    {org.name} ({org.slug})
+                            <option value="">Seleziona progetto...</option>
+                            {projects.map((project) => (
+                                <option key={project.id} value={project.id}>
+                                    {project.name} - {project.organizationName} ({project.ownerEmail})
                                 </option>
                             ))}
                         </select>
                     )}
+                    <p className="text-xs text-gray-500 mt-1">
+                        Seleziona il progetto a cui associare la connessione CMS
+                    </p>
                 </div>
 
                 <div>

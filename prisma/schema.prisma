@@ -151,10 +151,6 @@ model Organization {
   strategicVision        String?
   valueProposition       String?
 
-  // CMS Integration (managed by Voler.ai admin)
-  hasCMSIntegration      Boolean               @default(false)
-  cmsConnection          CMSConnection?
-
   // Strategy Copilot
   copilotSessions        CopilotSession[]
 }
@@ -280,6 +276,9 @@ model Project {
   accessList     ProjectAccess[]
   visibilityConfigs VisibilityConfig[]
   copilotSessions CopilotSession[]
+
+  // CMS Integration (managed by admin)
+  cmsConnection  CMSConnection?
 }
 
 model Bot {
@@ -1019,8 +1018,8 @@ enum Role {
 
 model CMSConnection {
   id              String              @id @default(cuid())
-  organizationId  String              @unique
-  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId       String              @unique
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Base configuration (set by admin)
   name            String              // Display name: "Sito Aziendale"

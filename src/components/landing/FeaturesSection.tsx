@@ -9,12 +9,12 @@ const features = [
     icon: MessageSquare,
     title: 'Raccogli Feedback con Interviste AI',
     description:
-      "L'intelligenza artificiale conduce interviste qualitative personalizzate con clienti, team e partner. Raccogli insight profondi senza il costo di un ricercatore.",
+      "L'intelligenza artificiale conduce interviste qualitative personalizzate con clienti, dipendenti e stakeholder. Raccogli insight profondi senza il costo di un ricercatore.",
     benefits: [
       'Interviste automatiche 24/7',
       'Domande adattive basate sulle risposte',
       'Analisi del sentiment in tempo reale',
-      'Report dettagliati per stakeholder',
+      'Report dettagliati per ogni stakeholder',
     ],
     color: 'coral',
     mockup: (
@@ -136,12 +136,12 @@ export function FeaturesSection() {
             <span className="text-sm font-medium">3 strumenti, 1 piattaforma</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Tutto ciò che serve per{' '}
-            <span className="gradient-text">ascoltare il mercato</span>
+            Ascolta{' '}
+            <span className="gradient-text">clienti, team e partner</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
             Tre strumenti potenti che parlano tra loro, connessi dall&apos;AI per
-            darti una visione completa della tua azienda
+            raccogliere feedback da tutti gli stakeholder e darti una visione completa
           </p>
         </motion.div>
 

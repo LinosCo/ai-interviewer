@@ -9,7 +9,7 @@ import {
 } from './encryption';
 
 export interface CreateConnectionInput {
-    organizationId: string;
+    projectId: string;
     name: string;
     cmsApiUrl: string;
     cmsDashboardUrl?: string;
@@ -53,15 +53,15 @@ export class CMSConnectionService {
      * Returns the credentials that should be shown only once.
      */
     static async createConnection(input: CreateConnectionInput): Promise<CreateConnectionResult> {
-        const { organizationId, name, cmsApiUrl, cmsDashboardUrl, cmsPublicUrl, notes, enabledBy } = input;
+        const { projectId, name, cmsApiUrl, cmsDashboardUrl, cmsPublicUrl, notes, enabledBy } = input;
 
-        // Check if organization already has a CMS connection
+        // Check if project already has a CMS connection
         const existing = await prisma.cMSConnection.findUnique({
-            where: { organizationId }
+            where: { projectId }
         });
 
         if (existing) {
-            throw new Error('Organization already has a CMS connection');
+            throw new Error('Project already has a CMS connection');
         }
 
         // Generate credentials
@@ -71,7 +71,7 @@ export class CMSConnectionService {
         // Create connection record (we'll get the ID from Prisma)
         const connection = await prisma.cMSConnection.create({
             data: {
-                organizationId,
+                projectId,
                 name,
                 cmsApiUrl,
                 cmsDashboardUrl,
@@ -95,12 +95,6 @@ export class CMSConnectionService {
         await prisma.cMSConnection.update({
             where: { id: connection.id },
             data: { webhookUrl }
-        });
-
-        // Enable CMS integration flag on organization
-        await prisma.organization.update({
-            where: { id: organizationId },
-            data: { hasCMSIntegration: true }
         });
 
         // Generate .env snippet
@@ -272,25 +266,13 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
     }
 
     /**
-     * Delete a CMS connection and disable integration for the organization.
+     * Delete a CMS connection for a project.
      */
     static async deleteConnection(connectionId: string): Promise<void> {
-        const connection = await prisma.cMSConnection.findUnique({
+        // Delete connection (cascades to suggestions, analytics, logs)
+        await prisma.cMSConnection.delete({
             where: { id: connectionId }
         });
-
-        if (connection) {
-            // Delete connection (cascades to suggestions, analytics, logs)
-            await prisma.cMSConnection.delete({
-                where: { id: connectionId }
-            });
-
-            // Disable integration flag on organization
-            await prisma.organization.update({
-                where: { id: connection.organizationId },
-                data: { hasCMSIntegration: false }
-            });
-        }
     }
 
     /**
@@ -442,9 +424,9 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
     /**
      * Get the full status of a CMS connection.
      */
-    static async getConnectionStatus(organizationId: string) {
+    static async getConnectionStatus(projectId: string) {
         const connection = await prisma.cMSConnection.findUnique({
-            where: { organizationId },
+            where: { projectId },
             include: {
                 _count: {
                     select: {
@@ -515,11 +497,24 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
     static async getAllConnections() {
         return prisma.cMSConnection.findMany({
             include: {
-                organization: {
+                project: {
                     select: {
                         id: true,
                         name: true,
-                        slug: true
+                        organization: {
+                            select: {
+                                id: true,
+                                name: true,
+                                slug: true
+                            }
+                        },
+                        owner: {
+                            select: {
+                                id: true,
+                                name: true,
+                                email: true
+                            }
+                        }
                     }
                 },
                 _count: {

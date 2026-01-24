@@ -1,16 +1,16 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { googleAnalyticsService } from '@/lib/cms/google-analytics.service';
+import { CMSConnectionService } from '@/lib/cms/connection.service';
 import { NextResponse } from 'next/server';
 
 /**
- * GET /api/admin/organizations/[orgId]/cms/google/auth-url
- * Get the Google OAuth URL for connecting Analytics and Search Console.
+ * POST /api/admin/projects/[projectId]/cms/test
+ * Test the CMS connection.
  * Admin only.
  */
-export async function GET(
+export async function POST(
     request: Request,
-    { params }: { params: Promise<{ orgId: string }> }
+    { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
         const session = await auth();
@@ -27,29 +27,29 @@ export async function GET(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        const { orgId } = await params;
+        const { projectId } = await params;
 
-        // Get connection for this organization
+        // Get connection for this project
         const connection = await prisma.cMSConnection.findUnique({
-            where: { organizationId: orgId }
+            where: { projectId }
         });
 
         if (!connection) {
             return NextResponse.json(
-                { error: 'CMS connection not found for this organization' },
+                { error: 'CMS connection not found for this project' },
                 { status: 404 }
             );
         }
 
-        // Generate OAuth URL
-        const authUrl = googleAnalyticsService.getAuthUrl(connection.id);
+        // Test connection
+        const result = await CMSConnectionService.testConnection(connection.id);
 
-        return NextResponse.json({ authUrl });
+        return NextResponse.json(result);
 
     } catch (error: any) {
-        console.error('Error generating Google auth URL:', error);
+        console.error('Error testing CMS connection:', error);
         return NextResponse.json(
-            { error: 'Failed to generate auth URL' },
+            { error: 'Failed to test CMS connection' },
             { status: 500 }
         );
     }

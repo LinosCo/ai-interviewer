@@ -103,13 +103,16 @@ export async function PATCH(
 
             // Custom limits (override plan defaults)
             customLimits,
+            maxInterviews,
+            maxChatbots,
+            maxProjects,
 
             // Extra resources (add to plan limits)
+            extraTokens,
             extraInterviews,
             extraChatbotSessions,
             extraVisibilityQueries,
             extraUsers,
-            purchasedTokens,
 
             // Reset counters
             resetUsage
@@ -136,9 +139,9 @@ export async function PATCH(
         if (org.subscription) {
             const subscriptionUpdate: any = {};
 
-            // Tier change
-            if (tier) {
-                subscriptionUpdate.tier = tier;
+            // Tier change (accept both 'tier' and 'plan' as input)
+            if (tier || plan) {
+                subscriptionUpdate.tier = tier || plan;
             }
 
             // Partner flag
@@ -146,12 +149,24 @@ export async function PATCH(
                 subscriptionUpdate.isPartner = isPartner;
             }
 
-            // Custom limits
+            // Custom limits (merge with existing)
             if (customLimits !== undefined) {
                 subscriptionUpdate.customLimits = customLimits;
+            } else if (maxInterviews !== undefined || maxChatbots !== undefined || maxProjects !== undefined) {
+                // Build custom limits from individual fields
+                const existingLimits = (org.subscription.customLimits as any) || {};
+                subscriptionUpdate.customLimits = {
+                    ...existingLimits,
+                    ...(maxInterviews !== undefined && { maxInterviews }),
+                    ...(maxChatbots !== undefined && { maxChatbots }),
+                    ...(maxProjects !== undefined && { maxProjects })
+                };
             }
 
             // Extra resources
+            if (typeof extraTokens === 'number') {
+                subscriptionUpdate.extraTokens = extraTokens;
+            }
             if (typeof extraInterviews === 'number') {
                 subscriptionUpdate.extraInterviews = extraInterviews;
             }
@@ -163,9 +178,6 @@ export async function PATCH(
             }
             if (typeof extraUsers === 'number') {
                 subscriptionUpdate.extraUsers = extraUsers;
-            }
-            if (typeof purchasedTokens === 'number') {
-                subscriptionUpdate.purchasedTokens = purchasedTokens;
             }
 
             if (Object.keys(subscriptionUpdate).length > 0) {

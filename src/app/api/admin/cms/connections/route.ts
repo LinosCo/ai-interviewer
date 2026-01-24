@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 
 /**
  * GET /api/admin/cms/connections
- * List all CMS connections across all organizations.
+ * List all CMS connections across all projects.
  * Admin only.
  */
 export async function GET(request: Request) {
@@ -27,14 +27,23 @@ export async function GET(request: Request) {
         const connections = await CMSConnectionService.getAllConnections();
 
         // Transform for response
-        const response = connections.map(conn => ({
+        const response = connections.map((conn: any) => ({
             id: conn.id,
             name: conn.name,
             status: conn.status,
-            organization: {
-                id: conn.organization.id,
-                name: conn.organization.name,
-                slug: conn.organization.slug
+            project: {
+                id: conn.project.id,
+                name: conn.project.name,
+                organization: conn.project.organization ? {
+                    id: conn.project.organization.id,
+                    name: conn.project.organization.name,
+                    slug: conn.project.organization.slug
+                } : null,
+                owner: conn.project.owner ? {
+                    id: conn.project.owner.id,
+                    name: conn.project.owner.name,
+                    email: conn.project.owner.email
+                } : null
             },
             cmsApiUrl: conn.cmsApiUrl,
             cmsPublicUrl: conn.cmsPublicUrl,

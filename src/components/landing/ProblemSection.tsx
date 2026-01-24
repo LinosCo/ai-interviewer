@@ -49,7 +49,7 @@ export function ProblemSection() {
           </p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-[1fr,auto,1fr] gap-4 sm:gap-6 items-center">
+        <div className="grid lg:grid-cols-[1fr,auto,1fr] gap-8 lg:gap-10 items-start">
           {/* Problems */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -84,7 +84,7 @@ export function ProblemSection() {
           </motion.div>
 
           {/* Arrow */}
-          <div className="hidden sm:flex items-center justify-center">
+          <div className="hidden lg:flex items-center justify-center self-center">
             <motion.div
               initial={{ opacity: 0, scale: 0 }}
               whileInView={{ opacity: 1, scale: 1 }}

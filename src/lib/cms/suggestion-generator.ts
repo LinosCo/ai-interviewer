@@ -33,15 +33,19 @@ export class CMSSuggestionGenerator {
     static async generateSuggestion(input: SuggestionInput): Promise<string> {
         const { connectionId, insightId, type, signals } = input;
 
-        // Get organization context
+        // Get project context
         const connection = await prisma.cMSConnection.findUnique({
             where: { id: connectionId },
             include: {
-                organization: {
-                    select: {
-                        strategicVision: true,
-                        valueProposition: true,
-                        name: true
+                project: {
+                    include: {
+                        organization: {
+                            select: {
+                                strategicVision: true,
+                                valueProposition: true,
+                                name: true
+                            }
+                        }
                     }
                 }
             }
@@ -51,13 +55,16 @@ export class CMSSuggestionGenerator {
             throw new Error('CMS connection not found');
         }
 
+        // Use project name or organization name
+        const brandName = connection.project.name || connection.project.organization?.name || 'Brand';
+
         // Generate content using LLM
         const content = await this.generateContent(
             type,
             signals,
-            connection.organization.name,
-            connection.organization.strategicVision,
-            connection.organization.valueProposition
+            brandName,
+            connection.project.organization?.strategicVision,
+            connection.project.organization?.valueProposition
         );
 
         // Calculate priority score based on signals
@@ -229,6 +236,7 @@ Professionale ma accessibile, adatto al web. Usa il "tu" o il "voi" aziendale co
 
     /**
      * Generate suggestions from a CrossChannelInsight that has create_content or modify_content actions.
+     * Finds projects with CMS connections in the organization.
      */
     static async generateFromInsight(insightId: string): Promise<string[]> {
         const insight = await prisma.crossChannelInsight.findUnique({
@@ -236,33 +244,55 @@ Professionale ma accessibile, adatto al web. Usa il "tu" o il "voi" aziendale co
             include: {
                 organization: {
                     include: {
-                        cmsConnection: true
+                        projects: {
+                            include: {
+                                cmsConnection: true
+                            },
+                            where: {
+                                cmsConnection: {
+                                    isNot: null
+                                }
+                            }
+                        }
                     }
                 }
             }
         });
 
-        if (!insight || !insight.organization.cmsConnection) {
+        if (!insight || insight.organization.projects.length === 0) {
             return [];
         }
 
-        const connection = insight.organization.cmsConnection;
+        // Get all projects with CMS connections
+        const projectsWithCMS = insight.organization.projects.filter(
+            (p: any) => p.cmsConnection !== null
+        );
+
+        if (projectsWithCMS.length === 0) {
+            return [];
+        }
+
         const actions = insight.suggestedActions as any[];
         const suggestionIds: string[] = [];
 
-        for (const action of actions) {
-            if (action.type === 'create_content' || action.type === 'modify_content') {
-                const type = this.mapActionTypeToSuggestionType(action);
-                const signals = this.extractSignalsFromInsight(insight, action);
+        // Generate suggestions for each project with CMS
+        for (const project of projectsWithCMS) {
+            const connection = (project as any).cmsConnection;
 
-                const suggestionId = await this.generateSuggestion({
-                    connectionId: connection.id,
-                    insightId,
-                    type,
-                    signals
-                });
+            for (const action of actions) {
+                if (action.type === 'create_content' || action.type === 'modify_content') {
+                    const type = this.mapActionTypeToSuggestionType(action);
+                    const signals = this.extractSignalsFromInsight(insight, action);
 
-                suggestionIds.push(suggestionId);
+                    const suggestionId = await this.generateSuggestion({
+                        connectionId: connection.id,
+                        insightId,
+                        type,
+                        signals
+                    });
+
+                    suggestionIds.push(suggestionId);
+                }
             }
         }
 

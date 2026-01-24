@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bot, MessageSquare, Plus, Settings, Unlink, Link2, Loader2, ArrowRight } from "lucide-react";
+import { Bot, MessageSquare, Settings, Loader2, ArrowRight } from "lucide-react";
 import Link from 'next/link';
 import { showToast } from '@/components/toast';
 
@@ -200,15 +200,9 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                     </div>
                 )}
 
-                {/* Create new */}
-                <div className="pt-4 border-t flex gap-3">
-                    <Link href={`/onboarding?projectId=${projectId}`} className="flex-1">
-                        <Button variant="outline" className="w-full gap-2">
-                            <MessageSquare className="w-4 h-4" />
-                            Nuova Intervista
-                        </Button>
-                    </Link>
-                    <Link href={`/dashboard/bots/create-chatbot?projectId=${projectId}`} className="flex-1">
+                {/* Create new chatbot */}
+                <div className="pt-4 border-t">
+                    <Link href={`/dashboard/bots/create-chatbot?projectId=${projectId}`}>
                         <Button variant="outline" className="w-full gap-2">
                             <Bot className="w-4 h-4" />
                             Nuovo Chatbot

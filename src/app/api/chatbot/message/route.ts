@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 export const maxDuration = 30;
 
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
         const conversation: any = await (prisma.conversation as any).findUnique({
             where: { id: conversationId },
             include: {
-                bot: { include: { knowledgeSources: true, topics: true } },
+                bot: { include: { knowledgeSources: true, topics: true, project: true } },
                 messages: { orderBy: { createdAt: 'asc' } },
                 chatbotSession: true
             }
@@ -94,16 +95,31 @@ export async function POST(req: Request) {
                     [nextMissingField.field]: z.string().optional().describe(`Extracted value for ${nextMissingField.field}`),
                     isRelevantAnswer: z.boolean().describe('Did the user provide the requested information?')
                 }),
-                system: `You are an expert data extractor. 
+                system: `You are an expert data extractor.
                 Field to extract: "${nextMissingField.field}"
                 Context: The user was previously asked: "${nextMissingField.question || nextMissingField.field}".
-                
+
                 Rules:
                 - If the message contains the requested information, extract it and set isRelevantAnswer to true.
                 - If the message is unrelated or a refusal, set isRelevantAnswer to false.
                 - Be flexible with formatting but accurate with data.`,
                 prompt: message
             });
+
+            // Track extraction tokens
+            const organizationId = bot.project?.organizationId;
+            if (organizationId && extraction.usage) {
+                TokenTrackingService.logTokenUsage({
+                    organizationId,
+                    inputTokens: extraction.usage.inputTokens || 0,
+                    outputTokens: extraction.usage.outputTokens || 0,
+                    category: 'CHATBOT',
+                    model: 'gpt-4o-mini',
+                    operation: 'chatbot-extraction',
+                    resourceType: 'chatbot',
+                    resourceId: bot.id
+                }).catch(err => console.error('Token tracking failed:', err));
+            }
 
             if (extraction.object[nextMissingField.field] && extraction.object.isRelevantAnswer) {
                 // Saved!
@@ -210,6 +226,22 @@ export async function POST(req: Request) {
 
         finalResponse = result.object.response;
 
+        // Track response tokens
+        const responseTokens = result.usage?.totalTokens || 0;
+        const orgId = bot.project?.organizationId;
+        if (orgId && result.usage) {
+            TokenTrackingService.logTokenUsage({
+                organizationId: orgId,
+                inputTokens: result.usage.inputTokens || 0,
+                outputTokens: result.usage.outputTokens || 0,
+                category: 'CHATBOT',
+                model: 'gpt-4o-mini',
+                operation: 'chatbot-response',
+                resourceType: 'chatbot',
+                resourceId: bot.id
+            }).catch(err => console.error('Token tracking failed:', err));
+        }
+
         // 5. Save and Return
         await prisma.message.create({
             data: { conversationId, role: 'assistant', content: finalResponse }
@@ -218,7 +250,7 @@ export async function POST(req: Request) {
         // @ts-ignore: Prisma client might be stale
         await prisma.chatbotSession.update({
             where: { id: session.id },
-            data: { messagesCount: { increment: 1 }, tokensUsed: { increment: 0 } } // Todo: usage
+            data: { messagesCount: { increment: 1 }, tokensUsed: { increment: responseTokens } }
         });
 
         return Response.json({ response: finalResponse });

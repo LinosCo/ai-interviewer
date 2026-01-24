@@ -8,6 +8,7 @@ import { LLMService } from '@/services/llmService';
 import { TopicManager } from '@/lib/llm/topic-manager';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import { prisma } from '@/lib/prisma';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 export const maxDuration = 60;
 
@@ -959,6 +960,21 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         console.timeEnd("LLM");
         let responseText = result.object.response;
         console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
+
+        // Track token usage
+        const organizationId = (bot as any).project?.organization?.id;
+        if (organizationId && result.usage) {
+            TokenTrackingService.logTokenUsage({
+                organizationId,
+                inputTokens: result.usage.inputTokens || 0,
+                outputTokens: result.usage.outputTokens || 0,
+                category: 'INTERVIEW',
+                model: model.modelId || 'gpt-4o',
+                operation: 'interview-response',
+                resourceType: 'interview',
+                resourceId: bot.id
+            }).catch(err => console.error('Token tracking failed:', err));
+        }
 
         // ====================================================================
         // 5.5 POST-PROCESSING: Detect premature closures and vague responses

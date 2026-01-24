@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg baseProfile="full" height="132px" version="1.1" viewBox="0,0,195,132" width="195px" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="iconGradient" x1="0%" x2="0%" y1="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF9A5A" />
+      <stop offset="100%" stop-color="#F06543" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Icona -->
+  <circle cx="14" cy="98" fill="url(#iconGradient)" r="14" />
+  <rect fill="url(#iconGradient)" height="63" rx="14" ry="14" width="28" x="41" y="59" />
+  <rect fill="url(#iconGradient)" height="132" rx="14" ry="14" width="28" x="83" y="0" />
+  <rect fill="url(#iconGradient)" height="63" rx="14" ry="14" width="28" x="125" y="50" />
+  <rect fill="url(#iconGradient)" height="84" rx="14" ry="14" width="28" x="167" y="28" />
+</svg>

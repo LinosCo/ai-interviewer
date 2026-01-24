@@ -35,7 +35,7 @@ export function InterviewsList() {
                 {/* Stats Cards Skeleton */}
                 <div className="grid md:grid-cols-3 gap-4">
                     {[1, 2, 3].map((i) => (
-                        <div key={i} className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm animate-pulse">
+                        <div key={i} className="platform-card rounded-xl p-5 animate-pulse">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-gray-200 rounded-lg w-9 h-9" />
                                 <div>
@@ -47,7 +47,7 @@ export function InterviewsList() {
                     ))}
                 </div>
                 {/* List Skeleton */}
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="platform-card rounded-xl overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <div className="h-5 w-32 bg-gray-200 rounded" />
                     </div>
@@ -90,7 +90,7 @@ export function InterviewsList() {
         <div className="space-y-8">
             {/* Stats Cards */}
             <div className="grid md:grid-cols-3 gap-4">
-                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+                <div className="platform-card rounded-xl p-5">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-amber-100 rounded-lg">
                             <MessageSquare className="w-5 h-5 text-amber-600" />
@@ -101,7 +101,7 @@ export function InterviewsList() {
                         </div>
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+                <div className="platform-card rounded-xl p-5">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-green-100 rounded-lg">
                             <Users className="w-5 h-5 text-green-600" />
@@ -112,7 +112,7 @@ export function InterviewsList() {
                         </div>
                     </div>
                 </div>
-                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+                <div className="platform-card rounded-xl p-5">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-amber-100 rounded-lg">
                             <TrendingUp className="w-5 h-5 text-amber-600" />
@@ -127,7 +127,7 @@ export function InterviewsList() {
 
             {/* Interviews List */}
             {allBots.length === 0 ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                <div className="platform-card rounded-xl p-12 text-center">
                     <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
                         {isAllProjectsSelected
@@ -145,7 +145,7 @@ export function InterviewsList() {
                     </Link>
                 </div>
             ) : (
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="platform-card rounded-xl overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <h2 className="font-semibold text-gray-900">
                             {isAllProjectsSelected ? 'Tutte le interviste' : `Interviste del progetto`}

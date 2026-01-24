@@ -40,9 +40,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-glow">
-            <Icons.Logo size={24} className="text-white" />
-          </div>
+          <Icons.Logo size={32} />
           <span className="font-display font-bold text-xl text-[hsl(var(--foreground))]">
             Business Tuner
           </span>

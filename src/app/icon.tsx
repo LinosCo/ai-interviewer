@@ -26,38 +26,25 @@ export default function Icon() {
                     background: 'transparent',
                 }}
             >
-                {/* Business Tuner Logo SVG Scaled Down */}
+                {/* Business Tuner Logo - New Design */}
                 <svg
                     width="32"
-                    height="32"
-                    viewBox="0 0 48 48"
+                    height="22"
+                    viewBox="0 0 195 132"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                 >
                     <defs>
-                        <linearGradient id="logoGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#d97706" /> {/* amber-600 */}
-                            <stop offset="50%" stopColor="#f59e0b" /> {/* amber-500 */}
-                            <stop offset="100%" stopColor="#ffd700" /> {/* gold */}
+                        <linearGradient id="logoGradient" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stopColor="#FF9A5A" />
+                            <stop offset="100%" stopColor="#F06543" />
                         </linearGradient>
                     </defs>
-                    <rect width="48" height="48" rx="14" fill="url(#logoGradient)" />
-                    <g fill="white" opacity="0.9">
-                        <rect x="8" y="28" width="5" height="12" rx="2" opacity="0.4" />
-                        <rect x="15" y="24" width="5" height="16" rx="2" opacity="0.55" />
-                        <rect x="22" y="18" width="5" height="22" rx="2" opacity="0.7" />
-                        <rect x="29" y="14" width="5" height="26" rx="2" opacity="0.85" />
-                        <rect x="36" y="20" width="5" height="20" rx="2" opacity="0.7" />
-                    </g>
-                    <path
-                        d="M10 34 L17.5 30 L24.5 22 L31.5 16 L38.5 22"
-                        stroke="white"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                    />
-                    <circle cx="31.5" cy="16" r="4" fill="white" />
+                    <circle cx="14" cy="98" r="14" fill="url(#logoGradient)" />
+                    <rect x="41" y="59" width="28" height="63" rx="14" fill="url(#logoGradient)" />
+                    <rect x="83" y="0" width="28" height="132" rx="14" fill="url(#logoGradient)" />
+                    <rect x="125" y="50" width="28" height="63" rx="14" fill="url(#logoGradient)" />
+                    <rect x="167" y="28" width="28" height="84" rx="14" fill="url(#logoGradient)" />
                 </svg>
             </div>
         ),

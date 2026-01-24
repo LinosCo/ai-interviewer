@@ -8,33 +8,38 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
 }
 
 export const Icons = {
-    // Brand Logo
-    Logo: ({ size = 48, ...props }: IconProps) => (
-        <svg width={size} height={size} viewBox="0 0 48 48" fill="none" {...props}>
+    // Brand Logo - Icon only (chart bars with dot)
+    Logo: ({ size = 32, ...props }: IconProps) => (
+        <svg width={size} height={Number(size) * 0.68} viewBox="0 0 195 132" fill="none" {...props}>
             <defs>
-                <linearGradient id="btLogoGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor={colors.amberDark} />
-                    <stop offset="50%" stopColor={colors.amber} />
-                    <stop offset="100%" stopColor={colors.gold} />
+                <linearGradient id="btLogoGradient" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stopColor="#FF9A5A" />
+                    <stop offset="100%" stopColor="#F06543" />
                 </linearGradient>
             </defs>
-            <rect width="48" height="48" rx="14" fill="url(#btLogoGradient)" />
-            <g fill="white" opacity="0.9">
-                <rect x="8" y="28" width="5" height="12" rx="2" opacity="0.4" />
-                <rect x="15" y="24" width="5" height="16" rx="2" opacity="0.55" />
-                <rect x="22" y="18" width="5" height="22" rx="2" opacity="0.7" />
-                <rect x="29" y="14" width="5" height="26" rx="2" opacity="0.85" />
-                <rect x="36" y="20" width="5" height="20" rx="2" opacity="0.7" />
-            </g>
-            <path
-                d="M10 34 L17.5 30 L24.5 22 L31.5 16 L38.5 22"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-            />
-            <circle cx="31.5" cy="16" r="3" fill="white" />
+            <circle cx="14" cy="98" r="14" fill="url(#btLogoGradient)" />
+            <rect x="41" y="59" width="28" height="63" rx="14" fill="url(#btLogoGradient)" />
+            <rect x="83" y="0" width="28" height="132" rx="14" fill="url(#btLogoGradient)" />
+            <rect x="125" y="50" width="28" height="63" rx="14" fill="url(#btLogoGradient)" />
+            <rect x="167" y="28" width="28" height="84" rx="14" fill="url(#btLogoGradient)" />
+        </svg>
+    ),
+
+    // Brand Logo with text - Horizontal
+    LogoWithText: ({ size = 32, ...props }: IconProps) => (
+        <svg width={Number(size) * 4.3} height={size} viewBox="0 0 780 181" fill="none" {...props}>
+            <defs>
+                <linearGradient id="btLogoGradientH" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stopColor="#FF9A5A" />
+                    <stop offset="100%" stopColor="#F06543" />
+                </linearGradient>
+            </defs>
+            <circle cx="36" cy="120" r="14" fill="url(#btLogoGradientH)" />
+            <rect x="63" y="81" width="28" height="63" rx="14" fill="url(#btLogoGradientH)" />
+            <rect x="105" y="22" width="28" height="132" rx="14" fill="url(#btLogoGradientH)" />
+            <rect x="147" y="72" width="28" height="63" rx="14" fill="url(#btLogoGradientH)" />
+            <rect x="189" y="50" width="28" height="84" rx="14" fill="url(#btLogoGradientH)" />
+            <text fontFamily="Arial, Helvetica, sans-serif" fontSize="52px" fontWeight="700" letterSpacing="2px" fill="#1a1a1a" x="245" y="118">BUSINESS TUNER</text>
         </svg>
     ),
 

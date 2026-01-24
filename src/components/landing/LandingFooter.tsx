@@ -43,9 +43,7 @@ export function LandingFooter() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
-                <Icons.Logo size={24} className="text-white" />
-              </div>
+              <Icons.Logo size={32} />
               <span className="font-display font-bold text-xl">
                 Business Tuner
               </span>

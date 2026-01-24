@@ -84,7 +84,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                 <div className="relative">
                     <button
                         onClick={() => setIsFilterOpen(!isFilterOpen)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 font-medium text-gray-700"
+                        className="flex items-center gap-2 px-4 py-2 platform-card rounded-lg font-medium text-gray-700"
                     >
                         <Bot className="w-4 h-4" />
                         Filtra Fonti ({selectedBotIds.length > 0 ? selectedBotIds.length : 'Tutte'})
@@ -92,7 +92,7 @@ export default function ProjectAnalytics({ projectId, availableBots }: ProjectAn
                     </button>
 
                     {isFilterOpen && (
-                        <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-50 p-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="absolute right-0 mt-2 w-72 platform-card rounded-xl shadow-xl z-50 p-4 animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex justify-between items-center mb-3">
                                 <span className="font-semibold text-sm">Seleziona Fonti</span>
                                 {selectedBotIds.length > 0 && (

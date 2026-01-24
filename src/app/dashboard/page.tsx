@@ -169,7 +169,7 @@ export default async function DashboardPage() {
             {/* Stats Cards Row */}
             <div className="grid md:grid-cols-4 gap-4">
                 {/* Interviews Stats */}
-                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group">
+                <div className="platform-card rounded-xl p-5 relative overflow-hidden group">
                     <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-amber-100 rounded-lg">
                             <MessageSquare className="w-5 h-5 text-amber-600" />
@@ -191,7 +191,7 @@ export default async function DashboardPage() {
                 </div>
 
                 {/* Chatbots Stats */}
-                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm relative overflow-hidden group">
+                <div className="platform-card rounded-xl p-5 relative overflow-hidden group">
                     <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-blue-100 rounded-lg">
                             <Bot className="w-5 h-5 text-blue-600" />
@@ -213,7 +213,7 @@ export default async function DashboardPage() {
                 </div>
 
                 {/* Tokens Stats */}
-                <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+                <div className="platform-card rounded-xl p-5">
                     <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-purple-100 rounded-lg">
                             <Sparkles className="w-5 h-5 text-purple-600" />
@@ -333,7 +333,7 @@ export default async function DashboardPage() {
 
                     <Link
                         href="/templates"
-                        className="block bg-white rounded-xl p-4 border border-gray-200 hover:border-gray-300 transition-colors group"
+                        className="block platform-card rounded-xl p-4 hover:border-gray-300 transition-colors group"
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -351,7 +351,7 @@ export default async function DashboardPage() {
                 </div>
 
                 {/* Recent Activity List */}
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+                <div className="platform-card rounded-xl overflow-hidden flex flex-col">
                     <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                         <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                             <Bell className="w-4 h-4 text-gray-400" />

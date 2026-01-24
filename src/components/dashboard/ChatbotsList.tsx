@@ -34,7 +34,7 @@ export function ChatbotsList() {
         return (
             <div className="space-y-4">
                 {[1, 2].map((i) => (
-                    <div key={i} className="bg-white rounded-xl border border-gray-200 p-6 animate-pulse">
+                    <div key={i} className="platform-card rounded-xl p-6 animate-pulse">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-12 h-12 bg-gray-200 rounded-xl" />
                             <div>
@@ -60,7 +60,7 @@ export function ChatbotsList() {
 
     if (!bots || bots.length === 0) {
         return (
-            <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <div className="platform-card rounded-xl p-12 text-center">
                 <Bot className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun chatbot in questo progetto</h3>
                 <p className="text-gray-500 mb-6">Crea il tuo primo assistente AI da integrare nel tuo sito</p>
@@ -83,7 +83,7 @@ export function ChatbotsList() {
                 return (
                     <div
                         key={bot.id}
-                        className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow relative"
+                        className="platform-card rounded-xl p-6 hover:shadow-md transition-shadow relative"
                     >
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">

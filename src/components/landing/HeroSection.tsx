@@ -65,10 +65,10 @@ export function HeroSection() {
             className="text-center max-w-4xl mx-auto"
           >
             {/* Animated Headline */}
-            <h1 className="font-display text-[2.25rem] md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.15] md:leading-[1.1] mb-6 md:mb-8">
+            <h1 className="font-display text-[2rem] md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.2] md:leading-[1.1] mb-4 md:mb-8">
               <span className="text-[hsl(var(--foreground))]">Ti piacerebbe sapere</span>
               <br />
-              <span className="relative h-[1.2em] block mt-3 md:mt-4">
+              <span className="relative h-[2.5em] md:h-[1.2em] block mt-2 md:mt-4">
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={currentPhraseIndex}
@@ -85,7 +85,7 @@ export function HeroSection() {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-base md:text-xl text-[hsl(var(--muted-foreground))] mb-10 md:mb-12 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-base md:text-xl text-[hsl(var(--muted-foreground))] mb-8 md:mb-12 max-w-2xl mx-auto leading-relaxed px-2 md:px-0">
               La piattaforma di marketing e business intelligence che ascolta mercato,
               dipendenti e filiera. Raccoglie feedback, identifica problemi e ti guida
               verso decisioni migliori.

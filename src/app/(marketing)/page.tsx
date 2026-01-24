@@ -8,6 +8,7 @@ import {
   AITipsSection,
   HowItWorks,
   WhySection,
+  UseCasesSection,
   PricingSection,
   FAQSection,
   CTASection,
@@ -42,8 +43,11 @@ export default function LandingPage() {
         <div className="h-24 section-fade-to-transparent" />
         <WhySection />
 
-        {/* Transition: Why (transparent) → Pricing (white) */}
+        {/* Transition: Why (transparent) → UseCases (white-ish) */}
         <div className="h-24 section-fade-from-transparent" />
+        <UseCasesSection />
+
+        {/* Transition: UseCases → Pricing (white) */}
         <PricingSection />
         <FAQSection />
 

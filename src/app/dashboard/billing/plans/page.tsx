@@ -91,7 +91,7 @@ export default async function PlansPage() {
             <div className="mt-12 bg-amber-50 rounded-[28px] p-8 border border-amber-100/50 flex flex-col md:flex-row items-center justify-between gap-6">
                 <div>
                     <h4 className="text-lg font-bold text-stone-900 mb-1">Passa alla fatturazione annuale?</h4>
-                    <p className="text-stone-600 text-sm">Risparmia il 20% su tutti i piani attivando il pagamento annuale.</p>
+                    <p className="text-stone-600 text-sm">Risparmia il 25% su tutti i piani attivando il pagamento annuale.</p>
                 </div>
                 <Link href="/api/stripe/portal">
                     <button className="bg-white text-stone-900 font-bold px-8 py-3.5 rounded-xl border border-stone-200 hover:bg-stone-50 transition-all text-sm shadow-sm flex items-center gap-2">

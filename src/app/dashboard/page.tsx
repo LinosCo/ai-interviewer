@@ -318,14 +318,14 @@ export default async function DashboardPage() {
                             <div className="flex items-start justify-between opacity-50">
                                 <div>
                                     <h3 className="text-xl font-semibold mb-2">Crea Chatbot AI</h3>
-                                    <p className="text-gray-500 text-sm">Hai raggiunto il limite di Chatbot.</p>
+                                    <p className="text-gray-500 text-sm">Hai raggiunto il limite di Chatbot del tuo piano.</p>
                                 </div>
                                 <Lock className="w-6 h-6 text-gray-400" />
                             </div>
                             <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-3 border-t border-gray-100 flex items-center justify-between px-6">
-                                <span className="text-xs font-semibold text-gray-600">Disponibile nel piano PRO</span>
-                                <Link href="/dashboard/settings/billing" className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-full hover:bg-indigo-700">
-                                    Passa a PRO
+                                <span className="text-xs font-semibold text-gray-600">Sblocca più chatbot</span>
+                                <Link href="/dashboard/billing/plans" className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-full hover:bg-indigo-700">
+                                    Upgrade Piano
                                 </Link>
                             </div>
                         </div>

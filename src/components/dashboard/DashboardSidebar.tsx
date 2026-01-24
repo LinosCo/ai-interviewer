@@ -49,7 +49,7 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
             `}>
                 <div className="hidden md:block absolute inset-6 bg-white/65 backdrop-blur-md border border-white/40 shadow-md rounded-[24px] -z-1" />
 
-                <Link href="/dashboard" className="mb-4 hidden md:flex items-center gap-2 px-3">
+                <Link href="/dashboard" className="mb-6 hidden md:flex items-center gap-2.5 px-4 pt-2">
                     <Icons.Logo size={32} />
                     <span className="font-bold text-xl text-gray-900 tracking-tight">Business Tuner</span>
                 </Link>
@@ -58,17 +58,6 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
                 <div className="mb-6">
                     <GlobalProjectSelector />
                 </div>
-
-                {/* Quick Create Button */}
-                <Link
-                    href="/onboarding"
-                    onClick={() => setIsOpen(false)}
-                    className="mb-8 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl font-semibold text-white shadow-lg transition-all hover:scale-[1.02] active:scale-95 group"
-                    style={{ background: gradients.primary, boxShadow: shadows.amber }}
-                >
-                    <Icons.Plus className="w-5 h-5" color="white" />
-                    <span>Nuova intervista</span>
-                </Link>
 
                 <nav className="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-hide pr-2 -mr-2">
                     <DashboardLink href="/dashboard" icon={<Icons.Home size={20} />} label="Home" onClick={() => setIsOpen(false)} />

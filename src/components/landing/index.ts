@@ -6,6 +6,7 @@ export { FeaturesSection } from './FeaturesSection';
 export { AITipsSection } from './AITipsSection';
 export { HowItWorks } from './HowItWorks';
 export { WhySection } from './WhySection';
+export { UseCasesSection } from './UseCasesSection';
 export { PricingSection } from './PricingSection';
 export { FAQSection } from './FAQSection';
 export { CTASection } from './CTASection';

@@ -77,20 +77,42 @@ export default function BillingSettingsPage() {
                     </Badge>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className={`flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl border ${
+                        usage?.status === 'PAST_DUE' ? 'bg-red-50 border-red-200' :
+                        usage?.status === 'CANCELED' ? 'bg-slate-100 border-slate-200' :
+                        'bg-slate-50 border-slate-100'
+                    }`}>
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
                                 {usage?.status === 'ACTIVE' ? (
                                     <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                ) : usage?.status === 'PAST_DUE' ? (
+                                    <CreditCard className="w-5 h-5 text-red-500" />
+                                ) : usage?.status === 'CANCELED' ? (
+                                    <ShieldCheck className="w-5 h-5 text-slate-400" />
                                 ) : (
                                     <ShieldCheck className="w-5 h-5 text-amber-500" />
                                 )}
                                 <span className="font-bold text-slate-900">
-                                    Stato: {usage?.status === 'ACTIVE' ? 'Sottoscrizione Attiva' : 'Periodo di Prova'}
+                                    Stato: {
+                                        usage?.status === 'ACTIVE' ? 'Sottoscrizione Attiva' :
+                                        usage?.status === 'TRIALING' ? 'Periodo di Prova' :
+                                        usage?.status === 'PAST_DUE' ? 'Pagamento Scaduto' :
+                                        usage?.status === 'CANCELED' ? 'Abbonamento Cancellato' :
+                                        'Periodo di Prova'
+                                    }
                                 </span>
                             </div>
                             <p className="text-sm text-slate-500 font-medium">
-                                Il tuo prossimo rinnovo è previsto per il <span className="text-slate-900 font-bold">{new Date(usage?.period.end).toLocaleDateString('it-IT')}</span>.
+                                {usage?.status === 'TRIALING' ? (
+                                    <>La tua prova termina il <span className="text-slate-900 font-bold">{new Date(usage?.period.end).toLocaleDateString('it-IT')}</span>.</>
+                                ) : usage?.status === 'PAST_DUE' ? (
+                                    <span className="text-red-600">Il pagamento è fallito. Aggiorna i dati di pagamento per continuare a usare il servizio.</span>
+                                ) : usage?.status === 'CANCELED' ? (
+                                    <>L'abbonamento è stato cancellato. Attiva un nuovo piano per continuare.</>
+                                ) : (
+                                    <>Il tuo prossimo rinnovo è previsto per il <span className="text-slate-900 font-bold">{new Date(usage?.period.end).toLocaleDateString('it-IT')}</span>.</>
+                                )}
                             </p>
                         </div>
 
@@ -100,11 +122,11 @@ export default function BillingSettingsPage() {
                                 disabled={isPortalLoading}
                                 className="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 rounded-xl font-bold shadow-sm"
                             >
-                                {isPortalLoading ? 'Caricamento...' : 'Gestisci su Stripe'}
+                                {isPortalLoading ? 'Caricamento...' : usage?.status === 'PAST_DUE' ? 'Aggiorna Pagamento' : 'Gestisci su Stripe'}
                                 <ExternalLink className="w-4 h-4 ml-2" />
                             </Button>
-                            <Link href="/pricing" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold text-white px-4 py-2 transition-colors">
-                                Modifica Piano
+                            <Link href="/dashboard/billing/plans" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold text-white px-4 py-2 transition-colors">
+                                {usage?.status === 'CANCELED' || usage?.status === 'TRIALING' ? 'Scegli un Piano' : 'Modifica Piano'}
                             </Link>
                         </div>
                     </div>
@@ -136,7 +158,7 @@ export default function BillingSettingsPage() {
                         <p className="text-sm text-slate-600 mb-6 font-medium">
                             Hai bisogno di più token o interviste per questo mese senza cambiare piano?
                         </p>
-                        <Link href="/pricing#addons" className="inline-flex items-center justify-center w-full rounded-xl font-bold border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
+                        <Link href="/dashboard/billing/plans" className="inline-flex items-center justify-center w-full rounded-xl font-bold border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
                             Vedi Pacchetti Extra
                         </Link>
                     </CardContent>

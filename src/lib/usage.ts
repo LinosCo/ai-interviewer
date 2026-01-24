@@ -264,11 +264,19 @@ export async function resetMonthlyUsage(organizationId?: string) {
     const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const updateData = {
+        // Main usage counters
         interviewsUsedThisMonth: 0,
         tokensUsedThisMonth: 0,
         chatbotSessionsUsedThisMonth: 0,
         visibilityQueriesUsedThisMonth: 0,
         aiSuggestionsUsedThisMonth: 0,
+        // Token breakdown by category
+        interviewTokensUsed: 0,
+        chatbotTokensUsed: 0,
+        visibilityTokensUsed: 0,
+        suggestionTokensUsed: 0,
+        systemTokensUsed: 0,
+        // Period dates
         currentPeriodStart: now,
         currentPeriodEnd: endOfNextMonth
     };

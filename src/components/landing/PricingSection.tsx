@@ -8,15 +8,14 @@ import Link from 'next/link';
 const plans = [
   {
     name: 'Free',
-    description: 'Per iniziare a esplorare',
+    description: 'Per sempre gratuito',
     monthlyPrice: '0',
     yearlyPrice: '0',
     features: [
+      '20 interviste/mese',
       '1 progetto',
-      '20 interviste AI/mese',
-      'Chatbot base',
-      'Report settimanali',
-      'Community support',
+      'Analytics base',
+      'Export PDF (watermark)',
     ],
     cta: 'Inizia Gratis',
     ctaHref: '/register',
@@ -24,57 +23,56 @@ const plans = [
   },
   {
     name: 'Starter',
-    description: 'Per piccole imprese',
-    monthlyPrice: '49',
-    yearlyPrice: '39',
+    description: 'Per il professionista',
+    monthlyPrice: '69',
+    yearlyPrice: '49',
     features: [
+      '100 interviste/mese',
       '3 progetti',
-      '100 interviste AI/mese',
-      'Chatbot personalizzato',
-      'Reputation monitoring base',
-      'Report giornalieri',
-      'Email support',
+      '1 Chatbot (500 sessioni)',
+      '2 utenti',
+      'Analytics completi',
+      'Export PDF/CSV',
     ],
-    cta: 'Inizia Ora',
+    cta: 'Inizia 14 giorni gratis',
     ctaHref: '/register?plan=starter',
     popular: false,
   },
   {
     name: 'Pro',
-    description: 'Per PMI in crescita',
-    monthlyPrice: '149',
-    yearlyPrice: '119',
+    description: 'Per la PMI',
+    monthlyPrice: '199',
+    yearlyPrice: '149',
     features: [
+      '400 interviste/mese',
       '10 progetti',
-      '500 interviste AI/mese',
-      'Chatbot multi-lingua',
-      'Reputation monitoring avanzato',
-      'AI insights & consigli',
-      'Priority support',
-      'Integrazioni API',
+      '3 Chatbot (4.000 sessioni)',
+      'Brand Monitor',
+      'AI Tips & suggerimenti',
+      '5 utenti',
+      'Supporto prioritario',
     ],
-    cta: 'Prova Pro',
+    cta: 'Inizia 14 giorni gratis',
     ctaHref: '/register?plan=pro',
     popular: true,
   },
   {
-    name: 'Enterprise',
-    description: 'Per consulenti e agenzie',
-    monthlyPrice: null,
-    yearlyPrice: null,
-    priceLabel: 'Su misura',
+    name: 'Business',
+    description: "Per l'azienda strutturata",
+    monthlyPrice: '399',
+    yearlyPrice: '299',
     features: [
+      '1.000 interviste/mese',
       'Progetti illimitati',
-      'Interviste illimitate',
-      'White-label chatbot',
-      'Reputation monitoring completo',
-      'AI coaching personalizzato',
-      'Dedicated success manager',
-      'Custom integrations',
-      'SLA garantito',
+      '10 Chatbot (12.000 sessioni)',
+      'Brand Monitor avanzato',
+      'White Label',
+      'API Access',
+      '15 utenti',
+      'Account manager dedicato',
     ],
     cta: 'Contattaci',
-    ctaHref: '/contact',
+    ctaHref: '/sales',
     popular: false,
   },
 ];
@@ -122,7 +120,7 @@ export function PricingSection() {
             </span>
             {isYearly && (
               <span className="px-2 py-1 text-xs font-semibold rounded-full gradient-bg text-white">
-                -20%
+                -25%
               </span>
             )}
           </div>
@@ -166,20 +164,14 @@ export function PricingSection() {
                 </div>
 
                 <div className="flex items-baseline gap-1 mb-6">
-                  {plan.monthlyPrice !== null ? (
-                    <>
-                      <span className="text-4xl font-bold">
-                        €{isYearly ? plan.yearlyPrice : plan.monthlyPrice}
-                      </span>
-                      <span className="text-[hsl(var(--muted-foreground))]">/mese</span>
-                      {isYearly && plan.monthlyPrice !== '0' && (
-                        <span className="text-sm text-[hsl(var(--muted-foreground))] line-through ml-2">
-                          €{plan.monthlyPrice}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-3xl font-bold">{plan.priceLabel}</span>
+                  <span className="text-4xl font-bold">
+                    €{isYearly ? plan.yearlyPrice : plan.monthlyPrice}
+                  </span>
+                  <span className="text-[hsl(var(--muted-foreground))]">/mese</span>
+                  {isYearly && plan.monthlyPrice !== '0' && (
+                    <span className="text-sm text-[hsl(var(--muted-foreground))] line-through ml-2">
+                      €{plan.monthlyPrice}
+                    </span>
                   )}
                 </div>
 

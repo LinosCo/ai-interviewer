@@ -49,7 +49,20 @@ export function ProblemSection() {
           </p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-[1fr,auto,1fr] gap-8 lg:gap-10 items-start">
+        <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-stretch relative">
+          {/* Arrow in the middle - desktop only */}
+          <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+            <motion.div
+              initial={{ opacity: 0, scale: 0 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="w-16 h-16 rounded-full gradient-bg shadow-glow flex items-center justify-center"
+            >
+              <ArrowRight className="w-8 h-8 text-white" />
+            </motion.div>
+          </div>
+
           {/* Problems */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -82,19 +95,6 @@ export function ProblemSection() {
               </motion.div>
             ))}
           </motion.div>
-
-          {/* Arrow */}
-          <div className="hidden lg:flex items-center justify-center self-center">
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="w-16 h-16 rounded-full gradient-bg shadow-glow flex items-center justify-center"
-            >
-              <ArrowRight className="w-8 h-8 text-white" />
-            </motion.div>
-          </div>
 
           {/* Solutions */}
           <motion.div

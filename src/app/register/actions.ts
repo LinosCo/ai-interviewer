@@ -108,9 +108,9 @@ export async function registerUser(prevState: string | undefined, formData: Form
         return 'Registration failed.';
     }
 
-    // Redirect logic
-    if (plan && ['STARTER', 'PRO'].includes(plan)) {
-        redirect(`/api/stripe/checkout?tier=${plan}${billing ? `&billing=${billing}` : ''}`);
+    // Redirect logic - include all paid plans
+    if (plan && ['STARTER', 'PRO', 'BUSINESS'].includes(plan.toUpperCase())) {
+        redirect(`/api/stripe/checkout?tier=${plan.toUpperCase()}${billing ? `&billing=${billing}` : ''}`);
     } else {
         redirect('/dashboard');
     }

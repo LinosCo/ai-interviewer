@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBot } from '@/app/actions/admin';
 import { linkVisibilityConfig, unlinkVisibilityConfig, transferBotToProject } from '@/app/actions/project-tools';
-import { ArrowLeft, Loader2, X, Plus, Link as LinkIcon, Unlink, Bot as BotIcon, Globe, MessageSquare, Search, LayoutGrid, ChevronRight, Users } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Link as LinkIcon, Unlink, Bot as BotIcon, Globe, MessageSquare, Search, LayoutGrid, ChevronRight, Users } from 'lucide-react';
 import { ProjectAccessManager } from '@/app/dashboard/projects/access-manager';
 import { showToast } from '@/components/toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -51,34 +50,12 @@ export default function ProjectDetailView({
     availableVisibilityConfigs
 }: ProjectDetailViewProps) {
     const router = useRouter();
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [createName, setCreateName] = useState('');
-    const [createGoal, setCreateGoal] = useState('');
-
     const [transferBotId, setTransferBotId] = useState<string | null>(null);
     const [targetProjectId, setTargetProjectId] = useState('');
 
     const [isManageToolsOpen, setIsManageToolsOpen] = useState(false);
     const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-
-    const handleCreate = async () => {
-        if (!createName || !createGoal) return;
-        setIsLoading(true);
-        try {
-            await createBot(project.id, createName, createGoal);
-            setIsCreateOpen(false);
-            setCreateName('');
-            setCreateGoal('');
-            showToast('Bot creato con successo', 'success');
-            router.refresh();
-        } catch (error) {
-            console.error(error);
-            showToast('Errore durante la creazione del bot', 'error');
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     const handleTransfer = async () => {
         if (!transferBotId || !targetProjectId) return;
@@ -164,17 +141,10 @@ export default function ProjectDetailView({
                     </button>
                     <button
                         onClick={() => setIsManageToolsOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-900 text-gray-900 rounded-xl font-bold hover:bg-gray-50 transition-all text-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all shadow-sm shadow-amber-200 text-sm"
                     >
                         <Search className="w-4 h-4" />
                         Gestisci Tool
-                    </button>
-                    <button
-                        onClick={() => setIsCreateOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all shadow-sm shadow-amber-200 text-sm"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Nuova Intervista
                     </button>
                 </div>
             </div>
@@ -392,77 +362,6 @@ export default function ProjectDetailView({
                                         )}
                                     </div>
                                 </section>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* Create Bot Dialog */}
-            <AnimatePresence>
-                {isCreateOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setIsCreateOpen(false)}
-                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
-                        />
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 relative z-10"
-                        >
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Nuovo Bot</h2>
-                                    <p className="text-sm text-gray-500 font-medium">Configura i parametri base per la nuova intervista.</p>
-                                </div>
-                                <button onClick={() => setIsCreateOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Nome del Tool</label>
-                                    <input
-                                        type="text"
-                                        value={createName}
-                                        onChange={(e) => setCreateName(e.target.value)}
-                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl px-5 py-3 text-sm font-bold outline-none transition-all"
-                                        placeholder="es. Feedback Prodotto Q1"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Obiettivo / Descrizione</label>
-                                    <textarea
-                                        value={createGoal}
-                                        onChange={(e) => setCreateGoal(e.target.value)}
-                                        className="w-full bg-gray-50 border-2 border-transparent focus:border-amber-500 focus:bg-white rounded-2xl px-5 py-3 text-sm font-bold outline-none h-32 resize-none transition-all"
-                                        placeholder="Qual è lo scopo principale di questo tool?"
-                                    />
-                                </div>
-
-                                <div className="flex gap-3 pt-4">
-                                    <button
-                                        onClick={() => setIsCreateOpen(false)}
-                                        className="flex-1 px-6 py-4 border-2 border-gray-100 text-gray-500 rounded-2xl text-sm font-black hover:bg-gray-50 transition-all"
-                                    >
-                                        Annulla
-                                    </button>
-                                    <button
-                                        onClick={handleCreate}
-                                        disabled={!createName || !createGoal || isLoading}
-                                        className="flex-1 px-6 py-4 bg-amber-500 text-white rounded-2xl text-sm font-black hover:bg-amber-600 shadow-lg shadow-amber-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
-                                    >
-                                        {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                                        Crea Tool
-                                    </button>
-                                </div>
                             </div>
                         </motion.div>
                     </div>

@@ -40,6 +40,11 @@ export function UsageDashboard() {
 
     if (!usage) return null;
 
+    // Check if trial has expired
+    const isTrialExpired = usage.status === 'TRIALING' && usage.trialEndsAt && new Date(usage.trialEndsAt) < new Date();
+    const isPastDue = usage.status === 'PAST_DUE';
+    const isCanceled = usage.status === 'CANCELED';
+
     const renderUsageRow = (label: string, icon: any, data: any, unit: string) => {
         const Icon = icon;
         const percentage = data.percentage || 0;
@@ -64,6 +69,50 @@ export function UsageDashboard() {
 
     return (
         <Card className="p-6 space-y-6 border-slate-100 shadow-sm">
+            {/* Status Warning Banners */}
+            {(isTrialExpired || isPastDue || isCanceled) && (
+                <div className={`rounded-xl p-4 flex items-start gap-3 border ${
+                    isPastDue ? 'bg-red-50 border-red-200' :
+                    isCanceled ? 'bg-slate-100 border-slate-200' :
+                    'bg-amber-50 border-amber-200'
+                }`}>
+                    <AlertCircle className={`w-5 h-5 mt-0.5 ${
+                        isPastDue ? 'text-red-500' :
+                        isCanceled ? 'text-slate-500' :
+                        'text-amber-500'
+                    }`} />
+                    <div className="flex-1">
+                        <p className={`text-sm font-bold ${
+                            isPastDue ? 'text-red-900' :
+                            isCanceled ? 'text-slate-900' :
+                            'text-amber-900'
+                        }`}>
+                            {isPastDue ? 'Pagamento non riuscito' :
+                             isCanceled ? 'Abbonamento cancellato' :
+                             'Periodo di prova terminato'}
+                        </p>
+                        <p className={`text-xs mt-1 ${
+                            isPastDue ? 'text-red-700' :
+                            isCanceled ? 'text-slate-600' :
+                            'text-amber-700'
+                        }`}>
+                            {isPastDue ? 'Aggiorna i dati di pagamento per continuare a usare tutte le funzionalità.' :
+                             isCanceled ? 'Attiva un nuovo piano per riprendere ad utilizzare il servizio.' :
+                             'Scegli un piano per continuare a usare tutte le funzionalità.'}
+                        </p>
+                        <Link href="/dashboard/billing/plans" className="inline-block mt-3">
+                            <Button size="sm" className={`rounded-lg font-bold text-xs h-8 ${
+                                isPastDue ? 'bg-red-600 hover:bg-red-700' :
+                                isCanceled ? 'bg-slate-900 hover:bg-slate-800' :
+                                'bg-amber-600 hover:bg-amber-700'
+                            }`}>
+                                {isPastDue ? 'Aggiorna pagamento' : 'Scegli un piano'}
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            )}
+
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-lg font-bold text-slate-900">Utilizzo Risorse</h2>

@@ -32,7 +32,7 @@ export function HeroSection() {
   }, []);
 
   return (
-    <section className="relative min-h-[85vh] flex items-center pt-28 pb-8 overflow-hidden">
+    <section className="relative min-h-[92vh] flex items-center pt-32 pb-12 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 relative z-10 w-full">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -41,7 +41,7 @@ export function HeroSection() {
           className="text-center max-w-4xl mx-auto"
         >
           {/* Animated Headline */}
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.1] mb-6">
+          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.1] mb-8">
             <span className="text-[hsl(var(--foreground))]">Ti piacerebbe sapere</span>
             <br />
             <span className="relative h-[1.2em] block mt-4">
@@ -61,7 +61,7 @@ export function HeroSection() {
           </h1>
 
           {/* Subtitle */}
-          <p className="text-lg md:text-xl text-[hsl(var(--muted-foreground))] mb-10 max-w-2xl mx-auto">
+          <p className="text-lg md:text-xl text-[hsl(var(--muted-foreground))] mb-12 max-w-2xl mx-auto">
             La piattaforma di marketing e business intelligence che ascolta mercato,
             dipendenti e filiera. Raccoglie feedback, identifica problemi e ti guida
             verso decisioni migliori.
@@ -90,7 +90,7 @@ export function HeroSection() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
-            className="flex flex-wrap justify-center gap-6 mt-12 text-[hsl(var(--muted-foreground))] text-sm"
+            className="flex flex-wrap justify-center gap-6 mt-16 text-[hsl(var(--muted-foreground))] text-sm"
           >
             <span className="flex items-center gap-2">
               <svg className="w-4 h-4 text-[hsl(var(--coral))]" fill="currentColor" viewBox="0 0 20 20">

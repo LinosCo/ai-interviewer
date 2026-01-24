@@ -49,7 +49,7 @@ export function ProblemSection() {
           </p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-[1fr,auto,1fr] gap-8 lg:gap-12 items-center">
+        <div className="grid sm:grid-cols-[1fr,auto,1fr] gap-4 sm:gap-6 items-center">
           {/* Problems */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -70,10 +70,10 @@ export function ProblemSection() {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: index * 0.1 }}
-                className="flex items-start gap-4 p-5 rounded-2xl glass-card transition-all"
+                className="flex items-start gap-3 p-4 rounded-2xl glass-card transition-all"
               >
-                <div className="w-12 h-12 rounded-xl bg-[hsl(var(--coral)/0.2)] flex items-center justify-center flex-shrink-0">
-                  <problem.icon className="w-6 h-6 text-[hsl(var(--coral))]" />
+                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--coral)/0.2)] flex items-center justify-center flex-shrink-0">
+                  <problem.icon className="w-5 h-5 text-[hsl(var(--coral))]" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg mb-1 text-[hsl(var(--foreground))]">{problem.title}</h3>
@@ -84,7 +84,7 @@ export function ProblemSection() {
           </motion.div>
 
           {/* Arrow */}
-          <div className="hidden lg:flex items-center justify-center">
+          <div className="hidden sm:flex items-center justify-center">
             <motion.div
               initial={{ opacity: 0, scale: 0 }}
               whileInView={{ opacity: 1, scale: 1 }}
@@ -108,7 +108,7 @@ export function ProblemSection() {
               La soluzione
             </div>
 
-            <div className="p-6 md:p-8 rounded-3xl glass-card">
+            <div className="p-5 sm:p-6 rounded-3xl glass-card">
               <h3 className="font-display text-2xl font-bold mb-6 text-[hsl(var(--foreground))]">
                 Business Tuner semplifica tutto
               </h3>

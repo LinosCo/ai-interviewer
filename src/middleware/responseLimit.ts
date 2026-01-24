@@ -29,7 +29,7 @@ export async function checkResponseLimit(
                                 url: '/billing/add-responses'
                             },
                             upgrade: {
-                                url: '/pricing'
+                                url: '/dashboard/billing/plans'
                             },
                             waitUntil: nextReset
                         }

@@ -59,6 +59,11 @@ export default async function VisibilityPage({
         redirect("/dashboard/visibility/create");
     }
 
+    // If no specific brand selected and multiple brands exist, show brands list
+    if (!brandIdFilter && !projectIdFilter && totalBrands > 0) {
+        redirect("/dashboard/visibility/brands");
+    }
+
     // If filtering by project but no config for that project
     if (!config && projectIdFilter && projectIdFilter !== '__ALL__') {
         return (

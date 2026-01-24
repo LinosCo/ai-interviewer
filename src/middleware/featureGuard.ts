@@ -27,7 +27,7 @@ export function requireFeature(feature: keyof PlanLimits) {
                         error: 'Feature not available in your plan',
                         code: 'FEATURE_NOT_IN_PLAN',
                         feature,
-                        upgradeUrl: '/pricing'
+                        upgradeUrl: '/dashboard/billing/plans'
                     },
                     { status: 403 }
                 );
@@ -63,7 +63,7 @@ export async function checkFeature(
                         error: 'Feature not available in your plan',
                         code: 'FEATURE_NOT_IN_PLAN',
                         feature,
-                        upgradeUrl: '/pricing'
+                        upgradeUrl: '/dashboard/billing/plans'
                     },
                     { status: 403 }
                 )

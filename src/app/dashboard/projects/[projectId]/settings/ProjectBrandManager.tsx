@@ -253,7 +253,7 @@ export function ProjectBrandManager({ projectId, projectName }: ProjectBrandMana
                         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-center">
                             <p className="text-sm text-amber-800">
                                 Hai raggiunto il limite di brand del tuo piano.{' '}
-                                <Link href="/pricing" className="font-medium underline">
+                                <Link href="/dashboard/billing/plans" className="font-medium underline">
                                     Passa a un piano superiore
                                 </Link>{' '}
                                 per monitorare più brand.

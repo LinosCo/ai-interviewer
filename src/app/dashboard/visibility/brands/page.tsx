@@ -77,7 +77,7 @@ export default async function BrandsListPage() {
                             </Button>
                         </Link>
                     ) : (
-                        <Link href="/pricing">
+                        <Link href="/dashboard/billing/plans">
                             <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
                                 <Zap className="w-4 h-4" />
                                 Upgrade per più brand
@@ -225,7 +225,7 @@ export default async function BrandsListPage() {
                         </p>
                     </div>
                     {maxBrands < 5 && (
-                        <Link href="/pricing">
+                        <Link href="/dashboard/billing/plans">
                             <Button variant="outline" className="gap-2">
                                 <Zap className="w-4 h-4" />
                                 Vedi piani

@@ -2,7 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { MessageSquare, Plus, TrendingUp, Users, Clock, ArrowRight, Sparkles, Bell, Bot, BarChart3, Lock } from 'lucide-react';
+import { MessageSquare, Plus, TrendingUp, Users, Clock, ArrowRight, Sparkles, Bell, Bot, BarChart3, Lock, Shield, Activity, Settings } from 'lucide-react';
 import { canCreateChatbot, canPublishBot, getUsageStats } from '@/lib/usage';
 
 export default async function DashboardPage() {
@@ -135,6 +135,44 @@ export default async function DashboardPage() {
                     <Link href="/dashboard/settings/billing" className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">
                         Risolvi Ora
                     </Link>
+                </div>
+            )}
+
+            {/* Admin Panel */}
+            {isAdmin && (
+                <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-500 rounded-full text-white">
+                            <Shield className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-white">Pannello Admin</p>
+                            <p className="text-sm text-slate-300">Accesso alle funzionalità di amministrazione.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/dashboard/admin/usage"
+                            className="px-4 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all flex items-center gap-2 text-sm"
+                        >
+                            <Activity className="w-4 h-4" />
+                            Monitoraggio Risorse
+                        </Link>
+                        <Link
+                            href="/dashboard/admin/users"
+                            className="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold hover:bg-slate-600 transition-all flex items-center gap-2 text-sm"
+                        >
+                            <Users className="w-4 h-4" />
+                            Utenti
+                        </Link>
+                        <Link
+                            href="/dashboard/admin/projects"
+                            className="px-4 py-2 bg-slate-700 text-white rounded-lg font-bold hover:bg-slate-600 transition-all flex items-center gap-2 text-sm"
+                        >
+                            <Settings className="w-4 h-4" />
+                            Progetti
+                        </Link>
+                    </div>
                 </div>
             )}
 
@@ -332,7 +370,7 @@ export default async function DashboardPage() {
                     )}
 
                     <Link
-                        href="/templates"
+                        href="/dashboard/templates"
                         className="block platform-card rounded-xl p-4 hover:border-gray-300 transition-colors group"
                     >
                         <div className="flex items-center justify-between">

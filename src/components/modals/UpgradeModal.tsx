@@ -134,7 +134,7 @@ export function UpgradeModal({
                     </Button>
                     <Button
                         variant="primary"
-                        onClick={() => window.location.href = '/pricing'}
+                        onClick={() => window.location.href = '/dashboard/billing/plans'}
                         className="flex-1"
                     >
                         Fai Upgrade Ora

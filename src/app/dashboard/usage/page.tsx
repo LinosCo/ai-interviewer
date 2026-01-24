@@ -111,7 +111,7 @@ export default function UsagePage() {
                     <Link href="/dashboard/settings/billing" className="inline-flex items-center justify-center rounded-xl font-bold border border-slate-200 px-4 py-2 text-slate-700 hover:bg-slate-50 transition-colors">
                         <CreditCard className="w-4 h-4 mr-2" /> Gestisci Billing
                     </Link>
-                    <Link href="/pricing" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold text-white px-4 py-2 transition-colors">
+                    <Link href="/dashboard/billing/plans" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold text-white px-4 py-2 transition-colors">
                         Upgrade Piano
                     </Link>
                 </div>
@@ -254,7 +254,7 @@ export default function UsagePage() {
                     <div>
                         <h3 className="font-bold text-red-900">Risorse quasi esaurite</h3>
                         <p className="text-sm text-red-700">Hai utilizzato oltre l'85% di alcune risorse incluse nel tuo piano. Considera un upgrade o l'acquisto di un add-on per evitare interruzioni.</p>
-                        <Link href="/pricing" className="text-red-600 font-bold text-sm mt-1 hover:underline">
+                        <Link href="/dashboard/billing/plans" className="text-red-600 font-bold text-sm mt-1 hover:underline">
                             Vedi opzioni upgrade →
                         </Link>
                     </div>

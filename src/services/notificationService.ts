@@ -74,7 +74,7 @@ export class NotificationService {
                 },
                 {
                     label: 'Fai upgrade',
-                    url: '/pricing',
+                    url: '/dashboard/billing/plans',
                     primary: true
                 }
             ],
@@ -108,7 +108,7 @@ export class NotificationService {
             actions: [
                 {
                     label: 'Scopri i piani',
-                    url: '/pricing',
+                    url: '/dashboard/billing/plans',
                     primary: true
                 }
             ]

@@ -207,7 +207,7 @@ Grazie`
                         AI Tips
                     </h2>
                     <p className="text-muted-foreground font-medium">
-                        Unisci l'ascolto dei clienti con la tua visione strategica.
+                        Analisi cross-channel di interviste, chatbot e visibilità online.
                     </p>
                 </div>
                 <Button
@@ -230,7 +230,7 @@ Grazie`
                             </div>
                             <div>
                                 <CardTitle className="text-lg font-bold">Visione Strategica & Value Prop</CardTitle>
-                                <CardDescription className="text-xs">Definisci i binari su cui l'AI genererà i suggerimenti.</CardDescription>
+                                <CardDescription className="text-xs">Definisci la direzione della tua organizzazione per suggerimenti AI più mirati.</CardDescription>
                             </div>
                         </div>
                         <Button

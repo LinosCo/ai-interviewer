@@ -27,7 +27,7 @@ interface Member {
 interface AccessData {
     members: Member[];
     isPersonal: boolean;
-    currentUserRole: 'OWNER' | 'MEMBER';
+    currentUserRole: 'OWNER' | 'MEMBER' | 'ADMIN';
 }
 
 interface ProjectAccessManagerProps {
@@ -162,13 +162,15 @@ export function ProjectAccessManager({ projectId, variant = 'full', onClose }: P
     };
 
     const isOwner = accessData?.currentUserRole === 'OWNER';
+    const isAdmin = accessData?.currentUserRole === 'ADMIN';
+    const canManage = isOwner || isAdmin; // Admin or Owner can manage users
     const isPersonal = accessData?.isPersonal || false;
     const isCompact = variant === 'compact';
 
     const content = (
         <>
-            {/* Invite form - only for owners of non-personal projects */}
-            {isOwner && !isPersonal && (
+            {/* Invite form - for owners/admins of non-personal projects */}
+            {canManage && !isPersonal && (
                 <div className="flex gap-2">
                     <div className="relative flex-1">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -187,6 +189,16 @@ export function ProjectAccessManager({ projectId, variant = 'full', onClose }: P
                     >
                         {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Invita"}
                     </Button>
+                </div>
+            )}
+
+            {/* Message for non-owners/non-admins */}
+            {!canManage && !isPersonal && (
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <p className="text-xs text-slate-500">
+                        Solo il proprietario del progetto può invitare nuovi membri.
+                    </p>
                 </div>
             )}
 
@@ -227,18 +239,20 @@ export function ProjectAccessManager({ projectId, variant = 'full', onClose }: P
                                         <p className="text-[10px] text-slate-500 font-medium">{member.email}</p>
                                     </div>
                                 </div>
-                                {/* Actions for members (not owners) when current user is owner */}
-                                {member.role !== 'OWNER' && isOwner && (
+                                {/* Actions for members (not owners) when current user can manage */}
+                                {member.role !== 'OWNER' && canManage && (
                                     <div className="flex items-center gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => openTransferDialog(member)}
-                                            className="text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-full"
-                                            title="Trasferisci proprietà"
-                                        >
-                                            <ArrowRightLeft className="w-4 h-4" />
-                                        </Button>
+                                        {isOwner && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => openTransferDialog(member)}
+                                                className="text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-full"
+                                                title="Trasferisci proprietà"
+                                            >
+                                                <ArrowRightLeft className="w-4 h-4" />
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -256,8 +270,8 @@ export function ProjectAccessManager({ projectId, variant = 'full', onClose }: P
                 )}
             </div>
 
-            {/* Leave project button - only for non-owners of non-personal projects */}
-            {!isOwner && !isPersonal && (
+            {/* Leave project button - only for regular members of non-personal projects */}
+            {!isOwner && !isAdmin && !isPersonal && (
                 <Button
                     variant="outline"
                     onClick={handleLeave}

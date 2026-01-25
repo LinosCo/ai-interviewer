@@ -22,19 +22,12 @@ export async function GET(
 
         const { projectId } = await params;
 
-        // Verify user has access to this project
-        const userAccess = await prisma.projectAccess.findUnique({
-            where: {
-                userId_projectId: {
-                    userId: session.user.id,
-                    projectId
-                }
-            }
+        // Get user info to check if admin
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
         });
-
-        if (!userAccess) {
-            return new Response('Access denied', { status: 403 });
-        }
+        const isAdmin = user?.role === 'ADMIN';
 
         // Get project with access list
         const project = await prisma.project.findUnique({
@@ -52,6 +45,24 @@ export async function GET(
             return new Response('Project not found', { status: 404 });
         }
 
+        // Check if user is project owner (via ownerId)
+        const isProjectOwnerById = project.ownerId === session.user.id;
+
+        // Check if user has access via ProjectAccess
+        const userAccess = await prisma.projectAccess.findUnique({
+            where: {
+                userId_projectId: {
+                    userId: session.user.id,
+                    projectId
+                }
+            }
+        });
+
+        // Allow access if: has ProjectAccess, is admin, or is project owner
+        if (!userAccess && !isAdmin && !isProjectOwnerById) {
+            return new Response('Access denied', { status: 403 });
+        }
+
         // Return access list with roles
         const members = project.accessList.map(pa => ({
             id: pa.id,
@@ -62,10 +73,21 @@ export async function GET(
             createdAt: pa.createdAt
         }));
 
+        // Determine current user's effective role
+        // Priority: ProjectAccess role > Owner via ownerId > Admin
+        let currentUserRole: 'OWNER' | 'MEMBER' | 'ADMIN' = 'MEMBER';
+        if (userAccess) {
+            currentUserRole = userAccess.role;
+        } else if (isProjectOwnerById) {
+            currentUserRole = 'OWNER';
+        } else if (isAdmin) {
+            currentUserRole = 'ADMIN';
+        }
+
         return NextResponse.json({
             members,
             isPersonal: project.isPersonal,
-            currentUserRole: userAccess.role
+            currentUserRole
         });
 
     } catch (error) {
@@ -101,8 +123,18 @@ export async function POST(
             return new Response('Non puoi invitare membri al progetto personale', { status: 403 });
         }
 
-        // Verify user is OWNER
-        if (!(await isProjectOwner(session.user.id, projectId))) {
+        // Check if user is admin
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
+        });
+        const isAdmin = user?.role === 'ADMIN';
+
+        // Verify user is OWNER or ADMIN
+        const ownerCheck = await isProjectOwner(session.user.id, projectId);
+        const isProjectOwnerById = project.ownerId === session.user.id;
+
+        if (!ownerCheck && !isProjectOwnerById && !isAdmin) {
             return new Response('Solo il proprietario può invitare membri', { status: 403 });
         }
 

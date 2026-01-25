@@ -23,7 +23,7 @@ export default function GlobalProjectSelector() {
 
     if (loading) {
         return (
-            <div className="w-full h-12 bg-gray-50 animate-pulse rounded-xl border border-gray-100" />
+            <div className="w-full h-10 bg-gray-50 animate-pulse rounded-xl border border-gray-100" />
         );
     }
 
@@ -31,24 +31,24 @@ export default function GlobalProjectSelector() {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-white border border-gray-100 shadow-sm rounded-2xl hover:border-amber-200 transition-all group"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-white border border-gray-100 shadow-sm rounded-xl hover:border-amber-200 transition-all group"
             >
-                <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="p-2 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="p-1.5 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
                         {selectedProject?.id === ALL_PROJECTS_OPTION.id ? (
-                            <LayoutGrid className="w-4 h-4 text-amber-600" />
+                            <LayoutGrid className="w-3.5 h-3.5 text-amber-600" />
                         ) : (
-                            <Folder className="w-4 h-4 text-amber-600" />
+                            <Folder className="w-3.5 h-3.5 text-amber-600" />
                         )}
                     </div>
                     <div className="flex flex-col items-start overflow-hidden">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Progetto Attivo</span>
-                        <span className="text-sm font-bold text-gray-900 truncate w-full">
-                            {selectedProject?.name || 'Seleziona Progetto'}
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Progetto</span>
+                        <span className="text-xs font-bold text-gray-900 truncate w-full">
+                            {selectedProject?.name || 'Seleziona'}
                         </span>
                     </div>
                 </div>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             <AnimatePresence>
@@ -57,7 +57,7 @@ export default function GlobalProjectSelector() {
                         initial={{ opacity: 0, y: -10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        className="absolute top-full left-0 right-0 mt-2 p-2 bg-white border border-gray-100 shadow-xl rounded-[24px] z-50 max-h-64 overflow-y-auto"
+                        className="absolute top-full left-0 right-0 mt-1.5 p-1.5 bg-white border border-gray-100 shadow-xl rounded-xl z-50 max-h-56 overflow-y-auto"
                     >
                         {isOrgAdmin && (
                             <button
@@ -65,12 +65,12 @@ export default function GlobalProjectSelector() {
                                     setSelectedProject(ALL_PROJECTS_OPTION);
                                     setIsOpen(false);
                                 }}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-black transition-all mb-1 ${selectedProject?.id === ALL_PROJECTS_OPTION.id
+                                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-black transition-all mb-1 ${selectedProject?.id === ALL_PROJECTS_OPTION.id
                                     ? 'bg-amber-600 text-white'
                                     : 'text-amber-600 hover:bg-amber-50'
                                     }`}
                             >
-                                <LayoutGrid className="w-4 h-4" />
+                                <LayoutGrid className="w-3.5 h-3.5" />
                                 <span className="truncate uppercase tracking-tight">{ALL_PROJECTS_OPTION.name}</span>
                             </button>
                         )}
@@ -84,15 +84,15 @@ export default function GlobalProjectSelector() {
                                     setSelectedProject(project);
                                     setIsOpen(false);
                                 }}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${selectedProject?.id === project.id
+                                className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium transition-all ${selectedProject?.id === project.id
                                     ? 'bg-amber-50 text-amber-900'
                                     : 'text-gray-600 hover:bg-gray-50'
                                     }`}
                             >
-                                <Folder className={`w-4 h-4 ${selectedProject?.id === project.id ? 'text-amber-600' : 'text-gray-400'}`} />
+                                <Folder className={`w-3.5 h-3.5 ${selectedProject?.id === project.id ? 'text-amber-600' : 'text-gray-400'}`} />
                                 <span className="truncate">{project.name}</span>
                                 {project.isPersonal && (
-                                    <span className="ml-auto text-[10px] font-black bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full uppercase">Io</span>
+                                    <span className="ml-auto text-[9px] font-black bg-gray-100 text-gray-500 px-1 py-0.5 rounded-full uppercase">Io</span>
                                 )}
                             </button>
                         ))}

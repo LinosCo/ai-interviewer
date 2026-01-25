@@ -169,8 +169,13 @@ export async function POST(req: Request) {
             project.organizationId = organization.id;
         }
 
+        console.log('🎯 [CREATE-BOT] Checking usage limits for org:', project.organizationId);
+
         const publishCheck = await canPublishBot(project.organizationId);
+        console.log('📊 [CREATE-BOT] Usage check result:', publishCheck);
+
         if (!publishCheck.allowed) {
+            console.log('⛔ [CREATE-BOT] Publishing not allowed:', publishCheck.reason);
             return new Response(JSON.stringify({
                 error: 'LIMIT_REACHED',
                 message: publishCheck.reason
@@ -179,6 +184,8 @@ export async function POST(req: Request) {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
+
+        console.log('✅ [CREATE-BOT] Usage check passed, proceeding to create bot...');
 
         // Create the bot with topics/KB based on type
         const slug = generateSlug(config.name || 'intervista');
@@ -263,12 +270,29 @@ export async function POST(req: Request) {
             };
         }
 
+        console.log('🤖 [CREATE-BOT] Creating bot with data:', {
+            name: botData.name,
+            botType: botData.botType,
+            projectId: botData.projectId,
+            slug: botData.slug,
+            hasTopics: !!botData.topics,
+            topicsCount: botData.topics?.create?.length || 0,
+            hasKnowledgeSources: !!botData.knowledgeSources,
+            knowledgeSourcesCount: botData.knowledgeSources?.create?.length || 0
+        });
+
         const bot = await prisma.bot.create({
             data: botData,
             include: {
                 topics: true,
                 knowledgeSources: true
             }
+        });
+
+        console.log('🎉 [CREATE-BOT] Bot created successfully:', {
+            botId: bot.id,
+            slug: bot.slug,
+            name: bot.name
         });
 
         return Response.json({
@@ -279,7 +303,18 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error('Create Bot Error:', error);
-        return new Response(error.message || 'Creation failed', { status: 500 });
+        console.error('❌ [CREATE-BOT] Error details:', {
+            message: error.message,
+            code: error.code,
+            meta: error.meta,
+            stack: error.stack?.split('\n').slice(0, 5).join('\n')
+        });
+        return new Response(JSON.stringify({
+            error: error.code || 'CREATION_FAILED',
+            message: error.message || 'Creation failed'
+        }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }

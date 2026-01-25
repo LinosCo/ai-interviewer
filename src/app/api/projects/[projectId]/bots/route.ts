@@ -45,7 +45,7 @@ export async function GET(
         }
 
         // If includeAll, return both linked and available bots for the tools manager
-        if (includeAll && project?.organizationId) {
+        if (includeAll) {
             // Bots linked to this project
             const linkedBots = await prisma.bot.findMany({
                 where: {
@@ -58,17 +58,29 @@ export async function GET(
                 orderBy: { updatedAt: 'desc' }
             });
 
-            // All other bots from projects the user has access to
+            // Get projects the user has access to via ProjectAccess
             const userProjects = await prisma.projectAccess.findMany({
                 where: { userId: session.user.id },
                 select: { projectId: true }
             });
-            const userProjectIds = userProjects.map(p => p.projectId);
 
+            // Also get projects the user owns directly
+            const ownedProjects = await prisma.project.findMany({
+                where: { ownerId: session.user.id },
+                select: { id: true }
+            });
+
+            // Combine and deduplicate project IDs
+            const allProjectIds = [...new Set([
+                ...userProjects.map(p => p.projectId),
+                ...ownedProjects.map(p => p.id)
+            ])];
+
+            // Get bots from all accessible projects (except current one)
             const availableBots = await prisma.bot.findMany({
                 where: {
                     projectId: {
-                        in: userProjectIds,
+                        in: allProjectIds,
                         not: projectId
                     },
                     ...(botType && { botType })

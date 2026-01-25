@@ -21,6 +21,7 @@ model User {
   role                    UserRole             @default(USER)
   customApiKeys           Json?
   accounts                Account[]
+  copilotSessions         CopilotSession[]
   memberships             Membership[]
   passwordResetTokens     PasswordResetToken[]
   platformSettings        PlatformSettings?
@@ -29,24 +30,18 @@ model User {
   reports                 Report[]
   rewardGrants            RewardGrant[]
   sessions                Session[]
-  copilotSessions         CopilotSession[]
 }
 
 model ProjectAccess {
   id        String      @id @default(cuid())
   userId    String
   projectId String
-  role      ProjectRole @default(MEMBER)
   createdAt DateTime    @default(now())
+  role      ProjectRole @default(MEMBER)
   project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
-}
-
-enum ProjectRole {
-  OWNER
-  MEMBER
 }
 
 model Account {
@@ -111,8 +106,6 @@ model GlobalConfig {
   id                       String   @id @default("default")
   openaiApiKey             String?
   anthropicApiKey          String?
-  geminiApiKey             String?
-  googleSerpApiKey         String?
   stripeSecretKey          String?
   stripeWebhookSecret      String?
   stripePriceStarter       String?
@@ -121,6 +114,8 @@ model GlobalConfig {
   updatedAt                DateTime @updatedAt
   stripePriceProYearly     String?
   stripePriceStarterYearly String?
+  geminiApiKey             String?
+  googleSerpApiKey         String?
 }
 
 model Organization {
@@ -140,6 +135,9 @@ model Organization {
   country                String                @default("IT")
   postalCode             String?
   vatId                  String?
+  strategicVision        String?
+  valueProposition       String?
+  copilotSessions        CopilotSession[]
   crossChannelInsights   CrossChannelInsight[]
   members                Membership[]
   projects               Project[]
@@ -148,82 +146,52 @@ model Organization {
   tokenUsage             TokenUsage?
   usageLogs              UsageLog[]
   visibilityConfigs      VisibilityConfig[]
-  strategicVision        String?
-  valueProposition       String?
-
-  // Strategy Copilot
-  copilotSessions        CopilotSession[]
 }
 
 model Subscription {
-  id                String   @id @default(cuid())
-  organizationId    String   @unique
-  
-  // Tier e stato
-  tier              SubscriptionTier @default(TRIAL)
-  status            SubscriptionStatus @default(TRIALING)
-  isPartner         Boolean  @default(false)
-  
-  // Stripe IDs
-  stripeCustomerId      String?  @unique
-  stripeSubscriptionId  String?  @unique
-  stripePriceId         String?
-  
-  // ═══════════════════════════════════════════════════════════
-  // CONTATORI UTILIZZO MENSILE (resettati ogni mese)
-  // ═══════════════════════════════════════════════════════════
-  tokensUsedThisMonth           Int @default(0)
-  interviewsUsedThisMonth       Int @default(0)
-  chatbotSessionsUsedThisMonth  Int @default(0)
-  visibilityQueriesUsedThisMonth Int @default(0)
-  aiSuggestionsUsedThisMonth    Int @default(0)
-  
-  // Breakdown token per categoria
-  interviewTokensUsed    Int @default(0)
-  chatbotTokensUsed      Int @default(0)
-  visibilityTokensUsed   Int @default(0)
-  suggestionTokensUsed   Int @default(0)
-  systemTokensUsed       Int @default(0)
-  
-  // ═══════════════════════════════════════════════════════════
-  // RISORSE EXTRA DA ADD-ON (sommate ai limiti piano)
-  // ═══════════════════════════════════════════════════════════
-  extraTokens            Int @default(0)
-  extraInterviews        Int @default(0)
-  extraChatbotSessions   Int @default(0)
-  extraVisibilityQueries Int @default(0)
-  extraAiSuggestions     Int @default(0)
-  extraUsers             Int @default(0)
-  
-  // ═══════════════════════════════════════════════════════════
-  // PERIODO E TRIAL
-  // ═══════════════════════════════════════════════════════════
-  currentPeriodStart  DateTime @default(now())
-  currentPeriodEnd    DateTime?
-  trialEndsAt         DateTime?
-  canceledAt          DateTime?
-  cancelAtPeriodEnd   Boolean  @default(false)
-  
-  // ═══════════════════════════════════════════════════════════
-  // FATTURAZIONE ITALIANA
-  // ═══════════════════════════════════════════════════════════
-  billingName         String?
-  billingEmail        String?
-  vatNumber           String?   // Partita IVA
-  codiceFiscale       String?
-  sdiCode             String?   // Codice SDI
-  pecEmail            String?   // PEC
-  billingAddress      Json?     // { street, city, zip, province, country }
-  
-  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  purchasedAddOns     PurchasedAddOn[]
-  invoices            Invoice[]
-  
-  customLimits        Json?     // Admin-overridable limits
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
+  id                             String             @id @default(cuid())
+  organizationId                 String             @unique
+  tier                           SubscriptionTier   @default(TRIAL)
+  status                         SubscriptionStatus @default(TRIALING)
+  stripeCustomerId               String?            @unique
+  stripeSubscriptionId           String?            @unique
+  stripePriceId                  String?
+  currentPeriodStart             DateTime           @default(now())
+  currentPeriodEnd               DateTime?
+  interviewsUsedThisMonth        Int                @default(0)
+  billingEmail                   String?
+  billingName                    String?
+  vatNumber                      String?
+  createdAt                      DateTime           @default(now())
+  updatedAt                      DateTime           @updatedAt
+  canceledAt                     DateTime?
+  codiceFiscale                  String?
+  pecEmail                       String?
+  sdiCode                        String?
+  customLimits                   Json?
+  aiSuggestionsUsedThisMonth     Int                @default(0)
+  chatbotSessionsUsedThisMonth   Int                @default(0)
+  extraChatbotSessions           Int                @default(0)
+  extraInterviews                Int                @default(0)
+  extraUsers                     Int                @default(0)
+  extraVisibilityQueries         Int                @default(0)
+  isPartner                      Boolean            @default(false)
+  tokensUsedThisMonth            Int                @default(0)
+  trialEndsAt                    DateTime?
+  visibilityQueriesUsedThisMonth Int                @default(0)
+  billingAddress                 Json?
+  cancelAtPeriodEnd              Boolean            @default(false)
+  chatbotTokensUsed              Int                @default(0)
+  extraAiSuggestions             Int                @default(0)
+  extraTokens                    Int                @default(0)
+  interviewTokensUsed            Int                @default(0)
+  suggestionTokensUsed           Int                @default(0)
+  systemTokensUsed               Int                @default(0)
+  visibilityTokensUsed           Int                @default(0)
+  invoices                       Invoice[]
+  purchasedAddOns                PurchasedAddOn[]
+  organization                   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([stripeCustomerId])
   @@index([stripeSubscriptionId])
 }
@@ -263,28 +231,23 @@ model Membership {
 }
 
 model Project {
-  id             String          @id @default(cuid())
-  name           String
-  organizationId String?
-  ownerId        String?
-  isPersonal     Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-
-  // Strategic context for AI Tips
-  strategicVision   String?
-  valueProposition  String?
-
-  bots           Bot[]
-  organization   Organization?   @relation(fields: [organizationId], references: [id])
-  owner          User?           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  accessList     ProjectAccess[]
-  visibilityConfigs VisibilityConfig[]
-  copilotSessions CopilotSession[]
+  id                   String                @id @default(cuid())
+  name                 String
+  organizationId       String?
+  ownerId              String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  isPersonal           Boolean               @default(false)
+  strategicVision      String?
+  valueProposition     String?
+  bots                 Bot[]
+  cmsConnection        CMSConnection?
+  copilotSessions      CopilotSession[]
   crossChannelInsights CrossChannelInsight[]
-
-  // CMS Integration (managed by admin)
-  cmsConnection  CMSConnection?
+  organization         Organization?         @relation(fields: [organizationId], references: [id])
+  owner                User?                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  accessList           ProjectAccess[]
+  visibilityConfigs    VisibilityConfig[]
 }
 
 model Bot {
@@ -314,12 +277,10 @@ model Bot {
   privacyNotice         String?
   dataUsageInfo         String?
   consentText           String?
-  privacyPolicyUrl      String?
   showAnonymityInfo     Boolean              @default(true)
   showDataUsageInfo     Boolean              @default(true)
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
-  boundaries            Json?
   analyticsMetadata     Json?
   formatExplanation     String?
   progressBarStyle      String               @default("semantic")
@@ -352,6 +313,8 @@ model Bot {
   maxMessagesPerSession Int                  @default(20)
   maxTokensPerMessage   Int                  @default(500)
   webhookUrl            String?
+  privacyPolicyUrl      String?
+  boundaries            Json?
   project               Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   analytics             ChatbotAnalytics[]
   chatbotSessions       ChatbotSession[]
@@ -596,116 +559,66 @@ model ChatbotSession {
 }
 
 model TokenUsage {
-  id              String       @id @default(cuid())
-  organizationId  String       @unique
-  periodStart     DateTime     @default(now())
-  periodEnd       DateTime
-  usedTokens      Int          @default(0)
-  purchasedTokens Int          @default(0)
-  updatedAt       DateTime     @updatedAt
-  organization    Organization @relation(fields: [organizationId], references: [id])
-
-  // Breakdown per categoria
-  interviewTokens    Int       @default(0)
-  chatbotTokens      Int       @default(0)
-  visibilityTokens   Int       @default(0)
-  suggestionTokens   Int       @default(0)
-  systemTokens       Int       @default(0)
-  copilotTokens      Int       @default(0)  // Strategy Copilot tokens
-
-  // Contatori risorse
-  interviewsUsed        Int    @default(0)
-  chatbotSessionsUsed   Int    @default(0)
-  visibilityQueriesUsed Int    @default(0)
-  aiSuggestionsUsed     Int    @default(0)
+  id                    String       @id @default(cuid())
+  organizationId        String       @unique
+  periodStart           DateTime     @default(now())
+  periodEnd             DateTime
+  usedTokens            Int          @default(0)
+  purchasedTokens       Int          @default(0)
+  updatedAt             DateTime     @updatedAt
+  aiSuggestionsUsed     Int          @default(0)
+  chatbotSessionsUsed   Int          @default(0)
+  chatbotTokens         Int          @default(0)
+  interviewTokens       Int          @default(0)
+  interviewsUsed        Int          @default(0)
+  suggestionTokens      Int          @default(0)
+  systemTokens          Int          @default(0)
+  visibilityQueriesUsed Int          @default(0)
+  visibilityTokens      Int          @default(0)
+  copilotTokens         Int          @default(0)
+  organization          Organization @relation(fields: [organizationId], references: [id])
 }
 
-// ═══════════════════════════════════════════════════════════════
-// TOKEN LOG MODEL - Per tracking dettagliato
-// ═══════════════════════════════════════════════════════════════
-
 model TokenLog {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   organizationId  String
   userId          String?
-  
-  // Categorizzazione
   category        TokenCategory
-  operation       String    // es: "interview_response", "chatbot_message", "visibility_scan"
-  
-  // Conteggio token
+  operation       String
   inputTokens     Int
   outputTokens    Int
   totalTokens     Int
-  
-  // Riferimenti
-  resourceType    String?   // es: "interview", "chatbot", "visibility"
-  resourceId      String?   // ID della risorsa specifica
-  
-  // Modello usato
-  model           String    // es: "gpt-4o-mini", "claude-sonnet"
-  
-  // Flag source
-  usedExtraTokens Boolean   @default(false)
-  addOnId         String?   // Se usato da add-on specifico
-  
-  createdAt       DateTime  @default(now())
-  
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  
+  resourceType    String?
+  resourceId      String?
+  model           String
+  addOnId         String?
+  createdAt       DateTime      @default(now())
+  usedExtraTokens Boolean       @default(false)
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([organizationId, createdAt])
   @@index([organizationId, category])
   @@index([createdAt])
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PURCHASED ADD-ON MODEL - Nuovo
-// ═══════════════════════════════════════════════════════════════
-
 model PurchasedAddOn {
-  id              String   @id @default(cuid())
-  subscriptionId  String
-  
-  // Tipo e quantità
-  type            AddOnType
-  stripeProductId String?
-  stripePriceId   String?
+  id                    String       @id @default(cuid())
+  type                  AddOnType
+  quantity              Int
+  remaining             Int
+  purchasedAt           DateTime     @default(now())
+  expiresAt             DateTime?
+  amountPaid            Int
+  currency              String       @default("eur")
+  isActive              Boolean      @default(true)
   stripePaymentIntentId String?
-  
-  // Quantità
-  quantity        Int      // Quantità acquistata
-  remaining       Int      // Quantità rimanente (decrementata ad ogni uso)
-  
-  // Prezzo pagato
-  amountPaid      Int      // In centesimi
-  currency        String   @default("eur")
-  
-  // Validità
-  purchasedAt     DateTime @default(now())
-  expiresAt       DateTime?  // Null = non scade, altrimenti fine periodo
-  isActive        Boolean  @default(true)
-  
-  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  
+  stripePriceId         String?
+  stripeProductId       String?
+  subscriptionId        String
+  subscription          Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
   @@index([subscriptionId])
   @@index([subscriptionId, type, isActive])
-}
-
-enum TokenCategory {
-  INTERVIEW
-  CHATBOT
-  VISIBILITY
-  SUGGESTION
-  SYSTEM
-}
-
-enum AddOnType {
-  TOKENS
-  INTERVIEWS
-  CHATBOT_SESSIONS
-  VISIBILITY_QUERIES
-  AI_SUGGESTIONS
-  EXTRA_USERS
 }
 
 model ChatbotAnalytics {
@@ -756,7 +669,6 @@ model FaqSuggestion {
 model CrossChannelInsight {
   id                String       @id @default(cuid())
   organizationId    String
-  projectId         String?
   topicName         String
   interviewData     Json?
   chatbotData       Json?
@@ -769,6 +681,7 @@ model CrossChannelInsight {
   reviewedAt        DateTime?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
+  projectId         String?
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project           Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -778,73 +691,62 @@ model CrossChannelInsight {
 }
 
 model VisibilityConfig {
-  id             String   @id @default(cuid())
+  id             String               @id @default(cuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  projectId      String?
-  project        Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
   brandName      String
   category       String
   description    String?
-  language       String   @default("it")
-  territory      String   @default("IT")
-  
-  isActive       Boolean  @default(true)
+  language       String               @default("it")
+  territory      String               @default("IT")
+  isActive       Boolean              @default(true)
   nextScanAt     DateTime?
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  prompts        VisibilityPrompt[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  projectId      String?
   competitors    Competitor[]
-  scans          VisibilityScan[]
   serpScans      SerpMonitoringScan[]
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  prompts        VisibilityPrompt[]
+  scans          VisibilityScan[]
 }
 
 model VisibilityPrompt {
-  id                String           @id @default(cuid())
-  configId          String?
-  visibilityConfig  VisibilityConfig? @relation(fields: [configId], references: [id], onDelete: Cascade)
-  
-  text              String
-  enabled           Boolean          @default(true)
-  orderIndex        Int              @default(0)
-  generatedByAI     Boolean          @default(false)
-  lastEditedAt      DateTime         @default(now())
-  
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-
-  responses         VisibilityResponse[]
+  id               String               @id @default(cuid())
+  text             String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  configId         String?
+  enabled          Boolean              @default(true)
+  generatedByAI    Boolean              @default(false)
+  lastEditedAt     DateTime             @default(now())
+  orderIndex       Int                  @default(0)
+  visibilityConfig VisibilityConfig?    @relation(fields: [configId], references: [id], onDelete: Cascade)
+  responses        VisibilityResponse[]
 }
 
 model Competitor {
-  id                String           @id @default(cuid())
-  configId          String
-  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
-  
-  name              String
-  website           String?
-  enabled           Boolean          @default(true)
-  
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id               String           @id @default(cuid())
+  configId         String
+  name             String
+  website          String?
+  enabled          Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  visibilityConfig VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
 }
 
 model VisibilityScan {
-  id                String           @id @default(cuid())
-  configId          String
-  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
-  
-  scanType          String           @default("manual") // manual, scheduled
-  score             Float            @default(0)
-  startedAt         DateTime         @default(now())
-  completedAt       DateTime?
-  status            String           @default("pending")
-  
-  metrics           VisibilityScanMetric[]
-  responses         VisibilityResponse[]
+  id               String                 @id @default(cuid())
+  configId         String
+  startedAt        DateTime               @default(now())
+  completedAt      DateTime?
+  status           String                 @default("pending")
+  scanType         String                 @default("manual")
+  score            Float                  @default(0)
+  responses        VisibilityResponse[]
+  visibilityConfig VisibilityConfig       @relation(fields: [configId], references: [id], onDelete: Cascade)
+  metrics          VisibilityScanMetric[]
 }
 
 model VisibilityResponse {
@@ -853,7 +755,7 @@ model VisibilityResponse {
   promptId            String
   platform            String
   model               String
-  responseText        String           @db.Text
+  responseText        String
   brandMentioned      Boolean
   brandPosition       Int?
   competitorPositions Json
@@ -861,91 +763,214 @@ model VisibilityResponse {
   sourcesCited        String[]
   tokenUsage          Json?
   createdAt           DateTime         @default(now())
-  
-  scan                VisibilityScan   @relation(fields: [scanId], references: [id], onDelete: Cascade)
   prompt              VisibilityPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  scan                VisibilityScan   @relation(fields: [scanId], references: [id], onDelete: Cascade)
 }
 
 model VisibilityScanMetric {
-  id              String         @id @default(cuid())
-  scanId          String
-  scan            VisibilityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
-
-  metricType      String
-  value           Float
-  dimensions      Json?
+  id         String         @id @default(cuid())
+  scanId     String
+  metricType String
+  value      Float
+  dimensions Json?
+  scan       VisibilityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
 }
 
-// SERP Monitoring - Google Search Results for Brand Mentions
 model SerpMonitoringScan {
-  id              String           @id @default(cuid())
-  configId        String
+  id               String           @id @default(cuid())
+  configId         String
+  scanType         String           @default("manual")
+  query            String
+  dateRange        String           @default("last_week")
+  totalResults     Int              @default(0)
+  positiveCount    Int              @default(0)
+  negativeCount    Int              @default(0)
+  neutralCount     Int              @default(0)
+  avgImportance    Float            @default(0)
+  startedAt        DateTime         @default(now())
+  completedAt      DateTime?
+  status           String           @default("pending")
   visibilityConfig VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
-
-  scanType        String           @default("manual") // manual, scheduled, weekly
-  query           String           // Search query used (brand name + filters)
-  dateRange       String           @default("last_week") // last_week, last_month, last_day
-  totalResults    Int              @default(0)
-
-  // Aggregate metrics
-  positiveCount   Int              @default(0)
-  negativeCount   Int              @default(0)
-  neutralCount    Int              @default(0)
-  avgImportance   Float            @default(0)
-
-  startedAt       DateTime         @default(now())
-  completedAt     DateTime?
-  status          String           @default("pending") // pending, running, completed, failed
-
-  results         SerpResult[]
+  results          SerpResult[]
 
   @@index([configId, startedAt])
 }
 
 model SerpResult {
-  id              String           @id @default(cuid())
-  scanId          String
-  scan            SerpMonitoringScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
-
-  // Raw SERP data
-  title           String
-  url             String
-  snippet         String           @db.Text
-  displayedLink   String?
-  publishedDate   DateTime?
-  position        Int              // Position in search results
-
-  // Source analysis
-  sourceDomain    String           // e.g., "ilsole24ore.com"
-  sourceType      String           // news, blog, forum, social, corporate, government
-  sourceReputation Float           @default(50) // 0-100 reputation score
-
-  // AI Analysis
-  sentiment       String           // positive, negative, neutral, mixed
-  sentimentScore  Float            // -1 to 1 continuous score
-  relevanceScore  Float            // 0-100 how relevant to brand
-  importanceScore Float            // 0-100 overall importance (combines all factors)
-
-  // Content analysis
-  brandMentionType String          // direct, indirect, competitor_comparison, industry_mention
-  topicCategory   String?          // product, service, leadership, controversy, award, partnership
-  keyEntities     Json?            // People, companies, products mentioned
-  contentSummary  String?          @db.Text // AI-generated summary
-
-  // Cross-channel correlation
-  relatedToLLMVisibility Boolean   @default(false) // Does this affect LLM recommendations?
-  suggestedActions Json?           // AI-suggested responses/actions
-
-  // Status
-  isReviewed      Boolean          @default(false)
-  reviewedBy      String?
-  reviewedAt      DateTime?
-  flagged         Boolean          @default(false) // Manual flag for attention
-
-  createdAt       DateTime         @default(now())
+  id                     String             @id @default(cuid())
+  scanId                 String
+  title                  String
+  url                    String
+  snippet                String
+  displayedLink          String?
+  publishedDate          DateTime?
+  position               Int
+  sourceDomain           String
+  sourceType             String
+  sourceReputation       Float              @default(50)
+  sentiment              String
+  sentimentScore         Float
+  relevanceScore         Float
+  importanceScore        Float
+  brandMentionType       String
+  topicCategory          String?
+  keyEntities            Json?
+  contentSummary         String?
+  relatedToLLMVisibility Boolean            @default(false)
+  suggestedActions       Json?
+  isReviewed             Boolean            @default(false)
+  reviewedBy             String?
+  reviewedAt             DateTime?
+  flagged                Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  scan                   SerpMonitoringScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
 
   @@index([scanId, importanceScore])
   @@index([scanId, sentiment])
+}
+
+model CMSConnection {
+  id                        String              @id @default(cuid())
+  name                      String
+  cmsApiUrl                 String
+  cmsDashboardUrl           String?
+  cmsPublicUrl              String?
+  apiKey                    String
+  apiKeyPrefix              String
+  apiKeyLastChars           String
+  webhookSecret             String
+  webhookUrl                String
+  googleAnalyticsPropertyId String?
+  googleAnalyticsConnected  Boolean             @default(false)
+  searchConsoleSiteUrl      String?
+  searchConsoleConnected    Boolean             @default(false)
+  googleRefreshToken        String?
+  googleTokenExpiresAt      DateTime?
+  googleScopes              String[]
+  status                    CMSConnectionStatus @default(PENDING)
+  lastPingAt                DateTime?
+  lastSyncAt                DateTime?
+  lastSyncError             String?
+  capabilities              String[]
+  cmsVersion                String?
+  brandingSyncEnabled       Boolean             @default(true)
+  lastBrandingSyncAt        DateTime?
+  notes                     String?
+  enabledAt                 DateTime            @default(now())
+  enabledBy                 String
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  projectId                 String              @unique
+  project                   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suggestions               CMSSuggestion[]
+  webhookLogs               CMSWebhookLog[]
+  analytics                 WebsiteAnalytics[]
+}
+
+model CMSWebhookLog {
+  id             String           @id @default(cuid())
+  connectionId   String
+  direction      WebhookDirection
+  event          String
+  requestPayload Json?
+  responseStatus Int?
+  responseBody   String?
+  success        Boolean
+  errorMessage   String?
+  createdAt      DateTime         @default(now())
+  connection     CMSConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, createdAt])
+}
+
+model CMSSuggestion {
+  id                    String              @id @default(cuid())
+  connectionId          String
+  crossChannelInsightId String?
+  type                  CMSSuggestionType
+  title                 String
+  slug                  String?
+  body                  String
+  metaDescription       String?
+  targetSection         String?
+  reasoning             String
+  sourceSignals         Json
+  priorityScore         Int                 @default(50)
+  status                CMSSuggestionStatus @default(PENDING)
+  cmsContentId          String?
+  cmsPreviewUrl         String?
+  pushedAt              DateTime?
+  publishedAt           DateTime?
+  rejectedAt            DateTime?
+  rejectedReason        String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  connection            CMSConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, status])
+  @@index([connectionId, createdAt])
+}
+
+model WebsiteAnalytics {
+  id                 String        @id @default(cuid())
+  connectionId       String
+  date               DateTime      @db.Date
+  pageviews          Int           @default(0)
+  uniqueVisitors     Int           @default(0)
+  avgSessionDuration Int           @default(0)
+  bounceRate         Float         @default(0)
+  topPages           Json
+  trafficSources     Json?
+  searchImpressions  Int?
+  searchClicks       Int?
+  searchCtr          Float?
+  avgSearchPosition  Float?
+  topSearchQueries   Json?
+  topSearchPages     Json?
+  createdAt          DateTime      @default(now())
+  connection         CMSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, date])
+  @@index([connectionId, date])
+}
+
+model CopilotSession {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  projectId      String?
+  messagesCount  Int          @default(0)
+  tokensUsed     Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id])
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+enum ProjectRole {
+  OWNER
+  MEMBER
+}
+
+enum TokenCategory {
+  INTERVIEW
+  CHATBOT
+  VISIBILITY
+  SUGGESTION
+  SYSTEM
+}
+
+enum AddOnType {
+  TOKENS
+  INTERVIEWS
+  CHATBOT_SESSIONS
+  VISIBILITY_QUERIES
+  AI_SUGGESTIONS
+  EXTRA_USERS
 }
 
 enum UserRole {
@@ -969,11 +994,11 @@ enum BillingCycle {
 
 enum SubscriptionTier {
   FREE
-  TRIAL
   STARTER
   PRO
   BUSINESS
   ENTERPRISE
+  TRIAL
   PARTNER
   ADMIN
 }
@@ -1021,136 +1046,18 @@ enum Role {
   VIEWER
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// CMS INTEGRATION MODELS
-// ═══════════════════════════════════════════════════════════════════════════
-
-model CMSConnection {
-  id              String              @id @default(cuid())
-  projectId       String              @unique
-  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  // Base configuration (set by admin)
-  name            String              // Display name: "Sito Aziendale"
-  cmsApiUrl       String              // "https://cms.cliente.it/api/integration"
-  cmsDashboardUrl String?             // "https://cms.cliente.it/dashboard"
-  cmsPublicUrl    String?             // "https://www.cliente.it"
-
-  // Authentication (BT -> CMS)
-  apiKey          String              // Encrypted, generated by BT
-  apiKeyPrefix    String              // "bt_live_" or "bt_test_" (not encrypted, for display)
-  apiKeyLastChars String              // Last 4 characters (for display: "...x7k2")
-
-  // Webhook (CMS -> BT)
-  webhookSecret   String              // Encrypted, for verifying signature
-  webhookUrl      String              // Callback URL on BT
-
-  // Google Integration (managed by BT)
-  googleAnalyticsPropertyId   String? // "properties/123456789"
-  googleAnalyticsConnected    Boolean @default(false)
-  searchConsoleSiteUrl        String? // "https://www.cliente.it/"
-  searchConsoleConnected      Boolean @default(false)
-  googleRefreshToken          String? // Encrypted
-  googleTokenExpiresAt        DateTime?
-  googleScopes                String[]
-
-  // Status
-  status          CMSConnectionStatus @default(PENDING)
-  lastPingAt      DateTime?           // Last successful health check
-  lastSyncAt      DateTime?           // Last analytics sync
-  lastSyncError   String?
-  capabilities    String[]            // Capabilities reported by CMS
-  cmsVersion      String?             // CMS version
-
-  // Branding sync
-  brandingSyncEnabled Boolean         @default(true)
-  lastBrandingSyncAt  DateTime?
-
-  // Audit
-  notes           String?             // Internal admin notes
-  enabledAt       DateTime            @default(now())
-  enabledBy       String              // Email of admin who enabled
-
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-
-  // Relations
-  suggestions     CMSSuggestion[]
-  analytics       WebsiteAnalytics[]
-  webhookLogs     CMSWebhookLog[]
-}
-
 enum CMSConnectionStatus {
-  PENDING         // Created but never tested
-  ACTIVE          // Working
-  PARTIAL         // CMS ok, Google partial
-  GOOGLE_ONLY     // Google ok, CMS unreachable
-  ERROR           // Last test failed
-  DISABLED        // Manually disabled
-}
-
-model CMSWebhookLog {
-  id              String           @id @default(cuid())
-  connectionId    String
-  connection      CMSConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-
-  direction       WebhookDirection // INBOUND (CMS->BT) or OUTBOUND (BT->CMS)
-  event           String           // "content.published", "suggestion.push", etc.
-  requestPayload  Json?
-  responseStatus  Int?
-  responseBody    String?
-  success         Boolean
-  errorMessage    String?
-
-  createdAt       DateTime         @default(now())
-
-  @@index([connectionId, createdAt])
+  PENDING
+  ACTIVE
+  PARTIAL
+  GOOGLE_ONLY
+  ERROR
+  DISABLED
 }
 
 enum WebhookDirection {
-  INBOUND         // CMS -> Business Tuner
-  OUTBOUND        // Business Tuner -> CMS
-}
-
-model CMSSuggestion {
-  id              String              @id @default(cuid())
-  connectionId    String
-  connection      CMSConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-
-  // Source insight (optional link to Cross-Channel)
-  crossChannelInsightId  String?
-
-  // Content suggestion
-  type            CMSSuggestionType
-  title           String
-  slug            String?             // Suggested URL slug
-  body            String              @db.Text
-  metaDescription String?
-  targetSection   String?             // "blog", "faq", "pages", etc.
-
-  // AI reasoning
-  reasoning       String              @db.Text
-  sourceSignals   Json                // { chatbotQuestions: 34, visibilityGap: true, ... }
-  priorityScore   Int                 @default(50) // 0-100
-
-  // Status tracking
-  status          CMSSuggestionStatus @default(PENDING)
-
-  // CMS response (after push)
-  cmsContentId    String?             // ID returned by CMS
-  cmsPreviewUrl   String?             // Preview URL on the site
-
-  // Timestamps
-  pushedAt        DateTime?
-  publishedAt     DateTime?           // When detected as live
-  rejectedAt      DateTime?
-  rejectedReason  String?
-
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-
-  @@index([connectionId, status])
-  @@index([connectionId, createdAt])
+  INBOUND
+  OUTBOUND
 }
 
 enum CMSSuggestionType {
@@ -1162,64 +1069,9 @@ enum CMSSuggestionType {
 }
 
 enum CMSSuggestionStatus {
-  PENDING         // Generated, not yet sent
-  PUSHED          // Sent to CMS as draft
-  PUBLISHED       // Detected as live on site
-  REJECTED        // User rejected
-  FAILED          // Push failed
-}
-
-model WebsiteAnalytics {
-  id              String           @id @default(cuid())
-  connectionId    String
-  connection      CMSConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-
-  date            DateTime         @db.Date
-
-  // Google Analytics metrics
-  pageviews       Int              @default(0)
-  uniqueVisitors  Int              @default(0)
-  avgSessionDuration Int           @default(0) // seconds
-  bounceRate      Float            @default(0) // 0-1
-  topPages        Json             // [{ path, views, avgTime, bounceRate }]
-  trafficSources  Json?            // { organic: 45, direct: 30, referral: 25 }
-
-  // Search Console metrics
-  searchImpressions    Int?
-  searchClicks         Int?
-  searchCtr            Float?       // 0-1
-  avgSearchPosition    Float?
-  topSearchQueries     Json?        // [{ query, impressions, clicks, position }]
-  topSearchPages       Json?        // [{ page, impressions, clicks, position }]
-
-  createdAt       DateTime         @default(now())
-
-  @@unique([connectionId, date])
-  @@index([connectionId, date])
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// STRATEGY COPILOT
-// ═══════════════════════════════════════════════════════════════════════════
-
-model CopilotSession {
-  id              String   @id @default(cuid())
-
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  organizationId  String
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  projectId       String?  // Active project during session (if Pro+)
-  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-
-  messagesCount   Int      @default(0)
-  tokensUsed      Int      @default(0)
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([userId])
-  @@index([organizationId])
+  PENDING
+  PUSHED
+  PUBLISHED
+  REJECTED
+  FAILED
 }

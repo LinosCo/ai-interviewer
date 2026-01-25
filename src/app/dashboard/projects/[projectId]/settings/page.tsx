@@ -5,6 +5,7 @@ import { ProjectAccessManager } from '../../access-manager';
 import { ProjectBrandManager } from './ProjectBrandManager';
 import { ProjectToolsManager } from './ProjectToolsManager';
 import { ProjectDeleteSection } from './ProjectDeleteSection';
+import { ProjectRenameSection } from './ProjectRenameSection';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, LayoutGrid } from "lucide-react";
 import Link from 'next/link';
@@ -57,6 +58,9 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
             </div>
 
             <div className="grid gap-8">
+                {/* Rename Project */}
+                <ProjectRenameSection projectId={projectId} projectName={project.name} isPersonal={project.isPersonal} />
+
                 {/* Sharing Manager */}
                 <ProjectAccessManager projectId={projectId} />
 

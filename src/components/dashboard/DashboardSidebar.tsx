@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import GlobalProjectSelector from './GlobalProjectSelector';
+import { ChevronDown } from 'lucide-react';
 
 interface DashboardSidebarProps {
     isAdmin: boolean;
@@ -13,6 +14,7 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = false }: DashboardSidebarProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [adminExpanded, setAdminExpanded] = useState(false);
 
     const toggleMenu = () => setIsOpen(!isOpen);
 
@@ -48,7 +50,7 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
             `}>
                 <div className="hidden md:block absolute inset-6 bg-white/65 backdrop-blur-md border border-white/40 shadow-md rounded-[24px] -z-1" />
 
-                <Link href="/dashboard" className="mb-6 hidden md:flex items-center gap-2.5 px-4 pt-2">
+                <Link href="/dashboard" className="mb-6 hidden md:flex items-center gap-2.5 px-4 pt-[7px]">
                     <Icons.Logo size={32} />
                     <span className="font-bold text-xl text-gray-900 tracking-tight">Business Tuner</span>
                 </Link>
@@ -59,7 +61,6 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
                 </div>
 
                 <nav className="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-hide pr-2 -mr-2">
-                    <DashboardLink href="/dashboard" icon={<Icons.Home size={20} />} label="Home" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/interviews" icon={<Icons.MessageSquare size={20} />} label="Interviste AI" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Brand Monitor" onClick={() => setIsOpen(false)} />
@@ -69,20 +70,33 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
                     )}
                     <DashboardLink href="/dashboard/templates" icon={<Icons.LayoutTemplate size={20} />} label="Template" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
-
-                    {isAdmin && (
-                        <div className="mt-6 pt-6 border-t border-gray-200/50">
-                            <span className="text-xs text-amber-600 font-bold uppercase tracking-wider px-4 mb-3 block">Admin</span>
-                            <DashboardLink href="/dashboard/admin/usage" icon={<Icons.Activity size={20} />} label="Monitoraggio Risorse" isAdmin onClick={() => setIsOpen(false)} />
-                            <DashboardLink href="/dashboard/admin/users" icon={<Icons.Users size={20} />} label="Gestione utenti" isAdmin onClick={() => setIsOpen(false)} />
-                            <DashboardLink href="/dashboard/admin/projects" icon={<Icons.FolderKanban size={20} />} label="Gestione progetti" isAdmin onClick={() => setIsOpen(false)} />
-                            <DashboardLink href="/dashboard/admin/cms" icon={<Icons.Link size={20} />} label="Integrazioni CMS" isAdmin onClick={() => setIsOpen(false)} />
-                        </div>
-                    )}
                 </nav>
 
                 {/* Bottom Section */}
-                <div className="border-t border-gray-200/50 pt-4 mt-auto space-y-2">
+                <div className="border-t border-gray-200/50 pt-4 mt-auto space-y-1">
+                    {isAdmin && (
+                        <div className="mb-1">
+                            <button
+                                onClick={() => setAdminExpanded(!adminExpanded)}
+                                className="flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all text-amber-700 hover:bg-amber-50 group font-medium"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <Icons.Shield size={20} className="text-amber-600" />
+                                    <span>Admin</span>
+                                </div>
+                                <ChevronDown size={16} className={`text-amber-500 transition-transform duration-200 ${adminExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                            {adminExpanded && (
+                                <div className="ml-4 mt-1 space-y-1 border-l-2 border-amber-100 pl-2">
+                                    <DashboardLink href="/dashboard/admin/usage" icon={<Icons.Activity size={18} />} label="Monitoraggio" isAdmin onClick={() => setIsOpen(false)} />
+                                    <DashboardLink href="/dashboard/admin/users" icon={<Icons.Users size={18} />} label="Utenti" isAdmin onClick={() => setIsOpen(false)} />
+                                    <DashboardLink href="/dashboard/admin/projects" icon={<Icons.FolderKanban size={18} />} label="Progetti" isAdmin onClick={() => setIsOpen(false)} />
+                                    <DashboardLink href="/dashboard/admin/cms" icon={<Icons.Link size={18} />} label="CMS" isAdmin onClick={() => setIsOpen(false)} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <DashboardLink href="/dashboard/settings" icon={<Icons.Settings size={20} />} label="Impostazioni" onClick={() => setIsOpen(false)} />
 
                     <button

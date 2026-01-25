@@ -48,22 +48,32 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
                 setProjects(projectsList);
                 setIsOrgAdmin(adminStatus);
 
-                // Restore selected project from localStorage or use first project
+                // Restore selected project from localStorage or set default
                 const savedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
 
                 // Handle "All Projects" selection for admins
                 if (savedProjectId === ALL_PROJECTS_OPTION.id && adminStatus) {
                     setSelectedProjectState(ALL_PROJECTS_OPTION);
-                } else {
+                } else if (savedProjectId) {
                     const savedProject = projectsList.find((p: Project) => p.id === savedProjectId);
-
                     if (savedProject) {
                         setSelectedProjectState(savedProject);
+                    } else if (adminStatus) {
+                        // Saved project not found, default to "All Projects" for admins
+                        setSelectedProjectState(ALL_PROJECTS_OPTION);
+                        localStorage.setItem(SELECTED_PROJECT_KEY, ALL_PROJECTS_OPTION.id);
                     } else if (projectsList.length > 0) {
-                        // Default to first project (personal project since it's sorted first)
                         setSelectedProjectState(projectsList[0]);
                         localStorage.setItem(SELECTED_PROJECT_KEY, projectsList[0].id);
                     }
+                } else if (adminStatus) {
+                    // No saved project, default to "All Projects" for admins
+                    setSelectedProjectState(ALL_PROJECTS_OPTION);
+                    localStorage.setItem(SELECTED_PROJECT_KEY, ALL_PROJECTS_OPTION.id);
+                } else if (projectsList.length > 0) {
+                    // Default to first project for non-admins
+                    setSelectedProjectState(projectsList[0]);
+                    localStorage.setItem(SELECTED_PROJECT_KEY, projectsList[0].id);
                 }
             }
         } catch (error) {

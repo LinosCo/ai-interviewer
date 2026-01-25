@@ -54,7 +54,7 @@ export default async function BillingPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 mb-8 mt-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 mt-4">
                         <div className="p-4 bg-stone-50 rounded-2xl">
                             <p className="text-xs text-stone-400 font-bold uppercase mb-1">Interviste/Mese</p>
                             <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxInterviewsPerMonth === -1 ? 'Illimitate' : planConfig.limits.maxInterviewsPerMonth}</p>
@@ -66,6 +66,18 @@ export default async function BillingPage() {
                         <div className="p-4 bg-stone-50 rounded-2xl">
                             <p className="text-xs text-stone-400 font-bold uppercase mb-1">Utenti</p>
                             <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxUsers === -1 ? 'Illimitati' : planConfig.limits.maxUsers}</p>
+                        </div>
+                        <div className="p-4 bg-stone-50 rounded-2xl">
+                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Brand Monitor</p>
+                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxBrands === -1 ? 'Illimitati' : planConfig.limits.maxBrands === 0 ? 'Non incluso' : planConfig.limits.maxBrands}</p>
+                        </div>
+                        <div className="p-4 bg-stone-50 rounded-2xl">
+                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">CMS Connections</p>
+                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxCmsConnections === -1 ? 'Illimitate' : planConfig.limits.maxCmsConnections === 0 ? 'Non incluso' : planConfig.limits.maxCmsConnections}</p>
+                        </div>
+                        <div className="p-4 bg-stone-50 rounded-2xl">
+                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Progetti</p>
+                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxProjects === -1 ? 'Illimitati' : planConfig.limits.maxProjects}</p>
                         </div>
                     </div>
 

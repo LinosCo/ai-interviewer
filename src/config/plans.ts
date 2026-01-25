@@ -18,6 +18,8 @@ export interface PlanLimits {
     maxProjects: number;
     maxUsers: number;
     maxChatbots: number;
+    maxBrands: number;                 // Max brand monitor configurations (-1 = unlimited)
+    maxCmsConnections: number;         // Max CMS integrations (-1 = unlimited)
 
     // Features boolean
     visibilityEnabled: boolean;
@@ -65,6 +67,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: 2,
             maxUsers: 1,
             maxChatbots: 1,
+            maxBrands: 1,
+            maxCmsConnections: 0,
             visibilityEnabled: true,
             aiTipsEnabled: true,
             apiAccessEnabled: false,
@@ -95,6 +99,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: 1,
             maxUsers: 1,
             maxChatbots: 0,
+            maxBrands: 0,
+            maxCmsConnections: 0,
             visibilityEnabled: false,
             aiTipsEnabled: false,
             apiAccessEnabled: false,
@@ -127,6 +133,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: 3,
             maxUsers: 2,
             maxChatbots: 1,
+            maxBrands: 0,
+            maxCmsConnections: 0,
             visibilityEnabled: false,
             aiTipsEnabled: false,
             apiAccessEnabled: false,
@@ -162,6 +170,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: 10,
             maxUsers: 5,
             maxChatbots: 3,
+            maxBrands: 3,
+            maxCmsConnections: 1,
             visibilityEnabled: true,
             aiTipsEnabled: true,
             apiAccessEnabled: false,
@@ -171,7 +181,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         features: [
             '400 interviste/mese',
             '3 chatbot (4.000 sessioni)',
-            'Brand Monitor',
+            'Brand Monitor (3 brand)',
             'AI Tips',
             '10 progetti',
             '5 utenti'
@@ -196,6 +206,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1, // Illimitati
             maxUsers: 15,
             maxChatbots: 10,
+            maxBrands: 10,
+            maxCmsConnections: 5,
             visibilityEnabled: true,
             aiTipsEnabled: true,
             apiAccessEnabled: true,
@@ -205,9 +217,11 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         features: [
             '1.000 interviste/mese',
             '10 chatbot (12.000 sessioni)',
+            'Brand Monitor (10 brand)',
             'Visibility avanzata',
             'White Label',
             'API Access',
+            'CMS Integrations (5)',
             'Progetti illimitati',
             '15 utenti'
         ]
@@ -229,6 +243,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1, // ILLIMITATI
             maxUsers: 10,
             maxChatbots: 5,
+            maxBrands: 5,
+            maxCmsConnections: 2,
             visibilityEnabled: true,
             aiTipsEnabled: true,
             apiAccessEnabled: false,
@@ -237,6 +253,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         },
         features: [
             'Tutte le funzioni PRO',
+            'Brand Monitor (5 brand)',
             'Progetti illimitati',
             'Trasferimento progetti',
             'Gratuito lifetime'
@@ -259,6 +276,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1,
             maxUsers: -1,
             maxChatbots: -1,
+            maxBrands: -1,
+            maxCmsConnections: -1,
             visibilityEnabled: true,
             aiTipsEnabled: true,
             apiAccessEnabled: true,
@@ -284,6 +303,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1,
             maxUsers: -1,
             maxChatbots: -1,
+            maxBrands: -1,
+            maxCmsConnections: -1,
             visibilityEnabled: true,
             aiTipsEnabled: true,
             apiAccessEnabled: true,

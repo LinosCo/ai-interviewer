@@ -51,9 +51,9 @@ export default async function BrandsListPage() {
     // Get plan limits
     const planType = subscription ? subscriptionTierToPlanType(subscription.tier) : PlanType.TRIAL;
     const plan = PLANS[planType];
-    // Brand limit: unlimited (-1) if visibility enabled, otherwise 0
-    const maxBrands = plan.limits.visibilityEnabled ? -1 : 0;
-    const canAddMore = maxBrands === -1 || brands.length < maxBrands;
+    const maxBrands = plan.limits.maxBrands;
+    const isUnlimited = maxBrands === -1;
+    const canAddMore = isUnlimited || brands.length < maxBrands;
 
     return (
         <div className="space-y-8 p-6 max-w-6xl mx-auto">
@@ -67,7 +67,7 @@ export default async function BrandsListPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Badge variant="outline" className="text-sm py-1 px-3">
-                        {brands.length} {maxBrands === -1 ? 'brand' : `/ ${maxBrands} brand`}
+                        {brands.length} {isUnlimited ? 'brand' : `/ ${maxBrands} brand`}
                     </Badge>
                     {canAddMore ? (
                         <Link href="/dashboard/visibility/create">
@@ -203,7 +203,7 @@ export default async function BrandsListPage() {
                                     </div>
                                     <p className="font-medium text-gray-900">Aggiungi Brand</p>
                                     <p className="text-xs text-gray-500 mt-1">
-                                        {maxBrands - brands.length} slot disponibili
+                                        {isUnlimited ? 'Slot illimitati' : `${maxBrands - brands.length} slot disponibili`}
                                     </p>
                                 </CardContent>
                             </Card>
@@ -220,11 +220,13 @@ export default async function BrandsListPage() {
                         <p className="text-sm text-gray-600">
                             {maxBrands === 0
                                 ? 'Il brand monitoring non è incluso nel tuo piano'
-                                : `Puoi monitorare fino a ${maxBrands} brand con il tuo piano attuale`
+                                : isUnlimited
+                                    ? 'Puoi monitorare brand illimitati con il tuo piano'
+                                    : `Puoi monitorare fino a ${maxBrands} brand con il tuo piano attuale`
                             }
                         </p>
                     </div>
-                    {maxBrands < 5 && (
+                    {!isUnlimited && maxBrands < 5 && (
                         <Link href="/dashboard/billing/plans">
                             <Button variant="outline" className="gap-2">
                                 <Zap className="w-4 h-4" />

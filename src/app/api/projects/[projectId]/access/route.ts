@@ -74,14 +74,20 @@ export async function GET(
         }));
 
         // Determine current user's effective role
-        // Priority: ProjectAccess role > Owner via ownerId > Admin
+        // Priority: Owner via ownerId > ProjectAccess OWNER role > Admin > ProjectAccess MEMBER
         let currentUserRole: 'OWNER' | 'MEMBER' | 'ADMIN' = 'MEMBER';
-        if (userAccess) {
-            currentUserRole = userAccess.role;
-        } else if (isProjectOwnerById) {
+        if (isProjectOwnerById) {
+            // Project owner via ownerId always gets OWNER role
+            currentUserRole = 'OWNER';
+        } else if (userAccess?.role === 'OWNER') {
+            // Explicit OWNER role in ProjectAccess
             currentUserRole = 'OWNER';
         } else if (isAdmin) {
+            // Admin users can manage
             currentUserRole = 'ADMIN';
+        } else if (userAccess) {
+            // Regular member
+            currentUserRole = userAccess.role;
         }
 
         return NextResponse.json({

@@ -4,6 +4,7 @@ import { gradients } from '@/lib/design-system';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { StrategyCopilot } from '@/components/copilot/StrategyCopilot';
+import { PLANS, PlanType } from '@/config/plans';
 
 export default async function DashboardLayout({
     children,
@@ -45,8 +46,14 @@ export default async function DashboardLayout({
         if (membership) {
             userTier = membership.organization.subscription?.tier || 'TRIAL';
             organizationId = membership.organizationId;
-            // Check if any project has an active CMS connection
-            hasCMSIntegration = membership.organization.projects.some(
+
+            // Check if the plan includes CMS feature
+            const planType = userTier as PlanType;
+            const plan = PLANS[planType] || PLANS[PlanType.TRIAL];
+            const hasCMSFeature = plan.features.cmsIntegrations;
+
+            // Check if any project has an active CMS connection AND the plan supports it
+            hasCMSIntegration = hasCMSFeature && membership.organization.projects.some(
                 (p: any) => p.cmsConnection?.status === 'ACTIVE'
             );
         }

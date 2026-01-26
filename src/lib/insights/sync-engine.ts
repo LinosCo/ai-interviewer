@@ -162,6 +162,38 @@ export class CrossChannelSyncEngine {
         // 5. Fetch SERP Monitoring Data (Google News/Search)
         const serpSummary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId);
 
+        // 5b. Fetch CMS/Website analytics if available
+        let websiteAnalytics = null;
+        const cmsConnection = await prisma.cMSConnection.findFirst({
+            where: {
+                project: {
+                    organizationId,
+                    ...(projectId ? { id: projectId } : {})
+                },
+                status: { in: ['ACTIVE', 'PARTIAL'] }
+            }
+        });
+
+        if (cmsConnection) {
+            const recentAnalytics = await prisma.websiteAnalytics.findMany({
+                where: { connectionId: cmsConnection.id },
+                orderBy: { date: 'desc' },
+                take: 7
+            });
+
+            if (recentAnalytics.length > 0) {
+                websiteAnalytics = {
+                    avgPageviews: recentAnalytics.reduce((sum, a) => sum + a.pageviews, 0) / recentAnalytics.length,
+                    avgBounceRate: recentAnalytics.reduce((sum, a) => sum + a.bounceRate, 0) / recentAnalytics.length,
+                    topPages: recentAnalytics[0]?.topPages || [],
+                    searchQueries: recentAnalytics[0]?.topSearchQueries || [],
+                    lowPerformingPages: (recentAnalytics[0]?.topPages as any[] || [])
+                        .filter((p: any) => p.bounceRate > 0.7)
+                        .slice(0, 5)
+                };
+            }
+        }
+
         // 6. Summarize data for LLM with specific identifiers for citations
         const visibilitySummary = visibilityConfig?.scans[0]?.responses?.map(r => ({
             platform: r.platform,
@@ -255,6 +287,15 @@ ${serpSummary ? JSON.stringify({
                 topCategories: serpSummary.topCategories,
                 recentAlerts: serpSummary.recentAlerts
             }, null, 2) : 'Nessun dato SERP disponibile'}
+
+6️⃣ ANALYTICS SITO WEB (Google Analytics + Search Console):
+${websiteAnalytics ? JSON.stringify({
+                avgPageviewsGiornalieri: Math.round(websiteAnalytics.avgPageviews),
+                bounceRateMedio: (websiteAnalytics.avgBounceRate * 100).toFixed(1) + '%',
+                paginePiuVisitate: (websiteAnalytics.topPages as any[]).slice(0, 5),
+                queryDiRicerca: (websiteAnalytics.searchQueries as any[]).slice(0, 10),
+                pagineConAltoBounce: websiteAnalytics.lowPerformingPages
+            }, null, 2) : 'Dati non disponibili - CMS non connesso o Google Analytics non configurato'}
 
 =============================================================
 📈 HEALTH REPORT RICHIESTO

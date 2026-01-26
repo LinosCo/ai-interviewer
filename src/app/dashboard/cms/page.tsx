@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { Globe, ExternalLink, RefreshCw } from 'lucide-react';
+import { showToast } from '@/components/toast';
 
 interface ConnectionStatus {
     enabled: boolean;
@@ -50,6 +52,32 @@ export default function CMSPage() {
     const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+    const [projectId, setProjectId] = useState<string | null>(null);
+
+    const handleOpenDashboard = async () => {
+        if (!projectId) return;
+        setIsLoadingDashboard(true);
+        try {
+            const res = await fetch('/api/cms/dashboard-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId })
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Failed to generate URL');
+            }
+
+            const { url } = await res.json();
+            window.open(url, '_blank');
+        } catch (error: any) {
+            showToast(error.message || 'Errore apertura dashboard', 'error');
+        } finally {
+            setIsLoadingDashboard(false);
+        }
+    };
 
     useEffect(() => {
         async function loadData() {
@@ -58,6 +86,9 @@ export default function CMSPage() {
                 const connRes = await fetch('/api/cms/connection');
                 const connData = await connRes.json();
                 setConnection(connData);
+                if (connData.projectId) {
+                    setProjectId(connData.projectId);
+                }
 
                 if (connData.enabled) {
                     // Load analytics
@@ -132,17 +163,41 @@ export default function CMSPage() {
     return (
         <div className="p-8 space-y-8">
             {/* Header */}
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Sito Web</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Gestione Sito</h1>
                     <p className="text-gray-500">{conn.name}</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                        Ultimo sync: {conn.lastSyncAt ? new Date(conn.lastSyncAt).toLocaleString('it-IT') : 'Mai'}
+                    </p>
                 </div>
-                <div className="text-right text-sm text-gray-500">
-                    <p>Ultimo sync: {conn.lastSyncAt ? new Date(conn.lastSyncAt).toLocaleString('it-IT') : 'Mai'}</p>
+                <div className="flex items-center gap-3">
                     {conn.cmsPublicUrl && (
-                        <a href={conn.cmsPublicUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                            Visita sito &rarr;
+                        <a
+                            href={conn.cmsPublicUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-600 hover:text-gray-900 text-sm flex items-center gap-1"
+                        >
+                            Visita sito <ExternalLink className="w-3 h-3" />
                         </a>
+                    )}
+                    {conn.cmsDashboardUrl && (
+                        <button
+                            onClick={handleOpenDashboard}
+                            disabled={isLoadingDashboard || conn.status === 'DISABLED'}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
+                        >
+                            {isLoadingDashboard ? (
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <>
+                                    <Globe className="w-4 h-4" />
+                                    Apri Editor CMS
+                                    <ExternalLink className="w-4 h-4" />
+                                </>
+                            )}
+                        </button>
                     )}
                 </div>
             </div>

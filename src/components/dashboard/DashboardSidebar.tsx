@@ -66,7 +66,7 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
                     <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Brand Monitor" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/insights" icon={<Icons.Layers size={20} />} label="AI Tips" onClick={() => setIsOpen(false)} />
                     {hasCMSIntegration && (
-                        <DashboardLink href="/dashboard/cms" icon={<Icons.Globe size={20} />} label="Sito Web" onClick={() => setIsOpen(false)} />
+                        <DashboardLink href="/dashboard/cms" icon={<Icons.Globe size={20} />} label="Gestione Sito" highlight={true} onClick={() => setIsOpen(false)} />
                     )}
                     <DashboardLink href="/dashboard/templates" icon={<Icons.LayoutTemplate size={20} />} label="Template" onClick={() => setIsOpen(false)} />
                     <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
@@ -112,7 +112,25 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
     );
 }
 
-function DashboardLink({ href, icon, label, isAdmin = false, onClick }: { href: string, icon: React.ReactNode, label: string, isAdmin?: boolean, onClick: () => void }) {
+function DashboardLink({ href, icon, label, isAdmin = false, highlight = false, onClick }: { href: string, icon: React.ReactNode, label: string, isAdmin?: boolean, highlight?: boolean, onClick: () => void }) {
+    if (highlight) {
+        return (
+            <Link
+                href={href}
+                onClick={onClick}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all group bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200"
+            >
+                <span className="text-emerald-600">
+                    {icon}
+                </span>
+                <span className="font-medium">{label}</span>
+                <span className="ml-auto text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">
+                    CMS
+                </span>
+            </Link>
+        );
+    }
+
     return (
         <Link
             href={href}

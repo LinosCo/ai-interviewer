@@ -98,6 +98,7 @@ export default function InsightHubPage() {
     const [valueProposition, setValueProposition] = useState('');
     const [isSavingStrategy, setIsSavingStrategy] = useState(false);
     const [showStrategyEdit, setShowStrategyEdit] = useState(false);
+    const [websiteAnalytics, setWebsiteAnalytics] = useState<any>(null);
 
     // Get the project ID for API calls (null if "All Projects" is selected)
     const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
@@ -119,6 +120,24 @@ export default function InsightHubPage() {
                 } else {
                     setHealthReport(null);
                 }
+            }
+
+            // Fetch website analytics if CMS is connected
+            try {
+                const analyticsRes = await fetch('/api/cms/analytics?range=7d');
+                if (analyticsRes.ok) {
+                    const analyticsData = await analyticsRes.json();
+                    if (analyticsData.summary) {
+                        setWebsiteAnalytics({
+                            avgPageviews: analyticsData.summary.pageviews / 7,
+                            avgBounceRate: analyticsData.summary.bounceRate,
+                            searchQueries: analyticsData.topSearchQueries?.length || 0,
+                            lowPerformingPages: analyticsData.topPages?.filter((p: any) => p.bounceRate > 0.7).length || 0
+                        });
+                    }
+                }
+            } catch {
+                // CMS not connected, ignore
             }
         } catch (err) {
             console.error(err);
@@ -389,6 +408,42 @@ Grazie`
                             <p className="text-xs text-slate-600 mt-2 leading-relaxed">{healthReport.brandVisibility.competitorInsights}</p>
                         </CardContent>
                     </Card>
+                </div>
+            )}
+
+            {/* Website Performance Section */}
+            {websiteAnalytics && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <Globe className="w-5 h-5 text-emerald-600" />
+                        Performance Sito Web
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <p className="text-2xl font-bold text-gray-900">
+                                {Math.round(websiteAnalytics.avgPageviews).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-gray-500">Visite/giorno</p>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <p className="text-2xl font-bold text-gray-900">
+                                {(websiteAnalytics.avgBounceRate * 100).toFixed(0)}%
+                            </p>
+                            <p className="text-sm text-gray-500">Bounce Rate</p>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <p className="text-2xl font-bold text-gray-900">
+                                {websiteAnalytics.searchQueries || 0}
+                            </p>
+                            <p className="text-sm text-gray-500">Query tracciate</p>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <p className="text-2xl font-bold text-gray-900">
+                                {websiteAnalytics.lowPerformingPages || 0}
+                            </p>
+                            <p className="text-sm text-gray-500">Pagine da ottimizzare</p>
+                        </div>
+                    </div>
                 </div>
             )}
 

@@ -71,9 +71,15 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                 <div className="flex items-center gap-3">
                     <ProjectUserManagementDialog projectId={projectId} />
                     <Link href={`/dashboard/projects/${projectId}/analytics`}>
-                        <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md font-bold transition-all px-5">
+                        <Button size="sm" variant="outline" className="border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl shadow-sm font-bold transition-all px-5">
                             <BarChart3 className="w-4 h-4 mr-2" />
-                            Analytics Unificati
+                            Analytics
+                        </Button>
+                    </Link>
+                    <Link href={`/dashboard/projects/${projectId}/settings`}>
+                        <Button size="sm" className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-md font-bold transition-all px-5">
+                            <Settings2 className="w-4 h-4 mr-2" />
+                            Impostazioni
                         </Button>
                     </Link>
                 </div>
@@ -252,8 +258,8 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             </div>
                             <div className="pt-4">
                                 <Link href={`/dashboard/projects/${projectId}/settings`}>
-                                    <Button variant="outline" className="w-full bg-transparent border-slate-700 text-white hover:bg-slate-800 text-xs font-black uppercase tracking-widest h-10 rounded-xl">
-                                        Gestisci Team
+                                    <Button variant="outline" className="w-full bg-transparent border-slate-700 text-white hover:bg-slate-800 text-[10px] font-black uppercase tracking-widest h-10 rounded-xl">
+                                        Impostazioni Progetto
                                     </Button>
                                 </Link>
                             </div>

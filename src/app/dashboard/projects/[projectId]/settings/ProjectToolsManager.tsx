@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bot, MessageSquare, Settings, Loader2, ArrowRight } from "lucide-react";
+import { Bot, MessageSquare, Settings, Loader2, ArrowRight, Trash2 } from "lucide-react";
 import Link from 'next/link';
 import { showToast } from '@/components/toast';
 
@@ -24,6 +24,7 @@ interface ProjectToolsManagerProps {
 export function ProjectToolsManager({ projectId, projectName }: ProjectToolsManagerProps) {
     const [linkedBots, setLinkedBots] = useState<BotItem[]>([]);
     const [availableBots, setAvailableBots] = useState<BotItem[]>([]);
+    const [personalProjectId, setPersonalProjectId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                 const data = await res.json();
                 setLinkedBots(data.linkedBots || []);
                 setAvailableBots(data.availableBots || []);
+                setPersonalProjectId(data.personalProjectId);
             }
         } catch (err) {
             console.error('Error fetching bots:', err);
@@ -141,10 +143,26 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Link href={`/dashboard/bots/${bot.id}`}>
-                                            <Button variant="ghost" size="sm">
-                                                <Settings className="w-4 h-4" />
+                                            <Button variant="ghost" size="sm" title="Impostazioni Bot">
+                                                <Settings className="w-4 h-4 text-slate-500" />
                                             </Button>
                                         </Link>
+                                        {personalProjectId && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => transferBot(bot.id, personalProjectId)}
+                                                disabled={actionLoading === bot.id}
+                                                title="Rimuovi dal progetto (sposta nel progetto personale)"
+                                                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                            >
+                                                {actionLoading === bot.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="w-4 h-4" />
+                                                )}
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

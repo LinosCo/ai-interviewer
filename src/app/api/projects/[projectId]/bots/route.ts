@@ -91,7 +91,17 @@ export async function GET(
                 orderBy: { updatedAt: 'desc' }
             });
 
+            // Find the owner's personal project ID
+            const personalProject = await prisma.project.findFirst({
+                where: {
+                    ownerId: session.user.id,
+                    isPersonal: true
+                },
+                select: { id: true }
+            });
+
             return NextResponse.json({
+                personalProjectId: personalProject?.id || null,
                 linkedBots: linkedBots.map(b => ({
                     id: b.id,
                     name: b.name,

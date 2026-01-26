@@ -186,9 +186,11 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                             <option value="STARTER">Starter</option>
                             <option value="PRO">Pro</option>
                             <option value="BUSINESS">Business (Enterprise)</option>
+                            <option value="PARTNER">Partner (Agenzie)</option>
+                            <option value="ADMIN">Admin (Staff)</option>
                         </select>
                         <p className="text-xs text-amber-600 mt-1 italic">
-                            Attivazione manuale per clienti Enterprise.
+                            Attivazione manuale per clienti Enterprise, Partner e Staff.
                         </p>
                     </div>
 

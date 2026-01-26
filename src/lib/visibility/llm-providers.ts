@@ -158,7 +158,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    model: geminiProvider('gemini-2.0-flash'),
+                    model: geminiProvider('gemini-2.0-flash') as any,
                     system: systemPrompt,
                     prompt
                 });

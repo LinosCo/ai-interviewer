@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getCreditPack, CREDIT_PACKS } from '@/config/creditPacks';
-import { stripe } from '@/lib/stripe';
+import { getStripeClient } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
@@ -35,14 +35,6 @@ export async function POST(request: Request) {
             );
         }
 
-        // Check if Stripe is configured
-        if (!stripe) {
-            return NextResponse.json(
-                { error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe non configurato' },
-                { status: 503 }
-            );
-        }
-
         // Check for Stripe price ID
         if (!pack.stripePriceId) {
             return NextResponse.json(
@@ -51,25 +43,63 @@ export async function POST(request: Request) {
             );
         }
 
-        // Get or create Stripe customer
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { stripeCustomerId: true }
+        // Get Stripe client (will throw if not configured)
+        let stripe;
+        try {
+            stripe = await getStripeClient();
+        } catch {
+            return NextResponse.json(
+                { error: 'STRIPE_NOT_CONFIGURED', message: 'Stripe non configurato' },
+                { status: 503 }
+            );
+        }
+
+        // Get user's organization and subscription
+        const membership = await prisma.organizationMember.findFirst({
+            where: { userId: session.user.id },
+            include: {
+                organization: {
+                    include: { subscription: true }
+                }
+            }
         });
 
-        let customerId = user?.stripeCustomerId;
+        if (!membership?.organization) {
+            return NextResponse.json(
+                { error: 'Organizzazione non trovata' },
+                { status: 404 }
+            );
+        }
 
+        const org = membership.organization;
+        let customerId = org.subscription?.stripeCustomerId;
+
+        // Create Stripe customer if needed
         if (!customerId) {
             const customer = await stripe.customers.create({
                 email: session.user.email,
-                metadata: { userId: session.user.id }
+                name: org.name,
+                metadata: {
+                    organizationId: org.id,
+                    userId: session.user.id
+                }
             });
             customerId = customer.id;
 
-            await prisma.user.update({
-                where: { id: session.user.id },
-                data: { stripeCustomerId: customerId }
-            });
+            // Update or create subscription with customer ID
+            if (org.subscription) {
+                await prisma.subscription.update({
+                    where: { id: org.subscription.id },
+                    data: { stripeCustomerId: customerId }
+                });
+            } else {
+                await prisma.subscription.create({
+                    data: {
+                        organizationId: org.id,
+                        stripeCustomerId: customerId
+                    }
+                });
+            }
         }
 
         // Create Stripe Checkout session

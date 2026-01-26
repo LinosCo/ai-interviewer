@@ -1,7 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 /**
  * GET /api/admin/organizations/[orgId]/limits
@@ -28,10 +27,7 @@ export async function GET(
 
         const { orgId } = await params;
 
-        // Get detailed usage stats
-        const usageStats = await TokenTrackingService.getUsageStats(orgId);
-
-        // Get organization with subscription
+        // Get organization with subscription and token usage
         const org = await prisma.organization.findUnique({
             where: { id: orgId },
             include: {
@@ -43,6 +39,15 @@ export async function GET(
         if (!org) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
+
+        // Build usage stats from tokenUsage
+        const usageStats = org.tokenUsage ? {
+            tokensUsed: org.tokenUsage.tokensUsed,
+            interviewsUsed: org.tokenUsage.interviewsUsed,
+            chatbotSessionsUsed: org.tokenUsage.chatbotSessionsUsed,
+            visibilityQueriesUsed: org.tokenUsage.visibilityQueriesUsed,
+            lastResetAt: org.tokenUsage.lastResetAt
+        } : null;
 
         return NextResponse.json({
             organization: {
@@ -190,7 +195,16 @@ export async function PATCH(
 
         // Reset usage counters if requested
         if (resetUsage) {
-            await TokenTrackingService.resetMonthlyCounters(orgId);
+            await prisma.tokenUsage.updateMany({
+                where: { organizationId: orgId },
+                data: {
+                    tokensUsed: 0,
+                    interviewsUsed: 0,
+                    chatbotSessionsUsed: 0,
+                    visibilityQueriesUsed: 0,
+                    lastResetAt: new Date()
+                }
+            });
         }
 
         return NextResponse.json({ success: true });

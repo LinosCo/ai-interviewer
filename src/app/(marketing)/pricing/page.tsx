@@ -127,7 +127,7 @@ export default function PricingPage() {
 
                         <div className="space-y-4 mb-10 flex-1">
                             <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Cosa include:</p>
-                            {plan.features.map((feature, i) => (
+                            {plan.featureList.map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
                                     <div className={`mt-0.5 p-0.5 rounded-full ${plan.popular ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
                                         <Check className="w-3.5 h-3.5" strokeWidth={3} />
@@ -139,7 +139,7 @@ export default function PricingPage() {
                             <div className="pt-4 border-t border-slate-50">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
                                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                                    {(plan.limits.monthlyTokenBudget / 1000000).toFixed(0)}M Token Budget
+                                    {plan.monthlyCredits === -1 ? 'Crediti Illimitati' : `${(plan.monthlyCredits / 1000000).toFixed(0)}M Crediti/mese`}
                                 </div>
                             </div>
                         </div>

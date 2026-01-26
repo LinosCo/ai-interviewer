@@ -101,10 +101,10 @@ async function migrateUserCredits() {
     console.log(`📊 Totale: ${users.length}`);
     console.log('========================================\n');
 
-    // Verifica finale
+    // Verifica finale - conta utenti con crediti configurati (limite > 0)
     const usersWithCredits = await prisma.user.count({
         where: {
-            monthlyCreditsLimit: { not: null },
+            monthlyCreditsLimit: { gt: 0 },
         },
     });
 

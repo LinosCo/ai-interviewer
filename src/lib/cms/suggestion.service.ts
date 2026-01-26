@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { CMSSuggestionStatus, CMSSuggestionType } from '@prisma/client';
+import { CMSSuggestionStatus, CMSSuggestionType, Prisma } from '@prisma/client';
 import { CMSConnectionService } from './connection.service';
 import { decrypt } from './encryption';
 
@@ -276,7 +276,10 @@ export class CMSSuggestionService {
       where: {
         status: 'PUBLISHED',
         publishedAt: { lte: sevenDaysAgo },
-        performanceAfter: { equals: null },
+        OR: [
+          { performanceAfter: { equals: Prisma.DbNull } },
+          { performanceAfter: { equals: Prisma.JsonNull } }
+        ],
         targetSection: { not: null }
       },
       select: { id: true }

@@ -18,7 +18,7 @@ const faqs = [
   {
     question: 'Posso personalizzare il chatbot con il mio brand?',
     answer:
-      'Assolutamente! Il chatbot impara dal tuo tono di voce, può essere addestrato sui tuoi documenti e FAQ, e si adatta perfettamente al look & feel del tuo sito web. Con il piano Enterprise, offriamo anche soluzioni white-label.',
+      'Assolutamente! Il chatbot impara dal tuo tono di voce, può essere addestrato sui tuoi documenti e FAQ, e si adatta perfettamente al look & feel del tuo sito web. Con il piano Business, offriamo anche soluzioni white-label.',
   },
   {
     question: 'I miei dati sono al sicuro?',
@@ -38,12 +38,12 @@ const faqs = [
   {
     question: 'Come funziona il supporto?',
     answer:
-      'Offriamo supporto via email per tutti i piani e supporto prioritario con tempi di risposta garantiti per i piani Pro ed Enterprise. Il nostro team è 100% italiano e sempre disponibile ad aiutarti.',
+      'Offriamo supporto via email per tutti i piani e supporto prioritario con tempi di risposta garantiti per i piani Pro ed Business. Il nostro team è 100% italiano e sempre disponibile ad aiutarti.',
   },
   {
     question: 'Posso integrare Business Tuner con altri strumenti?',
     answer:
-      'Sì! Offriamo integrazioni native con i principali CRM, strumenti di email marketing e piattaforme di analytics. I piani Pro ed Enterprise hanno anche accesso alle API per integrazioni personalizzate.',
+      'Sì! Offriamo integrazioni native con i principali CRM, strumenti di email marketing e piattaforme di analytics. I piani Pro ed Business hanno anche accesso alle API per integrazioni personalizzate.',
   },
 ];
 

@@ -1,9 +1,11 @@
 import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 const RefinePromptSchema = z.object({
     refinedPrompt: z.string().describe("The improved version of the original prompt"),
@@ -33,6 +35,12 @@ export async function POST(request: Request) {
         if (!session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        // Get user for credit tracking
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email },
+            select: { id: true }
+        });
 
         const body = await request.json();
         const { promptText, brandName, language = 'it', territory = 'IT' } = body;
@@ -70,7 +78,7 @@ Refine this prompt to make it more effective for monitoring how AI assistants ta
 Keep the same intent but improve clarity, naturalness, and effectiveness.`;
 
         const { model } = await getSystemLLM();
-        const { object } = await generateObject({
+        const result = await generateObject({
             model,
             system: systemPrompt,
             prompt: userPrompt,
@@ -78,9 +86,22 @@ Keep the same intent but improve clarity, naturalness, and effectiveness.`;
             temperature: 0.5 // Balanced between creativity and consistency
         });
 
+        // Track credit usage
+        if (user && result.usage) {
+            TokenTrackingService.logTokenUsage({
+                userId: user.id,
+                inputTokens: result.usage.inputTokens || 0,
+                outputTokens: result.usage.outputTokens || 0,
+                category: 'VISIBILITY',
+                model: 'gpt-4o-mini',
+                operation: 'visibility-refine-prompt',
+                resourceType: 'visibility'
+            }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+        }
+
         return NextResponse.json({
-            refinedPrompt: object.refinedPrompt,
-            improvements: object.improvements,
+            refinedPrompt: result.object.refinedPrompt,
+            improvements: result.object.improvements,
             original: promptText
         });
 

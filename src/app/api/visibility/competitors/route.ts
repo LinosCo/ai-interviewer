@@ -7,6 +7,7 @@ import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 const CompetitorSuggestionSchema = z.object({
     suggestions: z.array(z.string()).describe("List of competitor names")
@@ -54,18 +55,32 @@ export async function POST(request: Request) {
                 const suggestionLimit = 5;
 
                 const { model } = await getSystemLLM();
-                const { object } = await generateObject({
+                const result = await generateObject({
                     model,
                     schema: CompetitorSuggestionSchema,
                     prompt: `Generate a list of ${suggestionLimit} main competitors for "${brandName}" in the "${category}" category.
-                    
+
 Only include well-known, legitimate competitors that users might compare against.
 Return only the company/product names, without descriptions.`,
                     temperature: 0.3
                 });
 
+                // Track credit usage
+                if (result.usage) {
+                    TokenTrackingService.logTokenUsage({
+                        userId: user.id,
+                        organizationId,
+                        inputTokens: result.usage.inputTokens || 0,
+                        outputTokens: result.usage.outputTokens || 0,
+                        category: 'VISIBILITY',
+                        model: 'gpt-4o-mini',
+                        operation: 'visibility-suggest-competitors',
+                        resourceType: 'visibility'
+                    }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+                }
+
                 return NextResponse.json({
-                    suggestions: object.suggestions.slice(0, suggestionLimit)
+                    suggestions: result.object.suggestions.slice(0, suggestionLimit)
                 });
             } catch (error) {
                 console.error('Error suggesting competitors:', error);

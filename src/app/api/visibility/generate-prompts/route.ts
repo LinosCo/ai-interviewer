@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { getOrCreateSubscription } from '@/lib/usage';
 import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 const PromptGenerationSchema = z.object({
     prompts: z.array(z.string()).describe("Array of monitoring prompts in the specified language")
@@ -118,7 +119,7 @@ Examples of good prompt types:
 
         // Generate prompts using AI
         const { model } = await getSystemLLM();
-        const { object } = await generateObject({
+        const result = await generateObject({
             model,
             system: systemPrompt,
             prompt: userPrompt,
@@ -126,9 +127,23 @@ Examples of good prompt types:
             temperature: 0.8 // More creative for diverse prompts
         });
 
+        // Track credit usage
+        if (result.usage) {
+            TokenTrackingService.logTokenUsage({
+                userId: user.id,
+                organizationId,
+                inputTokens: result.usage.inputTokens || 0,
+                outputTokens: result.usage.outputTokens || 0,
+                category: 'VISIBILITY',
+                model: 'gpt-4o-mini',
+                operation: 'visibility-generate-prompts',
+                resourceType: 'visibility'
+            }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+        }
+
         return NextResponse.json({
-            prompts: object.prompts,
-            count: object.prompts.length,
+            prompts: result.object.prompts,
+            count: result.object.prompts.length,
             language,
             territory
         });

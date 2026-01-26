@@ -83,14 +83,14 @@ const features = [
   },
   {
     icon: LineChart,
-    title: 'Monitora la Reputazione Online',
+    title: 'Monitora la Visibilità AI',
     description:
-      "Tieni d'occhio cosa si dice del tuo brand online. Analizza il sentiment, identifica trend e reagisci rapidamente.",
+      "Scopri come il tuo brand appare nelle risposte di ChatGPT, Perplexity e altri LLM. Monitora il posizionamento rispetto ai competitor.",
     benefits: [
-      'Monitoraggio multi-canale',
-      'Alert in tempo reale',
+      'Monitoraggio LLM e Google News',
+      'Posizionamento vs competitor',
       'Analisi del sentiment automatica',
-      'Trend e competitor analysis',
+      'Report dettagliati per prompt',
     ],
     color: 'green',
     mockup: (

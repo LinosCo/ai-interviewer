@@ -147,11 +147,55 @@ export async function deleteProjectAction(projectId: string) {
     const user = await prisma.user.findUnique({ where: { email: session.user.email } });
     if (!user) throw new Error("User not found");
 
-    if (user.role !== 'ADMIN') {
-        throw new Error("Only admins can delete projects.");
+    // Get project to check ownership
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+            accessList: { where: { userId: user.id } }
+        }
+    });
+    if (!project) throw new Error("Project not found");
+
+    // Check if user is admin or owner
+    const isOwner = project.ownerId === user.id || project.accessList.some(a => a.role === 'OWNER');
+    if (user.role !== 'ADMIN' && !isOwner) {
+        throw new Error("Solo l'owner o un admin può eliminare il progetto.");
     }
 
-    await prisma.project.delete({ where: { id: projectId } });
+    // Cannot delete personal project
+    if (project.isPersonal) {
+        throw new Error("Non puoi eliminare il tuo progetto personale.");
+    }
+
+    // Find owner's personal project to transfer bots
+    const personalProject = await prisma.project.findFirst({
+        where: { ownerId: user.id, isPersonal: true }
+    });
+
+    if (!personalProject) {
+        throw new Error("Progetto personale non trovato per il trasferimento dei bot.");
+    }
+
+    // Transfer bots and delete project in transaction
+    await prisma.$transaction([
+        // Transfer bots to personal project
+        prisma.bot.updateMany({
+            where: { projectId },
+            data: { projectId: personalProject.id }
+        }),
+        // Unlink visibility configs
+        prisma.visibilityConfig.updateMany({
+            where: { projectId },
+            data: { projectId: null }
+        }),
+        // Delete project access entries
+        prisma.projectAccess.deleteMany({
+            where: { projectId }
+        }),
+        // Delete the project
+        prisma.project.delete({ where: { id: projectId } })
+    ]);
+
     revalidatePath('/dashboard');
 }
 

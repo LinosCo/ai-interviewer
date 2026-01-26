@@ -22,7 +22,7 @@ const problems = [
 ];
 
 const solutions = [
-  'Interviste AI automatiche da €49/mese',
+  'Interview AI gratis per sempre',
   'Insight in tempo reale, non in settimane',
   'Tutto connesso in un\'unica dashboard',
   'Consigli pratici generati dall\'AI',

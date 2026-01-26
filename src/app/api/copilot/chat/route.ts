@@ -8,6 +8,7 @@ import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
 import { canAccessProjectData } from '@/lib/copilot/permissions';
 import { searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { PLANS, PlanType, isUnlimited } from '@/config/plans';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 export const maxDuration = 60;
 
@@ -138,9 +139,24 @@ export async function POST(req: Request) {
             temperature: 0.3
         });
 
-        // 8. Track token usage (estimate based on message lengths)
-        const estimatedTokens = Math.ceil((message.length + result.object.response.length) / 4);
+        // 8. Track token usage with new credits system
+        if (result.usage) {
+            TokenTrackingService.logTokenUsage({
+                userId: session.user.id,
+                organizationId: organization.id,
+                projectId: projectId || undefined,
+                inputTokens: result.usage.inputTokens || 0,
+                outputTokens: result.usage.outputTokens || 0,
+                category: 'SUGGESTION', // COPILOT uses SUGGESTION category
+                model: 'gpt-4o-mini',
+                operation: 'copilot-chat',
+                resourceType: 'copilot',
+                resourceId: session.user.id
+            }).catch(err => console.error('[Copilot] Credit tracking failed:', err));
+        }
 
+        // Legacy: also update subscription for backward compatibility
+        const estimatedTokens = Math.ceil((message.length + result.object.response.length) / 4);
         if (subscription) {
             await prisma.subscription.update({
                 where: { id: subscription.id },

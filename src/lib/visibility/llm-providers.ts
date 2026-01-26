@@ -107,7 +107,7 @@ export async function queryVisibilityLLM(
     prompt: string,
     language: string = 'en',
     territory: string = 'US'
-): Promise<{ text: string; usage: { promptTokens: number; completionTokens: number } } | null> {
+): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } } | null> {
     try {
         // Language-specific system prompt
         const languageInstructions: Record<string, string> = {
@@ -174,8 +174,8 @@ Target market: ${territory}`;
         return {
             text: result.text,
             usage: {
-                promptTokens: usage?.promptTokens ?? usage?.inputTokens ?? 0,
-                completionTokens: usage?.completionTokens ?? usage?.outputTokens ?? 0
+                inputTokens: usage?.inputTokens ?? usage?.promptTokens ?? 0,
+                outputTokens: usage?.outputTokens ?? usage?.completionTokens ?? 0
             }
         };
     } catch (error) {

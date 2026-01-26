@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     await prisma.cMSWebhookLog.create({
       data: {
         connectionId,
-        direction: 'INCOMING',
+        direction: 'INBOUND',
         event: 'validate_session',
         success: true,
         requestPayload: { action: 'validate_session', userId: result.payload?.userId },

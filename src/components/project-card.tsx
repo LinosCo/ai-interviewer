@@ -18,9 +18,9 @@ export default function ProjectCard({ project, userId, isAdmin }: ProjectCardPro
     const [isDeleting, setIsDeleting] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
 
-    const isOwner = project.ownerId === userId;
+    const isOwner = project.ownerId === userId || project.role === 'OWNER';
     const canRename = isAdmin || isOwner;
-    const canDeleteProject = isAdmin; // Only Admin can delete projects per requirements
+    const canDeleteProject = isAdmin || isOwner; // Owner can delete their own projects
 
     // For bots, owner OR admin can delete. 
     // Since we are iterating bots here, we pass the flag down.

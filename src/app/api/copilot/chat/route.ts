@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { generateObject } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
@@ -57,7 +57,13 @@ export async function POST(req: Request) {
             }
         }
 
-        // 3. Determine if user can access project data
+        // 3. Get user's strategic plan from platform settings
+        const platformSettings = await prisma.platformSettings.findUnique({
+            where: { userId: session.user.id }
+        });
+        const strategicPlan = platformSettings?.strategicPlan || null;
+
+        // 4. Determine if user can access project data
         const hasProjectAccess = canAccessProjectData(tier);
 
         let projectContext = null;
@@ -91,38 +97,43 @@ export async function POST(req: Request) {
             }
         }
 
-        // 4. Search platform KB for relevant content
+        // 5. Search platform KB for relevant content
         const kbResults = await searchPlatformKB(message, 'all');
         const kbContext = kbResults.slice(0, 2).map(r => `[${r.title}]: ${r.content}`).join('\n\n');
 
-        // 5. Get API key
+        // 6. Get API key (Anthropic for Claude 4.5 Opus)
         const globalConfig = await prisma.globalConfig.findUnique({
             where: { id: 'default' }
         });
 
-        const apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
+        const apiKey = globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
 
         if (!apiKey) {
             return NextResponse.json({
                 error: 'API key not configured',
-                message: 'Chiave API OpenAI non configurata. Contatta l\'amministratore.'
+                message: 'Chiave API Anthropic non configurata. Contatta l\'amministratore.'
             }, { status: 500 });
         }
 
-        const openai = createOpenAI({ apiKey });
+        const anthropic = createAnthropic({ apiKey });
 
-        // 6. Build enhanced system prompt with KB context
-        const systemPrompt = buildCopilotSystemPrompt({
+        // 7. Build enhanced system prompt with KB context and strategic plan
+        let systemPrompt = buildCopilotSystemPrompt({
             userName: session.user.name || 'utente',
             organizationName: organization.name,
             tier,
             hasProjectAccess,
-            projectContext
-        }) + (kbContext ? `\n\n## Informazioni dalla Knowledge Base\n${kbContext}` : '');
+            projectContext,
+            strategicPlan
+        });
 
-        // 7. Generate response
+        if (kbContext) {
+            systemPrompt += `\n\n## Informazioni dalla Knowledge Base\n${kbContext}`;
+        }
+
+        // 8. Generate response with Claude 4.5 Opus
         const result = await generateObject({
-            model: openai('gpt-4o-mini'),
+            model: anthropic('claude-opus-4-5-20251101'),
             schema: z.object({
                 response: z.string().describe('La risposta completa per l\'utente in markdown'),
                 usedKnowledgeBase: z.boolean().describe('Se la risposta usa informazioni dalla knowledge base'),
@@ -139,7 +150,7 @@ export async function POST(req: Request) {
             temperature: 0.3
         });
 
-        // 8. Track token usage with new credits system
+        // 9. Track token usage with new credits system
         if (result.usage) {
             TokenTrackingService.logTokenUsage({
                 userId: session.user.id,
@@ -148,7 +159,7 @@ export async function POST(req: Request) {
                 inputTokens: result.usage.inputTokens || 0,
                 outputTokens: result.usage.outputTokens || 0,
                 category: 'SUGGESTION', // COPILOT uses SUGGESTION category
-                model: 'gpt-4o-mini',
+                model: 'claude-opus-4-5-20251101',
                 operation: 'copilot-chat',
                 resourceType: 'copilot',
                 resourceId: session.user.id
@@ -167,7 +178,7 @@ export async function POST(req: Request) {
             });
         }
 
-        // 9. Log copilot session
+        // 10. Log copilot session
         const sessionDate = new Date().toISOString().split('T')[0];
         const sessionKey = `${session.user.id}-${sessionDate}`;
 

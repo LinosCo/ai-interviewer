@@ -16,6 +16,10 @@ export default async function DashboardLayout({
     let userTier = 'TRIAL';
     let organizationId = '';
     let hasCMSIntegration = false;
+    let canManageProjects = false;
+    let hasChatbot = false;
+    let hasVisibilityTracker = false;
+    let hasAiTips = false;
 
     if (session?.user?.email) {
         const user = await prisma.user.findUnique({
@@ -56,6 +60,14 @@ export default async function DashboardLayout({
             hasCMSIntegration = hasCMSFeature && membership.organization.projects.some(
                 (p: any) => p.cmsConnection?.status === 'ACTIVE'
             );
+
+            // Check if user can manage multiple projects (STARTER and above)
+            canManageProjects = plan.features.maxProjects === -1 || plan.features.maxProjects > 1;
+
+            // Feature flags based on plan
+            hasChatbot = plan.features.chatbot;
+            hasVisibilityTracker = plan.features.visibilityTracker;
+            hasAiTips = plan.features.aiTips;
         }
     }
 
@@ -68,7 +80,15 @@ export default async function DashboardLayout({
         <ProjectProvider>
             <div className="flex flex-col md:flex-row h-screen overflow-hidden font-sans" style={{ background: gradients.mesh }}>
 
-                <DashboardSidebar isAdmin={isAdmin} signOutAction={signOutAction} hasCMSIntegration={hasCMSIntegration} />
+                <DashboardSidebar
+                    isAdmin={isAdmin}
+                    signOutAction={signOutAction}
+                    hasCMSIntegration={hasCMSIntegration}
+                    canManageProjects={canManageProjects}
+                    hasChatbot={hasChatbot}
+                    hasVisibilityTracker={hasVisibilityTracker}
+                    hasAiTips={hasAiTips}
+                />
 
                 {/* Main Content Area */}
                 <div className="flex-grow overflow-y-auto p-4 md:p-8 relative z-10">

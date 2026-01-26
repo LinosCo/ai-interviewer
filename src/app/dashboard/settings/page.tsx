@@ -34,6 +34,7 @@ export default async function PlatformSettingsPage() {
     }
 
     const currentKnowledge = user.platformSettings?.methodologyKnowledge || defaultKnowledge;
+    const currentStrategicPlan = user.platformSettings?.strategicPlan || '';
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -51,6 +52,7 @@ export default async function PlatformSettingsPage() {
                         userId={user.id}
                         isAdmin={user.role === 'ADMIN'}
                         currentKnowledge={currentKnowledge}
+                        currentStrategicPlan={currentStrategicPlan}
                         settingsId={user.platformSettings?.id}
                         // For Admins, populate with Global Config. 
                         // For Users, populate with personal override IF it exists, otherwise empty (masked later)

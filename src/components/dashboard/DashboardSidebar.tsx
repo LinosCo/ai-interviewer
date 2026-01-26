@@ -10,9 +10,21 @@ interface DashboardSidebarProps {
     isAdmin: boolean;
     signOutAction: () => Promise<void>;
     hasCMSIntegration?: boolean;
+    canManageProjects?: boolean;
+    hasChatbot?: boolean;
+    hasVisibilityTracker?: boolean;
+    hasAiTips?: boolean;
 }
 
-export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = false }: DashboardSidebarProps) {
+export function DashboardSidebar({
+    isAdmin,
+    signOutAction,
+    hasCMSIntegration = false,
+    canManageProjects = false,
+    hasChatbot = false,
+    hasVisibilityTracker = false,
+    hasAiTips = false
+}: DashboardSidebarProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [adminExpanded, setAdminExpanded] = useState(false);
 
@@ -62,13 +74,22 @@ export function DashboardSidebar({ isAdmin, signOutAction, hasCMSIntegration = f
 
                 <nav className="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-hide pr-2 -mr-2">
                     <DashboardLink href="/dashboard/interviews" icon={<Icons.MessageSquare size={20} />} label="Interviste AI" onClick={() => setIsOpen(false)} />
-                    <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />
-                    <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Brand Monitor" onClick={() => setIsOpen(false)} />
-                    <DashboardLink href="/dashboard/insights" icon={<Icons.Layers size={20} />} label="AI Tips" onClick={() => setIsOpen(false)} />
+                    {hasChatbot && (
+                        <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />
+                    )}
+                    {hasVisibilityTracker && (
+                        <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Brand Monitor" onClick={() => setIsOpen(false)} />
+                    )}
+                    {hasAiTips && (
+                        <DashboardLink href="/dashboard/insights" icon={<Icons.Layers size={20} />} label="AI Tips" onClick={() => setIsOpen(false)} />
+                    )}
                     {hasCMSIntegration && (
                         <DashboardLink href="/dashboard/cms" icon={<Icons.Globe size={20} />} label="Gestione Sito" highlight={true} onClick={() => setIsOpen(false)} />
                     )}
                     <DashboardLink href="/dashboard/templates" icon={<Icons.LayoutTemplate size={20} />} label="Template" onClick={() => setIsOpen(false)} />
+                    {canManageProjects && (
+                        <DashboardLink href="/dashboard/projects" icon={<Icons.FolderKanban size={20} />} label="Progetti" onClick={() => setIsOpen(false)} />
+                    )}
                     <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
                 </nav>
 

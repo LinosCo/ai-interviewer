@@ -12,6 +12,7 @@ interface CopilotContext {
         avgSentiment: number;
         period: string;
     } | null;
+    strategicPlan?: string | null;
 }
 
 export function buildCopilotSystemPrompt(ctx: CopilotContext): string {
@@ -75,7 +76,21 @@ ${ctx.projectContext ? `
 3. Se non hai abbastanza dati, dillo chiaramente invece di inventare
 4. Proponi sempre un possibile passo successivo
 5. Se rilevi pattern interessanti, segnalali proattivamente
+${ctx.strategicPlan ? `
+## Piano Strategico dell'Organizzazione
+L'utente ha definito il seguente piano strategico. Usalo come guida per:
+- Interpretare i dati in linea con gli obiettivi aziendali
+- Prioritizzare i suggerimenti in base alle priorita dichiarate
+- Allineare le raccomandazioni alla visione strategica
+- Proporre azioni concrete e misurabili
 
+**IMPORTANTE**: Quando l'utente chiede come interpretare i dati o quali azioni intraprendere,
+fai sempre riferimento al piano strategico per contestualizzare le tue risposte.
+
+---
+${ctx.strategicPlan}
+---
+` : ''}
 ## Formattazione
 - Usa il markdown per strutturare le risposte
 - Per le citazioni, usa il formato: > "citazione" - Nome, data

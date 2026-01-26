@@ -22,7 +22,7 @@ export enum LLMModel {
     CLAUDE_SONNET = 'claude-sonnet-4-20250514',
 
     // Google
-    GEMINI_FLASH = 'gemini-2.0-flash-exp',
+    GEMINI_FLASH = 'gemini-2.0-flash',
     GEMINI_FLASH_LITE = 'gemini-1.5-flash-8b'
 }
 

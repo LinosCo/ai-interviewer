@@ -7,6 +7,7 @@ import { showToast } from '@/components/toast';
 interface PlatformSettingsFormProps {
     userId: string;
     currentKnowledge: string;
+    currentStrategicPlan: string;
     settingsId?: string;
 
     platformOpenaiApiKey: string;
@@ -27,6 +28,7 @@ interface PlatformSettingsFormProps {
 export default function PlatformSettingsForm({
     userId,
     currentKnowledge,
+    currentStrategicPlan,
     settingsId,
     platformOpenaiApiKey,
     platformAnthropicApiKey,
@@ -42,6 +44,8 @@ export default function PlatformSettingsForm({
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
     const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
+    const [strategicPlan, setStrategicPlan] = useState(currentStrategicPlan);
+    const [isStrategicPlanOpen, setIsStrategicPlanOpen] = useState(false);
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
     const [openaiKey, setOpenaiKey] = useState('');
     const [anthropicKey, setAnthropicKey] = useState('');
@@ -67,7 +71,8 @@ export default function PlatformSettingsForm({
         sPriceStarterYearly !== stripePriceStarterYearly ||
         sPricePro !== stripePricePro ||
         sPriceProYearly !== stripePriceProYearly ||
-        knowledge !== currentKnowledge
+        knowledge !== currentKnowledge ||
+        strategicPlan !== currentStrategicPlan
     );
 
     const [isSaving, setIsSaving] = useState(false);
@@ -83,6 +88,7 @@ export default function PlatformSettingsForm({
                     userId,
                     settingsId,
                     methodologyKnowledge: knowledge,
+                    strategicPlan: strategicPlan,
                     platformOpenaiApiKey: openaiKey || undefined,
                     platformAnthropicApiKey: anthropicKey || undefined,
                     platformGeminiApiKey: geminiKey || undefined,
@@ -227,6 +233,81 @@ export default function PlatformSettingsForm({
                             >
                                 Ripristina metodologia predefinita
                             </button>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* Strategic Plan Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-xl font-semibold">Piano Strategico</h2>
+                        <p className="text-xs text-gray-500 mt-1">Utilizzato dal Copilot Strategico per interpretare i dati</p>
+                    </div>
+                    <button
+                        onClick={() => setIsStrategicPlanOpen(!isStrategicPlanOpen)}
+                        className="text-sm text-amber-600 font-bold hover:underline"
+                    >
+                        {isStrategicPlanOpen ? 'Nascondi editor' : 'Modifica piano'}
+                    </button>
+                </div>
+
+                {!isStrategicPlanOpen ? (
+                    <div className="p-4 bg-stone-50 rounded-lg border border-stone-100">
+                        <p className="text-sm text-stone-500 italic">
+                            Il piano strategico definisce obiettivi, priorità e linee guida che il Copilot utilizzerà
+                            per interpretare i dati e suggerire azioni concrete.
+                            Clicca su "Modifica piano" per personalizzarlo.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Descrivi qui la strategia della tua organizzazione. Il Copilot userà queste informazioni per:
+                        </p>
+                        <ul className="text-sm text-gray-600 mb-4 list-disc list-inside space-y-1">
+                            <li>Interpretare i dati in linea con i tuoi obiettivi</li>
+                            <li>Suggerire azioni concrete e prioritizzate</li>
+                            <li>Allineare le raccomandazioni alla tua visione</li>
+                        </ul>
+                        <textarea
+                            value={strategicPlan}
+                            onChange={(e) => setStrategicPlan(e.target.value)}
+                            className="w-full h-96 border border-gray-300 rounded-lg px-4 py-3 font-mono text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                            placeholder={`Esempio di piano strategico:
+
+## Visione e Obiettivi
+- Diventare leader di mercato nel segmento PMI entro 2 anni
+- Aumentare la retention del 20% nel prossimo trimestre
+- Espandere in 3 nuovi mercati europei
+
+## Target e Posizionamento
+- Target primario: PMI 10-50 dipendenti, settore servizi
+- Posizionamento: soluzione premium con supporto dedicato
+- Differenziatori: facilità d'uso, integrazione nativa
+
+## Priorità Attuali
+1. Migliorare onboarding (troppi abbandoni prima settimana)
+2. Ridurre churn cliente enterprise
+3. Lanciare feature X richiesta da 40% utenti
+
+## Vincoli e Risorse
+- Budget marketing: €50k/trimestre
+- Team dev: 5 persone, focus su stabilità
+- No investimenti in mercato US per ora
+
+## KPI Chiave
+- NPS > 50
+- Churn < 5% mensile
+- CAC < €200`}
+                        />
+                        <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <p className="text-xs text-amber-800">
+                                <strong>Suggerimento:</strong> Più dettagli fornisci, più il Copilot potrà darti
+                                suggerimenti specifici e allineati alla tua strategia. Includi obiettivi, vincoli,
+                                priorità e KPI.
+                            </p>
                         </div>
                     </>
                 )}

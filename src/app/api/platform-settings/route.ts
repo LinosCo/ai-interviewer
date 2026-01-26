@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
             userId,
             settingsId,
             methodologyKnowledge,
+            strategicPlan,
             platformOpenaiApiKey,
             platformAnthropicApiKey,
             platformGeminiApiKey,
@@ -34,13 +35,17 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Update user's methodology (PlatformSettings)
+        // Update user's methodology and strategic plan (PlatformSettings)
         const settings = await prisma.platformSettings.upsert({
             where: { userId },
-            update: { methodologyKnowledge },
+            update: {
+                methodologyKnowledge,
+                strategicPlan: strategicPlan || null
+            },
             create: {
                 userId,
-                methodologyKnowledge
+                methodologyKnowledge,
+                strategicPlan: strategicPlan || null
             }
         });
 

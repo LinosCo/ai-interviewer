@@ -93,7 +93,7 @@ export const VISIBILITY_PROVIDERS = {
         displayName: 'Claude 3.5 Haiku'
     },
     gemini: {
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.0-flash',
         displayName: 'Gemini 2.0 Flash'
     }
 } as const;
@@ -158,7 +158,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    model: geminiProvider('gemini-2.0-flash-exp') as any,
+                    model: geminiProvider('gemini-2.0-flash'),
                     system: systemPrompt,
                     prompt
                 });

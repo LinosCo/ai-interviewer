@@ -62,7 +62,6 @@ export const CreditNotificationService = {
                 });
                 userNotifications.add(key);
                 notificationsSent.set(userId, userNotifications);
-                console.log(`[Credits] Warning email sent to ${user.email}`);
             }
         }
 
@@ -77,7 +76,6 @@ export const CreditNotificationService = {
                 });
                 userNotifications.add(key);
                 notificationsSent.set(userId, userNotifications);
-                console.log(`[Credits] Exhausted email sent to ${user.email}`);
             }
         }
     },
@@ -115,8 +113,6 @@ export const CreditNotificationService = {
             pricePaid: `€${pricePaid}`,
             newTotal: formatCredits(newTotal)
         });
-
-        console.log(`[Credits] Purchase confirmation sent to ${user.email}`);
     },
 
     /**

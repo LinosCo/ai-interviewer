@@ -23,7 +23,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
 
     if (!project) notFound();
 
-    // Check user has access (via ProjectAccess with OWNER role)
+    // Check user has access (via ProjectAccess with OWNER role OR is the project owner)
     const userAccess = await prisma.projectAccess.findUnique({
         where: {
             userId_projectId: {
@@ -33,8 +33,11 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
         }
     });
 
-    // Only OWNER can access settings
-    if (!userAccess || userAccess.role !== 'OWNER') {
+    const isOwner = project.ownerId === session.user.id;
+    const hasOwnerAccess = userAccess?.role === 'OWNER';
+
+    // Only OWNER can access settings (via ProjectAccess role OR project.ownerId)
+    if (!isOwner && !hasOwnerAccess) {
         redirect('/dashboard/projects');
     }
 

@@ -10,19 +10,11 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { isFeatureEnabled } from '@/lib/usage'
 import { decryptIfNeeded, encryptIfNeeded } from '@/lib/encryption'
+import fs from 'fs';
+import path from 'path';
+import { User, Prisma } from '@prisma/client';
 
-const BotSchema = z.object({
-    name: z.string().min(1, "Name is required"),
-    description: z.string().optional(),
-    researchGoal: z.string().optional(),
-    targetAudience: z.string().optional(),
-    language: z.string().default("en"),
-    tone: z.string().optional(),
-    maxDurationMins: z.coerce.number().default(10),
-    introMessage: z.string().optional(),
-})
-
-async function getEffectiveApiKey(user: any, botSpecificKey?: string | null) {
+async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
     // 1. Bot-specific key always wins (decrypt if needed)
     if (botSpecificKey) return decryptIfNeeded(botSpecificKey);
 
@@ -77,7 +69,7 @@ export async function createBotAction(projectId: string, formData: FormData) {
     if (aiTopicsJson) {
         try {
             const parsedTopics = JSON.parse(aiTopicsJson);
-            topicsToCreate = parsedTopics.map((t: any, i: number) => ({
+            topicsToCreate = parsedTopics.map((t: { label: string; description: string; subGoals?: string[] }, i: number) => ({
                 orderIndex: i,
                 label: t.label,
                 description: t.description,
@@ -93,7 +85,6 @@ export async function createBotAction(projectId: string, formData: FormData) {
             projectId,
             name,
             description,
-            //             researchGoal, // TODO: Add to schema? Yes, schema has it.
             researchGoal: researchGoal || null,
             targetAudience: targetAudience || null,
             slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().split('-')[0],
@@ -240,8 +231,6 @@ export async function deleteBotAction(botId: string) {
     const isOwner = bot.project.ownerId === user.id;
     const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
 
-    console.log(`Delete Bot Attempt: BotId=${botId}, User=${user.email}, Role=${user.role}, ProjectOwner=${bot.project.ownerId}, IsOwner=${isOwner}, HasAccess=${hasAccess}`);
-
     // Only owner can delete (not just any member with access)
     if (!isOwner) {
         console.error("Delete Bot Unauthorized - User is not project owner");
@@ -260,8 +249,8 @@ export async function updateBotAction(botId: string, formData: FormData) {
     const getStr = (key: string) => formData.has(key) ? (formData.get(key) as string) : undefined;
 
     // Construct data object only with present fields to allow partial updates (split forms)
-    const data: any = {};
-    if (formData.has('name')) data.name = getStr('name');
+    const data: Prisma.BotUpdateInput = {};
+    if (formData.has('name')) data.name = getStr('name') ?? '';
     if (formData.has('researchGoal')) data.researchGoal = getStr('researchGoal');
     if (formData.has('targetAudience')) data.targetAudience = getStr('targetAudience');
     if (formData.has('language')) data.language = getStr('language');
@@ -317,7 +306,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
 
     // Candidate Fields (Array)
     if (formData.has('candidateFields')) {
-        data.candidateDataFields = formData.getAll('candidateFields');
+        data.candidateDataFields = formData.getAll('candidateFields').map(v => String(v));
     } else if (scope === 'constraints' || scope === 'all') {
         // If checkboxes are present in the DOM but none checked, formData won't have the key.
         // We rely on the context: if we are saving constraints and 'collectCandidateData' is ON, 
@@ -329,11 +318,11 @@ export async function updateBotAction(botId: string, formData: FormData) {
         // But formData.getAll returns empty if key missing? No, has() is false.
 
         // Simple Logic: if collectCandidateData is true in DATA (meaning it's being set to true or is true),
-        // we should probably look for fields. 
+        // we should probably look for fields.
         // But if I uncheck all fields, I send nothing.
         // Let's assume if we are in 'constraints' scope, we overwrite fields.
         if (data.collectCandidateData) {
-            data.candidateDataFields = formData.getAll('candidateFields'); // empty array if none
+            data.candidateDataFields = formData.getAll('candidateFields').map(v => String(v)); // empty array if none
         }
     }
 
@@ -371,11 +360,11 @@ export async function updateBotAction(botId: string, formData: FormData) {
         }
     }
 
-    if (data.openaiApiKey === '') data.openaiApiKey = null as any;
-    if (data.anthropicApiKey === '') data.anthropicApiKey = null as any;
+    if (data.openaiApiKey === '') delete data.openaiApiKey;
+    if (data.anthropicApiKey === '') delete data.anthropicApiKey;
     if (data.logoUrl === '') data.logoUrl = null;
 
-    console.log(`[updateBotAction] Updating bot ${botId}. LogoUrl length: ${data.logoUrl?.length || 'null'}`);
+    console.log(`[updateBotAction] Updating bot ${botId}. LogoUrl length: ${typeof data.logoUrl === 'string' ? data.logoUrl.length : 'null'}`);
 
     await prisma.bot.update({
         where: { id: botId },
@@ -441,8 +430,6 @@ export async function generateBotConfigAction(prompt: string) {
     });
 
     // Load methodology for context
-    const fs = require('fs');
-    const path = require('path');
     let methodology = '';
     try {
         methodology = fs.readFileSync(path.join(process.cwd(), 'knowledge', 'interview-methodology.md'), 'utf-8');
@@ -500,7 +487,7 @@ export async function generateBotAnalyticsAction(botId: string) {
     }
 
     // Filter only conversations that HAVE analysis
-    const analyzedConversations = bot.conversations.filter((c: any) => c.analysis);
+    const analyzedConversations = bot.conversations.filter(c => c.analysis);
 
     if (analyzedConversations.length === 0) {
         // Fallback? Or maybe trigger analysis for old ones?
@@ -515,9 +502,9 @@ export async function generateBotAnalyticsAction(botId: string) {
 
     // Prepare Aggregated Input for Global LLM
     // Instead of raw text, we send Summaries and Key Quotes from each convo.
-    const aggregatedInput = analyzedConversations.map((c: any) => {
+    const aggregatedInput = analyzedConversations.map(c => {
         const a = c.analysis!; // Verified by filter
-        const metadata = a.metadata as any || {};
+        const metadata = (a.metadata as Record<string, any> | null) || {};
         const summary = metadata.summary || "No summary available.";
         const quotes = (a.keyQuotes as string[])?.join(' | ') || "";
 
@@ -645,7 +632,7 @@ export async function generateBotAnalyticsAction(botId: string) {
     // Create Topic Analysis (Update keywords)
     if (data.topicAnalysis) {
         for (const topicData of data.topicAnalysis) {
-            const topic = bot.topics.find((t: any) => t.label === topicData.topicLabel);
+            const topic = bot.topics.find(t => t.label === topicData.topicLabel);
             if (topic) {
                 await prisma.topicBlock.update({
                     where: { id: topic.id },

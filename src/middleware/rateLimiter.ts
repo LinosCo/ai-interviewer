@@ -10,6 +10,9 @@ import { prisma as db } from '@/lib/prisma';
 
 // In-memory store for cooldowns (use Redis in production)
 const cooldownStore = new Map<string, number>();
+let requestCount = 0;
+const CLEANUP_THRESHOLD = 50; // Every 50 requests
+const CLEANUP_AGE = 3600000; // 1 hour
 
 export async function enforceMessageCooldown(
     sessionId: string,
@@ -52,11 +55,17 @@ export async function enforceMessageCooldown(
         // Update last message time
         cooldownStore.set(lastMessageKey, Date.now());
 
-        // Cleanup old entries (older than 1 hour)
-        const oneHourAgo = Date.now() - 3600000;
-        for (const [key, time] of cooldownStore.entries()) {
-            if (time < oneHourAgo) {
-                cooldownStore.delete(key);
+        // Cleanup old entries periodically (O(K) where K is expired count)
+        requestCount++;
+        if (requestCount >= CLEANUP_THRESHOLD) {
+            requestCount = 0;
+            const expirationTime = Date.now() - CLEANUP_AGE;
+            for (const [key, time] of cooldownStore.entries()) {
+                if (time < expirationTime) {
+                    cooldownStore.delete(key);
+                } else {
+                    break; // Map preserves insertion order
+                }
             }
         }
 

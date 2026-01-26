@@ -42,7 +42,7 @@ export class AnalyticsEngine {
      */
     static async generateProjectInsights(projectId: string, botIds?: string[]): Promise<{ insights: UnifiedInsight[], stats: UnifiedStats }> {
         // 1. Fetch all bots in the project
-        const whereClause: any = { projectId };
+        const whereClause: import('@prisma/client').Prisma.BotWhereInput = { projectId };
 
         if (botIds && botIds.length > 0) {
             whereClause.id = { in: botIds };
@@ -65,8 +65,8 @@ export class AnalyticsEngine {
         });
 
         const allConversations = bots.flatMap(b => b.conversations);
-        const chatbotConversations = bots.filter((b: any) => b.botType === 'chatbot').flatMap(b => b.conversations);
-        const interviewConversations = bots.filter((b: any) => b.botType === 'interview' || !b.botType).flatMap(b => b.conversations);
+        const chatbotConversations = bots.filter(b => b.botType === 'chatbot').flatMap(b => b.conversations);
+        const interviewConversations = bots.filter(b => b.botType === 'interview' || !b.botType).flatMap(b => b.conversations);
 
         // --- Calculate Stats ---
         const totalConversations = allConversations.length;
@@ -126,8 +126,8 @@ export class AnalyticsEngine {
 
         // NPS Score (from interview analyses)
         const npsScores = interviewConversations
-            .map(c => (c.analysis as any)?.npsScore)
-            .filter((s: any) => s !== undefined && s !== null) as number[];
+            .map(c => (c.analysis?.metadata as Record<string, any> | null)?.npsScore)
+            .filter((s): s is number => typeof s === 'number');
         const avgNpsScore = npsScores.length > 0
             ? npsScores.reduce((a, b) => a + b, 0) / npsScores.length
             : null;
@@ -248,7 +248,7 @@ export class AnalyticsEngine {
 
     // --- Helper Methods ---
 
-    private static extractThemes(conversations: any[]): { name: string, frequency: number, sentiment: number }[] {
+    private static extractThemes(conversations: (import('@prisma/client').Conversation & { themeOccurrences: (import('@prisma/client').ThemeOccurrence & { theme: import('@prisma/client').Theme })[] })[]): { name: string, frequency: number, sentiment: number }[] {
         const themeMap = new Map<string, { count: number, totalSentiment: number }>();
 
         conversations.forEach(c => {
@@ -268,9 +268,9 @@ export class AnalyticsEngine {
         }));
     }
 
-    private static isCoveredInInterviews(topicInfo: string, interviews: any[]): boolean {
+    private static isCoveredInInterviews(topicInfo: string, interviews: (import('@prisma/client').Conversation & { themeOccurrences: (import('@prisma/client').ThemeOccurrence & { theme: import('@prisma/client').Theme })[] })[]): boolean {
         return interviews.some(i =>
-            i.themeOccurrences.some((t: any) => t.theme.name.toLowerCase().includes(topicInfo.toLowerCase()))
+            i.themeOccurrences.some(t => t.theme.name.toLowerCase().includes(topicInfo.toLowerCase()))
         );
     }
 }

@@ -3,6 +3,8 @@
 
 export * from './encryption';
 export * from './connection.service';
+export * from './session.service';
+export * from './suggestion.service';
 export * from './google-analytics.service';
 export * from './search-console.service';
 export * from './suggestion-generator';

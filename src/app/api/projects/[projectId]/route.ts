@@ -5,12 +5,20 @@ import { z } from 'zod';
 
 // Helper to check if user is OWNER of project
 async function isProjectOwner(userId: string, projectId: string): Promise<boolean> {
+    // Check via ProjectAccess role
     const access = await prisma.projectAccess.findUnique({
         where: {
             userId_projectId: { userId, projectId }
         }
     });
-    return access?.role === 'OWNER';
+    if (access?.role === 'OWNER') return true;
+
+    // Also check via project.ownerId (the actual owner)
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { ownerId: true }
+    });
+    return project?.ownerId === userId;
 }
 
 const updateProjectSchema = z.object({

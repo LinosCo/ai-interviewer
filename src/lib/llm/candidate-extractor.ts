@@ -6,7 +6,8 @@ import { Message } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 // In-memory cache to avoid re-extraction
-const extractionCache = new Map<string, any>();
+const extractionCache = new Map<string, Record<string, unknown>>();
+const MAX_CACHE_SIZE = 100;
 
 export class CandidateExtractor {
 
@@ -28,10 +29,11 @@ export class CandidateExtractor {
                 select: { candidateProfile: true }
             });
 
-            if (conversation?.candidateProfile) {
+            if (conversation?.candidateProfile && typeof conversation.candidateProfile === 'object' && !Array.isArray(conversation.candidateProfile)) {
                 console.log('[CandidateExtractor] Profile already in DB');
-                extractionCache.set(conversationId, conversation.candidateProfile);
-                return conversation.candidateProfile;
+                const profile = conversation.candidateProfile as Record<string, unknown>;
+                extractionCache.set(conversationId, profile);
+                return profile;
             }
         }
 
@@ -85,10 +87,14 @@ ${transcript}
                 setTimeout(() => reject(new Error('Extraction timeout after 10s')), 10000)
             );
 
-            const result = await Promise.race([extractionPromise, timeoutPromise]) as any;
+            const result = await Promise.race([extractionPromise, timeoutPromise]) as { object: Record<string, unknown> };
 
             // Cache the result
             if (conversationId && result.object) {
+                if (extractionCache.size >= MAX_CACHE_SIZE) {
+                    const firstKey = extractionCache.keys().next().value;
+                    if (firstKey !== undefined) extractionCache.delete(firstKey);
+                }
                 extractionCache.set(conversationId, result.object);
             }
 

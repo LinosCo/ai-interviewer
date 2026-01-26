@@ -8,48 +8,48 @@ datasource db {
 }
 
 model User {
-  id                      String               @id @default(cuid())
+  id                      String    @id @default(cuid())
   name                    String?
-  email                   String               @unique
+  email                   String    @unique
   emailVerified           DateTime?
   password                String?
   image                   String?
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
   platformOpenaiApiKey    String?
   platformAnthropicApiKey String?
-  role                    UserRole             @default(USER)
+  role                    UserRole  @default(USER)
   customApiKeys           Json?
 
   // Piano e crediti
-  plan                    UserPlanType         @default(FREE)
-  monthlyCreditsLimit     BigInt               @default(500000)
-  monthlyCreditsUsed      BigInt               @default(0)
-  creditsResetDate        DateTime?
-  packCreditsAvailable    BigInt               @default(0)
+  plan                 UserPlanType @default(FREE)
+  monthlyCreditsLimit  BigInt       @default(500000)
+  monthlyCreditsUsed   BigInt       @default(0)
+  creditsResetDate     DateTime?
+  packCreditsAvailable BigInt       @default(0)
 
   // Partner
-  isPartner               Boolean              @default(false)
-  partnerStatus           String?              // trial, active, suspended
+  isPartner               Boolean   @default(false)
+  partnerStatus           String? // trial, active, suspended
   partnerTrialEndDate     DateTime?
   partnerFee              Int?
-  partnerActiveClients    Int                  @default(0)
-  partnerWhiteLabel       Boolean              @default(false)
+  partnerActiveClients    Int       @default(0)
+  partnerWhiteLabel       Boolean   @default(false)
   partnerGracePeriodStart DateTime?
   partnerCustomLogo       String?
 
-  accounts                Account[]
-  copilotSessions         CopilotSession[]
-  creditPacks             CreditPack[]
-  creditTransactions      CreditTransaction[]
-  memberships             Membership[]
-  passwordResetTokens     PasswordResetToken[]
-  platformSettings        PlatformSettings?
-  ownedProjects           Project[]
-  projectAccess           ProjectAccess[]
-  reports                 Report[]
-  rewardGrants            RewardGrant[]
-  sessions                Session[]
+  accounts            Account[]
+  copilotSessions     CopilotSession[]
+  creditPacks         CreditPack[]
+  creditTransactions  CreditTransaction[]
+  memberships         Membership[]
+  passwordResetTokens PasswordResetToken[]
+  platformSettings    PlatformSettings?
+  ownedProjects       Project[]
+  projectAccess       ProjectAccess[]
+  reports             Report[]
+  rewardGrants        RewardGrant[]
+  sessions            Session[]
 }
 
 model ProjectAccess {
@@ -252,23 +252,25 @@ model Membership {
 }
 
 model Project {
-  id                   String                @id @default(cuid())
-  name                 String
-  organizationId       String?
-  ownerId              String?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  isPersonal           Boolean               @default(false)
-  strategicVision      String?
-  valueProposition     String?
+  id               String   @id @default(cuid())
+  name             String
+  organizationId   String?
+  ownerId          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isPersonal       Boolean  @default(false)
+  strategicVision  String?
+  valueProposition String?
 
   // Partner tracking
-  originPartnerId      String?
-  transferredToUserId  String?
-  transferredAt        DateTime?
+  originPartnerId     String?
+  transferredToUserId String?
+  transferredAt       DateTime?
 
   bots                 Bot[]
   cmsConnection        CMSConnection?
+  mcpConnections       MCPConnection[]
+  googleConnection     GoogleConnection?
   copilotSessions      CopilotSession[]
   creditTransactions   CreditTransaction[]
   crossChannelInsights CrossChannelInsight[]
@@ -895,6 +897,7 @@ model CMSConnection {
   suggestions               CMSSuggestion[]
   webhookLogs               CMSWebhookLog[]
   analytics                 WebsiteAnalytics[]
+  integrationLogs           IntegrationLog[]
 }
 
 model CMSWebhookLog {
@@ -935,7 +938,15 @@ model CMSSuggestion {
   rejectedReason        String?
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
-  connection            CMSConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  // Performance tracking
+  performanceBefore Json? // Metriche pre-applicazione
+  performanceAfter  Json? // Metriche post-applicazione (dopo 7 giorni)
+
+  // Audit
+  createdBy String? // Utente che ha generato/approvato
+
+  connection CMSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@index([connectionId, status])
   @@index([connectionId, createdAt])
@@ -986,21 +997,21 @@ model CopilotSession {
 // ============================================
 
 model CreditTransaction {
-  id            String   @id @default(cuid())
-  userId        String
-  projectId     String?
-  executedById  String?  // chi ha eseguito l'azione (può essere collaboratore)
-  amount        BigInt   // crediti consumati
-  balanceAfter  BigInt   // saldo dopo transazione
-  type          String   // usage, monthly_reset, pack_purchase, adjustment
-  tool          String?  // interview, chatbot, visibility, copilot, tips, export
-  action        String?  // azione specifica
-  description   String?
-  metadata      Json?
-  createdAt     DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String?
+  executedById String? // chi ha eseguito l'azione (può essere collaboratore)
+  amount       BigInt // crediti consumati
+  balanceAfter BigInt // saldo dopo transazione
+  type         String // usage, monthly_reset, pack_purchase, adjustment
+  tool         String? // interview, chatbot, visibility, copilot, tips, export
+  action       String? // azione specifica
+  description  String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([projectId])
@@ -1008,16 +1019,16 @@ model CreditTransaction {
 }
 
 model CreditPack {
-  id                String   @id @default(cuid())
-  userId            String
-  packType          String   // small, medium, large
-  creditsPurchased  BigInt
-  creditsRemaining  BigInt
-  pricePaid         Decimal  @db.Decimal(10, 2)
-  stripePaymentId   String?
-  purchasedAt       DateTime @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  packType         String // small, medium, large
+  creditsPurchased BigInt
+  creditsRemaining BigInt
+  pricePaid        Decimal  @db.Decimal(10, 2)
+  stripePaymentId  String?
+  purchasedAt      DateTime @default(now())
 
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -1048,8 +1059,8 @@ model ProjectTransfer {
   clientId            String
   transferredAt       DateTime @default(now())
 
-  originalProject     Project  @relation("OriginalProject", fields: [originalProjectId], references: [id])
-  duplicatedProject   Project  @relation("DuplicatedProject", fields: [duplicatedProjectId], references: [id])
+  originalProject   Project @relation("OriginalProject", fields: [originalProjectId], references: [id])
+  duplicatedProject Project @relation("DuplicatedProject", fields: [duplicatedProjectId], references: [id])
 
   @@index([partnerId])
   @@index([clientId])
@@ -1190,4 +1201,150 @@ enum CMSSuggestionStatus {
   PUBLISHED
   REJECTED
   FAILED
+}
+
+// ============================================
+// EXTERNAL INTEGRATIONS (Business Tuner)
+// ============================================
+
+// MCP Connections (WordPress, WooCommerce)
+model MCPConnection {
+  id        String            @id @default(cuid())
+  projectId String
+  type      MCPConnectionType
+  name      String
+
+  // Endpoint MCP
+  endpoint    String
+  credentials String // Encrypted JSON (AES-256-GCM)
+
+  // Stato
+  status     ConnectionStatus @default(PENDING)
+  lastPingAt DateTime?
+  lastSyncAt DateTime?
+  lastError  String?
+
+  // Capabilities MCP
+  availableTools String[]
+  serverVersion  String?
+  serverName     String?
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+
+  // Relations
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  logs    IntegrationLog[]
+
+  @@unique([projectId, type])
+  @@index([projectId, status])
+}
+
+enum MCPConnectionType {
+  WORDPRESS
+  WOOCOMMERCE
+}
+
+// Google Connections (GA4 + Search Console unificati)
+model GoogleConnection {
+  id        String @id @default(cuid())
+  projectId String @unique
+
+  // Service Account (condiviso tra GA4 e GSC)
+  serviceAccountEmail String
+  serviceAccountJson  String // Encrypted
+
+  // Google Analytics 4
+  ga4Enabled    Boolean          @default(false)
+  ga4PropertyId String? // "123456789"
+  ga4Status     ConnectionStatus @default(PENDING)
+  ga4LastSyncAt DateTime?
+  ga4LastError  String?
+
+  // Search Console
+  gscEnabled    Boolean          @default(false)
+  gscSiteUrl    String? // "https://example.com" o "sc-domain:example.com"
+  gscStatus     ConnectionStatus @default(PENDING)
+  gscLastSyncAt DateTime?
+  gscLastError  String?
+
+  // Audit
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+
+  // Relations
+  project   Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  analytics GoogleAnalyticsData[]
+  logs      IntegrationLog[]
+
+  @@index([projectId])
+}
+
+// Analytics data from Google (daily snapshots)
+model GoogleAnalyticsData {
+  id                 String   @id @default(cuid())
+  googleConnectionId String
+  date               DateTime @db.Date
+
+  // GA4 metrics
+  pageviews          Int   @default(0)
+  sessions           Int   @default(0)
+  users              Int   @default(0)
+  avgSessionDuration Float @default(0)
+  bounceRate         Float @default(0)
+  topPages           Json?
+
+  // Search Console metrics
+  searchImpressions Int   @default(0)
+  searchClicks      Int   @default(0)
+  avgPosition       Float @default(0)
+  topSearchQueries  Json?
+
+  createdAt DateTime @default(now())
+
+  googleConnection GoogleConnection @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([googleConnectionId, date])
+  @@index([googleConnectionId, date])
+}
+
+// Unified Integration Logs (polymorphic)
+model IntegrationLog {
+  id String @id @default(cuid())
+
+  // Polymorphic relations (one of these will be set)
+  mcpConnectionId    String?
+  googleConnectionId String?
+  cmsConnectionId    String?
+
+  // Log data
+  action       String // "wordpress.create_post", "ga4.run_report", etc.
+  arguments    Json?
+  result       Json?
+  success      Boolean
+  errorMessage String?
+  creditsUsed  Int      @default(0)
+  durationMs   Int
+  createdAt    DateTime @default(now())
+
+  // Relations
+  mcpConnection    MCPConnection?    @relation(fields: [mcpConnectionId], references: [id], onDelete: Cascade)
+  googleConnection GoogleConnection? @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
+  cmsConnection    CMSConnection?    @relation(fields: [cmsConnectionId], references: [id], onDelete: Cascade)
+
+  @@index([mcpConnectionId, createdAt])
+  @@index([googleConnectionId, createdAt])
+  @@index([cmsConnectionId, createdAt])
+}
+
+// Shared status enum for all integrations
+enum ConnectionStatus {
+  PENDING
+  TESTING
+  ACTIVE
+  ERROR
+  DISABLED
 }

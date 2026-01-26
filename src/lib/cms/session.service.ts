@@ -20,6 +20,7 @@ export class CMSSessionService {
    * Genera un token JWT per l'accesso al CMS.
    * Il token è valido finché la sessione BT dell'utente è attiva.
    * Usiamo una durata di 24 ore con refresh automatico.
+   * Disponibile solo per piano BUSINESS o superiore.
    */
   static async generateToken(
     userId: string,
@@ -30,6 +31,12 @@ export class CMSSessionService {
     const hasAccess = await this.verifyUserProjectAccess(userId, projectId);
     if (!hasAccess) {
       throw new Error('User does not have access to this project');
+    }
+
+    // Verifica piano BUSINESS
+    const hasPlan = await this.verifyBusinessPlan(userId, projectId);
+    if (!hasPlan) {
+      throw new Error('CMS Voler.ai requires BUSINESS plan');
     }
 
     const user = await prisma.user.findUnique({
@@ -48,6 +55,10 @@ export class CMSSessionService {
 
     if (!connection || connection.projectId !== projectId) {
       throw new Error('Invalid connection for project');
+    }
+
+    if (connection.status === 'DISABLED') {
+      throw new Error('CMS connection is disabled');
     }
 
     const payload: Omit<CMSSessionPayload, 'iat' | 'exp'> = {
@@ -146,6 +157,44 @@ export class CMSSessionService {
     }
 
     return false;
+  }
+
+  /**
+   * Verifica se l'utente ha un piano BUSINESS o superiore.
+   * CMS Voler.ai è disponibile solo per piano BUSINESS/ENTERPRISE/ADMIN.
+   */
+  private static async verifyBusinessPlan(
+    userId: string,
+    projectId: string
+  ): Promise<boolean> {
+    // Check user's personal plan first
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { plan: true, role: true }
+    });
+
+    // Admin users always have access
+    if (user?.role === 'ADMIN' || user?.plan === 'ADMIN') {
+      return true;
+    }
+
+    // Check user plan
+    if (user?.plan === 'BUSINESS') {
+      return true;
+    }
+
+    // Check organization subscription
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        organization: {
+          include: { subscription: true }
+        }
+      }
+    });
+
+    const tier = project?.organization?.subscription?.tier;
+    return tier === 'BUSINESS' || tier === 'ENTERPRISE' || tier === 'ADMIN';
   }
 
   /**

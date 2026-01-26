@@ -174,7 +174,16 @@ export async function POST(
             }
         });
 
-        if (!currentAccess || currentAccess.role !== 'OWNER') {
+        // Also check if user is the project owner via ownerId
+        const currentProject = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { ownerId: true }
+        });
+
+        const isOwner = currentProject?.ownerId === session.user.id;
+        const hasOwnerAccess = currentAccess?.role === 'OWNER';
+
+        if (!isOwner && !hasOwnerAccess) {
             return NextResponse.json(
                 { error: 'Solo il proprietario può gestire i tool del progetto' },
                 { status: 403 }
@@ -191,7 +200,15 @@ export async function POST(
             }
         });
 
-        if (!targetAccess) {
+        // Also check if user is the owner of target project
+        const targetProject = await prisma.project.findUnique({
+            where: { id: targetProjectId },
+            select: { ownerId: true }
+        });
+
+        const isTargetOwner = targetProject?.ownerId === session.user.id;
+
+        if (!targetAccess && !isTargetOwner) {
             return NextResponse.json(
                 { error: 'Non hai accesso al progetto di destinazione' },
                 { status: 403 }
@@ -221,7 +238,15 @@ export async function POST(
             }
         });
 
-        if (!botProjectAccess) {
+        // Also check if user is owner of bot's current project
+        const botProject = await prisma.project.findUnique({
+            where: { id: bot.projectId },
+            select: { ownerId: true }
+        });
+
+        const isBotProjectOwner = botProject?.ownerId === session.user.id;
+
+        if (!botProjectAccess && !isBotProjectOwner) {
             return NextResponse.json(
                 { error: 'Non hai accesso a questo bot' },
                 { status: 403 }

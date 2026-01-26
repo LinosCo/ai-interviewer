@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { UserRole } from '@prisma/client';
+import { UserRole, User } from '@prisma/client';
 
 /**
  * API Key Restriction Middleware
@@ -13,7 +13,7 @@ import { UserRole } from '@prisma/client';
 
 export async function restrictApiKeyAccess(
     userRole: UserRole,
-    requestBody: any
+    requestBody: { customApiKeys?: unknown }
 ): Promise<{ allowed: boolean; error?: NextResponse }> {
     // If the request is trying to set/modify API keys
     if (requestBody.customApiKeys !== undefined) {
@@ -47,9 +47,9 @@ export function shouldShowApiKeySettings(userRole: UserRole): boolean {
  * Sanitize user data for non-admin users
  * Removes customApiKeys field from response
  */
-export function sanitizeUserData(user: any, requestingUserRole: UserRole): any {
+export function sanitizeUserData(user: Partial<User>, requestingUserRole: UserRole): Partial<User> {
     if (requestingUserRole !== UserRole.ADMIN) {
-        const { customApiKeys, ...sanitized } = user;
+        const { customApiKeys: _, ...sanitized } = user;
         return sanitized;
     }
     return user;

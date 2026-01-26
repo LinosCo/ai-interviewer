@@ -138,10 +138,10 @@ export async function GET(request: Request) {
                 totalInvoices: revenueStats._count.id
             },
             usage: {
-                totalTokensUsed: globalStats.totalTokensUsed,
-                totalInterviews: globalStats.totalInterviews,
-                totalChatbotSessions: globalStats.totalChatbotSessions,
-                byTier: globalStats.byTier
+                totalCreditsUsed: globalStats.totalCreditsUsed,
+                totalUsers: globalStats.totalUsers,
+                totalOrganizations: globalStats.totalOrganizations,
+                byPlan: globalStats.byPlan
             },
             distribution: {
                 byPlan
@@ -168,7 +168,7 @@ export async function GET(request: Request) {
                     tokensUsed: sub.tokensUsedThisMonth,
                     interviewsUsed: sub.interviewsUsedThisMonth
                 })),
-            recentTokenLogs: globalStats.recentLogs.slice(0, 20)
+            recentTransactions: globalStats.recentTransactions.slice(0, 20)
         });
 
     } catch (error) {

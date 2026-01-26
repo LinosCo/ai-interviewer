@@ -42,11 +42,12 @@ export async function GET(
 
         // Build usage stats from tokenUsage
         const usageStats = org.tokenUsage ? {
-            tokensUsed: org.tokenUsage.tokensUsed,
+            usedTokens: org.tokenUsage.usedTokens,
             interviewsUsed: org.tokenUsage.interviewsUsed,
             chatbotSessionsUsed: org.tokenUsage.chatbotSessionsUsed,
             visibilityQueriesUsed: org.tokenUsage.visibilityQueriesUsed,
-            lastResetAt: org.tokenUsage.lastResetAt
+            periodStart: org.tokenUsage.periodStart,
+            periodEnd: org.tokenUsage.periodEnd
         } : null;
 
         return NextResponse.json({
@@ -195,14 +196,17 @@ export async function PATCH(
 
         // Reset usage counters if requested
         if (resetUsage) {
+            const now = new Date();
+            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
             await prisma.tokenUsage.updateMany({
                 where: { organizationId: orgId },
                 data: {
-                    tokensUsed: 0,
+                    usedTokens: 0,
                     interviewsUsed: 0,
                     chatbotSessionsUsed: 0,
                     visibilityQueriesUsed: 0,
-                    lastResetAt: new Date()
+                    periodStart: now,
+                    periodEnd: nextMonth
                 }
             });
         }

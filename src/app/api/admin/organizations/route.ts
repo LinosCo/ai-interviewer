@@ -105,13 +105,9 @@ export async function GET(request: Request) {
             const planType = subscriptionTierToPlanType(tier);
             const plan = PLANS[planType];
 
-            const tokensLimit = plan?.limits.monthlyTokenBudget || 0;
-            const tokensUsed = org.subscription?.tokensUsedThisMonth || 0;
-            const tokensPercentage = isUnlimited(tokensLimit) ? 0 : Math.min(100, (tokensUsed / tokensLimit) * 100);
-
-            const interviewsLimit = plan?.limits.maxInterviewsPerMonth || 0;
-            const interviewsUsed = org.subscription?.interviewsUsedThisMonth || 0;
-            const interviewsPercentage = isUnlimited(interviewsLimit) ? 0 : Math.min(100, (interviewsUsed / interviewsLimit) * 100);
+            const creditsLimit = plan?.monthlyCredits || 0;
+            const creditsUsed = org.subscription?.tokensUsedThisMonth || 0;
+            const creditsPercentage = isUnlimited(creditsLimit) ? 0 : Math.min(100, (creditsUsed / creditsLimit) * 100);
 
             const owner = org.members[0]?.user;
 
@@ -132,23 +128,10 @@ export async function GET(request: Request) {
                 members: org._count.members,
                 projects: org.projects,
                 usage: {
-                    tokens: {
-                        used: tokensUsed,
-                        limit: tokensLimit,
-                        percentage: tokensPercentage
-                    },
-                    interviews: {
-                        used: interviewsUsed,
-                        limit: interviewsLimit,
-                        percentage: interviewsPercentage
-                    },
-                    chatbotSessions: {
-                        used: org.subscription?.chatbotSessionsUsedThisMonth || 0,
-                        limit: plan?.limits.maxChatbotSessionsPerMonth || 0
-                    },
-                    visibilityQueries: {
-                        used: org.subscription?.visibilityQueriesUsedThisMonth || 0,
-                        limit: plan?.limits.maxVisibilityQueriesPerMonth || 0
+                    credits: {
+                        used: creditsUsed,
+                        limit: creditsLimit,
+                        percentage: creditsPercentage
                     }
                 },
                 customLimits: org.subscription?.customLimits || null,

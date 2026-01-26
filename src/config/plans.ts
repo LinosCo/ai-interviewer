@@ -44,6 +44,25 @@ export interface PlanFeatures {
     customLogoReports?: boolean;
 }
 
+/**
+ * Legacy limits interface for backward compatibility
+ * These are derived from monthlyCredits and features
+ */
+export interface PlanLimits {
+    monthlyTokenBudget: number;
+    maxInterviewsPerMonth: number;
+    maxChatbots: number;
+    maxChatbotSessionsPerMonth: number;
+    maxVisibilityQueriesPerMonth: number;
+    maxAiSuggestionsPerMonth: number;
+    maxUsers: number;
+    visibilityEnabled: boolean;
+    aiTipsEnabled: boolean;
+    whiteLabelEnabled: boolean;
+    apiAccessEnabled: boolean;
+    canTransferProjects: boolean;
+}
+
 export interface PlanConfig {
     id: PlanType;
     name: string;
@@ -63,6 +82,9 @@ export interface PlanConfig {
 
     // Feature disponibili
     features: PlanFeatures;
+
+    // Legacy limits (for backward compatibility)
+    limits: PlanLimits;
 
     // Marketing
     popular?: boolean;
@@ -92,6 +114,20 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             analytics: 'base',
             canTransferProjects: false,
             maxProjects: 1
+        },
+        limits: {
+            monthlyTokenBudget: 500_000,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: 0,
+            maxChatbotSessionsPerMonth: 0,
+            maxVisibilityQueriesPerMonth: 0,
+            maxAiSuggestionsPerMonth: 0,
+            maxUsers: 1,
+            visibilityEnabled: false,
+            aiTipsEnabled: false,
+            whiteLabelEnabled: false,
+            apiAccessEnabled: false,
+            canTransferProjects: false
         },
         featureList: [
             '500K crediti/mese',
@@ -125,6 +161,20 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: false,
             maxProjects: -1
         },
+        limits: {
+            monthlyTokenBudget: 2_000_000,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: 100,
+            maxAiSuggestionsPerMonth: 50,
+            maxUsers: 5,
+            visibilityEnabled: true,
+            aiTipsEnabled: true,
+            whiteLabelEnabled: false,
+            apiAccessEnabled: false,
+            canTransferProjects: false
+        },
         featureList: [
             '2M crediti per 14 giorni',
             'Tutte le funzionalità PRO',
@@ -157,6 +207,20 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             analytics: 'full',
             canTransferProjects: false,
             maxProjects: -1
+        },
+        limits: {
+            monthlyTokenBudget: 6_000_000,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: 0,
+            maxAiSuggestionsPerMonth: 0,
+            maxUsers: 3,
+            visibilityEnabled: false,
+            aiTipsEnabled: false,
+            whiteLabelEnabled: false,
+            apiAccessEnabled: false,
+            canTransferProjects: false
         },
         featureList: [
             '6M crediti/mese',
@@ -193,6 +257,20 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             analytics: 'full',
             canTransferProjects: false,
             maxProjects: -1
+        },
+        limits: {
+            monthlyTokenBudget: 20_000_000,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: 200,
+            maxAiSuggestionsPerMonth: 100,
+            maxUsers: 10,
+            visibilityEnabled: true,
+            aiTipsEnabled: true,
+            whiteLabelEnabled: false,
+            apiAccessEnabled: false,
+            canTransferProjects: false
         },
         featureList: [
             '20M crediti/mese',
@@ -231,6 +309,20 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: false,
             maxProjects: -1
         },
+        limits: {
+            monthlyTokenBudget: 50_000_000,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: 500,
+            maxAiSuggestionsPerMonth: 200,
+            maxUsers: -1,
+            visibilityEnabled: true,
+            aiTipsEnabled: true,
+            whiteLabelEnabled: true,
+            apiAccessEnabled: true,
+            canTransferProjects: true
+        },
         featureList: [
             '50M crediti/mese',
             'Tutte le funzionalità PRO',
@@ -267,6 +359,20 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             multiClientDashboard: true,
             customLogoReports: true
         },
+        limits: {
+            monthlyTokenBudget: 10_000_000,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: 200,
+            maxAiSuggestionsPerMonth: 100,
+            maxUsers: -1,
+            visibilityEnabled: true,
+            aiTipsEnabled: true,
+            whiteLabelEnabled: false,
+            apiAccessEnabled: false,
+            canTransferProjects: false
+        },
         featureList: [
             '10M crediti/mese',
             'Tutte le funzionalità PRO',
@@ -302,6 +408,20 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1,
             multiClientDashboard: true,
             customLogoReports: true
+        },
+        limits: {
+            monthlyTokenBudget: -1,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: -1,
+            maxAiSuggestionsPerMonth: -1,
+            maxUsers: -1,
+            visibilityEnabled: true,
+            aiTipsEnabled: true,
+            whiteLabelEnabled: true,
+            apiAccessEnabled: true,
+            canTransferProjects: true
         },
         featureList: ['Tutto illimitato']
     }

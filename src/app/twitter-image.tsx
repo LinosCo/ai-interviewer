@@ -4,7 +4,7 @@ import { ImageResponse } from 'next/og';
 export const runtime = 'edge';
 
 // Image metadata
-export const alt = 'Business Tuner';
+export const alt = 'Business Tuner - Ascolta il mercato. Decidi meglio.';
 export const size = {
     width: 1200,
     height: 630,
@@ -15,24 +15,23 @@ export const contentType = 'image/png';
 export default function Image() {
     return new ImageResponse(
         (
-            // ImageResponse JSX element
             <div
                 style={{
                     width: '100%',
                     height: '100%',
                     display: 'flex',
-                    flexDirection: 'row',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#ffffff',
-                    padding: '80px',
+                    background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+                    padding: '60px 80px',
                 }}
             >
-                {/* Brand Logo Container */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '40px' }}>
+                {/* Logo + Brand Name */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '32px' }}>
                     <svg
-                        width="240"
-                        height="240"
+                        width="80"
+                        height="80"
                         viewBox="0 0 48 48"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
@@ -62,23 +61,51 @@ export default function Image() {
                         />
                         <circle cx="31.5" cy="16" r="3" fill="white" />
                     </svg>
-
-                    {/* Lettering */}
                     <div
                         style={{
-                            fontSize: '120px',
-                            fontWeight: 900,
-                            color: '#111827',
-                            letterSpacing: '-0.05em',
+                            fontSize: '48px',
+                            fontWeight: 800,
+                            color: '#ffffff',
+                            letterSpacing: '-0.02em',
                             display: 'flex',
                         }}
                     >
                         Business Tuner
                     </div>
                 </div>
+
+                {/* Tagline */}
+                <div
+                    style={{
+                        fontSize: '56px',
+                        fontWeight: 700,
+                        background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%)',
+                        backgroundClip: 'text',
+                        color: 'transparent',
+                        textAlign: 'center',
+                        marginBottom: '24px',
+                        display: 'flex',
+                    }}
+                >
+                    Ascolta il mercato. Decidi meglio.
+                </div>
+
+                {/* Description */}
+                <div
+                    style={{
+                        fontSize: '28px',
+                        fontWeight: 400,
+                        color: '#94a3b8',
+                        textAlign: 'center',
+                        maxWidth: '900px',
+                        lineHeight: 1.4,
+                        display: 'flex',
+                    }}
+                >
+                    Interviste AI per raccogliere feedback qualitativi da clienti e stakeholder
+                </div>
             </div>
         ),
-        // ImageResponse options
         {
             ...size,
         }

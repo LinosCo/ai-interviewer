@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         }
 
         // Get user's organization and subscription
-        const membership = await prisma.organizationMember.findFirst({
+        const membership = await prisma.membership.findFirst({
             where: { userId: session.user.id },
             include: {
                 organization: {

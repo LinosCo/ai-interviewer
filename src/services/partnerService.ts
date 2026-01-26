@@ -154,11 +154,10 @@ export const PartnerService = {
         // Trova progetti trasferiti dal partner
         const transfers = await prisma.projectTransfer.findMany({
             where: {
-                fromUserId: userId,
-                status: 'completed'
+                partnerId: userId
             },
             include: {
-                project: {
+                duplicatedProject: {
                     include: {
                         owner: {
                             select: {
@@ -168,29 +167,17 @@ export const PartnerService = {
                                 monthlyCreditsUsed: true,
                                 createdAt: true
                             }
-                        },
-                        _count: {
-                            select: { interviews: true }
                         }
-                    }
-                },
-                toUser: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        monthlyCreditsUsed: true,
-                        createdAt: true
                     }
                 }
             }
         });
 
-        // Raggruppa per utente destinatario
+        // Raggruppa per utente destinatario (clientId)
         const clientsMap = new Map<string, PartnerClient>();
 
         for (const transfer of transfers) {
-            const client = transfer.toUser;
+            const client = transfer.duplicatedProject?.owner;
             if (!client) continue;
 
             const existing = clientsMap.get(client.id);
@@ -269,8 +256,8 @@ export const PartnerService = {
         const invite = await prisma.projectTransferInvite.create({
             data: {
                 projectId,
-                fromUserId,
-                toEmail,
+                partnerId: fromUserId,
+                clientEmail: toEmail,
                 token,
                 expiresAt,
                 status: 'pending'
@@ -298,11 +285,7 @@ export const PartnerService = {
 
         // Trova l'invito
         const invite = await prisma.projectTransferInvite.findUnique({
-            where: { token },
-            include: {
-                project: true,
-                fromUser: true
-            }
+            where: { token }
         });
 
         if (!invite) {
@@ -327,46 +310,49 @@ export const PartnerService = {
             select: { email: true }
         });
 
-        if (acceptingUser?.email?.toLowerCase() !== invite.toEmail.toLowerCase()) {
+        if (acceptingUser?.email?.toLowerCase() !== invite.clientEmail.toLowerCase()) {
             return { success: false, error: 'Questo invito è per un altro indirizzo email' };
         }
 
-        // Esegui trasferimento
+        // Get the project to duplicate
+        const originalProject = await prisma.project.findUnique({
+            where: { id: invite.projectId }
+        });
+
+        if (!originalProject) {
+            return { success: false, error: 'Progetto non trovato' };
+        }
+
+        // Esegui trasferimento (duplica progetto invece di trasferirlo)
         await prisma.$transaction(async (tx) => {
             // Aggiorna invito
             await tx.projectTransferInvite.update({
                 where: { id: invite.id },
-                data: {
-                    status: 'accepted',
-                    acceptedAt: new Date(),
-                    acceptedByUserId: acceptingUserId
-                }
+                data: { status: 'accepted' }
             });
 
-            // Trasferisci progetto
-            await tx.project.update({
-                where: { id: invite.projectId },
+            // Crea copia del progetto per il cliente
+            const duplicatedProject = await tx.project.create({
                 data: {
+                    name: originalProject.name,
                     ownerId: acceptingUserId,
-                    originPartnerId: invite.fromUserId,
-                    transferredToUserId: acceptingUserId
+                    organizationId: originalProject.organizationId
                 }
             });
 
             // Crea record trasferimento
             await tx.projectTransfer.create({
                 data: {
-                    projectId: invite.projectId,
-                    fromUserId: invite.fromUserId,
-                    toUserId: acceptingUserId,
-                    status: 'completed',
-                    completedAt: new Date()
+                    originalProjectId: invite.projectId,
+                    duplicatedProjectId: duplicatedProject.id,
+                    partnerId: invite.partnerId,
+                    clientId: acceptingUserId
                 }
             });
 
             // Aggiorna contatore clienti del partner
             await tx.user.update({
-                where: { id: invite.fromUserId },
+                where: { id: invite.partnerId },
                 data: {
                     partnerActiveClients: { increment: 1 }
                 }
@@ -374,7 +360,7 @@ export const PartnerService = {
         });
 
         // Aggiorna status partner (white label, fee, etc.)
-        await this.updatePartnerStatus(invite.fromUserId);
+        await this.updatePartnerStatus(invite.partnerId);
 
         return { success: true };
     },
@@ -400,7 +386,7 @@ export const PartnerService = {
 
         // Calcola nuovo status
         let newStatus = user.partnerStatus;
-        let newFee = PARTNER_THRESHOLDS.baseMonthlyFee;
+        let newFee: number = PARTNER_THRESHOLDS.baseMonthlyFee;
         let whiteLabel = false;
         let gracePeriodStart: Date | null = null;
 

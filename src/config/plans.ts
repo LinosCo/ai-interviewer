@@ -1,38 +1,56 @@
+/**
+ * Sistema Piani - Basato su Crediti
+ *
+ * I piani sono per utente (non per organizzazione).
+ * Ogni piano ha un budget di crediti mensili.
+ * Le feature sono illimitate quando disponibili, ma consumano crediti.
+ * I crediti si resettano mensilmente (non si accumulano).
+ * I pack crediti acquistati non scadono.
+ */
+
 export enum PlanType {
-    TRIAL = 'TRIAL',
     FREE = 'FREE',
+    TRIAL = 'TRIAL',
     STARTER = 'STARTER',
     PRO = 'PRO',
     BUSINESS = 'BUSINESS',
-    ENTERPRISE = 'ENTERPRISE',
     PARTNER = 'PARTNER',
     ADMIN = 'ADMIN'
 }
 
-export interface PlanLimits {
-    monthlyTokenBudget: number;        // -1 = illimitato
-    maxInterviewsPerMonth: number;
-    maxChatbotSessionsPerMonth: number;
-    maxVisibilityQueriesPerMonth: number;
-    maxAiSuggestionsPerMonth: number;
-    maxProjects: number;
-    maxUsers: number;
-    maxChatbots: number;
-    maxBrands: number;                 // Max brand monitor configurations (-1 = unlimited)
-    maxCmsConnections: number;         // Max CMS integrations (-1 = unlimited)
-
-    // Features boolean
-    visibilityEnabled: boolean;
-    aiTipsEnabled: boolean;
-    apiAccessEnabled: boolean;
-    whiteLabelEnabled: boolean;
+/**
+ * Feature disponibili per piano
+ * - boolean: abilitato/disabilitato
+ * - 'base' | 'full': livello funzionalità
+ * - 'watermark' | 'clean': tipo export
+ * - 'conditional': dipende da condizioni (es. partner con 10+ clienti)
+ */
+export interface PlanFeatures {
+    interviewAI: 'base' | 'full';
+    chatbot: boolean;
+    visibilityTracker: boolean;
+    aiTips: boolean;
+    copilotStrategico: boolean;
+    whiteLabel: boolean | 'conditional';
+    apiAccess: boolean;
+    cmsIntegrations: boolean;
+    exportPdf: 'watermark' | 'clean';
+    exportCsv: boolean;
+    analytics: 'base' | 'full';
     canTransferProjects: boolean;
+    maxProjects: number;  // -1 = illimitati
+    // Partner-exclusive features
+    multiClientDashboard?: boolean;
+    customLogoReports?: boolean;
 }
 
 export interface PlanConfig {
     id: PlanType;
     name: string;
     description: string;
+
+    // Crediti mensili
+    monthlyCredits: number;  // -1 = illimitato
 
     // Prezzi
     monthlyPrice: number;           // In EUR, 0 per gratuiti
@@ -43,148 +61,148 @@ export interface PlanConfig {
     stripePriceIdMonthly?: string;
     stripePriceIdYearly?: string;
 
-    limits: PlanLimits;
+    // Feature disponibili
+    features: PlanFeatures;
 
     // Marketing
     popular?: boolean;
-    features: string[];
+    featureList: string[];  // Lista testuale per UI
 }
 
 export const PLANS: Record<PlanType, PlanConfig> = {
-    [PlanType.TRIAL]: {
-        id: PlanType.TRIAL,
-        name: 'Trial',
-        description: 'Prova gratuita 14 giorni',
-        monthlyPrice: 0,
-        yearlyPrice: 0,
-        yearlyMonthlyEquivalent: 0,
-        limits: {
-            monthlyTokenBudget: 2_000_000,
-            maxInterviewsPerMonth: 50,
-            maxChatbotSessionsPerMonth: 200,
-            maxVisibilityQueriesPerMonth: 50,
-            maxAiSuggestionsPerMonth: 5,
-            maxProjects: 2,
-            maxUsers: 1,
-            maxChatbots: 1,
-            maxBrands: 1,
-            maxCmsConnections: 0,
-            visibilityEnabled: true,
-            aiTipsEnabled: true,
-            apiAccessEnabled: false,
-            whiteLabelEnabled: false,
-            canTransferProjects: false
-        },
-        features: [
-            '50 interviste',
-            '1 chatbot (200 sessioni)',
-            'Visibility base',
-            '14 giorni gratis'
-        ]
-    },
-
     [PlanType.FREE]: {
         id: PlanType.FREE,
         name: 'Free',
         description: 'Per sempre gratuito',
+        monthlyCredits: 500_000,
         monthlyPrice: 0,
         yearlyPrice: 0,
         yearlyMonthlyEquivalent: 0,
-        limits: {
-            monthlyTokenBudget: 400_000,
-            maxInterviewsPerMonth: 20,
-            maxChatbotSessionsPerMonth: 0,
-            maxVisibilityQueriesPerMonth: 0,
-            maxAiSuggestionsPerMonth: 0,
-            maxProjects: 1,
-            maxUsers: 1,
-            maxChatbots: 0,
-            maxBrands: 0,
-            maxCmsConnections: 0,
-            visibilityEnabled: false,
-            aiTipsEnabled: false,
-            apiAccessEnabled: false,
-            whiteLabelEnabled: false,
-            canTransferProjects: false
+        features: {
+            interviewAI: 'base',
+            chatbot: false,
+            visibilityTracker: false,
+            aiTips: false,
+            copilotStrategico: false,
+            whiteLabel: false,
+            apiAccess: false,
+            cmsIntegrations: false,
+            exportPdf: 'watermark',
+            exportCsv: false,
+            analytics: 'base',
+            canTransferProjects: false,
+            maxProjects: 1
         },
-        features: [
-            '20 interviste/mese',
+        featureList: [
+            '500K crediti/mese',
+            'Interview AI base',
             '1 progetto',
             'Analytics base',
             'Export PDF (watermark)'
         ]
     },
 
+    [PlanType.TRIAL]: {
+        id: PlanType.TRIAL,
+        name: 'Trial',
+        description: 'Prova gratuita 14 giorni',
+        monthlyCredits: 2_000_000,
+        monthlyPrice: 0,
+        yearlyPrice: 0,
+        yearlyMonthlyEquivalent: 0,
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: true,
+            aiTips: true,
+            copilotStrategico: true,
+            whiteLabel: false,
+            apiAccess: false,
+            cmsIntegrations: false,
+            exportPdf: 'watermark',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: false,
+            maxProjects: -1
+        },
+        featureList: [
+            '2M crediti per 14 giorni',
+            'Tutte le funzionalità PRO',
+            'Progetti illimitati',
+            'Prova gratuita completa'
+        ]
+    },
+
     [PlanType.STARTER]: {
         id: PlanType.STARTER,
         name: 'Starter',
-        description: 'Per team piccoli',
+        description: 'Per iniziare',
+        monthlyCredits: 6_000_000,
         monthlyPrice: 69,
         yearlyPrice: 588,
         yearlyMonthlyEquivalent: 49,
         stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER,
         stripePriceIdYearly: process.env.STRIPE_PRICE_STARTER_YEARLY,
-        limits: {
-            monthlyTokenBudget: 4_000_000,
-            maxInterviewsPerMonth: 100,
-            maxChatbotSessionsPerMonth: 500,
-            maxVisibilityQueriesPerMonth: 0,
-            maxAiSuggestionsPerMonth: 0,
-            maxProjects: 3,
-            maxUsers: 2,
-            maxChatbots: 1,
-            maxBrands: 0,
-            maxCmsConnections: 0,
-            visibilityEnabled: false,
-            aiTipsEnabled: false,
-            apiAccessEnabled: false,
-            whiteLabelEnabled: false,
-            canTransferProjects: false
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: false,
+            aiTips: false,
+            copilotStrategico: false,
+            whiteLabel: false,
+            apiAccess: false,
+            cmsIntegrations: false,
+            exportPdf: 'clean',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: false,
+            maxProjects: -1
         },
-        features: [
-            '100 interviste/mese',
-            '1 chatbot (500 sessioni)',
-            '3 progetti',
-            '2 utenti',
+        featureList: [
+            '6M crediti/mese',
+            'Interview AI completo',
+            'Chatbot illimitati',
+            'Progetti illimitati',
             'Analytics completi',
-            'Export PDF/CSV'
+            'Export PDF/CSV puliti'
         ]
     },
 
     [PlanType.PRO]: {
         id: PlanType.PRO,
         name: 'Pro',
-        description: 'Per team in crescita',
+        description: 'Per professionisti',
+        monthlyCredits: 20_000_000,
         monthlyPrice: 199,
         yearlyPrice: 1788,
         yearlyMonthlyEquivalent: 149,
         stripePriceIdMonthly: process.env.STRIPE_PRICE_PRO,
         stripePriceIdYearly: process.env.STRIPE_PRICE_PRO_YEARLY,
         popular: true,
-        limits: {
-            monthlyTokenBudget: 25_000_000,
-            maxInterviewsPerMonth: 400,
-            maxChatbotSessionsPerMonth: 4000,
-            maxVisibilityQueriesPerMonth: 800,
-            maxAiSuggestionsPerMonth: 25,
-            maxProjects: 10,
-            maxUsers: 5,
-            maxChatbots: 3,
-            maxBrands: 3,
-            maxCmsConnections: 1,
-            visibilityEnabled: true,
-            aiTipsEnabled: true,
-            apiAccessEnabled: false,
-            whiteLabelEnabled: false,
-            canTransferProjects: false
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: true,
+            aiTips: true,
+            copilotStrategico: true,
+            whiteLabel: false,
+            apiAccess: false,
+            cmsIntegrations: false,
+            exportPdf: 'clean',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: false,
+            maxProjects: -1
         },
-        features: [
-            '400 interviste/mese',
-            '3 chatbot (4.000 sessioni)',
-            'Brand Monitor (3 brand)',
+        featureList: [
+            '20M crediti/mese',
+            'Interview AI completo',
+            'Chatbot illimitati',
+            'Brand Monitor',
             'AI Tips',
-            '10 progetti',
-            '5 utenti'
+            'Copilot Strategico',
+            'Progetti illimitati',
+            'Analytics avanzati'
         ]
     },
 
@@ -192,71 +210,71 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.BUSINESS,
         name: 'Business',
         description: 'Per aziende',
+        monthlyCredits: 50_000_000,
         monthlyPrice: 399,
         yearlyPrice: 3588,
         yearlyMonthlyEquivalent: 299,
         stripePriceIdMonthly: process.env.STRIPE_PRICE_BUSINESS,
         stripePriceIdYearly: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
-        limits: {
-            monthlyTokenBudget: 70_000_000,
-            maxInterviewsPerMonth: 1000,
-            maxChatbotSessionsPerMonth: 12000,
-            maxVisibilityQueriesPerMonth: 4000,
-            maxAiSuggestionsPerMonth: 100,
-            maxProjects: -1, // Illimitati
-            maxUsers: 15,
-            maxChatbots: 10,
-            maxBrands: 10,
-            maxCmsConnections: 5,
-            visibilityEnabled: true,
-            aiTipsEnabled: true,
-            apiAccessEnabled: true,
-            whiteLabelEnabled: true,
-            canTransferProjects: false
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: true,
+            aiTips: true,
+            copilotStrategico: true,
+            whiteLabel: true,
+            apiAccess: true,
+            cmsIntegrations: true,
+            exportPdf: 'clean',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: false,
+            maxProjects: -1
         },
-        features: [
-            '1.000 interviste/mese',
-            '10 chatbot (12.000 sessioni)',
-            'Brand Monitor (10 brand)',
-            'Visibility avanzata',
+        featureList: [
+            '50M crediti/mese',
+            'Tutte le funzionalità PRO',
             'White Label',
             'API Access',
-            'CMS Integrations (5)',
+            'CMS Integrations',
             'Progetti illimitati',
-            '15 utenti'
+            'Supporto prioritario'
         ]
     },
 
     [PlanType.PARTNER]: {
         id: PlanType.PARTNER,
         name: 'Partner',
-        description: 'Piano partner lifetime',
-        monthlyPrice: 0,
-        yearlyPrice: 0,
-        yearlyMonthlyEquivalent: 0,
-        limits: {
-            monthlyTokenBudget: 25_000_000, // Come PRO
-            maxInterviewsPerMonth: 400,
-            maxChatbotSessionsPerMonth: 4000,
-            maxVisibilityQueriesPerMonth: 800,
-            maxAiSuggestionsPerMonth: 25,
-            maxProjects: -1, // ILLIMITATI
-            maxUsers: 10,
-            maxChatbots: 5,
-            maxBrands: 5,
-            maxCmsConnections: 2,
-            visibilityEnabled: true,
-            aiTipsEnabled: true,
-            apiAccessEnabled: false,
-            whiteLabelEnabled: false,
-            canTransferProjects: true // PUÒ TRASFERIRE PROGETTI
+        description: 'Per agenzie e consulenti',
+        monthlyCredits: 10_000_000,
+        monthlyPrice: 29, // €0 con 3+ clienti attivi
+        yearlyPrice: 348,
+        yearlyMonthlyEquivalent: 29,
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: true,
+            aiTips: true,
+            copilotStrategico: true,
+            whiteLabel: 'conditional', // Con 10+ clienti
+            apiAccess: false,
+            cmsIntegrations: false,
+            exportPdf: 'clean',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: true,
+            maxProjects: -1,
+            multiClientDashboard: true,
+            customLogoReports: true
         },
-        features: [
-            'Tutte le funzioni PRO',
-            'Brand Monitor (5 brand)',
-            'Progetti illimitati',
+        featureList: [
+            '10M crediti/mese',
+            'Tutte le funzionalità PRO',
             'Trasferimento progetti',
-            'Gratuito lifetime'
+            'Dashboard multi-cliente',
+            'Report con logo personalizzato',
+            '€0/mese con 3+ clienti',
+            'White Label con 10+ clienti'
         ]
     },
 
@@ -264,71 +282,139 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.ADMIN,
         name: 'Admin',
         description: 'Staff Voler.ai',
+        monthlyCredits: -1, // Illimitato
         monthlyPrice: 0,
         yearlyPrice: 0,
         yearlyMonthlyEquivalent: 0,
-        limits: {
-            monthlyTokenBudget: -1,
-            maxInterviewsPerMonth: -1,
-            maxChatbotSessionsPerMonth: -1,
-            maxVisibilityQueriesPerMonth: -1,
-            maxAiSuggestionsPerMonth: -1,
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: true,
+            aiTips: true,
+            copilotStrategico: true,
+            whiteLabel: true,
+            apiAccess: true,
+            cmsIntegrations: true,
+            exportPdf: 'clean',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: true,
             maxProjects: -1,
-            maxUsers: -1,
-            maxChatbots: -1,
-            maxBrands: -1,
-            maxCmsConnections: -1,
-            visibilityEnabled: true,
-            aiTipsEnabled: true,
-            apiAccessEnabled: true,
-            whiteLabelEnabled: true,
-            canTransferProjects: true
+            multiClientDashboard: true,
+            customLogoReports: true
         },
-        features: ['Tutto illimitato']
-    },
-
-    [PlanType.ENTERPRISE]: {
-        id: PlanType.ENTERPRISE,
-        name: 'Enterprise',
-        description: 'Soluzioni personalizzate',
-        monthlyPrice: 0, // Custom
-        yearlyPrice: 0,
-        yearlyMonthlyEquivalent: 0,
-        limits: {
-            monthlyTokenBudget: -1,
-            maxInterviewsPerMonth: -1,
-            maxChatbotSessionsPerMonth: -1,
-            maxVisibilityQueriesPerMonth: -1,
-            maxAiSuggestionsPerMonth: -1,
-            maxProjects: -1,
-            maxUsers: -1,
-            maxChatbots: -1,
-            maxBrands: -1,
-            maxCmsConnections: -1,
-            visibilityEnabled: true,
-            aiTipsEnabled: true,
-            apiAccessEnabled: true,
-            whiteLabelEnabled: true,
-            canTransferProjects: true
-        },
-        features: [
-            'Tutto illimitato',
-            'SSO / SAML',
-            'SLA garantito',
-            'Account manager dedicato'
-        ]
+        featureList: ['Tutto illimitato']
     }
 };
 
-// Helper
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+/**
+ * Verifica se un valore è illimitato (-1)
+ */
 export function isUnlimited(value: number): boolean {
     return value === -1;
 }
 
+/**
+ * Ottiene la configurazione del piano per tier
+ */
 export function getPlanByTier(tier: string): PlanConfig {
     return PLANS[tier as PlanType] || PLANS[PlanType.FREE];
 }
 
+/**
+ * Converte tier string a PlanType enum
+ */
 export function subscriptionTierToPlanType(tier: string): PlanType {
-    return tier as PlanType;
+    const upperTier = tier?.toUpperCase();
+    if (upperTier && upperTier in PlanType) {
+        return upperTier as PlanType;
+    }
+    return PlanType.FREE;
 }
+
+/**
+ * Verifica se una feature è disponibile per un piano
+ */
+export function isFeatureAvailable(plan: PlanType, feature: keyof PlanFeatures): boolean {
+    const config = PLANS[plan];
+    if (!config) return false;
+
+    const value = config.features[feature];
+    if (typeof value === 'boolean') return value;
+    if (value === 'conditional') return true; // Disponibile con condizioni
+    if (value === 'base' || value === 'full') return true;
+    return false;
+}
+
+/**
+ * Verifica se l'utente ha accesso a una feature specifica
+ * Considera anche condizioni speciali (es. partner con X clienti)
+ */
+export function hasFeatureAccess(
+    plan: PlanType,
+    feature: keyof PlanFeatures,
+    context?: { partnerActiveClients?: number }
+): boolean {
+    const config = PLANS[plan];
+    if (!config) return false;
+
+    const value = config.features[feature];
+
+    // White label per partner è condizionale
+    if (feature === 'whiteLabel' && value === 'conditional') {
+        return (context?.partnerActiveClients ?? 0) >= 10;
+    }
+
+    if (typeof value === 'boolean') return value;
+    if (value === 'base' || value === 'full') return true;
+    return false;
+}
+
+/**
+ * Ottiene i crediti mensili formattati per visualizzazione
+ */
+export function formatMonthlyCredits(credits: number): string {
+    if (credits === -1) return 'Illimitati';
+    if (credits >= 1_000_000) {
+        return `${(credits / 1_000_000).toFixed(0)}M`;
+    }
+    if (credits >= 1_000) {
+        return `${(credits / 1_000).toFixed(0)}K`;
+    }
+    return credits.toString();
+}
+
+/**
+ * Lista piani ordinati per prezzo (per UI comparativa)
+ */
+export const PLAN_ORDER: PlanType[] = [
+    PlanType.FREE,
+    PlanType.STARTER,
+    PlanType.PRO,
+    PlanType.BUSINESS
+];
+
+/**
+ * Piani disponibili per l'acquisto
+ */
+export const PURCHASABLE_PLANS: PlanType[] = [
+    PlanType.STARTER,
+    PlanType.PRO,
+    PlanType.BUSINESS
+];
+
+// ============================================
+// PARTNER CONSTANTS
+// ============================================
+
+export const PARTNER_THRESHOLDS = {
+    freeThreshold: 3,      // 3+ clienti = €0/mese
+    whiteLabelThreshold: 10, // 10+ clienti = white label
+    trialDays: 60,         // 60 giorni trial gratuito
+    baseMonthlyFee: 29,    // €29/mese base (< 3 clienti)
+    gracePeriodDays: 30    // 30 giorni grace period
+} as const;

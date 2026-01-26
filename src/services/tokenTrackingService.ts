@@ -1,12 +1,270 @@
 import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType, isUnlimited } from '@/config/plans';
 import { TokenCategory } from '@prisma/client';
+import { CreditService } from './creditService';
+import { CreditAction, getCreditCost } from '@/config/creditCosts';
 
+/**
+ * TokenTrackingService
+ *
+ * Gestisce il tracking dei token AI e integra con il nuovo sistema crediti.
+ *
+ * Nel nuovo sistema:
+ * - I crediti sono l'unico limite (non più limiti separati per interviste, chatbot, etc.)
+ * - I crediti sono per utente, non per organizzazione
+ * - I token consumati vengono mappati a crediti
+ * - Il TokenLog viene mantenuto per analytics dettagliate
+ */
 export class TokenTrackingService {
     /**
-     * Registra il consumo di token e aggiorna i contatori della subscription
+     * Mappa categorie token a azioni crediti
+     */
+    private static categoryToAction: Record<string, CreditAction> = {
+        INTERVIEW: 'interview_question',
+        CHATBOT: 'chatbot_session_message',
+        VISIBILITY: 'visibility_query',
+        SUGGESTION: 'ai_tip_generation',
+        COPILOT: 'copilot_message',
+        SYSTEM: 'interview_question' // Default
+    };
+
+    /**
+     * Registra il consumo di token e scala i crediti dall'utente
+     *
+     * @param params - Parametri del consumo
+     * @returns Risultato con stato crediti
      */
     static async logTokenUsage(params: {
+        userId: string;              // Owner dei crediti
+        organizationId?: string;     // Per backward compatibility
+        projectId?: string;          // Progetto associato
+        executedById?: string;       // Chi ha eseguito (se diverso da owner)
+        inputTokens: number;
+        outputTokens: number;
+        category: TokenCategory;
+        model: string;
+        operation: string;
+        resourceType?: string;
+        resourceId?: string;
+    }) {
+        const {
+            userId,
+            organizationId,
+            projectId,
+            executedById,
+            inputTokens,
+            outputTokens,
+            category,
+            model,
+            operation,
+            resourceType,
+            resourceId
+        } = params;
+
+        const totalTokens = inputTokens + outputTokens;
+
+        // 1. Determina l'azione crediti dalla categoria
+        const action = this.categoryToAction[category] || 'interview_question';
+
+        // 2. Calcola crediti da consumare
+        // Usiamo i token effettivi come base per il consumo
+        // Il costo base dell'azione viene usato come minimo
+        const baseCost = getCreditCost(action);
+        const tokenBasedCost = Math.ceil(totalTokens * 0.5); // 0.5 crediti per token
+        const creditsToConsume = Math.max(baseCost, tokenBasedCost);
+
+        // 3. Consuma i crediti dall'utente owner
+        const creditResult = await CreditService.consumeCredits(userId, action, {
+            projectId,
+            executedById,
+            description: `${operation} - ${model}`,
+            customAmount: creditsToConsume,
+            metadata: {
+                inputTokens,
+                outputTokens,
+                totalTokens,
+                model,
+                category,
+                resourceType,
+                resourceId
+            }
+        });
+
+        // 4. Log dettagliato per analytics (manteniamo per backward compatibility)
+        if (organizationId) {
+            await prisma.tokenLog.create({
+                data: {
+                    organizationId,
+                    userId,
+                    inputTokens,
+                    outputTokens,
+                    totalTokens,
+                    category,
+                    model,
+                    operation,
+                    resourceType,
+                    resourceId
+                }
+            });
+        }
+
+        return {
+            success: creditResult.success,
+            creditsUsed: creditResult.creditsUsed,
+            creditsRemaining: creditResult.creditsRemaining,
+            warningLevel: creditResult.warningLevel,
+            error: creditResult.error
+        };
+    }
+
+    /**
+     * Registra l'uso di una risorsa (azione completa come intervista, sessione, etc.)
+     * Questa funzione consuma i crediti per l'intera azione
+     */
+    static async logResourceUsage(params: {
+        userId: string;
+        projectId?: string;
+        type: 'INTERVIEW_COMPLETE' | 'INTERVIEW_ANALYSIS' | 'CHATBOT_SESSION_COMPLETE' | 'VISIBILITY_REPORT' | 'AI_TIP' | 'COPILOT_ANALYSIS' | 'EXPORT_PDF' | 'EXPORT_CSV';
+    }) {
+        const { userId, projectId, type } = params;
+
+        // Mappa tipo a azione crediti
+        const actionMap: Record<string, CreditAction> = {
+            INTERVIEW_COMPLETE: 'interview_complete',
+            INTERVIEW_ANALYSIS: 'interview_analysis',
+            CHATBOT_SESSION_COMPLETE: 'chatbot_session_complete',
+            VISIBILITY_REPORT: 'visibility_report',
+            AI_TIP: 'ai_tip_generation',
+            COPILOT_ANALYSIS: 'copilot_analysis',
+            EXPORT_PDF: 'export_pdf_analysis',
+            EXPORT_CSV: 'export_csv'
+        };
+
+        const action = actionMap[type];
+        if (!action) {
+            console.warn(`Unknown resource type: ${type}`);
+            return { success: false, error: 'Tipo risorsa non riconosciuto' };
+        }
+
+        return await CreditService.consumeCredits(userId, action, {
+            projectId,
+            description: `Azione completata: ${type}`
+        });
+    }
+
+    /**
+     * Verifica se l'utente può usare una risorsa (ha crediti sufficienti)
+     */
+    static async checkCanUseResource(params: {
+        userId: string;
+        action: CreditAction;
+        customAmount?: number;
+    }): Promise<{ allowed: boolean; reason?: string; creditsNeeded?: number; creditsAvailable?: number }> {
+        const { userId, action, customAmount } = params;
+
+        // Verifica piano utente
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                plan: true,
+                monthlyCreditsLimit: true,
+                monthlyCreditsUsed: true,
+                packCreditsAvailable: true
+            }
+        });
+
+        if (!user) {
+            return { allowed: false, reason: 'Utente non trovato' };
+        }
+
+        // Piano ADMIN ha crediti illimitati
+        if (user.monthlyCreditsLimit === BigInt(-1)) {
+            return { allowed: true };
+        }
+
+        // Verifica feature disponibile per il piano
+        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+        const featureCheck = this.checkFeatureForAction(action, plan);
+        if (!featureCheck.allowed) {
+            return featureCheck;
+        }
+
+        // Calcola crediti necessari
+        const creditsNeeded = customAmount || getCreditCost(action);
+        const monthlyRemaining = Number(user.monthlyCreditsLimit) - Number(user.monthlyCreditsUsed);
+        const creditsAvailable = monthlyRemaining + Number(user.packCreditsAvailable);
+
+        if (creditsAvailable < creditsNeeded) {
+            return {
+                allowed: false,
+                reason: 'Crediti insufficienti',
+                creditsNeeded,
+                creditsAvailable
+            };
+        }
+
+        return { allowed: true, creditsNeeded, creditsAvailable };
+    }
+
+    /**
+     * Verifica se la feature è disponibile per il piano dell'utente
+     */
+    private static checkFeatureForAction(action: CreditAction, plan: typeof PLANS[PlanType]): { allowed: boolean; reason?: string } {
+        const featureMap: Record<string, keyof typeof plan.features> = {
+            interview_question: 'interviewAI',
+            interview_complete: 'interviewAI',
+            interview_analysis: 'interviewAI',
+            chatbot_session_message: 'chatbot',
+            chatbot_session_complete: 'chatbot',
+            visibility_query: 'visibilityTracker',
+            visibility_report: 'visibilityTracker',
+            ai_tip_generation: 'aiTips',
+            copilot_message: 'copilotStrategico',
+            copilot_analysis: 'copilotStrategico',
+            export_pdf_simple: 'exportPdf',
+            export_pdf_analysis: 'exportPdf',
+            export_csv: 'exportCsv'
+        };
+
+        const featureKey = featureMap[action];
+        if (!featureKey) return { allowed: true };
+
+        const featureValue = plan.features[featureKey];
+
+        // Boolean check
+        if (typeof featureValue === 'boolean' && !featureValue) {
+            return {
+                allowed: false,
+                reason: `Questa funzionalità non è inclusa nel piano ${plan.name}`
+            };
+        }
+
+        return { allowed: true };
+    }
+
+    /**
+     * Ottiene lo stato dei crediti per un utente
+     */
+    static async getCreditsStatus(userId: string) {
+        return await CreditService.getCreditsStatus(userId);
+    }
+
+    /**
+     * Ottiene il consumo per tool nel mese corrente
+     */
+    static async getUsageByTool(userId: string) {
+        return await CreditService.getUsageByTool(userId);
+    }
+
+    // ============================================
+    // BACKWARD COMPATIBILITY - Organization based
+    // ============================================
+
+    /**
+     * @deprecated Usa logTokenUsage con userId invece
+     * Manteniamo per backward compatibility durante la migrazione
+     */
+    static async logTokenUsageLegacy(params: {
         organizationId: string;
         userId?: string;
         inputTokens: number;
@@ -21,7 +279,7 @@ export class TokenTrackingService {
         const totalTokens = inputTokens + outputTokens;
 
         return await prisma.$transaction(async (tx) => {
-            // 1. Crea il log dettagliato
+            // Log dettagliato
             await tx.tokenLog.create({
                 data: {
                     organizationId,
@@ -37,18 +295,17 @@ export class TokenTrackingService {
                 }
             });
 
-            // 2. Aggiorna i contatori nella subscription
+            // Aggiorna contatori subscription (legacy)
             const subscription = await tx.subscription.findUnique({
                 where: { organizationId }
             });
 
             if (!subscription) return;
 
-            const updateData: any = {
+            const updateData: Record<string, unknown> = {
                 tokensUsedThisMonth: { increment: totalTokens }
             };
 
-            // Aggiorna contatore di categoria specifico
             const categoryFieldMap: Record<string, string> = {
                 INTERVIEW: 'interviewTokensUsed',
                 CHATBOT: 'chatbotTokensUsed',
@@ -70,194 +327,81 @@ export class TokenTrackingService {
     }
 
     /**
-     * Registra l'uso di una risorsa (intervista, sessione, ecc.)
-     */
-    static async logResourceUsage(params: {
-        organizationId: string;
-        type: 'INTERVIEW' | 'CHATBOT_SESSION' | 'VISIBILITY_QUERY' | 'AI_SUGGESTION';
-    }) {
-        const { organizationId, type } = params;
-
-        const fieldMap: Record<string, string> = {
-            INTERVIEW: 'interviewsUsedThisMonth',
-            CHATBOT_SESSION: 'chatbotSessionsUsedThisMonth',
-            VISIBILITY_QUERY: 'visibilityQueriesUsedThisMonth',
-            AI_SUGGESTION: 'aiSuggestionsUsedThisMonth'
-        };
-
-        const field = fieldMap[type];
-        if (!field) return;
-
-        return await prisma.subscription.update({
-            where: { organizationId },
-            data: {
-                [field]: { increment: 1 }
-            }
-        });
-    }
-
-    /**
-     * Verifica se l'organizzazione ha risorse disponibili
-     */
-    static async checkCanUseResource(params: {
-        organizationId: string;
-        resourceType: 'TOKENS' | 'INTERVIEW' | 'CHATBOT_SESSION' | 'VISIBILITY_QUERY' | 'AI_SUGGESTION';
-        tokensNeeded?: number;
-    }): Promise<{ allowed: boolean; reason?: string }> {
-        const { organizationId, resourceType, tokensNeeded = 0 } = params;
-
-        const subscription = await prisma.subscription.findUnique({
-            where: { organizationId }
-        });
-
-        if (!subscription) {
-            return { allowed: false, reason: 'Nessun abbonamento trovato.' };
-        }
-
-        if (subscription.status === 'PAST_DUE') {
-            return { allowed: false, reason: 'Pagamento scaduto. Controlla il tuo abbonamento.' };
-        }
-
-        const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
-        const limits = plan.limits;
-
-        // Verifica token
-        if (resourceType === 'TOKENS') {
-            const limit = limits.monthlyTokenBudget;
-            const extra = subscription.extraTokens;
-            const totalAvailable = isUnlimited(limit) ? -1 : limit + extra;
-
-            if (!isUnlimited(totalAvailable) && subscription.tokensUsedThisMonth + tokensNeeded > totalAvailable) {
-                return { allowed: false, reason: 'Budget token esaurito.' };
-            }
-        }
-
-        // Verifica altre risorse
-        const mapping: Record<string, { used: number; limit: number; extra: number }> = {
-            INTERVIEW: {
-                used: subscription.interviewsUsedThisMonth,
-                limit: limits.maxInterviewsPerMonth,
-                extra: subscription.extraInterviews
-            },
-            CHATBOT_SESSION: {
-                used: subscription.chatbotSessionsUsedThisMonth,
-                limit: limits.maxChatbotSessionsPerMonth,
-                extra: subscription.extraChatbotSessions
-            },
-            VISIBILITY_QUERY: {
-                used: subscription.visibilityQueriesUsedThisMonth,
-                limit: limits.maxVisibilityQueriesPerMonth,
-                extra: subscription.extraVisibilityQueries
-            },
-            AI_SUGGESTION: {
-                used: subscription.aiSuggestionsUsedThisMonth,
-                limit: limits.maxAiSuggestionsPerMonth,
-                extra: subscription.extraAiSuggestions
-            }
-        };
-
-        const res = mapping[resourceType];
-        if (res) {
-            const totalAllowed = isUnlimited(res.limit) ? -1 : res.limit + res.extra;
-            if (!isUnlimited(totalAllowed) && res.used >= totalAllowed) {
-                return { allowed: false, reason: `Limite ${resourceType.toLowerCase()} raggiunto.` };
-            }
-        }
-
-        return { allowed: true };
-    }
-
-    /**
      * Ottiene statistiche globali della piattaforma (per admin)
      */
     static async getGlobalStats() {
         const [
+            totalUsers,
             totalOrganizations,
-            totalTokensUsed,
-            totalInterviews,
-            totalChatbotSessions,
-            recentLogs
+            totalCreditsUsed,
+            recentTransactions
         ] = await Promise.all([
+            prisma.user.count(),
             prisma.organization.count(),
-            prisma.subscription.aggregate({ _sum: { tokensUsedThisMonth: true } }),
-            prisma.subscription.aggregate({ _sum: { interviewsUsedThisMonth: true } }),
-            prisma.subscription.aggregate({ _sum: { chatbotSessionsUsedThisMonth: true } }),
-            prisma.tokenLog.findMany({
+            prisma.user.aggregate({
+                _sum: { monthlyCreditsUsed: true }
+            }),
+            prisma.creditTransaction.findMany({
                 take: 50,
                 orderBy: { createdAt: 'desc' },
-                include: { organization: { select: { name: true } } }
+                where: { type: 'usage' },
+                include: {
+                    user: { select: { name: true, email: true } },
+                    project: { select: { name: true } }
+                }
             })
         ]);
 
-        const organizations = await prisma.organization.findMany({
-            include: { subscription: true }
+        // Stats per piano
+        const byPlan = await prisma.user.groupBy({
+            by: ['plan'],
+            _count: { id: true }
         });
 
-        const byTier: Record<string, number> = {};
-        organizations.forEach(org => {
-            const tier = org.subscription?.tier || 'FREE';
-            byTier[tier] = (byTier[tier] || 0) + 1;
+        const planStats: Record<string, number> = {};
+        byPlan.forEach(p => {
+            planStats[p.plan || 'FREE'] = p._count.id;
         });
 
         return {
+            totalUsers,
             totalOrganizations,
-            totalTokensUsed: totalTokensUsed._sum.tokensUsedThisMonth || 0,
-            totalInterviews: totalInterviews._sum.interviewsUsedThisMonth || 0,
-            totalChatbotSessions: totalChatbotSessions._sum.chatbotSessionsUsedThisMonth || 0,
-            byTier,
-            recentLogs
+            totalCreditsUsed: Number(totalCreditsUsed._sum.monthlyCreditsUsed || 0),
+            byPlan: planStats,
+            recentTransactions: recentTransactions.map(t => ({
+                id: t.id,
+                user: t.user?.name || t.user?.email || 'Unknown',
+                project: t.project?.name || null,
+                amount: Number(t.amount),
+                tool: t.tool,
+                action: t.action,
+                createdAt: t.createdAt
+            }))
         };
     }
 
     /**
-     * Ottiene statistiche di utilizzo per una specifica organizzazione
+     * Ottiene statistiche di utilizzo crediti per un utente
      */
-    static async getUsageStats(organizationId: string) {
-        const sub = await prisma.subscription.findUnique({
-            where: { organizationId }
-        });
+    static async getUserStats(userId: string) {
+        const status = await CreditService.getCreditsStatus(userId);
+        const usageByTool = await CreditService.getUsageByTool(userId);
 
-        if (!sub) return null;
-
-        const plan = PLANS[sub.tier as PlanType] || PLANS[PlanType.FREE];
+        if (!status) return null;
 
         return {
-            tokens: {
-                used: sub.tokensUsedThisMonth,
-                limit: plan.limits.monthlyTokenBudget,
-                extra: sub.extraTokens
+            credits: {
+                limit: Number(status.monthlyLimit),
+                used: Number(status.monthlyUsed),
+                remaining: Number(status.monthlyRemaining),
+                pack: Number(status.packCredits),
+                total: Number(status.totalAvailable),
+                percentage: status.usagePercentage,
+                warningLevel: status.warningLevel,
+                resetDate: status.resetDate,
+                isUnlimited: status.isUnlimited
             },
-            interviews: {
-                used: sub.interviewsUsedThisMonth,
-                limit: plan.limits.maxInterviewsPerMonth,
-                extra: sub.extraInterviews
-            },
-            chatbot: {
-                used: sub.chatbotSessionsUsedThisMonth,
-                limit: plan.limits.maxChatbotSessionsPerMonth,
-                extra: sub.extraChatbotSessions
-            }
+            byTool: usageByTool
         };
-    }
-
-    /**
-     * Resetta i contatori mensili (per admin o webhook)
-     */
-    static async resetMonthlyCounters(organizationId: string) {
-        return await prisma.subscription.update({
-            where: { organizationId },
-            data: {
-                tokensUsedThisMonth: 0,
-                interviewsUsedThisMonth: 0,
-                chatbotSessionsUsedThisMonth: 0,
-                visibilityQueriesUsedThisMonth: 0,
-                aiSuggestionsUsedThisMonth: 0,
-                interviewTokensUsed: 0,
-                chatbotTokensUsed: 0,
-                visibilityTokensUsed: 0,
-                suggestionTokensUsed: 0,
-                systemTokensUsed: 0
-            }
-        });
     }
 }

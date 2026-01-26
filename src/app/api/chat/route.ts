@@ -961,11 +961,14 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         let responseText = result.object.response;
         console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
 
-        // Track token usage
+        // Track token usage - NUOVO: usa userId (owner del progetto) per il sistema crediti
         const organizationId = (bot as any).project?.organization?.id;
-        if (organizationId && result.usage) {
+        const projectOwnerId = (bot as any).project?.ownerId;
+        if (projectOwnerId && result.usage) {
             TokenTrackingService.logTokenUsage({
+                userId: projectOwnerId,
                 organizationId,
+                projectId: (bot as any).project?.id,
                 inputTokens: result.usage.inputTokens || 0,
                 outputTokens: result.usage.outputTokens || 0,
                 category: 'INTERVIEW',

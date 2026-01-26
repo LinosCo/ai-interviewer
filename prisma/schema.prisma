@@ -20,8 +20,28 @@ model User {
   platformAnthropicApiKey String?
   role                    UserRole             @default(USER)
   customApiKeys           Json?
+
+  // Piano e crediti
+  plan                    UserPlanType         @default(FREE)
+  monthlyCreditsLimit     BigInt               @default(500000)
+  monthlyCreditsUsed      BigInt               @default(0)
+  creditsResetDate        DateTime?
+  packCreditsAvailable    BigInt               @default(0)
+
+  // Partner
+  isPartner               Boolean              @default(false)
+  partnerStatus           String?              // trial, active, suspended
+  partnerTrialEndDate     DateTime?
+  partnerFee              Int?
+  partnerActiveClients    Int                  @default(0)
+  partnerWhiteLabel       Boolean              @default(false)
+  partnerGracePeriodStart DateTime?
+  partnerCustomLogo       String?
+
   accounts                Account[]
   copilotSessions         CopilotSession[]
+  creditPacks             CreditPack[]
+  creditTransactions      CreditTransaction[]
   memberships             Membership[]
   passwordResetTokens     PasswordResetToken[]
   platformSettings        PlatformSettings?
@@ -240,13 +260,22 @@ model Project {
   isPersonal           Boolean               @default(false)
   strategicVision      String?
   valueProposition     String?
+
+  // Partner tracking
+  originPartnerId      String?
+  transferredToUserId  String?
+  transferredAt        DateTime?
+
   bots                 Bot[]
   cmsConnection        CMSConnection?
   copilotSessions      CopilotSession[]
+  creditTransactions   CreditTransaction[]
   crossChannelInsights CrossChannelInsight[]
   organization         Organization?         @relation(fields: [organizationId], references: [id])
   owner                User?                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   accessList           ProjectAccess[]
+  projectTransfersFrom ProjectTransfer[]     @relation("OriginalProject")
+  projectTransfersTo   ProjectTransfer[]     @relation("DuplicatedProject")
   visibilityConfigs    VisibilityConfig[]
 }
 
@@ -951,6 +980,80 @@ model CopilotSession {
   @@index([organizationId])
 }
 
+// ============================================
+// SISTEMA CREDITI
+// ============================================
+
+model CreditTransaction {
+  id            String   @id @default(cuid())
+  userId        String
+  projectId     String?
+  executedById  String?  // chi ha eseguito l'azione (può essere collaboratore)
+  amount        BigInt   // crediti consumati
+  balanceAfter  BigInt   // saldo dopo transazione
+  type          String   // usage, monthly_reset, pack_purchase, adjustment
+  tool          String?  // interview, chatbot, visibility, copilot, tips, export
+  action        String?  // azione specifica
+  description   String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([projectId])
+  @@index([type])
+}
+
+model CreditPack {
+  id                String   @id @default(cuid())
+  userId            String
+  packType          String   // small, medium, large
+  creditsPurchased  BigInt
+  creditsRemaining  BigInt
+  pricePaid         Decimal  @db.Decimal(10, 2)
+  stripePaymentId   String?
+  purchasedAt       DateTime @default(now())
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================
+// SISTEMA PARTNER
+// ============================================
+
+model ProjectTransferInvite {
+  id          String   @id @default(cuid())
+  projectId   String
+  partnerId   String
+  clientEmail String
+  token       String   @unique
+  status      String   @default("pending") // pending, accepted, expired
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([token])
+  @@index([partnerId])
+}
+
+model ProjectTransfer {
+  id                  String   @id @default(cuid())
+  originalProjectId   String
+  duplicatedProjectId String
+  partnerId           String
+  clientId            String
+  transferredAt       DateTime @default(now())
+
+  originalProject     Project  @relation("OriginalProject", fields: [originalProjectId], references: [id])
+  duplicatedProject   Project  @relation("DuplicatedProject", fields: [duplicatedProjectId], references: [id])
+
+  @@index([partnerId])
+  @@index([clientId])
+}
+
 enum ProjectRole {
   OWNER
   MEMBER
@@ -981,10 +1084,22 @@ enum UserRole {
 }
 
 enum PlanType {
+  FREE
   TRIAL
   STARTER
   PRO
   BUSINESS
+  PARTNER
+}
+
+enum UserPlanType {
+  FREE
+  TRIAL
+  STARTER
+  PRO
+  BUSINESS
+  PARTNER
+  ADMIN
 }
 
 enum BillingCycle {

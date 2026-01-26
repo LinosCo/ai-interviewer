@@ -1,9 +1,11 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { PLANS, PlanType } from '@/config/plans';
+import { PLANS, PlanType, formatMonthlyCredits } from '@/config/plans';
+import { CREDIT_PACKS } from '@/config/creditPacks';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import BillingClient from './billing-client';
 import { UsageDashboard } from '@/components/dashboard/UsageDashboard';
+import Link from 'next/link';
 
 export default async function BillingPage() {
     const session = await auth();
@@ -11,7 +13,13 @@ export default async function BillingPage() {
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
-        include: {
+        select: {
+            id: true,
+            plan: true,
+            monthlyCreditsLimit: true,
+            monthlyCreditsUsed: true,
+            packCreditsAvailable: true,
+            creditsResetDate: true,
             memberships: {
                 include: {
                     organization: {
@@ -24,18 +32,23 @@ export default async function BillingPage() {
         }
     });
 
-    if (!user || user.memberships.length === 0) return <div>Organizzazione non trovata.</div>;
+    if (!user) return <div>Utente non trovato.</div>;
 
-    const org = user.memberships[0].organization;
-    const currentPlan = (org.plan as PlanType) || PlanType.TRIAL;
+    const currentPlan = (user.plan as PlanType) || PlanType.FREE;
     const planConfig = PLANS[currentPlan] || PLANS[PlanType.FREE];
+
+    // Calculate credits info
+    const monthlyLimit = Number(user.monthlyCreditsLimit);
+    const monthlyUsed = Number(user.monthlyCreditsUsed);
+    const packAvailable = Number(user.packCreditsAvailable);
+    const isUnlimited = monthlyLimit === -1;
 
     return (
         <div className="pb-10">
             <div className="mb-10">
                 <h1 className="text-3xl font-bold text-stone-900 mb-2">Abbonamento</h1>
                 <p className="text-stone-600">
-                    Gestisci il tuo piano, i pagamenti e la fatturazione.
+                    Gestisci il tuo piano, i crediti e la fatturazione.
                 </p>
             </div>
 
@@ -54,31 +67,83 @@ export default async function BillingPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8 mt-4">
-                        <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Interviste/Mese</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxInterviewsPerMonth === -1 ? 'Illimitate' : planConfig.limits.maxInterviewsPerMonth}</p>
+                    {/* Credits Summary */}
+                    <div className="bg-gradient-to-br from-amber-50 to-stone-50 rounded-2xl p-6 mb-8 border border-amber-100/50">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Icons.Sparkles size={20} className="text-amber-500" />
+                            <h3 className="font-bold text-stone-900">Crediti AI</h3>
                         </div>
-                        <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Chatbot</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxChatbots === -1 ? 'Illimitati' : planConfig.limits.maxChatbots}</p>
-                        </div>
-                        <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Utenti</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxUsers === -1 ? 'Illimitati' : planConfig.limits.maxUsers}</p>
-                        </div>
-                        <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Brand Monitor</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxBrands === -1 ? 'Illimitati' : planConfig.limits.maxBrands === 0 ? 'Non incluso' : planConfig.limits.maxBrands}</p>
-                        </div>
-                        <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">CMS Connections</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxCmsConnections === -1 ? 'Illimitate' : planConfig.limits.maxCmsConnections === 0 ? 'Non incluso' : planConfig.limits.maxCmsConnections}</p>
-                        </div>
-                        <div className="p-4 bg-stone-50 rounded-2xl">
-                            <p className="text-xs text-stone-400 font-bold uppercase mb-1">Progetti</p>
-                            <p className="text-xl font-bold text-stone-900">{planConfig.limits.maxProjects === -1 ? 'Illimitati' : planConfig.limits.maxProjects}</p>
-                        </div>
+
+                        {isUnlimited ? (
+                            <div className="text-center py-4">
+                                <p className="text-3xl font-black text-amber-600">Illimitati</p>
+                                <p className="text-sm text-stone-500 mt-1">Nessun limite di utilizzo</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="text-center p-3 bg-white rounded-xl">
+                                    <p className="text-xs text-stone-400 font-bold uppercase mb-1">Limite Mensile</p>
+                                    <p className="text-xl font-bold text-stone-900">
+                                        {formatMonthlyCredits(monthlyLimit)}
+                                    </p>
+                                </div>
+                                <div className="text-center p-3 bg-white rounded-xl">
+                                    <p className="text-xs text-stone-400 font-bold uppercase mb-1">Utilizzati</p>
+                                    <p className="text-xl font-bold text-stone-900">
+                                        {formatMonthlyCredits(monthlyUsed)}
+                                    </p>
+                                </div>
+                                <div className="text-center p-3 bg-white rounded-xl">
+                                    <p className="text-xs text-stone-400 font-bold uppercase mb-1">Pack Extra</p>
+                                    <p className="text-xl font-bold text-amber-600">
+                                        {packAvailable > 0 ? formatMonthlyCredits(packAvailable) : '-'}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {user.creditsResetDate && !isUnlimited && (
+                            <p className="text-xs text-stone-500 text-center mt-4">
+                                Reset: {new Date(user.creditsResetDate).toLocaleDateString('it-IT', {
+                                    day: 'numeric',
+                                    month: 'long'
+                                })}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Features Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+                        <FeatureItem
+                            label="Interview AI"
+                            value={planConfig.features.interviewAI === 'full' ? 'Completo' : 'Base'}
+                            available={true}
+                        />
+                        <FeatureItem
+                            label="Chatbot"
+                            value={planConfig.features.chatbot ? 'Attivo' : 'Non incluso'}
+                            available={planConfig.features.chatbot}
+                        />
+                        <FeatureItem
+                            label="Brand Monitor"
+                            value={planConfig.features.visibilityTracker ? 'Attivo' : 'Non incluso'}
+                            available={planConfig.features.visibilityTracker}
+                        />
+                        <FeatureItem
+                            label="AI Tips"
+                            value={planConfig.features.aiTips ? 'Attivo' : 'Non incluso'}
+                            available={planConfig.features.aiTips}
+                        />
+                        <FeatureItem
+                            label="Copilot"
+                            value={planConfig.features.copilotStrategico ? 'Attivo' : 'Non incluso'}
+                            available={planConfig.features.copilotStrategico}
+                        />
+                        <FeatureItem
+                            label="White Label"
+                            value={planConfig.features.whiteLabel === true ? 'Attivo' : planConfig.features.whiteLabel === 'conditional' ? 'Condizionale' : 'Non incluso'}
+                            available={planConfig.features.whiteLabel !== false}
+                        />
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-stone-100">
@@ -86,30 +151,69 @@ export default async function BillingPage() {
                     </div>
                 </div>
 
-                {/* Info Card */}
-                <div className="bg-stone-900 text-white rounded-[24px] p-8 flex flex-col">
-                    <h3 className="text-xl font-bold mb-4">Passa al piano superiore</h3>
-                    <p className="text-stone-400 text-sm mb-8 leading-relaxed">
-                        Hai bisogno di più risposte o di rimuovere il watermark? Fai l'upgrade in qualsiasi momento. Gli abbonamenti annuali risparmiano il 25%.
-                    </p>
+                {/* Right Column */}
+                <div className="space-y-6">
+                    {/* Upgrade Card */}
+                    <div className="bg-stone-900 text-white rounded-[24px] p-8 flex flex-col">
+                        <h3 className="text-xl font-bold mb-4">Passa al piano superiore</h3>
+                        <p className="text-stone-400 text-sm mb-8 leading-relaxed">
+                            Hai bisogno di più crediti o di funzionalità avanzate? Fai l'upgrade in qualsiasi momento.
+                        </p>
 
-                    <ul className="space-y-4 flex-grow">
-                        <li className="flex items-start gap-3 text-sm">
-                            <Icons.Check size={18} className="text-amber-500 shrink-0" />
-                            <span>Analytics Avanzate</span>
-                        </li>
-                        <li className="flex items-start gap-3 text-sm">
-                            <Icons.Check size={18} className="text-amber-500 shrink-0" />
-                            <span>Export Dati & Webhooks</span>
-                        </li>
-                        <li className="flex items-start gap-3 text-sm">
-                            <Icons.Check size={18} className="text-amber-500 shrink-0" />
-                            <span>Branding Personalizzato</span>
-                        </li>
-                    </ul>
+                        <ul className="space-y-4 flex-grow">
+                            <li className="flex items-start gap-3 text-sm">
+                                <Icons.Check size={18} className="text-amber-500 shrink-0" />
+                                <span>Più crediti mensili</span>
+                            </li>
+                            <li className="flex items-start gap-3 text-sm">
+                                <Icons.Check size={18} className="text-amber-500 shrink-0" />
+                                <span>Tutte le funzionalità AI</span>
+                            </li>
+                            <li className="flex items-start gap-3 text-sm">
+                                <Icons.Check size={18} className="text-amber-500 shrink-0" />
+                                <span>Export senza watermark</span>
+                            </li>
+                        </ul>
 
-                    <div className="mt-8">
-                        <Icons.Logo size={40} className="opacity-20" />
+                        <Link href="/dashboard/billing/plans" className="mt-8">
+                            <button className="w-full bg-amber-500 text-white font-bold py-4 rounded-xl hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
+                                Vedi tutti i piani <Icons.ArrowRight size={18} />
+                            </button>
+                        </Link>
+                    </div>
+
+                    {/* Credit Packs */}
+                    <div className="bg-white/80 backdrop-blur-md rounded-[24px] p-6 border border-white/50 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Icons.Sparkles size={20} className="text-amber-500" />
+                            <h3 className="font-bold text-stone-900">Pack Crediti</h3>
+                        </div>
+                        <p className="text-sm text-stone-500 mb-4">
+                            Acquista crediti extra che non scadono mai.
+                        </p>
+                        <div className="space-y-3">
+                            {CREDIT_PACKS.map(pack => (
+                                <div key={pack.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-xl">
+                                    <div>
+                                        <p className="font-bold text-stone-900">{pack.name}</p>
+                                        <p className="text-xs text-stone-500">
+                                            {(pack.credits / 1_000_000).toFixed(0)}M crediti
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-amber-600">€{pack.price}</p>
+                                        <p className="text-[10px] text-stone-400">
+                                            €{pack.pricePerMillion.toFixed(2)}/M
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <Link href="/dashboard/billing?tab=packs" className="block mt-4">
+                            <button className="w-full bg-stone-100 text-stone-700 font-bold py-3 rounded-xl hover:bg-stone-200 transition-all text-sm">
+                                Acquista pack
+                            </button>
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -118,6 +222,17 @@ export default async function BillingPage() {
             <div className="mt-8">
                 <UsageDashboard />
             </div>
+        </div>
+    );
+}
+
+function FeatureItem({ label, value, available }: { label: string; value: string; available: boolean }) {
+    return (
+        <div className={`p-4 rounded-2xl ${available ? 'bg-stone-50' : 'bg-stone-50/50'}`}>
+            <p className="text-xs text-stone-400 font-bold uppercase mb-1">{label}</p>
+            <p className={`text-lg font-bold ${available ? 'text-stone-900' : 'text-stone-300'}`}>
+                {value}
+            </p>
         </div>
     );
 }

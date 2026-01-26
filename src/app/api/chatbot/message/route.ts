@@ -106,11 +106,14 @@ export async function POST(req: Request) {
                 prompt: message
             });
 
-            // Track extraction tokens
+            // Track extraction tokens - NUOVO: usa userId (owner del progetto) per sistema crediti
             const organizationId = bot.project?.organizationId;
-            if (organizationId && extraction.usage) {
+            const projectOwnerId = bot.project?.ownerId;
+            if (projectOwnerId && extraction.usage) {
                 TokenTrackingService.logTokenUsage({
+                    userId: projectOwnerId,
                     organizationId,
+                    projectId: bot.project?.id,
                     inputTokens: extraction.usage.inputTokens || 0,
                     outputTokens: extraction.usage.outputTokens || 0,
                     category: 'CHATBOT',
@@ -226,12 +229,15 @@ export async function POST(req: Request) {
 
         finalResponse = result.object.response;
 
-        // Track response tokens
+        // Track response tokens - NUOVO: usa userId (owner del progetto) per sistema crediti
         const responseTokens = result.usage?.totalTokens || 0;
         const orgId = bot.project?.organizationId;
-        if (orgId && result.usage) {
+        const ownerId = bot.project?.ownerId;
+        if (ownerId && result.usage) {
             TokenTrackingService.logTokenUsage({
+                userId: ownerId,
                 organizationId: orgId,
+                projectId: bot.project?.id,
                 inputTokens: result.usage.inputTokens || 0,
                 outputTokens: result.usage.outputTokens || 0,
                 category: 'CHATBOT',

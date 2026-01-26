@@ -48,12 +48,12 @@ export default async function BrandsListPage() {
     const brands = org.visibilityConfigs;
     const subscription = org.subscription;
 
-    // Get plan limits
+    // With credit-based system, brand monitor is unlimited when available
+    // The limit is only in credits consumed, not number of brands
     const planType = subscription ? subscriptionTierToPlanType(subscription.tier) : PlanType.TRIAL;
     const plan = PLANS[planType];
-    const maxBrands = plan.limits.maxBrands;
-    const isUnlimited = maxBrands === -1;
-    const canAddMore = isUnlimited || brands.length < maxBrands;
+    const hasVisibility = plan.features.visibilityTracker;
+    const canAddMore = hasVisibility; // Can add more if feature is available
 
     return (
         <div className="space-y-8 p-6 max-w-6xl mx-auto">
@@ -67,7 +67,7 @@ export default async function BrandsListPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <Badge variant="outline" className="text-sm py-1 px-3">
-                        {brands.length} {isUnlimited ? 'brand' : `/ ${maxBrands} brand`}
+                        {brands.length} brand configurati
                     </Badge>
                     {canAddMore ? (
                         <Link href="/dashboard/visibility/create">
@@ -203,7 +203,7 @@ export default async function BrandsListPage() {
                                     </div>
                                     <p className="font-medium text-gray-900">Aggiungi Brand</p>
                                     <p className="text-xs text-gray-500 mt-1">
-                                        {isUnlimited ? 'Slot illimitati' : `${maxBrands - brands.length} slot disponibili`}
+                                        Monitoraggio illimitato
                                     </p>
                                 </CardContent>
                             </Card>
@@ -218,19 +218,17 @@ export default async function BrandsListPage() {
                     <div>
                         <h3 className="font-semibold text-gray-900">Piano {planType}</h3>
                         <p className="text-sm text-gray-600">
-                            {maxBrands === 0
-                                ? 'Il brand monitoring non è incluso nel tuo piano'
-                                : isUnlimited
-                                    ? 'Puoi monitorare brand illimitati con il tuo piano'
-                                    : `Puoi monitorare fino a ${maxBrands} brand con il tuo piano attuale`
+                            {hasVisibility
+                                ? 'Brand Monitor illimitato - ogni scansione consuma crediti AI'
+                                : 'Il Brand Monitor non è incluso nel tuo piano'
                             }
                         </p>
                     </div>
-                    {!isUnlimited && maxBrands < 5 && (
+                    {!hasVisibility && (
                         <Link href="/dashboard/billing/plans">
                             <Button variant="outline" className="gap-2">
                                 <Zap className="w-4 h-4" />
-                                Vedi piani
+                                Upgrade piano
                             </Button>
                         </Link>
                     )}

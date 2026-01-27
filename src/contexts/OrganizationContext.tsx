@@ -17,6 +17,7 @@ interface OrganizationContextType {
     setCurrentOrganization: (org: Organization | null) => void;
     loading: boolean;
     refetchOrganizations: () => Promise<void>;
+    isAdmin: boolean;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
@@ -86,7 +87,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             currentOrganization,
             setCurrentOrganization,
             loading,
-            refetchOrganizations
+            refetchOrganizations,
+            isAdmin: (session?.user as any)?.role === 'ADMIN'
         }}>
             {children}
         </OrganizationContext.Provider>

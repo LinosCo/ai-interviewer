@@ -202,12 +202,17 @@ export const PartnerService = {
         const attributions = await prisma.partnerClientAttribution.findMany({
             where: { partnerId: userId },
             include: {
-                clientOrganization: {
+                clientUser: {
                     include: {
-                        _count: { select: { projects: true } },
-                        members: {
+                        memberships: {
                             where: { role: 'OWNER' },
-                            include: { user: { select: { email: true } } }
+                            include: {
+                                organization: {
+                                    include: {
+                                        _count: { select: { projects: true } }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -215,16 +220,16 @@ export const PartnerService = {
         });
 
         return attributions.map(attr => {
-            const org = attr.clientOrganization;
-            const ownerEmail = org?.members[0]?.user?.email || '';
+            const clientUser = attr.clientUser;
+            const org = clientUser?.memberships[0]?.organization;
 
             return {
                 id: org?.id || '',
                 name: org?.name || 'Sconosciuto',
-                email: ownerEmail,
+                email: clientUser?.email || '',
                 projectsCount: org?._count.projects || 0,
                 totalCreditsUsed: Number(org?.monthlyCreditsUsed || 0),
-                createdAt: org?.createdAt || new Date(),
+                createdAt: org?.createdAt || attr.attributedAt,
                 status: 'active'
             };
         });
@@ -376,23 +381,24 @@ export const PartnerService = {
             await tx.projectTransfer.create({
                 data: {
                     originalProjectId: invite.projectId,
+                    originalOrgId: originalProject.organizationId || '',
                     duplicatedProjectId: duplicatedProject.id,
+                    targetOrgId: targetOrganizationId,
                     partnerId: invite.partnerId,
-                    clientId: acceptingUserId, // Utente che ha accettato
-                    targetOrganizationId: targetOrganizationId
+                    clientUserId: acceptingUserId, // Utente che ha accettato
                 }
             });
 
-            // Crea attribuzione partner -> organizzazione SE non esiste già
+            // Crea attribuzione partner -> utente SE non esiste già
             const existingAttribution = await tx.partnerClientAttribution.findUnique({
-                where: { clientOrganizationId: targetOrganizationId }
+                where: { clientUserId: acceptingUserId }
             });
 
             if (!existingAttribution) {
                 await tx.partnerClientAttribution.create({
                     data: {
                         partnerId: invite.partnerId,
-                        clientOrganizationId: targetOrganizationId,
+                        clientUserId: acceptingUserId,
                         firstProjectId: duplicatedProject.id,
                         status: 'active'
                     }
@@ -415,15 +421,31 @@ export const PartnerService = {
     async refreshPartnerActiveClientsCount(partnerId: string, tx?: any): Promise<number> {
         const db = tx || prisma;
 
-        const activeCount = await db.partnerClientAttribution.count({
+        const attributions = await db.partnerClientAttribution.findMany({
             where: {
                 partnerId: partnerId,
-                status: 'active',
-                clientOrganization: {
-                    plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
+                status: 'active'
+            },
+            include: {
+                clientUser: {
+                    include: {
+                        memberships: {
+                            where: { role: 'OWNER' },
+                            include: {
+                                organization: {
+                                    select: { plan: true }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         });
+
+        const activeCount = attributions.filter((attr: any) => {
+            const memberships = attr.clientUser?.memberships || [];
+            return memberships.some((m: any) => ['STARTER', 'PRO', 'BUSINESS'].includes(m.organization.plan));
+        }).length;
 
         await db.user.update({
             where: { id: partnerId },
@@ -437,15 +459,31 @@ export const PartnerService = {
      * Conta i clienti attivi del partner
      */
     async getActiveClientsCount(partnerId: string): Promise<number> {
-        return await prisma.partnerClientAttribution.count({
+        const attributions = await prisma.partnerClientAttribution.findMany({
             where: {
                 partnerId: partnerId,
-                status: 'active',
-                clientOrganization: {
-                    plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
+                status: 'active'
+            },
+            include: {
+                clientUser: {
+                    include: {
+                        memberships: {
+                            where: { role: 'OWNER' },
+                            include: {
+                                organization: {
+                                    select: { plan: true }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         });
+
+        return attributions.filter((attr: any) => {
+            const memberships = attr.clientUser?.memberships || [];
+            return memberships.some((m: any) => ['STARTER', 'PRO', 'BUSINESS'].includes(m.organization.plan));
+        }).length;
     },
 
     /**
@@ -479,11 +517,9 @@ export const PartnerService = {
                 newStatus = 'active';
                 newFee = 0;
             } else {
-                // Avvia grace period se non è già attivo
-                if (user.partnerStatus !== 'grace_period') {
-                    newStatus = 'grace_period';
-                    gracePeriodStart = now;
-                }
+                // Avvia grace period
+                newStatus = 'grace_period';
+                gracePeriodStart = now;
             }
         }
 
@@ -517,12 +553,17 @@ export const PartnerService = {
             prisma.partnerClientAttribution.findMany({
                 where: { partnerId, status: 'active' },
                 include: {
-                    clientOrganization: {
+                    clientUser: {
                         include: {
-                            _count: { select: { projects: true } },
-                            members: {
+                            memberships: {
                                 where: { role: 'OWNER' },
-                                include: { user: { select: { email: true, name: true } } }
+                                include: {
+                                    organization: {
+                                        include: {
+                                            _count: { select: { projects: true } }
+                                        }
+                                    }
+                                }
                             }
                         }
                     },
@@ -539,8 +580,8 @@ export const PartnerService = {
         ]);
 
         const clients: PartnerClientDetailed[] = attributions.map(attr => {
-            const org = attr.clientOrganization;
-            const owner = org?.members[0]?.user;
+            const clientUser = attr.clientUser;
+            const org = clientUser?.memberships[0]?.organization;
             const plan = org?.plan || 'FREE';
             const isActive = ['STARTER', 'PRO', 'BUSINESS'].includes(plan);
 
@@ -548,7 +589,7 @@ export const PartnerService = {
                 attributionId: attr.id,
                 organizationId: org?.id || '',
                 organizationName: org?.name || 'Sconosciuto',
-                ownerEmail: owner?.email || '',
+                ownerEmail: clientUser?.email || '',
                 plan,
                 subscriptionStatus: org?.subscriptionStatus || null,
                 isActive,

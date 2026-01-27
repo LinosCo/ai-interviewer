@@ -166,7 +166,7 @@ export default async function CreditsSettingsPage() {
                             {CREDIT_PACKS.map(pack => (
                                 <div key={pack.id} className="flex justify-between text-sm">
                                     <span className="text-stone-600">{formatCredits(pack.credits)}</span>
-                                    <span className="font-medium text-stone-900">{pack.price}EUR</span>
+                                    <span className="font-medium text-stone-900">€{pack.price}</span>
                                 </div>
                             ))}
                         </div>

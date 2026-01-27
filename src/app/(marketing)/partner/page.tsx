@@ -254,7 +254,7 @@ export default function PartnerPage() {
 
                             <div className="mb-8">
                                 <div className="flex items-baseline gap-2 mb-2">
-                                    <span className="text-5xl font-bold">EUR0</span>
+                                    <span className="text-5xl font-bold">€0</span>
                                     <span className="text-stone-400">/mese</span>
                                 </div>
                                 <p className="text-stone-400">con {PARTNER_PLAN.freeThreshold}+ clienti attivi</p>

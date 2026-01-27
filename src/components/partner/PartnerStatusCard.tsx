@@ -120,7 +120,7 @@ export function PartnerStatusCard({
                         {monthlyFee === 0 ? (
                             <span className="text-green-600">GRATIS</span>
                         ) : (
-                            <span>{monthlyFee}EUR/mese</span>
+                            <span>{monthlyFee}€/mese</span>
                         )}
                     </p>
                 </div>

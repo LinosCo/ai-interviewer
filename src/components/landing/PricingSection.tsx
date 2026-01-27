@@ -85,8 +85,8 @@ export function PricingSection() {
 
                             <div
                                 className={`h-full bg-[hsl(var(--card))] rounded-2xl p-6 border shadow-soft hover:shadow-medium transition-all flex flex-col ${plan.popular
-                                        ? 'border-[hsl(var(--coral))] shadow-glow'
-                                        : 'border-[hsl(var(--border)/0.5)]'
+                                    ? 'border-[hsl(var(--coral))] shadow-glow'
+                                    : 'border-[hsl(var(--border)/0.5)]'
                                     }`}
                             >
                                 <div className="mb-6">
@@ -102,12 +102,12 @@ export function PricingSection() {
                                     {plan.showPrice ? (
                                         <>
                                             <span className="text-4xl font-bold">
-                                                EUR{isYearly ? plan.yearlyPrice : plan.monthlyPrice}
+                                                €{isYearly ? plan.yearlyPrice : plan.monthlyPrice}
                                             </span>
                                             <span className="text-[hsl(var(--muted-foreground))]">/mese</span>
                                             {isYearly && plan.monthlyPrice !== 0 && (
                                                 <span className="text-sm text-[hsl(var(--muted-foreground))] line-through ml-2">
-                                                    EUR{plan.monthlyPrice}
+                                                    €{plan.monthlyPrice}
                                                 </span>
                                             )}
                                         </>
@@ -132,8 +132,8 @@ export function PricingSection() {
                                 <Link
                                     href={plan.ctaHref}
                                     className={`block w-full text-center py-3 rounded-xl font-semibold transition-all mt-8 ${plan.popular
-                                            ? 'gradient-bg shadow-glow text-white hover:opacity-90'
-                                            : 'bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:bg-[hsl(var(--secondary)/0.8)]'
+                                        ? 'gradient-bg shadow-glow text-white hover:opacity-90'
+                                        : 'bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:bg-[hsl(var(--secondary)/0.8)]'
                                         }`}
                                 >
                                     {plan.cta}
@@ -179,8 +179,8 @@ export function PricingSection() {
                             <div
                                 key={pack.id}
                                 className={`relative bg-[hsl(var(--card))] rounded-xl p-5 border transition-all hover:shadow-medium ${pack.popular
-                                        ? 'border-amber-300 shadow-md'
-                                        : 'border-[hsl(var(--border)/0.5)]'
+                                    ? 'border-amber-300 shadow-md'
+                                    : 'border-[hsl(var(--border)/0.5)]'
                                     }`}
                             >
                                 {pack.popular && (
@@ -195,9 +195,9 @@ export function PricingSection() {
                                 </p>
                                 <p className="text-sm text-[hsl(var(--muted-foreground))] mb-3">crediti</p>
                                 <div className="flex items-baseline gap-1">
-                                    <span className="text-2xl font-bold">{pack.price}EUR</span>
+                                    <span className="text-2xl font-bold">€{pack.price}</span>
                                     <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                                        ({pack.pricePerMillion}EUR/M)
+                                        (€{pack.pricePerMillion}/M)
                                     </span>
                                 </div>
                             </div>
@@ -259,7 +259,7 @@ export function PricingSection() {
                                 <div className="bg-white rounded-xl shadow-lg p-6 w-64">
                                     <p className="text-sm text-[hsl(var(--muted-foreground))] mb-2">A partire da</p>
                                     <div className="flex items-baseline gap-1 mb-4">
-                                        <span className="text-4xl font-bold">EUR0</span>
+                                        <span className="text-4xl font-bold">€0</span>
                                         <span className="text-[hsl(var(--muted-foreground))]">/mese</span>
                                     </div>
                                     <p className="text-xs text-[hsl(var(--muted-foreground))]">
@@ -267,7 +267,7 @@ export function PricingSection() {
                                     </p>
                                     <div className="border-t border-stone-200 mt-4 pt-4">
                                         <p className="text-xs text-stone-500">
-                                            Altrimenti {PARTNER_PLAN.basePrice}EUR/mese
+                                            Altrimenti {PARTNER_PLAN.basePrice}€/mese
                                         </p>
                                     </div>
                                 </div>

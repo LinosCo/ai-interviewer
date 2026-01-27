@@ -18,10 +18,7 @@ async function main() {
     // Commenting out seed users to prevent overwrite on deploy.
     const user = await prisma.user.upsert({
         where: { email },
-        update: {
-            password,
-            role: 'ADMIN',
-        },
+        update: {}, // Don't overwrite existing admin data
         create: {
             email,
             name: 'Admin User',
@@ -33,10 +30,7 @@ async function main() {
 
     const socialUser = await prisma.user.upsert({
         where: { email: socialEmail },
-        update: {
-            password,
-            role: 'ADMIN',
-        },
+        update: {}, // Don't overwrite existing user data
         create: {
             email: socialEmail,
             name: 'Linos Admin',

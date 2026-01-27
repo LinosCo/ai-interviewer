@@ -44,13 +44,43 @@ export function shouldShowApiKeySettings(userRole: UserRole): boolean {
 }
 
 /**
- * Sanitize user data for non-admin users
- * Removes customApiKeys field from response
+ * Convert BigInt values to numbers for JSON serialization
  */
-export function sanitizeUserData(user: Partial<User>, requestingUserRole: UserRole): Partial<User> {
-    if (requestingUserRole !== UserRole.ADMIN) {
-        const { customApiKeys: _, ...sanitized } = user;
-        return sanitized;
+function serializeBigInt(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+
+    if (typeof obj === 'bigint') {
+        return Number(obj);
     }
-    return user;
+
+    if (Array.isArray(obj)) {
+        return obj.map(serializeBigInt);
+    }
+
+    if (typeof obj === 'object') {
+        const result: any = {};
+        for (const key in obj) {
+            result[key] = serializeBigInt(obj[key]);
+        }
+        return result;
+    }
+
+    return obj;
+}
+
+/**
+ * Sanitize user data for non-admin users
+ * Removes customApiKeys field from response and converts BigInt to number
+ */
+export function sanitizeUserData(user: any, requestingUserRole: UserRole): any {
+    let sanitized = user;
+
+    // Remove API keys for non-admin users
+    if (requestingUserRole !== UserRole.ADMIN) {
+        const { customApiKeys: _, ...rest } = user;
+        sanitized = rest;
+    }
+
+    // Convert BigInt values to numbers for JSON serialization
+    return serializeBigInt(sanitized);
 }

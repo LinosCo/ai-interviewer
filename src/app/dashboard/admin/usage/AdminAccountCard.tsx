@@ -197,7 +197,6 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                             <option value="PRO">PRO</option>
                             <option value="BUSINESS">BUSINESS</option>
                             <option value="PARTNER">PARTNER</option>
-                            <option value="ADMIN">ADMIN</option>
                         </select>
                     ) : (
                         <span className={`px-2 py-1 rounded text-xs font-bold ${planColors[sub?.tier || 'FREE'] || 'bg-gray-100 text-gray-800'}`}>
@@ -423,7 +422,7 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                         {/* Plan Limits Info */}
                         <div className="bg-blue-50 rounded-lg p-4">
                             <h4 className="font-medium text-blue-900 mb-2">Limiti Piano {sub?.tier || 'FREE'}</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                                 <div>
                                     <p className="text-xs text-blue-600">Token/Mese</p>
                                     <p className="font-bold text-blue-900">
@@ -440,12 +439,6 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                                     <p className="text-xs text-blue-600">Sessioni Chatbot</p>
                                     <p className="font-bold text-blue-900">
                                         {limits.maxChatbotSessionsPerMonth === -1 ? '∞' : formatNumber(limits.maxChatbotSessionsPerMonth)}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-blue-600">Max Utenti</p>
-                                    <p className="font-bold text-blue-900">
-                                        {limits.maxUsers === -1 ? '∞' : limits.maxUsers}
                                     </p>
                                 </div>
                             </div>

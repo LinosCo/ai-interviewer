@@ -7,6 +7,7 @@ import { Sparkles, ArrowRight, LayoutTemplate, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Footer } from '@/components/Footer';
 import { Icons } from '@/components/ui/business-tuner/Icons';
+import { FluidBackground } from '@/components/landing/FluidBackground';
 
 const examplePrompts = [
     'B2B: Vorrei capire perché i miei clienti SaaS non rinnovano il contratto dopo il primo anno',
@@ -50,13 +51,8 @@ function OnboardingPageContent() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-amber-100 font-sans relative overflow-hidden flex flex-col">
-            {/* Decorative Background Elements */}
-            <div className="fixed inset-0 pointer-events-none">
-                <div className="absolute -top-1/4 left-1/2 -translate-x-1/2 w-[80vw] h-[50vh] bg-gradient-radial from-orange-100/40 to-transparent rounded-full blur-3xl" />
-                <div className="absolute top-1/4 right-0 w-[60vw] h-[40vh] bg-gradient-radial from-rose-100/25 to-transparent rounded-full blur-3xl" />
-                <div className="absolute bottom-1/4 left-0 w-[50vw] h-[30vh] bg-gradient-radial from-purple-100/20 to-transparent rounded-full blur-3xl" />
-            </div>
+        <div className="min-h-screen font-sans relative overflow-hidden flex flex-col">
+            <FluidBackground />
 
             {/* Dashboard-style Header */}
             <header className="px-6 py-4 border-b border-black/5 bg-white/60 backdrop-blur-md flex justify-between items-center relative z-20">
@@ -75,9 +71,13 @@ function OnboardingPageContent() {
                 </Button>
             </header>
 
+            {/* Transition from header */}
+            <div className="h-16 section-fade-from-transparent relative z-10" />
+
             {/* Main Content */}
             <main className="flex-1 flex items-center justify-center p-6 md:p-12 relative z-10">
-                <div className="max-w-3xl w-full">
+                <div className="absolute inset-0 bg-white/85" />
+                <div className="max-w-3xl w-full relative z-10">
                     {!showTemplates ? (
                         <div className="flex flex-col gap-8">
                             {/* Title */}
@@ -217,6 +217,9 @@ function OnboardingPageContent() {
                     )}
                 </div>
             </main>
+
+            {/* Transition to footer */}
+            <div className="h-16 section-fade-to-transparent relative z-10" />
 
             <Footer />
         </div>

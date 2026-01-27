@@ -20,12 +20,11 @@ import { FluidBackground } from '@/components/landing/FluidBackground';
 
 export default function PartnerPage() {
     return (
-        <main className="relative">
+        <main className="relative min-h-screen overflow-x-hidden">
             <FluidBackground />
 
             {/* Hero Section */}
             <section className="relative pt-24 pb-16 md:pt-32 md:pb-24">
-                <div className="absolute inset-0 bg-gradient-to-b from-amber-50/50 to-transparent" />
                 <div className="max-w-7xl mx-auto px-6 relative z-10">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -64,9 +63,12 @@ export default function PartnerPage() {
                 </div>
             </section>
 
+            {/* Transition: Hero → Key Benefits (white) */}
+            <div className="h-24 section-fade-from-transparent" />
+
             {/* Key Benefits */}
             <section className="py-16 md:py-24 relative">
-                <div className="absolute inset-0 bg-white/85" />
+                <div className="absolute inset-0 bg-white/90" />
                 <div className="max-w-7xl mx-auto px-6 relative z-10">
                     <div className="grid md:grid-cols-3 gap-8">
                         <motion.div
@@ -126,9 +128,11 @@ export default function PartnerPage() {
                 </div>
             </section>
 
+            {/* Transition: Key Benefits (white) → How it Works (transparent) */}
+            <div className="h-24 section-fade-to-transparent" />
+
             {/* How it Works */}
             <section id="come-funziona" className="py-16 md:py-24 relative">
-                <div className="absolute inset-0 bg-stone-50/80" />
                 <div className="max-w-7xl mx-auto px-6 relative z-10">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -197,9 +201,12 @@ export default function PartnerPage() {
                 </div>
             </section>
 
+            {/* Transition: How it Works (transparent) → Features List (white) */}
+            <div className="h-24 section-fade-from-transparent" />
+
             {/* Features List */}
             <section className="py-16 md:py-24 relative">
-                <div className="absolute inset-0 bg-white/85" />
+                <div className="absolute inset-0 bg-white/90" />
                 <div className="max-w-7xl mx-auto px-6 relative z-10">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <motion.div
@@ -287,9 +294,11 @@ export default function PartnerPage() {
                 </div>
             </section>
 
+            {/* Transition: Features List (white) → FAQ (transparent) */}
+            <div className="h-24 section-fade-to-transparent" />
+
             {/* FAQ */}
             <section className="py-16 md:py-24 relative">
-                <div className="absolute inset-0 bg-stone-50/80" />
                 <div className="max-w-3xl mx-auto px-6 relative z-10">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}

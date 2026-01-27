@@ -1,4 +1,7 @@
-import { colors } from '@/lib/design-system';
+'use client';
+
+import { motion } from 'framer-motion';
+import { FluidBackground } from '@/components/landing/FluidBackground';
 
 const faqs = [
     {
@@ -65,23 +68,60 @@ const faqs = [
 
 export default function FAQPage() {
     return (
-        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '4rem 2rem' }}>
-            <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold mb-4" style={{ color: colors.text }}>Domande frequenti</h1>
-                <p className="text-xl text-gray-500">Tutto quello che devi sapere su Business Tuner</p>
-            </div>
+        <div className="min-h-screen relative overflow-x-hidden">
+            <FluidBackground />
 
-            <div className="space-y-6">
-                {faqs.map((faq, index) => (
-                    <div
-                        key={index}
-                        className="bg-white rounded-2xl p-6 border border-stone-200 shadow-sm hover:shadow-md transition-shadow"
-                    >
-                        <h3 className="text-lg font-bold mb-2" style={{ color: colors.text }}>{faq.question}</h3>
-                        <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
+            <main className="relative">
+                {/* Hero Section */}
+                <section className="pt-24 pb-12 md:pt-32 md:pb-16 relative">
+                    <div className="max-w-4xl mx-auto px-6 text-center">
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6 }}
+                        >
+                            <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">
+                                Domande <span className="gradient-text">Frequenti</span>
+                            </h1>
+                            <p className="text-xl text-[hsl(var(--muted-foreground))]">
+                                Tutto quello che devi sapere su Business Tuner
+                            </p>
+                        </motion.div>
                     </div>
-                ))}
-            </div>
+                </section>
+
+                {/* Transition: Hero → FAQ Content */}
+                <div className="h-24 section-fade-from-transparent" />
+
+                {/* FAQ Content */}
+                <section className="pb-24 relative">
+                    <div className="absolute inset-0 bg-white/85" />
+                    <div className="max-w-3xl mx-auto px-6 relative z-10">
+                        <div className="space-y-4">
+                            {faqs.map((faq, index) => (
+                                <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ delay: index * 0.03 }}
+                                    className="bg-white rounded-2xl p-6 border border-stone-200 shadow-sm hover:shadow-md transition-shadow"
+                                >
+                                    <h3 className="text-lg font-bold mb-2 text-[hsl(var(--foreground))]">
+                                        {faq.question}
+                                    </h3>
+                                    <p className="text-[hsl(var(--muted-foreground))] leading-relaxed">
+                                        {faq.answer}
+                                    </p>
+                                </motion.div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* Transition: FAQ → Footer */}
+                <div className="h-24 section-fade-to-transparent" />
+            </main>
         </div>
     );
 }

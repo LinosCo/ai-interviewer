@@ -27,16 +27,12 @@ export default async function PartnerDashboardPage() {
     });
 
     // Get pending invites
-    const pendingInvites = await prisma.projectTransferInvite.findMany({
+    const pendingInvitesCount = await prisma.projectTransferInvite.count({
         where: {
             partnerId: session.user.id,
             status: 'pending',
             expiresAt: { gt: new Date() }
-        },
-        include: {
-            projectId: false
-        },
-        orderBy: { createdAt: 'desc' }
+        }
     });
 
     return (
@@ -44,7 +40,7 @@ export default async function PartnerDashboardPage() {
             partnerStatus={partnerStatus}
             clientsData={clientsData}
             projects={projects}
-            pendingInvitesCount={pendingInvites.length}
+            pendingInvitesCount={pendingInvitesCount}
         />
     );
 }

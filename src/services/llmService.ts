@@ -10,14 +10,41 @@ export type ModelProvider = 'openai' | 'anthropic';
 // Cache for methodology file - loaded once at startup
 let methodologyCache: string | null = null;
 
+// Cache for GlobalConfig - TTL 5 minutes
+let globalConfigCache: GlobalConfig | null = null;
+let globalConfigCacheTime: number = 0;
+const GLOBAL_CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 export class LLMService {
+    /**
+     * Get GlobalConfig with caching (5 min TTL)
+     */
+    static async getGlobalConfig(): Promise<GlobalConfig | null> {
+        const now = Date.now();
+        if (globalConfigCache && (now - globalConfigCacheTime) < GLOBAL_CONFIG_CACHE_TTL) {
+            return globalConfigCache;
+        }
+
+        globalConfigCache = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        globalConfigCacheTime = now;
+        return globalConfigCache;
+    }
+
+    /**
+     * Invalidate GlobalConfig cache (call after admin updates config)
+     */
+    static invalidateGlobalConfigCache(): void {
+        globalConfigCache = null;
+        globalConfigCacheTime = 0;
+    }
+
     static async getApiKey(bot: Bot, provider: ModelProvider): Promise<string | null> {
         // 1. Bot specific key
         if (provider === 'openai' && bot.openaiApiKey) return bot.openaiApiKey;
         if (provider === 'anthropic' && bot.anthropicApiKey) return bot.anthropicApiKey;
 
-        // 2. Global / Env key (Admin managed)
-        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        // 2. Global / Env key (Admin managed) - now with cache
+        const globalConfig = await this.getGlobalConfig();
         if (provider === 'openai') {
             return globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || null;
         } else {

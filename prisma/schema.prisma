@@ -378,6 +378,8 @@ model KnowledgeSource {
   content   String
   createdAt DateTime @default(now())
   bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
 }
 
 model TopicBlock {
@@ -430,6 +432,10 @@ model Conversation {
   rewardGrant       RewardGrant?
   answers           StructuredAnswer[]
   themeOccurrences  ThemeOccurrence[]
+
+  @@index([botId])
+  @@index([botId, status])
+  @@index([botId, startedAt])
 }
 
 model ConversationMemory {
@@ -470,6 +476,8 @@ model Message {
   createdAt      DateTime     @default(now())
   metadata       Json?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
 }
 
 model RewardGrant {
@@ -511,6 +519,8 @@ model Theme {
   description String?
   bot         Bot               @relation(fields: [botId], references: [id], onDelete: Cascade)
   occurrences ThemeOccurrence[]
+
+  @@index([botId])
 }
 
 model ThemeOccurrence {
@@ -530,6 +540,8 @@ model Insight {
   content   String
   citations Json?
   bot       Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
 }
 
 model HotIdea {
@@ -537,6 +549,8 @@ model HotIdea {
   botId   String
   content String
   bot     Bot    @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
 }
 
 model Report {
@@ -691,6 +705,9 @@ model KnowledgeGap {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   bot          Bot       @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
+  @@index([botId, status])
 }
 
 model FaqSuggestion {
@@ -703,6 +720,9 @@ model FaqSuggestion {
   status      String   @default("pending")
   createdAt   DateTime @default(now())
   bot         Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
+  @@index([botId, status])
 }
 
 model CrossChannelInsight {

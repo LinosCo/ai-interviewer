@@ -599,70 +599,91 @@ export const PartnerService = {
 
     /**
      * Ottiene lista clienti dettagliata per dashboard partner
+     * OTTIMIZZATO: Usa query parallele invece di include annidati per evitare N+1
      */
     async getPartnerClientsDetailed(partnerId: string): Promise<PartnerClientsSummary> {
-        // 1. Ottieni attribuzioni con dati cliente
-        const attributions = await prisma.partnerClientAttribution.findMany({
-            where: {
-                partnerId,
-                status: 'active'
-            },
-            include: {
-                clientUser: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        plan: true,
-                        memberships: {
-                            take: 1,
-                            include: {
-                                organization: {
-                                    include: {
-                                        subscription: {
-                                            select: { status: true }
-                                        }
-                                    }
-                                }
-                            }
+        // Esegui tutte le query in parallelo
+        const [attributions, projectCounts, pendingInvites] = await Promise.all([
+            // 1. Ottieni attribuzioni con dati cliente (senza include annidati)
+            prisma.partnerClientAttribution.findMany({
+                where: {
+                    partnerId,
+                    status: 'active'
+                },
+                select: {
+                    id: true,
+                    clientUserId: true,
+                    attributedAt: true,
+                    clientUser: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            plan: true
+                        }
+                    },
+                    firstProject: {
+                        select: {
+                            name: true
                         }
                     }
-                },
-                firstProject: {
-                    select: {
-                        id: true,
-                        name: true
-                    }
                 }
-            }
-        });
+            }),
+            // 2. Conta progetti per cliente - singola query aggregata
+            prisma.projectTransfer.groupBy({
+                by: ['clientId'],
+                where: { partnerId },
+                _count: { id: true }
+            }),
+            // 3. Conta inviti pendenti
+            prisma.projectTransferInvite.count({
+                where: {
+                    partnerId,
+                    status: 'pending',
+                    expiresAt: { gt: new Date() }
+                }
+            })
+        ]);
 
-        // 2. Conta progetti per cliente
-        const projectCounts = await prisma.projectTransfer.groupBy({
-            by: ['clientId'],
-            where: {
-                partnerId,
-                clientId: { in: attributions.map(a => a.clientUserId) }
-            },
-            _count: { id: true }
-        });
-
+        // Crea map per lookup veloce
         const projectCountMap = new Map(
             projectCounts.map(p => [p.clientId, p._count.id])
         );
 
-        // 3. Conta inviti pendenti
-        const pendingInvites = await prisma.projectTransferInvite.count({
-            where: {
-                partnerId,
-                status: 'pending',
-                expiresAt: { gt: new Date() }
-            }
-        });
+        // 4. Se ci sono clienti, carica subscription status in batch
+        const clientUserIds = attributions.map(a => a.clientUserId);
+        let subscriptionStatusMap = new Map<string, string | null>();
 
-        // 4. Mappa a formato dettagliato
+        if (clientUserIds.length > 0) {
+            // Singola query per ottenere subscription status di tutti i clienti
+            const membershipsWithSubs = await prisma.membership.findMany({
+                where: {
+                    userId: { in: clientUserIds }
+                },
+                select: {
+                    userId: true,
+                    organization: {
+                        select: {
+                            subscription: {
+                                select: { status: true }
+                            }
+                        }
+                    }
+                },
+                distinct: ['userId']
+            });
+
+            subscriptionStatusMap = new Map(
+                membershipsWithSubs.map(m => [
+                    m.userId,
+                    m.organization?.subscription?.status || null
+                ])
+            );
+        }
+
+        // 5. Mappa a formato dettagliato
         const clients: PartnerClientDetailed[] = attributions.map(attr => {
-            const subscriptionStatus = attr.clientUser.memberships[0]?.organization?.subscription?.status || null;
+            const subscriptionStatus = subscriptionStatusMap.get(attr.clientUserId) || null;
             const plan = attr.clientUser.plan;
             const isActive = ['STARTER', 'PRO', 'BUSINESS'].includes(plan) && subscriptionStatus === 'ACTIVE';
 
@@ -680,7 +701,7 @@ export const PartnerService = {
             };
         });
 
-        // 5. Calcola summary
+        // 6. Calcola summary
         const activeClients = clients.filter(c => c.isActive).length;
 
         return {

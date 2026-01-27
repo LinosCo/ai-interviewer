@@ -407,6 +407,61 @@ export const CreditService = {
     },
 
     /**
+     * Ottiene lo stato dei crediti dell'organizzazione
+     * Alias per backward compatibility con helper che si aspettano getCreditsStatus
+     */
+    async getCreditsStatus(organizationId: string): Promise<OrganizationCreditsStatus | null> {
+        return this.getOrganizationCreditsStatus(organizationId);
+    },
+
+    /**
+     * Ottiene il consumo per tool nel mese corrente per l'organizzazione
+     */
+    async getUsageByTool(organizationId: string): Promise<CreditUsageByTool[]> {
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        // Fetch transactions for the current month
+        const transactions = await prisma.orgCreditTransaction.findMany({
+            where: {
+                organizationId,
+                type: 'usage',
+                createdAt: { gte: firstDayOfMonth }
+            },
+            select: {
+                tool: true,
+                amount: true
+            }
+        });
+
+        if (transactions.length === 0) return [];
+
+        // Group by tool
+        const toolTotals: Record<string, { amount: bigint; count: number }> = {};
+        let totalAmount = BigInt(0);
+
+        transactions.forEach(t => {
+            const tool = t.tool || 'other';
+            if (!toolTotals[tool]) {
+                toolTotals[tool] = { amount: BigInt(0), count: 0 };
+            }
+            toolTotals[tool].amount += t.amount;
+            toolTotals[tool].count += 1;
+            totalAmount += t.amount;
+        });
+
+        // Format result
+        return Object.entries(toolTotals).map(([tool, stats]) => ({
+            tool,
+            creditsUsed: stats.amount,
+            transactionCount: stats.count,
+            percentage: totalAmount > BigInt(0)
+                ? Number((stats.amount * BigInt(100)) / totalAmount)
+                : 0
+        })).sort((a, b) => Number(b.creditsUsed - a.creditsUsed));
+    },
+
+    /**
      * Log transaction nel database (a livello organizzazione)
      */
     async logTransaction(

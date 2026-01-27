@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { PLANS, PlanType, isUnlimited } from '@/config/plans';
-import { TokenCategory } from '@prisma/client';
+import { PLANS, isUnlimited } from '@/config/plans';
+import { TokenCategory, PlanType } from '@prisma/client';
 import { CreditService } from './creditService';
 import { CreditAction, getCreditCost } from '@/config/creditCosts';
 
@@ -29,16 +29,16 @@ export class TokenTrackingService {
     };
 
     /**
-     * Registra il consumo di token e scala i crediti dall'utente
+     * Registra il consumo di token e scala i crediti dall'organizzazione
      *
      * @param params - Parametri del consumo
      * @returns Risultato con stato crediti
      */
     static async logTokenUsage(params: {
-        userId: string;              // Owner dei crediti
-        organizationId?: string;     // Per backward compatibility
-        projectId?: string;          // Progetto associato
-        executedById?: string;       // Chi ha eseguito (se diverso da owner)
+        organizationId: string;      // Organization that owns the credits
+        userId?: string;             // User associated with the action (owner/legacy)
+        projectId?: string;          // Project associated
+        executedById?: string;       // Who executed 
         inputTokens: number;
         outputTokens: number;
         category: TokenCategory;
@@ -48,8 +48,8 @@ export class TokenTrackingService {
         resourceId?: string;
     }) {
         const {
-            userId,
             organizationId,
+            userId,
             projectId,
             executedById,
             inputTokens,
@@ -67,16 +67,14 @@ export class TokenTrackingService {
         const action = this.categoryToAction[category] || 'interview_question';
 
         // 2. Calcola crediti da consumare
-        // Usiamo i token effettivi come base per il consumo
-        // Il costo base dell'azione viene usato come minimo
         const baseCost = getCreditCost(action);
         const tokenBasedCost = Math.ceil(totalTokens * 0.5); // 0.5 crediti per token
         const creditsToConsume = Math.max(baseCost, tokenBasedCost);
 
-        // 3. Consuma i crediti dall'utente owner
-        const creditResult = await CreditService.consumeCredits(userId, action, {
+        // 3. Consuma i crediti dall'organizzazione
+        const creditResult = await CreditService.consumeCredits(organizationId, action, {
             projectId,
-            executedById,
+            executedById: executedById || userId,
             description: `${operation} - ${model}`,
             customAmount: creditsToConsume,
             metadata: {
@@ -90,23 +88,21 @@ export class TokenTrackingService {
             }
         });
 
-        // 4. Log dettagliato per analytics (manteniamo per backward compatibility)
-        if (organizationId) {
-            await prisma.tokenLog.create({
-                data: {
-                    organizationId,
-                    userId,
-                    inputTokens,
-                    outputTokens,
-                    totalTokens,
-                    category,
-                    model,
-                    operation,
-                    resourceType,
-                    resourceId
-                }
-            });
-        }
+        // 4. Log dettagliato per analytics
+        await prisma.tokenLog.create({
+            data: {
+                organizationId,
+                userId: userId || executedById || 'system',
+                inputTokens,
+                outputTokens,
+                totalTokens,
+                category,
+                model,
+                operation,
+                resourceType,
+                resourceId
+            }
+        }).catch(err => console.error('Failed to create tokenLog:', err));
 
         return {
             success: creditResult.success,
@@ -122,11 +118,12 @@ export class TokenTrackingService {
      * Questa funzione consuma i crediti per l'intera azione
      */
     static async logResourceUsage(params: {
-        userId: string;
+        organizationId: string;
+        userId?: string;
         projectId?: string;
         type: 'INTERVIEW_COMPLETE' | 'INTERVIEW_ANALYSIS' | 'CHATBOT_SESSION_COMPLETE' | 'VISIBILITY_REPORT' | 'AI_TIP' | 'COPILOT_ANALYSIS' | 'EXPORT_PDF' | 'EXPORT_CSV';
     }) {
-        const { userId, projectId, type } = params;
+        const { organizationId, userId, projectId, type } = params;
 
         // Mappa tipo a azione crediti
         const actionMap: Record<string, CreditAction> = {
@@ -146,48 +143,45 @@ export class TokenTrackingService {
             return { success: false, error: 'Tipo risorsa non riconosciuto' };
         }
 
-        return await CreditService.consumeCredits(userId, action, {
+        return await CreditService.consumeCredits(organizationId, action, {
             projectId,
+            executedById: userId,
             description: `Azione completata: ${type}`
         });
     }
 
     /**
-     * Verifica se l'utente può usare una risorsa (ha crediti sufficienti)
-     *
-     * Il piano dell'utente (User.plan) determina le feature disponibili.
-     * I crediti sono a livello utente.
+     * Verifica se l'organizzazione può usare una risorsa (ha crediti sufficienti)
      */
     static async checkCanUseResource(params: {
-        userId: string;
+        organizationId: string;
         action: CreditAction;
         customAmount?: number;
     }): Promise<{ allowed: boolean; reason?: string; creditsNeeded?: number; creditsAvailable?: number }> {
-        const { userId, action, customAmount } = params;
+        const { organizationId, action, customAmount } = params;
 
-        // Verifica piano utente
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
+        // Verifica piano organizzazione
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
             select: {
                 plan: true,
-                role: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true
             }
         });
 
-        if (!user) {
-            return { allowed: false, reason: 'Utente non trovato' };
+        if (!org) {
+            return { allowed: false, reason: 'Organizzazione non trovata' };
         }
 
         // Admin role o piano ADMIN hanno accesso illimitato
-        if (user.role === 'ADMIN' || user.plan === 'ADMIN' || user.monthlyCreditsLimit === BigInt(-1)) {
+        if (org.plan === 'ADMIN' || org.monthlyCreditsLimit === BigInt(-1)) {
             return { allowed: true };
         }
 
-        // Verifica feature disponibile per il piano dell'utente
-        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+        // Verifica feature disponibile per il piano
+        const plan = PLANS[org.plan as PlanType] || PLANS[PlanType.FREE];
         const featureCheck = this.checkFeatureForAction(action, plan);
         if (!featureCheck.allowed) {
             return featureCheck;
@@ -195,8 +189,8 @@ export class TokenTrackingService {
 
         // Calcola crediti necessari
         const creditsNeeded = customAmount || getCreditCost(action);
-        const monthlyRemaining = Number(user.monthlyCreditsLimit) - Number(user.monthlyCreditsUsed);
-        const creditsAvailable = monthlyRemaining + Number(user.packCreditsAvailable);
+        const monthlyRemaining = Number(org.monthlyCreditsLimit) - Number(org.monthlyCreditsUsed);
+        const creditsAvailable = monthlyRemaining + Number(org.packCreditsAvailable);
 
         if (creditsAvailable < creditsNeeded) {
             return {
@@ -211,7 +205,7 @@ export class TokenTrackingService {
     }
 
     /**
-     * Verifica se la feature è disponibile per il piano dell'utente
+     * Verifica se la feature è disponibile per il piano
      */
     private static checkFeatureForAction(action: CreditAction, plan: typeof PLANS[PlanType]): { allowed: boolean; reason?: string } {
         const featureMap: Record<string, keyof typeof plan.features> = {
@@ -247,24 +241,24 @@ export class TokenTrackingService {
     }
 
     /**
-     * Ottiene lo stato dei crediti per un utente
+     * Ottiene lo stato dei crediti per un'organizzazione
      */
-    static async getCreditsStatus(userId: string) {
-        return await CreditService.getCreditsStatus(userId);
+    static async getCreditsStatus(organizationId: string) {
+        return await CreditService.getCreditsStatus(organizationId);
     }
 
     /**
-     * Ottiene il consumo per tool nel mese corrente
+     * Ottiene il consumo per tool nel mese corrente per l'organizzazione
      */
-    static async getUsageByTool(userId: string) {
-        return await CreditService.getUsageByTool(userId);
+    static async getUsageByTool(organizationId: string) {
+        return await CreditService.getUsageByTool(organizationId);
     }
-
 
     /**
      * Ottiene statistiche globali della piattaforma (per admin)
      */
     static async getGlobalStats() {
+        // Fetch stats from Organizations now
         const [
             totalUsers,
             totalOrganizations,
@@ -273,29 +267,30 @@ export class TokenTrackingService {
         ] = await Promise.all([
             prisma.user.count(),
             prisma.organization.count(),
-            prisma.user.aggregate({
+            prisma.organization.aggregate({
                 _sum: { monthlyCreditsUsed: true }
             }),
-            prisma.creditTransaction.findMany({
+            prisma.orgCreditTransaction.findMany({
                 take: 50,
                 orderBy: { createdAt: 'desc' },
                 where: { type: 'usage' },
                 include: {
-                    user: { select: { name: true, email: true } },
-                    project: { select: { name: true } }
+                    executedBy: { select: { name: true, email: true } },
+                    project: { select: { name: true } },
+                    organization: { select: { name: true } }
                 }
             })
         ]);
 
-        // Stats per piano
-        const byPlan = await prisma.user.groupBy({
+        // Stats per piano (su Organizzazione)
+        const byPlan = await prisma.organization.groupBy({
             by: ['plan'],
             _count: { id: true }
         });
 
         const planStats: Record<string, number> = {};
         byPlan.forEach(p => {
-            planStats[p.plan || 'FREE'] = p._count.id;
+            planStats[p.plan] = p._count.id;
         });
 
         return {
@@ -303,9 +298,10 @@ export class TokenTrackingService {
             totalOrganizations,
             totalCreditsUsed: Number(totalCreditsUsed._sum.monthlyCreditsUsed || 0),
             byPlan: planStats,
-            recentTransactions: recentTransactions.map(t => ({
+            recentTransactions: recentTransactions.map((t: any) => ({
                 id: t.id,
-                user: t.user?.name || t.user?.email || 'Unknown',
+                user: t.executedBy?.name || t.executedBy?.email || 'System',
+                organization: t.organization?.name || 'Unknown',
                 project: t.project?.name || null,
                 amount: Number(t.amount),
                 tool: t.tool,
@@ -316,11 +312,11 @@ export class TokenTrackingService {
     }
 
     /**
-     * Ottiene statistiche di utilizzo crediti per un utente
+     * Ottiene statistiche di utilizzo crediti per un'organizzazione
      */
-    static async getUserStats(userId: string) {
-        const status = await CreditService.getCreditsStatus(userId);
-        const usageByTool = await CreditService.getUsageByTool(userId);
+    static async getOrganizationStats(organizationId: string) {
+        const status = await CreditService.getCreditsStatus(organizationId);
+        const usageByTool = await CreditService.getUsageByTool(organizationId);
 
         if (!status) return null;
 
@@ -334,7 +330,7 @@ export class TokenTrackingService {
                 percentage: status.usagePercentage,
                 warningLevel: status.warningLevel,
                 resetDate: status.resetDate,
-                isUnlimited: status.isUnlimited
+                isUnlimited: status.monthlyLimit === BigInt(-1)
             },
             byTool: usageByTool
         };

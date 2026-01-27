@@ -128,8 +128,8 @@ Examples of good prompt types:
         // Track credit usage
         if (result.usage) {
             TokenTrackingService.logTokenUsage({
+                organizationId: organizationId || 'unknown',
                 userId: user.id,
-                organizationId,
                 inputTokens: result.usage.inputTokens || 0,
                 outputTokens: result.usage.outputTokens || 0,
                 category: 'VISIBILITY',

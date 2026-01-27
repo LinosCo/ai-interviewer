@@ -36,24 +36,34 @@ export async function checkResourceAccess(
     }
 
     const currentUserId = session.user.id;
-    let ownerId = currentUserId; // Default: utente loggato
+    let organizationId: string | null = null;
 
-    // Se è specificato un projectId, usa il proprietario del progetto
+    // 1. Determina l'organizzazione
     if (options?.projectId) {
         const project = await prisma.project.findUnique({
             where: { id: options.projectId },
-            select: { ownerId: true }
+            select: { organizationId: true }
         });
-
-        if (project?.ownerId) {
-            ownerId = project.ownerId;
-        }
+        organizationId = project?.organizationId || null;
     }
 
-    // Verifica crediti e piano dell'owner
+    // 2. Fallback alla prima organizzazione dell'utente (o quella personale) se manca projectId o orgId
+    if (!organizationId) {
+        const membership = await prisma.membership.findFirst({
+            where: { userId: currentUserId, status: 'ACTIVE' },
+            select: { organizationId: true }
+        });
+        organizationId = membership?.organizationId || null;
+    }
+
+    if (!organizationId) {
+        return { allowed: false, error: 'Nessuna organizzazione trovata per l\'utente', status: 403 };
+    }
+
+    // Verifica crediti e piano dell'organizzazione
     const action = resourceToAction[resourceType] || 'interview_question';
     const check = await TokenTrackingService.checkCanUseResource({
-        userId: ownerId,
+        organizationId,
         action,
         customAmount: tokensNeeded > 0 ? tokensNeeded : undefined
     });
@@ -64,7 +74,7 @@ export async function checkResourceAccess(
             error: check.reason || 'Crediti insufficienti',
             status: 403,
             userId: currentUserId,
-            ownerId,
+            organizationId,
             creditsNeeded: check.creditsNeeded,
             creditsAvailable: check.creditsAvailable
         };
@@ -73,7 +83,7 @@ export async function checkResourceAccess(
     return {
         allowed: true,
         userId: currentUserId,
-        ownerId,
+        organizationId,
         creditsNeeded: check.creditsNeeded,
         creditsAvailable: check.creditsAvailable
     };
@@ -100,7 +110,7 @@ export function withResourceGuard(
         return handler(req, {
             ...args[0],
             userId: access.userId,
-            ownerId: access.ownerId
+            organizationId: access.organizationId
         });
     };
 }
@@ -118,21 +128,31 @@ export async function checkCreditsForAction(
         return { allowed: false, error: 'Unauthorized', status: 401 };
     }
 
-    let ownerId = session.user.id;
+    const currentUserId = session.user.id;
+    let organizationId: string | null = null;
 
-    // Se c'è un projectId, usa l'owner del progetto
     if (projectId) {
         const project = await prisma.project.findUnique({
             where: { id: projectId },
-            select: { ownerId: true }
+            select: { organizationId: true }
         });
-        if (project?.ownerId) {
-            ownerId = project.ownerId;
-        }
+        organizationId = project?.organizationId || null;
+    }
+
+    if (!organizationId) {
+        const membership = await prisma.membership.findFirst({
+            where: { userId: currentUserId, status: 'ACTIVE' },
+            select: { organizationId: true }
+        });
+        organizationId = membership?.organizationId || null;
+    }
+
+    if (!organizationId) {
+        return { allowed: false, error: 'Organizzazione non trovata', status: 403 };
     }
 
     const check = await TokenTrackingService.checkCanUseResource({
-        userId: ownerId,
+        organizationId,
         action,
         customAmount
     });
@@ -142,8 +162,8 @@ export async function checkCreditsForAction(
             allowed: false,
             error: check.reason || 'Crediti insufficienti',
             status: 403,
-            userId: session.user.id,
-            ownerId,
+            userId: currentUserId,
+            organizationId,
             creditsNeeded: check.creditsNeeded,
             creditsAvailable: check.creditsAvailable
         };
@@ -151,8 +171,8 @@ export async function checkCreditsForAction(
 
     return {
         allowed: true,
-        userId: session.user.id,
-        ownerId,
+        userId: currentUserId,
+        organizationId,
         creditsNeeded: check.creditsNeeded,
         creditsAvailable: check.creditsAvailable
     };

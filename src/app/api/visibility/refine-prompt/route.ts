@@ -39,8 +39,16 @@ export async function POST(request: Request) {
         // Get user for credit tracking
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            select: { id: true }
+            select: {
+                id: true,
+                memberships: {
+                    take: 1,
+                    select: { organizationId: true }
+                }
+            }
         });
+
+        const organizationId = user?.memberships[0]?.organizationId;
 
         const body = await request.json();
         const { promptText, brandName, language = 'it', territory = 'IT' } = body;
@@ -87,9 +95,10 @@ Keep the same intent but improve clarity, naturalness, and effectiveness.`;
         });
 
         // Track credit usage
-        if (user && result.usage) {
+        if (result.usage) {
             TokenTrackingService.logTokenUsage({
-                userId: user.id,
+                organizationId: organizationId || 'unknown',
+                userId: user?.id,
                 inputTokens: result.usage.inputTokens || 0,
                 outputTokens: result.usage.outputTokens || 0,
                 category: 'VISIBILITY',

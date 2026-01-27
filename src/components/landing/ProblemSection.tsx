@@ -1,31 +1,42 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { TrendingDown, Clock, DollarSign, ArrowRight, Check, Sparkles } from 'lucide-react';
+import { TrendingDown, Clock, DollarSign, Check, Sparkles, X } from 'lucide-react';
 
-const problems = [
+const comparisons = [
   {
-    icon: DollarSign,
-    title: 'Costi elevati',
-    description: 'Ricerche di mercato tradizionali costano migliaia di euro',
+    problem: {
+      icon: DollarSign,
+      title: 'Costi elevati',
+      description: 'Migliaia di euro per ricerche di mercato',
+    },
+    solution: {
+      title: 'Gratis per sempre',
+      description: 'Interview AI senza costi iniziali',
+    },
   },
   {
-    icon: Clock,
-    title: 'Tempi lunghi',
-    description: 'Settimane o mesi per raccogliere e analizzare i feedback',
+    problem: {
+      icon: Clock,
+      title: 'Tempi lunghi',
+      description: 'Settimane per raccogliere feedback',
+    },
+    solution: {
+      title: 'Insight in tempo reale',
+      description: 'Analisi istantanea delle risposte',
+    },
   },
   {
-    icon: TrendingDown,
-    title: 'Dati frammentati',
-    description: 'Informazioni sparse tra email, survey e CRM diversi',
+    problem: {
+      icon: TrendingDown,
+      title: 'Dati frammentati',
+      description: 'Email, survey e CRM separati',
+    },
+    solution: {
+      title: 'Un\'unica dashboard',
+      description: 'Tutto connesso e organizzato',
+    },
   },
-];
-
-const solutions = [
-  'Interview AI gratis per sempre',
-  'Insight in tempo reale, non in settimane',
-  'Tutto connesso in un\'unica dashboard',
-  'Consigli pratici generati dall\'AI',
 ];
 
 export function ProblemSection() {
@@ -49,103 +60,77 @@ export function ProblemSection() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-stretch relative">
-          {/* Arrow in the middle - desktop only */}
-          <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="w-16 h-16 rounded-full gradient-bg shadow-glow flex items-center justify-center"
-            >
-              <ArrowRight className="w-8 h-8 text-white" />
-            </motion.div>
-          </div>
-
-          {/* Problems */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="space-y-5"
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[hsl(var(--coral)/0.2)] text-[hsl(var(--coral))] text-sm font-medium mb-2">
+        {/* Headers row */}
+        <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 max-w-4xl mx-auto">
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[hsl(var(--coral)/0.2)] text-[hsl(var(--coral))] text-sm font-medium">
               <TrendingDown className="w-4 h-4" />
               Il problema
             </div>
-
-            {problems.map((problem, index) => (
-              <motion.div
-                key={problem.title}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-                className="flex items-start gap-3 p-4 rounded-2xl glass-card transition-all"
-              >
-                <div className="w-10 h-10 rounded-xl bg-[hsl(var(--coral)/0.2)] flex items-center justify-center flex-shrink-0">
-                  <problem.icon className="w-5 h-5 text-[hsl(var(--coral))]" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1 text-[hsl(var(--foreground))]">{problem.title}</h3>
-                  <p className="text-[hsl(var(--muted-foreground))]">{problem.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-
-          {/* Solutions */}
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[hsl(var(--amber)/0.2)] text-[hsl(var(--amber))] text-sm font-medium mb-2">
+          </div>
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[hsl(var(--amber)/0.2)] text-[hsl(var(--amber))] text-sm font-medium">
               <Sparkles className="w-4 h-4" />
               La soluzione
             </div>
-
-            <div className="p-5 sm:p-6 rounded-3xl glass-card">
-              <h3 className="font-display text-2xl font-bold mb-6 text-[hsl(var(--foreground))]">
-                Business Tuner semplifica tutto
-              </h3>
-
-              <ul className="space-y-4">
-                {solutions.map((solution, index) => (
-                  <motion.li
-                    key={solution}
-                    initial={{ opacity: 0, x: 20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="w-6 h-6 rounded-full gradient-bg flex items-center justify-center flex-shrink-0">
-                      <Check className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-medium text-[hsl(var(--foreground))]">{solution}</span>
-                  </motion.li>
-                ))}
-              </ul>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.8 }}
-                className="mt-8 p-4 rounded-xl bg-[hsl(var(--amber)/0.1)] border border-[hsl(var(--amber)/0.2)]"
-              >
-                <p className="text-sm text-[hsl(var(--foreground))]">
-                  <span className="font-semibold">A partire da €0/mese</span>{' '}
-                  — inizia gratis, scala quando cresci
-                </p>
-              </motion.div>
-            </div>
-          </motion.div>
+          </div>
         </div>
+
+        {/* Comparison rows */}
+        <div className="space-y-4 max-w-4xl mx-auto">
+          {comparisons.map((item, index) => (
+            <motion.div
+              key={item.problem.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: index * 0.1 }}
+              className="grid grid-cols-2 gap-4 md:gap-8"
+            >
+              {/* Problem card */}
+              <div className="p-4 rounded-2xl bg-[hsl(var(--coral)/0.05)] border border-[hsl(var(--coral)/0.2)]">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[hsl(var(--coral)/0.2)] flex items-center justify-center flex-shrink-0">
+                    <X className="w-4 h-4 text-[hsl(var(--coral))]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm md:text-base mb-0.5 text-[hsl(var(--foreground))]">{item.problem.title}</h3>
+                    <p className="text-xs md:text-sm text-[hsl(var(--muted-foreground))]">{item.problem.description}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Solution card */}
+              <div className="p-4 rounded-2xl bg-[hsl(var(--amber)/0.05)] border border-[hsl(var(--amber)/0.2)]">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center flex-shrink-0">
+                    <Check className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm md:text-base mb-0.5 text-[hsl(var(--foreground))]">{item.solution.title}</h3>
+                    <p className="text-xs md:text-sm text-[hsl(var(--muted-foreground))]">{item.solution.description}</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* CTA box */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.5 }}
+          className="mt-10 max-w-md mx-auto"
+        >
+          <div className="p-4 rounded-xl bg-[hsl(var(--amber)/0.1)] border border-[hsl(var(--amber)/0.2)] text-center">
+            <p className="text-sm text-[hsl(var(--foreground))]">
+              <span className="font-semibold">A partire da €0/mese</span>{' '}
+              — inizia gratis, scala quando cresci
+            </p>
+          </div>
+        </motion.div>
       </div>
     </section>
   );

@@ -50,6 +50,10 @@ model User {
   reports             Report[]
   rewardGrants        RewardGrant[]
   sessions            Session[]
+
+  // Relazioni attribuzione partner
+  partnerAttributions     PartnerClientAttribution[] @relation("PartnerAttributions")
+  clientAttribution       PartnerClientAttribution?  @relation("ClientAttribution")
 }
 
 model ProjectAccess {
@@ -280,6 +284,9 @@ model Project {
   projectTransfersFrom ProjectTransfer[]     @relation("OriginalProject")
   projectTransfersTo   ProjectTransfer[]     @relation("DuplicatedProject")
   visibilityConfigs    VisibilityConfig[]
+
+  // Relazione attribuzione partner
+  firstAttributions    PartnerClientAttribution[] @relation("FirstAttributionProject")
 }
 
 model Bot {
@@ -1064,6 +1071,30 @@ model ProjectTransfer {
 
   @@index([partnerId])
   @@index([clientId])
+}
+
+// ============================================
+// SISTEMA ATTRIBUZIONE PARTNER-CLIENTE
+// ============================================
+
+model PartnerClientAttribution {
+  id              String   @id @default(cuid())
+  partnerId       String
+  clientUserId    String   @unique // Un cliente può essere attribuito a UN solo partner
+  firstProjectId  String?
+
+  attributedAt    DateTime @default(now())
+  status          String   @default("active") // active, revoked
+  revokedAt       DateTime?
+  revokedReason   String?
+
+  // Relazioni
+  partner         User     @relation("PartnerAttributions", fields: [partnerId], references: [id])
+  clientUser      User     @relation("ClientAttribution", fields: [clientUserId], references: [id])
+  firstProject    Project? @relation("FirstAttributionProject", fields: [firstProjectId], references: [id])
+
+  @@index([partnerId])
+  @@index([partnerId, status])
 }
 
 enum ProjectRole {

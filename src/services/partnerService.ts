@@ -39,6 +39,32 @@ export interface PartnerClient {
     status: 'active' | 'inactive';
 }
 
+export interface PartnerClientDetailed {
+    attributionId: string;
+    clientId: string;
+    clientName: string | null;
+    clientEmail: string;
+    plan: string;
+    subscriptionStatus: string | null;
+    isActive: boolean; // Conta per soglie?
+    attributedAt: Date;
+    firstProjectName: string | null;
+    projectsCount: number;
+}
+
+export interface PartnerClientsSummary {
+    clients: PartnerClientDetailed[];
+    summary: {
+        totalAttributed: number;
+        activeClients: number;
+        pendingInvites: number;
+    };
+    thresholds: {
+        freeAccess: { required: number; current: number; met: boolean };
+        whiteLabel: { required: number; current: number; met: boolean };
+    };
+}
+
 export interface TransferResult {
     success: boolean;
     error?: string;
@@ -336,7 +362,8 @@ export const PartnerService = {
                 data: {
                     name: originalProject.name,
                     ownerId: acceptingUserId,
-                    organizationId: originalProject.organizationId
+                    organizationId: originalProject.organizationId,
+                    originPartnerId: invite.partnerId // Traccia origine
                 }
             });
 
@@ -350,12 +377,36 @@ export const PartnerService = {
                 }
             });
 
-            // Aggiorna contatore clienti del partner
+            // Crea attribuzione SE non esiste già
+            const existingAttribution = await tx.partnerClientAttribution.findUnique({
+                where: { clientUserId: acceptingUserId }
+            });
+
+            if (!existingAttribution) {
+                await tx.partnerClientAttribution.create({
+                    data: {
+                        partnerId: invite.partnerId,
+                        clientUserId: acceptingUserId,
+                        firstProjectId: duplicatedProject.id,
+                        status: 'active'
+                    }
+                });
+            }
+
+            // Ricalcola clienti attivi
+            const activeCount = await tx.partnerClientAttribution.count({
+                where: {
+                    partnerId: invite.partnerId,
+                    status: 'active',
+                    clientUser: {
+                        plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
+                    }
+                }
+            });
+
             await tx.user.update({
                 where: { id: invite.partnerId },
-                data: {
-                    partnerActiveClients: { increment: 1 }
-                }
+                data: { partnerActiveClients: activeCount }
             });
         });
 
@@ -460,6 +511,198 @@ export const PartnerService = {
         }
 
         return { updated };
+    },
+
+    // ============================================
+    // FUNZIONI ATTRIBUZIONE PARTNER-CLIENTE
+    // ============================================
+
+    /**
+     * Verifica se un cliente è già attribuito a qualche partner
+     */
+    async getExistingAttribution(clientUserId: string): Promise<{
+        exists: boolean;
+        partnerId?: string;
+        attributedAt?: Date;
+    }> {
+        const attribution = await prisma.partnerClientAttribution.findUnique({
+            where: { clientUserId },
+            select: {
+                partnerId: true,
+                attributedAt: true
+            }
+        });
+
+        if (!attribution) {
+            return { exists: false };
+        }
+
+        return {
+            exists: true,
+            partnerId: attribution.partnerId,
+            attributedAt: attribution.attributedAt
+        };
+    },
+
+    /**
+     * Crea attribuzione partner → cliente (se non esiste già)
+     */
+    async createAttribution(params: {
+        partnerId: string;
+        clientUserId: string;
+        firstProjectId?: string;
+    }): Promise<{ success: boolean; created: boolean; error?: string }> {
+        const { partnerId, clientUserId, firstProjectId } = params;
+
+        // Verifica se già attribuito
+        const existing = await this.getExistingAttribution(clientUserId);
+
+        if (existing.exists) {
+            return {
+                success: true,
+                created: false,
+                error: existing.partnerId === partnerId
+                    ? 'Cliente già attribuito a te'
+                    : 'Cliente già attribuito ad altro partner'
+            };
+        }
+
+        // Crea attribuzione
+        await prisma.partnerClientAttribution.create({
+            data: {
+                partnerId,
+                clientUserId,
+                firstProjectId,
+                status: 'active'
+            }
+        });
+
+        return { success: true, created: true };
+    },
+
+    /**
+     * Conta clienti attivi (con abbonamento pagante) per un partner
+     */
+    async getActiveClientsCount(partnerId: string): Promise<number> {
+        const count = await prisma.partnerClientAttribution.count({
+            where: {
+                partnerId,
+                status: 'active',
+                clientUser: {
+                    plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
+                }
+            }
+        });
+
+        return count;
+    },
+
+    /**
+     * Ottiene lista clienti dettagliata per dashboard partner
+     */
+    async getPartnerClientsDetailed(partnerId: string): Promise<PartnerClientsSummary> {
+        // 1. Ottieni attribuzioni con dati cliente
+        const attributions = await prisma.partnerClientAttribution.findMany({
+            where: {
+                partnerId,
+                status: 'active'
+            },
+            include: {
+                clientUser: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        plan: true,
+                        memberships: {
+                            take: 1,
+                            include: {
+                                organization: {
+                                    include: {
+                                        subscription: {
+                                            select: { status: true }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                firstProject: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                }
+            }
+        });
+
+        // 2. Conta progetti per cliente
+        const projectCounts = await prisma.projectTransfer.groupBy({
+            by: ['clientId'],
+            where: {
+                partnerId,
+                clientId: { in: attributions.map(a => a.clientUserId) }
+            },
+            _count: { id: true }
+        });
+
+        const projectCountMap = new Map(
+            projectCounts.map(p => [p.clientId, p._count.id])
+        );
+
+        // 3. Conta inviti pendenti
+        const pendingInvites = await prisma.projectTransferInvite.count({
+            where: {
+                partnerId,
+                status: 'pending',
+                expiresAt: { gt: new Date() }
+            }
+        });
+
+        // 4. Mappa a formato dettagliato
+        const clients: PartnerClientDetailed[] = attributions.map(attr => {
+            const subscriptionStatus = attr.clientUser.memberships[0]?.organization?.subscription?.status || null;
+            const plan = attr.clientUser.plan;
+            const isActive = ['STARTER', 'PRO', 'BUSINESS'].includes(plan) && subscriptionStatus === 'ACTIVE';
+
+            return {
+                attributionId: attr.id,
+                clientId: attr.clientUserId,
+                clientName: attr.clientUser.name,
+                clientEmail: attr.clientUser.email,
+                plan,
+                subscriptionStatus,
+                isActive,
+                attributedAt: attr.attributedAt,
+                firstProjectName: attr.firstProject?.name || null,
+                projectsCount: projectCountMap.get(attr.clientUserId) || 1
+            };
+        });
+
+        // 5. Calcola summary
+        const activeClients = clients.filter(c => c.isActive).length;
+
+        return {
+            clients,
+            summary: {
+                totalAttributed: clients.length,
+                activeClients,
+                pendingInvites
+            },
+            thresholds: {
+                freeAccess: {
+                    required: PARTNER_THRESHOLDS.freeThreshold,
+                    current: activeClients,
+                    met: activeClients >= PARTNER_THRESHOLDS.freeThreshold
+                },
+                whiteLabel: {
+                    required: PARTNER_THRESHOLDS.whiteLabelThreshold,
+                    current: activeClients,
+                    met: activeClients >= PARTNER_THRESHOLDS.whiteLabelThreshold
+                }
+            }
+        };
     }
 };
 

@@ -1,7 +1,7 @@
 /**
  * API Route: /api/partner/clients
  *
- * GET: Ottiene la lista dei clienti del partner
+ * GET: Ottiene la lista dettagliata dei clienti del partner con attribuzioni
  */
 
 import { NextResponse } from 'next/server';
@@ -15,18 +15,19 @@ export async function GET() {
             return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
         }
 
+        // Verifica che sia partner
         const status = await PartnerService.getPartnerStatus(session.user.id);
         if (!status?.isPartner) {
-            return NextResponse.json({ error: 'Non sei un partner' }, { status: 403 });
+            return NextResponse.json(
+                { error: 'Non sei registrato come partner' },
+                { status: 403 }
+            );
         }
 
-        const clients = await PartnerService.getPartnerClients(session.user.id);
+        // Ottieni lista clienti dettagliata con attribuzioni
+        const clientsData = await PartnerService.getPartnerClientsDetailed(session.user.id);
 
-        return NextResponse.json({
-            clients,
-            totalClients: clients.length,
-            activeClients: clients.filter(c => c.status === 'active').length
-        });
+        return NextResponse.json(clientsData);
     } catch (error) {
         console.error('Error fetching partner clients:', error);
         return NextResponse.json(

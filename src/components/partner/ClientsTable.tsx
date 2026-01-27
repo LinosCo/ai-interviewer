@@ -12,9 +12,9 @@ import { Check, XCircle, Search, Users } from 'lucide-react';
 
 interface Client {
     attributionId: string;
-    clientId: string;
-    clientName: string | null;
-    clientEmail: string;
+    organizationId: string;
+    organizationName: string | null;
+    ownerEmail: string;
     plan: string;
     subscriptionStatus: string | null;
     isActive: boolean;
@@ -38,8 +38,8 @@ export function ClientsTable({ clients, summary }: ClientsTableProps) {
 
     const filteredClients = clients.filter(client => {
         const matchesSearch = searchTerm === '' ||
-            client.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            client.clientEmail.toLowerCase().includes(searchTerm.toLowerCase());
+            client.organizationName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            client.ownerEmail.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesFilter = filterActive === null || client.isActive === filterActive;
 
@@ -147,8 +147,8 @@ export function ClientsTable({ clients, summary }: ClientsTableProps) {
                                 <tr key={client.attributionId} className="hover:bg-stone-50">
                                     <td className="py-4 px-6">
                                         <div>
-                                            <p className="font-medium text-stone-900">{client.clientName || 'Nome non disponibile'}</p>
-                                            <p className="text-sm text-stone-500">{client.clientEmail}</p>
+                                            <p className="font-medium text-stone-900">{client.organizationName || 'Nome non disponibile'}</p>
+                                            <p className="text-sm text-stone-500">{client.ownerEmail}</p>
                                         </div>
                                     </td>
                                     <td className="py-4 px-6">

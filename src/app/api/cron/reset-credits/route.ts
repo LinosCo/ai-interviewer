@@ -27,11 +27,11 @@ export async function POST(request: Request) {
 
         const result = await CreditService.resetMonthlyCredits();
 
-        console.log(`[Cron] Credits reset completed. Users reset: ${result.usersReset}`);
+        console.log(`[Cron] Credits reset completed. Organizations reset: ${result.organizationsReset}`);
 
         return NextResponse.json({
             success: true,
-            usersReset: result.usersReset,
+            organizationsReset: result.organizationsReset,
             timestamp: new Date().toISOString()
         });
     } catch (error) {

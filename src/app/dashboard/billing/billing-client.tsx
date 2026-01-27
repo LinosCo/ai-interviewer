@@ -1,4 +1,9 @@
+'use client';
+
+import { useState } from 'react';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { showToast } from '@/components/toast';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 
 export default function BillingClient() {
     const { currentOrganization } = useOrganization();

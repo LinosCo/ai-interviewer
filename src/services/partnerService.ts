@@ -173,6 +173,28 @@ export const PartnerService = {
     },
 
     /**
+     * Aggiorna il logo personalizzato del partner
+     */
+    async updateCustomLogo(userId: string, logoUrl: string | null): Promise<{ success: boolean; error?: string }> {
+        const status = await this.getPartnerStatus(userId);
+
+        if (!status) {
+            return { success: false, error: 'Partner non trovato' };
+        }
+
+        if (!status.hasWhiteLabel) {
+            return { success: false, error: 'Funzionalità White Label non attiva' };
+        }
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { partnerCustomLogo: logoUrl }
+        });
+
+        return { success: true };
+    },
+
+    /**
      * Ottiene la lista dei clienti del partner (Organizzazioni)
      */
     async getPartnerClients(userId: string): Promise<PartnerClient[]> {
@@ -409,6 +431,21 @@ export const PartnerService = {
         });
 
         return activeCount;
+    },
+
+    /**
+     * Conta i clienti attivi del partner
+     */
+    async getActiveClientsCount(partnerId: string): Promise<number> {
+        return await prisma.partnerClientAttribution.count({
+            where: {
+                partnerId: partnerId,
+                status: 'active',
+                clientOrganization: {
+                    plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
+                }
+            }
+        });
     },
 
     /**

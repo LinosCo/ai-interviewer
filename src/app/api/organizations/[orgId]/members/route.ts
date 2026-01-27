@@ -5,15 +5,14 @@ import { Role } from '@prisma/client';
 
 export async function GET(
     req: Request,
-    { params }: { params: { orgId: string } }
+    { params }: { params: Promise<{ orgId: string }> }
 ) {
     try {
+        const { orgId } = await params;
         const session = await auth();
         if (!session?.user?.id) {
             return new Response('Unauthorized', { status: 401 });
         }
-
-        const { orgId } = params;
 
         // Verifica membership dell'utente corrente
         const userMembership = await prisma.membership.findUnique({
@@ -53,15 +52,15 @@ export async function GET(
 
 export async function POST(
     req: Request,
-    { params }: { params: { orgId: string } }
+    { params }: { params: Promise<{ orgId: string }> }
 ) {
     try {
+        const { orgId } = await params;
         const session = await auth();
         if (!session?.user?.id) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
-        const { orgId } = params;
         const body = await req.json();
         const { email, role } = body;
 

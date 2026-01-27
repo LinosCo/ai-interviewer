@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         }
 
         const result = await PartnerService.createProjectTransferInvite({
-            fromUserId: session.user.id,
+            partnerId: session.user.id,
             projectId,
             toEmail
         });

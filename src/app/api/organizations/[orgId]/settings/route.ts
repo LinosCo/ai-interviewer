@@ -4,15 +4,14 @@ import { auth } from '@/auth';
 
 export async function GET(
     req: Request,
-    { params }: { params: { orgId: string } }
+    { params }: { params: Promise<{ orgId: string }> }
 ) {
     try {
+        const { orgId } = await params;
         const session = await auth();
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-
-        const { orgId } = await params;
 
         // Verify membership
         const membership = await prisma.membership.findUnique({

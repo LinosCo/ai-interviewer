@@ -799,13 +799,25 @@ export async function deleteKnowledgeSourceAction(sourceId: string, botId: strin
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
-export async function updateSettingsAction(userId: string, formData: FormData) {
+export async function updateSettingsAction(organizationId: string, formData: FormData) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
+    if (!session?.user?.id) throw new Error("Unauthorized");
 
     // Simple security check:
-    const currentUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!currentUser || currentUser.id !== userId) throw new Error("Unauthorized");
+    const currentUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!currentUser) throw new Error("User not found");
+
+    // Check membership
+    const membership = await prisma.membership.findUnique({
+        where: {
+            userId_organizationId: {
+                userId: currentUser.id,
+                organizationId
+            }
+        }
+    });
+
+    if (!membership && currentUser.role !== 'ADMIN') throw new Error("Unauthorized");
 
     const openaiKey = formData.get('platformOpenaiApiKey') as string;
     const anthropicKey = formData.get('platformAnthropicApiKey') as string;
@@ -854,9 +866,9 @@ export async function updateSettingsAction(userId: string, formData: FormData) {
 
     // Update linked PlatformSettings (Methodology)
     await prisma.platformSettings.upsert({
-        where: { userId },
+        where: { organizationId },
         update: { methodologyKnowledge },
-        create: { userId, methodologyKnowledge }
+        create: { organizationId, methodologyKnowledge }
     });
 
     // We do NOT update user.platformOpenaiApiKey anymore to enforce "Global Only" or "Admin Managed".

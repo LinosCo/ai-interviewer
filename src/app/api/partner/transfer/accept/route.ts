@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 import { PartnerService } from '@/services/partnerService';
 
 export async function POST(request: Request) {
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { token } = body;
+        const { token, targetOrganizationId } = body;
 
         if (!token) {
             return NextResponse.json(
@@ -26,9 +27,23 @@ export async function POST(request: Request) {
             );
         }
 
+        let orgId = targetOrganizationId;
+        if (!orgId) {
+            const membership = await prisma.membership.findFirst({
+                where: { userId: session.user.id },
+                select: { organizationId: true }
+            });
+            orgId = membership?.organizationId;
+        }
+
+        if (!orgId) {
+            return NextResponse.json({ error: 'No organization found' }, { status: 400 });
+        }
+
         const result = await PartnerService.acceptProjectTransfer({
             token,
-            acceptingUserId: session.user.id
+            acceptingUserId: session.user.id,
+            targetOrganizationId: orgId
         });
 
         if (!result.success) {

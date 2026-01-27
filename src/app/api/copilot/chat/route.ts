@@ -25,20 +25,26 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
         }
 
-        // 1. Get user with plan info and organization
+        // 1. Get user with organization info
         const userWithMembership = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
                 id: true,
                 name: true,
-                plan: true,
                 role: true,
-                monthlyCreditsLimit: true,
-                monthlyCreditsUsed: true,
                 memberships: {
                     take: 1,
                     include: {
-                        organization: true
+                        organization: {
+                            select: {
+                                id: true,
+                                name: true,
+                                plan: true,
+                                monthlyCreditsLimit: true,
+                                monthlyCreditsUsed: true,
+                                packCreditsAvailable: true
+                            }
+                        }
                     }
                 }
             }
@@ -50,26 +56,29 @@ export async function POST(req: Request) {
 
         const organization = userWithMembership.memberships[0].organization;
 
-        // Use user's plan (admin has unlimited access)
-        const isAdmin = userWithMembership.role === 'ADMIN' || userWithMembership.plan === 'ADMIN';
-        const tier = userWithMembership.plan || 'TRIAL';
+        // Use organization's plan (admin has unlimited access)
+        const isAdmin = userWithMembership.role === 'ADMIN' || organization.plan === 'ADMIN';
+        const tier = (organization.plan as PlanType) || 'TRIAL';
 
         // 2. Check credits limits (skip for admin)
         if (!isAdmin) {
-            const creditsLimit = Number(userWithMembership.monthlyCreditsLimit);
-            const creditsUsed = Number(userWithMembership.monthlyCreditsUsed);
+            const creditsLimit = Number(organization.monthlyCreditsLimit);
+            const creditsUsed = Number(organization.monthlyCreditsUsed);
+            const packCredits = Number(organization.packCreditsAvailable);
 
-            if (creditsLimit !== -1 && creditsUsed >= creditsLimit) {
+            const totalAvailable = (creditsLimit === -1) ? Infinity : (creditsLimit - creditsUsed + packCredits);
+
+            if (creditsLimit !== -1 && totalAvailable <= 0) {
                 return NextResponse.json({
                     error: 'Credit limit reached',
-                    message: 'Hai raggiunto il limite di crediti per questo mese. Effettua l\'upgrade per continuare.'
+                    message: 'La tua organizzazione ha raggiunto il limite di crediti per questo mese. Effettua l\'upgrade per continuare.'
                 }, { status: 429 });
             }
         }
 
-        // 3. Get user's strategic plan from platform settings
+        // 3. Get organization's strategic plan from platform settings
         const platformSettings = await prisma.platformSettings.findUnique({
-            where: { userId: session.user.id }
+            where: { organizationId: organization.id }
         });
         const strategicPlan = platformSettings?.strategicPlan || null;
 

@@ -19,24 +19,34 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url);
         const organizationId = searchParams.get('organizationId');
 
-        let usageByTool;
-        if (organizationId) {
-            // Verifica membership
+        let targetOrgId = organizationId;
+
+        if (!targetOrgId) {
+            // Find user's primary organization
+            const membership = await prisma.membership.findFirst({
+                where: { userId: session.user.id },
+                select: { organizationId: true }
+            });
+            if (!membership) {
+                return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+            }
+            targetOrgId = membership.organizationId;
+        } else {
+            // Verify membership if orgId provided
             const membership = await prisma.membership.findUnique({
                 where: {
                     userId_organizationId: {
                         userId: session.user.id,
-                        organizationId
+                        organizationId: targetOrgId
                     }
                 }
             });
-            if (!membership) {
+            if (!membership && (session.user as any).role !== 'ADMIN') {
                 return NextResponse.json({ error: 'Access denied' }, { status: 403 });
             }
-            usageByTool = await CreditService.getOrganizationUsageByTool(organizationId);
-        } else {
-            usageByTool = await CreditService.getUsageByTool(session.user.id);
         }
+
+        const usageByTool = await CreditService.getUsageByTool(targetOrgId);
 
         // Get current period
         const now = new Date();

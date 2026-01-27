@@ -20,24 +20,34 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url);
         const organizationId = searchParams.get('organizationId');
 
-        let status;
-        if (organizationId) {
-            // Verifica access per sicurezza
+        let targetOrgId = organizationId;
+
+        if (!targetOrgId) {
+            // Find user's primary organization
+            const membership = await prisma.membership.findFirst({
+                where: { userId: session.user.id },
+                select: { organizationId: true }
+            });
+            if (!membership) {
+                return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+            }
+            targetOrgId = membership.organizationId;
+        } else {
+            // Verify access for security
             const membership = await prisma.membership.findUnique({
                 where: {
                     userId_organizationId: {
                         userId: session.user.id,
-                        organizationId
+                        organizationId: targetOrgId
                     }
                 }
             });
-            if (!membership) {
+            if (!membership && (session.user as any).role !== 'ADMIN') {
                 return NextResponse.json({ error: 'Access denied' }, { status: 403 });
             }
-            status = await CreditService.getOrganizationCreditsStatus(organizationId);
-        } else {
-            status = await CreditService.getCreditsStatus(session.user.id);
         }
+
+        const status = await CreditService.getOrganizationCreditsStatus(targetOrgId);
 
         if (!status) {
             return NextResponse.json({ error: 'Status non trovato' }, { status: 404 });

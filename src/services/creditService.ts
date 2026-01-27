@@ -41,6 +41,7 @@ export interface OrganizationCreditsStatus {
     usagePercentage: number;
     warningLevel: 'none' | 'warning' | 'danger' | 'critical' | 'exhausted';
     resetDate: Date | null;
+    isUnlimited: boolean;
 }
 
 export interface CreditUsageByTool {
@@ -275,7 +276,8 @@ export const CreditService = {
             totalAvailable: isUnlimitedCredits ? BigInt(-1) : (totalAvailable > BigInt(0) ? totalAvailable : BigInt(0)),
             usagePercentage,
             warningLevel: getWarningLevel(usagePercentage),
-            resetDate: org.creditsResetDate
+            resetDate: org.creditsResetDate,
+            isUnlimited: isUnlimitedCredits
         };
     },
 

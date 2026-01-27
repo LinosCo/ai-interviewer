@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { PLANS, isUnlimited } from '@/config/plans';
-import { TokenCategory, PlanType } from '@prisma/client';
+import { PLANS, isUnlimited, PlanType } from '@/config/plans';
+import { TokenCategory } from '@prisma/client';
 import { CreditService } from './creditService';
 import { CreditAction, getCreditCost } from '@/config/creditCosts';
 
@@ -11,7 +11,7 @@ import { CreditAction, getCreditCost } from '@/config/creditCosts';
  *
  * Nel nuovo sistema:
  * - I crediti sono l'unico limite (non più limiti separati per interviste, chatbot, etc.)
- * - I crediti sono per utente, non per organizzazione
+ * - I crediti sono per organizzazione, non per utente
  * - I token consumati vengono mappati a crediti
  * - Il TokenLog viene mantenuto per analytics dettagliate
  */
@@ -175,13 +175,15 @@ export class TokenTrackingService {
             return { allowed: false, reason: 'Organizzazione non trovata' };
         }
 
+        const organization = org as any; // Bypass Prisma selection typing lag
+
         // Admin role o piano ADMIN hanno accesso illimitato
-        if (org.plan === 'ADMIN' || org.monthlyCreditsLimit === BigInt(-1)) {
+        if (organization.plan === 'ADMIN' || organization.monthlyCreditsLimit === BigInt(-1)) {
             return { allowed: true };
         }
 
         // Verifica feature disponibile per il piano
-        const plan = PLANS[org.plan as PlanType] || PLANS[PlanType.FREE];
+        const plan = PLANS[organization.plan as PlanType] || PLANS[PlanType.FREE];
         const featureCheck = this.checkFeatureForAction(action, plan);
         if (!featureCheck.allowed) {
             return featureCheck;
@@ -189,8 +191,8 @@ export class TokenTrackingService {
 
         // Calcola crediti necessari
         const creditsNeeded = customAmount || getCreditCost(action);
-        const monthlyRemaining = Number(org.monthlyCreditsLimit) - Number(org.monthlyCreditsUsed);
-        const creditsAvailable = monthlyRemaining + Number(org.packCreditsAvailable);
+        const monthlyRemaining = Number(organization.monthlyCreditsLimit) - Number(organization.monthlyCreditsUsed);
+        const creditsAvailable = monthlyRemaining + Number(organization.packCreditsAvailable);
 
         if (creditsAvailable < creditsNeeded) {
             return {
@@ -270,7 +272,7 @@ export class TokenTrackingService {
             prisma.organization.aggregate({
                 _sum: { monthlyCreditsUsed: true }
             }),
-            prisma.orgCreditTransaction.findMany({
+            (prisma as any).orgCreditTransaction.findMany({
                 take: 50,
                 orderBy: { createdAt: 'desc' },
                 where: { type: 'usage' },
@@ -296,7 +298,7 @@ export class TokenTrackingService {
         return {
             totalUsers,
             totalOrganizations,
-            totalCreditsUsed: Number(totalCreditsUsed._sum.monthlyCreditsUsed || 0),
+            totalCreditsUsed: Number((totalCreditsUsed as any)._sum.monthlyCreditsUsed || 0),
             byPlan: planStats,
             recentTransactions: recentTransactions.map((t: any) => ({
                 id: t.id,

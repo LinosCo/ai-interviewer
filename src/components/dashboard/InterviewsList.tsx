@@ -128,7 +128,7 @@ export function InterviewsList() {
             {/* Interviews List */}
             {allBots.length === 0 ? (
                 <div className="platform-card rounded-xl p-12 text-center">
-                    <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" aria-hidden="true" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
                         {isAllProjectsSelected
                             ? 'Nessuna intervista in nessun progetto'
@@ -140,7 +140,7 @@ export function InterviewsList() {
                         href="/onboarding"
                         className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
                     >
-                        <Plus className="w-5 h-5" />
+                        <Plus className="w-5 h-5" aria-hidden="true" />
                         Crea la tua prima intervista
                     </Link>
                 </div>

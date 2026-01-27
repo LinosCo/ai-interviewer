@@ -5,12 +5,12 @@
  *
  * Dashboard per visualizzare l'utilizzo dei crediti AI.
  * Mostra crediti disponibili, consumo per tool, e storico recente.
+ * OTTIMIZZATO: usa useMemo e useCallback per ridurre re-render
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback, memo } from 'react';
 import { Card } from '@/components/ui/business-tuner/Card';
 import { Button } from '@/components/ui/business-tuner/Button';
-import { Progress } from "@/components/ui/progress";
 import {
     Info,
     AlertCircle,
@@ -76,16 +76,66 @@ const toolColors: Record<string, string> = {
     export: 'bg-slate-500'
 };
 
+// Memoized helper functions (fuori dal componente per evitare re-creazione)
+const formatCredits = (num: number): string => {
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+    if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
+    return num.toString();
+};
+
+const formatResetDate = (dateStr: string | null): string => {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('it-IT', {
+        day: 'numeric',
+        month: 'long'
+    });
+};
+
+const getProgressColor = (percentageUsed: number): string => {
+    if (percentageUsed >= 95) return 'bg-red-500';
+    if (percentageUsed >= 85) return 'bg-orange-500';
+    if (percentageUsed >= 70) return 'bg-yellow-500';
+    return 'bg-green-500';
+};
+
+// Memoized Tool Item component
+const ToolUsageItem = memo(function ToolUsageItem({ tool }: { tool: ToolUsage }) {
+    const Icon = toolIcons[tool.id] || Zap;
+    const color = toolColors[tool.id] || 'bg-slate-500';
+
+    return (
+        <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 ${color} rounded-lg flex items-center justify-center`}>
+                <Icon className="w-4 h-4 text-white" aria-hidden="true" />
+            </div>
+            <div className="flex-1">
+                <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm font-medium text-slate-700">{tool.name}</span>
+                    <span className="text-xs font-bold text-slate-900">
+                        {formatCredits(tool.creditsUsed)}
+                    </span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                        className={`h-full ${color} transition-all`}
+                        style={{ width: `${tool.percentage}%` }}
+                    />
+                </div>
+            </div>
+            <span className="text-xs text-slate-400 w-10 text-right">
+                {tool.percentage}%
+            </span>
+        </div>
+    );
+});
+
 export function UsageDashboard() {
     const [credits, setCredits] = useState<CreditsData | null>(null);
     const [usageByTool, setUsageByTool] = useState<UsageByToolData | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
             const [creditsRes, usageRes] = await Promise.all([
                 fetch('/api/credits'),
@@ -106,7 +156,22 @@ export function UsageDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    // Memoized computed values
+    const progressColor = useMemo(
+        () => credits ? getProgressColor(credits.percentageUsed) : 'bg-green-500',
+        [credits?.percentageUsed]
+    );
+
+    const formattedResetDate = useMemo(
+        () => formatResetDate(credits?.resetDate ?? null),
+        [credits?.resetDate]
+    );
 
     if (loading) {
         return (
@@ -121,31 +186,6 @@ export function UsageDashboard() {
     }
 
     if (!credits) return null;
-
-    // Get progress bar color based on usage
-    const getProgressColor = () => {
-        if (credits.percentageUsed >= 95) return 'bg-red-500';
-        if (credits.percentageUsed >= 85) return 'bg-orange-500';
-        if (credits.percentageUsed >= 70) return 'bg-yellow-500';
-        return 'bg-green-500';
-    };
-
-    // Format date for display
-    const formatResetDate = (dateStr: string | null) => {
-        if (!dateStr) return 'N/A';
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('it-IT', {
-            day: 'numeric',
-            month: 'long'
-        });
-    };
-
-    // Format credits number
-    const formatCredits = (num: number) => {
-        if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-        if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
-        return num.toString();
-    };
 
     return (
         <Card className="p-6 space-y-6 border-slate-100 shadow-sm">
@@ -207,8 +247,8 @@ export function UsageDashboard() {
                         Crediti AI
                     </h2>
                     <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-1">
-                        <RefreshCcw className="w-3 h-3" />
-                        Reset: {formatResetDate(credits.resetDate)}
+                        <RefreshCcw className="w-3 h-3" aria-hidden="true" />
+                        Reset: {formattedResetDate}
                     </p>
                 </div>
                 <Link href="/dashboard/billing">
@@ -239,7 +279,7 @@ export function UsageDashboard() {
                         </div>
                         <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                             <div
-                                className={`h-full ${getProgressColor()} transition-all duration-500`}
+                                className={`h-full ${progressColor} transition-all duration-500`}
                                 style={{ width: `${Math.min(credits.percentageUsed, 100)}%` }}
                             />
                         </div>
@@ -281,35 +321,9 @@ export function UsageDashboard() {
                         Consumo per strumento
                     </h3>
                     <div className="space-y-3">
-                        {usageByTool.tools.map(tool => {
-                            const Icon = toolIcons[tool.id] || Zap;
-                            const color = toolColors[tool.id] || 'bg-slate-500';
-
-                            return (
-                                <div key={tool.id} className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 ${color} rounded-lg flex items-center justify-center`}>
-                                        <Icon className="w-4 h-4 text-white" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-sm font-medium text-slate-700">{tool.name}</span>
-                                            <span className="text-xs font-bold text-slate-900">
-                                                {formatCredits(tool.creditsUsed)}
-                                            </span>
-                                        </div>
-                                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full ${color} transition-all`}
-                                                style={{ width: `${tool.percentage}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <span className="text-xs text-slate-400 w-10 text-right">
-                                        {tool.percentage}%
-                                    </span>
-                                </div>
-                            );
-                        })}
+                        {usageByTool.tools.map(tool => (
+                            <ToolUsageItem key={tool.id} tool={tool} />
+                        ))}
                     </div>
                 </div>
             )}

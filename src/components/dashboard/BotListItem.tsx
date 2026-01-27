@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Bot, Trash2, ExternalLink, MoreVertical, Loader2, Users } from 'lucide-react';
+import { MessageSquare, Bot, Trash2, Loader2, Users } from 'lucide-react';
 import { deleteBotAction } from '@/actions/bot-actions';
 import { BotStatusToggle } from './BotStatusToggle';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface BotListItemProps {
     bot: {
@@ -23,24 +24,26 @@ interface BotListItemProps {
 export function BotListItem({ bot, compact = false, showProject = false }: BotListItemProps) {
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState(false);
-    const [showMenu, setShowMenu] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
-    const handleDelete = async (e: React.MouseEvent) => {
+    const handleDeleteClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setShowDeleteDialog(true);
+    };
 
-        if (!confirm('Sei sicuro di voler eliminare questo bot? Questa azione è irreversibile.')) {
-            return;
-        }
-
+    const handleConfirmDelete = async () => {
         setIsDeleting(true);
+        setDeleteError(null);
         const result = await deleteBotAction(bot.id);
 
         if (result.success) {
             router.refresh();
         } else {
-            alert(result.error || 'Errore durante la cancellazione');
+            setDeleteError(result.error || 'Errore durante la cancellazione');
             setIsDeleting(false);
+            throw new Error(result.error);
         }
     };
 
@@ -98,15 +101,28 @@ export function BotListItem({ bot, compact = false, showProject = false }: BotLi
                     <div className="w-px h-4 bg-gray-200 mx-1" />
 
                     <button
-                        onClick={handleDelete}
+                        onClick={handleDeleteClick}
                         disabled={isDeleting}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Elimina"
+                        aria-label={`Elimina bot ${bot.name}`}
                     >
-                        {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Trash2 className="w-4 h-4" aria-hidden="true" />}
                     </button>
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={showDeleteDialog}
+                onOpenChange={setShowDeleteDialog}
+                title="Elimina Bot"
+                description={`Sei sicuro di voler eliminare "${bot.name}"? Questa azione è irreversibile.${deleteError ? `\n\nErrore: ${deleteError}` : ''}`}
+                confirmLabel="Elimina"
+                cancelLabel="Annulla"
+                variant="destructive"
+                onConfirm={handleConfirmDelete}
+                loading={isDeleting}
+            />
         </div>
     );
 }

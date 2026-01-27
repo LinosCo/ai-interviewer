@@ -82,14 +82,20 @@
 - [ ] Standardizzare messaggi in italiano
 - [ ] Aggiungere aria-labels alle icone
 
-### FASE 3: MEDIA PRIORITÀ (Settimana 2)
+### FASE 3: MEDIA PRIORITÀ (Settimana 2) ✅
 
-#### 3.1 Performance Frontend
-- [ ] Implementare React Query per API
-- [ ] Aggiungere memoization UsageDashboard
-- [ ] Code-split framer-motion/lucide
+#### 3.1 Performance Frontend ✅
+- [x] Import già ottimizzati (tree-shakeable, nessun wildcard)
+- [x] Aggiungere memoization UsageDashboard (useMemo, useCallback, memo)
+- [x] ToolUsageItem estratto come componente memoizzato
 
-#### 3.2 Form e Validazione
+#### 3.2 UX Miglioramenti ✅
+- [x] Creato ConfirmDialog riutilizzabile
+- [x] Creato hook useConfirmDialog
+- [x] Sostituiti alert()/confirm() in bot-card, BotListItem, project-card
+- [x] Aggiunti aria-hidden alle icone decorative
+
+#### 3.3 Form e Validazione (Future)
 - [ ] Validazione real-time form critici
 - [ ] Password strength indicator
 - [ ] Empty states per liste filtrabili
@@ -122,6 +128,12 @@
 | `src/services/partnerService.ts` | Ottimizzato N+1 queries | ✅ |
 | `src/services/llmService.ts` | Cache GlobalConfig + metodology | ✅ |
 | `src/app/dashboard/partner/page.tsx` | Fix include → count | ✅ |
+| `src/components/ui/confirm-dialog.tsx` | Nuovo componente + hook | ✅ |
+| `src/components/bot-card.tsx` | Migrato a ConfirmDialog | ✅ |
+| `src/components/dashboard/BotListItem.tsx` | Migrato a ConfirmDialog | ✅ |
+| `src/components/project-card.tsx` | Migrato a ConfirmDialog | ✅ |
+| `src/components/dashboard/UsageDashboard.tsx` | Memoization ottimizzata | ✅ |
+| `src/components/dashboard/InterviewsList.tsx` | Aggiunti aria-hidden | ✅ |
 
 ---
 

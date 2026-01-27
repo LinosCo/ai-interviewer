@@ -11,8 +11,8 @@ const comparisons = [
       description: 'Migliaia di euro per ricerche di mercato',
     },
     solution: {
-      title: 'Gratis per sempre',
-      description: 'Interview AI senza costi iniziali',
+      title: 'Scalabilità intelligente',
+      description: 'Cresce con te, paghi solo quello che usi',
     },
   },
   {
@@ -22,8 +22,8 @@ const comparisons = [
       description: 'Settimane per raccogliere feedback',
     },
     solution: {
-      title: 'Insight in tempo reale',
-      description: 'Analisi istantanea delle risposte',
+      title: 'Efficienza automatizzata',
+      description: 'Analisi istantanea e proposte operative immediate',
     },
   },
   {
@@ -33,8 +33,8 @@ const comparisons = [
       description: 'Email, survey e CRM separati',
     },
     solution: {
-      title: 'Un\'unica dashboard',
-      description: 'Tutto connesso e organizzato',
+      title: 'Sistema generativo',
+      description: 'Analizza e propone soluzioni strategiche concrete',
     },
   },
 ];
@@ -126,8 +126,8 @@ export function ProblemSection() {
         >
           <div className="p-4 rounded-xl bg-[hsl(var(--amber)/0.1)] border border-[hsl(var(--amber)/0.2)] text-center">
             <p className="text-sm text-[hsl(var(--foreground))]">
-              <span className="font-semibold">A partire da €0/mese</span>{' '}
-              — inizia gratis, scala quando cresci
+              <span className="font-semibold">Un approccio sistemico</span>{' '}
+              — dalla raccolta dati alle decisioni strategiche
             </p>
           </div>
         </motion.div>

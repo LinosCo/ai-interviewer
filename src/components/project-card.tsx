@@ -5,6 +5,7 @@ import { deleteProjectAction, renameProjectAction } from '@/app/actions';
 import { MoreVertical, Trash2, Edit2, Check, X, Folder } from 'lucide-react';
 import Link from 'next/link';
 import BotCard from './bot-card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface ProjectCardProps {
     project: any;
@@ -17,13 +18,12 @@ export default function ProjectCard({ project, userId, isAdmin }: ProjectCardPro
     const [newName, setNewName] = useState(project.name);
     const [isDeleting, setIsDeleting] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const isOwner = project.ownerId === userId || project.role === 'OWNER';
     const canRename = isAdmin || isOwner;
-    const canDeleteProject = isAdmin || isOwner; // Owner can delete their own projects
-
-    // For bots, owner OR admin can delete. 
-    // Since we are iterating bots here, we pass the flag down.
+    const canDeleteProject = isAdmin || isOwner;
     const canDeleteBots = isAdmin || isOwner;
 
     const handleSaveName = async () => {
@@ -34,20 +34,26 @@ export default function ProjectCard({ project, userId, isAdmin }: ProjectCardPro
         try {
             await renameProjectAction(project.id, newName);
             setIsEditing(false);
-        } catch (error) {
-            alert("Failed to rename project.");
+            setError(null);
+        } catch (err) {
+            setError("Rinomina fallita.");
         }
     };
 
-    const handleDeleteProject = async () => {
-        if (confirm(`Are you sure you want to delete the project "${project.name}" and ALL its bots? This functionality is restricted to Admins.`)) {
-            setIsDeleting(true);
-            try {
-                await deleteProjectAction(project.id);
-            } catch (error: any) {
-                alert(error.message || "Failed to delete project.");
-                setIsDeleting(false);
-            }
+    const handleDeleteClick = () => {
+        setShowMenu(false);
+        setShowDeleteDialog(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        setIsDeleting(true);
+        setError(null);
+        try {
+            await deleteProjectAction(project.id);
+        } catch (err: any) {
+            setError(err.message || "Eliminazione fallita.");
+            setIsDeleting(false);
+            throw err;
         }
     };
 
@@ -94,10 +100,10 @@ export default function ProjectCard({ project, userId, isAdmin }: ProjectCardPro
                                 )}
                                 {canDeleteProject && (
                                     <button
-                                        onClick={() => { handleDeleteProject(); setShowMenu(false); }}
+                                        onClick={handleDeleteClick}
                                         className="w-full text-left px-4 py-2 text-sm hover:bg-red-50 flex items-center gap-2 text-red-600"
                                     >
-                                        <Trash2 className="w-4 h-4" /> Delete Project
+                                        <Trash2 className="w-4 h-4" aria-hidden="true" /> Elimina Progetto
                                     </button>
                                 )}
                             </div>
@@ -116,13 +122,30 @@ export default function ProjectCard({ project, userId, isAdmin }: ProjectCardPro
                 ))}
 
                 {/* Add new bot card */}
-                {/* Only Owner or Admin can add bots? Usually yes. */}
                 {(isOwner || isAdmin) && (
                     <Link href={`/dashboard/projects/${project.id}/bots/new`} className="flex items-center justify-center border-2 border-dashed p-4 rounded text-gray-400 hover:text-blue-600 hover:border-blue-300 transition bg-gray-50/50 hover:bg-blue-50/20">
-                        <span className="text-sm font-medium">+ Create Bot</span>
+                        <span className="text-sm font-medium">+ Crea Bot</span>
                     </Link>
                 )}
             </div>
+
+            {error && (
+                <div className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">
+                    {error}
+                </div>
+            )}
+
+            <ConfirmDialog
+                open={showDeleteDialog}
+                onOpenChange={setShowDeleteDialog}
+                title="Elimina Progetto"
+                description={`Sei sicuro di voler eliminare "${project.name}" e TUTTI i suoi bot? Questa azione non può essere annullata.`}
+                confirmLabel="Elimina"
+                cancelLabel="Annulla"
+                variant="destructive"
+                onConfirm={handleConfirmDelete}
+                loading={isDeleting}
+            />
         </div>
     );
 }

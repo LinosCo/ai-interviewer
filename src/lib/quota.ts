@@ -55,7 +55,7 @@ export async function checkQuota(
 
 export async function checkStaticLimit(
     orgId: string,
-    limitType: 'maxActiveBots' | 'maxUsers'
+    limitType: 'maxActiveBots'
 ): Promise<{ allowed: boolean; limit: number; current: number }> {
     const sub = await prisma.subscription.findUnique({
         where: { organizationId: orgId }
@@ -68,10 +68,7 @@ export async function checkStaticLimit(
     let limit = 0;
     let current = 0;
 
-    if (limitType === 'maxUsers') {
-        limit = plan.limits.maxUsers;
-        current = await prisma.membership.count({ where: { organizationId: orgId } });
-    } else if (limitType === 'maxActiveBots') {
+    if (limitType === 'maxActiveBots') {
         limit = plan.limits.maxChatbots;
         current = await prisma.bot.count({
             where: {

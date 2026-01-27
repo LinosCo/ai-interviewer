@@ -75,10 +75,6 @@ export function UpgradeModal({
                                 <Icons.Check className="w-4 h-4 text-gray-400" />
                                 {current.limits.maxChatbots === -1 ? 'Illimitati' : current.limits.maxChatbots} chatbot
                             </li>
-                            <li className="flex items-center gap-2">
-                                <Icons.Check className="w-4 h-4 text-gray-400" />
-                                {current.limits.maxUsers === -1 ? 'Illimitati' : current.limits.maxUsers} utenti
-                            </li>
                         </ul>
                     </div>
 
@@ -103,10 +99,6 @@ export function UpgradeModal({
                             <li className="flex items-center gap-2">
                                 <Icons.Check className="w-4 h-4 text-green-600" />
                                 {required.limits.maxChatbots === -1 ? 'Illimitati' : required.limits.maxChatbots} chatbot
-                            </li>
-                            <li className="flex items-center gap-2">
-                                <Icons.Check className="w-4 h-4 text-green-600" />
-                                {required.limits.maxUsers === -1 ? 'Illimitati' : required.limits.maxUsers} utenti
                             </li>
                             {required.limits.visibilityEnabled && (
                                 <li className="flex items-center gap-2">

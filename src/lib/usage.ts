@@ -40,7 +40,6 @@ export async function getSubscriptionLimits(subscription: { tier: SubscriptionTi
     return {
         maxActiveBots: limits.maxChatbots,
         maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
-        maxUsers: limits.maxUsers,
     };
 }
 
@@ -220,10 +219,6 @@ export async function getUsageStats(organizationId: string) {
     const extraInterviews = subscription.extraInterviews || 0;
     const totalInterviewLimit = isUnlimited(interviewLimit) ? -1 : interviewLimit + extraInterviews;
 
-    const usersLimit = limits.maxUsers;
-    const extraUsers = subscription.extraUsers || 0;
-    const totalUsersLimit = isUnlimited(usersLimit) ? -1 : usersLimit + extraUsers;
-
     return {
         tier: subscription.tier,
         activeBots: {
@@ -245,13 +240,6 @@ export async function getUsageStats(organizationId: string) {
             limit: totalTokenLimit,
             percentage: !isUnlimited(totalTokenLimit) && totalTokenLimit > 0
                 ? Math.round((usedTokens / totalTokenLimit) * 100)
-                : 0
-        },
-        users: {
-            used: usersCount,
-            limit: totalUsersLimit,
-            percentage: !isUnlimited(totalUsersLimit) && totalUsersLimit > 0
-                ? Math.round((usersCount / totalUsersLimit) * 100)
                 : 0
         },
         currentPeriodEnd: subscription.currentPeriodEnd

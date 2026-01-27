@@ -10,6 +10,7 @@ const navLinks = [
   { label: 'Strumenti', href: '#strumenti' },
   { label: 'Come funziona', href: '#come-funziona' },
   { label: 'Pricing', href: '#pricing' },
+  { label: 'Diventa Partner', href: '/partner' },
   { label: 'FAQ', href: '#faq' },
 ];
 
@@ -31,11 +32,10 @@ export function LandingHeader({ session }: LandingHeaderProps) {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
           ? 'py-3 glass border-b border-[hsl(var(--border)/0.5)]'
           : 'py-5 bg-transparent'
-      }`}
+        }`}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         {/* Logo */}

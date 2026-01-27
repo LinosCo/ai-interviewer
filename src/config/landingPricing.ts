@@ -58,7 +58,7 @@ export const LANDING_PLANS: LandingPlan[] = [
             '1 progetto',
             'Interview AI',
             'Analytics base',
-            '1 utente',
+            'Analytics base',
         ],
         cta: 'Inizia Gratis',
         ctaHref: '/register',
@@ -77,7 +77,7 @@ export const LANDING_PLANS: LandingPlan[] = [
             'Chatbot illimitati',
             'Progetti illimitati',
             'Analytics completi',
-            '3 utenti',
+            'Analytics completi',
         ],
         cta: 'Inizia 14 giorni gratis',
         ctaHref: '/register?plan=starter',
@@ -95,7 +95,8 @@ export const LANDING_PLANS: LandingPlan[] = [
             'Brand Monitor',
             'AI Tips',
             'Copilot Strategico',
-            '10 utenti',
+            'Copilot Strategico',
+            'Integra G.Analytics e Search Console',
             'Supporto prioritario',
         ],
         cta: 'Inizia 14 giorni gratis',
@@ -114,7 +115,8 @@ export const LANDING_PLANS: LandingPlan[] = [
             'White Label',
             'API Access',
             'CMS Integrations',
-            'Utenti illimitati',
+            'CMS Integrations su misura',
+            'Automatizza il tuo sito',
             'Account manager dedicato',
         ],
         cta: 'Contattaci',
@@ -211,5 +213,5 @@ export function getYearlyDiscount(): number {
 export function formatPrice(price: number | null, currency = 'EUR'): string {
     if (price === null) return 'Su misura';
     if (price === 0) return 'Gratis';
-    return `${price}EUR`;
+    return `€${price}`;
 }

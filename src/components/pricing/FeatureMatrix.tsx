@@ -18,7 +18,6 @@ const FEATURE_CATEGORIES: Array<{ name: string; features: Feature[] }> = [
         features: [
             { key: 'maxInterviewsPerMonth', label: 'Interviste/mese', getValue: (p) => p.limits.maxInterviewsPerMonth === -1 ? 'Illimitate' : p.limits.maxInterviewsPerMonth },
             { key: 'maxChatbotSessionsPerMonth', label: 'Sessioni Chatbot/mese', getValue: (p) => p.limits.maxChatbotSessionsPerMonth === -1 ? 'Illimitate' : p.limits.maxChatbotSessionsPerMonth },
-            { key: 'maxUsers', label: 'Utenti', getValue: (p) => p.limits.maxUsers === -1 ? 'Illimitati' : p.limits.maxUsers }
         ]
     },
     {

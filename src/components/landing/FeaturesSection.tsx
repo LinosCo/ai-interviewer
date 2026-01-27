@@ -46,11 +46,11 @@ const features = [
     icon: Bot,
     title: 'Assistente Chat AI per il tuo Sito',
     description:
-      'Un chatbot intelligente che impara dal tuo brand, risponde ai clienti 24/7 e raccoglie insight preziosi da ogni conversazione.',
+      'Un chatbot che va oltre le risposte. Interagisce con i visitatori per comprendere bisogni e criticità, trasformando ogni conversazione in AI tips strategici per migliorare prodotto, assistenza e logistica.',
     benefits: [
       'Personalizzato con il tuo tono di voce',
-      'Risponde in italiano naturale',
-      'Impara dai tuoi documenti e FAQ',
+      'Analisi continua dei bisogni dei clienti',
+      'AI Tips per miglioramenti strategici',
       'Scala automaticamente i casi complessi',
     ],
     color: 'amber',
@@ -85,12 +85,12 @@ const features = [
     icon: LineChart,
     title: 'Monitora la Visibilità AI',
     description:
-      "Scopri come il tuo brand appare nelle risposte di ChatGPT, Perplexity e altri LLM. Monitora il posizionamento rispetto ai competitor.",
+      "Scopri come il tuo brand appare nelle risposte di ChatGPT, Claude, Gemini e nella Search Console. Monitora il posizionamento AI e ottimizza la tua visibilità.",
     benefits: [
-      'Monitoraggio LLM e Google News',
+      'Monitoraggio LLM (ChatGPT, Claude, Gemini)',
+      'Google SERP & Search Console',
       'Posizionamento vs competitor',
       'Analisi del sentiment automatica',
-      'Report dettagliati per prompt',
     ],
     color: 'green',
     mockup: (
@@ -154,29 +154,26 @@ export function FeaturesSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className={`grid lg:grid-cols-2 gap-12 items-center ${
-                index % 2 === 1 ? 'lg:grid-flow-col-dense' : ''
-              }`}
+              className={`grid lg:grid-cols-2 gap-12 items-center ${index % 2 === 1 ? 'lg:grid-flow-col-dense' : ''
+                }`}
             >
               {/* Content */}
               <div className={index % 2 === 1 ? 'lg:col-start-2' : ''}>
                 <div
-                  className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-6 ${
-                    feature.color === 'coral'
+                  className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-6 ${feature.color === 'coral'
                       ? 'bg-[hsl(var(--coral)/0.1)]'
                       : feature.color === 'amber'
-                      ? 'bg-[hsl(var(--amber)/0.1)]'
-                      : 'bg-green-500/10'
-                  }`}
+                        ? 'bg-[hsl(var(--amber)/0.1)]'
+                        : 'bg-green-500/10'
+                    }`}
                 >
                   <feature.icon
-                    className={`w-7 h-7 ${
-                      feature.color === 'coral'
+                    className={`w-7 h-7 ${feature.color === 'coral'
                         ? 'text-[hsl(var(--coral))]'
                         : feature.color === 'amber'
-                        ? 'text-[hsl(var(--amber))]'
-                        : 'text-green-500'
-                    }`}
+                          ? 'text-[hsl(var(--amber))]'
+                          : 'text-green-500'
+                      }`}
                   />
                 </div>
                 <h3 className="font-display text-2xl md:text-3xl font-bold mb-4">
@@ -213,13 +210,12 @@ export function FeaturesSection() {
                 className={`relative ${index % 2 === 1 ? 'lg:col-start-1' : ''}`}
               >
                 <div
-                  className={`absolute inset-0 rounded-3xl blur-2xl opacity-50 ${
-                    feature.color === 'coral'
+                  className={`absolute inset-0 rounded-3xl blur-2xl opacity-50 ${feature.color === 'coral'
                       ? 'bg-[hsl(var(--coral)/0.1)]'
                       : feature.color === 'amber'
-                      ? 'bg-[hsl(var(--amber)/0.1)]'
-                      : 'bg-green-500/10'
-                  }`}
+                        ? 'bg-[hsl(var(--amber)/0.1)]'
+                        : 'bg-green-500/10'
+                    }`}
                 />
                 <div className="relative bg-[hsl(var(--card))] rounded-3xl p-6 md:p-8 border border-[hsl(var(--border)/0.5)] shadow-strong">
                   {feature.mockup}

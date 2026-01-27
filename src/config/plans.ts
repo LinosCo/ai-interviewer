@@ -55,7 +55,7 @@ export interface PlanLimits {
     maxChatbotSessionsPerMonth: number;
     maxVisibilityQueriesPerMonth: number;
     maxAiSuggestionsPerMonth: number;
-    maxUsers: number;
+
     visibilityEnabled: boolean;
     aiTipsEnabled: boolean;
     whiteLabelEnabled: boolean;
@@ -122,7 +122,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxChatbotSessionsPerMonth: 0,
             maxVisibilityQueriesPerMonth: 0,
             maxAiSuggestionsPerMonth: 0,
-            maxUsers: 1,
+
             visibilityEnabled: false,
             aiTipsEnabled: false,
             whiteLabelEnabled: false,
@@ -168,7 +168,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxChatbotSessionsPerMonth: -1,
             maxVisibilityQueriesPerMonth: 100,
             maxAiSuggestionsPerMonth: 50,
-            maxUsers: 5,
+
             visibilityEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
@@ -215,7 +215,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxChatbotSessionsPerMonth: -1,
             maxVisibilityQueriesPerMonth: 0,
             maxAiSuggestionsPerMonth: 0,
-            maxUsers: 3,
+
             visibilityEnabled: false,
             aiTipsEnabled: false,
             whiteLabelEnabled: false,
@@ -265,7 +265,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxChatbotSessionsPerMonth: -1,
             maxVisibilityQueriesPerMonth: 200,
             maxAiSuggestionsPerMonth: 100,
-            maxUsers: 10,
+
             visibilityEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
@@ -280,7 +280,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             'AI Tips',
             'Copilot Strategico',
             'Progetti illimitati',
-            'Analytics avanzati'
+            'Analytics avanzati',
+            'Integra G.Analytics e Search Console'
         ]
     },
 
@@ -316,7 +317,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxChatbotSessionsPerMonth: -1,
             maxVisibilityQueriesPerMonth: 500,
             maxAiSuggestionsPerMonth: 200,
-            maxUsers: -1,
+
             visibilityEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: true,
@@ -329,7 +330,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             'White Label',
             'API Access',
             'CMS Integrations',
+            'Integrazioni CMS su misura',
             'Progetti illimitati',
+            'Automatizza il tuo sito',
             'Supporto prioritario'
         ]
     },
@@ -366,7 +369,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxChatbotSessionsPerMonth: -1,
             maxVisibilityQueriesPerMonth: 200,
             maxAiSuggestionsPerMonth: 100,
-            maxUsers: -1,
+
             visibilityEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
@@ -416,7 +419,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxChatbotSessionsPerMonth: -1,
             maxVisibilityQueriesPerMonth: -1,
             maxAiSuggestionsPerMonth: -1,
-            maxUsers: -1,
+
             visibilityEnabled: true,
             aiTipsEnabled: true,
             whiteLabelEnabled: true,

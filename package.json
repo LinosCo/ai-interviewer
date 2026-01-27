@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "postinstall": "prisma generate && prisma db push --accept-data-loss && prisma db seed"
   },
   "dependencies": {

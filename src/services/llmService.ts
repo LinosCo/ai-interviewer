@@ -2,8 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { Bot, GlobalConfig, User } from '@prisma/client';
+import fs from 'fs';
+import path from 'path';
 
 export type ModelProvider = 'openai' | 'anthropic';
+
+// Cache for methodology file - loaded once at startup
+let methodologyCache: string | null = null;
 
 export class LLMService {
     static async getApiKey(bot: Bot, provider: ModelProvider): Promise<string | null> {
@@ -38,16 +43,23 @@ export class LLMService {
     }
 
     /**
-     * Helper to load methodology from disk
+     * Helper to load methodology from disk (cached)
      */
     static getMethodology(): string {
-        const fs = require('fs');
-        const path = require('path');
+        if (methodologyCache !== null) {
+            return methodologyCache;
+        }
+
         try {
-            return fs.readFileSync(path.join(process.cwd(), 'knowledge', 'interview-methodology.md'), 'utf-8');
+            methodologyCache = fs.readFileSync(
+                path.join(process.cwd(), 'knowledge', 'interview-methodology.md'),
+                'utf-8'
+            );
+            return methodologyCache;
         } catch (e) {
             console.warn("Methodology file missing, using empty string");
-            return "";
+            methodologyCache = "";
+            return methodologyCache;
         }
     }
 }

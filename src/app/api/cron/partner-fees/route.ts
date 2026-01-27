@@ -46,7 +46,7 @@ export async function POST(request: Request) {
             const activeClients = await PartnerService.getActiveClientsCount(partner.id);
 
             // 3. Calcola fee e white label
-            let newFee = PARTNER_THRESHOLDS.baseMonthlyFee;
+            let newFee: number = PARTNER_THRESHOLDS.baseMonthlyFee;
             let newWhiteLabel = false;
 
             if (activeClients >= PARTNER_THRESHOLDS.whiteLabelThreshold) {

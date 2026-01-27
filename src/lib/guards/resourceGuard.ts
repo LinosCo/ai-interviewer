@@ -16,36 +16,44 @@ const resourceToAction: Record<string, CreditAction> = {
 };
 
 /**
- * Verifica se l'utente ha crediti sufficienti per usare una risorsa
- * Sistema basato su USER, non su organization
+ * Verifica se l'utente può usare una risorsa
+ *
+ * Il controllo viene fatto sul PROPRIETARIO del progetto.
+ * Il piano dell'owner determina le feature disponibili.
+ *
+ * @param resourceType - Tipo di risorsa da verificare
+ * @param tokensNeeded - Token necessari (opzionale)
+ * @param options - projectId per determinare l'owner
  */
 export async function checkResourceAccess(
     resourceType: 'TOKENS' | 'INTERVIEW' | 'CHATBOT_SESSION' | 'VISIBILITY_QUERY' | 'AI_SUGGESTION',
-    tokensNeeded: number = 0
+    tokensNeeded: number = 0,
+    options?: { projectId?: string }
 ) {
     const session = await auth();
     if (!session?.user?.id) {
         return { allowed: false, error: 'Unauthorized', status: 401 };
     }
 
-    const userId = session.user.id;
+    const currentUserId = session.user.id;
+    let ownerId = currentUserId; // Default: utente loggato
 
-    // Ottieni organizationId per backward compatibility
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-            memberships: {
-                take: 1
-            }
+    // Se è specificato un projectId, usa il proprietario del progetto
+    if (options?.projectId) {
+        const project = await prisma.project.findUnique({
+            where: { id: options.projectId },
+            select: { ownerId: true }
+        });
+
+        if (project?.ownerId) {
+            ownerId = project.ownerId;
         }
-    });
+    }
 
-    const organizationId = user?.memberships[0]?.organizationId;
-
-    // Usa il nuovo sistema di crediti per utente
+    // Verifica crediti e piano dell'owner
     const action = resourceToAction[resourceType] || 'interview_question';
     const check = await TokenTrackingService.checkCanUseResource({
-        userId,
+        userId: ownerId,
         action,
         customAmount: tokensNeeded > 0 ? tokensNeeded : undefined
     });
@@ -55,8 +63,8 @@ export async function checkResourceAccess(
             allowed: false,
             error: check.reason || 'Crediti insufficienti',
             status: 403,
-            organizationId,
-            userId,
+            userId: currentUserId,
+            ownerId,
             creditsNeeded: check.creditsNeeded,
             creditsAvailable: check.creditsAvailable
         };
@@ -64,8 +72,8 @@ export async function checkResourceAccess(
 
     return {
         allowed: true,
-        organizationId,
-        userId,
+        userId: currentUserId,
+        ownerId,
         creditsNeeded: check.creditsNeeded,
         creditsAvailable: check.creditsAvailable
     };
@@ -89,29 +97,42 @@ export function withResourceGuard(
             }, { status: access.status });
         }
 
-        // Passa userId e organizationId al handler
         return handler(req, {
             ...args[0],
-            organizationId: access.organizationId,
-            userId: access.userId
+            userId: access.userId,
+            ownerId: access.ownerId
         });
     };
 }
 
 /**
- * Verifica crediti con nuovo sistema (CreditAction based)
+ * Verifica crediti per azione specifica
  */
 export async function checkCreditsForAction(
     action: CreditAction,
-    customAmount?: number
+    customAmount?: number,
+    projectId?: string
 ) {
     const session = await auth();
     if (!session?.user?.id) {
         return { allowed: false, error: 'Unauthorized', status: 401 };
     }
 
+    let ownerId = session.user.id;
+
+    // Se c'è un projectId, usa l'owner del progetto
+    if (projectId) {
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { ownerId: true }
+        });
+        if (project?.ownerId) {
+            ownerId = project.ownerId;
+        }
+    }
+
     const check = await TokenTrackingService.checkCanUseResource({
-        userId: session.user.id,
+        userId: ownerId,
         action,
         customAmount
     });
@@ -122,6 +143,7 @@ export async function checkCreditsForAction(
             error: check.reason || 'Crediti insufficienti',
             status: 403,
             userId: session.user.id,
+            ownerId,
             creditsNeeded: check.creditsNeeded,
             creditsAvailable: check.creditsAvailable
         };
@@ -130,6 +152,7 @@ export async function checkCreditsForAction(
     return {
         allowed: true,
         userId: session.user.id,
+        ownerId,
         creditsNeeded: check.creditsNeeded,
         creditsAvailable: check.creditsAvailable
     };

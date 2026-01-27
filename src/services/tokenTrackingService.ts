@@ -154,6 +154,9 @@ export class TokenTrackingService {
 
     /**
      * Verifica se l'utente può usare una risorsa (ha crediti sufficienti)
+     *
+     * Il piano dell'utente (User.plan) determina le feature disponibili.
+     * I crediti sono a livello utente.
      */
     static async checkCanUseResource(params: {
         userId: string;
@@ -167,6 +170,7 @@ export class TokenTrackingService {
             where: { id: userId },
             select: {
                 plan: true,
+                role: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true
@@ -177,12 +181,12 @@ export class TokenTrackingService {
             return { allowed: false, reason: 'Utente non trovato' };
         }
 
-        // Piano ADMIN ha crediti illimitati
-        if (user.monthlyCreditsLimit === BigInt(-1)) {
+        // Admin role o piano ADMIN hanno accesso illimitato
+        if (user.role === 'ADMIN' || user.plan === 'ADMIN' || user.monthlyCreditsLimit === BigInt(-1)) {
             return { allowed: true };
         }
 
-        // Verifica feature disponibile per il piano
+        // Verifica feature disponibile per il piano dell'utente
         const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
         const featureCheck = this.checkFeatureForAction(action, plan);
         if (!featureCheck.allowed) {

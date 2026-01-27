@@ -7,28 +7,46 @@ import { checkResourceAccess } from '@/lib/guards/resourceGuard';
 export async function POST(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+        // Trova la config di visibility per l'utente
+        // Prima cerca per projectId di cui l'utente è owner
+        const config = await prisma.visibilityConfig.findFirst({
+            where: {
+                OR: [
+                    // Config legata a un progetto di cui l'utente è owner
+                    {
+                        project: {
+                            ownerId: session.user.id
+                        }
+                    },
+                    // Fallback: config dell'org di cui è membro (legacy)
+                    {
+                        organization: {
+                            members: {
+                                some: { userId: session.user.id }
+                            }
+                        }
+                    }
+                ]
+            },
             include: {
-                memberships: {
-                    take: 1,
-                    include: { organization: true }
+                project: {
+                    select: { id: true, ownerId: true }
                 }
             }
         });
 
-        if (!user || !user.memberships[0]) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!config) {
+            return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        // Check plan limits - usa l'owner del progetto
+        const projectId = config.projectId || config.project?.id;
+        const access = await checkResourceAccess('VISIBILITY_QUERY', 0, { projectId: projectId || undefined });
 
-        // Check plan limits via ResourceGuard
-        const access = await checkResourceAccess('VISIBILITY_QUERY');
         if (!access.allowed) {
             return NextResponse.json(
                 { error: access.error },
@@ -36,16 +54,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { organizationId },
-            include: { organization: true }
-        });
-
-        if (!config) {
-            return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
-        }
-
-        // Check 24h cooldown - find last scan for this config
+        // Check 24h cooldown
         const lastScan = await prisma.visibilityScan.findFirst({
             where: { configId: config.id },
             orderBy: { startedAt: 'desc' }
@@ -65,10 +74,6 @@ export async function POST(request: Request) {
                 );
             }
         }
-
-        // Create today date range
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
 
         // Run the scan
         const result = await VisibilityEngine.runScan(config.id);

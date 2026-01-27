@@ -1108,10 +1108,10 @@ model PartnerClientAttribution {
   revokedAt       DateTime?
   revokedReason   String?
 
-  // Relazioni
-  partner         User     @relation("PartnerAttributions", fields: [partnerId], references: [id])
-  clientUser      User     @relation("ClientAttribution", fields: [clientUserId], references: [id])
-  firstProject    Project? @relation("FirstAttributionProject", fields: [firstProjectId], references: [id])
+  // Relazioni con onDelete per evitare errori referenziali
+  partner         User     @relation("PartnerAttributions", fields: [partnerId], references: [id], onDelete: Cascade)
+  clientUser      User     @relation("ClientAttribution", fields: [clientUserId], references: [id], onDelete: Cascade)
+  firstProject    Project? @relation("FirstAttributionProject", fields: [firstProjectId], references: [id], onDelete: SetNull)
 
   @@index([partnerId])
   @@index([partnerId, status])

@@ -2,7 +2,7 @@ import { signOut, auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { gradients } from '@/lib/design-system';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
-import { ProjectProvider } from '@/contexts/ProjectContext';
+import { DashboardProviders } from '@/components/dashboard/DashboardProviders';
 import { StrategyCopilot } from '@/components/copilot/StrategyCopilot';
 import { PLANS, PlanType } from '@/config/plans';
 
@@ -92,7 +92,7 @@ export default async function DashboardLayout({
     };
 
     return (
-        <ProjectProvider>
+        <DashboardProviders>
             <div className="flex flex-col md:flex-row h-screen overflow-hidden font-sans" style={{ background: gradients.mesh }}>
 
                 <DashboardSidebar
@@ -118,7 +118,7 @@ export default async function DashboardLayout({
                     organizationId={organizationId}
                 />
             </div>
-        </ProjectProvider>
+        </DashboardProviders>
     );
 }
 

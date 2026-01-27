@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import GlobalProjectSelector from './GlobalProjectSelector';
+import OrganizationSwitcher from './OrganizationSwitcher';
 import { ChevronDown } from 'lucide-react';
 
 interface DashboardSidebarProps {
@@ -67,6 +68,9 @@ export function DashboardSidebar({
                     <span className="font-bold text-xl text-gray-900 tracking-tight">Business Tuner</span>
                 </Link>
 
+                {/* Organization Switcher */}
+                <OrganizationSwitcher />
+
                 {/* Project Selector */}
                 <div className="mb-6">
                     <GlobalProjectSelector />
@@ -91,6 +95,7 @@ export function DashboardSidebar({
                         <DashboardLink href="/dashboard/projects" icon={<Icons.FolderKanban size={20} />} label="Progetti" onClick={() => setIsOpen(false)} />
                     )}
                     <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
+                    <DashboardLink href="/dashboard/settings/members" icon={<Icons.Users size={20} />} label="Team" onClick={() => setIsOpen(false)} />
                 </nav>
 
                 {/* Bottom Section */}

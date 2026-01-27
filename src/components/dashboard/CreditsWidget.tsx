@@ -7,9 +7,10 @@
  * con barra di progresso colorata e CTA per acquisto/upgrade
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Zap, RefreshCcw } from 'lucide-react';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface CreditsData {
     monthlyLimit: number;
@@ -31,18 +32,16 @@ interface CreditsData {
 }
 
 export function CreditsWidget() {
+    const { currentOrganization } = useOrganization();
     const [credits, setCredits] = useState<CreditsData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchCredits();
-    }, []);
-
-    const fetchCredits = async () => {
+    const fetchCredits = useCallback(async () => {
+        if (!currentOrganization) return;
         try {
             setLoading(true);
-            const res = await fetch('/api/credits');
+            const res = await fetch(`/api/credits?organizationId=${currentOrganization.id}`);
             if (!res.ok) throw new Error('Errore nel caricamento');
             const data = await res.json();
             setCredits(data);
@@ -52,7 +51,11 @@ export function CreditsWidget() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentOrganization]);
+
+    useEffect(() => {
+        fetchCredits();
+    }, [fetchCredits]);
 
     if (loading) {
         return (

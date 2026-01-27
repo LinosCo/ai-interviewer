@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useOrganization } from './OrganizationContext';
 
 interface Project {
     id: string;
@@ -29,29 +30,36 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-const SELECTED_PROJECT_KEY = 'bt_selected_project_id';
+const SELECTED_PROJECT_KEY_PREFIX = 'bt_selected_project_id_';
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
+    const { currentOrganization } = useOrganization();
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProject, setSelectedProjectState] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
     const [isOrgAdmin, setIsOrgAdmin] = useState(false);
 
-    const fetchProjects = async () => {
+    const fetchProjects = useCallback(async () => {
+        if (!currentOrganization) {
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
         try {
-            const res = await fetch('/api/projects');
+            const res = await fetch(`/api/projects?organizationId=${currentOrganization.id}`);
             if (res.ok) {
                 const data = await res.json();
-                const projectsList = data.projects || data; // Support both old and new API format
+                const projectsList = data.projects || [];
                 const adminStatus = data.isOrgAdmin || false;
 
                 setProjects(projectsList);
                 setIsOrgAdmin(adminStatus);
 
-                // Restore selected project from localStorage or set default
-                const savedProjectId = localStorage.getItem(SELECTED_PROJECT_KEY);
+                // Restore selected project from localStorage (organization-specific)
+                const storageKey = `${SELECTED_PROJECT_KEY_PREFIX}${currentOrganization.id}`;
+                const savedProjectId = localStorage.getItem(storageKey);
 
-                // Handle "All Projects" selection for admins
                 if (savedProjectId === ALL_PROJECTS_OPTION.id && adminStatus) {
                     setSelectedProjectState(ALL_PROJECTS_OPTION);
                 } else if (savedProjectId) {
@@ -59,21 +67,22 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
                     if (savedProject) {
                         setSelectedProjectState(savedProject);
                     } else if (adminStatus) {
-                        // Saved project not found, default to "All Projects" for admins
                         setSelectedProjectState(ALL_PROJECTS_OPTION);
-                        localStorage.setItem(SELECTED_PROJECT_KEY, ALL_PROJECTS_OPTION.id);
+                        localStorage.setItem(storageKey, ALL_PROJECTS_OPTION.id);
                     } else if (projectsList.length > 0) {
                         setSelectedProjectState(projectsList[0]);
-                        localStorage.setItem(SELECTED_PROJECT_KEY, projectsList[0].id);
+                        localStorage.setItem(storageKey, projectsList[0].id);
+                    } else {
+                        setSelectedProjectState(null);
                     }
                 } else if (adminStatus) {
-                    // No saved project, default to "All Projects" for admins
                     setSelectedProjectState(ALL_PROJECTS_OPTION);
-                    localStorage.setItem(SELECTED_PROJECT_KEY, ALL_PROJECTS_OPTION.id);
+                    localStorage.setItem(storageKey, ALL_PROJECTS_OPTION.id);
                 } else if (projectsList.length > 0) {
-                    // Default to first project for non-admins
                     setSelectedProjectState(projectsList[0]);
-                    localStorage.setItem(SELECTED_PROJECT_KEY, projectsList[0].id);
+                    localStorage.setItem(storageKey, projectsList[0].id);
+                } else {
+                    setSelectedProjectState(null);
                 }
             }
         } catch (error) {
@@ -81,21 +90,21 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentOrganization]);
 
     useEffect(() => {
         fetchProjects();
-    }, []);
+    }, [fetchProjects]);
 
     const setSelectedProject = (project: Project | null) => {
         setSelectedProjectState(project);
-        if (project) {
-            localStorage.setItem(SELECTED_PROJECT_KEY, project.id);
+        if (project && currentOrganization) {
+            const storageKey = `${SELECTED_PROJECT_KEY_PREFIX}${currentOrganization.id}`;
+            localStorage.setItem(storageKey, project.id);
         }
     };
 
     const refetchProjects = async () => {
-        setLoading(true);
         await fetchProjects();
     };
 

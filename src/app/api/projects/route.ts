@@ -3,51 +3,45 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return new Response('Unauthorized', { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
-                projectAccess: {
-                    include: {
-                        project: {
-                            select: {
-                                id: true,
-                                name: true,
-                                isPersonal: true,
-                                createdAt: true
-                            }
-                        }
-                    }
-                },
-                memberships: {
-                    select: { role: true }
+        const { searchParams } = new URL(req.url);
+        const organizationId = searchParams.get('organizationId');
+
+        if (!organizationId) {
+            return Response.json({ projects: [], isOrgAdmin: false });
+        }
+
+        // Verify membership and fetch projects for that organization
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId
                 }
             }
         });
 
-        if (!user) return new Response('User not found', { status: 404 });
+        if (!membership) {
+            return new Response('Organization not found or access denied', { status: 403 });
+        }
 
-        // Check if user is ADMIN or OWNER in organization
-        const isOrgAdmin = user.memberships.some(m => ['OWNER', 'ADMIN'].includes(m.role));
-
-        // Map projects with role information
-        const projects = user.projectAccess.map(pa => ({
-            ...pa.project,
-            role: pa.role
-        }));
-
-        // Sort: personal project first, then by name
-        projects.sort((a, b) => {
-            if (a.isPersonal && !b.isPersonal) return -1;
-            if (!a.isPersonal && b.isPersonal) return 1;
-            return a.name.localeCompare(b.name);
+        const projects = await prisma.project.findMany({
+            where: { organizationId },
+            select: {
+                id: true,
+                name: true,
+                isPersonal: true,
+                createdAt: true
+            }
         });
+
+        const isOrgAdmin = ['OWNER', 'ADMIN'].includes(membership.role);
 
         return Response.json({ projects, isOrgAdmin });
 

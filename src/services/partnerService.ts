@@ -4,14 +4,15 @@
  * Gestisce la logica del programma Partner:
  * - Registrazione come partner
  * - Gestione trial 60 giorni
- * - Tracking clienti attivi
+ * - Tracking organizzazioni clienti attive
  * - Calcolo fee (€0 con 3+ clienti, €29 altrimenti)
  * - White label con 10+ clienti
- * - Trasferimento progetti
+ * - Trasferimento progetti verso organizzazioni
  */
 
 import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType, PARTNER_THRESHOLDS } from '@/config/plans';
+import crypto from 'crypto';
 
 // ============================================
 // TYPES
@@ -22,7 +23,7 @@ export interface PartnerStatus {
     status: 'trial' | 'active' | 'suspended' | 'grace_period' | null;
     trialEndDate: Date | null;
     trialDaysRemaining: number | null;
-    activeClients: number;
+    activeClients: number; // Organizzazioni con piano pagante
     monthlyFee: number;
     hasWhiteLabel: boolean;
     gracePeriodEndDate: Date | null;
@@ -30,9 +31,9 @@ export interface PartnerStatus {
 }
 
 export interface PartnerClient {
-    id: string;
+    id: string; // Organization ID
     name: string;
-    email: string;
+    email: string; // Billing email o owner email
     projectsCount: number;
     totalCreditsUsed: number;
     createdAt: Date;
@@ -41,9 +42,9 @@ export interface PartnerClient {
 
 export interface PartnerClientDetailed {
     attributionId: string;
-    clientId: string;
-    clientName: string | null;
-    clientEmail: string;
+    organizationId: string;
+    organizationName: string | null;
+    ownerEmail: string;
     plan: string;
     subscriptionStatus: string | null;
     isActive: boolean; // Conta per soglie?
@@ -83,7 +84,7 @@ export const PartnerService = {
     async registerAsPartner(userId: string): Promise<{ success: boolean; error?: string }> {
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { isPartner: true, plan: true }
+            select: { isPartner: true }
         });
 
         if (!user) {
@@ -106,9 +107,7 @@ export const PartnerService = {
                 partnerTrialEndDate: trialEndDate,
                 partnerFee: 0, // Trial gratuito
                 partnerActiveClients: 0,
-                partnerWhiteLabel: false,
-                plan: PlanType.PARTNER,
-                monthlyCreditsLimit: BigInt(PLANS[PlanType.PARTNER].monthlyCredits)
+                partnerWhiteLabel: false
             }
         });
 
@@ -174,70 +173,54 @@ export const PartnerService = {
     },
 
     /**
-     * Ottiene la lista dei clienti del partner
+     * Ottiene la lista dei clienti del partner (Organizzazioni)
      */
     async getPartnerClients(userId: string): Promise<PartnerClient[]> {
-        // Trova progetti trasferiti dal partner
-        const transfers = await prisma.projectTransfer.findMany({
-            where: {
-                partnerId: userId
-            },
+        // Trova attribuzioni
+        const attributions = await prisma.partnerClientAttribution.findMany({
+            where: { partnerId: userId },
             include: {
-                duplicatedProject: {
+                clientOrganization: {
                     include: {
-                        owner: {
-                            select: {
-                                id: true,
-                                name: true,
-                                email: true,
-                                monthlyCreditsUsed: true,
-                                createdAt: true
-                            }
+                        _count: { select: { projects: true } },
+                        members: {
+                            where: { role: 'OWNER' },
+                            include: { user: { select: { email: true } } }
                         }
                     }
                 }
             }
         });
 
-        // Raggruppa per utente destinatario (clientId)
-        const clientsMap = new Map<string, PartnerClient>();
+        return attributions.map(attr => {
+            const org = attr.clientOrganization;
+            const ownerEmail = org?.members[0]?.user?.email || '';
 
-        for (const transfer of transfers) {
-            const client = transfer.duplicatedProject?.owner;
-            if (!client) continue;
-
-            const existing = clientsMap.get(client.id);
-            if (existing) {
-                existing.projectsCount++;
-            } else {
-                clientsMap.set(client.id, {
-                    id: client.id,
-                    name: client.name || 'Sconosciuto',
-                    email: client.email || '',
-                    projectsCount: 1,
-                    totalCreditsUsed: Number(client.monthlyCreditsUsed || 0),
-                    createdAt: client.createdAt,
-                    status: 'active'
-                });
-            }
-        }
-
-        return Array.from(clientsMap.values());
+            return {
+                id: org?.id || '',
+                name: org?.name || 'Sconosciuto',
+                email: ownerEmail,
+                projectsCount: org?._count.projects || 0,
+                totalCreditsUsed: Number(org?.monthlyCreditsUsed || 0),
+                createdAt: org?.createdAt || new Date(),
+                status: 'active'
+            };
+        });
     },
 
     /**
-     * Crea un invito per trasferire un progetto
+     * Crea un invito per trasferire un progetto verso un'organizzazione
      */
     async createProjectTransferInvite(params: {
-        fromUserId: string;
+        partnerId: string;
         projectId: string;
-        toEmail: string;
+        toEmail: string; // Email della persona che riceverà il progetto (nella sua org)
     }): Promise<TransferResult> {
-        const { fromUserId, projectId, toEmail } = params;
+        const { partnerId, projectId, toEmail } = params;
 
         // Verifica che l'utente sia partner
         const user = await prisma.user.findUnique({
-            where: { id: fromUserId },
+            where: { id: partnerId },
             select: { isPartner: true, partnerStatus: true }
         });
 
@@ -250,14 +233,12 @@ export const PartnerService = {
         }
 
         // Verifica che il progetto esista e appartenga al partner
-        const project = await prisma.project.findFirst({
-            where: {
-                id: projectId,
-                ownerId: fromUserId
-            }
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { ownerId: true }
         });
 
-        if (!project) {
+        if (!project || project.ownerId !== partnerId) {
             return { success: false, error: 'Progetto non trovato o non sei il proprietario' };
         }
 
@@ -282,7 +263,7 @@ export const PartnerService = {
         const invite = await prisma.projectTransferInvite.create({
             data: {
                 projectId,
-                partnerId: fromUserId,
+                partnerId: partnerId,
                 clientEmail: toEmail,
                 token,
                 expiresAt,
@@ -301,13 +282,15 @@ export const PartnerService = {
     },
 
     /**
-     * Accetta un invito di trasferimento
+     * Accetta un invito di trasferimento (da parte del cliente)
+     * Crea una copia del progetto nell'organizzazione attiva dell'utente
      */
     async acceptProjectTransfer(params: {
         token: string;
         acceptingUserId: string;
+        targetOrganizationId: string;
     }): Promise<TransferResult> {
-        const { token, acceptingUserId } = params;
+        const { token, acceptingUserId, targetOrganizationId } = params;
 
         // Trova l'invito
         const invite = await prisma.projectTransferInvite.findUnique({
@@ -330,7 +313,7 @@ export const PartnerService = {
             return { success: false, error: 'Invito scaduto' };
         }
 
-        // Verifica email
+        // Verifica email (opzionale se l'utente è già loggato e vogliamo essere flessibili, ma meglio per sicurezza)
         const acceptingUser = await prisma.user.findUnique({
             where: { id: acceptingUserId },
             select: { email: true }
@@ -346,7 +329,7 @@ export const PartnerService = {
         });
 
         if (!originalProject) {
-            return { success: false, error: 'Progetto non trovato' };
+            return { success: false, error: 'Progetto originale non trovato' };
         }
 
         // Esegui trasferimento (duplica progetto invece di trasferirlo)
@@ -357,63 +340,75 @@ export const PartnerService = {
                 data: { status: 'accepted' }
             });
 
-            // Crea copia del progetto per il cliente
+            // Crea copia del progetto per l'organizzazione del cliente
             const duplicatedProject = await tx.project.create({
                 data: {
                     name: originalProject.name,
-                    ownerId: acceptingUserId,
-                    organizationId: originalProject.organizationId,
-                    originPartnerId: invite.partnerId // Traccia origine
+                    ownerId: acceptingUserId, // L'utente che accetta diventa l'owner locale del progetto clonizzato
+                    organizationId: targetOrganizationId,
+                    originPartnerId: invite.partnerId // Traccia origine per reportistica partner
                 }
             });
 
-            // Crea record trasferimento
+            // Crea record trasferimento definitivo
             await tx.projectTransfer.create({
                 data: {
                     originalProjectId: invite.projectId,
                     duplicatedProjectId: duplicatedProject.id,
                     partnerId: invite.partnerId,
-                    clientId: acceptingUserId
+                    clientId: acceptingUserId, // Utente che ha accettato
+                    targetOrganizationId: targetOrganizationId
                 }
             });
 
-            // Crea attribuzione SE non esiste già
+            // Crea attribuzione partner -> organizzazione SE non esiste già
             const existingAttribution = await tx.partnerClientAttribution.findUnique({
-                where: { clientUserId: acceptingUserId }
+                where: { clientOrganizationId: targetOrganizationId }
             });
 
             if (!existingAttribution) {
                 await tx.partnerClientAttribution.create({
                     data: {
                         partnerId: invite.partnerId,
-                        clientUserId: acceptingUserId,
+                        clientOrganizationId: targetOrganizationId,
                         firstProjectId: duplicatedProject.id,
                         status: 'active'
                     }
                 });
             }
 
-            // Ricalcola clienti attivi
-            const activeCount = await tx.partnerClientAttribution.count({
-                where: {
-                    partnerId: invite.partnerId,
-                    status: 'active',
-                    clientUser: {
-                        plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
-                    }
-                }
-            });
-
-            await tx.user.update({
-                where: { id: invite.partnerId },
-                data: { partnerActiveClients: activeCount }
-            });
+            // Ricalcola clienti attivi per il partner
+            await this.refreshPartnerActiveClientsCount(invite.partnerId, tx);
         });
 
-        // Aggiorna status partner (white label, fee, etc.)
+        // Aggiorna status partner globale (white label, fee, etc.)
         await this.updatePartnerStatus(invite.partnerId);
 
         return { success: true };
+    },
+
+    /**
+     * Ricalcola il conteggio dei clienti attivi (organizzazioni con piano pagante)
+     */
+    async refreshPartnerActiveClientsCount(partnerId: string, tx?: any): Promise<number> {
+        const db = tx || prisma;
+
+        const activeCount = await db.partnerClientAttribution.count({
+            where: {
+                partnerId: partnerId,
+                status: 'active',
+                clientOrganization: {
+                    plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
+                }
+            }
+        });
+
+        await db.user.update({
+            where: { id: partnerId },
+            data: { partnerActiveClients: activeCount }
+        });
+
+        return activeCount;
     },
 
     /**
@@ -447,18 +442,18 @@ export const PartnerService = {
                 newStatus = 'active';
                 newFee = 0;
             } else {
-                // Avvia grace period
-                newStatus = 'grace_period';
-                gracePeriodStart = now;
+                // Avvia grace period se non è già attivo
+                if (user.partnerStatus !== 'grace_period') {
+                    newStatus = 'grace_period';
+                    gracePeriodStart = now;
+                }
             }
         }
 
-        // Se già attivo, controlla soglie
-        if (user.partnerStatus === 'active' || user.partnerStatus === 'grace_period') {
-            if (activeClients >= PARTNER_THRESHOLDS.freeThreshold) {
-                newStatus = 'active';
-                newFee = 0;
-            }
+        // Se già attivo o in grace period, controlla se ha raggiunto i 3 clienti
+        if (activeClients >= PARTNER_THRESHOLDS.freeThreshold) {
+            newStatus = 'active';
+            newFee = 0;
         }
 
         // White label con 10+ clienti
@@ -478,164 +473,25 @@ export const PartnerService = {
     },
 
     /**
-     * Aggiorna logo personalizzato del partner (solo con white label)
-     */
-    async updateCustomLogo(userId: string, logoUrl: string | null): Promise<{ success: boolean; error?: string }> {
-        const status = await this.getPartnerStatus(userId);
-
-        if (!status?.hasWhiteLabel) {
-            return { success: false, error: 'White label non disponibile. Raggiungi 10+ clienti.' };
-        }
-
-        await prisma.user.update({
-            where: { id: userId },
-            data: { partnerCustomLogo: logoUrl }
-        });
-
-        return { success: true };
-    },
-
-    /**
-     * Verifica e aggiorna tutti i partner (per cron)
-     */
-    async checkAllPartnersStatus(): Promise<{ updated: number }> {
-        const partners = await prisma.user.findMany({
-            where: { isPartner: true },
-            select: { id: true }
-        });
-
-        let updated = 0;
-        for (const partner of partners) {
-            await this.updatePartnerStatus(partner.id);
-            updated++;
-        }
-
-        return { updated };
-    },
-
-    // ============================================
-    // FUNZIONI ATTRIBUZIONE PARTNER-CLIENTE
-    // ============================================
-
-    /**
-     * Verifica se un cliente è già attribuito a qualche partner
-     */
-    async getExistingAttribution(clientUserId: string): Promise<{
-        exists: boolean;
-        partnerId?: string;
-        attributedAt?: Date;
-    }> {
-        const attribution = await prisma.partnerClientAttribution.findUnique({
-            where: { clientUserId },
-            select: {
-                partnerId: true,
-                attributedAt: true
-            }
-        });
-
-        if (!attribution) {
-            return { exists: false };
-        }
-
-        return {
-            exists: true,
-            partnerId: attribution.partnerId,
-            attributedAt: attribution.attributedAt
-        };
-    },
-
-    /**
-     * Crea attribuzione partner → cliente (se non esiste già)
-     */
-    async createAttribution(params: {
-        partnerId: string;
-        clientUserId: string;
-        firstProjectId?: string;
-    }): Promise<{ success: boolean; created: boolean; error?: string }> {
-        const { partnerId, clientUserId, firstProjectId } = params;
-
-        // Verifica se già attribuito
-        const existing = await this.getExistingAttribution(clientUserId);
-
-        if (existing.exists) {
-            return {
-                success: true,
-                created: false,
-                error: existing.partnerId === partnerId
-                    ? 'Cliente già attribuito a te'
-                    : 'Cliente già attribuito ad altro partner'
-            };
-        }
-
-        // Crea attribuzione
-        await prisma.partnerClientAttribution.create({
-            data: {
-                partnerId,
-                clientUserId,
-                firstProjectId,
-                status: 'active'
-            }
-        });
-
-        return { success: true, created: true };
-    },
-
-    /**
-     * Conta clienti attivi (con abbonamento pagante) per un partner
-     */
-    async getActiveClientsCount(partnerId: string): Promise<number> {
-        const count = await prisma.partnerClientAttribution.count({
-            where: {
-                partnerId,
-                status: 'active',
-                clientUser: {
-                    plan: { in: ['STARTER', 'PRO', 'BUSINESS'] }
-                }
-            }
-        });
-
-        return count;
-    },
-
-    /**
-     * Ottiene lista clienti dettagliata per dashboard partner
-     * OTTIMIZZATO: Usa query parallele invece di include annidati per evitare N+1
+     * Ottiene lista clienti dettagliata per dashboard partner (Organizzazioni)
      */
     async getPartnerClientsDetailed(partnerId: string): Promise<PartnerClientsSummary> {
-        // Esegui tutte le query in parallelo
-        const [attributions, projectCounts, pendingInvites] = await Promise.all([
-            // 1. Ottieni attribuzioni con dati cliente (senza include annidati)
+        const [attributions, pendingInvites] = await Promise.all([
             prisma.partnerClientAttribution.findMany({
-                where: {
-                    partnerId,
-                    status: 'active'
-                },
-                select: {
-                    id: true,
-                    clientUserId: true,
-                    attributedAt: true,
-                    clientUser: {
-                        select: {
-                            id: true,
-                            name: true,
-                            email: true,
-                            plan: true
+                where: { partnerId, status: 'active' },
+                include: {
+                    clientOrganization: {
+                        include: {
+                            _count: { select: { projects: true } },
+                            members: {
+                                where: { role: 'OWNER' },
+                                include: { user: { select: { email: true, name: true } } }
+                            }
                         }
                     },
-                    firstProject: {
-                        select: {
-                            name: true
-                        }
-                    }
+                    firstProject: { select: { name: true } }
                 }
             }),
-            // 2. Conta progetti per cliente - singola query aggregata
-            prisma.projectTransfer.groupBy({
-                by: ['clientId'],
-                where: { partnerId },
-                _count: { id: true }
-            }),
-            // 3. Conta inviti pendenti
             prisma.projectTransferInvite.count({
                 where: {
                     partnerId,
@@ -645,63 +501,26 @@ export const PartnerService = {
             })
         ]);
 
-        // Crea map per lookup veloce
-        const projectCountMap = new Map(
-            projectCounts.map(p => [p.clientId, p._count.id])
-        );
-
-        // 4. Se ci sono clienti, carica subscription status in batch
-        const clientUserIds = attributions.map(a => a.clientUserId);
-        let subscriptionStatusMap = new Map<string, string | null>();
-
-        if (clientUserIds.length > 0) {
-            // Singola query per ottenere subscription status di tutti i clienti
-            const membershipsWithSubs = await prisma.membership.findMany({
-                where: {
-                    userId: { in: clientUserIds }
-                },
-                select: {
-                    userId: true,
-                    organization: {
-                        select: {
-                            subscription: {
-                                select: { status: true }
-                            }
-                        }
-                    }
-                },
-                distinct: ['userId']
-            });
-
-            subscriptionStatusMap = new Map(
-                membershipsWithSubs.map(m => [
-                    m.userId,
-                    m.organization?.subscription?.status || null
-                ])
-            );
-        }
-
-        // 5. Mappa a formato dettagliato
         const clients: PartnerClientDetailed[] = attributions.map(attr => {
-            const subscriptionStatus = subscriptionStatusMap.get(attr.clientUserId) || null;
-            const plan = attr.clientUser.plan;
-            const isActive = ['STARTER', 'PRO', 'BUSINESS'].includes(plan) && subscriptionStatus === 'ACTIVE';
+            const org = attr.clientOrganization;
+            const owner = org?.members[0]?.user;
+            const plan = org?.plan || 'FREE';
+            const isActive = ['STARTER', 'PRO', 'BUSINESS'].includes(plan);
 
             return {
                 attributionId: attr.id,
-                clientId: attr.clientUserId,
-                clientName: attr.clientUser.name,
-                clientEmail: attr.clientUser.email,
+                organizationId: org?.id || '',
+                organizationName: org?.name || 'Sconosciuto',
+                ownerEmail: owner?.email || '',
                 plan,
-                subscriptionStatus,
+                subscriptionStatus: org?.subscriptionStatus || null,
                 isActive,
                 attributedAt: attr.attributedAt,
                 firstProjectName: attr.firstProject?.name || null,
-                projectsCount: projectCountMap.get(attr.clientUserId) || 1
+                projectsCount: org?._count.projects || 0
             };
         });
 
-        // 6. Calcola summary
         const activeClients = clients.filter(c => c.isActive).length;
 
         return {

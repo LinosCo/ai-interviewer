@@ -1,7 +1,7 @@
 /**
  * Credit Service
  *
- * Gestisce il sistema di crediti per gli utenti.
+ * Gestisce il sistema di crediti per le organizzazioni (Organization-centric).
  * - Consumo crediti per azioni AI
  * - Verifica disponibilità crediti
  * - Acquisto pack crediti
@@ -10,7 +10,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { CreditAction, getCreditCost } from '@/config/creditCosts';
-import { getCreditPack, calculateUsagePercentage, getWarningLevel } from '@/config/creditPacks';
+import { calculateUsagePercentage, getWarningLevel } from '@/config/creditPacks';
 import { PLANS, PlanType } from '@/config/plans';
 
 // Import dinamico per evitare circular dependency
@@ -32,7 +32,7 @@ export interface CreditResult {
     warningLevel?: 'none' | 'warning' | 'danger' | 'critical' | 'exhausted';
 }
 
-export interface CreditsStatus {
+export interface OrganizationCreditsStatus {
     monthlyLimit: bigint;
     monthlyUsed: bigint;
     monthlyRemaining: bigint;
@@ -41,7 +41,6 @@ export interface CreditsStatus {
     usagePercentage: number;
     warningLevel: 'none' | 'warning' | 'danger' | 'critical' | 'exhausted';
     resetDate: Date | null;
-    isUnlimited: boolean;
 }
 
 export interface CreditUsageByTool {
@@ -51,29 +50,21 @@ export interface CreditUsageByTool {
     percentage: number;
 }
 
-export interface PurchaseResult {
-    success: boolean;
-    creditsAdded: number;
-    newPackBalance: bigint;
-    error?: string;
-    stripeSessionUrl?: string;
-}
-
 // ============================================
 // CREDIT SERVICE
 // ============================================
 
 export const CreditService = {
     /**
-     * Consuma crediti per un'azione
+     * Consuma crediti per un'azione a livello organizzazione
      * Prima usa i crediti mensili, poi i pack
      */
     async consumeCredits(
-        userId: string,
+        organizationId: string,
         action: CreditAction,
         options?: {
             projectId?: string;
-            executedById?: string;  // Se diverso dall'owner
+            executedById?: string;  // Utente che ha eseguito l'azione
             description?: string;
             metadata?: Record<string, unknown>;
             customAmount?: number;  // Per override (es. token effettivi)
@@ -81,9 +72,9 @@ export const CreditService = {
     ): Promise<CreditResult> {
         const amount = options?.customAmount ?? getCreditCost(action);
 
-        // Fetch user credits
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
+        // Fetch organization credits
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
             select: {
                 plan: true,
                 monthlyCreditsLimit: true,
@@ -93,20 +84,20 @@ export const CreditService = {
             }
         });
 
-        if (!user) {
+        if (!org) {
             return {
                 success: false,
                 creditsUsed: 0,
                 creditsRemaining: 0,
                 usedFromPack: false,
-                error: 'User not found'
+                error: 'Organization not found'
             };
         }
 
         // Check if unlimited (ADMIN)
-        if (user.monthlyCreditsLimit === BigInt(-1)) {
+        if (org.plan === PlanType.ADMIN || org.monthlyCreditsLimit === BigInt(-1)) {
             // Log transaction but don't deduct
-            await this.logTransaction(userId, {
+            await this.logTransaction(organizationId, {
                 amount: BigInt(amount),
                 type: 'usage',
                 action,
@@ -126,8 +117,8 @@ export const CreditService = {
             };
         }
 
-        const monthlyRemaining = user.monthlyCreditsLimit - user.monthlyCreditsUsed;
-        const totalAvailable = monthlyRemaining + user.packCreditsAvailable;
+        const monthlyRemaining = org.monthlyCreditsLimit - org.monthlyCreditsUsed;
+        const totalAvailable = monthlyRemaining + org.packCreditsAvailable;
 
         // Check if enough credits
         if (totalAvailable < BigInt(amount)) {
@@ -148,13 +139,13 @@ export const CreditService = {
         if (monthlyRemaining >= BigInt(amount)) {
             usedFromMonthly = BigInt(amount);
         } else {
-            usedFromMonthly = monthlyRemaining;
-            usedFromPack = BigInt(amount) - monthlyRemaining;
+            usedFromMonthly = monthlyRemaining > BigInt(0) ? monthlyRemaining : BigInt(0);
+            usedFromPack = BigInt(amount) - usedFromMonthly;
         }
 
-        // Update user credits
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
+        // Update organization credits using a transaction for safety
+        const updatedOrg = await prisma.organization.update({
+            where: { id: organizationId },
             data: {
                 monthlyCreditsUsed: {
                     increment: usedFromMonthly
@@ -170,11 +161,11 @@ export const CreditService = {
             }
         });
 
-        const newMonthlyRemaining = updatedUser.monthlyCreditsLimit - updatedUser.monthlyCreditsUsed;
-        const newTotalRemaining = newMonthlyRemaining + updatedUser.packCreditsAvailable;
+        const newMonthlyRemaining = updatedOrg.monthlyCreditsLimit - updatedOrg.monthlyCreditsUsed;
+        const newTotalRemaining = newMonthlyRemaining + updatedOrg.packCreditsAvailable;
 
         // Log transaction
-        await this.logTransaction(userId, {
+        await this.logTransaction(organizationId, {
             amount: BigInt(amount),
             type: 'usage',
             action,
@@ -192,19 +183,22 @@ export const CreditService = {
 
         // Calculate warning level
         const usagePercentage = calculateUsagePercentage(
-            Number(updatedUser.monthlyCreditsUsed),
-            Number(updatedUser.monthlyCreditsLimit)
+            Number(updatedOrg.monthlyCreditsUsed),
+            Number(updatedOrg.monthlyCreditsLimit)
         );
         const warningLevel = getWarningLevel(usagePercentage);
 
-        // Trigger notifications asynchronously (don't await)
+        // Trigger notifications asynchronously (to organizational members who should receive them)
+        // TODO: Refactor notification service to handle organizations
+        /*
         if (warningLevel === 'danger' || warningLevel === 'critical' || warningLevel === 'exhausted') {
             getNotificationService().then(service => {
-                service.checkAndNotify(userId, usagePercentage).catch(err => {
+                service.checkAndNotifyOrg(organizationId, usagePercentage).catch(err => {
                     console.error('[Credits] Notification error:', err);
                 });
             });
         }
+        */
 
         return {
             success: true,
@@ -216,36 +210,38 @@ export const CreditService = {
     },
 
     /**
-     * Verifica se l'utente ha crediti sufficienti
+     * Verifica se l'organizzazione ha crediti sufficienti
      */
-    async checkCreditsAvailable(userId: string, requiredAmount: number): Promise<boolean> {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
+    async checkCreditsAvailable(organizationId: string, requiredAmount: number): Promise<boolean> {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
             select: {
+                plan: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true
             }
         });
 
-        if (!user) return false;
+        if (!org) return false;
 
         // Unlimited
-        if (user.monthlyCreditsLimit === BigInt(-1)) return true;
+        if (org.plan === PlanType.ADMIN || org.monthlyCreditsLimit === BigInt(-1)) return true;
 
-        const monthlyRemaining = user.monthlyCreditsLimit - user.monthlyCreditsUsed;
-        const totalAvailable = monthlyRemaining + user.packCreditsAvailable;
+        const monthlyRemaining = org.monthlyCreditsLimit - org.monthlyCreditsUsed;
+        const totalAvailable = monthlyRemaining + org.packCreditsAvailable;
 
         return totalAvailable >= BigInt(requiredAmount);
     },
 
     /**
-     * Ottiene lo stato dei crediti dell'utente
+     * Ottiene lo stato dei crediti dell'organizzazione
      */
-    async getCreditsStatus(userId: string): Promise<CreditsStatus | null> {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
+    async getOrganizationCreditsStatus(organizationId: string): Promise<OrganizationCreditsStatus | null> {
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
             select: {
+                plan: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true,
@@ -253,202 +249,45 @@ export const CreditService = {
             }
         });
 
-        if (!user) return null;
+        if (!org) return null;
 
-        const isUnlimitedCredits = user.monthlyCreditsLimit === BigInt(-1);
+        const isUnlimitedCredits = org.plan === PlanType.ADMIN || org.monthlyCreditsLimit === BigInt(-1);
         const monthlyRemaining = isUnlimitedCredits
             ? BigInt(-1)
-            : user.monthlyCreditsLimit - user.monthlyCreditsUsed;
+            : org.monthlyCreditsLimit - org.monthlyCreditsUsed;
 
         const totalAvailable = isUnlimitedCredits
             ? BigInt(-1)
-            : monthlyRemaining + user.packCreditsAvailable;
+            : (monthlyRemaining > BigInt(0) ? monthlyRemaining : BigInt(0)) + org.packCreditsAvailable;
 
         const usagePercentage = isUnlimitedCredits
             ? 0
             : calculateUsagePercentage(
-                Number(user.monthlyCreditsUsed),
-                Number(user.monthlyCreditsLimit)
+                Number(org.monthlyCreditsUsed),
+                Number(org.monthlyCreditsLimit)
             );
 
         return {
-            monthlyLimit: user.monthlyCreditsLimit,
-            monthlyUsed: user.monthlyCreditsUsed,
-            monthlyRemaining,
-            packCredits: user.packCreditsAvailable,
-            totalAvailable,
+            monthlyLimit: org.monthlyCreditsLimit,
+            monthlyUsed: org.monthlyCreditsUsed,
+            monthlyRemaining: isUnlimitedCredits ? BigInt(-1) : (monthlyRemaining > BigInt(0) ? monthlyRemaining : BigInt(0)),
+            packCredits: org.packCreditsAvailable,
+            totalAvailable: isUnlimitedCredits ? BigInt(-1) : (totalAvailable > BigInt(0) ? totalAvailable : BigInt(0)),
             usagePercentage,
             warningLevel: getWarningLevel(usagePercentage),
-            resetDate: user.creditsResetDate,
-            isUnlimited: isUnlimitedCredits
+            resetDate: org.creditsResetDate
         };
     },
 
     /**
-     * Ottiene l'utilizzo crediti per tool nel mese corrente
-     */
-    async getUsageByTool(userId: string): Promise<CreditUsageByTool[]> {
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-
-        const transactions = await prisma.creditTransaction.groupBy({
-            by: ['tool'],
-            where: {
-                userId,
-                type: 'usage',
-                createdAt: { gte: startOfMonth },
-                tool: { not: null }
-            },
-            _sum: { amount: true },
-            _count: { id: true }
-        });
-
-        const totalCredits = transactions.reduce(
-            (sum, t) => sum + (t._sum.amount || BigInt(0)),
-            BigInt(0)
-        );
-
-        return transactions
-            .filter(t => t.tool)
-            .map(t => ({
-                tool: t.tool!,
-                creditsUsed: t._sum.amount || BigInt(0),
-                transactionCount: t._count.id,
-                percentage: totalCredits > BigInt(0)
-                    ? Number((t._sum.amount || BigInt(0)) * BigInt(100) / totalCredits)
-                    : 0
-            }))
-            .sort((a, b) => Number(b.creditsUsed - a.creditsUsed));
-    },
-
-    /**
-     * Acquista un pack di crediti (ritorna URL Stripe o aggiunge direttamente)
-     */
-    async purchasePack(
-        userId: string,
-        packId: string,
-        options?: { skipStripe?: boolean }
-    ): Promise<PurchaseResult> {
-        const pack = getCreditPack(packId);
-        if (!pack) {
-            return {
-                success: false,
-                creditsAdded: 0,
-                newPackBalance: BigInt(0),
-                error: 'Pack non trovato'
-            };
-        }
-
-        // Se skipStripe (per test o admin), aggiungi direttamente
-        if (options?.skipStripe) {
-            const updatedUser = await prisma.user.update({
-                where: { id: userId },
-                data: {
-                    packCreditsAvailable: { increment: BigInt(pack.credits) }
-                },
-                select: { packCreditsAvailable: true }
-            });
-
-            // Crea record pack
-            await prisma.creditPack.create({
-                data: {
-                    userId,
-                    packType: packId,
-                    creditsPurchased: BigInt(pack.credits),
-                    creditsRemaining: BigInt(pack.credits),
-                    pricePaid: pack.price
-                }
-            });
-
-            // Log transaction
-            await this.logTransaction(userId, {
-                amount: BigInt(pack.credits),
-                type: 'pack_purchase',
-                description: `Acquisto ${pack.name}`,
-                metadata: { packId, price: pack.price },
-                balanceAfter: updatedUser.packCreditsAvailable
-            });
-
-            return {
-                success: true,
-                creditsAdded: pack.credits,
-                newPackBalance: updatedUser.packCreditsAvailable
-            };
-        }
-
-        // Altrimenti ritorna info per creare Stripe session
-        return {
-            success: true,
-            creditsAdded: pack.credits,
-            newPackBalance: BigInt(0),
-            stripeSessionUrl: `/api/stripe/checkout?pack=${packId}`
-        };
-    },
-
-    /**
-     * Completa l'acquisto pack dopo pagamento Stripe
-     */
-    async completePurchase(
-        userId: string,
-        packId: string,
-        stripePaymentId: string
-    ): Promise<PurchaseResult> {
-        const pack = getCreditPack(packId);
-        if (!pack) {
-            return {
-                success: false,
-                creditsAdded: 0,
-                newPackBalance: BigInt(0),
-                error: 'Pack non trovato'
-            };
-        }
-
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: {
-                packCreditsAvailable: { increment: BigInt(pack.credits) }
-            },
-            select: { packCreditsAvailable: true }
-        });
-
-        // Crea record pack
-        await prisma.creditPack.create({
-            data: {
-                userId,
-                packType: packId,
-                creditsPurchased: BigInt(pack.credits),
-                creditsRemaining: BigInt(pack.credits),
-                pricePaid: pack.price,
-                stripePaymentId
-            }
-        });
-
-        // Log transaction
-        await this.logTransaction(userId, {
-            amount: BigInt(pack.credits),
-            type: 'pack_purchase',
-            description: `Acquisto ${pack.name}`,
-            metadata: { packId, price: pack.price, stripePaymentId },
-            balanceAfter: updatedUser.packCreditsAvailable
-        });
-
-        return {
-            success: true,
-            creditsAdded: pack.credits,
-            newPackBalance: updatedUser.packCreditsAvailable
-        };
-    },
-
-    /**
-     * Reset crediti mensili per tutti gli utenti
+     * Reset crediti mensili per tutte le organizzazioni
      * Da eseguire via cron job all'inizio di ogni mese
      */
-    async resetMonthlyCredits(): Promise<{ usersReset: number }> {
+    async resetMonthlyCredits(): Promise<{ organizationsReset: number }> {
         const now = new Date();
 
-        // Trova utenti da resettare (reset date passata o null)
-        const usersToReset = await prisma.user.findMany({
+        // Trova organizzazioni da resettare (reset date passata o null)
+        const orgsToReset = await prisma.organization.findMany({
             where: {
                 OR: [
                     { creditsResetDate: null },
@@ -462,17 +301,17 @@ export const CreditService = {
             }
         });
 
-        let usersReset = 0;
+        let organizationsReset = 0;
 
-        for (const user of usersToReset) {
+        for (const org of orgsToReset) {
             // Calcola prossima data reset (primo del prossimo mese)
             const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
             // Get piano config per limite crediti
-            const planConfig = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+            const planConfig = PLANS[org.plan as PlanType] || PLANS[PlanType.FREE];
 
-            await prisma.user.update({
-                where: { id: user.id },
+            await prisma.organization.update({
+                where: { id: org.id },
                 data: {
                     monthlyCreditsUsed: BigInt(0),
                     monthlyCreditsLimit: BigInt(planConfig.monthlyCredits),
@@ -481,73 +320,64 @@ export const CreditService = {
             });
 
             // Log reset
-            if (user.monthlyCreditsUsed > BigInt(0)) {
-                await this.logTransaction(user.id, {
-                    amount: user.monthlyCreditsUsed,
+            if (org.monthlyCreditsUsed > BigInt(0)) {
+                await this.logTransaction(org.id, {
+                    amount: org.monthlyCreditsUsed,
                     type: 'monthly_reset',
                     description: 'Reset mensile crediti',
-                    metadata: { previousUsed: Number(user.monthlyCreditsUsed) },
+                    metadata: { previousUsed: Number(org.monthlyCreditsUsed) },
                     balanceAfter: BigInt(planConfig.monthlyCredits)
                 });
             }
 
-            usersReset++;
+            organizationsReset++;
         }
 
-        return { usersReset };
+        return { organizationsReset };
     },
 
     /**
-     * Aggiorna il limite crediti quando l'utente cambia piano
+     * Aggiunge crediti pack a un'organizzazione
      */
-    async updatePlanCredits(userId: string, newPlan: PlanType): Promise<void> {
-        const planConfig = PLANS[newPlan];
-        if (!planConfig) return;
-
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
-                plan: newPlan,
-                monthlyCreditsLimit: BigInt(planConfig.monthlyCredits)
-            }
-        });
-
-        await this.logTransaction(userId, {
-            amount: BigInt(0),
-            type: 'adjustment',
-            description: `Upgrade a piano ${newPlan}`,
-            metadata: { newPlan, newLimit: planConfig.monthlyCredits },
-            balanceAfter: BigInt(planConfig.monthlyCredits)
-        });
-    },
-
-    /**
-     * Aggiunge crediti manualmente (admin)
-     */
-    async addCredits(
-        userId: string,
+    async addPackCredits(
+        organizationId: string,
         amount: number,
-        reason: string
-    ): Promise<{ success: boolean; newBalance: bigint }> {
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
+        type: string,
+        purchasedBy?: string,
+        stripePaymentId?: string
+    ): Promise<void> {
+        const updatedOrg = await prisma.organization.update({
+            where: { id: organizationId },
             data: {
                 packCreditsAvailable: { increment: BigInt(amount) }
             },
-            select: { packCreditsAvailable: true }
+            select: {
+                packCreditsAvailable: true
+            }
         });
 
-        await this.logTransaction(userId, {
+        // Crea record pack
+        await prisma.orgCreditPack.create({
+            data: {
+                organizationId,
+                packType: type,
+                creditsPurchased: BigInt(amount),
+                creditsRemaining: BigInt(amount),
+                pricePaid: 0, // In realtà andrebbe passato il prezzo reale
+                purchasedBy,
+                stripePaymentId
+            }
+        });
+
+        // Log transaction
+        await this.logTransaction(organizationId, {
             amount: BigInt(amount),
-            type: 'adjustment',
-            description: reason,
-            balanceAfter: updatedUser.packCreditsAvailable
+            type: 'pack_purchase',
+            description: `Acquisto pack ${type}`,
+            metadata: { type, stripePaymentId },
+            balanceAfter: updatedOrg.packCreditsAvailable,
+            executedById: purchasedBy
         });
-
-        return {
-            success: true,
-            newBalance: updatedUser.packCreditsAvailable
-        };
     },
 
     // ============================================
@@ -577,13 +407,13 @@ export const CreditService = {
     },
 
     /**
-     * Log transaction nel database
+     * Log transaction nel database (a livello organizzazione)
      */
     async logTransaction(
-        userId: string,
+        organizationId: string,
         data: {
             amount: bigint;
-            type: 'usage' | 'monthly_reset' | 'pack_purchase' | 'adjustment';
+            type: string;
             action?: CreditAction;
             tool?: string;
             projectId?: string;
@@ -593,9 +423,9 @@ export const CreditService = {
             balanceAfter: bigint;
         }
     ): Promise<void> {
-        await prisma.creditTransaction.create({
+        await prisma.orgCreditTransaction.create({
             data: {
-                userId,
+                organizationId,
                 amount: data.amount,
                 balanceAfter: data.balanceAfter,
                 type: data.type,

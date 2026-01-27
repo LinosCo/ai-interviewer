@@ -25,9 +25,16 @@ export const authConfig = {
             if (url.startsWith('/')) return `${baseUrl}${url}`;
             return baseUrl + '/dashboard';
         },
+        jwt({ token, user }) {
+            if (user) {
+                token.role = (user as any).role;
+            }
+            return token;
+        },
         session({ session, token }) {
             if (session.user && token.sub) {
                 session.user.id = token.sub;
+                (session.user as any).role = token.role;
             }
             return session;
         }

@@ -3,33 +3,42 @@ import { getStripeClient } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+        const { searchParams } = new URL(req.url);
+        const organizationId = searchParams.get('organizationId');
+
+        if (!organizationId) {
+            return new NextResponse('Organization ID required', { status: 400 });
+        }
+
+        // Verify membership
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId
+                }
+            },
             include: {
-                memberships: {
+                organization: {
                     include: {
-                        organization: {
-                            include: {
-                                subscription: true
-                            }
-                        }
+                        subscription: true
                     }
                 }
             }
         });
 
-        if (!user || user.memberships.length === 0) {
-            return new NextResponse('User or Organization not found', { status: 404 });
+        if (!membership) {
+            return new NextResponse('Access Denied', { status: 403 });
         }
 
-        const organization = user.memberships[0].organization;
+        const organization = membership.organization;
         let stripe;
         try {
             stripe = await getStripeClient();
@@ -48,10 +57,8 @@ export async function GET() {
 
         if (!customerId) {
             // Check if we have any previous subscription or customer
-            // If not, we can't open portal for a user without a customer ID in Stripe
-            // In a real app, we might search by email
             const customers = await stripe.customers.list({
-                email: user.email,
+                email: session.user.email!,
                 limit: 1
             });
 
@@ -60,7 +67,7 @@ export async function GET() {
             } else {
                 // If no customer, we create one so they can manage their future billing
                 const customer = await stripe.customers.create({
-                    email: user.email,
+                    email: session.user.email!,
                     name: organization.name,
                     metadata: {
                         organizationId: organization.id

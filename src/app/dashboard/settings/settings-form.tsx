@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { showToast } from '@/components/toast';
 
 interface PlatformSettingsFormProps {
-    userId: string;
+    organizationId: string;
     currentKnowledge: string;
     currentStrategicPlan: string;
     settingsId?: string;
@@ -26,7 +26,7 @@ interface PlatformSettingsFormProps {
 }
 
 export default function PlatformSettingsForm({
-    userId,
+    organizationId,
     currentKnowledge,
     currentStrategicPlan,
     settingsId,
@@ -85,7 +85,7 @@ export default function PlatformSettingsForm({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId,
+                    organizationId,
                     settingsId,
                     methodologyKnowledge: knowledge,
                     strategicPlan: strategicPlan,

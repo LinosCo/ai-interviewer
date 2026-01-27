@@ -9,8 +9,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const body = await req.json();
         const {
-            userId,
+            organizationId,
             settingsId,
             methodologyKnowledge,
             strategicPlan,
@@ -24,33 +25,48 @@ export async function POST(req: NextRequest) {
             stripePriceStarterYearly,
             stripePricePro,
             stripePriceProYearly
-        } = await req.json();
+        } = body;
 
-        // Verify user owns these settings
-        const user = await prisma.user.findUnique({
-            where: { id: userId, email: session.user.email }
-        });
-
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organization ID required' }, { status: 400 });
         }
 
-        // Update user's methodology and strategic plan (PlatformSettings)
+        // Verify membership
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId
+                }
+            }
+        });
+
+        if (!membership && session.user.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
+        // Update organization's methodology and strategic plan
         const settings = await prisma.platformSettings.upsert({
-            where: { userId },
+            where: { organizationId },
             update: {
                 methodologyKnowledge,
                 strategicPlan: strategicPlan || null
             },
             create: {
-                userId,
+                organizationId,
                 methodologyKnowledge,
                 strategicPlan: strategicPlan || null
             }
         });
 
+        // Link organization to these settings if not already
+        await prisma.organization.update({
+            where: { id: organizationId },
+            data: { platformSettingsId: settings.id }
+        });
+
         // If Admin, update Global Config API Keys and Stripe Config
-        if (user.role === 'ADMIN') {
+        if ((session.user as any).role === 'ADMIN') {
             const updateData: any = {};
 
             if (platformOpenaiApiKey !== undefined) updateData.openaiApiKey = platformOpenaiApiKey || null;

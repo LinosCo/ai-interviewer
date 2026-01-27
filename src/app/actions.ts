@@ -100,17 +100,31 @@ export async function createBotAction(projectId: string, formData: FormData) {
 
 export async function createProjectAction(formData: FormData) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: { memberships: { take: 1 } }
-    });
-    if (!user) throw new Error("User not found");
-
-    const organizationId = user.memberships[0]?.organizationId;
+    if (!session?.user?.id) throw new Error("Unauthorized");
 
     const name = formData.get('name') as string;
     if (!name) throw new Error("Name required");
+
+    let organizationId = formData.get('organizationId') as string;
+
+    // Get user and verify membership
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { memberships: true }
+    });
+
+    if (!user) throw new Error("User not found");
+
+    if (!organizationId) {
+        // Fallback to first membership if none provided
+        organizationId = user.memberships[0]?.organizationId;
+    }
+
+    if (!organizationId) throw new Error("No organization found for project");
+
+    // Verify membership in that specific organization
+    const hasMembership = user.memberships.some(m => m.organizationId === organizationId);
+    if (!hasMembership) throw new Error("Access denied to organization");
 
     // Create project and add owner access in a transaction
     const project = await prisma.project.create({
@@ -118,7 +132,7 @@ export async function createProjectAction(formData: FormData) {
             name,
             ownerId: user.id,
             organizationId: organizationId,
-            isPersonal: false, // New projects are not personal
+            isPersonal: false,
             accessList: {
                 create: {
                     userId: user.id,

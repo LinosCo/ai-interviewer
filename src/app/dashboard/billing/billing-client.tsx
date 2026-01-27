@@ -1,18 +1,16 @@
-'use client';
-
-import { useState } from 'react';
-import { Icons } from '@/components/ui/business-tuner/Icons';
-import { showToast } from '@/components/toast';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 export default function BillingClient() {
+    const { currentOrganization } = useOrganization();
     const [isLoading, setIsLoading] = useState(false);
     const [stripeError, setStripeError] = useState<string | null>(null);
 
     const handleManageBilling = async () => {
+        if (!currentOrganization) return;
         setIsLoading(true);
         setStripeError(null);
         try {
-            const res = await fetch('/api/stripe/portal');
+            const res = await fetch(`/api/stripe/portal?organizationId=${currentOrganization.id}`);
             const data = await res.json();
 
             if (data.error === 'STRIPE_NOT_CONFIGURED') {

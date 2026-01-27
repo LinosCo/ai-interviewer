@@ -6,16 +6,37 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 import { CreditService } from '@/services/creditService';
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const session = await auth();
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
         }
 
-        const usageByTool = await CreditService.getUsageByTool(session.user.id);
+        const { searchParams } = new URL(req.url);
+        const organizationId = searchParams.get('organizationId');
+
+        let usageByTool;
+        if (organizationId) {
+            // Verifica membership
+            const membership = await prisma.membership.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: session.user.id,
+                        organizationId
+                    }
+                }
+            });
+            if (!membership) {
+                return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+            }
+            usageByTool = await CreditService.getOrganizationUsageByTool(organizationId);
+        } else {
+            usageByTool = await CreditService.getUsageByTool(session.user.id);
+        }
 
         // Get current period
         const now = new Date();

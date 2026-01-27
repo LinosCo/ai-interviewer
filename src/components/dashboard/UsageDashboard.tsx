@@ -25,6 +25,7 @@ import {
     TrendingUp
 } from 'lucide-react';
 import Link from 'next/link';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface CreditsData {
     monthlyLimit: number;
@@ -131,15 +132,18 @@ const ToolUsageItem = memo(function ToolUsageItem({ tool }: { tool: ToolUsage })
 });
 
 export function UsageDashboard() {
+    const { currentOrganization, loading: orgLoading } = useOrganization();
     const [credits, setCredits] = useState<CreditsData | null>(null);
     const [usageByTool, setUsageByTool] = useState<UsageByToolData | null>(null);
     const [loading, setLoading] = useState(true);
 
     const fetchData = useCallback(async () => {
+        if (!currentOrganization) return;
         try {
+            setLoading(true);
             const [creditsRes, usageRes] = await Promise.all([
-                fetch('/api/credits'),
-                fetch('/api/credits/usage-by-tool')
+                fetch(`/api/credits?organizationId=${currentOrganization.id}`),
+                fetch(`/api/credits/usage-by-tool?organizationId=${currentOrganization.id}`)
             ]);
 
             if (creditsRes.ok) {
@@ -156,11 +160,13 @@ export function UsageDashboard() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [currentOrganization]);
 
     useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        if (!orgLoading) {
+            fetchData();
+        }
+    }, [fetchData, orgLoading]);
 
     // Memoized computed values
     const progressColor = useMemo(
@@ -191,31 +197,27 @@ export function UsageDashboard() {
         <Card className="p-6 space-y-6 border-slate-100 shadow-sm">
             {/* Warning Banner for low credits */}
             {credits.alertLevel && credits.alertLevel !== 'warning' && (
-                <div className={`rounded-xl p-4 flex items-start gap-3 border ${
-                    credits.alertLevel === 'exhausted' ? 'bg-red-100 border-red-300' :
+                <div className={`rounded-xl p-4 flex items-start gap-3 border ${credits.alertLevel === 'exhausted' ? 'bg-red-100 border-red-300' :
                     credits.alertLevel === 'critical' ? 'bg-red-50 border-red-200' :
-                    'bg-orange-50 border-orange-200'
-                }`}>
-                    <AlertCircle className={`w-5 h-5 mt-0.5 ${
-                        credits.alertLevel === 'exhausted' ? 'text-red-600' :
+                        'bg-orange-50 border-orange-200'
+                    }`}>
+                    <AlertCircle className={`w-5 h-5 mt-0.5 ${credits.alertLevel === 'exhausted' ? 'text-red-600' :
                         credits.alertLevel === 'critical' ? 'text-red-500' :
-                        'text-orange-500'
-                    }`} />
+                            'text-orange-500'
+                        }`} />
                     <div className="flex-1">
-                        <p className={`text-sm font-bold ${
-                            credits.alertLevel === 'exhausted' ? 'text-red-900' :
+                        <p className={`text-sm font-bold ${credits.alertLevel === 'exhausted' ? 'text-red-900' :
                             credits.alertLevel === 'critical' ? 'text-red-900' :
-                            'text-orange-900'
-                        }`}>
+                                'text-orange-900'
+                            }`}>
                             {credits.alertLevel === 'exhausted' ? 'Crediti esauriti' :
-                             credits.alertLevel === 'critical' ? 'Crediti in esaurimento critico' :
-                             'Crediti quasi esauriti'}
+                                credits.alertLevel === 'critical' ? 'Crediti in esaurimento critico' :
+                                    'Crediti quasi esauriti'}
                         </p>
-                        <p className={`text-xs mt-1 ${
-                            credits.alertLevel === 'exhausted' ? 'text-red-700' :
+                        <p className={`text-xs mt-1 ${credits.alertLevel === 'exhausted' ? 'text-red-700' :
                             credits.alertLevel === 'critical' ? 'text-red-700' :
-                            'text-orange-700'
-                        }`}>
+                                'text-orange-700'
+                            }`}>
                             {credits.alertLevel === 'exhausted'
                                 ? 'Le funzionalità AI sono temporaneamente sospese. Acquista un pack o fai upgrade.'
                                 : `Hai usato il ${credits.percentageUsed}% dei crediti mensili.`}
@@ -227,10 +229,9 @@ export function UsageDashboard() {
                                 </Button>
                             </Link>
                             <Link href="/dashboard/billing/plans">
-                                <Button size="sm" className={`rounded-lg font-bold text-xs h-8 ${
-                                    credits.alertLevel === 'exhausted' ? 'bg-red-600 hover:bg-red-700' :
+                                <Button size="sm" className={`rounded-lg font-bold text-xs h-8 ${credits.alertLevel === 'exhausted' ? 'bg-red-600 hover:bg-red-700' :
                                     'bg-amber-600 hover:bg-amber-700'
-                                }`}>
+                                    }`}>
                                     Upgrade piano
                                 </Button>
                             </Link>

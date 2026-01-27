@@ -6,19 +6,41 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 import { CreditService } from '@/services/creditService';
 import { formatCredits } from '@/config/creditPacks';
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
         const session = await auth();
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
         }
 
-        const status = await CreditService.getCreditsStatus(session.user.id);
+        const { searchParams } = new URL(req.url);
+        const organizationId = searchParams.get('organizationId');
+
+        let status;
+        if (organizationId) {
+            // Verifica access per sicurezza
+            const membership = await prisma.membership.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: session.user.id,
+                        organizationId
+                    }
+                }
+            });
+            if (!membership) {
+                return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+            }
+            status = await CreditService.getOrganizationCreditsStatus(organizationId);
+        } else {
+            status = await CreditService.getCreditsStatus(session.user.id);
+        }
+
         if (!status) {
-            return NextResponse.json({ error: 'Utente non trovato' }, { status: 404 });
+            return NextResponse.json({ error: 'Status non trovato' }, { status: 404 });
         }
 
         // Calcola prossima data reset formattata

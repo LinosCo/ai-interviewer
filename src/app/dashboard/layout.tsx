@@ -21,24 +21,24 @@ export default async function DashboardLayout({
     let hasVisibilityTracker = false;
     let hasAiTips = false;
 
-    if (session?.user?.email) {
+    if (session?.user?.id) {
+        // Get user with plan info
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            select: { role: true }
-        });
-        isAdmin = user?.role === 'ADMIN';
-
-        // Get organization and subscription for Strategy Copilot
-        const membership = await prisma.membership.findFirst({
-            where: { userId: session.user.id },
-            include: {
-                organization: {
+            where: { id: session.user.id },
+            select: {
+                role: true,
+                plan: true,
+                memberships: {
+                    take: 1,
                     include: {
-                        subscription: true,
-                        projects: {
+                        organization: {
                             include: {
-                                cmsConnection: {
-                                    select: { id: true, status: true }
+                                projects: {
+                                    include: {
+                                        cmsConnection: {
+                                            select: { id: true, status: true }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -47,27 +47,42 @@ export default async function DashboardLayout({
             }
         });
 
-        if (membership) {
-            userTier = membership.organization.subscription?.tier || 'TRIAL';
-            organizationId = membership.organizationId;
+        isAdmin = user?.role === 'ADMIN' || user?.plan === 'ADMIN';
 
-            // Check if the plan includes CMS feature
-            const planType = userTier as PlanType;
-            const plan = PLANS[planType] || PLANS[PlanType.TRIAL];
-            const hasCMSFeature = plan.features.cmsIntegrations;
+        if (user) {
+            // Use user's plan directly
+            userTier = user.plan || 'TRIAL';
+            const membership = user.memberships[0];
 
-            // Check if any project has an active CMS connection AND the plan supports it
-            hasCMSIntegration = hasCMSFeature && membership.organization.projects.some(
-                (p: any) => p.cmsConnection?.status === 'ACTIVE'
-            );
+            if (membership) {
+                organizationId = membership.organizationId;
 
-            // Check if user can manage multiple projects (STARTER and above)
-            canManageProjects = plan.features.maxProjects === -1 || plan.features.maxProjects > 1;
+                // Check if the plan includes CMS feature
+                const planType = userTier as PlanType;
+                const plan = PLANS[planType] || PLANS[PlanType.TRIAL];
+                const hasCMSFeature = plan.features.cmsIntegrations;
 
-            // Feature flags based on plan
-            hasChatbot = plan.features.chatbot;
-            hasVisibilityTracker = plan.features.visibilityTracker;
-            hasAiTips = plan.features.aiTips;
+                // Check if any project has an active CMS connection AND the plan supports it
+                hasCMSIntegration = hasCMSFeature && membership.organization.projects.some(
+                    (p: any) => p.cmsConnection?.status === 'ACTIVE'
+                );
+
+                // Admin bypasses all feature checks
+                if (isAdmin) {
+                    canManageProjects = true;
+                    hasChatbot = true;
+                    hasVisibilityTracker = true;
+                    hasAiTips = true;
+                } else {
+                    // Check if user can manage multiple projects (STARTER and above)
+                    canManageProjects = plan.features.maxProjects === -1 || plan.features.maxProjects > 1;
+
+                    // Feature flags based on plan
+                    hasChatbot = plan.features.chatbot;
+                    hasVisibilityTracker = plan.features.visibilityTracker;
+                    hasAiTips = plan.features.aiTips;
+                }
+            }
         }
     }
 

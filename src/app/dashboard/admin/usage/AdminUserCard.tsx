@@ -135,7 +135,9 @@ export function AdminUserCard({ user }: AdminUserCardProps) {
                         <User className="w-5 h-5 text-gray-400" />
                         <h3 className="text-xl font-bold text-gray-900">{user.name || 'Senza nome'}</h3>
                         {user.role === 'ADMIN' && (
-                            <Shield className="w-4 h-4 text-red-500" title="Admin" />
+                            <span title="Admin">
+                                <Shield className="w-4 h-4 text-red-500" />
+                            </span>
                         )}
                     </div>
                     <p className="text-sm text-gray-500">{user.email}</p>

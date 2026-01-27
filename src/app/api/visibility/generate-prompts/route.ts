@@ -5,8 +5,7 @@ import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
-import { getOrCreateSubscription } from '@/lib/usage';
-import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
+import { PLANS, PlanType } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 
 const PromptGenerationSchema = z.object({
@@ -33,37 +32,36 @@ const TERRITORY_CONTEXTS = {
 export async function POST(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                plan: true,
+                role: true,
                 memberships: {
                     take: 1,
-                    include: { organization: true }
+                    select: { organizationId: true }
                 }
             }
         });
 
-        if (!user || !user.memberships[0]) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        const organizationId = user.memberships[0]?.organizationId;
 
-        // Check plan limits
-        const subscription = await getOrCreateSubscription(organizationId);
-        if (!subscription) {
-            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
-        }
-        const planType = subscriptionTierToPlanType(subscription.tier);
-        const plan = PLANS[planType];
-        // Default max prompts: 20 if visibility enabled, 0 otherwise
-        const maxPrompts = plan.limits.visibilityEnabled ? 20 : 0;
+        // Use user's plan (admin has unlimited access)
+        const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
+        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+        // Admin bypasses, 20 prompts if visibility enabled
+        const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 20 : 0);
 
-        if (!plan.limits.visibilityEnabled) {
+        if (!isAdmin && !plan.features.visibilityTracker) {
             return NextResponse.json(
                 { error: 'Visibility tracking not available in your plan' },
                 { status: 403 }

@@ -25,34 +25,44 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
         }
 
-        // 1. Get user's organization and subscription
-        const membership = await prisma.membership.findFirst({
-            where: { userId: session.user.id },
-            include: {
-                organization: {
-                    include: { subscription: true }
+        // 1. Get user with plan info and organization
+        const userWithMembership = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                name: true,
+                plan: true,
+                role: true,
+                monthlyCreditsLimit: true,
+                monthlyCreditsUsed: true,
+                memberships: {
+                    take: 1,
+                    include: {
+                        organization: true
+                    }
                 }
             }
         });
 
-        if (!membership) {
+        if (!userWithMembership || !userWithMembership.memberships[0]) {
             return NextResponse.json({ error: 'No organization found' }, { status: 400 });
         }
 
-        const { organization } = membership;
-        const tier = organization.subscription?.tier || 'TRIAL';
+        const organization = userWithMembership.memberships[0].organization;
 
-        // 2. Check token limits
-        const subscription = organization.subscription;
-        if (subscription) {
-            const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.TRIAL];
-            const tokenLimit = plan.limits.monthlyTokenBudget;
-            const tokensUsed = subscription.tokensUsedThisMonth || 0;
+        // Use user's plan (admin has unlimited access)
+        const isAdmin = userWithMembership.role === 'ADMIN' || userWithMembership.plan === 'ADMIN';
+        const tier = userWithMembership.plan || 'TRIAL';
 
-            if (!isUnlimited(tokenLimit) && tokensUsed >= tokenLimit) {
+        // 2. Check credits limits (skip for admin)
+        if (!isAdmin) {
+            const creditsLimit = Number(userWithMembership.monthlyCreditsLimit);
+            const creditsUsed = Number(userWithMembership.monthlyCreditsUsed);
+
+            if (creditsLimit !== -1 && creditsUsed >= creditsLimit) {
                 return NextResponse.json({
-                    error: 'Token limit reached',
-                    message: 'Hai raggiunto il limite di token per questo mese. Effettua l\'upgrade per continuare.'
+                    error: 'Credit limit reached',
+                    message: 'Hai raggiunto il limite di crediti per questo mese. Effettua l\'upgrade per continuare.'
                 }, { status: 429 });
             }
         }
@@ -154,7 +164,7 @@ export async function POST(req: Request) {
         if (result.usage) {
             TokenTrackingService.logTokenUsage({
                 userId: session.user.id,
-                organizationId: organization.id,
+                organizationId: organization?.id,
                 projectId: projectId || undefined,
                 inputTokens: result.usage.inputTokens || 0,
                 outputTokens: result.usage.outputTokens || 0,
@@ -166,19 +176,8 @@ export async function POST(req: Request) {
             }).catch(err => console.error('[Copilot] Credit tracking failed:', err));
         }
 
-        // Legacy: also update subscription for backward compatibility
-        const estimatedTokens = Math.ceil((message.length + result.object.response.length) / 4);
-        if (subscription) {
-            await prisma.subscription.update({
-                where: { id: subscription.id },
-                data: {
-                    tokensUsedThisMonth: { increment: estimatedTokens },
-                    systemTokensUsed: { increment: estimatedTokens }
-                }
-            });
-        }
-
         // 10. Log copilot session
+        const estimatedTokens = Math.ceil((message.length + result.object.response.length) / 4);
         const sessionDate = new Date().toISOString().split('T')[0];
         const sessionKey = `${session.user.id}-${sessionDate}`;
 

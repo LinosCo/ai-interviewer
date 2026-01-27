@@ -2,8 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
-import { getOrCreateSubscription } from '@/lib/usage';
-import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
+import { PLANS, PlanType } from '@/config/plans';
 
 /**
  * GET - Fetch recent SERP monitoring results
@@ -11,25 +10,26 @@ import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
 export async function GET(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
+            where: { id: session.user.id },
+            select: {
+                id: true,
                 memberships: {
                     take: 1,
-                    include: { organization: true }
+                    select: { organizationId: true }
                 }
             }
         });
 
-        if (!user || !user.memberships[0]) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        const organizationId = user.memberships[0]?.organizationId;
 
         // Get URL params
         const { searchParams } = new URL(request.url);
@@ -54,37 +54,35 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                plan: true,
+                role: true,
                 memberships: {
                     take: 1,
-                    include: { organization: true }
+                    select: { organizationId: true }
                 }
             }
         });
 
-        if (!user || !user.memberships[0]) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        const organizationId = user.memberships[0]?.organizationId;
 
-        // Check subscription tier for SERP monitoring access
-        const subscription = await getOrCreateSubscription(organizationId);
-        if (!subscription) {
-            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
-        }
+        // Use user's plan (admin has unlimited access)
+        const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
+        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
 
-        const planType = subscriptionTierToPlanType(subscription.tier);
-        const plan = PLANS[planType];
-
-        // SERP monitoring requires visibility feature
-        if (!plan.limits.visibilityEnabled) {
+        // SERP monitoring requires visibility feature (admin bypasses)
+        if (!isAdmin && !plan.features.visibilityTracker) {
             return NextResponse.json(
                 { error: 'SERP monitoring requires a PRO or higher plan' },
                 { status: 403 }

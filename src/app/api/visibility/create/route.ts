@@ -1,41 +1,40 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { getOrCreateSubscription } from '@/lib/usage';
-import { PLANS, subscriptionTierToPlanType } from '@/config/plans';
+import { PLANS, PlanType } from '@/config/plans';
 
 export async function POST(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Get user with plan info
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                plan: true,
+                role: true,
                 memberships: {
                     take: 1,
-                    include: { organization: true }
+                    select: { organizationId: true }
                 }
             }
         });
 
-        if (!user || !user.memberships[0]) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        const organizationId = user.memberships[0]?.organizationId;
 
-        // Check plan limits
-        const subscription = await getOrCreateSubscription(organizationId);
-        if (!subscription) {
-            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
-        }
-        const planType = subscriptionTierToPlanType(subscription.tier);
-        const plan = PLANS[planType];
+        // Use user's plan (admin has unlimited access)
+        const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
+        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
 
-        if (!plan.limits.visibilityEnabled) {
+        if (!isAdmin && !plan.features.visibilityTracker) {
             return NextResponse.json(
                 { error: 'Visibility tracking not available in your plan' },
                 { status: 403 }
@@ -47,7 +46,7 @@ export async function POST(request: Request) {
             where: { organizationId }
         });
 
-        const maxBrands = plan.limits.visibilityEnabled ? -1 : 0; // -1 = unlimited
+        const maxBrands = (isAdmin || plan.features.visibilityTracker) ? -1 : 0; // -1 = unlimited
         if (maxBrands !== -1 && existingBrands >= maxBrands) {
             return NextResponse.json(
                 { error: `Limite brand raggiunto (${maxBrands}). Passa a un piano superiore per monitorare più brand.` },
@@ -65,20 +64,20 @@ export async function POST(request: Request) {
             );
         }
 
-        // Validate limits (default limits if visibility enabled: 20 prompts, 10 competitors)
+        // Validate limits (admin bypasses, or use plan limits: 20 prompts, 10 competitors)
         const enabledPrompts = prompts?.filter((p: any) => p.enabled) || [];
         const enabledCompetitors = competitors?.filter((c: any) => c.enabled) || [];
-        const maxPrompts = plan.limits.visibilityEnabled ? 20 : 0;
-        const maxCompetitors = plan.limits.visibilityEnabled ? 10 : 0;
+        const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 20 : 0);
+        const maxCompetitors = isAdmin ? 999 : (plan.features.visibilityTracker ? 10 : 0);
 
-        if (enabledPrompts.length > maxPrompts) {
+        if (!isAdmin && enabledPrompts.length > maxPrompts) {
             return NextResponse.json(
                 { error: `Your plan allows a maximum of ${maxPrompts} prompts` },
                 { status: 400 }
             );
         }
 
-        if (enabledCompetitors.length > maxCompetitors) {
+        if (!isAdmin && enabledCompetitors.length > maxCompetitors) {
             return NextResponse.json(
                 { error: `Your plan allows a maximum of ${maxCompetitors} competitors` },
                 { status: 400 }
@@ -156,25 +155,26 @@ export async function GET(request: Request) {
         const projectId = searchParams.get('projectId');
 
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
+            where: { id: session.user.id },
+            select: {
+                id: true,
                 memberships: {
                     take: 1,
-                    include: { organization: true }
+                    select: { organizationId: true }
                 }
             }
         });
 
-        if (!user || !user.memberships[0]) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        const organizationId = user.memberships[0]?.organizationId;
 
         const config = await prisma.visibilityConfig.findFirst({
             where: {
@@ -220,25 +220,28 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
+            where: { id: session.user.id },
+            select: {
+                id: true,
+                plan: true,
+                role: true,
                 memberships: {
                     take: 1,
-                    include: { organization: true }
+                    select: { organizationId: true }
                 }
             }
         });
 
-        if (!user || !user.memberships[0]) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0].organizationId;
+        const organizationId = user.memberships[0]?.organizationId;
 
         const body = await request.json();
         const { id, brandName, category, description, language, territory, isActive, prompts, competitors, projectId } = body;
@@ -255,19 +258,15 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        // Check plan limits for validation
-        const subscription = await getOrCreateSubscription(organizationId);
-        if (!subscription) {
-            return NextResponse.json({ error: 'Subscription not found' }, { status: 404 });
-        }
-        const planType = subscriptionTierToPlanType(subscription.tier);
-        const plan = PLANS[planType];
+        // Use user's plan (admin bypasses limits)
+        const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
+        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
 
-        // Default limits if visibility enabled: 20 prompts, 10 competitors
-        const maxPrompts = plan.limits.visibilityEnabled ? 20 : 0;
-        const maxCompetitors = plan.limits.visibilityEnabled ? 10 : 0;
+        // Admin bypasses, or use plan limits: 20 prompts, 10 competitors
+        const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 20 : 0);
+        const maxCompetitors = isAdmin ? 999 : (plan.features.visibilityTracker ? 10 : 0);
 
-        if (prompts) {
+        if (!isAdmin && prompts) {
             const enabledPrompts = prompts.filter((p: any) => p.enabled);
             if (enabledPrompts.length > maxPrompts) {
                 return NextResponse.json(
@@ -277,7 +276,7 @@ export async function PATCH(request: Request) {
             }
         }
 
-        if (competitors) {
+        if (!isAdmin && competitors) {
             const enabledCompetitors = competitors.filter((c: any) => c.enabled);
             if (enabledCompetitors.length > maxCompetitors) {
                 return NextResponse.json(

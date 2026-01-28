@@ -110,6 +110,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                 <div className="space-y-8">
                     <ProjectSelector
                         botId={bot.id}
+                        botName={bot.name}
                         currentProjectId={bot.projectId}
                         projects={projects}
                     />

@@ -9,6 +9,7 @@ import {
   Trash2,
   RefreshCw,
   ExternalLink,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
@@ -24,6 +25,7 @@ interface IntegrationCardProps {
   onTest?: () => Promise<void>;
   onConfigure?: () => void;
   onDelete?: () => Promise<void>;
+  onTransfer?: () => void;
   disabled?: boolean;
   upgradeRequired?: boolean;
 }
@@ -99,6 +101,7 @@ export function IntegrationCard({
   onTest,
   onConfigure,
   onDelete,
+  onTransfer,
   disabled = false,
   upgradeRequired = false,
 }: IntegrationCardProps) {
@@ -132,9 +135,8 @@ export function IntegrationCard({
 
   return (
     <div
-      className={`bg-white rounded-xl border border-gray-200 p-6 transition-all ${
-        disabled ? 'opacity-60' : 'hover:border-gray-300'
-      }`}
+      className={`bg-white rounded-xl border border-gray-200 p-6 transition-all ${disabled ? 'opacity-60' : 'hover:border-gray-300'
+        }`}
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
@@ -207,6 +209,16 @@ export function IntegrationCard({
             >
               <Settings className="w-4 h-4" />
               Configura
+            </button>
+          )}
+
+          {onTransfer && (
+            <button
+              onClick={onTransfer}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+              title="Trasferisci in un altro progetto"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
             </button>
           )}
 

@@ -6,6 +6,7 @@ import { ProjectBrandManager } from './ProjectBrandManager';
 import { ProjectToolsManager } from './ProjectToolsManager';
 import { ProjectDeleteSection } from './ProjectDeleteSection';
 import { ProjectRenameSection } from './ProjectRenameSection';
+import { ProjectTransferSection } from './ProjectTransferSection';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, LayoutGrid } from "lucide-react";
 import Link from 'next/link';
@@ -18,10 +19,23 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
 
     const project = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { id: true, name: true, ownerId: true, isPersonal: true }
+        select: { id: true, name: true, ownerId: true, isPersonal: true, organizationId: true }
     });
 
     if (!project) notFound();
+
+    // Fetch user organizations for transfer
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: {
+            memberships: {
+                where: { role: { in: ['OWNER', 'ADMIN'] } },
+                include: { organization: { select: { id: true, name: true } } }
+            }
+        }
+    });
+
+    const availableOrganizations = user?.memberships.map(m => m.organization) || [];
 
     // Check user has access (via ProjectAccess with OWNER role OR is the project owner)
     const userAccess = await prisma.projectAccess.findUnique({
@@ -63,6 +77,16 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
             <div className="grid gap-8">
                 {/* Rename Project */}
                 <ProjectRenameSection projectId={projectId} projectName={project.name} isPersonal={project.isPersonal} />
+
+                {/* Transfer Project (only for project owner or org owner/admin) */}
+                {(isOwner || hasOwnerAccess) && (
+                    <ProjectTransferSection
+                        projectId={projectId}
+                        projectName={project.name}
+                        currentOrgId={project.organizationId || ''}
+                        availableOrganizations={availableOrganizations}
+                    />
+                )}
 
                 {/* Sharing Manager */}
                 <ProjectAccessManager projectId={projectId} />

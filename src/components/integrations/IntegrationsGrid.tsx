@@ -1,6 +1,13 @@
 'use client';
 
 import { IntegrationCard } from './IntegrationCard';
+import { useState } from 'react';
+import TransferDialog from '@/components/dashboard/TransferDialog';
+import {
+  transferMCPConnectionToProject,
+  transferGoogleConnectionToProject,
+  transferCMSConnectionToProject
+} from '@/app/actions/project-tools';
 
 type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
 
@@ -36,6 +43,11 @@ interface CMSConnection {
   lastSyncError?: string | null;
 }
 
+interface Project {
+  id: string;
+  name: string;
+}
+
 interface IntegrationsGridProps {
   mcpConnections: MCPConnection[];
   googleConnection: GoogleConnection | null;
@@ -48,6 +60,9 @@ interface IntegrationsGridProps {
   onTestGSC: (id: string) => Promise<void>;
   onConfigureGoogle: () => void;
   onDeleteGoogle: (id: string) => Promise<void>;
+  projects: Project[];
+  currentProjectId: string;
+  onRefresh: () => void;
 }
 
 export function IntegrationsGrid({
@@ -62,7 +77,12 @@ export function IntegrationsGrid({
   onTestGSC,
   onConfigureGoogle,
   onDeleteGoogle,
+  projects,
+  currentProjectId,
+  onRefresh
 }: IntegrationsGridProps) {
+  const [transferItem, setTransferItem] = useState<{ id: string; name: string; type: 'MCP' | 'GOOGLE' | 'CMS' } | null>(null);
+
   const canRead = ['PRO', 'BUSINESS', 'PARTNER'].includes(userPlan);
   const canWrite = ['BUSINESS', 'PARTNER'].includes(userPlan);
 
@@ -96,8 +116,8 @@ export function IntegrationsGrid({
               ? googleConnection.ga4Status === 'ACTIVE' && googleConnection.gscStatus === 'ACTIVE'
                 ? 'ACTIVE'
                 : googleConnection.ga4Status === 'ERROR' || googleConnection.gscStatus === 'ERROR'
-                ? 'ERROR'
-                : 'PENDING'
+                  ? 'ERROR'
+                  : 'PENDING'
               : 'DISABLED'
           }
           lastSyncAt={googleConnection?.ga4LastSyncAt || googleConnection?.gscLastSyncAt}
@@ -105,13 +125,14 @@ export function IntegrationsGrid({
           onTest={
             googleConnection
               ? async () => {
-                  if (googleConnection.ga4Enabled) await onTestGA4(googleConnection.id);
-                  if (googleConnection.gscEnabled) await onTestGSC(googleConnection.id);
-                }
+                if (googleConnection.ga4Enabled) await onTestGA4(googleConnection.id);
+                if (googleConnection.gscEnabled) await onTestGSC(googleConnection.id);
+              }
               : undefined
           }
           onConfigure={onConfigureGoogle}
           onDelete={googleConnection ? () => onDeleteGoogle(googleConnection.id) : undefined}
+          onTransfer={googleConnection ? () => setTransferItem({ id: googleConnection.id, name: 'Google Connection', type: 'GOOGLE' }) : undefined}
           disabled={!googleConnection}
           upgradeRequired={!canRead}
         />
@@ -128,6 +149,7 @@ export function IntegrationsGrid({
           onTest={wpConnection ? () => onTestMCP(wpConnection.id) : undefined}
           onConfigure={() => onConfigureMCP('WORDPRESS')}
           onDelete={wpConnection ? () => onDeleteMCP(wpConnection.id) : undefined}
+          onTransfer={wpConnection ? () => setTransferItem({ id: wpConnection.id, name: wpConnection.name, type: 'MCP' }) : undefined}
           disabled={!wpConnection}
           upgradeRequired={!canRead}
         />
@@ -144,6 +166,7 @@ export function IntegrationsGrid({
           onTest={wooConnection ? () => onTestMCP(wooConnection.id) : undefined}
           onConfigure={() => onConfigureMCP('WOOCOMMERCE')}
           onDelete={wooConnection ? () => onDeleteMCP(wooConnection.id) : undefined}
+          onTransfer={wooConnection ? () => setTransferItem({ id: wooConnection.id, name: wooConnection.name, type: 'MCP' }) : undefined}
           disabled={!wooConnection}
           upgradeRequired={!canWrite}
         />
@@ -161,6 +184,7 @@ export function IntegrationsGrid({
           }
           lastSyncAt={cmsConnection?.lastSyncAt}
           lastError={cmsConnection?.lastSyncError}
+          onTransfer={cmsConnection ? () => setTransferItem({ id: cmsConnection.id, name: cmsConnection.name, type: 'CMS' }) : undefined}
           disabled={!cmsConnection}
           upgradeRequired={!canWrite}
         />
@@ -183,6 +207,24 @@ export function IntegrationsGrid({
             Scopri i piani
           </a>
         </div>
+      )}
+
+      {transferItem && (
+        <TransferDialog
+          isOpen={!!transferItem}
+          onClose={() => setTransferItem(null)}
+          itemName={transferItem.name}
+          itemId={transferItem.id}
+          itemType="TOOL"
+          targetProjects={projects}
+          currentProjectId={currentProjectId}
+          onTransfer={async (targetId) => {
+            if (transferItem.type === 'MCP') await transferMCPConnectionToProject(transferItem.id, targetId);
+            if (transferItem.type === 'GOOGLE') await transferGoogleConnectionToProject(transferItem.id, targetId);
+            if (transferItem.type === 'CMS') await transferCMSConnectionToProject(transferItem.id, targetId);
+            onRefresh();
+          }}
+        />
       )}
     </div>
   );

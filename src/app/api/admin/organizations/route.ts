@@ -161,3 +161,82 @@ export async function GET(request: Request) {
         );
     }
 }
+/**
+ * POST /api/admin/organizations
+ * Create a new organization (Admin only)
+ */
+export async function POST(request: Request) {
+    try {
+        const session = await auth();
+        if (!session?.user?.email) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Check admin role
+        const user = await prisma.user.findUnique({
+            where: { email: session.user.email }
+        });
+
+        if (user?.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        const body = await request.json();
+        const { name, slug, ownerEmail } = body;
+
+        if (!name || !slug || !ownerEmail) {
+            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        // Check if owner exists
+        const owner = await prisma.user.findUnique({
+            where: { email: ownerEmail }
+        });
+
+        if (!owner) {
+            return NextResponse.json({ error: 'Owner user not found' }, { status: 404 });
+        }
+
+        // Check if slug is unique
+        const existingOrg = await prisma.organization.findUnique({
+            where: { slug }
+        });
+
+        if (existingOrg) {
+            return NextResponse.json({ error: 'Slug already in use' }, { status: 409 });
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            // Create Organization
+            const org = await tx.organization.create({
+                data: {
+                    name,
+                    slug,
+                    plan: 'FREE',
+                }
+            });
+
+            // Create Ownership Membership
+            await tx.membership.create({
+                data: {
+                    userId: owner.id,
+                    organizationId: org.id,
+                    role: 'OWNER',
+                    status: 'ACTIVE',
+                    joinedAt: new Date(),
+                }
+            });
+
+            return org;
+        });
+
+        return NextResponse.json(result);
+
+    } catch (error) {
+        console.error('Error creating organization:', error);
+        return NextResponse.json(
+            { error: 'Failed to create organization' },
+            { status: 500 }
+        );
+    }
+}

@@ -190,6 +190,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
                                             </div>
                                             <ProjectSelector
                                                 botId={bot.id}
+                                                botName={bot.name}
                                                 currentProjectId={bot.projectId}
                                                 projects={projects}
                                             />

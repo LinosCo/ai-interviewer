@@ -27,6 +27,11 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
         select: { id: true, name: true }
     });
 
+    // Fetch all organizations for project transfer
+    const allOrganizations = await prisma.organization.findMany({
+        select: { id: true, name: true }
+    });
+
     // FALLBACK: If project has no organizationId, try to find it from the owner's memberships
     let orgId = project.organizationId;
     if (!orgId && project.ownerId) {
@@ -87,6 +92,7 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
         <ProjectDetailView
             project={project}
             allProjects={allProjects}
+            allOrganizations={allOrganizations}
             availableBots={availableBots}
             availableVisibilityConfigs={availableVisibilityConfigs}
         />

@@ -49,6 +49,7 @@ model User {
   reports             Report[]
   rewardGrants        RewardGrant[]
   sessions            Session[]
+  sentTransfers      ItemTransferInvite[] @relation("UserSentTransfers")
 
   // Relazioni attribuzione partner
   partnerAttributions     PartnerClientAttribution[] @relation("PartnerAttributions")
@@ -303,6 +304,20 @@ enum MemberStatus {
   SUSPENDED  // Sospeso temporaneamente
 }
 
+enum ItemTransferType {
+  ORGANIZATION
+  PROJECT
+  BOT
+  TOOL
+}
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 model Project {
   id               String   @id @default(cuid())
   name             String
@@ -335,6 +350,7 @@ model Project {
   visibilityConfigs    VisibilityConfig[]
 
   // Relazione attribuzione partner
+  itemTransfers        ItemTransferInvite[] @relation("ProjectItemTransfers")
   firstAttributions    PartnerClientAttribution[] @relation("FirstAttributionProject")
 }
 
@@ -1558,4 +1574,30 @@ enum ConnectionStatus {
   ACTIVE
   ERROR
   DISABLED
+}
+
+model ItemTransferInvite {
+  id              String           @id @default(cuid())
+  itemType        ItemTransferType
+  itemId          String           // ID of the Organization, Project, Bot, or Tool
+  
+  senderId        String           // User ID of the person sending the transfer
+  recipientEmail  String           // Email of the person who will receive it
+  
+  token           String           @unique
+  status          TransferStatus   @default(PENDING)
+  
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  
+  // Relations
+  sender          User             @relation("UserSentTransfers", fields: [senderId], references: [id])
+  project         Project?         @relation("ProjectItemTransfers", fields: [itemId], references: [id], map: "ItemTransferInvite_projectId_fkey")
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([senderId])
+  @@index([recipientEmail])
+  @@index([token])
 }

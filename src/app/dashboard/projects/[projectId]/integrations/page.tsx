@@ -36,6 +36,11 @@ interface CMSConnection {
   lastSyncError?: string | null;
 }
 
+interface Project {
+  id: string;
+  name: string;
+}
+
 type UserPlan = 'FREE' | 'STARTER' | 'PRO' | 'BUSINESS' | 'PARTNER';
 
 export default function IntegrationsPage() {
@@ -47,16 +52,18 @@ export default function IntegrationsPage() {
   const [mcpConnections, setMcpConnections] = useState<MCPConnection[]>([]);
   const [googleConnection, setGoogleConnection] = useState<GoogleConnection | null>(null);
   const [cmsConnection, setCmsConnection] = useState<CMSConnection | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
 
   // Fetch all integrations data
   const fetchData = useCallback(async () => {
     try {
-      const [mcpRes, googleRes, cmsRes, userRes] = await Promise.all([
+      const [mcpRes, googleRes, cmsRes, userRes, projectsRes] = await Promise.all([
         fetch(`/api/integrations/mcp/connections?projectId=${projectId}`),
         fetch(`/api/integrations/google/connections?projectId=${projectId}`),
         fetch(`/api/cms/connection?projectId=${projectId}`),
         fetch('/api/user/me'),
+        fetch('/api/projects/list-all'),
       ]);
 
       if (mcpRes.ok) {
@@ -85,6 +92,11 @@ export default function IntegrationsPage() {
       if (userRes.ok) {
         const data = await userRes.json();
         setUserPlan(data.plan || 'FREE');
+      }
+
+      if (projectsRes.ok) {
+        const data = await projectsRes.json();
+        setProjects(data.projects || []);
       }
     } catch (error) {
       console.error('Error fetching integrations:', error);
@@ -181,6 +193,9 @@ export default function IntegrationsPage() {
         onTestGSC={handleTestGSC}
         onConfigureGoogle={handleConfigureGoogle}
         onDeleteGoogle={handleDeleteGoogle}
+        projects={projects}
+        currentProjectId={projectId}
+        onRefresh={fetchData}
       />
     </div>
   );

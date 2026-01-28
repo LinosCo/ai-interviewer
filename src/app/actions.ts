@@ -13,6 +13,7 @@ import { decryptIfNeeded, encryptIfNeeded } from '@/lib/encryption'
 import fs from 'fs';
 import path from 'path';
 import { User, Prisma } from '@prisma/client';
+import { transferBotToProject } from './actions/project-tools';
 
 async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
     // 1. Bot-specific key always wins (decrypt if needed)
@@ -390,31 +391,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
 }
 
 export async function updateBotProjectAction(botId: string, projectId: string) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-
-    // Verify access to bot
-    const bot = await prisma.bot.findUnique({
-        where: { id: botId },
-        include: { project: true }
-    });
-    if (!bot) throw new Error("Bot not found");
-
-    // Verify user owns the project or is admin
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) throw new Error("User not found");
-
-    const newProject = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!newProject) throw new Error("Target project not found");
-
-    await prisma.bot.update({
-        where: { id: botId },
-        data: { projectId }
-    });
-
-    revalidatePath(`/dashboard/bots/${botId}`);
-    revalidatePath('/dashboard');
-    return { success: true };
+    return transferBotToProject(botId, projectId);
 }
 
 export async function generateBotConfigAction(prompt: string) {

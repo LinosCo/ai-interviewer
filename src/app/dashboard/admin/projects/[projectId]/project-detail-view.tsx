@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { linkVisibilityConfig, unlinkVisibilityConfig, transferBotToProject } from '@/app/actions/project-tools';
-import { ArrowLeft, Loader2, X, Link as LinkIcon, Unlink, Bot as BotIcon, Globe, MessageSquare, Search, LayoutGrid, ChevronRight, Users } from 'lucide-react';
+import { linkVisibilityConfig, unlinkVisibilityConfig, transferBotToProject, transferProjectToOrganization } from '@/app/actions/project-tools';
+import { ArrowLeft, Loader2, X, Link as LinkIcon, Unlink, Bot as BotIcon, Globe, MessageSquare, Search, LayoutGrid, ChevronRight, Users, Building2, ArrowLeftRight } from 'lucide-react';
+import TransferProjectDialog from '@/components/dashboard/TransferProjectDialog';
 import { ProjectAccessManager } from '@/app/dashboard/projects/access-manager';
 import { showToast } from '@/components/toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,13 +33,15 @@ interface Project {
         name: string | null;
         email: string;
     } | null;
-    bots: Bot[];
     visibilityConfigs: VisibilityConfig[];
+    bots: Bot[];
+    organization: { id: string; name: string } | null;
 }
 
 interface ProjectDetailViewProps {
     project: Project;
     allProjects: { id: string; name: string }[];
+    allOrganizations: { id: string; name: string }[];
     availableBots: (Bot & { project: { name: string } })[];
     availableVisibilityConfigs: (VisibilityConfig & { project?: { name: string } | null })[];
 }
@@ -46,12 +49,14 @@ interface ProjectDetailViewProps {
 export default function ProjectDetailView({
     project,
     allProjects,
+    allOrganizations,
     availableBots,
     availableVisibilityConfigs
 }: ProjectDetailViewProps) {
     const router = useRouter();
     const [transferBotId, setTransferBotId] = useState<string | null>(null);
     const [targetProjectId, setTargetProjectId] = useState('');
+    const [isTransferProjectOpen, setIsTransferProjectOpen] = useState(false);
 
     const [isManageToolsOpen, setIsManageToolsOpen] = useState(false);
     const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
@@ -61,7 +66,7 @@ export default function ProjectDetailView({
         if (!transferBotId || !targetProjectId) return;
         setIsLoading(true);
         try {
-            await transferBotToProject(transferBotId, targetProjectId, project.id);
+            await transferBotToProject(transferBotId, targetProjectId);
             setTransferBotId(null);
             setTargetProjectId('');
             showToast('Bot trasferito con successo', 'success');
@@ -138,6 +143,13 @@ export default function ProjectDetailView({
                     >
                         <Users className="w-4 h-4" />
                         Gestisci Utenti
+                    </button>
+                    <button
+                        onClick={() => setIsTransferProjectOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-bold hover:border-gray-900 hover:bg-gray-50 transition-all text-sm"
+                    >
+                        <ArrowLeftRight className="w-4 h-4" />
+                        Sposta Organizzazione
                     </button>
                     <button
                         onClick={() => setIsManageToolsOpen(true)}
@@ -484,6 +496,18 @@ export default function ProjectDetailView({
                     </div>
                 )}
             </AnimatePresence>
+
+            <TransferProjectDialog
+                isOpen={isTransferProjectOpen}
+                onClose={() => setIsTransferProjectOpen(false)}
+                projectName={project.name}
+                targetOrganizations={allOrganizations}
+                currentOrgId={project.organization?.id || ''}
+                onTransfer={async (targetOrgId) => {
+                    await transferProjectToOrganization(project.id, targetOrgId);
+                    router.refresh();
+                }}
+            />
         </div>
     );
 }

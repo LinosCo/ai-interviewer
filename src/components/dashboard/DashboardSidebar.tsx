@@ -115,6 +115,7 @@ export function DashboardSidebar({
                             {adminExpanded && (
                                 <div className="ml-4 mt-1 space-y-1 border-l-2 border-amber-100 pl-2">
                                     <DashboardLink href="/dashboard/admin/usage" icon={<Icons.Activity size={18} />} label="Monitoraggio" isAdmin onClick={() => setIsOpen(false)} />
+                                    <DashboardLink href="/dashboard/admin/organizations" icon={<Icons.Building size={18} />} label="Organizzazioni" isAdmin onClick={() => setIsOpen(false)} />
                                     <DashboardLink href="/dashboard/admin/users" icon={<Icons.Users size={18} />} label="Utenti" isAdmin onClick={() => setIsOpen(false)} />
                                     <DashboardLink href="/dashboard/admin/projects" icon={<Icons.FolderKanban size={18} />} label="Progetti" isAdmin onClick={() => setIsOpen(false)} />
                                     <DashboardLink href="/dashboard/admin/cms" icon={<Icons.Link size={18} />} label="CMS" isAdmin onClick={() => setIsOpen(false)} />

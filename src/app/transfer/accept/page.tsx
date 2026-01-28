@@ -6,7 +6,7 @@ import { acceptTransferInvite } from '@/app/actions/transfer';
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/ui/business-tuner/Icons";
 import { showToast } from '@/components/toast';
-import { Building2, Package, Bot, Tool, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Building2, Package, Bot, Wrench, CheckCircle2, AlertCircle } from 'lucide-react';
 
 function AcceptTransferContent() {
     const searchParams = useSearchParams();

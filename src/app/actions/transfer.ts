@@ -99,7 +99,7 @@ export async function acceptTransferInvite(token: string) {
     await prisma.$transaction(async (tx) => {
         // Find recipient's default organization and project if needed
         const recipientMemberships = await tx.membership.findMany({
-            where: { userId: session.user.id, role: 'OWNER' },
+            where: { userId: session.user!.id, role: 'OWNER' },
             include: { organization: true }
         });
 
@@ -120,7 +120,7 @@ export async function acceptTransferInvite(token: string) {
                 });
                 // 2. New owner (recipient) is added or updated
                 const existingMember = await tx.membership.findFirst({
-                    where: { organizationId: invite.itemId, userId: session.user.id }
+                    where: { organizationId: invite.itemId, userId: session.user!.id }
                 });
                 if (existingMember) {
                     await tx.membership.update({
@@ -131,7 +131,7 @@ export async function acceptTransferInvite(token: string) {
                     await tx.membership.create({
                         data: {
                             organizationId: invite.itemId,
-                            userId: session.user.id,
+                            userId: session.user!.id as string,
                             role: 'OWNER'
                         }
                     });
@@ -144,7 +144,7 @@ export async function acceptTransferInvite(token: string) {
                     where: { id: invite.itemId },
                     data: {
                         organizationId: targetOrgId,
-                        ownerId: session.user.id,
+                        ownerId: session.user!.id,
                         transferredAt: new Date(),
                         transferredFromOrgId: (await tx.project.findUnique({ where: { id: invite.itemId } }))?.organizationId
                     }

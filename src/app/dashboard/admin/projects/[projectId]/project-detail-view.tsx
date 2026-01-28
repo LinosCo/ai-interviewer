@@ -26,7 +26,7 @@ interface VisibilityConfig {
     projectId: string | null;
 }
 
-interface Project {
+interface ProjectData {
     id: string;
     name: string;
     owner: {
@@ -39,7 +39,7 @@ interface Project {
 }
 
 interface ProjectDetailViewProps {
-    project: Project;
+    project: ProjectData;
     allProjects: { id: string; name: string }[];
     allOrganizations: { id: string; name: string }[];
     availableBots: (Bot & { project: { name: string } })[];

@@ -4,16 +4,18 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bot, MessageSquare, Settings, Loader2, ArrowRight, Trash2 } from "lucide-react";
+import { Bot, MessageSquare, Settings, Loader2, ArrowRight, Trash2, Pencil, Eye } from "lucide-react";
 import Link from 'next/link';
 import { showToast } from '@/components/toast';
 
 interface BotItem {
     id: string;
     name: string;
+    type: 'bot' | 'tracker';
     botType: string | null;
     projectId: string;
     projectName: string | null;
+    orgName?: string | null;
 }
 
 interface ProjectToolsManagerProps {
@@ -22,11 +24,13 @@ interface ProjectToolsManagerProps {
 }
 
 export function ProjectToolsManager({ projectId, projectName }: ProjectToolsManagerProps) {
-    const [linkedBots, setLinkedBots] = useState<BotItem[]>([]);
-    const [availableBots, setAvailableBots] = useState<BotItem[]>([]);
+    const [linkedTools, setLinkedTools] = useState<ToolItem[]>([]);
+    const [availableTools, setAvailableTools] = useState<ToolItem[]>([]);
     const [personalProjectId, setPersonalProjectId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [editingBotId, setEditingBotId] = useState<string | null>(null);
+    const [editName, setEditName] = useState('');
 
     useEffect(() => {
         fetchBots();
@@ -37,14 +41,46 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
             const res = await fetch(`/api/projects/${projectId}/bots?includeAll=true`);
             if (res.ok) {
                 const data = await res.json();
-                setLinkedBots(data.linkedBots || []);
-                setAvailableBots(data.availableBots || []);
+                setLinkedTools(data.linkedTools || []);
+                setAvailableTools(data.availableTools || []);
                 setPersonalProjectId(data.personalProjectId);
             }
         } catch (err) {
             console.error('Error fetching bots:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const renameTool = async (tool: ToolItem) => {
+        if (!editName.trim()) return;
+        setActionLoading(tool.id);
+        try {
+            const url = tool.type === 'bot'
+                ? `/api/bots/${tool.id}`
+                : `/api/visibility/create`;
+
+            const body = tool.type === 'bot'
+                ? { name: editName }
+                : { id: tool.id, brandName: editName };
+
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                showToast(tool.type === 'bot' ? 'Bot rinominato' : 'Monitor rinominato');
+                setEditingBotId(null);
+                fetchBots();
+            } else {
+                showToast('Errore nel rinominare il tool', 'error');
+            }
+        } catch (err) {
+            showToast('Errore di rete', 'error');
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -108,7 +144,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                         </CardDescription>
                     </div>
                     <Badge variant="outline" className="text-sm">
-                        {linkedBots.length} tool associati
+                        {linkedTools.length} tool associati
                     </Badge>
                 </div>
             </CardHeader>
@@ -118,7 +154,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">
                         Tool in {projectName}
                     </h4>
-                    {linkedBots.length === 0 ? (
+                    {linkedTools.length === 0 ? (
                         <div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed">
                             <Bot className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                             <p className="text-sm text-gray-500">
@@ -127,23 +163,57 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {linkedBots.map(bot => (
+                            {linkedTools.map(tool => (
                                 <div
-                                    key={bot.id}
+                                    key={tool.id}
                                     className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${bot.botType === 'chatbot' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                                            {getBotIcon(bot.botType)}
+                                        <div className={`p-2 rounded-lg ${tool.type === 'tracker' ? 'bg-purple-100 text-purple-600' : tool.botType === 'chatbot' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
+                                            {tool.type === 'tracker' ? <Eye className="w-4 h-4" /> : getBotIcon(tool.botType)}
                                         </div>
                                         <div>
-                                            <p className="font-medium text-gray-900">{bot.name}</p>
-                                            <p className="text-xs text-gray-500">{getBotTypeLabel(bot.botType)}</p>
+                                            {editingBotId === tool.id ? (
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={editName}
+                                                        onChange={(e) => setEditName(e.target.value)}
+                                                        className="px-2 py-1 text-sm border rounded"
+                                                        autoFocus
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') renameTool(tool);
+                                                            if (e.key === 'Escape') setEditingBotId(null);
+                                                        }}
+                                                    />
+                                                    <Button size="xs" onClick={() => renameTool(tool)} disabled={actionLoading === tool.id}>
+                                                        Salva
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <p className="font-medium text-gray-900 line-clamp-1">{tool.name}</p>
+                                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">
+                                                        {tool.type === 'tracker' ? 'Monitor Visibilità' : getBotTypeLabel(tool.botType)}
+                                                    </p>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Link href={`/dashboard/bots/${bot.id}`}>
-                                            <Button variant="ghost" size="sm" title="Impostazioni Bot">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setEditingBotId(tool.id);
+                                                setEditName(tool.name);
+                                            }}
+                                            title="Rinomina"
+                                        >
+                                            <Pencil size={14} className="text-slate-500" />
+                                        </Button>
+                                        <Link href={tool.type === 'bot' ? `/dashboard/bots/${tool.id}` : `/dashboard/visibility`}>
+                                            <Button variant="ghost" size="sm" title="Impostazioni">
                                                 <Settings className="w-4 h-4 text-slate-500" />
                                             </Button>
                                         </Link>
@@ -151,12 +221,12 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => transferBot(bot.id, personalProjectId)}
-                                                disabled={actionLoading === bot.id}
+                                                onClick={() => transferBot(tool.id, personalProjectId)}
+                                                disabled={actionLoading === tool.id}
                                                 title="Rimuovi dal progetto (sposta nel progetto personale)"
                                                 className="text-red-500 hover:text-red-600 hover:bg-red-50"
                                             >
-                                                {actionLoading === bot.id ? (
+                                                {actionLoading === tool.id ? (
                                                     <Loader2 className="w-4 h-4 animate-spin" />
                                                 ) : (
                                                     <Trash2 className="w-4 h-4" />
@@ -170,28 +240,28 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                     )}
                 </div>
 
-                {/* Available Bots (from other projects) */}
-                {availableBots.length > 0 && (
+                {/* Available Tools (from other projects) */}
+                {availableTools.length > 0 && (
                     <div>
                         <h4 className="text-sm font-semibold text-gray-700 mb-3">
                             Altri tool disponibili
                         </h4>
                         <div className="space-y-2">
-                            {availableBots.map(bot => (
+                            {availableTools.map(tool => (
                                 <div
-                                    key={bot.id}
+                                    key={tool.id}
                                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-lg ${bot.botType === 'chatbot' ? 'bg-blue-50 text-blue-400' : 'bg-amber-50 text-amber-400'}`}>
-                                            {getBotIcon(bot.botType)}
+                                        <div className={`p-2 rounded-lg ${tool.type === 'tracker' ? 'bg-purple-50 text-purple-400' : tool.botType === 'chatbot' ? 'bg-blue-50 text-blue-400' : 'bg-amber-50 text-amber-400'}`}>
+                                            {tool.type === 'tracker' ? <Eye className="w-4 h-4" /> : getBotIcon(tool.botType)}
                                         </div>
                                         <div>
-                                            <p className="font-medium text-gray-900">{bot.name}</p>
-                                            <p className="text-xs text-gray-500">
-                                                {getBotTypeLabel(bot.botType)} •
-                                                <span className="text-gray-400 ml-1">
-                                                    in: {bot.projectName || 'Progetto personale'}
+                                            <p className="font-medium text-gray-900">{tool.name}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">
+                                                {tool.type === 'tracker' ? 'Monitor Visibilità' : getBotTypeLabel(tool.botType)} •
+                                                <span className="text-gray-400 ml-1 font-normal lowercase">
+                                                    {tool.orgName || 'Nessun Team'} / {tool.projectName || 'P. Personale'}
                                                 </span>
                                             </p>
                                         </div>
@@ -199,11 +269,11 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => transferBot(bot.id, projectId)}
-                                        disabled={actionLoading === bot.id}
-                                        className="gap-1"
+                                        onClick={() => transferBot(tool.id, projectId)}
+                                        disabled={actionLoading === tool.id}
+                                        className="gap-1 border-slate-200 text-xs py-1 h-8 rounded-lg"
                                     >
-                                        {actionLoading === bot.id ? (
+                                        {actionLoading === tool.id ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
                                         ) : (
                                             <>

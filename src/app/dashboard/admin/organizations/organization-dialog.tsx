@@ -47,7 +47,7 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
             const method = organization ? 'PATCH' : 'POST';
 
             const body = organization
-                ? { newOwnerEmail }
+                ? { name, slug, newOwnerEmail: newOwnerEmail || undefined }
                 : { name, slug, ownerEmail };
 
             const response = await fetch(url, {
@@ -61,7 +61,7 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
                 throw new Error(error.error || 'Something went wrong');
             }
 
-            showToast(organization ? 'Proprietario aggiornato' : 'Organizzazione creata');
+            showToast(organization ? 'Organizzazione aggiornata' : 'Organizzazione creata');
             router.refresh();
             onClose();
         } catch (error: any) {
@@ -73,61 +73,61 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent>
+            <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{organization ? 'Trasferisci Proprietà' : 'Crea Organizzazione'}</DialogTitle>
+                    <DialogTitle>{organization ? 'Modifica Organizzazione' : 'Crea Organizzazione'}</DialogTitle>
                 </DialogHeader>
 
-                <form onSubmit={onSubmit} className="space-y-4">
-                    {!organization ? (
-                        <>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Nome</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    required
-                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                                />
-                            </div>
+                <form onSubmit={onSubmit} className="space-y-4 py-2">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nome</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            required
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:bg-white outline-none transition-all placeholder:text-gray-400 text-sm"
+                            placeholder="Nome organizzazione"
+                        />
+                    </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Slug</label>
-                                <input
-                                    type="text"
-                                    value={slug}
-                                    onChange={(e) => setSlug(e.target.value)}
-                                    required
-                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                                    placeholder="my-org-slug"
-                                />
-                                <p className="text-xs text-gray-400 mt-1">Caratteri minuscoli, numeri e trattini soltanto.</p>
-                            </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Slug</label>
+                        <input
+                            type="text"
+                            value={slug}
+                            onChange={(e) => setSlug(e.target.value)}
+                            required
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:bg-white outline-none transition-all placeholder:text-gray-400 text-sm"
+                            placeholder="my-org-slug"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">Caratteri minuscoli, numeri e trattini soltanto.</p>
+                    </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Email Proprietario</label>
-                                <input
-                                    type="email"
-                                    value={ownerEmail}
-                                    onChange={(e) => setOwnerEmail(e.target.value)}
-                                    required
-                                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
-                                />
-                            </div>
-                        </>
-                    ) : (
-                        <div>
-                            <p className="text-sm text-gray-600 mb-4">
-                                Attualmente di proprietà di: <strong>{organization.owner?.email || 'Sconosciuto'}</strong>
+                    {organization ? (
+                        <div className="pt-4 border-t border-gray-100">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Trasferisci Proprietà (Opzionale)</label>
+                            <p className="text-xs text-gray-500 mb-2">
+                                Attuale proprietario: <span className="font-semibold text-gray-900">{organization.owner?.email || 'Sconosciuto'}</span>
                             </p>
-                            <label className="block text-sm font-medium text-gray-700">Nuova Email Proprietario</label>
                             <input
                                 type="email"
                                 value={newOwnerEmail}
                                 onChange={(e) => setNewOwnerEmail(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:bg-white outline-none transition-all placeholder:text-gray-400 text-sm"
+                                placeholder="Email del nuovo proprietario"
+                            />
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Email Proprietario</label>
+                            <input
+                                type="email"
+                                value={ownerEmail}
+                                onChange={(e) => setOwnerEmail(e.target.value)}
                                 required
-                                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500"
+                                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:bg-white outline-none transition-all placeholder:text-gray-400 text-sm"
+                                placeholder="Proprietario organizzazione"
                             />
                         </div>
                     )}

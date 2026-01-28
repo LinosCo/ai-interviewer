@@ -31,32 +31,48 @@ export default async function AdminOrganizationsPage() {
                 }
             },
             projects: {
+                include: {
+                    _count: {
+                        select: { bots: true }
+                    }
+                }
+            },
+            visibilityConfigs: {
                 select: { id: true }
             },
             subscription: true,
             _count: {
                 select: {
                     members: true,
+                    projects: true
                 }
             }
         },
         orderBy: { createdAt: 'desc' }
     });
 
-    const enrichedOrgs = organizations.map(org => ({
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-        createdAt: org.createdAt.toISOString(),
-        plan: org.plan,
-        tier: org.subscription?.tier || 'FREE',
-        owner: org.members[0] ? {
-            name: org.members[0].user.name,
-            email: org.members[0].user.email
-        } : null,
-        members: org._count.members,
-        projects: org.projects,
-    }));
+    const enrichedOrgs = organizations.map(org => {
+        const botCount = org.projects.reduce((acc, p) => acc + p._count.bots, 0);
+        const toolCount = org.visibilityConfigs.length;
+
+        return {
+            id: org.id,
+            name: org.name,
+            slug: org.slug,
+            createdAt: org.createdAt.toISOString(),
+            plan: org.plan,
+            tier: org.subscription?.tier || 'FREE',
+            owner: org.members[0] ? {
+                name: org.members[0].user.name,
+                email: org.members[0].user.email
+            } : null,
+            members: org._count.members,
+            projectCount: org._count.projects,
+            botCount,
+            toolCount,
+            projects: org.projects,
+        };
+    });
 
     return (
         <div className="flex-1 overflow-y-auto">

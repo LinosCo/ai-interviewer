@@ -44,78 +44,92 @@ export async function GET(
             return new Response('Access denied', { status: 403 });
         }
 
-        // If includeAll, return both linked and available bots for the tools manager
+        // If includeAll, return both linked and available tools (bots + trackers)
         if (includeAll) {
-            // Bots linked to this project
+            // 1. Fetch Bots
             const linkedBots = await prisma.bot.findMany({
-                where: {
-                    projectId,
-                    ...(botType && { botType })
-                },
-                include: {
-                    project: { select: { name: true } }
-                },
+                where: { projectId },
+                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
                 orderBy: { updatedAt: 'desc' }
             });
 
-            // Get projects the user has access to via ProjectAccess
-            const userProjects = await prisma.projectAccess.findMany({
-                where: { userId: session.user.id },
-                select: { projectId: true }
+            // 2. Fetch Trackers (VisibilityConfigs)
+            const linkedTrackers = await prisma.visibilityConfig.findMany({
+                where: { projectId },
+                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
+                orderBy: { updatedAt: 'desc' }
             });
 
-            // Also get projects the user owns directly
-            const ownedProjects = await prisma.project.findMany({
-                where: { ownerId: session.user.id },
+            // Get all accessible projects
+            const userMemberships = await prisma.membership.findMany({
+                where: { userId: session.user.id },
+                select: { organizationId: true }
+            });
+            const orgIds = userMemberships.map(m => m.organizationId);
+
+            const allAccessibleProjects = await prisma.project.findMany({
+                where: {
+                    OR: [
+                        { organizationId: { in: orgIds } },
+                        { ownerId: session.user.id }
+                    ]
+                },
                 select: { id: true }
             });
+            const allProjectIds = allAccessibleProjects.map(p => p.id);
 
-            // Combine and deduplicate project IDs
-            const allProjectIds = [...new Set([
-                ...userProjects.map(p => p.projectId),
-                ...ownedProjects.map(p => p.id)
-            ])];
-
-            // Get bots from all accessible projects (except current one)
             const availableBots = await prisma.bot.findMany({
                 where: {
-                    projectId: {
-                        in: allProjectIds,
-                        not: projectId
-                    },
-                    ...(botType && { botType })
+                    projectId: { in: allProjectIds, not: projectId }
                 },
-                include: {
-                    project: { select: { name: true } }
+                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
+                orderBy: { updatedAt: 'desc' }
+            });
+
+            const availableTrackers = await prisma.visibilityConfig.findMany({
+                where: {
+                    projectId: { in: allProjectIds, not: projectId }
                 },
+                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
                 orderBy: { updatedAt: 'desc' }
             });
 
             // Find the owner's personal project ID
             const personalProject = await prisma.project.findFirst({
-                where: {
-                    ownerId: session.user.id,
-                    isPersonal: true
-                },
+                where: { ownerId: session.user.id, isPersonal: true },
                 select: { id: true }
+            });
+
+            const mapBot = (b: any) => ({
+                id: b.id,
+                name: b.name,
+                type: 'bot',
+                botType: b.botType,
+                projectId: b.projectId,
+                projectName: b.project?.name || null,
+                orgName: b.project?.organization?.name || null
+            });
+
+            const mapTracker = (t: any) => ({
+                id: t.id,
+                name: t.brandName,
+                type: 'tracker',
+                botType: 'tracker',
+                projectId: t.projectId,
+                projectName: t.project?.name || null,
+                orgName: t.project?.organization?.name || null
             });
 
             return NextResponse.json({
                 personalProjectId: personalProject?.id || null,
-                linkedBots: linkedBots.map(b => ({
-                    id: b.id,
-                    name: b.name,
-                    botType: b.botType,
-                    projectId: b.projectId,
-                    projectName: b.project?.name || null
-                })),
-                availableBots: availableBots.map(b => ({
-                    id: b.id,
-                    name: b.name,
-                    botType: b.botType,
-                    projectId: b.projectId,
-                    projectName: b.project?.name || null
-                }))
+                linkedTools: [
+                    ...linkedBots.map(mapBot),
+                    ...linkedTrackers.map(mapTracker)
+                ],
+                availableTools: [
+                    ...availableBots.map(mapBot),
+                    ...availableTrackers.map(mapTracker)
+                ]
             });
         }
 
@@ -215,53 +229,70 @@ export async function POST(
             );
         }
 
-        // Verify bot exists and user has access to it
-        const bot = await prisma.bot.findUnique({
+        // Detect tool type and verify existence
+        let bot = await prisma.bot.findUnique({
             where: { id: botId },
-            include: { project: { select: { id: true } } }
+            include: { project: { select: { id: true, ownerId: true } } }
         });
 
+        let tracker = null;
         if (!bot) {
+            tracker = await prisma.visibilityConfig.findUnique({
+                where: { id: botId },
+                include: { project: { select: { id: true, ownerId: true } } }
+            });
+        }
+
+        if (!bot && !tracker) {
             return NextResponse.json(
-                { error: 'Bot non trovato' },
+                { error: 'Tool non trovato' },
                 { status: 404 }
             );
         }
 
-        // Verify user has access to the bot's current project
+        const tool = bot || tracker;
+        const toolCurrentProjectId = bot ? bot.projectId : tracker!.projectId;
+
+        // Verify user has access to the tool's current project
         const botProjectAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
                     userId: session.user.id,
-                    projectId: bot.projectId
+                    projectId: toolCurrentProjectId
                 }
             }
         });
 
-        // Also check if user is owner of bot's current project
-        const botProject = await prisma.project.findUnique({
-            where: { id: bot.projectId },
-            select: { ownerId: true }
-        });
+        // Also check if user is owner of tool's current project
+        const isToolProjectOwner = tool?.project?.ownerId === session.user.id;
 
-        const isBotProjectOwner = botProject?.ownerId === session.user.id;
-
-        if (!botProjectAccess && !isBotProjectOwner) {
+        if (!botProjectAccess && !isToolProjectOwner) {
             return NextResponse.json(
-                { error: 'Non hai accesso a questo bot' },
+                { error: 'Non hai accesso a questo tool' },
                 { status: 403 }
             );
         }
 
-        // Transfer the bot
-        await prisma.bot.update({
-            where: { id: botId },
-            data: { projectId: targetProjectId }
-        });
+        // Transfer the tool
+        if (bot) {
+            await prisma.bot.update({
+                where: { id: botId },
+                data: { projectId: targetProjectId }
+            });
+        } else {
+            // For visibility configs, we also need to update organizationId
+            await prisma.visibilityConfig.update({
+                where: { id: botId },
+                data: {
+                    projectId: targetProjectId,
+                    organizationId: targetProject.organizationId
+                }
+            });
+        }
 
         return NextResponse.json({
             success: true,
-            message: 'Bot trasferito con successo'
+            message: 'Tool trasferito con successo'
         });
 
     } catch (error) {

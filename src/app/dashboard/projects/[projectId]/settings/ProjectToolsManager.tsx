@@ -8,7 +8,7 @@ import { Bot, MessageSquare, Settings, Loader2, ArrowRight, Trash2, Pencil, Eye 
 import Link from 'next/link';
 import { showToast } from '@/components/toast';
 
-interface BotItem {
+interface ToolItem {
     id: string;
     name: string;
     type: 'bot' | 'tracker';
@@ -186,7 +186,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                                             if (e.key === 'Escape') setEditingBotId(null);
                                                         }}
                                                     />
-                                                    <Button size="xs" onClick={() => renameTool(tool)} disabled={actionLoading === tool.id}>
+                                                    <Button size="sm" onClick={() => renameTool(tool)} disabled={actionLoading === tool.id}>
                                                         Salva
                                                     </Button>
                                                 </div>

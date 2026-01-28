@@ -1,41 +1,52 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
-import { AdminUserCard } from './AdminUserCard';
+import { AdminAccountCard } from './AdminAccountCard';
 import { Sparkles, MessageSquare, Bot, Eye, Users, Building2 } from 'lucide-react';
+import { PLANS, PlanType } from '@/config/plans';
 
-export interface UserData {
+export interface AccountData {
     id: string;
-    email: string;
-    name: string | null;
-    role: string;
+    name: string;
     plan: string;
     monthlyCreditsLimit: bigint;
     monthlyCreditsUsed: bigint;
     packCreditsAvailable: bigint;
     creditsResetDate: Date | null;
-    createdAt: Date;
-    organizations: {
+    owner: { id: string; name: string | null; email: string } | null;
+    subscription: {
+        id: string;
+        tier: string;
+        status: string;
+        tokensUsedThisMonth: number;
+        interviewsUsedThisMonth: number;
+        chatbotSessionsUsedThisMonth: number;
+        visibilityQueriesUsedThisMonth: number;
+        interviewTokensUsed: number;
+        chatbotTokensUsed: number;
+        visibilityTokensUsed: number;
+        suggestionTokensUsed: number;
+        systemTokensUsed: number;
+        extraTokens: number;
+        extraInterviews: number;
+        extraChatbotSessions: number;
+        currentPeriodEnd: Date | null;
+    } | null;
+    projects: {
         id: string;
         name: string;
-        role: string;
-        subscription: {
-            tier: string;
-            status: string;
-            tokensUsedThisMonth: number;
-            interviewsUsedThisMonth: number;
-            chatbotSessionsUsedThisMonth: number;
-            visibilityQueriesUsedThisMonth: number;
-        } | null;
+        isPersonal: boolean;
+        owner: { id: string; name: string | null; email: string } | null;
+        _count: { bots: number };
+        hasCMS: boolean;
     }[];
     _count: {
-        ownedProjects: number;
+        members: number;
+        projects: number;
     };
-    projectsWithBots: {
-        id: string;
-        name: string;
-        _count: { bots: number };
-    }[];
+    botCount: number;
+    visibilityCount: number;
+    hasCMS: boolean;
 }
 
 export default async function AdminUsagePage() {
@@ -49,87 +60,84 @@ export default async function AdminUsagePage() {
         return <div className="p-8">Access Denied</div>;
     }
 
-    // Fetch USERS (not organizations) - correct approach for user-centric credits
-    const users = await prisma.user.findMany({
+    // Fetch ORGANIZATIONS
+    const organizations = await prisma.organization.findMany({
         include: {
-            memberships: {
-                include: {
-                    organization: {
-                        include: {
-                            subscription: {
-                                select: {
-                                    tier: true,
-                                    status: true,
-                                    tokensUsedThisMonth: true,
-                                    interviewsUsedThisMonth: true,
-                                    chatbotSessionsUsedThisMonth: true,
-                                    visibilityQueriesUsedThisMonth: true
-                                }
-                            }
-                        }
-                    }
-                }
+            members: {
+                where: { role: 'OWNER' },
+                include: { user: true }
             },
-            ownedProjects: {
-                select: {
-                    id: true,
-                    name: true,
+            subscription: true,
+            projects: {
+                include: {
+                    owner: true,
                     _count: { select: { bots: true } }
                 }
             },
             _count: {
-                select: { ownedProjects: true }
+                select: {
+                    members: true,
+                    projects: true
+                }
             }
         },
         orderBy: { createdAt: 'desc' }
     });
 
-    // Transform to user-centric view
-    const userData: UserData[] = users.map((user) => ({
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        plan: user.plan,
-        monthlyCreditsLimit: user.monthlyCreditsLimit,
-        monthlyCreditsUsed: user.monthlyCreditsUsed,
-        packCreditsAvailable: user.packCreditsAvailable,
-        creditsResetDate: user.creditsResetDate,
-        createdAt: user.createdAt,
-        organizations: user.memberships.map((m) => ({
-            id: m.organization.id,
-            name: m.organization.name,
-            role: m.role,
-            subscription: m.organization.subscription
-        })),
-        _count: user._count,
-        projectsWithBots: user.ownedProjects
-    }));
+    const accountData: AccountData[] = organizations.map((org) => {
+        const ownerMembership = org.members.find(m => m.role === 'OWNER');
+        const owner = ownerMembership ? {
+            id: ownerMembership.user.id,
+            name: ownerMembership.user.name,
+            email: ownerMembership.user.email
+        } : null;
 
-    // Global stats - based on USER credits (new system)
-    const totalUsers = userData.length;
-    const totalCreditsUsed = userData.reduce((sum, u) => sum + Number(u.monthlyCreditsUsed), 0);
+        // Sum bots across projects
+        const botCount = org.projects.reduce((sum, p) => sum + p._count.bots, 0);
 
-    // Stats from organization subscriptions (legacy)
-    const totalInterviews = userData.reduce((sum, u) =>
-        sum + u.organizations.reduce((orgSum, org) =>
-            orgSum + (org.subscription?.interviewsUsedThisMonth || 0), 0), 0);
-    const totalChatbotSessions = userData.reduce((sum, u) =>
-        sum + u.organizations.reduce((orgSum, org) =>
-            orgSum + (org.subscription?.chatbotSessionsUsedThisMonth || 0), 0), 0);
-    const totalVisibilityQueries = userData.reduce((sum, u) =>
-        sum + u.organizations.reduce((orgSum, org) =>
-            orgSum + (org.subscription?.visibilityQueriesUsedThisMonth || 0), 0), 0);
+        // Hypothetical visibility count (e.g. from VisibilityConfig if joined, but let's count projects for now or leave as is)
+        const visibilityCount = org.projects.length;
 
-    // Plan distribution (user-level)
-    const planCounts = userData.reduce((acc, u) => {
-        acc[u.plan] = (acc[u.plan] || 0) + 1;
+        return {
+            id: org.id,
+            name: org.name,
+            plan: org.plan || 'FREE',
+            monthlyCreditsLimit: org.monthlyCreditsLimit,
+            monthlyCreditsUsed: org.monthlyCreditsUsed,
+            packCreditsAvailable: org.packCreditsAvailable,
+            creditsResetDate: org.creditsResetDate,
+            owner,
+            subscription: org.subscription,
+            projects: org.projects.map(p => ({
+                id: p.id,
+                name: p.name,
+                isPersonal: false, // Placeholder
+                owner: p.owner ? { id: p.owner.id, name: p.owner.name, email: p.owner.email } : null,
+                _count: p._count,
+                hasCMS: false // Placeholder
+            })),
+            _count: org._count,
+            botCount,
+            visibilityCount,
+            hasCMS: false
+        };
+    });
+
+    // Global stats
+    const totalOrganizations = accountData.length;
+    const totalCreditsUsed = organizations.reduce((sum, org) => sum + Number(org.monthlyCreditsUsed), 0);
+    const totalInterviews = accountData.reduce((sum, acc) => sum + (acc.subscription?.interviewsUsedThisMonth || 0), 0);
+    const totalChatbotSessions = accountData.reduce((sum, acc) => sum + (acc.subscription?.chatbotSessionsUsedThisMonth || 0), 0);
+    const totalVisibilityQueries = accountData.reduce((sum, acc) => sum + (acc.subscription?.visibilityQueriesUsedThisMonth || 0), 0);
+
+    // Plan distribution
+    const planCounts = accountData.reduce((acc, a) => {
+        const tier = a.subscription?.tier || 'FREE';
+        acc[tier] = (acc[tier] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
 
-    // Organization count
-    const uniqueOrgs = new Set(userData.flatMap(u => u.organizations.map(o => o.id)));
-    const totalOrganizations = uniqueOrgs.size;
+    const totalUsers = await prisma.user.count();
 
     const formatNumber = (n: number) => {
         if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -142,7 +150,7 @@ export default async function AdminUsagePage() {
             <div>
                 <h1 className="text-2xl font-bold text-gray-900">Monitoraggio Risorse (Admin)</h1>
                 <p className="text-gray-500 mt-1">
-                    Vista per <strong>Utenti</strong> con crediti e organizzazioni associate
+                    Vista per <strong>Organizzazioni</strong> (Account) con risorse e proprietari associati
                 </p>
             </div>
 
@@ -206,16 +214,16 @@ export default async function AdminUsagePage() {
 
             {/* Info Banner */}
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-                <strong>Nota:</strong> Questa vista mostra gli <strong>utenti unici</strong> con i loro crediti personali.
-                Ogni utente puo essere membro di piu organizzazioni (mostrate nel dettaglio).
+                <strong>Nota:</strong> Questa vista mostra le <strong>Organizzazioni</strong> registrate.
+                Puoi monitorare l'utilizzo delle risorse e gestire i limiti per ogni account.
             </div>
 
-            {/* User List */}
+            {/* Account List */}
             <div>
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Utilizzo per Utente</h2>
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Utilizzo per Organizzazione (Account)</h2>
                 <div className="grid gap-6">
-                    {userData.map((user) => (
-                        <AdminUserCard key={user.id} user={user} />
+                    {accountData.map((account) => (
+                        <AdminAccountCard key={account.id} account={account} />
                     ))}
                 </div>
             </div>

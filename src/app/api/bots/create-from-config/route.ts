@@ -57,42 +57,15 @@ export async function POST(req: Request) {
         let projectId = config.projectId;
 
         if (!projectId) {
-            // Find a valid project (one that has an organization)
+            const { getOrCreateDefaultOrganization } = await import('@/lib/organizations');
+            const organization = await getOrCreateDefaultOrganization(user.id);
+
+            // Create default project linked to this org
             let project = await prisma.project.findFirst({
-                where: {
-                    ownerId: user.id,
-                    organizationId: { not: null }
-                }
+                where: { ownerId: user.id, organizationId: organization.id }
             });
 
             if (!project) {
-                // Determine organization
-                let organization = await prisma.organization.findFirst({
-                    where: { members: { some: { userId: user.id } } }
-                });
-
-                // If no org, create a Personal Organization
-                if (!organization) {
-                    const orgName = user.name ? `${user.name}'s Org` : 'My Organization';
-                    const slug = user.name
-                        ? `${user.name.toLowerCase().replace(/\s+/g, '-')}-${randomBytes(2).toString('hex')}`
-                        : `org-${randomBytes(4).toString('hex')}`;
-
-                    organization = await prisma.organization.create({
-                        data: {
-                            name: orgName,
-                            slug: slug,
-                            members: {
-                                create: {
-                                    userId: user.id,
-                                    role: 'OWNER'
-                                }
-                            }
-                        }
-                    });
-                }
-
-                // Create default project linked to this org
                 project = await prisma.project.create({
                     data: {
                         name: 'Il mio workspace',
@@ -114,58 +87,24 @@ export async function POST(req: Request) {
             }
         }
 
-        // Check usage limits
-        // Check usage limits
-
         // Get organizationId from project
-        let project = await prisma.project.findUnique({
+        const project = await prisma.project.findUnique({
             where: { id: projectId },
             select: { organizationId: true, name: true, id: true }
         });
 
-        console.log('📁 [CREATE-BOT] Project lookup:', {
-            projectId,
-            found: !!project,
-            hasOrganization: !!project?.organizationId,
-            projectName: project?.name
-        });
-
         if (!project) {
-            console.error('❌ [CREATE-BOT] Project not found:', projectId);
             return new Response('Project not found', { status: 404 });
         }
 
         if (!project.organizationId) {
-            // Project exists but has no organization - create one
-            console.log('🏢 [CREATE-BOT] Project has no organization, creating one...');
+            const { getOrCreateDefaultOrganization } = await import('@/lib/organizations');
+            const organization = await getOrCreateDefaultOrganization(user.id);
 
-            const orgName = user.name ? `${user.name}'s Organization` : 'My Organization';
-            const orgSlug = user.name
-                ? `${user.name.toLowerCase().replace(/\s+/g, '-')}-${randomBytes(2).toString('hex')}`
-                : `org-${randomBytes(4).toString('hex')}`;
-
-            const organization = await prisma.organization.create({
-                data: {
-                    name: orgName,
-                    slug: orgSlug,
-                    members: {
-                        create: {
-                            userId: user.id,
-                            role: 'OWNER'
-                        }
-                    }
-                }
-            });
-
-            // Link project to organization
             await prisma.project.update({
                 where: { id: projectId },
                 data: { organizationId: organization.id }
             });
-
-            console.log('✅ [CREATE-BOT] Organization created and linked:', organization.id);
-
-            // Update project variable
             project.organizationId = organization.id;
         }
 

@@ -6,20 +6,19 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import BillingClient from './billing-client';
 import { UsageDashboard } from '@/components/dashboard/UsageDashboard';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 
 export default async function BillingPage() {
     const session = await auth();
-    if (!session?.user?.email) return null;
+    if (!session?.user?.id) return null;
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
+    const cookieStore = await cookies();
+    const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
+
+    // Get user and their memberships to identify the active organization
+    const userWithOrgs = await prisma.user.findUnique({
+        where: { id: session.user.id },
         select: {
-            id: true,
-            plan: true,
-            monthlyCreditsLimit: true,
-            monthlyCreditsUsed: true,
-            packCreditsAvailable: true,
-            creditsResetDate: true,
             memberships: {
                 include: {
                     organization: {
@@ -32,16 +31,27 @@ export default async function BillingPage() {
         }
     });
 
-    if (!user) return <div>Utente non trovato.</div>;
+    if (!userWithOrgs) return <div>Utente non trovato.</div>;
 
-    const currentPlan = (user.plan as PlanType) || PlanType.FREE;
+    // Determine active organization
+    const activeMembership = activeOrgId
+        ? userWithOrgs.memberships.find(m => m.organizationId === activeOrgId) || userWithOrgs.memberships[0]
+        : userWithOrgs.memberships[0];
+
+    if (!activeMembership) return <div>Nessuna organizzazione trovata. Selezionane una nella sidebar.</div>;
+
+    const organization = activeMembership.organization;
+    const subscription = organization.subscription;
+
+    const currentPlan = (organization.plan as PlanType) || PlanType.FREE;
     const planConfig = PLANS[currentPlan] || PLANS[PlanType.FREE];
 
-    // Calculate credits info
-    const monthlyLimit = Number(user.monthlyCreditsLimit);
-    const monthlyUsed = Number(user.monthlyCreditsUsed);
-    const packAvailable = Number(user.packCreditsAvailable);
+    // Calculate credits info from Organization
+    const monthlyLimit = Number(organization.monthlyCreditsLimit);
+    const monthlyUsed = Number(organization.monthlyCreditsUsed);
+    const packAvailable = Number(organization.packCreditsAvailable);
     const isUnlimited = monthlyLimit === -1;
+    const creditsResetDate = organization.creditsResetDate;
 
     return (
         <div className="pb-10">
@@ -102,9 +112,9 @@ export default async function BillingPage() {
                             </div>
                         )}
 
-                        {user.creditsResetDate && !isUnlimited && (
+                        {creditsResetDate && !isUnlimited && (
                             <p className="text-xs text-stone-500 text-center mt-4">
-                                Reset: {new Date(user.creditsResetDate).toLocaleDateString('it-IT', {
+                                Reset: {new Date(creditsResetDate).toLocaleDateString('it-IT', {
                                     day: 'numeric',
                                     month: 'long'
                                 })}

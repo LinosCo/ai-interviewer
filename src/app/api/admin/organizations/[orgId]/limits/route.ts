@@ -119,6 +119,7 @@ export async function PATCH(
             extraChatbotSessions,
             extraVisibilityQueries,
             extraUsers,
+            monthlyCreditsLimit,
 
             // Reset counters
             resetUsage
@@ -133,12 +134,20 @@ export async function PATCH(
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
 
-        // Update organization plan if changed
-        if (plan && plan !== org.plan) {
-            await prisma.organization.update({
-                where: { id: orgId },
-                data: { plan }
-            });
+        // Update organization plan or limits if changed
+        if (plan || monthlyCreditsLimit !== undefined) {
+            const orgUpdate: any = {};
+            if (plan && plan !== org.plan) orgUpdate.plan = plan;
+            if (monthlyCreditsLimit !== undefined) {
+                orgUpdate.monthlyCreditsLimit = BigInt(monthlyCreditsLimit);
+            }
+
+            if (Object.keys(orgUpdate).length > 0) {
+                await prisma.organization.update({
+                    where: { id: orgId },
+                    data: orgUpdate
+                });
+            }
         }
 
         // Update subscription if exists

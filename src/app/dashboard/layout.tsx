@@ -5,6 +5,7 @@ import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardProviders } from '@/components/dashboard/DashboardProviders';
 import { StrategyCopilot } from '@/components/copilot/StrategyCopilot';
 import { PLANS, PlanType } from '@/config/plans';
+import { cookies } from 'next/headers';
 
 export default async function DashboardLayout({
     children,
@@ -22,14 +23,17 @@ export default async function DashboardLayout({
     let hasAiTips = false;
 
     if (session?.user?.id) {
-        // Get user with plan info
+        // Read active organization from cookies
+        const cookieStore = await cookies();
+        const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
+
+        // Get user and their memberships
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
                 role: true,
                 plan: true,
                 memberships: {
-                    take: 1,
                     include: {
                         organization: {
                             include: {
@@ -50,12 +54,16 @@ export default async function DashboardLayout({
         isAdmin = user?.role === 'ADMIN' || user?.plan === 'ADMIN';
 
         if (user) {
-            // Use user's plan directly
-            userTier = user.plan || 'TRIAL';
-            const membership = user.memberships[0];
+            // Find active membership based on cookie or default to first
+            const membership = activeOrgId
+                ? user.memberships.find(m => m.organizationId === activeOrgId) || user.memberships[0]
+                : user.memberships[0];
 
             if (membership) {
                 organizationId = membership.organizationId;
+
+                // Source of truth for tier is now the Organization
+                userTier = membership.organization.plan || 'FREE';
 
                 // Check if the plan includes CMS feature
                 const planType = userTier as PlanType;

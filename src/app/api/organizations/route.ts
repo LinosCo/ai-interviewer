@@ -38,41 +38,22 @@ export async function GET() {
 
         // Se l'utente non ha organizzazioni, creane una di default (Personale)
         if (organizations.length === 0) {
-            const orgName = `${user.name || 'Mio'} Workspace`;
-            const slug = `${user.id.toLowerCase()}-personal`;
-
-            const newOrg = await prisma.organization.create({
-                data: {
-                    name: orgName,
-                    slug,
-                    plan: (user as any).plan || 'FREE', // Migrazione piano
-                    monthlyCreditsLimit: (user as any).monthlyCreditsLimit,
-                    monthlyCreditsUsed: (user as any).monthlyCreditsUsed,
-                    creditsResetDate: (user as any).creditsResetDate,
-                    packCreditsAvailable: (user as any).packCreditsAvailable,
-                    members: {
-                        create: {
-                            userId: user.id,
-                            role: 'OWNER',
-                            status: 'ACTIVE'
-                        }
-                    }
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                    plan: true
-                }
-            });
+            const { getOrCreateDefaultOrganization } = await import('@/lib/organizations');
+            const newOrg = await getOrCreateDefaultOrganization(user.id);
 
             // Migrazione progetti esistenti (se ce ne sono rimasti senza org)
             await prisma.project.updateMany({
-                where: { ownerId: user.id, organizationId: "" }, // Hypothetical orphaned projects
+                where: { ownerId: user.id, organizationId: "" },
                 data: { organizationId: newOrg.id }
             });
 
-            organizations = [{ ...newOrg, role: 'OWNER' }];
+            organizations = [{
+                id: newOrg.id,
+                name: newOrg.name,
+                slug: newOrg.slug,
+                plan: newOrg.plan,
+                role: 'OWNER'
+            }];
         }
 
         return NextResponse.json({ organizations });

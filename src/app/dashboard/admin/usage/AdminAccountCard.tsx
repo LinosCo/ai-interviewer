@@ -6,54 +6,12 @@ import { Button } from '@/components/ui/business-tuner/Button';
 import { showToast } from '@/components/toast';
 import { PLANS, PlanType } from '@/config/plans';
 import {
-    Edit2, Save, X, Users, Briefcase, MessageSquare, Bot, Eye, Sparkles,
-    ChevronDown, ChevronUp, AlertTriangle, User, Link2, FolderKanban
+    ChevronDown, ChevronUp, AlertTriangle, User, Link2, FolderKanban, Zap, Building2,
+    Bot, Eye, Users, Edit2, X, Save
 } from 'lucide-react';
+import type { AccountData } from './page';
 
-interface SubscriptionData {
-    id: string;
-    tier: string;
-    status: string;
-    tokensUsedThisMonth: number;
-    interviewsUsedThisMonth: number;
-    chatbotSessionsUsedThisMonth: number;
-    visibilityQueriesUsedThisMonth: number;
-    interviewTokensUsed: number;
-    chatbotTokensUsed: number;
-    visibilityTokensUsed: number;
-    suggestionTokensUsed: number;
-    systemTokensUsed: number;
-    extraTokens: number;
-    extraInterviews: number;
-    extraChatbotSessions: number;
-    currentPeriodEnd: Date | null;
-    customLimits?: any;
-}
-
-interface ProjectData {
-    id: string;
-    name: string;
-    isPersonal: boolean;
-    owner: { id: string; name: string | null; email: string } | null;
-    _count: { bots: number };
-    hasCMS: boolean;
-}
-
-interface AccountData {
-    id: string;
-    name: string;
-    plan: string;
-    owner: { id: string; name: string | null; email: string } | null;
-    subscription: SubscriptionData | null;
-    projects: ProjectData[];
-    _count: {
-        members: number;
-        projects: number;
-    };
-    botCount: number;
-    visibilityCount: number;
-    hasCMS: boolean;
-}
+// Interface moved to page.tsx to avoid duplication
 
 interface AdminAccountCardProps {
     account: AccountData;
@@ -115,7 +73,8 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
         extraTokens: sub?.extraTokens || 0,
         extraInterviews: sub?.extraInterviews || 0,
         extraChatbotSessions: sub?.extraChatbotSessions || 0,
-        plan: sub?.tier || account.plan
+        plan: sub?.tier || account.plan,
+        monthlyCreditsLimit: Number(account.monthlyCreditsLimit)
     });
 
     const handleSave = async () => {
@@ -171,17 +130,22 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
 
     return (
         <Card className="p-6">
-            {/* Header - User Centric */}
+            {/* Organization Info */}
             <div className="flex justify-between items-start mb-6">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <User className="w-5 h-5 text-gray-400" />
-                        <h3 className="text-xl font-bold text-gray-900">Account di {ownerDisplay}</h3>
+                        <Building2 className="w-5 h-5 text-gray-400" />
+                        <h3 className="text-xl font-bold text-gray-900">{account.name}</h3>
                     </div>
-                    <p className="text-sm text-gray-500">{account.owner?.email || 'Email non disponibile'}</p>
+                    {account.owner && (
+                        <div className="space-y-1">
+                            <p className="text-sm text-gray-500 flex items-center gap-1">
+                                <User className="w-3 h-3" /> Owner: {account.owner.name || 'Senza nome'} ({account.owner.email})
+                            </p>
+                        </div>
+                    )}
                     <p className="text-xs text-gray-400 mt-1">
-                        Azienda: {account.name}
-                        <span className="font-mono ml-2 text-gray-300">({account.id.slice(0, 8)}...)</span>
+                        ID: <span className="font-mono">{account.id}</span>
                     </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -199,14 +163,38 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                             <option value="PARTNER">PARTNER</option>
                         </select>
                     ) : (
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${planColors[sub?.tier || 'FREE'] || 'bg-gray-100 text-gray-800'}`}>
-                            {sub?.tier || 'FREE'}
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${planColors[sub?.tier || account.plan] || 'bg-gray-100 text-gray-800'}`}>
+                            {sub?.tier || account.plan}
                         </span>
                     )}
                     <span className={`text-xs font-medium ${statusColors[sub?.status || ''] || 'text-gray-500'}`}>
-                        {sub?.status || 'N/A'}
+                        {sub?.status || 'NO_SUBSCRIPTION'}
                     </span>
                 </div>
+            </div>
+
+            {/* Credit Status (New System) */}
+            <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                    <Zap className="w-5 h-5 text-violet-600" />
+                    <span className="font-semibold text-violet-900">Crediti Organizzazione</span>
+                </div>
+                <UsageBar
+                    used={Number(account.monthlyCreditsUsed)}
+                    limit={Number(account.monthlyCreditsLimit)}
+                    label="Crediti Mensili"
+                    color="bg-violet-500"
+                />
+                {account.packCreditsAvailable > BigInt(0) && (
+                    <p className="text-xs text-violet-600 mt-2">
+                        + {formatNumber(Number(account.packCreditsAvailable))} crediti da pack
+                    </p>
+                )}
+                {account.creditsResetDate && (
+                    <p className="text-xs text-gray-500 mt-1">
+                        Reset: {new Date(account.creditsResetDate).toLocaleDateString('it-IT')}
+                    </p>
+                )}
             </div>
 
             {/* Usage Bars */}
@@ -370,7 +358,26 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Limite Crediti Mensili</label>
+                                    {isEditing ? (
+                                        <input
+                                            type="number"
+                                            value={editLimits.monthlyCreditsLimit}
+                                            onChange={(e) => setEditLimits(prev => ({
+                                                ...prev,
+                                                monthlyCreditsLimit: parseInt(e.target.value) || 0
+                                            }))}
+                                            className="w-full px-3 py-2 border rounded-lg text-sm"
+                                            placeholder="-1 per illimitato"
+                                        />
+                                    ) : (
+                                        <p className="text-lg font-semibold">
+                                            {account.monthlyCreditsLimit === BigInt(-1) ? '∞' : formatNumber(Number(account.monthlyCreditsLimit))}
+                                        </p>
+                                    )}
+                                </div>
                                 <div>
                                     <label className="block text-xs text-gray-500 mb-1">Extra Token</label>
                                     {isEditing ? (

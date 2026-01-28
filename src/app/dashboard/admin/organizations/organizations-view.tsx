@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, ArrowLeftRight, Pencil } from 'lucide-react';
+import { Plus, ArrowLeftRight, Pencil, Trash2 } from 'lucide-react';
+import { deleteOrganization } from '@/app/actions/admin';
+import { showToast } from '@/components/toast';
 import OrganizationDialog from './organization-dialog';
 
 interface Organization {
@@ -32,6 +34,20 @@ export default function OrganizationsView({ organizations }: OrganizationsViewPr
     const handleTransfer = (org: Organization) => {
         setSelectedOrg(org);
         setIsDialogOpen(true);
+    };
+
+    const handleDelete = async (orgId: string, orgName: string) => {
+        if (!confirm(`Sei sicuro di voler eliminare l'organizzazione "${orgName}"? Questa azione eliminerà anche tutti i progetti e i bot associati. L'azione è irreversibile.`)) {
+            return;
+        }
+
+        try {
+            await deleteOrganization(orgId);
+            showToast('Organizzazione eliminata con successo', 'success');
+        } catch (error: any) {
+            console.error(error);
+            showToast(error.message || 'Errore durante l\'eliminazione', 'error');
+        }
     };
 
     return (
@@ -88,13 +104,22 @@ export default function OrganizationsView({ organizations }: OrganizationsViewPr
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button
-                                        onClick={() => handleTransfer(org)}
-                                        className="text-amber-600 hover:text-amber-700 flex items-center gap-1.5 ml-auto bg-amber-50 px-3 py-1.5 rounded-lg transition-all"
-                                    >
-                                        <ArrowLeftRight size={16} />
-                                        Trasferisci
-                                    </button>
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button
+                                            onClick={() => handleTransfer(org)}
+                                            className="text-amber-600 hover:text-amber-700 flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-lg transition-all"
+                                        >
+                                            <ArrowLeftRight size={16} />
+                                            Trasferisci
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(org.id, org.name)}
+                                            className="text-red-600 hover:text-red-700 p-2 bg-red-50 rounded-lg transition-all"
+                                            title="Elimina Organizzazione"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

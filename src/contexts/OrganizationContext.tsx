@@ -23,6 +23,7 @@ interface OrganizationContextType {
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
 const SELECTED_ORG_KEY = 'bt_selected_org_id';
+const COOKIE_ORG_KEY = 'bt_selected_org_id';
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
     const { data: session } = useSession();
@@ -40,18 +41,24 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                 setOrganizations(data.organizations);
 
                 // Ripristina organizzazione selezionata
-                const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
+                const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
+                    document.cookie.split('; ').find(row => row.startsWith(`${COOKIE_ORG_KEY}=`))?.split('=')[1];
+
                 if (savedOrgId) {
                     const savedOrg = data.organizations.find((o: Organization) => o.id === savedOrgId);
                     if (savedOrg) {
                         setCurrentOrganizationState(savedOrg);
+                        // Assicurati che il cookie sia sincronizzato
+                        document.cookie = `${COOKIE_ORG_KEY}=${savedOrg.id}; path=/; max-age=31536000; SameSite=Lax`;
                     } else if (data.organizations.length > 0) {
                         setCurrentOrganizationState(data.organizations[0]);
                         localStorage.setItem(SELECTED_ORG_KEY, data.organizations[0].id);
+                        document.cookie = `${COOKIE_ORG_KEY}=${data.organizations[0].id}; path=/; max-age=31536000; SameSite=Lax`;
                     }
                 } else if (data.organizations.length > 0) {
                     setCurrentOrganizationState(data.organizations[0]);
                     localStorage.setItem(SELECTED_ORG_KEY, data.organizations[0].id);
+                    document.cookie = `${COOKIE_ORG_KEY}=${data.organizations[0].id}; path=/; max-age=31536000; SameSite=Lax`;
                 }
             }
         } catch (error) {
@@ -71,6 +78,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         setCurrentOrganizationState(org);
         if (org) {
             localStorage.setItem(SELECTED_ORG_KEY, org.id);
+            document.cookie = `${COOKIE_ORG_KEY}=${org.id}; path=/; max-age=31536000; SameSite=Lax`;
             // Trigger a page reload or event to refresh other contexts (like projects)
             // For now, let's keep it simple and assume components will react to currentOrganization change
         }

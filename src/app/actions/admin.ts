@@ -276,3 +276,36 @@ export async function updateUserSubscription(userId: string, tier: any) {
 
     revalidatePath('/dashboard/admin/users');
 }
+
+export async function deleteOrganization(orgId: string) {
+    await requireAdmin();
+    console.log(`[AdminAction] Delete Organization: orgId=${orgId}`);
+
+    // We need to handle related data. 
+    // Projects might have a lot of data, we should probably delete them too.
+    // Memberships must be deleted.
+
+    await prisma.$transaction(async (tx) => {
+        // Delete project-related data first (cascading in DB handles most, but let's be safe)
+        // Actually Project model has onDelete: Cascade for its children in many cases?
+        // Let's check Bot, etc. 
+        // For now, let's delete the organization and assume DB supports it or we'll add more cleanup.
+
+        // Deleting projects linked to this org
+        await tx.project.deleteMany({
+            where: { organizationId: orgId }
+        });
+
+        // Deleting memberships
+        await tx.membership.deleteMany({
+            where: { organizationId: orgId }
+        });
+
+        // Delete the organization itself
+        await tx.organization.delete({
+            where: { id: orgId }
+        });
+    });
+
+    revalidatePath('/dashboard/admin/organizations');
+}

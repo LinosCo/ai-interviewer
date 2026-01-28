@@ -20,9 +20,11 @@ interface Profile {
     status: string;
     data: {
         fullName?: string;
+        name?: string;          // alternative field name
         email?: string;
         phone?: string;
         currentRole?: string;
+        role?: string;          // alternative field name
         company?: string;
         alignmentScore?: number;
         cultureFitScore?: number; // legacy
@@ -38,10 +40,10 @@ export default function ProfilesList({ profiles }: { profiles: Profile[] }) {
         const headers = ["Date", "Name", "Email", "Phone", "Role", "Company", "Score", "LinkedIn", "Summary"];
         const rows = profiles.map(p => [
             new Date(p.date).toLocaleDateString(),
-            p.data.fullName || "Anon",
+            p.data.fullName || p.data.name || "Anon",
             p.data.email || "",
             p.data.phone || "",
-            p.data.currentRole || "",
+            p.data.currentRole || p.data.role || "",
             p.data.company || "",
             p.data.alignmentScore || p.data.cultureFitScore || "",
             p.data.linkedIn || "",
@@ -96,7 +98,7 @@ export default function ProfilesList({ profiles }: { profiles: Profile[] }) {
                                 {new Date(profile.date).toLocaleDateString()}
                             </TableCell>
                             <TableCell className="font-medium">
-                                {profile.data.fullName || "Anonimo"}
+                                {profile.data.fullName || profile.data.name || "Anonimo"}
                             </TableCell>
                             <TableCell>
                                 <div className="text-sm">
@@ -111,7 +113,7 @@ export default function ProfilesList({ profiles }: { profiles: Profile[] }) {
                             </TableCell>
                             <TableCell>
                                 <div className="text-sm">
-                                    {profile.data.currentRole && <div className="font-medium">{profile.data.currentRole}</div>}
+                                    {(profile.data.currentRole || profile.data.role) && <div className="font-medium">{profile.data.currentRole || profile.data.role}</div>}
                                     {profile.data.company && <div className="text-gray-500">{profile.data.company}</div>}
                                 </div>
                             </TableCell>

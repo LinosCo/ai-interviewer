@@ -154,5 +154,6 @@ export default function OrganizationsView({ organizations }: OrganizationsViewPr
                     organization={selectedOrg}
                 />
             </div>
-            );
+        </div>
+    );
 }

@@ -366,7 +366,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
         const canColor = await isFeatureEnabled(bot.project.organizationId, 'customColor');
 
         if (!canLogo && data.logoUrl) {
-            throw new Error("Logo personalizzato disponibile solo nel piano PRO.");
+            throw new Error("Logo personalizzato disponibile solo nei piani PRO e BUSINESS.");
         }
         if (!canColor && (data.primaryColor || data.backgroundColor || data.textColor)) {
             // Basic check: if they are different from default? 

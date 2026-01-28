@@ -85,16 +85,16 @@ export async function getSystemLLM() {
  */
 export const VISIBILITY_PROVIDERS = {
     openai: {
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         displayName: 'OpenAI GPT-4o'
     },
     anthropic: {
-        model: 'claude-3-5-haiku-20241022',
-        displayName: 'Claude 3.5 Haiku'
+        model: 'claude-3-5-sonnet-20241022',
+        displayName: 'Claude 3.5 Sonnet'
     },
     gemini: {
-        model: 'gemini-2.0-flash',
-        displayName: 'Gemini 2.0 Flash'
+        model: 'gemini-1.5-pro',
+        displayName: 'Gemini 1.5 Pro'
     }
 } as const;
 
@@ -134,7 +134,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const openaiProvider = await getLLMProvider('openai');
                 result = await generateText({
-                    model: openaiProvider('gpt-4o-mini') as any,
+                    model: openaiProvider('gpt-4o') as any,
                     system: systemPrompt,
                     prompt
                 });
@@ -146,7 +146,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const anthropicProvider = await getLLMProvider('anthropic');
                 result = await generateText({
-                    model: anthropicProvider('claude-3-5-haiku-20241022') as any,
+                    model: anthropicProvider('claude-3-5-sonnet-20241022') as any,
                     system: systemPrompt,
                     prompt
                 });
@@ -158,7 +158,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    model: geminiProvider('gemini-2.0-flash') as any,
+                    model: geminiProvider('gemini-1.5-pro') as any,
                     system: systemPrompt,
                     prompt
                 });

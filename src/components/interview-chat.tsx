@@ -2,6 +2,7 @@
 
 import { saveBotMessageAction } from '@/app/actions';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { colors, gradients, shadows, radius } from '@/lib/design-system';
@@ -139,6 +140,7 @@ export default function InterviewChat({
     warmupFollowup = true,
     skipWelcome = false
 }: InterviewChatProps) {
+    const router = useRouter();
     const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
     // State for local topic tracking
     const [activeTopicId, setActiveTopicId] = useState<string | null>(currentTopicId || (topics[0]?.id) || null);
@@ -758,17 +760,39 @@ export default function InterviewChat({
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">
                             <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4">
-                                <Icons.Check size={32} />
+                                {rewardConfig?.enabled ? <Icons.Gift size={32} /> : <Icons.Check size={32} />}
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Intervista Completata!</h2>
-                            <p className="text-gray-600 mb-6">Grazie per il tuo prezioso contributo.</p>
-                            <button
-                                onClick={() => window.location.reload()}
-                                className="px-6 py-2 rounded-full text-white font-medium hover:opacity-90 transition-opacity"
-                                style={{ background: brandColor }}
-                            >
-                                Nuova Intervista
-                            </button>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                                {language?.toLowerCase().startsWith('it') ? 'Intervista Completata!' : 'Interview Completed!'}
+                            </h2>
+                            <p className="text-gray-600 mb-4">
+                                {language?.toLowerCase().startsWith('it')
+                                    ? 'Grazie per il tuo prezioso contributo.'
+                                    : 'Thank you for your valuable contribution.'}
+                            </p>
+                            {rewardConfig?.enabled && rewardConfig.displayText && (
+                                <div className="bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg mb-6 flex items-center justify-center gap-2">
+                                    <Icons.Gift size={18} />
+                                    <span className="font-medium">{rewardConfig.displayText}</span>
+                                </div>
+                            )}
+                            {rewardConfig?.enabled ? (
+                                <button
+                                    onClick={() => router.push(`/claim/${conversationId}`)}
+                                    className="px-6 py-3 rounded-full text-white font-medium hover:opacity-90 transition-opacity"
+                                    style={{ background: brandColor }}
+                                >
+                                    {language?.toLowerCase().startsWith('it') ? 'Richiedi il tuo premio' : 'Claim your reward'}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    className="px-6 py-2 rounded-full text-white font-medium hover:opacity-90 transition-opacity"
+                                    style={{ background: brandColor }}
+                                >
+                                    {language?.toLowerCase().startsWith('it') ? 'Nuova Intervista' : 'New Interview'}
+                                </button>
+                            )}
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="relative group">

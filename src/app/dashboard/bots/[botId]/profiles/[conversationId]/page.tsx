@@ -25,7 +25,8 @@ export default async function ProfileDetailPage({ params }: { params: Promise<{ 
     const profile = conversation.candidateProfile as any || {};
 
     // Normalize fields (legacy vs new neutral)
-    const displayName = profile.fullName || "Anonimo";
+    const displayName = profile.fullName || profile.name || "Anonimo";
+    const displayRole = profile.currentRole || profile.role || "Ruolo non specificato";
     const score = profile.alignmentScore || profile.cultureFitScore || 0;
     const note = profile.summaryNote || profile.recruiterNote || "Nessuna nota disponibile.";
     const hardSkills = profile.hardSkills || [];
@@ -47,7 +48,7 @@ export default async function ProfileDetailPage({ params }: { params: Promise<{ 
                     <Card className="bg-white border-slate-200">
                         <CardHeader>
                             <CardTitle className="text-gray-900">{displayName}</CardTitle>
-                            <p className="text-sm text-gray-500">{profile.currentRole || "Ruolo non specificato"}</p>
+                            <p className="text-sm text-gray-500">{displayRole}</p>
                         </CardHeader>
                         <CardContent className="space-y-4 text-gray-900">
                             <div>

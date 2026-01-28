@@ -52,6 +52,7 @@ interface InterviewState {
     dataCollectionAttempts: number;
     deepTurnsPerTopic: number;      // Calculated budget for DEEP phase
     fieldAttemptCounts: Record<string, number>;  // Track attempts per field to prevent loops
+    closureAttempts: number;        // Track consecutive closure attempts to prevent infinite loops
     // NEW: Dynamic time budget
     initialBudget?: InitialBudget;
     interestingTopics?: InterestingTopic[];
@@ -71,6 +72,9 @@ async function extractFieldFromMessage(
     const openai = createOpenAI({ apiKey });
 
     const fieldDescriptions: Record<string, string> = {
+        name: language === 'it'
+            ? 'Nome della persona (può essere solo nome, o nome e cognome)'
+            : 'Name of the person (can be first name only, or full name)',
         fullName: language === 'it'
             ? 'Nome della persona (può essere solo nome, o nome e cognome)'
             : 'Name of the person (can be first name only, or full name)',
@@ -91,8 +95,8 @@ async function extractFieldFromMessage(
     });
 
     try {
-        const nameSpecificRules = fieldName === 'fullName'
-            ? `\n- For name: Accept first name only (e.g., "Marco", "Geppi", "Anna"). Don't require full name.\n- If the message contains a word that looks like a name, extract it.`
+        const nameSpecificRules = (fieldName === 'name' || fieldName === 'fullName')
+            ? `\n- For name: Accept first name only (e.g., "Marco", "Franco", "Anna"). Don't require full name.\n- If the message contains a word that looks like a name, extract it.`
             : '';
 
         const result = await generateObject({
@@ -279,6 +283,7 @@ export async function POST(req: Request) {
             dataCollectionAttempts: rawMetadata.dataCollectionAttempts ?? 0,
             deepTurnsPerTopic: rawMetadata.deepTurnsPerTopic ?? 0,
             fieldAttemptCounts: rawMetadata.fieldAttemptCounts ?? {},
+            closureAttempts: rawMetadata.closureAttempts ?? 0,
             // NEW: Dynamic time budget fields
             initialBudget: rawMetadata.initialBudget ?? undefined,
             interestingTopics: rawMetadata.interestingTopics ?? [],
@@ -382,7 +387,7 @@ export async function POST(req: Request) {
                 console.log(`📊 [TIME_UP] Suggested topics for continuation:`, sortedTopics.map(t => `${t.topicLabel} (${t.engagementScore.toFixed(2)})`));
 
                 nextState.phase = 'TIME_UP_OFFER';
-                nextState.timeUpOfferAccepted = null; // Will be set to false after asking
+                nextState.timeUpOfferAccepted = false; // Ready to check user's response to the offer
                 nextState.timeUpSelectedTopics = sortedTopics.map(t => t.topicId);
 
                 supervisorInsight = {
@@ -524,30 +529,13 @@ export async function POST(req: Request) {
             }
 
             // --------------------------------------------------------------------
-            // PHASE: TIME_UP_OFFER (NEW - declares time is up and offers continuation)
+            // PHASE: TIME_UP_OFFER (declares time is up and offers continuation)
             // --------------------------------------------------------------------
             else if (state.phase === 'TIME_UP_OFFER') {
                 console.log(`⏰ [TIME_UP_OFFER] State: timeUpOfferAccepted=${state.timeUpOfferAccepted}`);
 
-                if (state.timeUpOfferAccepted === null) {
-                    // First time - bot will declare time is up and offer continuation
-                    console.log(`⏰ [TIME_UP_OFFER] Declaring time is up and offering continuation`);
-
-                    const sortedTopics = [...(state.interestingTopics || [])]
-                        .sort((a, b) => b.engagementScore - a.engagementScore)
-                        .slice(0, 2);
-
-                    supervisorInsight = {
-                        status: 'TIME_UP_DECLARATION',
-                        suggestedTopics: sortedTopics.map(t => ({
-                            id: t.topicId,
-                            label: t.topicLabel
-                        }))
-                    };
-                    nextState.timeUpOfferAccepted = false; // Mark that we're waiting for response
-
-                } else if (state.timeUpOfferAccepted === false) {
-                    // We asked, now check user's response
+                if (state.timeUpOfferAccepted === false) {
+                    // Check user's response to the TIME_UP offer
                     console.log(`⏰ [TIME_UP_OFFER] Checking user response: "${lastMessage?.content}"`);
                     const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
                     console.log(`⏰ [TIME_UP_OFFER] Intent detected: ${intent}`);
@@ -1038,12 +1026,16 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             // Helper to get field label
             const getFieldLabel = (field: string, lang: string) => {
                 const labels: Record<string, { it: string; en: string }> = {
-                    fullName: { it: 'il tuo nome', en: 'your name' },
-                    email: { it: 'la tua email', en: 'your email' },
+                    name: { it: 'il tuo nome e cognome', en: 'your full name' },
+                    fullName: { it: 'il tuo nome e cognome', en: 'your full name' },
+                    email: { it: 'il tuo indirizzo email', en: 'your email address' },
                     phone: { it: 'il tuo numero di telefono', en: 'your phone number' },
-                    company: { it: 'la tua azienda', en: 'your company' },
+                    company: { it: 'il nome della tua azienda', en: 'your company name' },
                     linkedin: { it: 'il tuo profilo LinkedIn', en: 'your LinkedIn profile' },
-                    role: { it: 'il tuo ruolo', en: 'your role' },
+                    role: { it: 'il tuo ruolo attuale', en: 'your current role' },
+                    location: { it: 'la tua città', en: 'your city' },
+                    budget: { it: 'il tuo budget', en: 'your budget' },
+                    availability: { it: 'la tua disponibilità', en: 'your availability' },
                 };
                 return labels[field]?.[lang as 'it' | 'en'] || field;
             };
@@ -1069,9 +1061,11 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             else if (nextState.consentGiven === true && missingField) {
                 // Only override if the response doesn't already ask for this field
                 const fieldMentioned = responseText.toLowerCase().includes(missingField.toLowerCase()) ||
-                    (missingField === 'fullName' && /\b(nome|name)\b/i.test(responseText)) ||
+                    ((missingField === 'name' || missingField === 'fullName') && /\b(nome|cognome|name)\b/i.test(responseText)) ||
                     (missingField === 'email' && /\b(email|mail)\b/i.test(responseText)) ||
-                    (missingField === 'phone' && /\b(telefono|phone|numero)\b/i.test(responseText));
+                    (missingField === 'phone' && /\b(telefono|phone|numero)\b/i.test(responseText)) ||
+                    (missingField === 'company' && /\b(azienda|company|organizzazione)\b/i.test(responseText)) ||
+                    (missingField === 'role' && /\b(ruolo|role|posizione)\b/i.test(responseText));
 
                 if (!fieldMentioned || hasNoQuestion) {
                     console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". OVERRIDING with field question.`);
@@ -1109,71 +1103,84 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 responseText = completionMessages[Math.floor(Math.random() * completionMessages.length)] + " INTERVIEW_COMPLETED";
             }
         }
-        // Other phases - SOFT OVERRIDE if bot tries to close OR asks for contacts prematurely
-        // Strategy: Preserve useful content, only add question if missing
+        // Other phases - Handle bot trying to close during SCAN/DEEP
+        // NEW STRATEGY: Track closure attempts and respect user's intent after 2 attempts
         else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isPrematureContactRequest)) {
-            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Applying SOFT override.`);
+            nextState.closureAttempts = (state.closureAttempts || 0) + 1;
+            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Closure attempt #${nextState.closureAttempts}`);
             console.log(`   Original response: "${responseText.substring(0, 100)}..."`);
 
-            const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
-            const topicLabel = targetTopic?.label || 'questo argomento';
-            const currentSubGoal = supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || topicLabel;
+            const MAX_CLOSURE_ATTEMPTS = 2;
 
-            // SOFT OVERRIDE: Try to salvage useful content first
-            let cleanedResponse = responseText
-                .replace(goodbyePattern, '')
-                .replace(contactRequestPattern, '')
-                .replace(/\?+\s*$/, '') // Remove trailing question marks
-                .trim();
+            if (nextState.closureAttempts >= MAX_CLOSURE_ATTEMPTS) {
+                // Respect user's implicit desire to end - transition to DATA_COLLECTION
+                console.log(`   ✓ Max closure attempts reached. Respecting user intent, transitioning to DATA_COLLECTION.`);
 
-            // If there's substantial content (>20 chars), append a question
-            // Otherwise, generate a fresh response with variation
-            if (cleanedResponse.length > 20) {
-                // Append a contextual question to the cleaned response
-                const appendQuestions = language === 'it' ? [
-                    `Puoi dirmi di più su questo aspetto?`,
-                    `Come hai vissuto questa situazione?`,
-                    `Cosa ne pensi?`,
-                    `Puoi farmi un esempio concreto?`,
-                ] : [
-                    `Can you tell me more about this?`,
-                    `How did you experience this?`,
-                    `What do you think about it?`,
-                    `Can you give me a concrete example?`,
-                ];
-                const randomQuestion = appendQuestions[Math.floor(Math.random() * appendQuestions.length)];
-                responseText = `${cleanedResponse} ${randomQuestion}`;
-                console.log(`   ✓ Soft override: preserved content + added question`);
+                if (shouldCollectData) {
+                    nextState.phase = 'DATA_COLLECTION';
+                    nextState.consentGiven = null;
+
+                    const transitionMessages = language === 'it' ? [
+                        `Grazie per le tue risposte! Prima di concludere, posso chiederti alcuni dati di contatto?`,
+                        `Ti ringrazio per questa conversazione! Posso chiederti i tuoi contatti prima di salutarci?`,
+                    ] : [
+                        `Thank you for your answers! Before we wrap up, may I ask for your contact details?`,
+                        `Thanks for this conversation! May I ask for your contact info before we say goodbye?`,
+                    ];
+                    responseText = transitionMessages[Math.floor(Math.random() * transitionMessages.length)];
+                } else {
+                    nextState.phase = 'DATA_COLLECTION';
+                    const goodbyeMessages = language === 'it' ? [
+                        `Grazie mille per il tuo tempo e le tue risposte! È stato un piacere.`,
+                        `Ti ringrazio per questa conversazione! Buona giornata.`,
+                    ] : [
+                        `Thank you so much for your time and answers! It was a pleasure.`,
+                        `Thanks for this conversation! Have a great day.`,
+                    ];
+                    responseText = goodbyeMessages[Math.floor(Math.random() * goodbyeMessages.length)] + " INTERVIEW_COMPLETED";
+                }
             } else {
-                // Generate varied follow-up questions to avoid repetition
-                const scanQuestions = language === 'it' ? [
-                    `Parlando di ${topicLabel}, qual è stata la tua esperienza diretta?`,
-                    `Riguardo a ${topicLabel}, cosa ti ha colpito di più?`,
-                    `Su ${topicLabel}, quali aspetti consideri più rilevanti?`,
-                    `Come descriveresti la tua esperienza con ${topicLabel}?`,
-                ] : [
-                    `Speaking of ${topicLabel}, what has been your direct experience?`,
-                    `Regarding ${topicLabel}, what struck you the most?`,
-                    `On ${topicLabel}, which aspects do you consider most relevant?`,
-                    `How would you describe your experience with ${topicLabel}?`,
-                ];
+                // First closure attempt - try to move to next topic instead of appending generic questions
+                const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
+                const topicLabel = targetTopic?.label || 'questo argomento';
 
-                const deepQuestions = language === 'it' ? [
-                    `Tornando a ${topicLabel}, puoi approfondire un aspetto che ti sta a cuore?`,
-                    `Su ${topicLabel}, c'è qualcosa che vorresti esplorare più nel dettaglio?`,
-                    `Riguardo a ${topicLabel}, quali sfide hai incontrato?`,
-                    `Come hai affrontato ${currentSubGoal}?`,
-                ] : [
-                    `Going back to ${topicLabel}, can you elaborate on an aspect that matters to you?`,
-                    `On ${topicLabel}, is there something you'd like to explore in more detail?`,
-                    `Regarding ${topicLabel}, what challenges have you encountered?`,
-                    `How have you dealt with ${currentSubGoal}?`,
-                ];
+                // Check if we can move to next topic
+                if (nextState.topicIndex + 1 < numTopics) {
+                    nextState.topicIndex = nextState.topicIndex + 1;
+                    nextState.turnInTopic = 0;
+                    const nextTopic = botTopics[nextState.topicIndex];
+                    nextTopicId = nextTopic.id;
 
-                const questions = nextState.phase === 'SCAN' ? scanQuestions : deepQuestions;
-                responseText = questions[Math.floor(Math.random() * questions.length)];
-                console.log(`   ✓ Full override: generated new question`);
+                    const transitionQuestions = language === 'it' ? [
+                        `Capisco. Passando a ${nextTopic.label}, qual è la tua esperienza a riguardo?`,
+                        `Va bene. Parliamo di ${nextTopic.label}: cosa ne pensi?`,
+                        `Perfetto. Su ${nextTopic.label}, come ti sei trovato?`,
+                    ] : [
+                        `I understand. Moving to ${nextTopic.label}, what's your experience with it?`,
+                        `Alright. Let's talk about ${nextTopic.label}: what do you think?`,
+                        `Perfect. On ${nextTopic.label}, how has it been for you?`,
+                    ];
+                    responseText = transitionQuestions[Math.floor(Math.random() * transitionQuestions.length)];
+                    console.log(`   ✓ Moving to next topic: ${nextTopic.label}`);
+                } else {
+                    // No more topics - generate a closing question for current topic
+                    const closingQuestions = language === 'it' ? [
+                        `Prima di concludere su ${topicLabel}, c'è qualcosa che vorresti aggiungere?`,
+                        `Un'ultima cosa su ${topicLabel}: quali sono le tue aspettative per il futuro?`,
+                        `Per chiudere ${topicLabel}: cosa cambieresti se potessi?`,
+                    ] : [
+                        `Before we wrap up ${topicLabel}, is there anything you'd like to add?`,
+                        `One last thing about ${topicLabel}: what are your expectations for the future?`,
+                        `To close on ${topicLabel}: what would you change if you could?`,
+                    ];
+                    responseText = closingQuestions[Math.floor(Math.random() * closingQuestions.length)];
+                    console.log(`   ✓ Asking closing question for current topic`);
+                }
             }
+        }
+        // Reset closure attempts when bot generates a valid question (not trying to close)
+        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && !isGoodbyeResponse && !hasNoQuestion) {
+            nextState.closureAttempts = 0;
         }
         else if (nextState.phase === 'DEEP_OFFER' && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion)) {
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. OVERRIDING with offer question.`);

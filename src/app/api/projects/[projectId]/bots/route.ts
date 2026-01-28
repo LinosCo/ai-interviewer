@@ -217,10 +217,17 @@ export async function POST(
         // Also check if user is the owner of target project
         const targetProject = await prisma.project.findUnique({
             where: { id: targetProjectId },
-            select: { ownerId: true }
+            select: { ownerId: true, organizationId: true }
         });
 
-        const isTargetOwner = targetProject?.ownerId === session.user.id;
+        if (!targetProject) {
+            return NextResponse.json(
+                { error: 'Progetto di destinazione non trovato' },
+                { status: 404 }
+            );
+        }
+
+        const isTargetOwner = targetProject.ownerId === session.user.id;
 
         if (!targetAccess && !isTargetOwner) {
             return NextResponse.json(
@@ -252,6 +259,13 @@ export async function POST(
 
         const tool = bot || tracker;
         const toolCurrentProjectId = bot ? bot.projectId : tracker!.projectId;
+
+        if (!toolCurrentProjectId) {
+            return NextResponse.json(
+                { error: 'Progetto del tool non trovato' },
+                { status: 404 }
+            );
+        }
 
         // Verify user has access to the tool's current project
         const botProjectAccess = await prisma.projectAccess.findUnique({
@@ -285,7 +299,7 @@ export async function POST(
                 where: { id: botId },
                 data: {
                     projectId: targetProjectId,
-                    organizationId: targetProject.organizationId
+                    ...(targetProject.organizationId && { organizationId: targetProject.organizationId })
                 }
             });
         }
@@ -298,5 +312,5 @@ export async function POST(
     } catch (error) {
         console.error('Transfer Bot Error:', error);
         return new Response('Internal Server Error', { status: 500 });
-    }
+}
 }

@@ -64,6 +64,8 @@ export interface PlanLimits {
     customLogo: boolean;
     customColor: boolean;
     themeExtraction: boolean;
+    knowledgeBase: boolean;
+    conditionalLogic: boolean;
 }
 
 export interface PlanConfig {
@@ -133,7 +135,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: false,
             customLogo: false,
             customColor: false,
-            themeExtraction: false
+            themeExtraction: false,
+            knowledgeBase: false,
+            conditionalLogic: false
         },
         featureList: [
             '500K crediti/mese',
@@ -182,7 +186,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: false,
             customLogo: true,
             customColor: true,
-            themeExtraction: true
+            themeExtraction: true,
+            knowledgeBase: false,
+            conditionalLogic: false
         },
         featureList: [
             '2M crediti per 14 giorni',
@@ -232,7 +238,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: false,
             customLogo: false,
             customColor: false,
-            themeExtraction: false
+            themeExtraction: false,
+            knowledgeBase: false,
+            conditionalLogic: false
         },
         featureList: [
             '6M crediti/mese',
@@ -285,7 +293,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: false,
             customLogo: true,
             customColor: true,
-            themeExtraction: true
+            themeExtraction: true,
+            knowledgeBase: true,
+            conditionalLogic: true
         },
         featureList: [
             '20M crediti/mese',
@@ -340,7 +350,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: true,
             customLogo: true,
             customColor: true,
-            themeExtraction: true
+            themeExtraction: true,
+            knowledgeBase: true,
+            conditionalLogic: true
         },
         featureList: [
             '50M crediti/mese',
@@ -395,7 +407,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: false,
             customLogo: true,
             customColor: true,
-            themeExtraction: true
+            themeExtraction: true,
+            knowledgeBase: true,
+            conditionalLogic: true
         },
         featureList: [
             '10M crediti/mese',
@@ -448,7 +462,9 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             canTransferProjects: true,
             customLogo: true,
             customColor: true,
-            themeExtraction: true
+            themeExtraction: true,
+            knowledgeBase: true,
+            conditionalLogic: true
         },
         featureList: ['Tutto illimitato']
     }

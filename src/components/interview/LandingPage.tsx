@@ -73,7 +73,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                     style={{ background: `radial-gradient(circle, ${primaryColor}20 0%, transparent 70%)` }} />
             </div>
 
-            <main className="flex-1 relative z-10 w-full max-w-4xl mx-auto p-6 md:p-12 lg:p-16 flex flex-col items-center text-center gap-12 animate-in fade-in zoom-in-95 duration-1000">
+            <main className="flex-1 relative z-10 w-full max-w-4xl mx-auto p-6 md:p-12 lg:p-16 flex flex-col items-center text-center gap-12 animate-in fade-in slide-in-from-bottom-4 duration-300">
 
                 {/* Logo Section (Centered & Large) */}
                 <div className="w-full flex justify-center mb-4">
@@ -202,19 +202,20 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                         <div className="flex flex-col items-center gap-2 mb-4">
                             <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Powered by</span>
                             <a
-                                href="/"
+                                href="https://voler.ai"
                                 target="_blank"
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-all border border-gray-100 hover:border-gray-200 group"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-all border border-gray-100 hover:border-gray-200 group"
                             >
-                                <Icons.Logo className="w-5 h-5" />
-                                <span className="font-bold text-gray-700 text-sm tracking-tight group-hover:text-gray-900">Business Tuner AI</span>
+                                <span className="font-black text-gray-800 text-base tracking-tight group-hover:text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>VOLER</span>
+                                <span className="font-black text-gray-800 text-base tracking-tight group-hover:text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', fontStyle: 'italic' }}>.AI</span>
                             </a>
                         </div>
 
                         <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs font-bold text-gray-400 uppercase tracking-widest">
                             <a href="/privacy" className="transition-colors hover:text-gray-900">Privacy Policy</a>
                             <a href="/terms" className="transition-colors hover:text-gray-900">Termini</a>
-                            <span className="opacity-50">© {new Date().getFullYear()} Business Tuner AI</span>
+                            <span className="opacity-50">© {new Date().getFullYear()} Voler.ai</span>
                         </div>
 
                         {bot.privacyNotice && (

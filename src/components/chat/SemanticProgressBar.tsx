@@ -27,13 +27,13 @@ export function SemanticProgressBar({ currentTopicId, topics, progress, brandCol
     return (
         <>
             {/* Mobile View: Show only active topic */}
-            <div className="sm:hidden w-full mb-4 mt-4 px-4">
-                <div className="flex items-center justify-center gap-2 py-2 px-4 rounded-full" style={{ backgroundColor: `${brandColor}20` }}>
+            <div className="sm:hidden w-full mb-2 mt-2 px-2">
+                <div className="flex items-center justify-center gap-2 py-1.5 px-3 rounded-full bg-white/80 backdrop-blur-sm shadow-sm border border-gray-100" style={{ borderColor: `${brandColor}30` }}>
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: brandColor }}></div>
-                    <span className="text-xs font-bold uppercase tracking-wide" style={{ color: brandColor }}>
+                    <span className="text-[10px] font-bold uppercase tracking-wide truncate max-w-[150px]" style={{ color: brandColor }}>
                         {activeTopic?.label || 'Loading...'}
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-[10px] text-gray-500 flex-shrink-0">
                         {activeIndex + 1}/{topics.length}
                     </span>
                 </div>

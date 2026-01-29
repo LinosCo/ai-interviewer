@@ -256,12 +256,29 @@ export default function InterviewChat({
         }
     };
 
+    // Auto-resize textarea function
+    const autoResizeTextarea = () => {
+        if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+            inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 150)}px`;
+        }
+    };
+
     // Auto-focus input when question changes
     useEffect(() => {
         if (inputRef.current && !isLoading) {
-            inputRef.current.focus();
+            // Use setTimeout to ensure DOM is ready
+            setTimeout(() => {
+                inputRef.current?.focus();
+                autoResizeTextarea();
+            }, 100);
         }
     }, [currentQuestionIndex, isLoading]);
+
+    // Auto-resize on input change
+    useEffect(() => {
+        autoResizeTextarea();
+    }, [input]);
 
     const handleSendMessage = async (messageContent: string, isInitial = false, overrideHistory?: Message[]) => {
         if ((!messageContent.trim() || isLoading) && !isInitial) return;
@@ -575,8 +592,8 @@ export default function InterviewChat({
 
             {/* Progress bar */}
             {showProgressBar && (
-                <div className="fixed top-0 left-0 right-0 z-40 backdrop-blur-sm pt-14 pb-2">
-                    <div className="max-w-7xl mx-auto px-8 md:px-12">
+                <div className="fixed top-0 left-0 right-0 z-30 backdrop-blur-sm pt-20 md:pt-16 pb-2">
+                    <div className="max-w-7xl mx-auto px-4 md:px-12">
                         {progressBarStyle === 'semantic' && topics.length > 0 ? (
                             <SemanticProgressBar
                                 progress={progress}
@@ -602,7 +619,7 @@ export default function InterviewChat({
             )}
 
             {/* Header - Moved to top for mobile, custom position for larger screens */}
-            <header className="fixed top-4 left-0 right-0 z-40 p-4 md:p-6 flex items-start justify-between pointer-events-none transition-all duration-300">
+            <header className="fixed top-2 left-0 right-0 z-50 px-3 py-2 md:p-4 flex items-start justify-between pointer-events-none transition-all duration-300">
                 <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md border border-stone-200/50 p-2 pl-3 pr-4 rounded-full shadow-lg pointer-events-auto transition-all hover:shadow-xl hover:scale-105">
                     {logoUrl ? (
                         <div className="h-8 w-8 rounded-full overflow-hidden border border-stone-100 flex-shrink-0 bg-stone-50">
@@ -649,7 +666,7 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col items-center justify-center px-4 pt-64 pb-72 w-full max-w-4xl mx-auto relative z-10">
+            <div className="flex-1 flex flex-col items-center justify-center px-4 pt-32 md:pt-40 pb-48 md:pb-56 w-full max-w-4xl mx-auto relative z-10">
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
                 {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
@@ -756,7 +773,7 @@ export default function InterviewChat({
             </div>
 
             {/* Input Area or Completion Screen */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 p-4 md:p-6 pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-12">
+            <div className="fixed bottom-0 left-0 right-0 z-50 p-3 md:p-6 pb-4 md:pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-8 md:pt-12">
                 <div className="max-w-3xl mx-auto w-full relative">
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">
@@ -822,18 +839,29 @@ export default function InterviewChat({
                                         typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
                                     }}
                                     onKeyDown={handleKeyDown}
+                                    onFocus={() => {
+                                        // Scroll to bottom on mobile when focused to keep input visible
+                                        setTimeout(() => {
+                                            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                                        }, 300);
+                                    }}
                                     disabled={isLoading}
                                     placeholder={t.typePlaceholder}
                                     rows={1}
-                                    className="w-full resize-none border-none bg-transparent px-6 py-5 pr-16 text-lg text-gray-900 placeholder-gray-400 focus:ring-0 max-h-[200px]"
-                                    style={{ minHeight: '72px' }}
+                                    inputMode="text"
+                                    enterKeyHint="send"
+                                    autoComplete="off"
+                                    autoCorrect="on"
+                                    spellCheck="true"
+                                    className="w-full resize-none border-none bg-transparent px-4 md:px-6 py-4 md:py-5 pr-16 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:ring-0 focus:outline-none overflow-hidden"
+                                    style={{ minHeight: '56px', maxHeight: '150px' }}
                                 />
 
-                                <div className="pb-3 pr-3">
+                                <div className="pb-2 md:pb-3 pr-2 md:pr-3 flex items-end">
                                     <button
                                         type="submit"
                                         disabled={!input.trim() || isLoading}
-                                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95"
+                                        className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-white shadow-lg transition-all transform disabled:opacity-50 disabled:scale-95 disabled:shadow-none hover:scale-105 active:scale-95"
                                         style={{
                                             background: brandColor,
                                             boxShadow: `0 4px 14px 0 ${brandColor}50`
@@ -841,9 +869,9 @@ export default function InterviewChat({
                                         aria-label="Send answer"
                                     >
                                         {isLoading ? (
-                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <div className="w-4 h-4 md:w-5 md:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                         ) : (
-                                            <Icons.ArrowRight size={24} />
+                                            <Icons.ArrowRight size={20} className="md:w-6 md:h-6" />
                                         )}
                                     </button>
                                 </div>

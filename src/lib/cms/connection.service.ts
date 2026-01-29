@@ -351,10 +351,11 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
         // Log the transfer
         await prisma.integrationLog.create({
             data: {
-                connectionId,
-                event: 'connection.transferred',
-                status: 'SUCCESS',
-                metadata: {
+                cmsConnectionId: connectionId,
+                action: 'connection.transferred',
+                success: true,
+                durationMs: 0,
+                result: {
                     fromProjectId: connection.projectId,
                     toProjectId: targetProjectId,
                     fromOrgId: connection.project.organizationId,

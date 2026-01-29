@@ -4,9 +4,10 @@ import { NextResponse } from 'next/server';
 
 export async function POST(
     req: Request,
-    { params }: { params: { connectionId: string } }
+    { params }: { params: Promise<{ connectionId: string }> }
 ) {
     try {
+        const { connectionId } = await params;
         const session = await auth();
         if (!session?.user?.id) {
             return new Response('Unauthorized', { status: 401 });
@@ -22,7 +23,7 @@ export async function POST(
         }
 
         const result = await CMSConnectionService.transferConnection(
-            params.connectionId,
+            connectionId,
             targetProjectId,
             session.user.id
         );

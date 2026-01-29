@@ -30,6 +30,7 @@ interface InterviewChatProps {
     rewardConfig?: {
         enabled: boolean;
         type: string;
+        payload?: string;
         displayText?: string | null;
         showOnLanding: boolean;
     } | null;
@@ -777,13 +778,23 @@ export default function InterviewChat({
                                 </div>
                             )}
                             {rewardConfig?.enabled ? (
-                                <button
-                                    onClick={() => router.push(`/claim/${conversationId}`)}
-                                    className="px-6 py-3 rounded-full text-white font-medium hover:opacity-90 transition-opacity"
-                                    style={{ background: brandColor }}
-                                >
-                                    {language?.toLowerCase().startsWith('it') ? 'Richiedi il tuo premio' : 'Claim your reward'}
-                                </button>
+                                rewardConfig.type === 'redirect' && rewardConfig.payload ? (
+                                    <button
+                                        onClick={() => window.open(rewardConfig.payload, '_blank')}
+                                        className="px-6 py-3 rounded-full text-white font-medium hover:opacity-90 transition-opacity"
+                                        style={{ background: brandColor }}
+                                    >
+                                        {language?.toLowerCase().startsWith('it') ? 'Scopri' : 'Discover'} →
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => router.push(`/claim/${conversationId}`)}
+                                        className="px-6 py-3 rounded-full text-white font-medium hover:opacity-90 transition-opacity"
+                                        style={{ background: brandColor }}
+                                    >
+                                        {language?.toLowerCase().startsWith('it') ? 'Richiedi il tuo premio' : 'Claim your reward'}
+                                    </button>
+                                )
                             ) : (
                                 <button
                                     onClick={() => window.location.reload()}

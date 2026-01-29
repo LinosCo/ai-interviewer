@@ -16,11 +16,7 @@ export async function GET(request: Request) {
         const url = new URL(request.url);
         const projectId = url.searchParams.get('projectId');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
-
-        // Verify user has access to this project
+        // Find user's memberships and projects with CMS connections
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
             include: {
@@ -29,7 +25,7 @@ export async function GET(request: Request) {
                         organization: {
                             include: {
                                 projects: {
-                                    where: { id: projectId },
+                                    where: projectId ? { id: projectId } : undefined,
                                     include: {
                                         cmsConnection: true
                                     }
@@ -45,14 +41,18 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'No organization found' }, { status: 404 });
         }
 
-        // Find the project with CMS connection
+        // Find the first project with CMS connection (or specific one if projectId provided)
         let cmsConnection = null;
+        let foundProjectId = null;
         for (const membership of user.memberships) {
-            const project = membership.organization.projects.find(p => p.id === projectId);
-            if (project?.cmsConnection) {
-                cmsConnection = project.cmsConnection;
-                break;
+            for (const project of membership.organization.projects) {
+                if (project.cmsConnection) {
+                    cmsConnection = project.cmsConnection;
+                    foundProjectId = project.id;
+                    break;
+                }
             }
+            if (cmsConnection) break;
         }
 
         if (!cmsConnection) {
@@ -64,6 +64,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             enabled: true,
+            projectId: foundProjectId,
             connection: {
                 name: cmsConnection.name,
                 status: cmsConnection.status,

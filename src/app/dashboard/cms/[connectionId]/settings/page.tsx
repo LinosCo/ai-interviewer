@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/components/ui/use-toast";
+import { showToast } from '@/components/toast';
 import {
     ArrowLeft,
     RefreshCw,
@@ -26,7 +26,6 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
     const [regenerating, setRegenerating] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const router = useRouter();
-    const { toast } = useToast();
 
     useEffect(() => {
         fetchConnection();
@@ -39,11 +38,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
             const data = await res.json();
             setConnection(data);
         } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to load connection details",
-                variant: "destructive"
-            });
+            showToast("Failed to load connection details", "error");
         } finally {
             setLoading(false);
         }
@@ -62,16 +57,9 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
 
             const data = await res.json();
             setConnection({ ...connection, apiKey: data.apiKey });
-            toast({
-                title: "Success",
-                description: "API Key regenerated successfully",
-            });
+            showToast("API Key regenerated successfully", "success");
         } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to regenerate API key",
-                variant: "destructive"
-            });
+            showToast("Failed to regenerate API key", "error");
         } finally {
             setRegenerating(false);
         }
@@ -88,27 +76,17 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
 
             if (!res.ok) throw new Error('Failed to delete connection');
 
-            toast({
-                title: "Success",
-                description: "Connection removed successfully",
-            });
+            showToast("Connection removed successfully", "success");
             router.push('/dashboard');
         } catch (error) {
-            toast({
-                title: "Error",
-                description: "Failed to delete connection",
-                variant: "destructive"
-            });
+            showToast("Failed to delete connection", "error");
             setDeleting(false);
         }
     };
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        toast({
-            title: "Copied",
-            description: "Copied to clipboard",
-        });
+        showToast("Copied to clipboard", "success");
     };
 
     if (loading) {

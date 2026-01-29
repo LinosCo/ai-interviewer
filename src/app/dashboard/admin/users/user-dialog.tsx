@@ -86,12 +86,6 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                 });
             }
 
-            // Update Subscription if edited or for new user (if not FREE)
-            const currentTier = user?.memberships?.[0]?.organization?.subscription?.tier || 'FREE';
-            if (tier !== currentTier) {
-                const targetUserId = user ? user.id : (res as any).id;
-                await updateUserSubscription(targetUserId, tier);
-            }
 
             showToast(`Utente ${user ? 'aggiornato' : 'creato'} con successo!`);
             router.refresh();
@@ -175,24 +169,6 @@ export default function UserDialog({ isOpen, onClose, user, projects }: UserDial
                         </select>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Piano Abbonamento</label>
-                        <select
-                            value={tier}
-                            onChange={(e) => setTier(e.target.value)}
-                            className="w-full border rounded-lg px-3 py-2 bg-amber-50 border-amber-200"
-                        >
-                            <option value="FREE">Free</option>
-                            <option value="STARTER">Starter</option>
-                            <option value="PRO">Pro</option>
-                            <option value="BUSINESS">Business (Enterprise)</option>
-                            <option value="PARTNER">Partner (Agenzie)</option>
-                            <option value="ADMIN">Admin (Staff)</option>
-                        </select>
-                        <p className="text-xs text-amber-600 mt-1 italic">
-                            Attivazione manuale per clienti Enterprise, Partner e Staff.
-                        </p>
-                    </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Accesso Progetti</label>

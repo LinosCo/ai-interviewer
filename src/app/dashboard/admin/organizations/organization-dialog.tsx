@@ -26,6 +26,7 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
     const [slug, setSlug] = useState('');
     const [ownerEmail, setOwnerEmail] = useState('');
     const [newOwnerEmail, setNewOwnerEmail] = useState('');
+    const [plan, setPlan] = useState('FREE');
 
     useEffect(() => {
         if (isOpen) {
@@ -33,6 +34,7 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
             setSlug(organization?.slug || '');
             setOwnerEmail(organization?.owner?.email || '');
             setNewOwnerEmail('');
+            setPlan(organization?.plan || 'FREE');
         }
     }, [isOpen, organization]);
 
@@ -47,8 +49,8 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
             const method = organization ? 'PATCH' : 'POST';
 
             const body = organization
-                ? { name, slug, newOwnerEmail: newOwnerEmail || undefined }
-                : { name, slug, ownerEmail };
+                ? { name, slug, plan, newOwnerEmail: newOwnerEmail || undefined }
+                : { name, slug, plan, ownerEmail };
 
             const response = await fetch(url, {
                 method,
@@ -102,6 +104,22 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
                             placeholder="my-org-slug"
                         />
                         <p className="text-[10px] text-gray-400 mt-1">Caratteri minuscoli, numeri e trattini soltanto.</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Piano Abbonamento</label>
+                        <select
+                            value={plan}
+                            onChange={(e) => setPlan(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:bg-white outline-none transition-all text-sm"
+                        >
+                            <option value="FREE">Free</option>
+                            <option value="TRIAL">Trial</option>
+                            <option value="STARTER">Starter</option>
+                            <option value="PRO">Pro</option>
+                            <option value="BUSINESS">Business</option>
+                            <option value="PARTNER">Partner</option>
+                        </select>
                     </div>
 
                     {organization ? (

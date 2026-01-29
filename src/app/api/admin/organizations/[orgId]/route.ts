@@ -27,7 +27,7 @@ export async function PATCH(
         }
 
         const body = await request.json();
-        const { name, slug, newOwnerEmail } = body;
+        const { name, slug, newOwnerEmail, plan } = body;
 
         // Check if organization exists
         const org = await prisma.organization.findUnique({
@@ -47,6 +47,27 @@ export async function PATCH(
             const data: any = {};
             if (name) data.name = name;
             if (slug) data.slug = slug;
+            if (plan) {
+                // Determine PlanType enum value
+                const planValue = plan === 'FREE' ? 'TRIAL' : plan.toUpperCase();
+                data.plan = planValue;
+
+                // Also upsert Subscription to keep strictly in sync
+                const subscriptionTier = plan.toUpperCase();
+                await tx.subscription.upsert({
+                    where: { organizationId: orgId },
+                    update: {
+                        tier: subscriptionTier as any,
+                        status: 'ACTIVE',
+                    },
+                    create: {
+                        organizationId: orgId,
+                        tier: subscriptionTier as any,
+                        status: 'ACTIVE',
+                        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+                    }
+                });
+            }
 
             const updatedOrg = await tx.organization.update({
                 where: { id: orgId },

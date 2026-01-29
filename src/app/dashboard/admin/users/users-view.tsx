@@ -81,7 +81,6 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Access</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
@@ -99,15 +98,6 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'ADMIN' ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
                                         }`}>
                                         {user.role}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.memberships[0]?.organization?.subscription?.tier === 'BUSINESS' ? 'bg-purple-100 text-purple-800' :
-                                        user.memberships[0]?.organization?.subscription?.tier === 'PRO' ? 'bg-blue-100 text-blue-800' :
-                                            user.memberships[0]?.organization?.subscription?.tier === 'STARTER' ? 'bg-indigo-100 text-indigo-800' :
-                                                'bg-gray-100 text-gray-800'
-                                        }`}>
-                                        {user.memberships[0]?.organization?.subscription?.tier || 'FREE'}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4">

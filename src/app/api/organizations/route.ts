@@ -43,7 +43,7 @@ export async function GET() {
 
             // Migrazione progetti esistenti (se ce ne sono rimasti senza org)
             await prisma.project.updateMany({
-                where: { ownerId: user.id, organizationId: "" },
+                where: { ownerId: user.id, organizationId: null },
                 data: { organizationId: newOrg.id }
             });
 

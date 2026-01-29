@@ -47,14 +47,14 @@ export default function PlatformSettingsForm({
     const [strategicPlan, setStrategicPlan] = useState(currentStrategicPlan);
     const [isStrategicPlanOpen, setIsStrategicPlanOpen] = useState(false);
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
-    const [openaiKey, setOpenaiKey] = useState('');
-    const [anthropicKey, setAnthropicKey] = useState('');
-    const [geminiKey, setGeminiKey] = useState('');
-    const [serpKey, setSerpKey] = useState('');
+    const [openaiKey, setOpenaiKey] = useState(platformOpenaiApiKey);
+    const [anthropicKey, setAnthropicKey] = useState(platformAnthropicApiKey);
+    const [geminiKey, setGeminiKey] = useState(platformGeminiApiKey);
+    const [serpKey, setSerpKey] = useState(googleSerpApiKey);
 
     // Stripe State
-    const [sSecretKey, setSSecretKey] = useState('');
-    const [sWebhookSecret, setSWebhookSecret] = useState('');
+    const [sSecretKey, setSSecretKey] = useState(stripeSecretKey);
+    const [sWebhookSecret, setSWebhookSecret] = useState(stripeWebhookSecret);
     const [sPriceStarter, setSPriceStarter] = useState(stripePriceStarter);
     const [sPriceStarterYearly, setSPriceStarterYearly] = useState(stripePriceStarterYearly);
     const [sPricePro, setSPricePro] = useState(stripePricePro);

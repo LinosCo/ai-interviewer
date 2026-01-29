@@ -60,6 +60,7 @@ export interface PlanLimits {
     aiTipsEnabled: boolean;
     whiteLabelEnabled: boolean;
     apiAccessEnabled: boolean;
+    canTransferProjects: boolean;
     customLogo: boolean;
     customColor: boolean;
     themeExtraction: boolean;

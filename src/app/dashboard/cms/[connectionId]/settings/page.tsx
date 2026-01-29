@@ -199,7 +199,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                                 <h4 className="font-medium text-gray-900">Delete Connection</h4>
                                 <p className="text-sm text-gray-500">Permanently remove this connection and all its data.</p>
                             </div>
-                            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                            <Button variant="danger" onClick={handleDelete} disabled={deleting}>
                                 {deleting ? 'Deleting...' : 'Delete Connection'}
                             </Button>
                         </div>

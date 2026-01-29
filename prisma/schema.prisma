@@ -1130,10 +1130,14 @@ model CMSConnection {
   updatedAt                 DateTime            @updatedAt
   projectId                 String              @unique
   project                   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId            String
+  organization              Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   suggestions               CMSSuggestion[]
   webhookLogs               CMSWebhookLog[]
   analytics                 WebsiteAnalytics[]
   integrationLogs           IntegrationLog[]
+
+  @@index([organizationId])
 }
 
 model CMSWebhookLog {

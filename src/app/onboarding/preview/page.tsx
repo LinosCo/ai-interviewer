@@ -315,7 +315,7 @@ function PreviewPageContent() {
                                     onClick={() => router.push(publishedBotId ? `/dashboard/bots/${publishedBotId}` : '/dashboard')}
                                     className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors border border-gray-200 shadow-sm flex items-center justify-center gap-2"
                                 >
-                                    <Icons.Layout size={18} />
+                                    <Icons.Dashboard size={18} />
                                     Dashboard
                                 </button>
                                 <button

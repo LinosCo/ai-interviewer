@@ -3,6 +3,21 @@ import { CMSSessionService } from '@/lib/cms/session.service';
 import { NextResponse } from 'next/server';
 import { decrypt } from '@/lib/cms/encryption';
 
+// CORS headers for cross-origin requests from CMS
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+/**
+ * OPTIONS /api/cms/validate-session
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 /**
  * POST /api/cms/validate-session
  * Chiamato dal CMS esterno per validare un token JWT.
@@ -15,7 +30,7 @@ export async function POST(request: Request) {
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json(
         { valid: false, error: 'Missing authorization' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -26,7 +41,7 @@ export async function POST(request: Request) {
     if (!token || !connectionId) {
       return NextResponse.json(
         { valid: false, error: 'Missing token or connectionId' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -38,7 +53,7 @@ export async function POST(request: Request) {
     if (!connection) {
       return NextResponse.json(
         { valid: false, error: 'Connection not found' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -48,7 +63,7 @@ export async function POST(request: Request) {
     if (apiKey !== storedApiKey) {
       return NextResponse.json(
         { valid: false, error: 'Invalid API key' },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -58,7 +73,7 @@ export async function POST(request: Request) {
     if (!result.valid) {
       return NextResponse.json(
         { valid: false, error: result.error },
-        { status: 401 }
+        { status: 401, headers: corsHeaders }
       );
     }
 
@@ -87,13 +102,13 @@ export async function POST(request: Request) {
       organization: {
         id: result.payload!.organizationId
       }
-    });
+    }, { headers: corsHeaders });
 
   } catch (error: any) {
     console.error('Error validating CMS session:', error);
     return NextResponse.json(
       { valid: false, error: 'Validation failed' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

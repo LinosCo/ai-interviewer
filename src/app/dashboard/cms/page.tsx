@@ -90,16 +90,16 @@ export default function CMSPage() {
                     setProjectId(connData.projectId);
                 }
 
-                if (connData.enabled) {
+                if (connData.enabled && connData.projectId) {
                     // Load analytics
-                    const analyticsRes = await fetch('/api/cms/analytics?range=30d');
+                    const analyticsRes = await fetch(`/api/cms/analytics?range=30d&projectId=${connData.projectId}`);
                     if (analyticsRes.ok) {
                         const analyticsData = await analyticsRes.json();
                         setAnalytics(analyticsData);
                     }
 
                     // Load pending suggestions
-                    const suggestionsRes = await fetch('/api/cms/suggestions?status=PENDING');
+                    const suggestionsRes = await fetch(`/api/cms/suggestions?status=PENDING&projectId=${connData.projectId}`);
                     if (suggestionsRes.ok) {
                         const suggestionsData = await suggestionsRes.json();
                         setSuggestions(suggestionsData.suggestions || []);

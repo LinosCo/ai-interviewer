@@ -18,7 +18,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             if (loading || isProcessing || disabled) return;
 
             // If onClick returns a promise, handle loading state automatically
-            const result = onClick?.(e);
+            const result = onClick?.(e) as unknown;
             if (result instanceof Promise) {
                 setIsProcessing(true);
                 try {

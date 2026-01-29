@@ -60,7 +60,9 @@ export interface PlanLimits {
     aiTipsEnabled: boolean;
     whiteLabelEnabled: boolean;
     apiAccessEnabled: boolean;
-    canTransferProjects: boolean;
+    customLogo: boolean;
+    customColor: boolean;
+    themeExtraction: boolean;
 }
 
 export interface PlanConfig {
@@ -127,7 +129,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiTipsEnabled: false,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
-            canTransferProjects: false
+            canTransferProjects: false,
+            customLogo: false,
+            customColor: false,
+            themeExtraction: false
         },
         featureList: [
             '500K crediti/mese',
@@ -173,7 +178,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
-            canTransferProjects: false
+            canTransferProjects: false,
+            customLogo: true,
+            customColor: true,
+            themeExtraction: true
         },
         featureList: [
             '2M crediti per 14 giorni',
@@ -220,7 +228,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiTipsEnabled: false,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
-            canTransferProjects: false
+            canTransferProjects: false,
+            customLogo: false,
+            customColor: false,
+            themeExtraction: false
         },
         featureList: [
             '6M crediti/mese',
@@ -270,7 +281,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
-            canTransferProjects: false
+            canTransferProjects: false,
+            customLogo: true,
+            customColor: true,
+            themeExtraction: true
         },
         featureList: [
             '20M crediti/mese',
@@ -322,7 +336,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiTipsEnabled: true,
             whiteLabelEnabled: true,
             apiAccessEnabled: true,
-            canTransferProjects: true
+            canTransferProjects: true,
+            customLogo: true,
+            customColor: true,
+            themeExtraction: true
         },
         featureList: [
             '50M crediti/mese',
@@ -374,7 +391,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiTipsEnabled: true,
             whiteLabelEnabled: false,
             apiAccessEnabled: false,
-            canTransferProjects: false
+            canTransferProjects: false,
+            customLogo: true,
+            customColor: true,
+            themeExtraction: true
         },
         featureList: [
             '10M crediti/mese',
@@ -424,7 +444,10 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             aiTipsEnabled: true,
             whiteLabelEnabled: true,
             apiAccessEnabled: true,
-            canTransferProjects: true
+            canTransferProjects: true,
+            customLogo: true,
+            customColor: true,
+            themeExtraction: true
         },
         featureList: ['Tutto illimitato']
     }

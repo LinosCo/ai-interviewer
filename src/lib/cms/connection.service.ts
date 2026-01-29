@@ -266,6 +266,108 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
     }
 
     /**
+     * Transfer CMS connection to another project.
+     * Validates permissions and target project availability.
+     */
+    static async transferConnection(
+        connectionId: string,
+        targetProjectId: string,
+        userId: string
+    ): Promise<{ success: boolean; error?: string }> {
+        // Get source connection with project and organization
+        const connection = await prisma.cMSConnection.findUnique({
+            where: { id: connectionId },
+            include: {
+                project: {
+                    include: {
+                        organization: true,
+                        owner: true
+                    }
+                }
+            }
+        });
+
+        if (!connection) {
+            return { success: false, error: 'Connection not found' };
+        }
+
+        // Verify user has permission (must be project owner or org admin)
+        if (connection.project.ownerId !== userId) {
+            const membership = await prisma.membership.findFirst({
+                where: {
+                    userId,
+                    organizationId: connection.project.organizationId || '',
+                    role: { in: ['OWNER', 'ADMIN'] }
+                }
+            });
+
+            if (!membership) {
+                return { success: false, error: 'Insufficient permissions' };
+            }
+        }
+
+        // Get target project
+        const targetProject = await prisma.project.findUnique({
+            where: { id: targetProjectId },
+            include: {
+                cmsConnection: true,
+                organization: true
+            }
+        });
+
+        if (!targetProject) {
+            return { success: false, error: 'Target project not found' };
+        }
+
+        // Check if target already has a connection
+        if (targetProject.cmsConnection) {
+            return { success: false, error: 'Target project already has a CMS connection' };
+        }
+
+        // Verify user has access to target project
+        if (targetProject.ownerId !== userId) {
+            const targetMembership = await prisma.membership.findFirst({
+                where: {
+                    userId,
+                    organizationId: targetProject.organizationId || '',
+                    role: { in: ['OWNER', 'ADMIN'] }
+                }
+            });
+
+            if (!targetMembership) {
+                return { success: false, error: 'No access to target project' };
+            }
+        }
+
+        // Perform transfer
+        await prisma.cMSConnection.update({
+            where: { id: connectionId },
+            data: {
+                projectId: targetProjectId,
+                status: 'PENDING' // Require re-testing after transfer
+            }
+        });
+
+        // Log the transfer
+        await prisma.integrationLog.create({
+            data: {
+                connectionId,
+                event: 'connection.transferred',
+                status: 'SUCCESS',
+                metadata: {
+                    fromProjectId: connection.projectId,
+                    toProjectId: targetProjectId,
+                    fromOrgId: connection.project.organizationId,
+                    toOrgId: targetProject.organizationId,
+                    transferredBy: userId
+                }
+            }
+        });
+
+        return { success: true };
+    }
+
+    /**
      * Delete a CMS connection for a project.
      */
     static async deleteConnection(connectionId: string): Promise<void> {

@@ -415,29 +415,32 @@ export async function POST(req: Request) {
                     } else {
                         // End of SCAN - check time for DEEP
                         const budget = calculateDeepBudget(effectiveSec, maxDurationMins, numTopics);
-                        console.log("📊 [SCAN] Complete. Budget:", budget);
+                        const maxDurationSec = maxDurationMins * 60;
+                        const remainingSec = maxDurationSec - effectiveSec;
+                        console.log("📊 [SCAN] Complete. Budget:", budget, `remainingSec: ${remainingSec}`);
 
-                        if (budget.isLowTime) {
-                            // Time almost up - offer optional DEEP
-                            nextState.phase = 'DEEP_OFFER';
-                            nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
-                            supervisorInsight = { status: 'DEEP_OFFER_ASK' }; // FIX: was 'DEEP_OFFER' which isn't handled
-                        } else if (budget.canDoDeep) {
-                            // Enough time - go to DEEP
+                        if (budget.canDoDeep && !budget.isLowTime) {
+                            // Plenty of time - go directly to DEEP
                             nextState.phase = 'DEEP';
                             nextState.topicIndex = 0;
                             nextState.turnInTopic = 0;
                             nextState.deepTurnsPerTopic = budget.turnsPerTopic;
                             nextTopicId = botTopics[0].id;
                             supervisorInsight = { status: 'START_DEEP' };
+                        } else if (remainingSec >= 60) {
+                            // Some time remaining (>60s) - offer DEEP to let user decide
+                            // This covers both isLowTime and !canDoDeep cases
+                            nextState.phase = 'DEEP_OFFER';
+                            nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
+                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                            console.log(`🎁 [SCAN→DEEP_OFFER] Offering DEEP with ${remainingSec}s remaining`);
                         } else {
-                            // No time for DEEP - go to DATA_COLLECTION or END
+                            // Very little time (<60s) - go to DATA_COLLECTION
                             if (shouldCollectData) {
                                 nextState.phase = 'DATA_COLLECTION';
                                 supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
                                 nextState.consentGiven = false; // Waiting for consent
                             } else {
-                                // Let the AI say goodbye
                                 nextState.phase = 'DATA_COLLECTION';
                                 supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             }

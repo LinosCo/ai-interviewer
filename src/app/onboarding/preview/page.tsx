@@ -64,6 +64,7 @@ function PreviewPageContent() {
     const [expandedTopics, setExpandedTopics] = useState<Set<number>>(new Set([0]));
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+    const [publishedBotId, setPublishedBotId] = useState<string | null>(null);
     const [showSimulator, setShowSimulator] = useState(false);
     const [copied, setCopied] = useState(false);
     const [showAuthModal, setShowAuthModal] = useState(false);
@@ -220,6 +221,7 @@ function PreviewPageContent() {
 
             const result = await response.json();
             setPublishedSlug(result.slug);
+            setPublishedBotId(result.botId);
             sessionStorage.removeItem('generatedConfig');
         } catch (err) {
             console.error(err);
@@ -298,20 +300,32 @@ function PreviewPageContent() {
                             </button>
                         </div>
 
-                        <div className="flex gap-4">
+                        <div className="flex flex-col gap-3">
                             <button
-                                onClick={() => router.push('/dashboard')}
-                                className="flex-1 px-6 py-3 bg-white/50 hover:bg-white text-gray-700 font-medium rounded-xl transition-colors border border-gray-200"
-                            >
-                                Vai alla dashboard
-                            </button>
-                            <button
-                                onClick={() => router.push('/onboarding')}
-                                className="flex-1 px-6 py-3 text-white font-medium rounded-xl transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                                onClick={() => window.open(interviewLink, '_blank')}
+                                className="w-full px-6 py-3 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2"
                                 style={{ background: gradients.primary, boxShadow: shadows.amber }}
                             >
-                                Crea un'altra
+                                <Play className="w-5 h-5" fill="currentColor" />
+                                Inizia l'intervista
                             </button>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => router.push(publishedBotId ? `/dashboard/bots/${publishedBotId}` : '/dashboard')}
+                                    className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors border border-gray-200 shadow-sm flex items-center justify-center gap-2"
+                                >
+                                    <Icons.Layout size={18} />
+                                    Dashboard
+                                </button>
+                                <button
+                                    onClick={copyLink}
+                                    className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors border border-gray-200 shadow-sm flex items-center justify-center gap-2"
+                                >
+                                    {copied ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5" />}
+                                    {copied ? 'Copiato' : 'Copia link'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </main>

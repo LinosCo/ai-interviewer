@@ -120,7 +120,13 @@ export async function PATCH(
             return updatedOrg;
         });
 
-        return NextResponse.json(result);
+        // Serialize BigInts before returning
+        const serializedOrg = {
+            ...result,
+            monthlyCreditsLimit: result.monthlyCreditsLimit ? result.monthlyCreditsLimit.toString() : null
+        };
+
+        return NextResponse.json(serializedOrg);
 
     } catch (error: any) {
         console.error('Error updating organization:', error);

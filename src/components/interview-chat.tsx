@@ -600,9 +600,9 @@ export default function InterviewChat({
                 </div>
             )}
 
-            {/* Header - Moved lower to avoid overlap with progress bar labels */}
-            <header className="fixed top-44 left-0 right-0 z-50 p-6 flex items-center justify-between pointer-events-none transition-all duration-300">
-                <div className="flex items-center gap-3 bg-white border border-stone-200 p-2.5 pl-3.5 pr-5 rounded-full shadow-xl pointer-events-auto transition-all hover:shadow-2xl hover:scale-105">
+            {/* Header - Moved to top for mobile, custom position for larger screens */}
+            <header className="fixed top-4 left-0 right-0 z-40 p-4 md:p-6 flex items-start justify-between pointer-events-none transition-all duration-300">
+                <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md border border-stone-200/50 p-2 pl-3 pr-4 rounded-full shadow-lg pointer-events-auto transition-all hover:shadow-xl hover:scale-105">
                     {logoUrl ? (
                         <div className="h-8 w-8 rounded-full overflow-hidden border border-stone-100 flex-shrink-0 bg-stone-50">
                             <img
@@ -623,24 +623,24 @@ export default function InterviewChat({
                         </div>
                     ) : (
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-sm" style={{ background: brandColor }}>
-                            <Icons.Chat size={18} />
+                            <Icons.Chat size={16} />
                         </div>
                     )}
-                    <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-[10px] text-gray-400 uppercase tracking-widest leading-none mb-0.5">Sessione Live</span>
-                        <span className="font-bold text-sm text-gray-900 tracking-tight truncate max-w-[200px]">{botName}</span>
+                    <div className="flex flex-col min-w-0 pr-1">
+                        <span className="font-bold text-[10px] text-gray-400 uppercase tracking-widest leading-none mb-0.5" style={{ fontSize: '0.6rem' }}>Sessione Live</span>
+                        <span className="font-bold text-sm text-gray-900 tracking-tight truncate max-w-[120px] md:max-w-[200px]">{botName}</span>
                     </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-1">
-                    <div className="bg-white/95 backdrop-blur-md px-4 py-2 rounded-full border border-stone-200 shadow-md text-[11px] font-bold text-gray-600 flex items-center gap-1.5">
+                <div className="flex flex-col items-end gap-2 mt-1 pointer-events-auto">
+                    <div className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/50 shadow-md text-[11px] font-bold text-gray-600 flex items-center gap-1.5">
                         <Icons.Clock size={12} className="text-gray-400" />
                         <span>{elapsedMinutes}m</span>
                         <span className="text-gray-300">/</span>
                         <span className="text-gray-400 font-medium">~{estimatedMinutes}m</span>
                     </div>
                     {privacyLevel === 'anonymous' && (
-                        <div className="bg-green-50 text-[10px] font-bold text-green-600 px-3 py-1 rounded-full border border-green-100 uppercase tracking-wide">
+                        <div className="bg-green-50/90 backdrop-blur-sm text-[10px] font-bold text-green-600 px-2.5 py-1 rounded-full border border-green-100 uppercase tracking-wide shadow-sm">
                             Anonimo
                         </div>
                     )}

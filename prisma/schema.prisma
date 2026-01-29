@@ -23,7 +23,7 @@ model User {
 
   // Partner (resta a livello utente come "certificazione")
   isPartner               Boolean   @default(false)
-  partnerStatus           String?   // trial, active, suspended
+  partnerStatus           String? // trial, active, suspended
   partnerTrialEndDate     DateTime?
   partnerFee              Int?
   partnerActiveClients    Int       @default(0)
@@ -49,11 +49,11 @@ model User {
   reports             Report[]
   rewardGrants        RewardGrant[]
   sessions            Session[]
-  sentTransfers      ItemTransferInvite[] @relation("UserSentTransfers")
+  sentTransfers       ItemTransferInvite[] @relation("UserSentTransfers")
 
   // Relazioni attribuzione partner
-  partnerAttributions     PartnerClientAttribution[] @relation("PartnerAttributions")
-  clientAttribution       PartnerClientAttribution?  @relation("ClientAttribution")
+  partnerAttributions PartnerClientAttribution[] @relation("PartnerAttributions")
+  clientAttribution   PartnerClientAttribution?  @relation("ClientAttribution")
 }
 
 model ProjectAccess {
@@ -118,13 +118,13 @@ model PasswordResetToken {
 }
 
 model PlatformSettings {
-  id                   String   @id @default(cuid())
-  organizationId       String?  @unique // Collegato a Organization
-  methodologyKnowledge String   @db.Text
-  strategicPlan        String?  @db.Text // Piano strategico per il Copilot
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  organization        Organization? @relation
+  id                   String        @id @default(cuid())
+  organizationId       String?       @unique // Collegato a Organization
+  methodologyKnowledge String        @db.Text
+  strategicPlan        String?       @db.Text // Piano strategico per il Copilot
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  organization         Organization? @relation
 }
 
 model GlobalConfig {
@@ -144,62 +144,63 @@ model GlobalConfig {
 }
 
 model Organization {
-  id                     String                @id @default(cuid())
+  id                     String   @id @default(cuid())
   name                   String
-  slug                   String                @unique
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
-  allowCustomApiKeys     Boolean               @default(false)
+  slug                   String   @unique
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  allowCustomApiKeys     Boolean  @default(false)
   customLimits           Json?
-  responsesUsedThisMonth Int                   @default(0)
-  monthlyResetDate       DateTime              @default(now())
+  responsesUsedThisMonth Int      @default(0)
+  monthlyResetDate       DateTime @default(now())
   address                String?
   city                   String?
-  country                String                @default("IT")
+  country                String   @default("IT")
   postalCode             String?
   vatId                  String?
   strategicVision        String?
   valueProposition       String?
 
   // Piano e billing (NUOVI - migrati da User/Subscription)
-  plan                 PlanType     @default(FREE)
-  billingCycle         BillingCycle @default(MONTHLY)
+  plan         PlanType     @default(FREE)
+  billingCycle BillingCycle @default(MONTHLY)
 
   // Crediti (NUOVI - migrati da User)
-  monthlyCreditsLimit   BigInt    @default(500000)
-  monthlyCreditsUsed    BigInt    @default(0)
-  creditsResetDate      DateTime?
-  packCreditsAvailable  BigInt    @default(0)  // crediti extra acquistati
+  monthlyCreditsLimit  BigInt    @default(500000)
+  monthlyCreditsUsed   BigInt    @default(0)
+  creditsResetDate     DateTime?
+  packCreditsAvailable BigInt    @default(0) // crediti extra acquistati
 
   // Limiti membri
-  maxMembers      Int       @default(1)  // dipende dal piano
-  extraMemberSlots Int      @default(0)
-  currentMemberCount Int    @default(0)
+  maxMembers         Int @default(1) // dipende dal piano
+  extraMemberSlots   Int @default(0)
+  currentMemberCount Int @default(0)
 
   // Stripe
-  stripeCustomerId     String?   @unique
-  subscription        Subscription?
+  stripeCustomerId String?       @unique
+  subscription     Subscription?
 
   // Impostazioni della piattaforma (NUOVO - collegato a Organization)
   platformSettingsId   String?           @unique
   platformSettings     PlatformSettings? @relation(fields: [platformSettingsId], references: [id])
   stripeSubscriptionId String?
-  subscriptionStatus   String?   // ACTIVE, PAST_DUE, etc.
+  subscriptionStatus   String? // ACTIVE, PAST_DUE, etc.
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean   @default(false)
+  cancelAtPeriodEnd    Boolean           @default(false)
 
-  copilotSessions        CopilotSession[]
-  crossChannelInsights   CrossChannelInsight[]
-  members                Membership[]
-  projects               Project[]
-  tokenLogs              TokenLog[]
-  tokenUsage             TokenUsage?
-  usageLogs              UsageLog[]
-  visibilityConfigs      VisibilityConfig[]
-  creditPacks            OrgCreditPack[]
-  creditTransactions     OrgCreditTransaction[]
-  invoices               OrgInvoice[]
+  copilotSessions      CopilotSession[]
+  crossChannelInsights CrossChannelInsight[]
+  members              Membership[]
+  projects             Project[]
+  tokenLogs            TokenLog[]
+  tokenUsage           TokenUsage?
+  usageLogs            UsageLog[]
+  visibilityConfigs    VisibilityConfig[]
+  creditPacks          OrgCreditPack[]
+  creditTransactions   OrgCreditTransaction[]
+  invoices             OrgInvoice[]
+  cmsConnections       CMSConnection[]
 }
 
 model Subscription {
@@ -274,34 +275,34 @@ model UsageEvent {
 }
 
 model Membership {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   userId         String
   organizationId String
-  role           Role         @default(MEMBER)
+  role           Role   @default(MEMBER)
 
   // Stato membro
-  status         MemberStatus @default(ACTIVE)  // ACTIVE, INVITED, SUSPENDED
-  invitedAt      DateTime?
-  joinedAt       DateTime?
-  invitedBy      String?      // userId di chi ha invitato
-  acceptedAt     DateTime?
+  status     MemberStatus @default(ACTIVE) // ACTIVE, INVITED, SUSPENDED
+  invitedAt  DateTime?
+  joinedAt   DateTime?
+  invitedBy  String? // userId di chi ha invitato
+  acceptedAt DateTime?
 
   // Notifiche e preferenze
-  receiveAlerts  Boolean      @default(true)  // riceve alert crediti esauriti etc
+  receiveAlerts Boolean @default(true) // riceve alert crediti esauriti etc
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@unique([userId, organizationId])
 }
 
 enum MemberStatus {
   ACTIVE
-  INVITED    // Invitato ma non ha ancora accettato
-  SUSPENDED  // Sospeso temporaneamente
+  INVITED // Invitato ma non ha ancora accettato
+  SUSPENDED // Sospeso temporaneamente
 }
 
 enum ItemTransferType {
@@ -330,10 +331,10 @@ model Project {
   valueProposition String?
 
   // Partner tracking (per trasferimenti)
-  originPartnerId     String?   // partner che ha creato il progetto
-  transferredAt       DateTime?
-  transferredFromOrgId String?  // org di origine se trasferito
-  transferredToUserId String?
+  originPartnerId      String? // partner che ha creato il progetto
+  transferredAt        DateTime?
+  transferredFromOrgId String? // org di origine se trasferito
+  transferredToUserId  String?
 
   bots                 Bot[]
   cmsConnection        CMSConnection?
@@ -350,29 +351,29 @@ model Project {
   visibilityConfigs    VisibilityConfig[]
 
   // Relazione attribuzione partner
-  itemTransfers        ItemTransferInvite[] @relation("ProjectItemTransfers")
-  firstAttributions    PartnerClientAttribution[] @relation("FirstAttributionProject")
+  itemTransfers     ItemTransferInvite[]       @relation("ProjectItemTransfers")
+  firstAttributions PartnerClientAttribution[] @relation("FirstAttributionProject")
 }
 
 // Transazioni crediti a livello organizzazione
 model OrgCreditTransaction {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   projectId      String?
-  executedById   String?  // utente che ha eseguito l'azione
+  executedById   String? // utente che ha eseguito l'azione
 
-  amount         BigInt   // crediti consumati (positivo) o aggiunti (negativo)
-  balanceAfter   BigInt   // saldo dopo transazione
+  amount       BigInt // crediti consumati (positivo) o aggiunti (negativo)
+  balanceAfter BigInt // saldo dopo transazione
 
-  type           String   // usage, monthly_reset, pack_purchase, adjustment, transfer
-  tool           String?  // interview, chatbot, visibility, copilot, tips, export
-  action         String?  // azione specifica
-  description    String?
-  metadata       Json?
+  type        String // usage, monthly_reset, pack_purchase, adjustment, transfer
+  tool        String? // interview, chatbot, visibility, copilot, tips, export
+  action      String? // azione specifica
+  description String?
+  metadata    Json?
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
   @@index([projectId])
@@ -381,99 +382,99 @@ model OrgCreditTransaction {
 
 // Pack crediti acquistati dall'organizzazione
 model OrgCreditPack {
-  id               String   @id @default(cuid())
-  organizationId   String
+  id             String @id @default(cuid())
+  organizationId String
 
-  packType         String   // small, medium, large
+  packType         String // small, medium, large
   creditsPurchased BigInt
   creditsRemaining BigInt
-  pricePaid        Decimal  @db.Decimal(10, 2)
+  pricePaid        Decimal @db.Decimal(10, 2)
 
-  stripePaymentId  String?
-  purchasedAt      DateTime @default(now())
-  purchasedBy      String?  // userId
+  stripePaymentId String?
+  purchasedAt     DateTime @default(now())
+  purchasedBy     String? // userId
 
-  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
 }
 
 // Fatture organizzazione (mirror di Stripe per consultazione rapida)
 model OrgInvoice {
-  id              String       @id @default(cuid())
+  id              String @id @default(cuid())
   organizationId  String
-  stripeInvoiceId String       @unique
+  stripeInvoiceId String @unique
 
-  amountPaid      Int          // in centesimi
-  currency        String       @default("eur")
-  status          String       // paid, open, void, uncollectible
-  invoiceNumber   String?
-  pdfUrl          String?
-  hostedUrl       String?      // link Stripe per visualizzare
+  amountPaid    Int // in centesimi
+  currency      String  @default("eur")
+  status        String // paid, open, void, uncollectible
+  invoiceNumber String?
+  pdfUrl        String?
+  hostedUrl     String? // link Stripe per visualizzare
 
-  periodStart     DateTime?
-  periodEnd       DateTime?
+  periodStart DateTime?
+  periodEnd   DateTime?
 
   // Dettagli per fatturazione italiana
-  vatNumber       String?
-  companyName     String?
-  billingAddress  Json?
+  vatNumber      String?
+  companyName    String?
+  billingAddress Json?
 
-  createdAt       DateTime     @default(now())
+  createdAt DateTime @default(now())
 
-  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([stripeInvoiceId])
 }
 
 model ProjectTransfer {
-  id                  String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Progetto originale (del partner)
-  originalProjectId   String
-  originalOrgId       String
+  originalProjectId String
+  originalOrgId     String
 
   // Progetto duplicato (del cliente)
   duplicatedProjectId String
   targetOrgId         String
 
   // Attori
-  partnerId           String   // Partner che trasferisce
-  clientUserId        String   // Utente cliente che riceve
+  partnerId    String // Partner che trasferisce
+  clientUserId String // Utente cliente che riceve
 
   // Opzioni
-  partnerKeepsAccess  Boolean  @default(true)   // Partner rimane VIEWER?
-  includeData         Boolean  @default(false)  // Include risposte/analytics?
+  partnerKeepsAccess Boolean @default(true) // Partner rimane VIEWER?
+  includeData        Boolean @default(false) // Include risposte/analytics?
 
-  transferredAt       DateTime @default(now())
+  transferredAt DateTime @default(now())
 
   // Relazioni
-  originalProject     Project  @relation("OriginalProject", fields: [originalProjectId], references: [id])
-  duplicatedProject   Project  @relation("DuplicatedProject", fields: [duplicatedProjectId], references: [id])
+  originalProject   Project @relation("OriginalProject", fields: [originalProjectId], references: [id])
+  duplicatedProject Project @relation("DuplicatedProject", fields: [duplicatedProjectId], references: [id])
 
   @@index([partnerId])
   @@index([clientUserId])
 }
 
 model ProjectTransferInvite {
-  id              String   @id @default(cuid())
-  projectId       String   // Progetto da trasferire
-  partnerId       String   // Partner che invita
+  id        String @id @default(cuid())
+  projectId String // Progetto da trasferire
+  partnerId String // Partner che invita
 
-  clientEmail     String   // Email destinatario
-  token           String   @unique
+  clientEmail String // Email destinatario
+  token       String @unique
 
   // Opzioni trasferimento
-  partnerKeepsAccess  Boolean @default(true)
-  includeData         Boolean @default(false)
-  personalMessage     String?
+  partnerKeepsAccess Boolean @default(true)
+  includeData        Boolean @default(false)
+  personalMessage    String?
 
-  status          String   @default("pending")  // pending, accepted, expired, revoked
-  expiresAt       DateTime
-  acceptedAt      DateTime?
+  status     String    @default("pending") // pending, accepted, expired, revoked
+  expiresAt  DateTime
+  acceptedAt DateTime?
 
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([token])
   @@index([partnerId])
@@ -481,18 +482,18 @@ model ProjectTransferInvite {
 }
 
 model OrganizationInvite {
-  id              String   @id @default(cuid())
-  organizationId  String
-  email           String
-  role            Role     @default(MEMBER)
-  token           String   @unique
-  invitedById     String
-  message         String?
-  status          String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
-  expiresAt       DateTime
-  acceptedAt      DateTime?
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           Role      @default(MEMBER)
+  token          String    @unique
+  invitedById    String
+  message        String?
+  status         String    @default("PENDING") // PENDING, ACCEPTED, EXPIRED, REVOKED
+  expiresAt      DateTime
+  acceptedAt     DateTime?
 
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([organizationId, email])
 }
@@ -1273,20 +1274,20 @@ model CreditPack {
 // ============================================
 
 model PartnerClientAttribution {
-  id              String   @id @default(cuid())
-  partnerId       String
-  clientUserId    String   @unique // Un cliente può essere attribuito a UN solo partner
-  firstProjectId  String?
+  id             String  @id @default(cuid())
+  partnerId      String
+  clientUserId   String  @unique // Un cliente può essere attribuito a UN solo partner
+  firstProjectId String?
 
-  attributedAt    DateTime @default(now())
-  status          String   @default("active") // active, revoked
-  revokedAt       DateTime?
-  revokedReason   String?
+  attributedAt  DateTime  @default(now())
+  status        String    @default("active") // active, revoked
+  revokedAt     DateTime?
+  revokedReason String?
 
   // Relazioni con onDelete per evitare errori referenziali
-  partner         User     @relation("PartnerAttributions", fields: [partnerId], references: [id], onDelete: Cascade)
-  clientUser      User     @relation("ClientAttribution", fields: [clientUserId], references: [id], onDelete: Cascade)
-  firstProject    Project? @relation("FirstAttributionProject", fields: [firstProjectId], references: [id], onDelete: SetNull)
+  partner      User     @relation("PartnerAttributions", fields: [partnerId], references: [id], onDelete: Cascade)
+  clientUser   User     @relation("ClientAttribution", fields: [clientUserId], references: [id], onDelete: Cascade)
+  firstProject Project? @relation("FirstAttributionProject", fields: [firstProjectId], references: [id], onDelete: SetNull)
 
   @@index([partnerId])
   @@index([partnerId, status])
@@ -1577,25 +1578,25 @@ enum ConnectionStatus {
 }
 
 model ItemTransferInvite {
-  id              String           @id @default(cuid())
-  itemType        ItemTransferType
-  itemId          String           // ID of the Organization, Project, Bot, or Tool
-  
-  senderId        String           // User ID of the person sending the transfer
-  recipientEmail  String           // Email of the person who will receive it
-  
-  token           String           @unique
-  status          TransferStatus   @default(PENDING)
-  
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  
+  id       String           @id @default(cuid())
+  itemType ItemTransferType
+  itemId   String // ID of the Organization, Project, Bot, or Tool
+
+  senderId       String // User ID of the person sending the transfer
+  recipientEmail String // Email of the person who will receive it
+
+  token  String         @unique
+  status TransferStatus @default(PENDING)
+
+  expiresAt  DateTime
+  acceptedAt DateTime?
+
   // Relations
-  sender          User             @relation("UserSentTransfers", fields: [senderId], references: [id])
-  project         Project?         @relation("ProjectItemTransfers", fields: [itemId], references: [id], map: "ItemTransferInvite_projectId_fkey")
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  sender  User     @relation("UserSentTransfers", fields: [senderId], references: [id])
+  project Project? @relation("ProjectItemTransfers", fields: [itemId], references: [id], map: "ItemTransferInvite_projectId_fkey")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([senderId])
   @@index([recipientEmail])

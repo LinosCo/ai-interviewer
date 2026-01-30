@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticate } from './actions';
 import Link from 'next/link';
@@ -13,12 +13,19 @@ import { Card } from '@/components/ui/business-tuner/Card';
 export default function LoginPage() {
     const router = useRouter();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
+    const [isNavigating, setIsNavigating] = useState(false);
+
+    // Combined loading state: pending action OR navigating to dashboard
+    const isLoading = isPending || isNavigating;
 
     useEffect(() => {
-        if (!isPending && errorMessage === null) {
+        if (!isPending && errorMessage === null && !isNavigating) {
+            // Login successful, start navigation
+            setIsNavigating(true);
             router.push('/dashboard');
+            // Note: isNavigating stays true - page will unmount during navigation
         }
-    }, [errorMessage, isPending, router]);
+    }, [errorMessage, isPending, router, isNavigating]);
 
     return (
         <div style={{
@@ -54,7 +61,7 @@ export default function LoginPage() {
                                 name="email"
                                 required
                                 placeholder="nome@azienda.com"
-                                disabled={isPending}
+                                disabled={isLoading}
                                 icon={<Icons.Users size={18} />}
                             />
                         </div>
@@ -65,7 +72,7 @@ export default function LoginPage() {
                                 name="password"
                                 required
                                 placeholder="••••••••"
-                                disabled={isPending}
+                                disabled={isLoading}
                                 icon={<div style={{ width: '18px' }}>🔒</div>} // Placeholder icon if Lock not available
                             />
                         </div>
@@ -85,10 +92,10 @@ export default function LoginPage() {
                         <Button
                             type="submit"
                             fullWidth
-                            disabled={isPending}
-                            withShimmer={!isPending}
+                            disabled={isLoading}
+                            withShimmer={!isLoading}
                         >
-                            {isPending ? 'Accesso in corso...' : 'Accedi'}
+                            {isLoading ? 'Accesso in corso...' : 'Accedi'}
                         </Button>
                     </form>
                 </Card>

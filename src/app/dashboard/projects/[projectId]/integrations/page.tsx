@@ -222,6 +222,7 @@ export default function IntegrationsPage() {
       });
       if (res.ok) {
         const data = await res.json();
+        console.log('CMS Dashboard URL generated:', data.url);
         if (data.url) {
           window.open(data.url, '_blank');
         }

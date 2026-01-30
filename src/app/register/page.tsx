@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, Suspense } from 'react';
+import { useActionState, Suspense, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { registerUser } from './actions';
 import Link from 'next/link';
@@ -14,6 +14,19 @@ function RegisterForm() {
     const searchParams = useSearchParams();
     const plan = searchParams.get('plan');
     const [errorMessage, dispatch, isPending] = useActionState(registerUser, undefined);
+    const [isNavigating, setIsNavigating] = useState(false);
+
+    // Combined loading state
+    const isLoading = isPending || isNavigating;
+
+    // When action completes successfully, keep loading state until navigation
+    useEffect(() => {
+        if (!isPending && errorMessage === null && !isNavigating) {
+            // Registration successful, redirect will happen from server action
+            // Keep showing loading state
+            setIsNavigating(true);
+        }
+    }, [errorMessage, isPending, isNavigating]);
 
     return (
         <div style={{
@@ -58,7 +71,7 @@ function RegisterForm() {
                                 name="name"
                                 required
                                 placeholder="Mario Rossi"
-                                disabled={isPending}
+                                disabled={isLoading}
                             />
                         </div>
 
@@ -69,7 +82,7 @@ function RegisterForm() {
                                 name="email"
                                 required
                                 placeholder="nome@azienda.com"
-                                disabled={isPending}
+                                disabled={isLoading}
                                 icon={<Icons.Building size={18} />}
                             />
                         </div>
@@ -81,7 +94,7 @@ function RegisterForm() {
                                 name="companyName"
                                 required
                                 placeholder="Azienda S.r.l."
-                                disabled={isPending}
+                                disabled={isLoading}
                                 icon={<Icons.Building size={18} />}
                             />
                         </div>
@@ -92,7 +105,7 @@ function RegisterForm() {
                                 type="text"
                                 name="vatId"
                                 placeholder="IT01234567890"
-                                disabled={isPending}
+                                disabled={isLoading}
                                 icon={<div style={{ fontSize: '14px', fontWeight: 'bold', color: colors.muted }}>%</div>}
                             />
                         </div>
@@ -105,7 +118,7 @@ function RegisterForm() {
                                 required
                                 placeholder="Creane una sicura"
                                 minLength={6}
-                                disabled={isPending}
+                                disabled={isLoading}
                                 icon={<Icons.Check size={18} />} // Using Check as placeholder for "secure" lock icon if lock not available
                             />
                         </div>
@@ -119,10 +132,10 @@ function RegisterForm() {
                         <Button
                             type="submit"
                             fullWidth
-                            disabled={isPending}
-                            withShimmer={!isPending}
+                            disabled={isLoading}
+                            withShimmer={!isLoading}
                         >
-                            {isPending ? 'Creazione account...' : 'Inizia prova gratuita'}
+                            {isLoading ? 'Creazione account...' : 'Inizia prova gratuita'}
                         </Button>
 
                         <p style={{ fontSize: '0.75rem', color: colors.subtle, textAlign: 'center', marginTop: '1rem', lineHeight: 1.5 }}>

@@ -70,9 +70,11 @@ export async function GET(request: Request) {
             enabled: true,
             projectId: foundProjectId,
             connection: {
+                id: cmsConnection.id,
                 name: cmsConnection.name,
                 status: cmsConnection.status,
                 lastSyncAt: cmsConnection.lastSyncAt,
+                lastSyncError: cmsConnection.lastSyncError,
                 hasGoogleAnalytics: cmsConnection.googleAnalyticsConnected,
                 hasSearchConsole: cmsConnection.searchConsoleConnected,
                 cmsPublicUrl: cmsConnection.cmsPublicUrl,

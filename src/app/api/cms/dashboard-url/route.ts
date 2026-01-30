@@ -49,6 +49,11 @@ export async function POST(request: Request) {
       connection.id
     );
 
+    console.log('[CMS Dashboard URL] Generated:', {
+      cmsDashboardUrl: connection.cmsDashboardUrl,
+      fullUrl: dashboardUrl
+    });
+
     return NextResponse.json({ url: dashboardUrl });
 
   } catch (error: any) {

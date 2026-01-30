@@ -42,10 +42,16 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const fetchProjects = useCallback(async () => {
         if (!currentOrganization) {
             setLoading(false);
+            setProjects([]);
+            setSelectedProjectState(null);
             return;
         }
 
         setLoading(true);
+        // Reset state before fetching new data to avoid showing stale data
+        setProjects([]);
+        setSelectedProjectState(null);
+
         try {
             const res = await fetch(`/api/projects?organizationId=${currentOrganization.id}`);
             if (res.ok) {

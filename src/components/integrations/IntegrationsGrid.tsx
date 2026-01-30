@@ -69,6 +69,9 @@ interface IntegrationsGridProps {
   onTestGSC: (id: string) => Promise<void>;
   onConfigureGoogle: () => void;
   onDeleteGoogle: (id: string) => Promise<void>;
+  onDeleteCMS: (id: string) => Promise<void>;
+  onOpenCMSDashboard?: () => Promise<void>;
+  onConfigureCMS?: () => void;
   projects: Project[];
   organizations?: Organization[];
   currentProjectId: string;
@@ -89,6 +92,9 @@ export function IntegrationsGrid({
   onTestGSC,
   onConfigureGoogle,
   onDeleteGoogle,
+  onDeleteCMS,
+  onOpenCMSDashboard,
+  onConfigureCMS,
   projects,
   organizations = [],
   currentProjectId,
@@ -205,9 +211,12 @@ export function IntegrationsGrid({
           }
           lastSyncAt={cmsConnection?.lastSyncAt}
           lastError={cmsConnection?.lastSyncError}
+          onOpenDashboard={cmsConnection && cmsConnection.status === 'ACTIVE' ? onOpenCMSDashboard : undefined}
+          onConfigure={onConfigureCMS}
           onTransfer={cmsConnection ? () => setTransferItem({ id: cmsConnection.id, name: cmsConnection.name, type: 'CMS' }) : undefined}
           onManageSharing={cmsConnection ? () => setShareConnection({ id: cmsConnection.id, name: cmsConnection.name, type: 'CMS' }) : undefined}
           onTransferOrg={cmsConnection ? () => setTransferOrgConnection({ id: cmsConnection.id, name: cmsConnection.name, type: 'CMS' }) : undefined}
+          onDelete={cmsConnection ? () => onDeleteCMS(cmsConnection.id) : undefined}
           disabled={!cmsConnection}
           upgradeRequired={!canWrite}
         />

@@ -30,6 +30,7 @@ interface IntegrationCardProps {
   onTransfer?: () => void;
   onManageSharing?: () => void;
   onTransferOrg?: () => void;
+  onOpenDashboard?: () => Promise<void>;
   disabled?: boolean;
   upgradeRequired?: boolean;
   sharedProjectsCount?: number;
@@ -109,12 +110,14 @@ export function IntegrationCard({
   onTransfer,
   onManageSharing,
   onTransferOrg,
+  onOpenDashboard,
   disabled = false,
   upgradeRequired = false,
   sharedProjectsCount = 0,
 }: IntegrationCardProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isOpeningDashboard, setIsOpeningDashboard] = useState(false);
 
   const statusConfig = STATUS_CONFIG[status];
   const typeConfig = TYPE_CONFIG[type];
@@ -138,6 +141,16 @@ export function IntegrationCard({
       await onDelete();
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleOpenDashboard = async () => {
+    if (!onOpenDashboard || isOpeningDashboard) return;
+    setIsOpeningDashboard(true);
+    try {
+      await onOpenDashboard();
+    } finally {
+      setIsOpeningDashboard(false);
     }
   };
 
@@ -210,6 +223,17 @@ export function IntegrationCard({
           )}
 
           <div className="flex items-center gap-2">
+            {onOpenDashboard && (
+              <button
+                onClick={handleOpenDashboard}
+                disabled={isOpeningDashboard}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+              >
+                <ExternalLink className={`w-4 h-4 ${isOpeningDashboard ? 'animate-pulse' : ''}`} />
+                {isOpeningDashboard ? 'Apertura...' : 'Apri Dashboard'}
+              </button>
+            )}
+
             {onTest && (
               <button
                 onClick={handleTest}

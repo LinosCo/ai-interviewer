@@ -198,6 +198,47 @@ export default function IntegrationsPage() {
     }
   };
 
+  const handleDeleteCMS = async (id: string) => {
+    try {
+      const res = await fetch(`/api/cms/${id}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        await fetchData();
+      } else {
+        console.error('Failed to delete CMS connection');
+      }
+    } catch (error) {
+      console.error('Error deleting CMS connection:', error);
+    }
+  };
+
+  const handleOpenCMSDashboard = async () => {
+    try {
+      const res = await fetch('/api/cms/dashboard-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          window.open(data.url, '_blank');
+        }
+      } else {
+        const error = await res.json();
+        console.error('Failed to get CMS dashboard URL:', error);
+        alert(error.error || 'Impossibile aprire il CMS');
+      }
+    } catch (error) {
+      console.error('Error opening CMS dashboard:', error);
+    }
+  };
+
+  const handleConfigureCMS = () => {
+    router.push(`/dashboard/projects/${projectId}/integrations/connect/cms`);
+  };
+
   if (loading) {
     return (
       <div className="p-8">
@@ -228,6 +269,9 @@ export default function IntegrationsPage() {
         onTestGSC={handleTestGSC}
         onConfigureGoogle={handleConfigureGoogle}
         onDeleteGoogle={handleDeleteGoogle}
+        onDeleteCMS={handleDeleteCMS}
+        onOpenCMSDashboard={handleOpenCMSDashboard}
+        onConfigureCMS={handleConfigureCMS}
         projects={projects}
         organizations={organizations}
         currentProjectId={projectId}

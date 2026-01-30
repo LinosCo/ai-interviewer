@@ -26,7 +26,7 @@ const SELECTED_ORG_KEY = 'bt_selected_org_id';
 const COOKIE_ORG_KEY = 'bt_selected_org_id';
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
@@ -69,10 +69,19 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     };
 
     useEffect(() => {
-        if (session) {
+        if (status === 'loading') return;
+
+        if (status === 'unauthenticated') {
+            setLoading(false);
+            setOrganizations([]);
+            setCurrentOrganizationState(null);
+            return;
+        }
+
+        if (status === 'authenticated') {
             fetchOrganizations();
         }
-    }, [session]);
+    }, [status, session]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);

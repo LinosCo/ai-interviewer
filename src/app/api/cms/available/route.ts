@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     }
 
     // Verifica che l'utente appartenga all'organizzazione
-    const membership = await prisma.organizationMembership.findFirst({
+    const membership = await prisma.membership.findFirst({
       where: {
         userId: session.user.id,
         organizationId,

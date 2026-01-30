@@ -52,7 +52,8 @@ export async function GET(req: Request) {
 }
 
 const createProjectSchema = z.object({
-    name: z.string().min(1, 'Nome progetto richiesto')
+    name: z.string().min(1, 'Nome progetto richiesto'),
+    organizationId: z.string().optional()
 });
 
 export async function POST(req: Request) {
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { name } = createProjectSchema.parse(body);
+        const { name, organizationId } = createProjectSchema.parse(body);
 
         // Get user with organization membership
         const user = await prisma.user.findUnique({
@@ -77,9 +78,23 @@ export async function POST(req: Request) {
 
         if (!user) return new Response('User not found', { status: 404 });
 
+        // Determine organization: explicit or first membership
+        let finalOrgId = organizationId;
+
+        if (!finalOrgId) {
+            const membership = user.memberships[0];
+            if (!membership) return new Response('Nessuna organizzazione trovata per l\'utente', { status: 403 });
+            finalOrgId = membership.organizationId;
+        }
+
+        // Verify membership for the target organization
+        const targetMembership = user.memberships.find(m => m.organizationId === finalOrgId);
+        if (!targetMembership) {
+            return new Response('Accesso negato all\'organizzazione specificata', { status: 403 });
+        }
+
         // Check if user is ADMIN or OWNER (can create projects)
-        const membership = user.memberships[0];
-        if (!membership || !['OWNER', 'ADMIN'].includes(membership.role)) {
+        if (!['OWNER', 'ADMIN'].includes(targetMembership.role)) {
             return new Response('Solo Admin e Owner possono creare progetti', { status: 403 });
         }
 
@@ -88,7 +103,7 @@ export async function POST(req: Request) {
             data: {
                 name,
                 ownerId: user.id,
-                organizationId: membership.organizationId,
+                organizationId: finalOrgId,
                 isPersonal: false,
                 accessList: {
                     create: {

@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { PLANS, PlanType } from '@/config/plans';
 
 /**
  * PATCH /api/admin/organizations/[orgId]
@@ -51,6 +52,10 @@ export async function PATCH(
                 // Determine PlanType enum value
                 const planValue = plan === 'FREE' ? 'TRIAL' : plan.toUpperCase();
                 data.plan = planValue;
+
+                // Sync monthlyCreditsLimit from PLANS
+                const planConfig = PLANS[planValue as PlanType] || PLANS[PlanType.FREE];
+                data.monthlyCreditsLimit = BigInt(planConfig.monthlyCredits);
 
                 // Also upsert Subscription to keep strictly in sync
                 const subscriptionTier = plan.toUpperCase();

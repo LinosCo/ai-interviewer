@@ -15,7 +15,8 @@ import {
     Globe,
     CheckCircle2,
     AlertCircle,
-    Copy
+    Copy,
+    ArrowRightLeft
 } from "lucide-react";
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +26,34 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
     const [loading, setLoading] = useState(true);
     const [regenerating, setRegenerating] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [projects, setProjects] = useState<any[]>([]);
+    const [targetProjectId, setTargetProjectId] = useState('');
+    const [transferring, setTransferring] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
         fetchConnection();
+        fetchProjects();
     }, [params.connectionId]);
+
+    const fetchProjects = async () => {
+        try {
+            const res = await fetch('/api/user/settings');
+            if (res.ok) {
+                const data = await res.json();
+                // Collect projects from all organizations
+                const allProjects = (data.memberships || []).flatMap((m: any) =>
+                    (m.organization?.projects || []).map((p: any) => ({
+                        ...p,
+                        orgName: m.organization?.name
+                    }))
+                );
+                setProjects(allProjects);
+            }
+        } catch (error) {
+            console.error('Failed to load projects', error);
+        }
+    };
 
     const fetchConnection = async () => {
         try {
@@ -62,6 +86,32 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
             showToast("Failed to regenerate API key", "error");
         } finally {
             setRegenerating(false);
+        }
+    };
+
+    const handleTransfer = async () => {
+        if (!targetProjectId) return;
+        if (!confirm('Sei sicuro di voler trasferire questa connessione a un altro progetto?')) return;
+
+        setTransferring(true);
+        try {
+            const res = await fetch(`/api/cms/${params.connectionId}/transfer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetProjectId })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to transfer connection');
+            }
+
+            showToast("Connessione trasferita con successo", "success");
+            router.push('/dashboard');
+        } catch (error: any) {
+            showToast(error.message || "Errore durante il trasferimento", "error");
+        } finally {
+            setTransferring(false);
         }
     };
 
@@ -181,6 +231,43 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                             <p className="text-xs text-gray-500">
                                 Use this key to authenticate requests from your CMS to our API.
                             </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Transfer Section */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <ArrowRightLeft className="w-5 h-5 text-blue-500" />
+                            Trasferisci Connessione
+                        </CardTitle>
+                        <CardDescription>Sposta questa connessione in un altro progetto della tua organizzazione.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label>Seleziona Progetto di Destinazione</Label>
+                            <div className="flex gap-2">
+                                <select
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    onChange={(e) => setTargetProjectId(e.target.value)}
+                                    value={targetProjectId}
+                                >
+                                    <option value="">Seleziona un progetto...</option>
+                                    {projects.filter(p => p.id !== connection.projectId).map(p => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name} ({p.orgName})
+                                        </option>
+                                    ))}
+                                </select>
+                                <Button
+                                    onClick={handleTransfer}
+                                    disabled={!targetProjectId || transferring}
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                >
+                                    {transferring ? 'Trasferimento...' : 'Trasferisci'}
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

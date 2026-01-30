@@ -16,7 +16,7 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
 
-    const isLimitReached = config.prompts.length >= maxPrompts;
+    const isLimitReached = maxPrompts !== -1 && config.prompts.length >= maxPrompts;
 
     const handleGenerate = async () => {
         if (!config.brandName || !config.category) {
@@ -140,7 +140,7 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
                         Genera automaticamente o crea manualmente i prompt che verranno utilizzati per interrogare gli LLM
                     </p>
                     <div className="text-xs font-semibold bg-gray-100 px-3 py-1 rounded-full text-gray-700">
-                        {config.prompts.length} / {maxPrompts} Prompts
+                        {config.prompts.length} / {maxPrompts === -1 ? '∞' : maxPrompts} Prompts
                     </div>
                 </div>
             </div>

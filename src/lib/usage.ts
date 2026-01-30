@@ -40,6 +40,15 @@ export async function getSubscriptionLimits(subscription: { tier: SubscriptionTi
     return {
         maxActiveBots: limits.maxChatbots,
         maxInterviewsPerMonth: limits.maxInterviewsPerMonth,
+        maxVisibilityQueriesPerMonth: limits.maxVisibilityQueriesPerMonth,
+        maxAiSuggestionsPerMonth: limits.maxAiSuggestionsPerMonth,
+        monthlyTokenBudget: limits.monthlyTokenBudget,
+        maxProjects: plan.features.maxProjects,
+        visibilityEnabled: plan.features.visibilityTracker,
+        cmsEnabled: plan.features.cmsIntegrations,
+        chatbotEnabled: plan.features.chatbot,
+        aiTipsEnabled: plan.features.aiTips,
+        whiteLabelingEnabled: plan.features.whiteLabeling
     };
 }
 
@@ -309,6 +318,17 @@ export async function isFeatureEnabled(organizationId: string, featureKey: strin
     if (!subscription) return false;
 
     const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
+
+    // Check in features first
+    // @ts-ignore
+    if (plan.features[featureKey] !== undefined) {
+        // @ts-ignore
+        const value = plan.features[featureKey];
+        if (typeof value === 'boolean') return value;
+        if (value === 'base' || value === 'full' || value === 'conditional') return true;
+    }
+
+    // Then check in limits (legacy/derived)
     // @ts-ignore
     return !!plan.limits[featureKey];
 }

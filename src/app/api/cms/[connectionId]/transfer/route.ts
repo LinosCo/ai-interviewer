@@ -1,5 +1,5 @@
 import { auth } from '@/auth';
-import { CMSConnectionService } from '@/lib/cms';
+import { CMSConnectionService } from '@/lib/cms/connection.service';
 import { NextResponse } from 'next/server';
 
 export async function POST(

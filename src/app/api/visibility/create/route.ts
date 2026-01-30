@@ -18,7 +18,6 @@ export async function POST(request: Request) {
                 plan: true,
                 role: true,
                 memberships: {
-                    take: 1,
                     select: { organizationId: true }
                 }
             }
@@ -28,22 +27,40 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const body = await request.json();
+        const { brandName, category, description, language, territory, prompts, competitors, organizationId } = body;
 
-        // Use user's plan (admin has unlimited access)
-        const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
-        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+        // Determine organizationId: use provided if admin, or fallback to first membership
+        let finalOrganizationId = organizationId;
+
+        if (!finalOrganizationId || user.role !== 'ADMIN') {
+            finalOrganizationId = user.memberships[0]?.organizationId;
+        }
+
+        if (!finalOrganizationId) {
+            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        }
+
+        // Get organization's subscription (the source of truth for limits)
+        const subscription = await prisma.subscription.findUnique({
+            where: { organizationId: finalOrganizationId }
+        });
+
+        // Use organization's plan (admin role has unlimited access)
+        const isAdmin = user.role === 'ADMIN';
+        const tier = subscription?.tier as PlanType || PlanType.FREE;
+        const plan = PLANS[tier];
 
         if (!isAdmin && !plan.features.visibilityTracker) {
             return NextResponse.json(
-                { error: 'Visibility tracking not available in your plan' },
+                { error: 'Visibility tracking non disponibile nel tuo piano' },
                 { status: 403 }
             );
         }
 
         // Check brand limit (unlimited if visibility enabled)
         const existingBrands = await prisma.visibilityConfig.count({
-            where: { organizationId }
+            where: { organizationId: finalOrganizationId }
         });
 
         const maxBrands = (isAdmin || plan.features.visibilityTracker) ? -1 : 0; // -1 = unlimited
@@ -54,8 +71,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const body = await request.json();
-        const { brandName, category, description, language, territory, prompts, competitors, projectId } = body;
+        const { projectId } = body;
 
         if (!brandName || !category) {
             return NextResponse.json(
@@ -64,11 +80,13 @@ export async function POST(request: Request) {
             );
         }
 
-        // Validate limits (admin bypasses, or use plan limits: 20 prompts, 10 competitors)
+        // Validate limits based on plan config
         const enabledPrompts = prompts?.filter((p: any) => p.enabled) || [];
         const enabledCompetitors = competitors?.filter((c: any) => c.enabled) || [];
-        const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 20 : 0);
-        const maxCompetitors = isAdmin ? 999 : (plan.features.visibilityTracker ? 10 : 0);
+
+        // Let's use more generous default limits from our plans
+        const maxPrompts = isAdmin ? 999 : (plan.limits.maxAiSuggestionsPerMonth || 20); // Reuse suggestion limit or default 20
+        const maxCompetitors = isAdmin ? 999 : (plan.limits.maxVisibilityQueriesPerMonth > 0 ? 15 : 5); // Default 15 for pro/business, 5 for trial
 
         if (!isAdmin && enabledPrompts.length > maxPrompts) {
             return NextResponse.json(
@@ -95,7 +113,7 @@ export async function POST(request: Request) {
         // Create configuration with prompts and competitors
         const config = await prisma.visibilityConfig.create({
             data: {
-                organizationId,
+                organizationId: finalOrganizationId,
                 brandName,
                 category,
                 description: description || '',
@@ -258,13 +276,19 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        // Use user's plan (admin bypasses limits)
-        const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
-        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+        // Get organization's subscription
+        const subscription = await prisma.subscription.findUnique({
+            where: { organizationId }
+        });
 
-        // Admin bypasses, or use plan limits: 20 prompts, 10 competitors
-        const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 20 : 0);
-        const maxCompetitors = isAdmin ? 999 : (plan.features.visibilityTracker ? 10 : 0);
+        // Use organization's plan (admin bypasses limits)
+        const isAdmin = user.role === 'ADMIN';
+        const tier = subscription?.tier as PlanType || PlanType.FREE;
+        const plan = PLANS[tier];
+
+        // Limits validation
+        const maxPrompts = isAdmin ? 999 : (plan.limits.maxAiSuggestionsPerMonth || 20);
+        const maxCompetitors = isAdmin ? 999 : (plan.limits.maxVisibilityQueriesPerMonth > 0 ? 15 : 5);
 
         if (!isAdmin && prompts) {
             const enabledPrompts = prompts.filter((p: any) => p.enabled);

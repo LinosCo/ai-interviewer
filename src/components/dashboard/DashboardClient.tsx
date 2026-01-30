@@ -83,6 +83,22 @@ export default function DashboardClient({
         router.push(`/dashboard/cms/${connectionId}/settings`);
     };
 
+    const handleDeleteConnection = async (connectionId: string) => {
+        try {
+            const res = await fetch(`/api/cms/${connectionId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) throw new Error('Failed to delete connection');
+
+            // Refresh the page or update state
+            router.refresh();
+        } catch (error) {
+            console.error('Error deleting CMS connection:', error);
+            alert('Failed to delete connection. Please try again.');
+        }
+    };
+
     return (
         <div className="space-y-8">
             {/* Subscription & Trial Warnings */}
@@ -205,7 +221,7 @@ export default function DashboardClient({
                         }}
                         canManage={true}
                         onTransfer={handleTransfer}
-                        onDelete={() => { }} // Handle delete
+                        onDelete={handleDeleteConnection}
                     />
                 </div>
             )}

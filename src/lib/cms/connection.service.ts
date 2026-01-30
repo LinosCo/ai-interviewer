@@ -166,6 +166,17 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
 
             const data = await response.json();
 
+            // Additional validation of the response body to avoid false positives
+            if (data.status === 'error' || data.success === false) {
+                const errorMsg = data.message || 'CMS ha restituito un errore nel corpo della risposta';
+                await this.updateConnectionStatus(connectionId, 'ERROR', errorMsg);
+                return {
+                    success: false,
+                    status: 'error',
+                    message: errorMsg
+                };
+            }
+
             // Update connection with capabilities and status
             await prisma.cMSConnection.update({
                 where: { id: connectionId },

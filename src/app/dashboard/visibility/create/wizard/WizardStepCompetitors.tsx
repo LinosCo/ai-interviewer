@@ -11,7 +11,7 @@ interface WizardStepCompetitorsProps {
 
 export function WizardStepCompetitors({ config, setConfig, maxCompetitors = 5 }: WizardStepCompetitorsProps) {
     const [newCompetitor, setNewCompetitor] = useState('');
-    const isLimitReached = config.competitors.length >= maxCompetitors;
+    const isLimitReached = maxCompetitors !== -1 && config.competitors.length >= maxCompetitors;
 
     const addCompetitor = () => {
         if (!newCompetitor.trim()) return;
@@ -51,7 +51,7 @@ export function WizardStepCompetitors({ config, setConfig, maxCompetitors = 5 }:
                         Aggiungi i tuoi principali concorrenti per confrontare la loro visibilità con la tua.
                     </p>
                     <div className="mt-2 text-xs font-semibold text-blue-800">
-                        Limite piano: {config.competitors.length} / {maxCompetitors}
+                        Limite piano: {config.competitors.length} / {maxCompetitors === -1 ? '∞' : maxCompetitors}
                     </div>
                 </div>
             </div>

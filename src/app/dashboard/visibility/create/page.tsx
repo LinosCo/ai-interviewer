@@ -96,16 +96,23 @@ export default function CreateVisibilityWizardPage() {
                     const limitData = await limitRes.json();
 
                     // Extract projects
-                    const orgProjects = limitData.memberships?.[0]?.organization?.projects || [];
+                    const org = limitData.memberships?.[0]?.organization;
+                    const orgProjects = org?.projects || [];
                     setProjects(orgProjects.map((p: any) => ({ id: p.id, name: p.name })));
 
-                    const plan = limitData.memberships?.[0]?.organization?.plan || 'TRIAL';
-                    let maxComp = 2; // Trial default
-                    let maxPrompts = 5;
+                    const tier = org?.subscription?.tier || 'FREE';
 
-                    if (plan === 'STARTER') { maxComp = 0; maxPrompts = 0; }
-                    if (plan === 'PRO') { maxComp = 3; maxPrompts = 45; }
-                    if (plan === 'BUSINESS') { maxComp = 10; maxPrompts = 75; }
+                    // Default limits (from our centralized config logic)
+                    let maxComp = 15;
+                    let maxPrompts = 20;
+
+                    if (tier === 'FREE' || tier === 'STARTER') {
+                        maxComp = 0;
+                        maxPrompts = 0;
+                    } else if (tier === 'TRIAL') {
+                        maxComp = 5;
+                        maxPrompts = 10;
+                    }
 
                     setLimits({ maxCompetitors: maxComp, maxPrompts: maxPrompts });
                 }

@@ -58,11 +58,11 @@ export class CMSConnectionService {
         // Get project to find organization
         const project = await prisma.project.findUnique({
             where: { id: projectId },
-            select: { id: true, organizationId: true, cmsConnectionId: true }
+            include: { cmsConnection: true }
         });
 
         if (!project) throw new Error('Project not found');
-        if (project.cmsConnectionId) throw new Error('Project already has a CMS connection');
+        if (project.cmsConnection) throw new Error('Project already has a CMS connection');
         if (!project.organizationId) throw new Error('Project must belong to an organization');
 
         // Generate credentials
@@ -73,6 +73,7 @@ export class CMSConnectionService {
         const connection = await prisma.cMSConnection.create({
             data: {
                 organizationId: project.organizationId,
+                projectId,
                 name,
                 cmsApiUrl,
                 cmsDashboardUrl,
@@ -88,12 +89,6 @@ export class CMSConnectionService {
                 enabledBy,
                 status: 'PENDING'
             }
-        });
-
-        // Link the initial project
-        await prisma.project.update({
-            where: { id: projectId },
-            data: { cmsConnectionId: connection.id }
         });
 
         // Update webhook URL with connection ID
@@ -293,12 +288,12 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
         userId: string,
         mode: 'MOVE' | 'ASSOCIATE' = 'MOVE'
     ): Promise<{ success: boolean; error?: string }> {
-        // Get source connection with projects and organization
+        // Get source connection with project and organization
         const connection = await prisma.cMSConnection.findUnique({
             where: { id: connectionId },
             include: {
                 organization: true,
-                projects: true
+                project: true
             }
         });
 
@@ -344,9 +339,9 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             // If the user wants to remove others, they can do it via a separate UI action.
         }
 
-        await prisma.project.update({
-            where: { id: targetProjectId },
-            data: { cmsConnectionId: connectionId }
+        await prisma.cMSConnection.update({
+            where: { id: connectionId },
+            data: { projectId: targetProjectId }
         });
 
         // Log the action

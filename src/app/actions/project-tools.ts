@@ -123,7 +123,9 @@ export async function transferCMSConnectionToProject(connectionId: string, targe
     const connection = await prisma.cMSConnection.findUnique({ where: { id: connectionId } });
     if (!connection) throw new Error('Connection not found');
 
+    if (!connection.projectId) throw new Error('Connection is not linked to a project');
     await verifyTransferPermissions(connection.projectId, targetProjectId);
+
 
     await prisma.cMSConnection.update({
         where: { id: connectionId },

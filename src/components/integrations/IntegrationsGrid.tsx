@@ -1,6 +1,8 @@
 'use client';
 
 import { IntegrationCard } from './IntegrationCard';
+import { ConnectionShareDialog } from './ConnectionShareDialog';
+import { ConnectionTransferOrgDialog } from './ConnectionTransferOrgDialog';
 import { useState } from 'react';
 import TransferDialog from '@/components/dashboard/TransferDialog';
 import {
@@ -46,6 +48,13 @@ interface CMSConnection {
 interface Project {
   id: string;
   name: string;
+  organizationId?: string;
+}
+
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 interface IntegrationsGridProps {
@@ -61,7 +70,10 @@ interface IntegrationsGridProps {
   onConfigureGoogle: () => void;
   onDeleteGoogle: (id: string) => Promise<void>;
   projects: Project[];
+  organizations?: Organization[];
   currentProjectId: string;
+  currentOrgId?: string;
+  currentOrgName?: string;
   onRefresh: () => void;
 }
 
@@ -78,10 +90,15 @@ export function IntegrationsGrid({
   onConfigureGoogle,
   onDeleteGoogle,
   projects,
+  organizations = [],
   currentProjectId,
+  currentOrgId = '',
+  currentOrgName = '',
   onRefresh
 }: IntegrationsGridProps) {
   const [transferItem, setTransferItem] = useState<{ id: string; name: string; type: 'MCP' | 'GOOGLE' | 'CMS' } | null>(null);
+  const [shareConnection, setShareConnection] = useState<{ id: string; name: string; type: 'CMS' | 'MCP' } | null>(null);
+  const [transferOrgConnection, setTransferOrgConnection] = useState<{ id: string; name: string; type: 'CMS' | 'MCP' } | null>(null);
 
   const canRead = ['PRO', 'BUSINESS', 'PARTNER'].includes(userPlan);
   const canWrite = ['BUSINESS', 'PARTNER'].includes(userPlan);
@@ -150,6 +167,8 @@ export function IntegrationsGrid({
           onConfigure={() => onConfigureMCP('WORDPRESS')}
           onDelete={wpConnection ? () => onDeleteMCP(wpConnection.id) : undefined}
           onTransfer={wpConnection ? () => setTransferItem({ id: wpConnection.id, name: wpConnection.name, type: 'MCP' }) : undefined}
+          onManageSharing={wpConnection ? () => setShareConnection({ id: wpConnection.id, name: wpConnection.name, type: 'MCP' }) : undefined}
+          onTransferOrg={wpConnection ? () => setTransferOrgConnection({ id: wpConnection.id, name: wpConnection.name, type: 'MCP' }) : undefined}
           disabled={!wpConnection}
           upgradeRequired={!canRead}
         />
@@ -167,6 +186,8 @@ export function IntegrationsGrid({
           onConfigure={() => onConfigureMCP('WOOCOMMERCE')}
           onDelete={wooConnection ? () => onDeleteMCP(wooConnection.id) : undefined}
           onTransfer={wooConnection ? () => setTransferItem({ id: wooConnection.id, name: wooConnection.name, type: 'MCP' }) : undefined}
+          onManageSharing={wooConnection ? () => setShareConnection({ id: wooConnection.id, name: wooConnection.name, type: 'MCP' }) : undefined}
+          onTransferOrg={wooConnection ? () => setTransferOrgConnection({ id: wooConnection.id, name: wooConnection.name, type: 'MCP' }) : undefined}
           disabled={!wooConnection}
           upgradeRequired={!canWrite}
         />
@@ -185,6 +206,8 @@ export function IntegrationsGrid({
           lastSyncAt={cmsConnection?.lastSyncAt}
           lastError={cmsConnection?.lastSyncError}
           onTransfer={cmsConnection ? () => setTransferItem({ id: cmsConnection.id, name: cmsConnection.name, type: 'CMS' }) : undefined}
+          onManageSharing={cmsConnection ? () => setShareConnection({ id: cmsConnection.id, name: cmsConnection.name, type: 'CMS' }) : undefined}
+          onTransferOrg={cmsConnection ? () => setTransferOrgConnection({ id: cmsConnection.id, name: cmsConnection.name, type: 'CMS' }) : undefined}
           disabled={!cmsConnection}
           upgradeRequired={!canWrite}
         />
@@ -209,6 +232,7 @@ export function IntegrationsGrid({
         </div>
       )}
 
+      {/* Transfer Dialog (legacy - project to project) */}
       {transferItem && (
         <TransferDialog
           isOpen={!!transferItem}
@@ -222,6 +246,38 @@ export function IntegrationsGrid({
             if (transferItem.type === 'MCP') await transferMCPConnectionToProject(transferItem.id, targetId);
             if (transferItem.type === 'GOOGLE') await transferGoogleConnectionToProject(transferItem.id, targetId);
             if (transferItem.type === 'CMS') await transferCMSConnectionToProject(transferItem.id, targetId);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {/* Share Connection Dialog (multi-project) */}
+      {shareConnection && (
+        <ConnectionShareDialog
+          isOpen={!!shareConnection}
+          onClose={() => setShareConnection(null)}
+          connectionId={shareConnection.id}
+          connectionName={shareConnection.name}
+          connectionType={shareConnection.type}
+          currentProjectId={currentProjectId}
+          availableProjects={projects}
+          onRefresh={onRefresh}
+        />
+      )}
+
+      {/* Transfer Organization Dialog */}
+      {transferOrgConnection && (
+        <ConnectionTransferOrgDialog
+          isOpen={!!transferOrgConnection}
+          onClose={() => setTransferOrgConnection(null)}
+          connectionId={transferOrgConnection.id}
+          connectionName={transferOrgConnection.name}
+          connectionType={transferOrgConnection.type}
+          currentOrgId={currentOrgId}
+          currentOrgName={currentOrgName}
+          availableOrganizations={organizations}
+          onSuccess={() => {
+            setTransferOrgConnection(null);
             onRefresh();
           }}
         />

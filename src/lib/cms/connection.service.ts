@@ -70,7 +70,7 @@ export class CMSConnectionService {
         const webhookSecret = generateWebhookSecret();
 
         // Create connection record
-        const connection = await prisma.cMSConnection.create({
+        const connection = await (prisma.cMSConnection as any).create({
             data: {
                 organizationId: project.organizationId,
                 projectId,
@@ -294,7 +294,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             include: {
                 organization: true,
                 project: true
-            }
+            } as any
         });
 
         if (!connection) {
@@ -339,7 +339,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             // If the user wants to remove others, they can do it via a separate UI action.
         }
 
-        await prisma.cMSConnection.update({
+        await (prisma.cMSConnection as any).update({
             where: { id: connectionId },
             data: { projectId: targetProjectId }
         });
@@ -522,7 +522,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
      * Get the full status of a CMS connection.
      */
     static async getConnectionStatus(projectId: string) {
-        const connection = await prisma.cMSConnection.findUnique({
+        const connection = await (prisma.cMSConnection as any).findFirst({
             where: { projectId },
             include: {
                 _count: {
@@ -578,7 +578,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
                 suggestionsPublished: statsMap['PUBLISHED'] || 0,
                 suggestionsRejected: statsMap['REJECTED'] || 0,
                 suggestionsFailed: statsMap['FAILED'] || 0,
-                analyticsRecordsCount: connection._count.analytics
+                analyticsRecordsCount: (connection as any)._count.analytics
             },
             audit: {
                 enabledAt: connection.enabledAt,
@@ -592,7 +592,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
      * Get all CMS connections (for admin panel).
      */
     static async getAllConnections() {
-        return prisma.cMSConnection.findMany({
+        return (prisma.cMSConnection as any).findMany({
             include: {
                 project: {
                     select: {
@@ -623,5 +623,322 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             },
             orderBy: { createdAt: 'desc' }
         });
+    }
+
+    /**
+     * NEW MULTI-PROJECT SUPPORT
+     * Associate a CMS connection with a project.
+     * Allows sharing connections across multiple projects.
+     */
+    static async associateProject(
+        connectionId: string,
+        projectId: string,
+        userId: string,
+        role: 'OWNER' | 'EDITOR' | 'VIEWER' = 'VIEWER'
+    ): Promise<{ success: boolean; error?: string }> {
+        // Get connection and verify it exists
+        const connection = await prisma.cMSConnection.findUnique({
+            where: { id: connectionId },
+            include: { organization: true }
+        });
+
+        if (!connection) {
+            return { success: false, error: 'Connection not found' };
+        }
+
+        // Get project and verify it exists
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            include: { organization: true }
+        });
+
+        if (!project) {
+            return { success: false, error: 'Project not found' };
+        }
+
+        // Verify user has permission in the connection's organization
+        const orgMembership = await prisma.membership.findFirst({
+            where: {
+                userId,
+                organizationId: connection.organizationId || '',
+                role: { in: ['OWNER', 'ADMIN'] }
+            }
+        });
+
+        if (!orgMembership) {
+            return { success: false, error: 'Insufficient permissions in the connection organization' };
+        }
+
+        // Check if already associated
+        const existing = await prisma.projectCMSConnection.findUnique({
+            where: {
+                projectId_connectionId: {
+                    projectId,
+                    connectionId
+                }
+            }
+        });
+
+        if (existing) {
+            return { success: false, error: 'Connection already associated with this project' };
+        }
+
+        // Create association
+        await prisma.projectCMSConnection.create({
+            data: {
+                projectId,
+                connectionId,
+                role,
+                createdBy: userId
+            }
+        });
+
+        // Log the action
+        await prisma.integrationLog.create({
+            data: {
+                cmsConnectionId: connectionId,
+                action: 'connection.project_associated',
+                success: true,
+                durationMs: 0,
+                result: {
+                    projectId,
+                    role,
+                    performedBy: userId
+                }
+            }
+        });
+
+        return { success: true };
+    }
+
+    /**
+     * Dissociate a CMS connection from a project.
+     */
+    static async dissociateProject(
+        connectionId: string,
+        projectId: string,
+        userId: string
+    ): Promise<{ success: boolean; error?: string }> {
+        // Verify connection exists
+        const connection = await prisma.cMSConnection.findUnique({
+            where: { id: connectionId },
+            select: { organizationId: true }
+        });
+
+        if (!connection) {
+            return { success: false, error: 'Connection not found' };
+        }
+
+        // Verify user has permission
+        const orgMembership = await prisma.membership.findFirst({
+            where: {
+                userId,
+                organizationId: connection.organizationId || '',
+                role: { in: ['OWNER', 'ADMIN'] }
+            }
+        });
+
+        if (!orgMembership) {
+            return { success: false, error: 'Insufficient permissions' };
+        }
+
+        // Delete association
+        const deleted = await prisma.projectCMSConnection.deleteMany({
+            where: {
+                projectId,
+                connectionId
+            }
+        });
+
+        if (deleted.count === 0) {
+            return { success: false, error: 'Association not found' };
+        }
+
+        // Log the action
+        await prisma.integrationLog.create({
+            data: {
+                cmsConnectionId: connectionId,
+                action: 'connection.project_dissociated',
+                success: true,
+                durationMs: 0,
+                result: {
+                    projectId,
+                    performedBy: userId
+                }
+            }
+        });
+
+        return { success: true };
+    }
+
+    /**
+     * Get all projects associated with a CMS connection.
+     */
+    static async getAssociatedProjects(connectionId: string) {
+        const associations = await prisma.projectCMSConnection.findMany({
+            where: { connectionId },
+            include: {
+                project: {
+                    select: {
+                        id: true,
+                        name: true,
+                        organizationId: true,
+                        organization: {
+                            select: {
+                                id: true,
+                                name: true,
+                                slug: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        return associations.map(assoc => ({
+            projectId: assoc.project.id,
+            projectName: assoc.project.name,
+            organization: assoc.project.organization,
+            role: assoc.role,
+            associatedAt: assoc.createdAt,
+            associatedBy: assoc.createdBy
+        }));
+    }
+
+    /**
+     * Get all CMS connections available to a project.
+     * Includes both direct connections and shared connections.
+     */
+    static async getProjectConnections(projectId: string) {
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { organizationId: true }
+        });
+
+        if (!project || !project.organizationId) {
+            return [];
+        }
+
+        // Get shared connections
+        const shared = await prisma.projectCMSConnection.findMany({
+            where: { projectId },
+            include: {
+                connection: {
+                    select: {
+                        id: true,
+                        name: true,
+                        status: true,
+                        cmsApiUrl: true,
+                        cmsPublicUrl: true,
+                        lastSyncAt: true,
+                        googleAnalyticsConnected: true,
+                        searchConsoleConnected: true
+                    }
+                }
+            }
+        });
+
+        return shared.map(s => ({
+            ...s.connection,
+            associationType: 'SHARED' as const,
+            role: s.role,
+            associatedAt: s.createdAt
+        }));
+    }
+
+    /**
+     * Transfer CMS connection to another organization.
+     * Enhanced version that supports cross-organization transfer.
+     */
+    static async transferToOrganization(
+        connectionId: string,
+        targetOrganizationId: string,
+        userId: string
+    ): Promise<{ success: boolean; error?: string }> {
+        // Get source connection
+        const connection = await prisma.cMSConnection.findUnique({
+            where: { id: connectionId },
+            include: {
+                organization: true,
+                projectShares: {
+                    include: {
+                        project: true
+                    }
+                }
+            }
+        });
+
+        if (!connection) {
+            return { success: false, error: 'Connection not found' };
+        }
+
+        // Verify user has permission in source organization
+        if (connection.organizationId) {
+            const sourceMembership = await prisma.membership.findFirst({
+                where: {
+                    userId,
+                    organizationId: connection.organizationId,
+                    role: { in: ['OWNER', 'ADMIN'] }
+                }
+            });
+
+            if (!sourceMembership) {
+                return { success: false, error: 'Insufficient permissions in source organization' };
+            }
+        }
+
+        // Verify user has permission in target organization
+        const targetMembership = await prisma.membership.findFirst({
+            where: {
+                userId,
+                organizationId: targetOrganizationId,
+                role: { in: ['OWNER', 'ADMIN'] }
+            }
+        });
+
+        if (!targetMembership) {
+            return { success: false, error: 'Insufficient permissions in target organization' };
+        }
+
+        // Verify target organization exists
+        const targetOrg = await prisma.organization.findUnique({
+            where: { id: targetOrganizationId }
+        });
+
+        if (!targetOrg) {
+            return { success: false, error: 'Target organization not found' };
+        }
+
+        // Remove all project associations (they belong to the old org)
+        await prisma.projectCMSConnection.deleteMany({
+            where: { connectionId }
+        });
+
+        // Transfer the connection
+        await prisma.cMSConnection.update({
+            where: { id: connectionId },
+            data: {
+                organizationId: targetOrganizationId,
+                projectId: null // Clear direct project association
+            }
+        });
+
+        // Log the action
+        await prisma.integrationLog.create({
+            data: {
+                cmsConnectionId: connectionId,
+                action: 'connection.organization_transferred',
+                success: true,
+                durationMs: 0,
+                result: {
+                    fromOrganizationId: connection.organizationId,
+                    toOrganizationId: targetOrganizationId,
+                    performedBy: userId
+                }
+            }
+        });
+
+        return { success: true };
     }
 }

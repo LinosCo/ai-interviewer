@@ -170,6 +170,7 @@ model Organization {
   subscriptionStatus     String?
   platformSettingsId     String?                @unique
   cmsConnections         CMSConnection[]
+  mcpConnections         MCPConnection[]
   copilotSessions        CopilotSession[]
   crossChannelInsights   CrossChannelInsight[]
   members                Membership[]
@@ -299,13 +300,15 @@ model Project {
   googleConnection     GoogleConnection?
   itemTransfers        ItemTransferInvite[]       @relation("ProjectItemTransfers")
   mcpConnections       MCPConnection[]
+  cmsShares            ProjectCMSConnection[]
+  mcpShares            ProjectMCPConnection[]
   firstAttributions    PartnerClientAttribution[] @relation("FirstAttributionProject")
 
-  organization         Organization?              @relation(fields: [organizationId], references: [id])
-  owner                User?                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  organization         Organization?      @relation(fields: [organizationId], references: [id])
+  owner                User?              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   accessList           ProjectAccess[]
-  projectTransfersTo   ProjectTransfer[]          @relation("DuplicatedProject")
-  projectTransfersFrom ProjectTransfer[]          @relation("OriginalProject")
+  projectTransfersTo   ProjectTransfer[]  @relation("DuplicatedProject")
+  projectTransfersFrom ProjectTransfer[]  @relation("OriginalProject")
   visibilityConfigs    VisibilityConfig[]
 }
 
@@ -1019,7 +1022,7 @@ model SerpResult {
 }
 
 model CMSConnection {
-  id                        String              @id @default(cuid())
+  id                        String                 @id @default(cuid())
   name                      String
   cmsApiUrl                 String
   cmsDashboardUrl           String?
@@ -1030,35 +1033,36 @@ model CMSConnection {
   webhookSecret             String
   webhookUrl                String
   googleAnalyticsPropertyId String?
-  googleAnalyticsConnected  Boolean             @default(false)
+  googleAnalyticsConnected  Boolean                @default(false)
   searchConsoleSiteUrl      String?
-  searchConsoleConnected    Boolean             @default(false)
+  searchConsoleConnected    Boolean                @default(false)
   googleRefreshToken        String?
   googleTokenExpiresAt      DateTime?
   googleScopes              String[]
-  status                    CMSConnectionStatus @default(PENDING)
+  status                    CMSConnectionStatus    @default(PENDING)
   lastPingAt                DateTime?
   lastSyncAt                DateTime?
   lastSyncError             String?
   capabilities              String[]
   cmsVersion                String?
-  brandingSyncEnabled       Boolean             @default(true)
+  brandingSyncEnabled       Boolean                @default(true)
   lastBrandingSyncAt        DateTime?
   notes                     String?
-  enabledAt                 DateTime            @default(now())
+  enabledAt                 DateTime               @default(now())
   enabledBy                 String
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
   organizationId            String?
-  organization              Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  projectId                 String?             @unique
-  project                   Project?            @relation("NewCMSAssociation", fields: [projectId], references: [id], onDelete: Cascade)
-  projects                  Project[]           @relation("ProjectToCMS")
+  organization              Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId                 String?                @unique
+  project                   Project?               @relation("NewCMSAssociation", fields: [projectId], references: [id], onDelete: Cascade)
+  projects                  Project[]              @relation("ProjectToCMS")
+  projectShares             ProjectCMSConnection[]
   suggestions               CMSSuggestion[]
   webhookLogs               CMSWebhookLog[]
   integrationLogs           IntegrationLog[]
 
-  analytics                 WebsiteAnalytics[]
+  analytics WebsiteAnalytics[]
 
   @@index([organizationId])
 }
@@ -1203,27 +1207,31 @@ model PartnerClientAttribution {
 }
 
 model MCPConnection {
-  id             String            @id @default(cuid())
+  id             String                 @id @default(cuid())
   projectId      String
+  organizationId String?
   type           MCPConnectionType
   name           String
   endpoint       String
   credentials    String
-  status         ConnectionStatus  @default(PENDING)
+  status         ConnectionStatus       @default(PENDING)
   lastPingAt     DateTime?
   lastSyncAt     DateTime?
   lastError      String?
   availableTools String[]
   serverVersion  String?
   serverName     String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
   createdBy      String
   logs           IntegrationLog[]
-  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectShares  ProjectMCPConnection[]
 
   @@unique([projectId, type])
   @@index([projectId, status])
+  @@index([organizationId])
 }
 
 model GoogleConnection {
@@ -1312,6 +1320,36 @@ model ItemTransferInvite {
   @@index([senderId])
   @@index([recipientEmail])
   @@index([token])
+}
+
+model ProjectCMSConnection {
+  id           String        @id @default(cuid())
+  projectId    String
+  connectionId String
+  role         String        @default("VIEWER")
+  createdAt    DateTime      @default(now())
+  createdBy    String?
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection   CMSConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, connectionId])
+  @@index([projectId])
+  @@index([connectionId])
+}
+
+model ProjectMCPConnection {
+  id           String        @id @default(cuid())
+  projectId    String
+  connectionId String
+  role         String        @default("VIEWER")
+  createdAt    DateTime      @default(now())
+  createdBy    String?
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection   MCPConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, connectionId])
+  @@index([projectId])
+  @@index([connectionId])
 }
 
 enum MemberStatus {

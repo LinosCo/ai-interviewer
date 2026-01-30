@@ -25,37 +25,35 @@ export async function GET(request: Request) {
         // Verify user has access to this project
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            include: {
-                memberships: {
-                    include: {
-                        organization: {
-                            include: {
-                                projects: {
-                                    where: { id: projectId },
-                                    include: {
-                                        cmsConnection: true
-                                    }
-                                }
-                            }
+            select: { id: true }
+        });
+
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        const project = await prisma.project.findFirst({
+            where: {
+                id: projectId,
+                organization: {
+                    members: {
+                        some: {
+                            userId: user.id
                         }
                     }
                 }
-            }
+            },
+            include: {
+                cmsConnection: true,
+                newCmsConnection: true
+            } as any
         });
 
-        if (!user || user.memberships.length === 0) {
-            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        if (!project) {
+            return NextResponse.json({ error: 'Project not found or access denied' }, { status: 404 });
         }
 
-        // Find the project with CMS connection
-        let cmsConnection = null;
-        for (const membership of user.memberships) {
-            const project = membership.organization.projects.find(p => p.id === projectId);
-            if (project?.cmsConnection) {
-                cmsConnection = project.cmsConnection;
-                break;
-            }
-        }
+        const cmsConnection = (project as any).newCmsConnection || (project as any).cmsConnection;
 
         if (!cmsConnection) {
             return NextResponse.json({ error: 'CMS integration not enabled for this project' }, { status: 400 });

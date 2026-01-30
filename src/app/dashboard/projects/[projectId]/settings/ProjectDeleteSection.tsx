@@ -61,14 +61,14 @@ export function ProjectDeleteSection({ projectId, projectName }: ProjectDeleteSe
                         Elimina Progetto
                     </CardTitle>
                     <CardDescription>
-                        Elimina definitivamente questo progetto. I tool verranno spostati nel tuo progetto personale.
+                        Elimina definitivamente questo progetto. I tool verranno spostati in un altro dei tuoi progetti.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="p-4 rounded-xl bg-red-50 border border-red-100 flex gap-3">
                         <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                         <div className="text-sm text-red-800">
-                            <strong>Attenzione:</strong> Questa azione non può essere annullata. Tutti i membri perderanno l'accesso a questo progetto. I bot e le configurazioni di visibilità verranno spostati nel tuo progetto personale.
+                            <strong>Attenzione:</strong> Questa azione non può essere annullata. Tutti i membri perderanno l'accesso a questo progetto. I bot e le configurazioni di visibilità verranno spostati in un altro dei tuoi progetti.
                         </div>
                     </div>
                     <Button
@@ -99,7 +99,7 @@ export function ProjectDeleteSection({ projectId, projectName }: ProjectDeleteSe
                                 <strong>Cosa succederà:</strong>
                             </p>
                             <ul className="text-sm text-amber-700 mt-2 space-y-1 list-disc list-inside">
-                                <li>I bot verranno spostati nel tuo progetto personale</li>
+                                <li>I bot verranno spostati in un altro dei tuoi progetti</li>
                                 <li>I brand di visibilità verranno scollegati (potrai riassociarli)</li>
                                 <li>Tutti i membri perderanno l'accesso</li>
                             </ul>

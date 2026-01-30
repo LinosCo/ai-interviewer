@@ -10,6 +10,8 @@ import {
   RefreshCw,
   ExternalLink,
   ArrowLeftRight,
+  Users,
+  Building2,
 } from 'lucide-react';
 
 type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
@@ -26,8 +28,11 @@ interface IntegrationCardProps {
   onConfigure?: () => void;
   onDelete?: () => Promise<void>;
   onTransfer?: () => void;
+  onManageSharing?: () => void;
+  onTransferOrg?: () => void;
   disabled?: boolean;
   upgradeRequired?: boolean;
+  sharedProjectsCount?: number;
 }
 
 const STATUS_CONFIG: Record<ConnectionStatus, {
@@ -102,8 +107,11 @@ export function IntegrationCard({
   onConfigure,
   onDelete,
   onTransfer,
+  onManageSharing,
+  onTransferOrg,
   disabled = false,
   upgradeRequired = false,
+  sharedProjectsCount = 0,
 }: IntegrationCardProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -190,47 +198,80 @@ export function IntegrationCard({
 
       {/* Actions */}
       {!disabled && !upgradeRequired && (
-        <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-          {onTest && (
-            <button
-              onClick={handleTest}
-              disabled={isTesting}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
-              {isTesting ? 'Test...' : 'Testa'}
-            </button>
+        <div className="space-y-2 pt-4 border-t border-gray-100">
+          {/* Multi-project sharing info */}
+          {sharedProjectsCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm">
+              <Users className="w-4 h-4 text-indigo-600" />
+              <span className="text-indigo-700 font-medium">
+                Condivisa con {sharedProjectsCount} {sharedProjectsCount === 1 ? 'progetto' : 'progetti'}
+              </span>
+            </div>
           )}
 
-          {onConfigure && (
-            <button
-              onClick={onConfigure}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <Settings className="w-4 h-4" />
-              Configura
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {onTest && (
+              <button
+                onClick={handleTest}
+                disabled={isTesting}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
+                {isTesting ? 'Test...' : 'Testa'}
+              </button>
+            )}
 
-          {onTransfer && (
-            <button
-              onClick={onTransfer}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
-              title="Trasferisci in un altro progetto"
-            >
-              <ArrowLeftRight className="w-4 h-4" />
-            </button>
-          )}
+            {onConfigure && (
+              <button
+                onClick={onConfigure}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                Configura
+              </button>
+            )}
 
-          {onDelete && (
-            <button
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
+            {onManageSharing && (
+              <button
+                onClick={onManageSharing}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                title="Gestisci condivisione progetti"
+              >
+                <Users className="w-4 h-4" />
+                Condividi
+              </button>
+            )}
+
+            {onTransferOrg && (
+              <button
+                onClick={onTransferOrg}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
+                title="Trasferisci ad altra organizzazione"
+              >
+                <Building2 className="w-4 h-4" />
+              </button>
+            )}
+
+            {onTransfer && (
+              <button
+                onClick={onTransfer}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                title="Trasferisci in un altro progetto"
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+              </button>
+            )}
+
+            {onDelete && (
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       )}
 

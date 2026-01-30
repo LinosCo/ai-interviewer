@@ -97,11 +97,19 @@ export const CreditService = {
 
         // Check if unlimited (ADMIN)
         if (org.plan === PlanType.ADMIN || org.monthlyCreditsLimit === BigInt(-1)) {
-            // Log transaction but don't deduct
+            // Log transaction but don't deduct (still increment monthlyCreditsUsed for monitoring)
+            await prisma.organization.update({
+                where: { id: organizationId },
+                data: {
+                    monthlyCreditsUsed: { increment: BigInt(amount) }
+                }
+            });
+
             await this.logTransaction(organizationId, {
                 amount: BigInt(amount),
                 type: 'usage',
                 action,
+                tool: this.getToolFromAction(action),
                 projectId: options?.projectId,
                 executedById: options?.executedById,
                 description: options?.description,

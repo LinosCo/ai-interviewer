@@ -230,7 +230,14 @@ export async function POST(request: Request) {
             return org;
         });
 
-        return NextResponse.json(result);
+        const serializedOrg = {
+            ...result,
+            monthlyCreditsLimit: result.monthlyCreditsLimit ? result.monthlyCreditsLimit.toString() : null,
+            monthlyCreditsUsed: result.monthlyCreditsUsed ? result.monthlyCreditsUsed.toString() : '0',
+            packCreditsAvailable: result.packCreditsAvailable ? result.packCreditsAvailable.toString() : '0'
+        };
+
+        return NextResponse.json(serializedOrg);
 
     } catch (error) {
         console.error('Error creating organization:', error);

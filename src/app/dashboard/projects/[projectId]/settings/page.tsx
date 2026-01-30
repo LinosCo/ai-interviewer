@@ -97,10 +97,8 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
                 {/* Brand Manager */}
                 <ProjectBrandManager projectId={projectId} projectName={project.name} />
 
-                {/* Delete Project Section - only for non-personal projects */}
-                {!project.isPersonal && (
-                    <ProjectDeleteSection projectId={projectId} projectName={project.name} />
-                )}
+                {/* Delete Project Section */}
+                <ProjectDeleteSection projectId={projectId} projectName={project.name} />
             </div>
         </div>
     );

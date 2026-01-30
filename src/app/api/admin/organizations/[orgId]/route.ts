@@ -128,7 +128,9 @@ export async function PATCH(
         // Serialize BigInts before returning
         const serializedOrg = {
             ...result,
-            monthlyCreditsLimit: result.monthlyCreditsLimit ? result.monthlyCreditsLimit.toString() : null
+            monthlyCreditsLimit: result.monthlyCreditsLimit ? result.monthlyCreditsLimit.toString() : null,
+            monthlyCreditsUsed: result.monthlyCreditsUsed ? result.monthlyCreditsUsed.toString() : '0',
+            packCreditsAvailable: result.packCreditsAvailable ? result.packCreditsAvailable.toString() : '0'
         };
 
         return NextResponse.json(serializedOrg);

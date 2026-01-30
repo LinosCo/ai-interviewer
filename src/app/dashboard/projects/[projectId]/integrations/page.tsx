@@ -39,6 +39,13 @@ interface CMSConnection {
 interface Project {
   id: string;
   name: string;
+  organizationId?: string;
+}
+
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 type UserPlan = 'FREE' | 'STARTER' | 'PRO' | 'BUSINESS' | 'PARTNER';
@@ -53,6 +60,9 @@ export default function IntegrationsPage() {
   const [googleConnection, setGoogleConnection] = useState<GoogleConnection | null>(null);
   const [cmsConnection, setCmsConnection] = useState<CMSConnection | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [currentOrgId, setCurrentOrgId] = useState<string>('');
+  const [currentOrgName, setCurrentOrgName] = useState<string>('');
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
 
   // Fetch all integrations data
@@ -97,6 +107,31 @@ export default function IntegrationsPage() {
       if (projectsRes.ok) {
         const data = await projectsRes.json();
         setProjects(data.projects || []);
+      }
+
+      // Fetch current project organization info
+      try {
+        const projectRes = await fetch(`/api/projects/${projectId}`);
+        if (projectRes.ok) {
+          const projectData = await projectRes.json();
+          if (projectData.project?.organization) {
+            setCurrentOrgId(projectData.project.organization.id);
+            setCurrentOrgName(projectData.project.organization.name);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching project org:', err);
+      }
+
+      // Fetch user's organizations
+      try {
+        const orgsRes = await fetch('/api/organizations');
+        if (orgsRes.ok) {
+          const orgsData = await orgsRes.json();
+          setOrganizations(orgsData.organizations || []);
+        }
+      } catch (err) {
+        console.error('Error fetching organizations:', err);
       }
     } catch (error) {
       console.error('Error fetching integrations:', error);
@@ -194,7 +229,10 @@ export default function IntegrationsPage() {
         onConfigureGoogle={handleConfigureGoogle}
         onDeleteGoogle={handleDeleteGoogle}
         projects={projects}
+        organizations={organizations}
         currentProjectId={projectId}
+        currentOrgId={currentOrgId}
+        currentOrgName={currentOrgName}
         onRefresh={fetchData}
       />
     </div>

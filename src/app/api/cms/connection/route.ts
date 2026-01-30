@@ -16,46 +16,48 @@ export async function GET(request: Request) {
         const url = new URL(request.url);
         const projectId = url.searchParams.get('projectId');
 
-        // Find user's memberships and projects with CMS connections
+        // Verify user exists
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            include: {
-                memberships: {
-                    include: {
-                        organization: {
-                            include: {
-                                projects: {
-                                    where: projectId ? { id: projectId } : undefined,
-                                    include: {
-                                        cmsConnection: true,
-                                        newCmsConnection: true
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            select: { id: true }
         });
 
-        if (!user || user.memberships.length === 0) {
-            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Find the first project with CMS connection (or specific one if projectId provided)
-        let cmsConnection = null;
-        let foundProjectId = null;
-        for (const membership of user.memberships) {
-            for (const project of membership.organization.projects) {
-                const connection = project.newCmsConnection || project.cmsConnection;
-                if (connection) {
-                    cmsConnection = connection;
-                    foundProjectId = project.id;
-                    break;
-                }
-            }
-            if (cmsConnection) break;
+        // Find projects with CMS connections that the user has access to
+        const projects = await prisma.project.findMany({
+            where: {
+                id: projectId || undefined,
+                organization: {
+                    members: {
+                        some: {
+                            userId: user.id
+                        }
+                    }
+                },
+                OR: [
+                    { cmsConnection: { isNot: null } },
+                    { newCmsConnection: { isNot: null } }
+                ] as any
+            },
+            include: {
+                cmsConnection: true,
+                newCmsConnection: true
+            } as any
+        });
+
+        if (projects.length === 0) {
+            return NextResponse.json({
+                enabled: false,
+                message: 'CMS integration is not enabled for this project'
+            });
         }
+
+        const project = projects[0];
+        const cmsConnection = (project as any).newCmsConnection || (project as any).cmsConnection;
+        const foundProjectId = project.id;
 
         if (!cmsConnection) {
             return NextResponse.json({

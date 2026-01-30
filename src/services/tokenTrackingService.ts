@@ -47,7 +47,7 @@ export class TokenTrackingService {
         resourceType?: string;
         resourceId?: string;
     }) {
-        const {
+        let {
             organizationId,
             userId,
             projectId,
@@ -60,6 +60,38 @@ export class TokenTrackingService {
             resourceType,
             resourceId
         } = params;
+
+        // Fallback: if organizationId is missing, try to find it from the user
+        if (!organizationId && (userId || executedById)) {
+            const userWithOrg = await prisma.user.findUnique({
+                where: { id: userId || executedById },
+                include: { memberships: { take: 1 } }
+            });
+            if (userWithOrg?.memberships?.[0]) {
+                organizationId = userWithOrg.memberships[0].organizationId;
+            }
+        }
+
+        if (!organizationId) {
+            console.warn(`[TokenTracking] Missing organizationId for usage: ${operation}`);
+            // Still create tokenLog but skip credit consumption
+            await prisma.tokenLog.create({
+                data: {
+                    organizationId: 'unknown',
+                    userId: userId || executedById || 'system',
+                    inputTokens,
+                    outputTokens,
+                    totalTokens: inputTokens + outputTokens,
+                    category,
+                    model,
+                    operation,
+                    resourceType,
+                    resourceId
+                }
+            }).catch(err => console.error('Failed to create tokenLog fallback:', err));
+
+            return { success: false, error: 'Organization ID missing' };
+        }
 
         const totalTokens = inputTokens + outputTokens;
 

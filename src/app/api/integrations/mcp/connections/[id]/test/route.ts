@@ -38,7 +38,7 @@ export async function POST(
     },
   });
 
-  if (!connection) {
+  if (!connection || !connection.project) {
     return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
   }
 

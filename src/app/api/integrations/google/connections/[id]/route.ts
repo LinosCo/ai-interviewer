@@ -40,7 +40,7 @@ export async function GET(
     },
   });
 
-  if (!connection) {
+  if (!connection || !connection.project) {
     return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
   }
 
@@ -104,7 +104,7 @@ export async function PUT(
     },
   });
 
-  if (!connection) {
+  if (!connection || !connection.project) {
     return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
   }
 
@@ -220,7 +220,7 @@ export async function DELETE(
     },
   });
 
-  if (!connection) {
+  if (!connection || !connection.project) {
     return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
   }
 

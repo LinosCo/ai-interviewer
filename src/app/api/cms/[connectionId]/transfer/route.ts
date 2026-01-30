@@ -13,7 +13,7 @@ export async function POST(
             return new Response('Unauthorized', { status: 401 });
         }
 
-        const { targetProjectId } = await req.json();
+        const { targetProjectId, mode } = await req.json();
 
         if (!targetProjectId) {
             return NextResponse.json(
@@ -25,7 +25,8 @@ export async function POST(
         const result = await CMSConnectionService.transferConnection(
             connectionId,
             targetProjectId,
-            session.user.id
+            session.user.id,
+            mode || 'MOVE'
         );
 
         if (!result.success) {

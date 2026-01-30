@@ -337,7 +337,8 @@ model Project {
   transferredToUserId  String?
 
   bots                 Bot[]
-  cmsConnection        CMSConnection?
+  cmsConnectionId      String?
+  cmsConnection        CMSConnection?        @relation(fields: [cmsConnectionId], references: [id], onDelete: SetNull)
   mcpConnections       MCPConnection[]
   googleConnection     GoogleConnection?
   copilotSessions      CopilotSession[]
@@ -1128,10 +1129,9 @@ model CMSConnection {
   enabledBy                 String
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
-  projectId                 String              @unique
-  project                   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   organizationId            String?
   organization              Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projects                  Project[]
   suggestions               CMSSuggestion[]
   webhookLogs               CMSWebhookLog[]
   analytics                 WebsiteAnalytics[]

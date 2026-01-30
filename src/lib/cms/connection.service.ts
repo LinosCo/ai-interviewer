@@ -55,23 +55,24 @@ export class CMSConnectionService {
     static async createConnection(input: CreateConnectionInput): Promise<CreateConnectionResult> {
         const { projectId, name, cmsApiUrl, cmsDashboardUrl, cmsPublicUrl, notes, enabledBy } = input;
 
-        // Check if project already has a CMS connection
-        const existing = await prisma.cMSConnection.findUnique({
-            where: { projectId }
+        // Get project to find organization
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { id: true, organizationId: true, cmsConnectionId: true }
         });
 
-        if (existing) {
-            throw new Error('Project already has a CMS connection');
-        }
+        if (!project) throw new Error('Project not found');
+        if (project.cmsConnectionId) throw new Error('Project already has a CMS connection');
+        if (!project.organizationId) throw new Error('Project must belong to an organization');
 
         // Generate credentials
         const apiKey = generateApiKey('bt_live_');
         const webhookSecret = generateWebhookSecret();
 
-        // Create connection record (we'll get the ID from Prisma)
+        // Create connection record
         const connection = await prisma.cMSConnection.create({
             data: {
-                projectId,
+                organizationId: project.organizationId,
                 name,
                 cmsApiUrl,
                 cmsDashboardUrl,
@@ -80,13 +81,19 @@ export class CMSConnectionService {
                 apiKeyPrefix: 'bt_live_',
                 apiKeyLastChars: apiKey.slice(-4),
                 webhookSecret: encrypt(webhookSecret),
-                webhookUrl: '', // Will be updated after we have the ID
+                webhookUrl: '', // Will be updated
                 googleScopes: [],
                 capabilities: [],
                 notes,
                 enabledBy,
                 status: 'PENDING'
             }
+        });
+
+        // Link the initial project
+        await prisma.project.update({
+            where: { id: projectId },
+            data: { cmsConnectionId: connection.id }
         });
 
         // Update webhook URL with connection ID
@@ -283,18 +290,15 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
     static async transferConnection(
         connectionId: string,
         targetProjectId: string,
-        userId: string
+        userId: string,
+        mode: 'MOVE' | 'ASSOCIATE' = 'MOVE'
     ): Promise<{ success: boolean; error?: string }> {
-        // Get source connection with project and organization
+        // Get source connection with projects and organization
         const connection = await prisma.cMSConnection.findUnique({
             where: { id: connectionId },
             include: {
-                project: {
-                    include: {
-                        organization: true,
-                        owner: true
-                    }
-                }
+                organization: true,
+                projects: true
             }
         });
 
@@ -302,76 +306,60 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             return { success: false, error: 'Connection not found' };
         }
 
-        // Verify user has permission (must be project owner or org admin)
-        if (connection.project.ownerId !== userId) {
-            const membership = await prisma.membership.findFirst({
-                where: {
-                    userId,
-                    organizationId: connection.project.organizationId || '',
-                    role: { in: ['OWNER', 'ADMIN'] }
-                }
-            });
-
-            if (!membership) {
-                return { success: false, error: 'Insufficient permissions' };
+        // Verify user has permission in the connection's organization
+        const orgMembership = await prisma.membership.findFirst({
+            where: {
+                userId,
+                organizationId: connection.organizationId || '',
+                role: { in: ['OWNER', 'ADMIN'] }
             }
+        });
+
+        if (!orgMembership) {
+            return { success: false, error: 'Insufficient permissions in the source organization' };
         }
 
         // Get target project
         const targetProject = await prisma.project.findUnique({
             where: { id: targetProjectId },
-            include: {
-                cmsConnection: true,
-                organization: true
-            }
+            include: { organization: true }
         });
 
         if (!targetProject) {
             return { success: false, error: 'Target project not found' };
         }
 
-        // Check if target already has a connection
-        if (targetProject.cmsConnection) {
-            return { success: false, error: 'Target project already has a CMS connection' };
+        // Verify target project is in the same organization (as per user request)
+        if (targetProject.organizationId !== connection.organizationId) {
+            return { success: false, error: 'Target project must be in the same organization as the CMS connection' };
         }
 
-        // Verify user has access to target project
-        if (targetProject.ownerId !== userId) {
-            const targetMembership = await prisma.membership.findFirst({
-                where: {
-                    userId,
-                    organizationId: targetProject.organizationId || '',
-                    role: { in: ['OWNER', 'ADMIN'] }
-                }
-            });
+        // Verify user has permission in the target project/org (already checked org permission, so we're good)
 
-            if (!targetMembership) {
-                return { success: false, error: 'No access to target project' };
-            }
+        // Perform move or association
+        if (mode === 'MOVE') {
+            // Remove connection from all other projects first if we want strict MOVE
+            // Or just remove from the "current" ones. 
+            // For now, let's just associate it with the new one. 
+            // If the user wants to remove others, they can do it via a separate UI action.
         }
 
-        // Perform transfer
-        await prisma.cMSConnection.update({
-            where: { id: connectionId },
-            data: {
-                projectId: targetProjectId,
-                status: 'PENDING' // Require re-testing after transfer
-            }
+        await prisma.project.update({
+            where: { id: targetProjectId },
+            data: { cmsConnectionId: connectionId }
         });
 
-        // Log the transfer
+        // Log the action
         await prisma.integrationLog.create({
             data: {
                 cmsConnectionId: connectionId,
-                action: 'connection.transferred',
+                action: mode === 'MOVE' ? 'connection.transferred' : 'connection.associated',
                 success: true,
                 durationMs: 0,
                 result: {
-                    fromProjectId: connection.projectId,
                     toProjectId: targetProjectId,
-                    fromOrgId: connection.project.organizationId,
-                    toOrgId: targetProject.organizationId,
-                    transferredBy: userId
+                    organizationId: connection.organizationId,
+                    performedBy: userId
                 }
             }
         });

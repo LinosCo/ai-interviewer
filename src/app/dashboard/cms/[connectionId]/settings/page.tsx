@@ -89,16 +89,16 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
         }
     };
 
-    const handleTransfer = async () => {
+    const handleTransfer = async (mode: 'MOVE' | 'ASSOCIATE' = 'ASSOCIATE') => {
         if (!targetProjectId) return;
-        if (!confirm('Sei sicuro di voler trasferire questa connessione a un altro progetto?')) return;
+        if (!confirm(mode === 'MOVE' ? 'Sei sicuro di voler trasferire questa connessione?' : 'Sei sicuro di voler associare questa connessione anche a questo progetto?')) return;
 
         setTransferring(true);
         try {
             const res = await fetch(`/api/cms/${params.connectionId}/transfer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetProjectId })
+                body: JSON.stringify({ targetProjectId, mode })
             });
 
             if (!res.ok) {
@@ -106,10 +106,11 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                 throw new Error(data.error || 'Failed to transfer connection');
             }
 
-            showToast("Connessione trasferita con successo", "success");
-            router.push('/dashboard');
+            showToast("Operazione completata con successo", "success");
+            fetchConnection(); // Refresh data
+            setTargetProjectId('');
         } catch (error: any) {
-            showToast(error.message || "Errore durante il trasferimento", "error");
+            showToast(error.message || "Errore durante l'operazione", "error");
         } finally {
             setTransferring(false);
         }
@@ -191,9 +192,17 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                         </div>
 
                         <div className="grid gap-2">
-                            <Label>Project Association</Label>
-                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <span className="font-medium">{connection.project?.name || 'Unknown Project'}</span>
+                            <Label>Project Associations</Label>
+                            <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                {connection.projects && connection.projects.length > 0 ? (
+                                    connection.projects.map((p: any) => (
+                                        <Badge key={p.id} variant="secondary" className="px-2 py-1">
+                                            {p.name}
+                                        </Badge>
+                                    ))
+                                ) : (
+                                    <span className="text-gray-500 italic text-sm">No projects associated</span>
+                                )}
                             </div>
                         </div>
                     </CardContent>
@@ -240,9 +249,9 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <ArrowRightLeft className="w-5 h-5 text-blue-500" />
-                            Trasferisci Connessione
+                            Associa a un altro Progetto
                         </CardTitle>
-                        <CardDescription>Sposta questa connessione in un altro progetto della tua organizzazione.</CardDescription>
+                        <CardDescription>Collega questa connessione CMS a un altro progetto della stessa organizzazione.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-2">
@@ -254,18 +263,21 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                                     value={targetProjectId}
                                 >
                                     <option value="">Seleziona un progetto...</option>
-                                    {projects.filter(p => p.id !== connection.projectId).map(p => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.name} ({p.orgName})
-                                        </option>
-                                    ))}
+                                    {projects
+                                        .filter(p => p.organizationId === connection.organizationId) // Must be same org
+                                        .filter(p => !connection.projects?.some((cp: any) => cp.id === p.id)) // Filter out already associated
+                                        .map(p => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name}
+                                            </option>
+                                        ))}
                                 </select>
                                 <Button
-                                    onClick={handleTransfer}
+                                    onClick={() => handleTransfer('ASSOCIATE')}
                                     disabled={!targetProjectId || transferring}
                                     className="bg-blue-600 hover:bg-blue-700"
                                 >
-                                    {transferring ? 'Trasferimento...' : 'Trasferisci'}
+                                    {transferring ? 'Associazione...' : 'Associa'}
                                 </Button>
                             </div>
                         </div>

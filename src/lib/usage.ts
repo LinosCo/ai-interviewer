@@ -48,7 +48,7 @@ export async function getSubscriptionLimits(subscription: { tier: SubscriptionTi
         cmsEnabled: plan.features.cmsIntegrations,
         chatbotEnabled: plan.features.chatbot,
         aiTipsEnabled: plan.features.aiTips,
-        whiteLabelingEnabled: plan.features.whiteLabeling
+        whiteLabelingEnabled: plan.features.whiteLabel === true || plan.features.whiteLabel === 'conditional'
     };
 }
 

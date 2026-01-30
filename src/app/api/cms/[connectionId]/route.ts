@@ -22,12 +22,11 @@ export async function GET(
         const connection = await prisma.cMSConnection.findUnique({
             where: { id: connectionId },
             include: {
-                project: {
-                    select: {
-                        id: true,
-                        name: true,
-                        organizationId: true
-                    }
+                organization: {
+                    select: { id: true, name: true }
+                },
+                projects: {
+                    select: { id: true, name: true }
                 }
             }
         });
@@ -40,7 +39,7 @@ export async function GET(
         const membership = await prisma.membership.findFirst({
             where: {
                 userId: session.user.id,
-                organizationId: connection.project.organizationId || ''
+                organizationId: connection.organizationId || ''
             }
         });
 
@@ -77,8 +76,7 @@ export async function DELETE(
 
         // Get connection to check permissions
         const connection = await prisma.cMSConnection.findUnique({
-            where: { id: connectionId },
-            include: { project: true }
+            where: { id: connectionId }
         });
 
         if (!connection) {
@@ -96,7 +94,7 @@ export async function DELETE(
         const membership = await prisma.membership.findFirst({
             where: {
                 userId: session.user.id,
-                organizationId: connection.project.organizationId || '',
+                organizationId: connection.organizationId || '',
                 role: { in: ['OWNER', 'ADMIN'] }
             }
         });

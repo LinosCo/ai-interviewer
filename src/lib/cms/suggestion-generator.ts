@@ -51,7 +51,7 @@ export class CMSSuggestionGenerator {
             }
         });
 
-        if (!connection) {
+        if (!connection || !connection.project) {
             throw new Error('CMS connection not found');
         }
 

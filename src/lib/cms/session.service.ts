@@ -53,7 +53,7 @@ export class CMSSessionService {
       include: { project: true }
     });
 
-    if (!connection || connection.projectId !== projectId) {
+    if (!connection || connection.projectId !== projectId || !connection.project) {
       throw new Error('Invalid connection for project');
     }
 

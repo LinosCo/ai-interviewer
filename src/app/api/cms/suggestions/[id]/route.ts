@@ -22,11 +22,7 @@ export async function GET(
         const suggestion = await prisma.cMSSuggestion.findUnique({
             where: { id },
             include: {
-                connection: {
-                    include: {
-                        project: true
-                    }
-                }
+                connection: true
             }
         });
 
@@ -40,7 +36,7 @@ export async function GET(
             include: {
                 memberships: {
                     where: {
-                        organizationId: suggestion.connection.project.organizationId || undefined
+                        organizationId: suggestion.connection.organizationId || undefined
                     }
                 }
             }

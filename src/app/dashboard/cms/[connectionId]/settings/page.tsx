@@ -194,15 +194,20 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                         <div className="grid gap-2">
                             <Label>Project Associations</Label>
                             <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                {connection.projects && connection.projects.length > 0 ? (
-                                    connection.projects.map((p: any) => (
-                                        <Badge key={p.id} variant="secondary" className="px-2 py-1">
-                                            {p.name}
-                                        </Badge>
-                                    ))
-                                ) : (
-                                    <span className="text-gray-500 italic text-sm">No projects associated</span>
-                                )}
+                                {(() => {
+                                    const allAssoc = [
+                                        ...(connection.project ? [connection.project] : []),
+                                        ...(connection.projects || [])
+                                    ];
+                                    if (allAssoc.length > 0) {
+                                        return allAssoc.map((p: any) => (
+                                            <Badge key={p.id} variant="secondary" className="px-2 py-1">
+                                                {p.name}
+                                            </Badge>
+                                        ));
+                                    }
+                                    return <span className="text-gray-500 italic text-sm">No projects associated</span>;
+                                })()}
                             </div>
                         </div>
                     </CardContent>
@@ -265,7 +270,11 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                                     <option value="">Seleziona un progetto...</option>
                                     {projects
                                         .filter(p => p.organizationId === connection.organizationId) // Must be same org
-                                        .filter(p => !connection.projects?.some((cp: any) => cp.id === p.id)) // Filter out already associated
+                                        .filter(p => {
+                                            const isSingular = connection.project?.id === p.id;
+                                            const inPlural = connection.projects?.some((cp: any) => cp.id === p.id);
+                                            return !isSingular && !inPlural;
+                                        }) // Filter out already associated
                                         .map(p => (
                                             <option key={p.id} value={p.id}>
                                                 {p.name}

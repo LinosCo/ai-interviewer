@@ -289,7 +289,9 @@ model Project {
   transferredAt        DateTime?
   transferredToUserId  String?
   transferredFromOrgId String?
-  cmsConnection        CMSConnection?
+  cmsConnectionId      String? // DEPRECATED: use CMSConnection.projectId instead
+  cmsConnection        CMSConnection?             @relation("ProjectToCMS", fields: [cmsConnectionId], references: [id])
+  newCmsConnection     CMSConnection?             @relation("NewCMSAssociation")
   bots                 Bot[]
   copilotSessions      CopilotSession[]
   creditTransactions   CreditTransaction[]
@@ -1050,7 +1052,8 @@ model CMSConnection {
   organizationId            String?
   organization              Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   projectId                 String?             @unique
-  project                   Project?            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project                   Project?            @relation("NewCMSAssociation", fields: [projectId], references: [id], onDelete: Cascade)
+  projects                  Project[]           @relation("ProjectToCMS")
   suggestions               CMSSuggestion[]
   webhookLogs               CMSWebhookLog[]
   integrationLogs           IntegrationLog[]

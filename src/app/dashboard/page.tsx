@@ -33,7 +33,8 @@ export default async function DashboardPage() {
                                         },
                                         orderBy: { updatedAt: 'desc' }
                                     },
-                                    cmsConnection: true
+                                    cmsConnection: true,
+                                    newCmsConnection: true
                                 }
                             }
                         }
@@ -83,7 +84,7 @@ export default async function DashboardPage() {
     const projectsWithCms = organization.projects.map(p => ({
         id: p.id,
         name: p.name,
-        cmsConnection: p.cmsConnection
+        cmsConnection: p.newCmsConnection || p.cmsConnection
     }));
 
     // Serialize BigInts in usage stats

@@ -27,7 +27,8 @@ export async function GET(request: Request) {
                                 projects: {
                                     where: projectId ? { id: projectId } : undefined,
                                     include: {
-                                        cmsConnection: true
+                                        cmsConnection: true,
+                                        newCmsConnection: true
                                     }
                                 }
                             }
@@ -46,8 +47,9 @@ export async function GET(request: Request) {
         let foundProjectId = null;
         for (const membership of user.memberships) {
             for (const project of membership.organization.projects) {
-                if (project.cmsConnection) {
-                    cmsConnection = project.cmsConnection;
+                const connection = project.newCmsConnection || project.cmsConnection;
+                if (connection) {
+                    cmsConnection = connection;
                     foundProjectId = project.id;
                     break;
                 }

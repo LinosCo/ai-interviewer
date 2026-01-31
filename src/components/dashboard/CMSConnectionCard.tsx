@@ -22,6 +22,7 @@ interface CMSConnectionCardProps {
 
 export default function CMSConnectionCard({ connection, canManage, onTransfer, onDelete }: CMSConnectionCardProps) {
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isOpeningDashboard, setIsOpeningDashboard] = useState(false);
 
     const statusColors = {
         ACTIVE: 'bg-green-100 text-green-700 border-green-200',
@@ -46,6 +47,33 @@ export default function CMSConnectionCard({ connection, canManage, onTransfer, o
             await onDelete?.(connection.id);
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleOpenDashboard = async () => {
+        if (isOpeningDashboard) return;
+        setIsOpeningDashboard(true);
+        try {
+            const res = await fetch('/api/cms/dashboard-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId: connection.projectId }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.url) {
+                    window.open(data.url, '_blank');
+                }
+            } else {
+                const error = await res.json();
+                console.error('Failed to get CMS dashboard URL:', error);
+                alert(error.error || 'Impossibile aprire il CMS');
+            }
+        } catch (error) {
+            console.error('Error opening CMS dashboard:', error);
+            alert('Errore durante l\'apertura del CMS');
+        } finally {
+            setIsOpeningDashboard(false);
         }
     };
 
@@ -80,11 +108,13 @@ export default function CMSConnectionCard({ connection, canManage, onTransfer, o
                     </Button>
                 )}
 
-                {canManage && connection.cmsDashboardUrl && (
+                {canManage && connection.cmsDashboardUrl && connection.status === 'ACTIVE' && (
                     <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => window.open(connection.cmsDashboardUrl, '_blank')}
+                        onClick={handleOpenDashboard}
+                        loading={isOpeningDashboard}
+                        loadingText="Apertura..."
                     >
                         <ExternalLink className="w-3.5 h-3.5" />
                         Dashboard CMS

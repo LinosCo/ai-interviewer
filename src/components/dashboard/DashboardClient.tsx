@@ -23,8 +23,11 @@ import {
     Lock,
     Shield,
     Activity,
-    Settings
+    Settings,
+    Globe,
+    ExternalLink
 } from "lucide-react";
+import { useState } from 'react';
 import Link from 'next/link';
 import CMSConnectionCard from '@/components/dashboard/CMSConnectionCard';
 import { useRouter } from 'next/navigation';
@@ -58,6 +61,7 @@ export default function DashboardClient({
 }: DashboardClientProps) {
     const { selectedProject } = useProject();
     const router = useRouter();
+    const [isOpeningCms, setIsOpeningCms] = useState(false);
 
     // Filter content based on selected project
     const isAllProjects = !selectedProject || selectedProject.id === ALL_PROJECTS_OPTION.id;
@@ -96,6 +100,33 @@ export default function DashboardClient({
         } catch (error) {
             console.error('Error deleting CMS connection:', error);
             alert('Failed to delete connection. Please try again.');
+        }
+    };
+
+    const handleOpenCmsDashboard = async () => {
+        if (!selectedProject?.id || isOpeningCms) return;
+        setIsOpeningCms(true);
+        try {
+            const res = await fetch('/api/cms/dashboard-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId: selectedProject.id }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.url) {
+                    window.open(data.url, '_blank');
+                }
+            } else {
+                const error = await res.json();
+                console.error('Failed to get CMS dashboard URL:', error);
+                alert(error.error || 'Impossibile aprire il CMS');
+            }
+        } catch (error) {
+            console.error('Error opening CMS dashboard:', error);
+            alert('Errore durante l\'apertura del CMS');
+        } finally {
+            setIsOpeningCms(false);
         }
     };
 
@@ -318,6 +349,33 @@ export default function DashboardClient({
                         <Sparkles className="w-4 h-4 text-gray-400" />
                         Azioni rapide
                     </h2>
+
+                    {/* CMS Dashboard Quick Access */}
+                    {currentCmsConnection && currentCmsConnection.status === 'ACTIVE' && (
+                        <button
+                            onClick={handleOpenCmsDashboard}
+                            disabled={isOpeningCms}
+                            className="w-full text-left block bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-wait"
+                        >
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <h3 className="text-xl font-semibold mb-2">
+                                        {isOpeningCms ? 'Apertura...' : currentCmsConnection.name || 'Gestisci Sito Web'}
+                                    </h3>
+                                    <p className="text-emerald-100 text-sm">
+                                        Accedi alla dashboard CMS per gestire contenuti e pagine.
+                                    </p>
+                                </div>
+                                <div className="p-2 bg-white/20 rounded-lg">
+                                    {isOpeningCms ? (
+                                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <Globe className="w-6 h-6 text-white" />
+                                    )}
+                                </div>
+                            </div>
+                        </button>
+                    )}
 
                     {/* Create Interview */}
                     {canCreateInterview.allowed ? (

@@ -16,7 +16,9 @@ import {
     CheckCircle2,
     AlertCircle,
     Copy,
-    ArrowRightLeft
+    ArrowRightLeft,
+    Save,
+    Edit3
 } from "lucide-react";
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +28,18 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
     const [loading, setLoading] = useState(true);
     const [regenerating, setRegenerating] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [projects, setProjects] = useState<any[]>([]);
     const [targetProjectId, setTargetProjectId] = useState('');
     const [transferring, setTransferring] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({
+        name: '',
+        cmsApiUrl: '',
+        cmsDashboardUrl: '',
+        cmsPublicUrl: '',
+        notes: ''
+    });
     const router = useRouter();
 
     useEffect(() => {
@@ -61,11 +72,54 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
             if (!res.ok) throw new Error('Failed to fetch connection');
             const data = await res.json();
             setConnection(data);
+            setEditForm({
+                name: data.name || '',
+                cmsApiUrl: data.cmsApiUrl || '',
+                cmsDashboardUrl: data.cmsDashboardUrl || '',
+                cmsPublicUrl: data.cmsPublicUrl || '',
+                notes: data.notes || ''
+            });
         } catch (error) {
             showToast("Failed to load connection details", "error");
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch(`/api/cms/${params.connectionId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editForm)
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to save changes');
+            }
+
+            const updatedConnection = await res.json();
+            setConnection(updatedConnection);
+            setIsEditing(false);
+            showToast("Modifiche salvate con successo", "success");
+        } catch (error: any) {
+            showToast(error.message || "Errore durante il salvataggio", "error");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditForm({
+            name: connection.name || '',
+            cmsApiUrl: connection.cmsApiUrl || '',
+            cmsDashboardUrl: connection.cmsDashboardUrl || '',
+            cmsPublicUrl: connection.cmsPublicUrl || '',
+            notes: connection.notes || ''
+        });
+        setIsEditing(false);
     };
 
     const handleRegenerateKey = async () => {
@@ -173,26 +227,127 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                 {/* Connection Details */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Globe className="w-5 h-5 text-indigo-500" />
-                            Connection Details
-                        </CardTitle>
-                        <CardDescription>Basic information about your CMS connection</CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Globe className="w-5 h-5 text-indigo-500" />
+                                    Dettagli Connessione
+                                </CardTitle>
+                                <CardDescription>Informazioni sulla connessione CMS</CardDescription>
+                            </div>
+                            {!isEditing ? (
+                                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                                    <Edit3 className="w-4 h-4 mr-2" />
+                                    Modifica
+                                </Button>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                                        Annulla
+                                    </Button>
+                                    <Button size="sm" onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                                        <Save className="w-4 h-4 mr-2" />
+                                        {saving ? 'Salvataggio...' : 'Salva'}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-2">
-                            <Label>CMS URL</Label>
-                            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <LinkIcon className="w-4 h-4 text-gray-400" />
-                                <span className="flex-1 font-mono text-sm">{connection.cmsApiUrl}</span>
-                                <Button size="sm" variant="ghost" onClick={() => window.open(connection.cmsApiUrl, '_blank')}>
-                                    Open
-                                </Button>
-                            </div>
+                            <Label>Nome Connessione</Label>
+                            {isEditing ? (
+                                <Input
+                                    value={editForm.name}
+                                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                    placeholder="Nome della connessione CMS"
+                                />
+                            ) : (
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <span className="text-sm font-medium">{connection.name}</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="grid gap-2">
-                            <Label>Project Associations</Label>
+                            <Label>URL API CMS</Label>
+                            {isEditing ? (
+                                <Input
+                                    value={editForm.cmsApiUrl}
+                                    onChange={(e) => setEditForm({ ...editForm, cmsApiUrl: e.target.value })}
+                                    placeholder="https://example.com/api"
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <LinkIcon className="w-4 h-4 text-gray-400" />
+                                    <span className="flex-1 font-mono text-sm">{connection.cmsApiUrl}</span>
+                                    <Button size="sm" variant="ghost" onClick={() => window.open(connection.cmsApiUrl, '_blank')}>
+                                        Apri
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>URL Dashboard CMS</Label>
+                            {isEditing ? (
+                                <Input
+                                    value={editForm.cmsDashboardUrl}
+                                    onChange={(e) => setEditForm({ ...editForm, cmsDashboardUrl: e.target.value })}
+                                    placeholder="https://cms-dashboard.example.com"
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <Globe className="w-4 h-4 text-gray-400" />
+                                    <span className="flex-1 font-mono text-sm">{connection.cmsDashboardUrl || 'Non configurato'}</span>
+                                    {connection.cmsDashboardUrl && (
+                                        <Button size="sm" variant="ghost" onClick={() => window.open(connection.cmsDashboardUrl, '_blank')}>
+                                            Apri
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>URL Sito Pubblico</Label>
+                            {isEditing ? (
+                                <Input
+                                    value={editForm.cmsPublicUrl}
+                                    onChange={(e) => setEditForm({ ...editForm, cmsPublicUrl: e.target.value })}
+                                    placeholder="https://www.example.com"
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <Globe className="w-4 h-4 text-gray-400" />
+                                    <span className="flex-1 font-mono text-sm">{connection.cmsPublicUrl || 'Non configurato'}</span>
+                                    {connection.cmsPublicUrl && (
+                                        <Button size="sm" variant="ghost" onClick={() => window.open(connection.cmsPublicUrl, '_blank')}>
+                                            Apri
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Note</Label>
+                            {isEditing ? (
+                                <textarea
+                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={editForm.notes}
+                                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                                    placeholder="Note aggiuntive sulla connessione..."
+                                />
+                            ) : (
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 min-h-[60px]">
+                                    <span className="text-sm text-gray-600">{connection.notes || 'Nessuna nota'}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Progetti Associati</Label>
                             <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
                                 {(() => {
                                     const allAssoc = [
@@ -206,7 +361,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
                                             </Badge>
                                         ));
                                     }
-                                    return <span className="text-gray-500 italic text-sm">No projects associated</span>;
+                                    return <span className="text-gray-500 italic text-sm">Nessun progetto associato</span>;
                                 })()}
                             </div>
                         </div>

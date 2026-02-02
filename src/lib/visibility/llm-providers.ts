@@ -89,11 +89,11 @@ export const VISIBILITY_PROVIDERS = {
         displayName: 'ChatGPT'
     },
     anthropic: {
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-3-haiku-20240307',
         displayName: 'Claude'
     },
     gemini: {
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.0-flash',
         displayName: 'Gemini'
     }
 } as const;
@@ -146,7 +146,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const anthropicProvider = await getLLMProvider('anthropic');
                 result = await generateText({
-                    model: anthropicProvider('claude-3-5-sonnet-20241022') as any,
+                    model: anthropicProvider('claude-3-haiku-20240307') as any,
                     system: systemPrompt,
                     prompt
                 });
@@ -158,7 +158,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    model: geminiProvider('gemini-1.5-flash') as any,
+                    model: geminiProvider('gemini-2.0-flash') as any,
                     system: systemPrompt,
                     prompt
                 });

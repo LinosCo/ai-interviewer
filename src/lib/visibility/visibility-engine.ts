@@ -48,6 +48,7 @@ export class VisibilityEngine {
                 // Run queries in parallel for all providers
                 const providerPromises = providers.map(async (provider) => {
                     // Query LLM (returns null if failed/missing key)
+                    console.log(`[visibility] Querying ${provider}...`);
                     const llmResult = await queryVisibilityLLM(
                         provider,
                         prompt.text,
@@ -55,7 +56,11 @@ export class VisibilityEngine {
                         config.territory
                     );
 
-                    if (!llmResult) return null; // Skip if failed
+                    if (!llmResult) {
+                        console.log(`[visibility] ${provider} returned null (failed or not configured)`);
+                        return null;
+                    }
+                    console.log(`[visibility] ${provider} returned response (${llmResult.text.length} chars)`);
 
                     // Analyze response
                     const analysis = await this.analyzeResponse(
@@ -65,6 +70,7 @@ export class VisibilityEngine {
                     );
 
                     // Save response
+                    console.log(`[visibility] Saving response for ${provider}...`);
                     const response = await prisma.visibilityResponse.create({
                         data: {
                             scanId: scan.id,
@@ -134,7 +140,9 @@ export class VisibilityEngine {
      */
     private static async analyzeResponse(text: string, brandName: string, competitors: string[]) {
         try {
-            const { model } = await getSystemLLM();
+            console.log(`[visibility] Analyzing response for brand "${brandName}"...`);
+            const { model, provider } = await getSystemLLM();
+            console.log(`[visibility] Using ${provider} for analysis`);
             const { object } = await generateObject({
                 model,
                 schema: AnalysisSchema,
@@ -156,9 +164,10 @@ export class VisibilityEngine {
                 temperature: 0
             });
 
+            console.log(`[visibility] Analysis complete: brandMentioned=${object.brandMentioned}, position=${object.brandPosition}`);
             return object;
         } catch (error) {
-            console.error('Analysis failed:', error);
+            console.error('[visibility] Analysis failed:', error);
             // Fallback default
             return {
                 brandMentioned: false,

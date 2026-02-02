@@ -163,12 +163,10 @@ export async function markInterviewAsCompleted(conversationId: string) {
     if (organizationId) {
         await recordInterviewCompleted(organizationId, conversationId);
 
-        // Trigger Analysis if not already done
-        try {
-            await generateConversationInsightAction(conversationId);
-        } catch (e) {
-            console.error("Auto-analysis failed during completion", e);
-        }
+        // Trigger Analysis in background (fire and forget - don't block completion)
+        // This is an LLM call that can take several seconds
+        generateConversationInsightAction(conversationId)
+            .catch(e => console.error("Auto-analysis failed (background):", e));
     }
 }
 

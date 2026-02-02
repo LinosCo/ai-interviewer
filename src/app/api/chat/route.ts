@@ -223,21 +223,32 @@ async function completeInterview(
     apiKey: string,
     existingProfile: any
 ): Promise<void> {
-    try {
-        const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
-        const extractedProfile = await CandidateExtractor.extractProfile(messages, apiKey, conversationId);
-        if (extractedProfile) {
-            const mergedProfile = { ...extractedProfile, ...existingProfile };
-            await prisma.conversation.update({
-                where: { id: conversationId },
-                data: { candidateProfile: mergedProfile }
-            });
-            console.log("👤 Profile saved:", mergedProfile.email || 'partial');
-        }
-    } catch (e) {
-        console.error("Profile extraction failed:", e);
+    // Run profile extraction and completion marking in PARALLEL
+    // This saves time by not waiting for one before starting the other
+    const [extractedProfile] = await Promise.all([
+        // Profile extraction (slow LLM call)
+        (async () => {
+            try {
+                const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
+                return await CandidateExtractor.extractProfile(messages, apiKey, conversationId);
+            } catch (e) {
+                console.error("Profile extraction failed:", e);
+                return null;
+            }
+        })(),
+        // Mark interview as completed (fast DB call)
+        ChatService.completeInterview(conversationId)
+    ]);
+
+    // Save extracted profile if available
+    if (extractedProfile) {
+        const mergedProfile = { ...extractedProfile, ...existingProfile };
+        await prisma.conversation.update({
+            where: { id: conversationId },
+            data: { candidateProfile: mergedProfile }
+        });
+        console.log("👤 Profile saved:", mergedProfile.email || 'partial');
     }
-    await ChatService.completeInterview(conversationId);
 }
 
 // ============================================================================
@@ -1248,27 +1259,25 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         }
 
         // ====================================================================
-        // 6. SAVE & UPDATE STATE
+        // 6. SAVE & UPDATE STATE (parallelized for speed)
         // ====================================================================
-        await ChatService.saveAssistantMessage(conversationId, responseText);
-
-        // Update topic if changed
-        if (nextTopicId !== currentTopic.id) {
-            await ChatService.updateCurrentTopic(conversationId, nextTopicId);
-        }
-
-        // Save state (cast to any for Prisma JSON compatibility)
-        await prisma.conversation.update({
-            where: { id: conversationId },
-            data: {
-                metadata: nextState as any,
-                currentTopicId: nextTopicId
-            }
-        });
+        // Run save operations in parallel - they're independent
+        await Promise.all([
+            // Save assistant message
+            ChatService.saveAssistantMessage(conversationId, responseText),
+            // Update conversation state (metadata + topic in one query)
+            prisma.conversation.update({
+                where: { id: conversationId },
+                data: {
+                    metadata: nextState as any,
+                    currentTopicId: nextTopicId
+                }
+            })
+        ]);
 
         console.log(`✅ [CHAT_API] Finished. Response sent. Next Phase: ${nextState.phase}`);
 
-        // Memory update (async)
+        // Memory update (fire and forget - don't block response)
         if (lastMessage?.role === 'user') {
             MemoryManager.updateAfterUserResponse(
                 conversationId,

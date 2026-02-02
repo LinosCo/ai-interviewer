@@ -85,16 +85,16 @@ export async function getSystemLLM() {
  */
 export const VISIBILITY_PROVIDERS = {
     openai: {
-        model: 'gpt-4o',
-        displayName: 'OpenAI GPT-4o'
+        model: 'gpt-4o-mini',
+        displayName: 'ChatGPT'
     },
     anthropic: {
         model: 'claude-3-5-sonnet-20241022',
-        displayName: 'Claude 3.5 Sonnet'
+        displayName: 'Claude'
     },
     gemini: {
-        model: 'gemini-1.5-pro',
-        displayName: 'Gemini 1.5 Pro'
+        model: 'gemini-1.5-flash',
+        displayName: 'Gemini'
     }
 } as const;
 
@@ -134,7 +134,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const openaiProvider = await getLLMProvider('openai');
                 result = await generateText({
-                    model: openaiProvider('gpt-4o') as any,
+                    model: openaiProvider('gpt-4o-mini') as any,
                     system: systemPrompt,
                     prompt
                 });
@@ -158,7 +158,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    model: geminiProvider('gemini-1.5-pro') as any,
+                    model: geminiProvider('gemini-1.5-flash') as any,
                     system: systemPrompt,
                     prompt
                 });

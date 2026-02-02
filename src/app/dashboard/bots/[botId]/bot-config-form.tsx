@@ -231,8 +231,8 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                                     <option value="claude-sonnet-4-5-20250929">Claude 4.5 Sonnet (2025-09-29)</option>
                                                 </optgroup>
                                                 <optgroup label="Claude 3.5 (Stable)">
-                                                    <option value="claude-3-5-sonnet-latest">Claude 3.5 Sonnet (Latest)</option>
-                                                    <option value="claude-3-5-haiku-latest">Claude 3.5 Haiku (Fast)</option>
+                                                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                                                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
                                                 </optgroup>
                                             </>
                                         )}

@@ -62,7 +62,7 @@ export class LLMService {
 
         if (provider === 'anthropic') {
             const anthropic = createAnthropic({ apiKey });
-            return anthropic(bot.modelName || 'claude-3-5-sonnet-latest');
+            return anthropic(bot.modelName || 'claude-3-5-sonnet-20241022');
         } else {
             const openai = createOpenAI({ apiKey });
             return openai(bot.modelName || 'gpt-4o');

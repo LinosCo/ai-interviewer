@@ -89,11 +89,11 @@ export const VISIBILITY_PROVIDERS = {
         displayName: 'OpenAI GPT-4o'
     },
     anthropic: {
-        model: 'claude-3-5-sonnet-latest',
+        model: 'claude-3-5-sonnet-20241022',
         displayName: 'Claude 3.5 Sonnet'
     },
     gemini: {
-        model: 'gemini-1.5-pro-latest',
+        model: 'gemini-1.5-pro',
         displayName: 'Gemini 1.5 Pro'
     }
 } as const;
@@ -146,7 +146,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const anthropicProvider = await getLLMProvider('anthropic');
                 result = await generateText({
-                    model: anthropicProvider('claude-3-5-sonnet-latest') as any,
+                    model: anthropicProvider('claude-3-5-sonnet-20241022') as any,
                     system: systemPrompt,
                     prompt
                 });
@@ -158,7 +158,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    model: geminiProvider('gemini-1.5-pro-latest') as any,
+                    model: geminiProvider('gemini-1.5-pro') as any,
                     system: systemPrompt,
                     prompt
                 });

@@ -35,7 +35,7 @@ export async function runInterviewTurn(
             throw new Error("No Anthropic API key configured. Please add one in bot settings or system settings.");
         }
         const anthropicProvider = createAnthropic({ apiKey });
-        model = anthropicProvider(bot.modelName || 'claude-3-5-sonnet-latest');
+        model = anthropicProvider(bot.modelName || 'claude-3-5-sonnet-20241022');
     } else {
         apiKey = bot.openaiApiKey || process.env.OPENAI_API_KEY;
         if (!apiKey) {

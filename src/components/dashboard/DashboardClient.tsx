@@ -77,10 +77,19 @@ export default function DashboardClient({
             allBots.find(b => b.id === r.botId)?.projectId === selectedProject.id
         );
 
-    // Find CMS connection for selected project
+    // Find CMS connection(s) based on selection
     const currentCmsConnection = !isAllProjects
         ? projectsWithCms.find(p => p.id === selectedProject.id)?.cmsConnection
         : null;
+
+    // All CMS connections for "All Projects" view
+    const allCmsConnections = isAllProjects
+        ? projectsWithCms.filter(p => p.cmsConnection).map(p => ({
+            ...p.cmsConnection,
+            projectName: p.name,
+            projectId: p.id
+        }))
+        : [];
 
     // Handle CMS transfer navigation
     const handleTransfer = (connectionId: string) => {
@@ -472,7 +481,7 @@ export default function DashboardClient({
                         </div>
                     </Link>
 
-                    {/* CMS Connection Card (Project Specific) */}
+                    {/* CMS Connection Card(s) */}
                     {currentCmsConnection && (
                         <CMSConnectionCard
                             connection={{
@@ -486,6 +495,19 @@ export default function DashboardClient({
                             onDelete={handleDeleteConnection}
                         />
                     )}
+                    {/* Show all CMS connections when "All Projects" is selected */}
+                    {isAllProjects && allCmsConnections.map((conn: any) => (
+                        <CMSConnectionCard
+                            key={conn.id}
+                            connection={{
+                                ...conn,
+                                status: conn.status || 'ACTIVE'
+                            }}
+                            canManage={true}
+                            onTransfer={handleTransfer}
+                            onDelete={handleDeleteConnection}
+                        />
+                    ))}
                 </div>
 
                 {/* Recent Activity List */}

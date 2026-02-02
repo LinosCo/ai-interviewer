@@ -1,12 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { Plus, Eye, Settings, BarChart3, Building2, Calendar, Zap, AlertCircle } from "lucide-react";
+import { Plus, Eye, Settings, BarChart3, Building2, Calendar, Zap, AlertCircle, Trash2, MoreVertical, ArrowRightLeft, FolderInput } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useProject } from '@/contexts/ProjectContext';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Brand {
     id: string;
@@ -29,10 +40,74 @@ interface BrandsListProps {
 }
 
 export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
-    const { selectedProject, isAllProjectsSelected, loading: projectLoading } = useProject();
+    const { selectedProject, isAllProjectsSelected, loading: projectLoading, projects } = useProject();
     const [brands, setBrands] = useState<Brand[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [movingId, setMovingId] = useState<string | null>(null);
+    const router = useRouter();
+
+    const handleDeleteBrand = async (brandId: string, brandName: string) => {
+        if (!confirm(`Sei sicuro di voler eliminare il brand "${brandName}"? Questa azione eliminerà anche tutti gli scan e i dati associati.`)) {
+            return;
+        }
+
+        setDeletingId(brandId);
+        try {
+            const res = await fetch(`/api/visibility/${brandId}`, {
+                method: 'DELETE'
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to delete brand');
+            }
+
+            // Remove brand from local state
+            setBrands(prev => prev.filter(b => b.id !== brandId));
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Errore durante l\'eliminazione');
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    const handleMoveBrand = async (brandId: string, targetProjectId: string | null, targetProjectName: string) => {
+        if (!confirm(`Vuoi spostare questo brand nel progetto "${targetProjectName}"?`)) {
+            return;
+        }
+
+        setMovingId(brandId);
+        try {
+            const res = await fetch(`/api/visibility/${brandId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectId: targetProjectId })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to move brand');
+            }
+
+            // Update local state
+            setBrands(prev => prev.map(b =>
+                b.id === brandId
+                    ? { ...b, project: targetProjectId ? { id: targetProjectId, name: targetProjectName } : null }
+                    : b
+            ));
+
+            // If viewing a specific project, refresh to show/hide the brand
+            if (!isAllProjectsSelected) {
+                router.refresh();
+            }
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Errore durante lo spostamento');
+        } finally {
+            setMovingId(null);
+        }
+    };
 
     useEffect(() => {
         if (projectLoading) return;
@@ -229,11 +304,66 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                                     Risultati
                                                 </Button>
                                             </Link>
-                                            <Link href={`/dashboard/visibility/create?configId=${brand.id}`}>
-                                                <Button variant="ghost" size="sm" className="gap-1">
-                                                    <Settings className="w-4 h-4" />
-                                                </Button>
-                                            </Link>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="gap-1" disabled={deletingId === brand.id}>
+                                                        {deletingId === brand.id ? (
+                                                            <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                                                        ) : (
+                                                            <MoreVertical className="w-4 h-4" />
+                                                        )}
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem asChild>
+                                                        <Link href={`/dashboard/visibility/create?configId=${brand.id}`} className="flex items-center gap-2">
+                                                            <Settings className="w-4 h-4" />
+                                                            Modifica
+                                                        </Link>
+                                                    </DropdownMenuItem>
+                                                    {projects.length > 0 && (
+                                                        <DropdownMenuSub>
+                                                            <DropdownMenuSubTrigger>
+                                                                <FolderInput className="w-4 h-4 mr-2" />
+                                                                Sposta in progetto
+                                                            </DropdownMenuSubTrigger>
+                                                            <DropdownMenuSubContent>
+                                                                {projects
+                                                                    .filter(p => p.id !== brand.project?.id)
+                                                                    .map(project => (
+                                                                        <DropdownMenuItem
+                                                                            key={project.id}
+                                                                            onClick={() => handleMoveBrand(brand.id, project.id, project.name)}
+                                                                            disabled={movingId === brand.id}
+                                                                        >
+                                                                            {project.name}
+                                                                        </DropdownMenuItem>
+                                                                    ))}
+                                                                {brand.project && (
+                                                                    <>
+                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuItem
+                                                                            onClick={() => handleMoveBrand(brand.id, null, 'Nessun progetto')}
+                                                                            disabled={movingId === brand.id}
+                                                                            className="text-gray-500"
+                                                                        >
+                                                                            Rimuovi da progetto
+                                                                        </DropdownMenuItem>
+                                                                    </>
+                                                                )}
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuSub>
+                                                    )}
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                                        onClick={() => handleDeleteBrand(brand.id, brand.brandName)}
+                                                    >
+                                                        <Trash2 className="w-4 h-4 mr-2" />
+                                                        Elimina
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
                                     </div>
                                 </CardContent>

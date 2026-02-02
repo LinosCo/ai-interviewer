@@ -454,6 +454,24 @@ export default function DashboardClient({
                         </div>
                     </Link>
 
+                    <Link
+                        href="/dashboard/visibility/brands"
+                        className="block platform-card rounded-xl p-4 hover:border-purple-300 transition-colors group"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100">
+                                    <Eye className="w-4 h-4 text-purple-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 text-sm">Brand Monitor</h3>
+                                    <p className="text-gray-500 text-xs">Monitora la visibilità del tuo brand</p>
+                                </div>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                    </Link>
+
                     {/* CMS Connection Card (Project Specific) */}
                     {currentCmsConnection && (
                         <CMSConnectionCard

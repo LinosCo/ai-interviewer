@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Bot, Project, Organization } from '@prisma/client';
 import { colors, gradients, shadows } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
-import { ArrowRight, Play, Clock, Info, Lock } from 'lucide-react';
+import { ArrowRight, Play, Clock, Info, Lock, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
 interface LandingPageProps {
@@ -15,6 +15,8 @@ interface LandingPageProps {
 export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const isPro = bot.project.organization?.plan === 'PRO' || bot.project.organization?.plan === 'BUSINESS' || bot.project.organization?.plan === 'TRIAL';
     const [consentGiven, setConsentGiven] = useState(false);
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageError, setImageError] = useState(false);
 
     // Helper to get video embed URL
     const getEmbedUrl = (url: string) => {
@@ -111,7 +113,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                         </p>
 
                         {/* Media Section */}
-                        {(computedImageUrl || embedUrl) && (
+                        {(computedImageUrl || embedUrl) && !imageError && (
                             <div className="w-full rounded-[2rem] overflow-hidden shadow-2xl border border-gray-100/50 bg-gray-50/50 backdrop-blur-md aspect-video relative group transition-all">
                                 {embedUrl ? (
                                     <iframe
@@ -122,15 +124,26 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                                         allowFullScreen
                                     />
                                 ) : computedImageUrl ? (
-                                    <img
-                                        src={computedImageUrl}
-                                        alt="Cover"
-                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                        onError={(e) => {
-                                            // Fallback if image fails
-                                            (e.target as HTMLImageElement).parentElement!.style.display = 'none';
-                                        }}
-                                    />
+                                    <>
+                                        {/* Loading skeleton */}
+                                        {!imageLoaded && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse">
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <Loader2 className="w-8 h-8 animate-spin" style={{ color: primaryColor }} />
+                                                    <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Caricamento...</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <img
+                                            src={computedImageUrl}
+                                            alt="Cover"
+                                            className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                                            onLoad={() => setImageLoaded(true)}
+                                            onError={() => {
+                                                setImageError(true);
+                                            }}
+                                        />
+                                    </>
                                 ) : null}
                             </div>
                         )}
@@ -202,20 +215,20 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                         <div className="flex flex-col items-center gap-2 mb-4">
                             <span className="text-[10px] uppercase font-bold text-gray-400 tracking-widest">Powered by</span>
                             <a
-                                href="https://voler.ai"
+                                href="https://businesstuner.voler.ai"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-all border border-gray-100 hover:border-gray-200 group"
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-full transition-all border border-gray-100 hover:border-gray-200 group"
                             >
-                                <span className="font-black text-gray-800 text-base tracking-tight group-hover:text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>VOLER</span>
-                                <span className="font-black text-gray-800 text-base tracking-tight group-hover:text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', fontStyle: 'italic' }}>.AI</span>
+                                <Icons.Logo size={20} />
+                                <span className="font-bold text-gray-800 text-sm tracking-tight group-hover:text-gray-900">Business Tuner</span>
                             </a>
                         </div>
 
                         <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-xs font-bold text-gray-400 uppercase tracking-widest">
                             <a href="/privacy" className="transition-colors hover:text-gray-900">Privacy Policy</a>
                             <a href="/terms" className="transition-colors hover:text-gray-900">Termini</a>
-                            <span className="opacity-50">© {new Date().getFullYear()} Voler.ai</span>
+                            <span className="opacity-50">© {new Date().getFullYear()} Business Tuner</span>
                         </div>
 
                         {bot.privacyNotice && (

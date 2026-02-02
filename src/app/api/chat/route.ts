@@ -250,19 +250,27 @@ export async function POST(req: Request) {
         console.log(`\n🚀 [CHAT_API] Processing message for conversation: ${conversationId}`);
 
         // ====================================================================
-        // 1. LOAD DATA
+        // 1. LOAD DATA (with parallel operations for speed)
         // ====================================================================
         const conversation = await ChatService.loadConversation(conversationId, botId);
         const bot = conversation.bot;
         const language = bot.language || 'en';
         const shouldCollectData = (bot as any).collectCandidateData;
-
         const lastMessage = messages[messages.length - 1];
-        if (lastMessage?.role === 'user') {
-            await ChatService.saveUserMessage(conversationId, lastMessage.content);
-        }
 
-        await ChatService.updateProgress(conversationId, Number(effectiveDuration || conversation.effectiveDuration));
+        // Run these operations in parallel - they don't depend on each other
+        const [, , openAIKey, prefetchedModel] = await Promise.all([
+            // Save user message (fire and forget style, but await for consistency)
+            lastMessage?.role === 'user'
+                ? ChatService.saveUserMessage(conversationId, lastMessage.content)
+                : Promise.resolve(null),
+            // Update progress
+            ChatService.updateProgress(conversationId, Number(effectiveDuration || conversation.effectiveDuration)),
+            // Get API key
+            LLMService.getApiKey(bot, 'openai').then(key => key || process.env.OPENAI_API_KEY || ''),
+            // Pre-fetch model (this also warms up the connection)
+            LLMService.getModel(bot)
+        ]);
 
         // Topics
         const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -305,9 +313,6 @@ export async function POST(req: Request) {
 
         // Use calculated budget instead of fixed CONFIG (fallback to CONFIG if not set)
         const scanTurnsPerTopic = state.initialBudget?.scanTurnsPerTopic ?? CONFIG.SCAN_TURNS_PER_TOPIC;
-
-        // API Key
-        const openAIKey = await LLMService.getApiKey(bot, 'openai') || process.env.OPENAI_API_KEY || '';
 
         console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
         console.log(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
@@ -865,7 +870,7 @@ export async function POST(req: Request) {
         // 4. BUILD PROMPT
         // ====================================================================
         const methodology = LLMService.getMethodology();
-        const model = await LLMService.getModel(bot);
+        const model = prefetchedModel; // Use pre-fetched model from parallel init
         const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
 
 

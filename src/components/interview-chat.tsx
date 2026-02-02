@@ -669,7 +669,7 @@ export default function InterviewChat({
             <div className="flex-1 flex flex-col items-center justify-center px-4 pt-32 md:pt-40 pb-48 md:pb-56 w-full max-w-4xl mx-auto relative z-10">
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
-                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
+                {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && (
                     <div className="w-full max-w-2xl mb-4">
                         <motion.div
                             key={`answer-${messages[messages.length - 2].id}`}
@@ -687,8 +687,73 @@ export default function InterviewChat({
                     </div>
                 )}
 
+                {/* Loading/Thinking Indicator - Shows while waiting for AI response */}
+                {isLoading && currentQuestion && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="w-full max-w-2xl"
+                    >
+                        <div className="bg-white/60 backdrop-blur-md border border-white/80 rounded-3xl p-8 shadow-xl">
+                            <div className="flex flex-col items-center gap-5">
+                                {/* Animated thinking dots */}
+                                <div className="relative">
+                                    <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: `${brandColor}15` }}>
+                                        <div className="flex items-center gap-1.5">
+                                            <motion.div
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ background: brandColor }}
+                                                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                                                transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
+                                            />
+                                            <motion.div
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ background: brandColor }}
+                                                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                                                transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
+                                            />
+                                            <motion.div
+                                                className="w-3 h-3 rounded-full"
+                                                style={{ background: brandColor }}
+                                                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
+                                                transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
+                                            />
+                                        </div>
+                                    </div>
+                                    {/* Pulsing ring */}
+                                    <motion.div
+                                        className="absolute inset-0 rounded-full border-2"
+                                        style={{ borderColor: brandColor }}
+                                        animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
+                                        transition={{ duration: 1.5, repeat: Infinity }}
+                                    />
+                                </div>
+
+                                <div className="text-center space-y-2">
+                                    <p className="text-base font-semibold text-gray-700">
+                                        {language?.toLowerCase().startsWith('it') ? 'Sto elaborando la tua risposta...' : 'Processing your answer...'}
+                                    </p>
+                                    <p className="text-sm text-gray-400">
+                                        {language?.toLowerCase().startsWith('it') ? 'Preparando la prossima domanda' : 'Preparing the next question'}
+                                    </p>
+                                </div>
+
+                                {/* Progress bar animation */}
+                                <div className="w-full max-w-xs h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <motion.div
+                                        className="h-full rounded-full"
+                                        style={{ background: brandColor }}
+                                        animate={{ x: ['-100%', '100%'] }}
+                                        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
                 <AnimatePresence mode="wait">
-                    {currentQuestion && (
+                    {currentQuestion && !isLoading && (
                         <motion.div
                             key={currentQuestion.id}
                             initial={{ opacity: 0, y: 30, scale: 0.98 }}
@@ -881,11 +946,17 @@ export default function InterviewChat({
 
                     {!isCompleted && (
                         <div className="mt-4 flex items-center justify-between px-2 opacity-60 text-xs font-medium text-gray-500">
-                            <span className="hidden md:inline-block">{t.pressEnter}</span>
+                            <span className="hidden md:inline-block">{!isLoading && t.pressEnter}</span>
                             <div className="flex items-center gap-1.5 ml-auto">
-                                <div className={`w-2 h-2 rounded-full ${isTyping ? 'animate-pulse' : 'bg-gray-300'}`}
-                                    style={isTyping ? { background: brandColor } : undefined} />
-                                <span>{isTyping ? 'Typing...' : 'Ready'}</span>
+                                <div className={`w-2 h-2 rounded-full ${isLoading ? 'animate-pulse' : isTyping ? 'animate-pulse' : 'bg-gray-300'}`}
+                                    style={(isLoading || isTyping) ? { background: brandColor } : undefined} />
+                                <span>
+                                    {isLoading
+                                        ? (language?.toLowerCase().startsWith('it') ? 'Elaborazione...' : 'Processing...')
+                                        : isTyping
+                                            ? 'Typing...'
+                                            : 'Ready'}
+                                </span>
                             </div>
                         </div>
                     )}

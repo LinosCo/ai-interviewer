@@ -121,9 +121,16 @@ export function LandingFooter() {
           <p className="text-sm text-white/50">
             © {new Date().getFullYear()} Business Tuner. Tutti i diritti riservati.
           </p>
-          <p className="text-sm text-white/50">
-            Made with love in Italia
-          </p>
+          <a
+            href="https://voler.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-white/50 hover:text-white/80 transition-colors flex items-center gap-1.5"
+          >
+            <span>Powered by</span>
+            <span className="font-bold">VOLER</span>
+            <span className="font-bold italic">.AI</span>
+          </a>
         </div>
       </div>
     </footer>

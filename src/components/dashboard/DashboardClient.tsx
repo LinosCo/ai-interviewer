@@ -212,7 +212,7 @@ export default function DashboardClient({
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">
-                        Ciao{user.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋
+                        Ciao{user.name ? `, ${user.name.split(' ')[0]}` : ''}!
                     </h1>
                     <p className="text-gray-500 mt-1">
                         {isAllProjects
@@ -239,23 +239,6 @@ export default function DashboardClient({
                     </Link>
                 </div>
             </div>
-
-            {/* CMS Connection Card (Project Specific) */}
-            {currentCmsConnection && (
-                <div className="grid grid-cols-1">
-                    <CMSConnectionCard
-                        connection={{
-                            ...currentCmsConnection,
-                            projectName: selectedProject?.name || '',
-                            projectId: selectedProject?.id || '',
-                            status: currentCmsConnection.status || 'ACTIVE' // Fallback status
-                        }}
-                        canManage={true}
-                        onTransfer={handleTransfer}
-                        onDelete={handleDeleteConnection}
-                    />
-                </div>
-            )}
 
             {/* Stats Cards Row */}
             <div className="grid md:grid-cols-4 gap-4">
@@ -470,6 +453,21 @@ export default function DashboardClient({
                             <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
                         </div>
                     </Link>
+
+                    {/* CMS Connection Card (Project Specific) */}
+                    {currentCmsConnection && (
+                        <CMSConnectionCard
+                            connection={{
+                                ...currentCmsConnection,
+                                projectName: selectedProject?.name || '',
+                                projectId: selectedProject?.id || '',
+                                status: currentCmsConnection.status || 'ACTIVE'
+                            }}
+                            canManage={true}
+                            onTransfer={handleTransfer}
+                            onDelete={handleDeleteConnection}
+                        />
+                    )}
                 </div>
 
                 {/* Recent Activity List */}

@@ -25,6 +25,9 @@ export async function GET(
                 organization: {
                     select: { id: true, name: true }
                 },
+                project: {
+                    select: { id: true, name: true, organizationId: true }
+                },
                 projects: {
                     select: { id: true, name: true }
                 }
@@ -118,6 +121,9 @@ export async function PATCH(
             include: {
                 organization: {
                     select: { id: true, name: true }
+                },
+                project: {
+                    select: { id: true, name: true, organizationId: true }
                 },
                 projects: {
                     select: { id: true, name: true }

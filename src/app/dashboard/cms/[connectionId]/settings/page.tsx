@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,7 +23,8 @@ import {
 import Link from 'next/link';
 import { Badge } from "@/components/ui/badge";
 
-export default function CMSSettingsPage({ params }: { params: { connectionId: string } }) {
+export default function CMSSettingsPage({ params }: { params: Promise<{ connectionId: string }> }) {
+    const resolvedParams = use(params);
     const [connection, setConnection] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [regenerating, setRegenerating] = useState(false);
@@ -45,7 +46,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
     useEffect(() => {
         fetchConnection();
         fetchProjects();
-    }, [params.connectionId]);
+    }, [resolvedParams.connectionId]);
 
     const fetchProjects = async () => {
         try {
@@ -68,7 +69,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
 
     const fetchConnection = async () => {
         try {
-            const res = await fetch(`/api/cms/${params.connectionId}`);
+            const res = await fetch(`/api/cms/${resolvedParams.connectionId}`);
             if (!res.ok) throw new Error('Failed to fetch connection');
             const data = await res.json();
             setConnection(data);
@@ -89,7 +90,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
     const handleSave = async () => {
         setSaving(true);
         try {
-            const res = await fetch(`/api/cms/${params.connectionId}`, {
+            const res = await fetch(`/api/cms/${resolvedParams.connectionId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(editForm)
@@ -127,7 +128,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
 
         setRegenerating(true);
         try {
-            const res = await fetch(`/api/cms/${params.connectionId}/regenerate-key`, {
+            const res = await fetch(`/api/cms/${resolvedParams.connectionId}/regenerate-key`, {
                 method: 'POST'
             });
 
@@ -149,7 +150,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
 
         setTransferring(true);
         try {
-            const res = await fetch(`/api/cms/${params.connectionId}/transfer`, {
+            const res = await fetch(`/api/cms/${resolvedParams.connectionId}/transfer`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ targetProjectId, mode })
@@ -175,7 +176,7 @@ export default function CMSSettingsPage({ params }: { params: { connectionId: st
 
         setDeleting(true);
         try {
-            const res = await fetch(`/api/cms/${params.connectionId}`, {
+            const res = await fetch(`/api/cms/${resolvedParams.connectionId}`, {
                 method: 'DELETE'
             });
 

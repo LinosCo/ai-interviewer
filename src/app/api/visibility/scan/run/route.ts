@@ -54,27 +54,7 @@ export async function POST(request: Request) {
             );
         }
 
-        // Check 24h cooldown
-        const lastScan = await prisma.visibilityScan.findFirst({
-            where: { configId: config.id },
-            orderBy: { startedAt: 'desc' }
-        });
-
-        if (lastScan) {
-            const hoursSinceLastScan = (Date.now() - new Date(lastScan.startedAt).getTime()) / (1000 * 60 * 60);
-            if (hoursSinceLastScan < 24) {
-                const hoursRemaining = Math.ceil(24 - hoursSinceLastScan);
-                return NextResponse.json(
-                    {
-                        error: `Cooldown attivo. Prossimo scan disponibile tra ${hoursRemaining} ore.`,
-                        cooldownRemaining: hoursRemaining,
-                        nextAvailable: new Date(new Date(lastScan.startedAt).getTime() + 24 * 60 * 60 * 1000).toISOString()
-                    },
-                    { status: 429 }
-                );
-            }
-        }
-
+        // No cooldown - scans only consume AI credits from the plan
         // Run the scan
         const result = await VisibilityEngine.runScan(config.id);
 

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { queryVisibilityLLM, getSystemLLM } from './llm-providers';
+import { queryVisibilityLLM, getSystemLLM, getAdminApiKey } from './llm-providers';
+import { SerpMonitoringEngine } from './serp-monitoring-engine';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { CrossChannelSyncEngine } from '../insights/sync-engine';
@@ -43,9 +44,13 @@ export class VisibilityEngine {
         const providers = ['openai', 'anthropic', 'gemini'] as const;
 
         try {
+            // Check if Google SERP API is configured for AI Overviews
+            const serpApiKey = await getAdminApiKey('GOOGLE_SERP');
+            const hasGoogleAiOverview = !!serpApiKey;
+
             // 3. Iterate over prompts
             for (const prompt of config.prompts) {
-                // Run queries in parallel for all providers
+                // Run queries in parallel for all providers (including Google AI Overview)
                 const providerPromises = providers.map(async (provider) => {
                     // Query LLM (returns null if failed/missing key)
                     console.log(`[visibility] Querying ${provider}...`);
@@ -89,6 +94,45 @@ export class VisibilityEngine {
 
                     return { provider, response };
                 });
+
+                // Add Google AI Overview query (AI-generated box in Google Search results)
+                if (hasGoogleAiOverview) {
+                    providerPromises.push((async () => {
+                        console.log(`[visibility] Querying Google AI Overview...`);
+                        const aiOverviewResult = await SerpMonitoringEngine.checkGoogleAiOverviewVisibility(
+                            config.brandName,
+                            config.competitors.map(c => c.name),
+                            prompt.text,
+                            config.language,
+                            config.territory
+                        );
+
+                        if (!aiOverviewResult.aiOverview) {
+                            console.log(`[visibility] Google AI Overview not available for this query`);
+                            return null;
+                        }
+                        console.log(`[visibility] Google AI Overview returned (${aiOverviewResult.aiOverview.text.length} chars)`);
+
+                        // Save response
+                        const response = await prisma.visibilityResponse.create({
+                            data: {
+                                scanId: scan.id,
+                                promptId: prompt.id,
+                                platform: 'google_ai_overview', // New platform: Google AI Mode / AI Overviews
+                                model: 'ai_overview',
+                                responseText: aiOverviewResult.aiOverview.text,
+                                brandMentioned: aiOverviewResult.brandMentioned,
+                                brandPosition: aiOverviewResult.brandPosition,
+                                competitorPositions: aiOverviewResult.competitorPositions as any,
+                                sentiment: null, // AI Overview doesn't have inherent sentiment
+                                sourcesCited: aiOverviewResult.aiOverview.sources.map(s => s.url),
+                                tokenUsage: { inputTokens: 0, outputTokens: 0 } // N/A for SERP
+                            }
+                        });
+
+                        return { provider: 'google_ai_overview' as const, response };
+                    })());
+                }
 
                 const promptResults = await Promise.all(providerPromises);
                 results.push(...promptResults.filter(r => r !== null));

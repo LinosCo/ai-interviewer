@@ -3,6 +3,7 @@ import { createOpenAI, openai } from '@ai-sdk/openai';
 import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
 import { generateText } from 'ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
  * Get admin-configured API key from GlobalConfig
@@ -99,31 +100,45 @@ export const VISIBILITY_PROVIDERS = {
 } as const;
 
 /**
- * Execute query on LLM with standardized system prompt
- * Returns null if provider is not configured or query fails
+ * Execute query on LLM simulating what a real user would see
+ *
+ * @param provider - The LLM provider to query
+ * @param prompt - The user's query
+ * @param language - Language code (en, it, es, fr, de)
+ * @param territory - Target market (US, IT, etc.)
+ * @param realistic - If true, sends query without system prompt (simulates free user experience)
+ * @returns Response text and token usage, or null if failed
  */
 export async function queryVisibilityLLM(
     provider: 'openai' | 'anthropic' | 'gemini',
     prompt: string,
     language: string = 'en',
-    territory: string = 'US'
+    territory: string = 'US',
+    realistic: boolean = true // Default to realistic mode for accurate simulation
 ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } } | null> {
     try {
-        // Language-specific system prompt
-        const languageInstructions: Record<string, string> = {
-            it: 'Rispondi in italiano.',
-            en: 'Respond in English.',
-            es: 'Responde en español.',
-            fr: 'Répondez en français.',
-            de: 'Antworte auf Deutsch.'
-        };
+        // In realistic mode, we only add minimal language instruction (what free users do)
+        // In guided mode, we use full system prompt for better structured responses
+        let systemPrompt: string | undefined;
 
-        const systemPrompt = `You are an AI assistant helping users discover software solutions and services.
+        if (!realistic) {
+            // Full system prompt (original behavior for internal tasks)
+            const languageInstructions: Record<string, string> = {
+                it: 'Rispondi in italiano.',
+                en: 'Respond in English.',
+                es: 'Responde en español.',
+                fr: 'Répondez en français.',
+                de: 'Antworte auf Deutsch.'
+            };
+
+            systemPrompt = `You are an AI assistant helping users discover software solutions and services.
 Provide a helpful, unbiased list of the top solutions for the user's query.
 Include specific product/service names and brief descriptions.
 Format as a numbered list when appropriate.
 ${languageInstructions[language] || languageInstructions.en}
 Target market: ${territory}`;
+        }
+        // In realistic mode: no system prompt, just the raw user query
 
         let result;
 
@@ -156,13 +171,33 @@ Target market: ${territory}`;
             case 'gemini': {
                 const config = await checkProviderConfiguration('gemini');
                 if (!config.configured) return null;
-                const geminiProvider = await getLLMProvider('gemini');
-                result = await generateText({
-                    model: geminiProvider('gemini-1.5-flash') as any,
-                    system: systemPrompt,
-                    prompt
+
+                // Use native Google SDK to avoid AI SDK v3 compatibility issues
+                const adminKey = await getAdminApiKey('GEMINI');
+                const apiKey = adminKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+                if (!apiKey) return null;
+
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+                // In realistic mode, just send the user prompt directly (simulates free user)
+                const geminiPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
+
+                const geminiResult = await model.generateContent({
+                    contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }]
                 });
-                break;
+
+                const response = geminiResult.response;
+                const text = response.text();
+                const usageMetadata = response.usageMetadata;
+
+                return {
+                    text,
+                    usage: {
+                        inputTokens: usageMetadata?.promptTokenCount ?? 0,
+                        outputTokens: usageMetadata?.candidatesTokenCount ?? 0
+                    }
+                };
             }
 
             default:

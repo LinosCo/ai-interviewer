@@ -261,6 +261,7 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                     name="openaiApiKey"
                                     defaultValue={bot.openaiApiKey || ''}
                                     placeholder="sk-..."
+                                    autoComplete="new-password"
                                     className="w-full border p-2 rounded font-mono"
                                 />
                             </div>
@@ -271,6 +272,7 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                     name="anthropicApiKey"
                                     defaultValue={bot.anthropicApiKey || ''}
                                     placeholder="sk-ant-..."
+                                    autoComplete="new-password"
                                     className="w-full border p-2 rounded font-mono"
                                 />
                             </div>

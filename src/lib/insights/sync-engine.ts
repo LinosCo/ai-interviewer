@@ -32,7 +32,7 @@ const InsightSchema = z.object({
     topicName: z.string(),
     reasoning: z.string(),
     suggestedActions: z.array(ActionSchema),
-    priorityScore: z.number().min(0).max(100)
+    priorityScore: z.number().min(0).max(100).default(50)
 });
 
 const HealthReportSchema = z.object({

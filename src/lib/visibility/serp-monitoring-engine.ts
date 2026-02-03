@@ -225,6 +225,168 @@ export class SerpMonitoringEngine {
     }
 
     /**
+     * Fetch Google AI Overview (AI-generated answer at top of search results)
+     * This simulates what users see when Googling - the AI summary box
+     *
+     * @returns AI Overview data or null if not present
+     */
+    static async fetchGoogleAiOverview(
+        query: string,
+        language: string = 'en',
+        territory: string = 'US'
+    ): Promise<{
+        text: string;
+        sources: Array<{ title: string; url: string; domain: string }>;
+        brandMentioned: boolean;
+        brandPosition: number | null;
+    } | null> {
+        const serpApiKey = await getAdminApiKey('GOOGLE_SERP');
+        if (!serpApiKey) {
+            console.log('[AI Overview] SERP API key not configured');
+            return null;
+        }
+
+        try {
+            // Regular search (not news) to get AI Overview
+            const params = new URLSearchParams({
+                api_key: serpApiKey,
+                q: query,
+                hl: language,
+                gl: territory,
+                num: '10'
+                // Note: No 'tbm' parameter = regular web search which includes AI Overview
+            });
+
+            const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
+
+            if (!response.ok) {
+                const error = await response.text();
+                console.error('[AI Overview] SERP API error:', error);
+                return null;
+            }
+
+            const data = await response.json();
+
+            // Check for AI Overview in the response
+            // SerpAPI returns it as 'ai_overview' for Google's AI-generated summaries
+            const aiOverview = data.ai_overview;
+
+            if (!aiOverview || !aiOverview.text_blocks) {
+                console.log('[AI Overview] No AI Overview in search results');
+                return null;
+            }
+
+            // Extract the text from text_blocks
+            const textBlocks = aiOverview.text_blocks || [];
+            const fullText = textBlocks.map((block: any) => {
+                if (block.type === 'paragraph') {
+                    return block.snippet || '';
+                }
+                if (block.type === 'list' && block.list) {
+                    return block.list.map((item: string) => `• ${item}`).join('\n');
+                }
+                return '';
+            }).filter(Boolean).join('\n\n');
+
+            // Extract sources from AI Overview
+            const sources = (aiOverview.sources || []).map((src: any) => ({
+                title: src.title || '',
+                url: src.link || '',
+                domain: this.extractDomain(src.link || '')
+            }));
+
+            return {
+                text: fullText,
+                sources,
+                brandMentioned: false, // Will be filled by caller after analysis
+                brandPosition: null
+            };
+
+        } catch (error) {
+            console.error('[AI Overview] Failed to fetch:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Run a visibility check on Google AI Overview for a specific query
+     * Returns what users see in the AI Overview box when they Google something
+     */
+    static async checkGoogleAiOverviewVisibility(
+        brandName: string,
+        competitors: string[],
+        query: string,
+        language: string = 'en',
+        territory: string = 'US'
+    ): Promise<{
+        aiOverview: {
+            text: string;
+            sources: Array<{ title: string; url: string; domain: string }>;
+        } | null;
+        brandMentioned: boolean;
+        brandPosition: number | null;
+        competitorPositions: Record<string, number | null>;
+    }> {
+        const overview = await this.fetchGoogleAiOverview(query, language, territory);
+
+        if (!overview) {
+            return {
+                aiOverview: null,
+                brandMentioned: false,
+                brandPosition: null,
+                competitorPositions: {}
+            };
+        }
+
+        // Analyze the AI Overview text for brand mentions
+        const text = overview.text.toLowerCase();
+        const brandLower = brandName.toLowerCase();
+
+        // Check if brand is mentioned
+        const brandMentioned = text.includes(brandLower);
+
+        // Find position (simple: count occurrences before brand mention)
+        let brandPosition: number | null = null;
+        if (brandMentioned) {
+            // Split by common separators and find brand position
+            const parts = text.split(/[,;.\n]/);
+            for (let i = 0; i < parts.length; i++) {
+                if (parts[i].includes(brandLower)) {
+                    brandPosition = i + 1;
+                    break;
+                }
+            }
+        }
+
+        // Check competitor positions
+        const competitorPositions: Record<string, number | null> = {};
+        for (const competitor of competitors) {
+            const compLower = competitor.toLowerCase();
+            if (text.includes(compLower)) {
+                const parts = text.split(/[,;.\n]/);
+                for (let i = 0; i < parts.length; i++) {
+                    if (parts[i].includes(compLower)) {
+                        competitorPositions[competitor] = i + 1;
+                        break;
+                    }
+                }
+            } else {
+                competitorPositions[competitor] = null;
+            }
+        }
+
+        return {
+            aiOverview: {
+                text: overview.text,
+                sources: overview.sources
+            },
+            brandMentioned,
+            brandPosition,
+            competitorPositions
+        };
+    }
+
+    /**
      * Fetch results from Google SERP API
      */
     private static async fetchSerpResults(

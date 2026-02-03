@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, ChevronDown, ChevronUp, ExternalLink, Info, Link2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { AlertCircle, ChevronDown, ChevronUp, ExternalLink, Info, Link2, Globe } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface ScanData {
     id: string;
@@ -108,6 +108,49 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
         .slice(0, 15); // Top 15 sources
 
     const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
+
+    // LLM Platform styling with proper contrast
+    const getLLMBadgeStyle = (platform: string): { bg: string, text: string, border: string, label: string } => {
+        const platformLower = platform.toLowerCase();
+        if (platformLower.includes('openai') || platformLower.includes('gpt')) {
+            return { bg: 'bg-emerald-600', text: 'text-white', border: 'border-emerald-700', label: 'OpenAI' };
+        }
+        if (platformLower.includes('anthropic') || platformLower.includes('claude')) {
+            return { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600', label: 'Anthropic' };
+        }
+        if (platformLower.includes('google') || platformLower.includes('gemini')) {
+            return { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700', label: 'Google' };
+        }
+        if (platformLower.includes('perplexity')) {
+            return { bg: 'bg-cyan-600', text: 'text-white', border: 'border-cyan-700', label: 'Perplexity' };
+        }
+        return { bg: 'bg-slate-600', text: 'text-white', border: 'border-slate-700', label: platform };
+    };
+
+    // Helper to extract domain from URL
+    const extractDomain = (url: string): { domain: string, isUrl: boolean, fullUrl: string } => {
+        try {
+            if (url.startsWith('http')) {
+                const urlObj = new URL(url);
+                return {
+                    domain: urlObj.hostname.replace('www.', ''),
+                    isUrl: true,
+                    fullUrl: url
+                };
+            }
+            // Try to detect if it's a domain without protocol
+            if (url.includes('.') && !url.includes(' ')) {
+                return {
+                    domain: url.replace('www.', ''),
+                    isUrl: true,
+                    fullUrl: `https://${url}`
+                };
+            }
+            return { domain: url, isUrl: false, fullUrl: '' };
+        } catch {
+            return { domain: url, isUrl: false, fullUrl: '' };
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -244,58 +287,78 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                            {sourcesData.map((source, idx) => (
-                                <div
-                                    key={source.source}
-                                    className={`p-3 rounded-lg border transition-colors ${
-                                        source.withBrand > 0
-                                            ? 'bg-green-50 border-green-200'
-                                            : 'bg-slate-50 border-slate-200'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-sm text-slate-900 truncate" title={source.source}>
-                                                {source.source.startsWith('http')
-                                                    ? new URL(source.source).hostname.replace('www.', '')
-                                                    : source.source}
-                                            </p>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-xs text-slate-500">
-                                                    Citato {source.count}x
-                                                </span>
-                                                {source.withBrand > 0 && (
-                                                    <Badge variant="default" className="text-[10px] h-4 px-1.5 bg-green-600">
-                                                        {source.withBrand}x con brand
-                                                    </Badge>
+                            {sourcesData.map((source, idx) => {
+                                const sourceInfo = extractDomain(source.source);
+                                return (
+                                    <div
+                                        key={source.source}
+                                        className={`p-3 rounded-lg border transition-colors ${
+                                            source.withBrand > 0
+                                                ? 'bg-green-50 border-green-200 hover:border-green-300'
+                                                : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Globe className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                                                    {sourceInfo.isUrl ? (
+                                                        <a
+                                                            href={sourceInfo.fullUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="font-semibold text-sm text-blue-700 hover:text-blue-900 hover:underline truncate"
+                                                            title={source.source}
+                                                        >
+                                                            {sourceInfo.domain}
+                                                        </a>
+                                                    ) : (
+                                                        <span className="font-medium text-sm text-slate-900 truncate" title={source.source}>
+                                                            {sourceInfo.domain}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <span className="text-xs text-slate-500 font-medium">
+                                                        Citato {source.count}x
+                                                    </span>
+                                                    {source.withBrand > 0 && (
+                                                        <Badge variant="default" className="text-[10px] h-4 px-1.5 bg-green-600">
+                                                            {source.withBrand}x con brand
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <Badge variant="outline" className="text-[10px] h-5 bg-white">
+                                                    #{idx + 1}
+                                                </Badge>
+                                                {sourceInfo.isUrl && (
+                                                    <a
+                                                        href={sourceInfo.fullUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-500 hover:text-blue-700 transition-colors p-1 rounded hover:bg-blue-50"
+                                                        title="Apri articolo"
+                                                    >
+                                                        <ExternalLink className="w-4 h-4" />
+                                                    </a>
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex flex-col items-end gap-1">
-                                            <Badge variant="outline" className="text-[10px] h-5">
-                                                #{idx + 1}
-                                            </Badge>
-                                            {source.source.startsWith('http') && (
-                                                <a
-                                                    href={source.source}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-slate-400 hover:text-amber-600 transition-colors"
-                                                >
-                                                    <ExternalLink className="w-3.5 h-3.5" />
-                                                </a>
-                                            )}
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {source.platforms.map(p => {
+                                                const pStyle = getLLMBadgeStyle(p);
+                                                return (
+                                                    <span key={p} className={`text-[9px] px-1.5 py-0.5 rounded ${pStyle.bg} ${pStyle.text} font-medium`}>
+                                                        {pStyle.label}
+                                                    </span>
+                                                );
+                                            })}
                                         </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-1 mt-2">
-                                        {source.platforms.map(p => (
-                                            <span key={p} className="text-[9px] px-1.5 py-0.5 bg-white rounded border border-slate-200 text-slate-500 uppercase">
-                                                {p}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         <p className="text-xs text-slate-400 mt-4 text-center">
                             Le fonti evidenziate in verde sono citate quando il brand viene menzionato
@@ -321,7 +384,7 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
 
                             // Find competitors mentioned in this response
                             const mentionedCompetitors = Object.entries(res.competitorPositions)
-                                .filter(([_, pos]) => pos !== null)
+                                .filter((entry) => entry[1] !== null)
                                 .map(([name, pos]) => ({ name, pos }));
 
                             return (
@@ -330,21 +393,30 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                                         className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
                                         onClick={() => setExpandedResponse(isExpanded ? null : res.id)}
                                     >
-                                        <div className="flex-1 space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="capitalize bg-slate-50 border-slate-200">
-                                                    {res.platform} <span className="text-slate-400 ml-1 text-[10px]">({res.model})</span>
-                                                </Badge>
+                                        <div className="flex-1 space-y-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {(() => {
+                                                    const llmStyle = getLLMBadgeStyle(res.platform);
+                                                    return (
+                                                        <Badge className={`${llmStyle.bg} ${llmStyle.text} ${llmStyle.border} border font-semibold px-3 py-1`}>
+                                                            {llmStyle.label}
+                                                            <span className="ml-1.5 opacity-80 text-[10px] font-normal">({res.model})</span>
+                                                        </Badge>
+                                                    );
+                                                })()}
                                                 {res.sentiment && (
-                                                    <Badge variant={
-                                                        res.sentiment === 'positive' ? 'default' :
-                                                            res.sentiment === 'negative' ? 'destructive' : 'secondary'
-                                                    } className="text-[10px] px-2 h-5 flex items-center bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100">
+                                                    <Badge className={`text-[10px] px-2 h-5 flex items-center font-medium ${
+                                                        res.sentiment === 'positive'
+                                                            ? 'bg-green-100 text-green-800 border-green-200'
+                                                            : res.sentiment === 'negative'
+                                                                ? 'bg-red-100 text-red-800 border-red-200'
+                                                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                                                    } border`}>
                                                         {res.sentiment}
                                                     </Badge>
                                                 )}
                                             </div>
-                                            <p className="font-semibold text-slate-900 leading-tight">
+                                            <p className="font-medium text-slate-800 leading-snug text-sm">
                                                 &quot;{res.promptText}&quot;
                                             </p>
                                         </div>
@@ -391,24 +463,30 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                                                             Fonti Citate
                                                         </h5>
                                                         <div className="flex flex-wrap gap-2">
-                                                            {res.sourcesCited.map((source, idx) => (
-                                                                <a
-                                                                    key={idx}
-                                                                    href={source.startsWith('http') ? source : undefined}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border transition-colors ${
-                                                                        source.startsWith('http')
-                                                                            ? 'bg-blue-50 border-blue-100 text-blue-700 hover:bg-blue-100 cursor-pointer'
-                                                                            : 'bg-slate-50 border-slate-200 text-slate-600'
-                                                                    }`}
-                                                                >
-                                                                    {source.startsWith('http')
-                                                                        ? new URL(source).hostname.replace('www.', '')
-                                                                        : source}
-                                                                    {source.startsWith('http') && <ExternalLink className="w-3 h-3" />}
-                                                                </a>
-                                                            ))}
+                                                            {res.sourcesCited.map((source, idx) => {
+                                                                const sInfo = extractDomain(source);
+                                                                return sInfo.isUrl ? (
+                                                                    <a
+                                                                        key={idx}
+                                                                        href={sInfo.fullUrl}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 transition-colors font-medium"
+                                                                        title={source}
+                                                                    >
+                                                                        <Globe className="w-3 h-3" />
+                                                                        {sInfo.domain}
+                                                                        <ExternalLink className="w-3 h-3 opacity-60" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <span
+                                                                        key={idx}
+                                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-md border bg-slate-50 border-slate-200 text-slate-600"
+                                                                    >
+                                                                        {sInfo.domain}
+                                                                    </span>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                 )}

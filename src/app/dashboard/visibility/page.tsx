@@ -239,16 +239,16 @@ export default async function VisibilityPage({
                                             allScans.map((s) => (
                                                 <Link
                                                     key={s.id}
-                                                    href={`/dashboard/visibility?scanId=${s.id}`}
-                                                    className={`flex items-center justify-between p-3 rounded-lg text-sm transition-colors ${activeScan?.id === s.id ? 'bg-amber-50 border-amber-200 border' : 'hover:bg-slate-50 border border-transparent'}`}
+                                                    href={`/dashboard/visibility?brandId=${config.id}&scanId=${s.id}`}
+                                                    className={`flex items-center justify-between p-3 rounded-lg text-sm transition-colors cursor-pointer ${activeScan?.id === s.id ? 'bg-amber-50 border-amber-200 border' : 'hover:bg-slate-50 border border-transparent'}`}
                                                 >
                                                     <div className="flex flex-col">
                                                         <span className="font-medium text-slate-900">
-                                                            {s.completedAt?.toLocaleDateString()}
+                                                            {s.completedAt?.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                         </span>
                                                         <span className="text-[10px] text-slate-500 flex items-center gap-1">
                                                             <Calendar className="w-3 h-3" />
-                                                            {s.completedAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            {s.completedAt?.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     </div>
                                                     <Badge variant={s.score > 50 ? 'default' : 'secondary'} className={s.score > 50 ? 'bg-green-600' : ''}>

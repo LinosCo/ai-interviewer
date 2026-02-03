@@ -10,6 +10,17 @@ interface PromptWithRef {
     referenceUrl?: string | null;
 }
 
+// Strategic context from multiple data sources
+interface StrategicContext {
+    organizationVision?: string;
+    organizationValueProp?: string;
+    knowledgeGaps: Array<{ topic: string; priority: string; evidence: string }>;
+    interviewThemes: Array<{ name: string; category?: string; description?: string; occurrenceCount: number }>;
+    visibilityScanInsights: Array<{ prompt: string; brandMentioned: boolean; position?: number; sentiment?: string }>;
+    chatbotFaqSuggestions: Array<{ question: string; occurrences: number }>;
+    crossChannelInsights: Array<{ topic: string; suggestedActions: any; priorityScore: number }>;
+}
+
 // Zod schemas for structured LLM output
 const PromptCoverageItemSchema = z.object({
     promptText: z.string(),
@@ -28,13 +39,17 @@ const RecommendationSchema = z.object({
         'add_page',
         'modify_content',
         'add_faq',
-        'improve_meta'
+        'improve_meta',
+        'address_knowledge_gap',
+        'leverage_interview_insight',
+        'competitive_positioning'
     ]),
     priority: z.enum(['high', 'medium', 'low']),
     title: z.string(),
     description: z.string(),
     impact: z.string(),
-    relatedPrompts: z.array(z.string()).optional()
+    relatedPrompts: z.array(z.string()).optional(),
+    dataSource: z.string().optional() // Which data source this recommendation came from
 });
 
 const FullAnalysisSchema = z.object({
@@ -69,6 +84,118 @@ const FullAnalysisSchema = z.object({
 
 export class WebsiteAnalysisEngine {
     /**
+     * Fetch strategic context from multiple data sources
+     */
+    private static async fetchStrategicContext(configId: string, organizationId: string): Promise<StrategicContext> {
+        // Fetch organization data
+        const organization = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: { strategicVision: true, valueProposition: true }
+        });
+
+        // Fetch project if linked
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
+            select: { projectId: true }
+        });
+
+        // Get bots for this organization through projects
+        const projects = await prisma.project.findMany({
+            where: { organizationId },
+            select: { id: true }
+        });
+        const projectIds = projects.map(p => p.id);
+
+        const bots = projectIds.length > 0 ? await prisma.bot.findMany({
+            where: { projectId: { in: projectIds } },
+            select: { id: true }
+        }) : [];
+        const botIds = bots.map(b => b.id);
+
+        // Fetch knowledge gaps (what users ask that chatbot can't answer)
+        const knowledgeGaps = botIds.length > 0 ? await prisma.knowledgeGap.findMany({
+            where: {
+                botId: { in: botIds },
+                status: 'pending'
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 15,
+            select: { topic: true, priority: true, evidence: true }
+        }) : [];
+
+        // Fetch interview themes (recurring topics from user interviews)
+        const themes = botIds.length > 0 ? await prisma.theme.findMany({
+            where: { botId: { in: botIds } },
+            include: { _count: { select: { occurrences: true } } },
+            orderBy: { occurrences: { _count: 'desc' } },
+            take: 10
+        }) : [];
+
+        // Fetch recent visibility scan insights
+        const recentScan = await prisma.visibilityScan.findFirst({
+            where: { configId, status: 'completed' },
+            orderBy: { completedAt: 'desc' },
+            include: {
+                responses: {
+                    include: { prompt: true }
+                }
+            }
+        });
+
+        const visibilityScanInsights = recentScan?.responses.map(r => ({
+            prompt: r.prompt.text,
+            brandMentioned: r.brandMentioned,
+            position: r.brandPosition ?? undefined,
+            sentiment: r.sentiment ?? undefined
+        })) || [];
+
+        // Fetch FAQ suggestions (frequently asked questions from chatbot)
+        const faqSuggestions = botIds.length > 0 ? await prisma.faqSuggestion.findMany({
+            where: {
+                botId: { in: botIds },
+                status: 'pending'
+            },
+            orderBy: { occurrences: 'desc' },
+            take: 10,
+            select: { question: true, occurrences: true }
+        }) : [];
+
+        // Fetch cross-channel insights
+        const crossChannelInsights = await prisma.crossChannelInsight.findMany({
+            where: {
+                organizationId,
+                ...(config?.projectId ? { projectId: config.projectId } : {})
+            },
+            orderBy: { priorityScore: 'desc' },
+            take: 5,
+            select: { topicName: true, suggestedActions: true, priorityScore: true }
+        });
+
+        return {
+            organizationVision: organization?.strategicVision ?? undefined,
+            organizationValueProp: organization?.valueProposition ?? undefined,
+            knowledgeGaps: knowledgeGaps.map(g => ({
+                topic: g.topic,
+                priority: g.priority,
+                evidence: typeof g.evidence === 'string' ? g.evidence : JSON.stringify(g.evidence)
+            })),
+            interviewThemes: themes.map(t => ({
+                name: t.name,
+                category: t.category ?? undefined,
+                description: t.description ?? undefined,
+                occurrenceCount: t._count.occurrences
+            })),
+            visibilityScanInsights,
+            chatbotFaqSuggestions: faqSuggestions,
+            crossChannelInsights: crossChannelInsights.map(i => ({
+                topic: i.topicName,
+                suggestedActions: i.suggestedActions,
+                priorityScore: i.priorityScore
+            }))
+        };
+    }
+
+    /**
      * Run a complete website analysis for a config
      */
     static async runAnalysis(analysisId: string) {
@@ -94,12 +221,20 @@ export class WebsiteAnalysisEngine {
         });
 
         try {
-            // 3. Parse additional URLs from config
+            // 3. Fetch strategic context from multiple data sources
+            console.log(`[website-analysis] Fetching strategic context...`);
+            const strategicContext = await this.fetchStrategicContext(
+                analysis.configId,
+                analysis.visibilityConfig.organizationId
+            );
+            console.log(`[website-analysis] Context: ${strategicContext.knowledgeGaps.length} knowledge gaps, ${strategicContext.interviewThemes.length} themes, ${strategicContext.visibilityScanInsights.length} scan insights`);
+
+            // 4. Parse additional URLs from config
             const additionalUrls: AdditionalUrl[] = Array.isArray(analysis.visibilityConfig.additionalUrls)
                 ? (analysis.visibilityConfig.additionalUrls as unknown as AdditionalUrl[])
                 : [];
 
-            // 4. Scrape website content (including subpages and additional URLs)
+            // 5. Scrape website content (including subpages and additional URLs)
             console.log(`[website-analysis] Scraping ${analysis.websiteUrl} with subpages...`);
             if (additionalUrls.length > 0) {
                 console.log(`[website-analysis] Including ${additionalUrls.length} additional user-specified URLs`);
@@ -107,8 +242,8 @@ export class WebsiteAnalysisEngine {
             const scrapedContent = await scrapeWebsiteWithSubpages(analysis.websiteUrl, 8, additionalUrls);
             console.log(`[website-analysis] Scraped ${scrapedContent.pagesScraped} pages, ${scrapedContent.totalContent.length} chars total`);
 
-            // 5. Analyze with LLM
-            console.log(`[website-analysis] Analyzing content...`);
+            // 6. Analyze with LLM
+            console.log(`[website-analysis] Analyzing content with strategic context...`);
             const promptsWithRef: PromptWithRef[] = analysis.visibilityConfig.prompts.map(p => ({
                 text: p.text,
                 referenceUrl: p.referenceUrl
@@ -117,10 +252,11 @@ export class WebsiteAnalysisEngine {
                 scrapedContent,
                 analysis.visibilityConfig.brandName,
                 promptsWithRef,
-                analysis.visibilityConfig.competitors.map(c => c.name)
+                analysis.visibilityConfig.competitors.map(c => c.name),
+                strategicContext
             );
 
-            // 6. Calculate overall score (weighted average)
+            // 7. Calculate overall score (weighted average)
             const overallScore = Math.round(
                 (analysisResult.structuredData.score * 0.15) +
                 (analysisResult.valueProposition.score * 0.30) +
@@ -128,7 +264,7 @@ export class WebsiteAnalysisEngine {
                 (analysisResult.contentClarity.score * 0.20)
             );
 
-            // 7. Prepare prompts addressed data
+            // 8. Prepare prompts addressed data
             const promptsAddressed = {
                 addressed: analysisResult.keywordCoverage.promptsAddressed
                     .filter(p => p.coverageLevel === 'strong' || p.coverageLevel === 'partial')
@@ -138,7 +274,7 @@ export class WebsiteAnalysisEngine {
                     .map(p => p.promptText)
             };
 
-            // 8. Update analysis record
+            // 9. Update analysis record
             await prisma.websiteAnalysis.update({
                 where: { id: analysisId },
                 data: {
@@ -179,13 +315,14 @@ export class WebsiteAnalysisEngine {
     }
 
     /**
-     * Analyze website content using LLM
+     * Analyze website content using LLM with strategic context
      */
     private static async analyzeContent(
         content: MultiPageScrapedContent,
         brandName: string,
         prompts: PromptWithRef[],
-        competitors: string[]
+        competitors: string[],
+        strategicContext: StrategicContext
     ) {
         const { model } = await getSystemLLM();
 
@@ -209,18 +346,32 @@ export class WebsiteAnalysisEngine {
             return line;
         }).join('\n');
 
+        // Build strategic context section
+        const strategicContextSection = this.buildStrategicContextSection(strategicContext);
+
         const { object } = await generateObject({
             model,
             schema: FullAnalysisSchema,
-            prompt: `Sei un esperto di SEO e ottimizzazione per LLM (ChatGPT, Claude, Gemini). Analizza il seguente contenuto di un sito web per valutare quanto è ottimizzato per essere citato dagli assistenti AI.
+            prompt: `Sei un consulente strategico esperto di visibilità AI (LLM come ChatGPT, Claude, Gemini) e SEO.
+La tua analisi deve essere STRATEGICA, SPECIFICA e AZIONABILE - non generica.
+
+Hai accesso a dati multi-canale dell'organizzazione che ti permettono di fare raccomandazioni molto più mirate rispetto a una semplice analisi del sito.
 
 === BRAND ===
 Nome: ${brandName}
 Competitor: ${competitors.join(', ') || 'Non specificati'}
 
+${strategicContext.organizationVision ? `VISIONE STRATEGICA DELL'ORGANIZZAZIONE:
+${strategicContext.organizationVision}` : ''}
+
+${strategicContext.organizationValueProp ? `VALUE PROPOSITION DICHIARATA:
+${strategicContext.organizationValueProp}` : ''}
+
+=== DATI MULTI-CANALE DELL'ORGANIZZAZIONE ===
+${strategicContextSection}
+
 === PROMPTS DA MONITORARE ===
-Questi sono i prompt che gli utenti potrebbero fare agli LLM e per cui il brand vuole essere menzionato.
-Per alcuni prompt è indicato un "URL di riferimento" - questa è la pagina che il brand desidera venga citata come fonte per quella specifica query.
+Questi sono i prompt per cui il brand vuole essere menzionato dagli LLM:
 ${promptsList}
 
 === SITO WEB ANALIZZATO ===
@@ -230,55 +381,114 @@ ${pagesSummary}
 
 Meta Description Homepage: ${content.homepage.description || 'Non presente'}
 
-=== CONTENUTO COMPLETO DEL SITO ===
-(Include homepage e sottopagine principali - primi 10000 caratteri)
+=== CONTENUTO DEL SITO ===
 """
-${content.totalContent.substring(0, 10000)}
+${content.totalContent.substring(0, 12000)}
 """
 
-=== ANALISI RICHIESTA ===
+=== ISTRUZIONI PER L'ANALISI ===
 
-1. STRUCTURED DATA (peso 15%):
-   - Valuta se il sito sembra avere dati strutturati (Schema.org come Organization, Product, FAQPage, etc.)
-   - Identifica quali schemi sarebbero utili per la visibilità LLM
-   - Score: 100 se ben strutturato, 0 se mancano completamente
+La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandazioni generiche tipo "migliora la SEO" o "aggiungi keyword".
 
-2. VALUE PROPOSITION (peso 30%):
-   - Identifica le proposte di valore presenti nel contenuto
-   - Valuta se sono chiare, uniche e differenzianti
-   - Gli LLM citano più facilmente brand con value proposition chiare
-   - Score: basato su chiarezza e unicità
+1. STRUCTURED DATA (15%):
+   - Valuta presenza Schema.org (Organization, Product, FAQPage, HowTo, etc.)
+   - Considera se i knowledge gaps del chatbot potrebbero essere risolti con FAQ strutturate
 
-3. KEYWORD COVERAGE (peso 35%):
-   - Per OGNI prompt di monitoraggio, valuta se il contenuto del sito risponde adeguatamente:
-     - "strong": Il sito ha contenuti che rispondono chiaramente a questa query
-     - "partial": Il sito tocca l'argomento ma non completamente
-     - "weak": Menzione indiretta o superficiale
-     - "missing": Nessun contenuto rilevante
-   - Se un prompt ha un URL di riferimento:
-     - Indica se quella specifica pagina è stata analizzata (referenceUrlCovered: true/false)
-     - Fornisci una nota su come la pagina di riferimento copre il prompt (referenceUrlNote)
-   - Questo è il fattore più importante per la visibilità LLM
-   - Score: basato sulla percentuale di prompt coperti (strong=100%, partial=50%, weak=25%, missing=0%)
+2. VALUE PROPOSITION (30%):
+   - Confronta la value proposition dichiarata con quella comunicata sul sito
+   - Verifica se i temi emersi dalle interviste sono riflessi nel messaggio
+   - Gli LLM preferiscono brand con posizionamento chiaro e differenziante
 
-4. CONTENT CLARITY (peso 20%):
-   - Valuta chiarezza, leggibilità e struttura del contenuto
-   - Gli LLM preferiscono contenuti ben organizzati e facili da comprendere
-   - Identifica punti di forza e debolezze
-   - Score: basato sulla qualità della scrittura
+3. KEYWORD COVERAGE (35%):
+   - Per ogni prompt, valuta la copertura del sito
+   - USA I DATI DEL VISIBILITY SCAN: se un prompt ha performance scarsa, è una priorità
+   - I knowledge gaps del chatbot indicano domande reali degli utenti
 
-5. RECOMMENDATIONS:
-   - Genera 5-8 raccomandazioni concrete e azionabili
-   - Ordina per priorità (high = maggior impatto sulla visibilità LLM)
-   - Ogni raccomandazione deve avere:
-     - Titolo chiaro (azione specifica)
-     - Descrizione dettagliata di cosa fare
-     - Impatto atteso sulla visibilità
-     - Prompt correlati (se applicabile)`,
-            temperature: 0.1
+4. CONTENT CLARITY (20%):
+   - Valuta chiarezza e struttura
+   - Il tono deve essere coerente con i temi delle interviste
+
+5. RECOMMENDATIONS (5-10 raccomandazioni):
+   CRITICHE: Le raccomandazioni devono essere:
+   - SPECIFICHE: "Aggiungi una sezione FAQ che risponda a [domanda specifica da knowledge gap]"
+   - STRATEGICHE: Basate sui dati reali dell'organizzazione
+   - PRIORITIZZATE: Le azioni con maggior impatto sulla visibilità AI prima
+   - MISURABILI: Con impatto chiaro e verificabile
+
+   Per ogni raccomandazione indica:
+   - Titolo: Azione specifica (es: "Crea pagina dedicata a [tema X] emerso dalle interviste")
+   - Descrizione: Dettagli su come implementare
+   - Impatto: Quale metrica migliorerà e perché
+   - dataSource: Da quale fonte dati deriva (es: "knowledge_gap", "interview_theme", "visibility_scan", "chatbot_faq")
+   - relatedPrompts: Quali prompt beneficeranno di questa azione
+
+   Tipi di raccomandazione disponibili:
+   - address_knowledge_gap: Risponde a gap identificato dal chatbot
+   - leverage_interview_insight: Sfrutta insight dalle interviste
+   - competitive_positioning: Miglioramento posizionamento vs competitor
+   - add_structured_data, improve_value_proposition, add_keyword_content, improve_clarity, add_page, modify_content, add_faq, improve_meta`,
+            temperature: 0.2
         });
 
         return object;
+    }
+
+    /**
+     * Build the strategic context section for the prompt
+     */
+    private static buildStrategicContextSection(context: StrategicContext): string {
+        const sections: string[] = [];
+
+        // Knowledge Gaps from Chatbot
+        if (context.knowledgeGaps.length > 0) {
+            sections.push(`📊 KNOWLEDGE GAPS (domande utenti a cui il chatbot non sa rispondere):
+${context.knowledgeGaps.map(g => `- [${g.priority}] ${g.topic}`).join('\n')}
+
+Questi gap rappresentano opportunità concrete: gli utenti cercano queste informazioni ma non le trovano.`);
+        }
+
+        // Interview Themes
+        if (context.interviewThemes.length > 0) {
+            sections.push(`🎤 TEMI RICORRENTI DALLE INTERVISTE UTENTI:
+${context.interviewThemes.map(t => `- "${t.name}" (${t.occurrenceCount} menzioni)${t.description ? ': ' + t.description : ''}`).join('\n')}
+
+Questi temi sono emersi direttamente dalla voce dei clienti e rappresentano ciò che conta per loro.`);
+        }
+
+        // Visibility Scan Results
+        if (context.visibilityScanInsights.length > 0) {
+            const mentioned = context.visibilityScanInsights.filter(i => i.brandMentioned);
+            const notMentioned = context.visibilityScanInsights.filter(i => !i.brandMentioned);
+
+            sections.push(`🔍 RISULTATI ULTIMO VISIBILITY SCAN:
+✅ Prompt dove il brand È MENZIONATO (${mentioned.length}):
+${mentioned.slice(0, 5).map(i => `- "${i.prompt}" - Posizione: ${i.position ?? 'N/A'}, Sentiment: ${i.sentiment ?? 'N/A'}`).join('\n')}
+
+❌ Prompt dove il brand NON È MENZIONATO (${notMentioned.length}):
+${notMentioned.slice(0, 5).map(i => `- "${i.prompt}"`).join('\n')}
+
+PRIORITÀ STRATEGICA: Migliorare la visibilità sui prompt dove il brand non viene menzionato.`);
+        }
+
+        // FAQ Suggestions from Chatbot
+        if (context.chatbotFaqSuggestions.length > 0) {
+            sections.push(`💬 DOMANDE FREQUENTI DAL CHATBOT:
+${context.chatbotFaqSuggestions.map(f => `- "${f.question}" (${f.occurrences} volte)`).join('\n')}
+
+Queste domande vengono poste ripetutamente dagli utenti - il sito dovrebbe rispondere chiaramente.`);
+        }
+
+        // Cross-Channel Insights
+        if (context.crossChannelInsights.length > 0) {
+            sections.push(`🔗 INSIGHT CROSS-CANALE:
+${context.crossChannelInsights.map(i => `- ${i.topic} (priorità: ${i.priorityScore.toFixed(1)})`).join('\n')}`);
+        }
+
+        if (sections.length === 0) {
+            return 'Nessun dato aggiuntivo disponibile. Basa la tua analisi solo sul contenuto del sito.';
+        }
+
+        return sections.join('\n\n');
     }
 
     /**

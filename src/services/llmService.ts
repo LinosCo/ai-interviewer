@@ -65,7 +65,8 @@ export class LLMService {
             return anthropic(bot.modelName || 'claude-3-5-sonnet-20241022');
         } else {
             const openai = createOpenAI({ apiKey });
-            return openai(bot.modelName || 'gpt-4o');
+            // Use gpt-4o-mini for faster responses while maintaining quality
+            return openai(bot.modelName || 'gpt-4o-mini');
         }
     }
 

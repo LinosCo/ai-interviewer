@@ -438,7 +438,7 @@ model Bot {
   maxTurns              Int                  @default(20)
   maxOpenQuestions      Int                  @default(5)
   modelProvider         String               @default("openai")
-  modelName             String               @default("gpt-4o")
+  modelName             String               @default("gpt-4o-mini")
   openaiApiKey          String?
   anthropicApiKey       String?
   logoUrl               String?
@@ -904,6 +904,7 @@ model VisibilityConfig {
   prompts        VisibilityPrompt[]
   scans          VisibilityScan[]
   websiteAnalyses WebsiteAnalysis[]
+  tipActions      TipAction[]
 }
 
 model VisibilityPrompt {
@@ -1011,6 +1012,24 @@ model WebsiteAnalysis {
   visibilityConfig      VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
 
   @@index([configId, completedAt])
+}
+
+model TipAction {
+  id                String           @id @default(cuid())
+  configId          String
+  tipKey            String           // Hash or unique identifier for the tip
+  tipTitle          String           // Title for reference
+  tipType           String           // Type of recommendation
+  status            String           @default("active") // active, completed, dismissed
+  completedAt       DateTime?
+  dismissedAt       DateTime?
+  notes             String?          // Optional notes from user
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  visibilityConfig  VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@unique([configId, tipKey])
+  @@index([configId, status])
 }
 
 model SerpMonitoringScan {

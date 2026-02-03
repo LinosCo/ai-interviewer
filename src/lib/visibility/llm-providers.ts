@@ -83,14 +83,20 @@ export async function getSystemLLM() {
 
 /**
  * Configuration for visibility tracking LLM providers
+ *
+ * IMPORTANT: These models should match what free-tier users actually see
+ * when using each AI assistant's web interface:
+ * - ChatGPT Free: GPT-4o (not mini)
+ * - Claude Free: Claude 3.5 Sonnet (not Haiku)
+ * - Gemini Free: Gemini 2.0 Flash
  */
 export const VISIBILITY_PROVIDERS = {
     openai: {
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         displayName: 'ChatGPT'
     },
     anthropic: {
-        model: 'claude-3-haiku-20240307',
+        model: 'claude-3-5-sonnet-20241022',
         displayName: 'Claude'
     },
     gemini: {
@@ -157,7 +163,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const openaiProvider = await getLLMProvider('openai');
                 result = await generateText({
-                    model: openaiProvider('gpt-4o-mini') as any,
+                    model: openaiProvider(VISIBILITY_PROVIDERS.openai.model) as any,
                     system: systemPrompt,
                     prompt: finalPrompt
                 });
@@ -169,7 +175,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const anthropicProvider = await getLLMProvider('anthropic');
                 result = await generateText({
-                    model: anthropicProvider('claude-3-haiku-20240307') as any,
+                    model: anthropicProvider(VISIBILITY_PROVIDERS.anthropic.model) as any,
                     system: systemPrompt,
                     prompt: finalPrompt
                 });
@@ -186,7 +192,7 @@ Target market: ${territory}`;
                 if (!apiKey) return null;
 
                 const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+                const model = genAI.getGenerativeModel({ model: VISIBILITY_PROVIDERS.gemini.model });
 
                 // In realistic mode, just send the user prompt directly (simulates free user)
                 const geminiPrompt = systemPrompt ? `${systemPrompt}\n\n${finalPrompt}` : finalPrompt;

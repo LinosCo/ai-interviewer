@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Lightbulb,
     RefreshCw,
@@ -15,7 +16,11 @@ import {
     FileText,
     Code,
     Sparkles,
-    Globe
+    Globe,
+    Check,
+    X,
+    Archive,
+    RotateCcw
 } from "lucide-react";
 
 interface Recommendation {
@@ -25,6 +30,16 @@ interface Recommendation {
     description: string;
     impact: string;
     relatedPrompts?: string[];
+}
+
+interface TipAction {
+    id: string;
+    tipKey: string;
+    tipTitle: string;
+    tipType: string;
+    status: 'active' | 'completed' | 'dismissed';
+    completedAt?: string;
+    dismissedAt?: string;
 }
 
 interface WebsiteAnalysis {
@@ -48,21 +63,40 @@ interface AITipsSectionProps {
     websiteUrl?: string | null;
 }
 
+function generateTipKey(title: string, type: string): string {
+    // Simple hash for client-side matching
+    let hash = 0;
+    const str = `${title}-${type}`;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString(16).substring(0, 16);
+}
+
 export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
     const [analysis, setAnalysis] = useState<WebsiteAnalysis | null>(null);
+    const [tipActions, setTipActions] = useState<TipAction[]>([]);
     const [loading, setLoading] = useState(true);
     const [running, setRunning] = useState(false);
     const [expandedRec, setExpandedRec] = useState<number | null>(null);
+    const [activeTab, setActiveTab] = useState('active');
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (websiteUrl) {
-            fetchAnalysis();
-        } else {
-            setLoading(false);
+    const fetchTipActions = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/visibility/tip-actions?configId=${configId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setTipActions(data.tipActions || []);
+            }
+        } catch (error) {
+            console.error('Error fetching tip actions:', error);
         }
-    }, [configId, websiteUrl]);
+    }, [configId]);
 
-    const fetchAnalysis = async () => {
+    const fetchAnalysis = useCallback(async () => {
         try {
             const res = await fetch(`/api/visibility/website-analysis?configId=${configId}`);
             if (res.ok) {
@@ -75,7 +109,16 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [configId]);
+
+    useEffect(() => {
+        if (websiteUrl) {
+            fetchAnalysis();
+            fetchTipActions();
+        } else {
+            setLoading(false);
+        }
+    }, [configId, websiteUrl, fetchAnalysis, fetchTipActions]);
 
     const runAnalysis = async () => {
         if (!websiteUrl) return;
@@ -87,7 +130,6 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                 body: JSON.stringify({ configId })
             });
             if (res.ok) {
-                // Poll for completion
                 const pollInterval = setInterval(async () => {
                     const pollRes = await fetch(`/api/visibility/website-analysis?configId=${configId}`);
                     if (pollRes.ok) {
@@ -100,7 +142,6 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                     }
                 }, 3000);
 
-                // Timeout after 2 minutes
                 setTimeout(() => {
                     clearInterval(pollInterval);
                     setRunning(false);
@@ -111,6 +152,38 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
             console.error('Error running analysis:', error);
             setRunning(false);
         }
+    };
+
+    const handleTipAction = async (rec: Recommendation, action: 'complete' | 'dismiss' | 'restore') => {
+        const tipKey = generateTipKey(rec.title, rec.type);
+        setActionLoading(tipKey);
+
+        try {
+            const res = await fetch('/api/visibility/tip-actions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    configId,
+                    tipTitle: rec.title,
+                    tipType: rec.type,
+                    action
+                })
+            });
+
+            if (res.ok) {
+                await fetchTipActions();
+            }
+        } catch (error) {
+            console.error('Error updating tip action:', error);
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const getTipStatus = (rec: Recommendation): 'active' | 'completed' | 'dismissed' => {
+        const tipKey = generateTipKey(rec.title, rec.type);
+        const action = tipActions.find(a => a.tipKey === tipKey);
+        return action?.status || 'active';
     };
 
     const getScoreColor = (score: number) => {
@@ -143,6 +216,12 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
         return <Icon className="w-4 h-4" />;
     };
 
+    // Filter recommendations by status
+    const activeRecs = analysis?.recommendations?.filter(rec => getTipStatus(rec) === 'active') || [];
+    const completedRecs = analysis?.recommendations?.filter(rec => getTipStatus(rec) === 'completed') || [];
+    const dismissedRecs = analysis?.recommendations?.filter(rec => getTipStatus(rec) === 'dismissed') || [];
+    const archivedRecs = [...completedRecs, ...dismissedRecs];
+
     if (!websiteUrl) {
         return (
             <Card className="border-dashed border-2">
@@ -167,6 +246,116 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
             </Card>
         );
     }
+
+    const renderRecommendation = (rec: Recommendation, idx: number, showActions: boolean = true) => {
+        const tipKey = generateTipKey(rec.title, rec.type);
+        const status = getTipStatus(rec);
+        const isLoading = actionLoading === tipKey;
+
+        return (
+            <div
+                key={`${rec.title}-${idx}`}
+                className={`bg-white rounded-lg border overflow-hidden ${
+                    status === 'completed' ? 'border-green-200 bg-green-50/30' :
+                    status === 'dismissed' ? 'border-slate-200 opacity-60' :
+                    'border-slate-200'
+                }`}
+            >
+                <div
+                    className="p-2 flex items-center justify-between cursor-pointer hover:bg-slate-50"
+                    onClick={() => setExpandedRec(expandedRec === idx ? null : idx)}
+                >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className={`p-1 rounded shrink-0 ${
+                            status === 'completed' ? 'bg-green-100' :
+                            status === 'dismissed' ? 'bg-slate-100' :
+                            'bg-slate-100'
+                        }`}>
+                            {status === 'completed' ? (
+                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            ) : (
+                                getTypeIcon(rec.type)
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className={`font-medium text-xs truncate ${
+                                status === 'completed' ? 'text-green-700 line-through' :
+                                status === 'dismissed' ? 'text-slate-500 line-through' :
+                                'text-slate-800'
+                            }`}>
+                                {rec.title}
+                            </div>
+                            <Badge variant="outline" className={`text-[9px] h-4 px-1 ${getPriorityBadge(rec.priority)}`}>
+                                {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Media' : 'Bassa'}
+                            </Badge>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        {showActions && status === 'active' && (
+                            <>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTipAction(rec, 'complete');
+                                    }}
+                                    disabled={isLoading}
+                                    className="p-1 rounded hover:bg-green-100 text-green-600 transition-colors"
+                                    title="Segna come completato"
+                                >
+                                    <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTipAction(rec, 'dismiss');
+                                    }}
+                                    disabled={isLoading}
+                                    className="p-1 rounded hover:bg-red-100 text-red-500 transition-colors"
+                                    title="Scarta"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </>
+                        )}
+                        {showActions && status !== 'active' && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTipAction(rec, 'restore');
+                                }}
+                                disabled={isLoading}
+                                className="p-1 rounded hover:bg-blue-100 text-blue-500 transition-colors"
+                                title="Ripristina"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                        {expandedRec === idx ?
+                            <ChevronUp className="w-4 h-4 text-slate-400" /> :
+                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                        }
+                    </div>
+                </div>
+                {expandedRec === idx && (
+                    <div className="px-2 pb-2 pt-0 border-t bg-slate-50/50">
+                        <p className="text-[11px] text-slate-600 mt-2">{rec.description}</p>
+                        <div className="mt-2 p-1.5 bg-green-50 rounded text-[10px] text-green-700">
+                            <strong>Impatto:</strong> {rec.impact}
+                        </div>
+                        {rec.relatedPrompts && rec.relatedPrompts.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                                {rec.relatedPrompts.slice(0, 2).map((p, i) => (
+                                    <span key={i} className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded truncate max-w-[120px]">
+                                        {p}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     return (
         <Card className="border-amber-200 bg-gradient-to-br from-amber-50/50 to-white">
@@ -265,58 +454,72 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                             </div>
                         </div>
 
-                        {/* Recommendations */}
-                        <div>
-                            <h4 className="text-xs font-semibold text-slate-800 mb-2">
-                                Raccomandazioni ({analysis.recommendations?.length || 0})
-                            </h4>
-                            <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                                {analysis.recommendations?.map((rec, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="bg-white rounded-lg border border-slate-200 overflow-hidden"
-                                    >
-                                        <div
-                                            className="p-2 flex items-center justify-between cursor-pointer hover:bg-slate-50"
-                                            onClick={() => setExpandedRec(expandedRec === idx ? null : idx)}
+                        {/* Recommendations with Tabs */}
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 h-8">
+                                <TabsTrigger value="active" className="text-xs gap-1.5">
+                                    <Lightbulb className="w-3 h-3" />
+                                    Attivi ({activeRecs.length})
+                                </TabsTrigger>
+                                <TabsTrigger value="archived" className="text-xs gap-1.5">
+                                    <Archive className="w-3 h-3" />
+                                    Archivio ({archivedRecs.length})
+                                </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="active" className="mt-2">
+                                {activeRecs.length > 0 ? (
+                                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                                        {activeRecs.map((rec, idx) => renderRecommendation(rec, idx))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-6 text-slate-500">
+                                        <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-400" />
+                                        <p className="text-xs">Tutti i suggerimenti sono stati completati o archiviati!</p>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={runAnalysis}
+                                            disabled={running}
+                                            className="mt-3 gap-2"
                                         >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <div className="p-1 bg-slate-100 rounded shrink-0">
-                                                    {getTypeIcon(rec.type)}
+                                            <RefreshCw className={`w-3 h-3 ${running ? 'animate-spin' : ''}`} />
+                                            Genera nuovi suggerimenti
+                                        </Button>
+                                    </div>
+                                )}
+                            </TabsContent>
+
+                            <TabsContent value="archived" className="mt-2">
+                                {archivedRecs.length > 0 ? (
+                                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                                        {completedRecs.length > 0 && (
+                                            <>
+                                                <div className="text-[10px] font-medium text-green-600 flex items-center gap-1 mb-1">
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    Completati ({completedRecs.length})
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <div className="font-medium text-xs text-slate-800 truncate">{rec.title}</div>
-                                                    <Badge variant="outline" className={`text-[9px] h-4 px-1 ${getPriorityBadge(rec.priority)}`}>
-                                                        {rec.priority === 'high' ? 'Alta' : rec.priority === 'medium' ? 'Media' : 'Bassa'}
-                                                    </Badge>
+                                                {completedRecs.map((rec, idx) => renderRecommendation(rec, idx + 1000))}
+                                            </>
+                                        )}
+                                        {dismissedRecs.length > 0 && (
+                                            <>
+                                                <div className="text-[10px] font-medium text-slate-500 flex items-center gap-1 mb-1 mt-2">
+                                                    <X className="w-3 h-3" />
+                                                    Scartati ({dismissedRecs.length})
                                                 </div>
-                                            </div>
-                                            {expandedRec === idx ?
-                                                <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" /> :
-                                                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-                                            }
-                                        </div>
-                                        {expandedRec === idx && (
-                                            <div className="px-2 pb-2 pt-0 border-t bg-slate-50/50">
-                                                <p className="text-[11px] text-slate-600 mt-2">{rec.description}</p>
-                                                <div className="mt-2 p-1.5 bg-green-50 rounded text-[10px] text-green-700">
-                                                    <strong>Impatto:</strong> {rec.impact}
-                                                </div>
-                                                {rec.relatedPrompts && rec.relatedPrompts.length > 0 && (
-                                                    <div className="mt-1.5 flex flex-wrap gap-1">
-                                                        {rec.relatedPrompts.slice(0, 2).map((p, i) => (
-                                                            <span key={i} className="text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded truncate max-w-[120px]">
-                                                                {p}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                                {dismissedRecs.map((rec, idx) => renderRecommendation(rec, idx + 2000))}
+                                            </>
                                         )}
                                     </div>
-                                ))}
-                            </div>
-                        </div>
+                                ) : (
+                                    <div className="text-center py-6 text-slate-400">
+                                        <Archive className="w-8 h-8 mx-auto mb-2" />
+                                        <p className="text-xs">Nessun suggerimento archiviato</p>
+                                    </div>
+                                )}
+                            </TabsContent>
+                        </Tabs>
 
                         <div className="text-[10px] text-slate-400 text-center pt-2 border-t">
                             Ultima analisi: {new Date(analysis.completedAt).toLocaleString('it-IT')}

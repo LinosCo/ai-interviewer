@@ -687,7 +687,7 @@ export default function InterviewChat({
                     </div>
                 )}
 
-                {/* Loading/Thinking Indicator - Minimal logo with animated bars */}
+                {/* Loading/Thinking Indicator - Pulsing circle with logo */}
                 {isLoading && currentQuestion && (
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -698,35 +698,49 @@ export default function InterviewChat({
                         {/* Subtle backdrop */}
                         <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
 
-                        {/* Centered loading indicator */}
-                        <div className="relative flex flex-col items-center gap-6">
-                            {/* Logo */}
+                        {/* Centered loading indicator - Logo in pulsing circle */}
+                        <div className="relative flex items-center justify-center">
+                            {/* Outer pulsing ring */}
                             <motion.div
-                                animate={{ scale: [1, 1.02, 1] }}
-                                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                                className="absolute rounded-full"
+                                style={{
+                                    width: 96,
+                                    height: 96,
+                                    border: `3px solid ${brandColor}30`,
+                                }}
+                                animate={{
+                                    scale: [1, 1.15, 1],
+                                    opacity: [0.6, 0.2, 0.6],
+                                }}
+                                transition={{
+                                    duration: 1.5,
+                                    repeat: Infinity,
+                                    ease: 'easeInOut',
+                                }}
+                            />
+                            {/* Inner circle with logo */}
+                            <motion.div
+                                className="relative flex items-center justify-center rounded-full bg-white shadow-lg"
+                                style={{
+                                    width: 80,
+                                    height: 80,
+                                    border: `2px solid ${brandColor}40`,
+                                }}
+                                animate={{
+                                    scale: [1, 1.03, 1],
+                                }}
+                                transition={{
+                                    duration: 1.5,
+                                    repeat: Infinity,
+                                    ease: 'easeInOut',
+                                }}
                             >
-                                <Icons.Logo size={48} style={{ color: brandColor }} />
+                                {logoUrl ? (
+                                    <img src={logoUrl} alt={botName} className="w-12 h-12 object-contain" />
+                                ) : (
+                                    <Icons.Logo size={36} style={{ color: brandColor }} />
+                                )}
                             </motion.div>
-
-                            {/* Animated equalizer bars */}
-                            <div className="flex items-end gap-1 h-8">
-                                {[0, 1, 2, 3, 4].map((i) => (
-                                    <motion.div
-                                        key={i}
-                                        className="w-1 rounded-full"
-                                        style={{ background: brandColor }}
-                                        animate={{
-                                            height: ['8px', '24px', '12px', '28px', '8px'],
-                                        }}
-                                        transition={{
-                                            duration: 1,
-                                            repeat: Infinity,
-                                            delay: i * 0.1,
-                                            ease: 'easeInOut',
-                                        }}
-                                    />
-                                ))}
-                            </div>
                         </div>
                     </motion.div>
                 )}
@@ -735,10 +749,10 @@ export default function InterviewChat({
                     {currentQuestion && !isLoading && (
                         <motion.div
                             key={currentQuestion.id}
-                            initial={{ opacity: 0, y: 30, scale: 0.98 }}
+                            initial={{ opacity: 0, y: 20, scale: 0.99 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -20, scale: 0.98 }}
-                            transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+                            exit={{ opacity: 0, y: -10, scale: 0.99 }}
+                            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
                             className="w-full max-w-2xl"
                         >
                             {/* Bot Question Card */}

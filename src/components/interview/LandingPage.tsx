@@ -2,10 +2,9 @@
 
 import { useState } from 'react';
 import { Bot, Project, Organization } from '@prisma/client';
-import { colors, gradients, shadows } from '@/lib/design-system';
+import { colors } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
-import { ArrowRight, Play, Clock, Info, Lock, Loader2 } from 'lucide-react';
-import Image from 'next/image';
+import { ArrowRight, Clock, Lock, Loader2 } from 'lucide-react';
 
 interface LandingPageProps {
     bot: Bot & { project: Project & { organization: Organization | null } };
@@ -17,6 +16,18 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const [consentGiven, setConsentGiven] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
+    const [isStarting, setIsStarting] = useState(false);
+
+    const handleStart = async () => {
+        if (!consentGiven || isStarting) return;
+        setIsStarting(true);
+        try {
+            await onStart();
+        } catch (error) {
+            console.error('Failed to start interview:', error);
+            setIsStarting(false);
+        }
+    };
 
     // Helper to get video embed URL
     const getEmbedUrl = (url: string) => {
@@ -186,16 +197,25 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                         </div>
 
                         <button
-                            onClick={onStart}
-                            disabled={!consentGiven}
-                            className={`w-full group relative inline-flex items-center justify-center px-10 py-5 text-white font-black text-xl rounded-2xl shadow-xl transition-all duration-300 transform ${!consentGiven ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:shadow-2xl hover:-translate-y-1 active:scale-95'}`}
+                            onClick={handleStart}
+                            disabled={!consentGiven || isStarting}
+                            className={`w-full group relative inline-flex items-center justify-center px-10 py-5 text-white font-black text-xl rounded-2xl shadow-xl transition-all duration-300 transform ${(!consentGiven || isStarting) ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:shadow-2xl hover:-translate-y-1 active:scale-95'}`}
                             style={{
-                                background: consentGiven ? `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)` : '#999',
-                                boxShadow: consentGiven ? `0 20px 40px -15px ${primaryColor}70` : 'none'
+                                background: (consentGiven && !isStarting) ? `linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd)` : '#999',
+                                boxShadow: (consentGiven && !isStarting) ? `0 20px 40px -15px ${primaryColor}70` : 'none'
                             }}
                         >
-                            <span className="relative z-10">Inizia Conversazione</span>
-                            <ArrowRight className="relative z-10 ml-3 w-6 h-6 transition-transform group-hover:translate-x-1.5" />
+                            {isStarting ? (
+                                <>
+                                    <Loader2 className="relative z-10 w-6 h-6 animate-spin" />
+                                    <span className="relative z-10 ml-3">Avvio in corso...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="relative z-10">Inizia Conversazione</span>
+                                    <ArrowRight className="relative z-10 ml-3 w-6 h-6 transition-transform group-hover:translate-x-1.5" />
+                                </>
+                            )}
                         </button>
 
                         <div className="flex items-center justify-center gap-8 text-[11px] font-bold text-gray-400 uppercase tracking-widest">

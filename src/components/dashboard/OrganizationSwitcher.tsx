@@ -20,13 +20,12 @@ export default function OrganizationSwitcher() {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    if (loading) {
+    // Show skeleton while loading or if no data yet
+    if (loading || (!currentOrganization && organizations.length === 0)) {
         return (
             <div className="w-full h-12 bg-gray-50 animate-pulse rounded-xl border border-gray-100" />
         );
     }
-
-    if (!currentOrganization && organizations.length === 0) return null;
 
     return (
         <div className="relative mb-6" ref={dropdownRef}>

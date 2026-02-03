@@ -21,7 +21,7 @@ export class VisibilityEngine {
         const config = await prisma.visibilityConfig.findUnique({
             where: { id: configId },
             include: {
-                prompts: { where: { enabled: true }, orderBy: { orderIndex: 'asc' } },
+                prompts: { where: { enabled: true }, orderBy: { orderIndex: 'asc' }, take: 10 },
                 competitors: { where: { enabled: true } }
             }
         });
@@ -95,15 +95,18 @@ export class VisibilityEngine {
             }
 
             // 4. Calculate Aggregate Score (only based on successful responses)
-            // Valid responses are those where brandMentioned is true or false (completed analysis)
+            console.log(`[visibility] All prompts processed. Results count: ${results.length}`);
+
             const validResponses = await prisma.visibilityResponse.findMany({
                 where: { scanId: scan.id }
             });
+            console.log(`[visibility] Valid responses in DB: ${validResponses.length}`);
 
             let totalScore = 0;
             if (validResponses.length > 0) {
                 const mentions = validResponses.filter(r => r.brandMentioned).length;
                 totalScore = Math.round((mentions / validResponses.length) * 100);
+                console.log(`[visibility] Score: ${totalScore}% (${mentions}/${validResponses.length} mentions)`);
             }
 
             // 5. Update Scan Status
@@ -115,6 +118,7 @@ export class VisibilityEngine {
                     score: totalScore
                 }
             });
+            console.log(`[visibility] Scan ${scan.id} marked as completed with score ${totalScore}`);
 
             // 6. Trigger Cross-Channel Sync
             try {
@@ -123,6 +127,7 @@ export class VisibilityEngine {
                 console.error('Cross-channel sync failed but scan completed:', e);
             }
 
+            console.log(`[visibility] Scan complete! Returning success.`);
             return { success: true, scanId: scan.id, partial: results.length < (config.prompts.length * providers.length) };
 
         } catch (error) {

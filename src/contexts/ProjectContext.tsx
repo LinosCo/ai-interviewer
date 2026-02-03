@@ -99,8 +99,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     }, [currentOrganization]);
 
     useEffect(() => {
+        // Re-fetch when organization changes
         fetchProjects();
-    }, [fetchProjects]);
+    }, [currentOrganization?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const setSelectedProject = (project: Project | null) => {
         setSelectedProjectState(project);

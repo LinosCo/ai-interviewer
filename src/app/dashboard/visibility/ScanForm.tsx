@@ -7,7 +7,11 @@ import { Loader2 } from "lucide-react";
 import { ScanProgress } from "@/components/visibility/ScanProgress";
 import { showToast } from "@/components/toast";
 
-export function ScanForm() {
+interface ScanFormProps {
+    configId: string;
+}
+
+export function ScanForm({ configId }: ScanFormProps) {
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
@@ -15,7 +19,9 @@ export function ScanForm() {
         setLoading(true);
         try {
             const response = await fetch('/api/visibility/scan/run', {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ configId })
             });
 
             if (!response.ok) {

@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server';
 import { VisibilityEngine } from '@/lib/visibility/visibility-engine';
 import { checkResourceAccess } from '@/lib/guards/resourceGuard';
 
+// Extend timeout for long-running scans (5 minutes)
+export const maxDuration = 300;
+
 export async function POST(request: Request) {
     try {
         const session = await auth();
@@ -11,10 +14,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Trova la config di visibility per l'utente
-        // Prima cerca per projectId di cui l'utente è owner
+        // Get configId from request body
+        const body = await request.json().catch(() => ({}));
+        const { configId } = body;
+
+        // Find the specific config (with security check)
         const config = await prisma.visibilityConfig.findFirst({
             where: {
+                ...(configId ? { id: configId } : {}),
                 OR: [
                     // Config legata a un progetto di cui l'utente è owner
                     {

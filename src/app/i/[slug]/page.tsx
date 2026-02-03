@@ -3,14 +3,26 @@ import { notFound, redirect } from 'next/navigation';
 import LandingPage from '@/components/interview/LandingPage';
 import { canStartInterview } from '@/lib/usage';
 import { Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 
-export const dynamic = 'force-dynamic';
+// Cache bot data for 60 seconds - landing pages can tolerate slight staleness
+const getBotBySlug = unstable_cache(
+    async (slug: string) => {
+        return prisma.bot.findUnique({
+            where: { slug },
+            include: {
+                project: { include: { organization: true } },
+                topics: { orderBy: { orderIndex: 'asc' } }
+            }
+        });
+    },
+    ['bot-by-slug'],
+    { revalidate: 60, tags: ['bot'] }
+);
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
     const { slug } = await params;
-    const bot = await prisma.bot.findUnique({
-        where: { slug }
-    });
+    const bot = await getBotBySlug(slug);
 
     if (!bot) return {};
 
@@ -37,13 +49,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function InterviewPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
-    const bot = await prisma.bot.findUnique({
-        where: { slug },
-        include: {
-            project: { include: { organization: true } },
-            topics: { orderBy: { orderIndex: 'asc' } }
-        }
-    });
+    const bot = await getBotBySlug(slug);
 
     if (!bot) notFound();
 

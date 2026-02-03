@@ -192,7 +192,7 @@ export default async function VisibilityPage({
                             Impostazioni
                         </Button>
                     </Link>
-                    <ScanForm />
+                    <ScanForm configId={config.id} />
                 </div>
             </div>
 

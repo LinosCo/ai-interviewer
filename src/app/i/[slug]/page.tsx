@@ -6,6 +6,13 @@ import { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { Suspense } from 'react';
 
+// Helper to serialize BigInt values for client components
+function serializeData<T>(data: T): T {
+    return JSON.parse(JSON.stringify(data, (_, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+    ));
+}
+
 // Cache bot data for 60 seconds - landing pages can tolerate slight staleness
 const getBotBySlug = unstable_cache(
     async (slug: string) => {
@@ -222,8 +229,8 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
-            {/* Landing page renders immediately */}
-            <LandingPage bot={bot} onStart={startInterview} />
+            {/* Landing page renders immediately - serialize to handle BigInt */}
+            <LandingPage bot={serializeData(bot)} onStart={startInterview} />
 
             {/* Usage check streams in - blocks UI if limit reached */}
             {organizationId && (

@@ -50,6 +50,21 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                     </div>
                 </div>
                 <div className="mt-4">
+                    <label className="block text-sm font-medium mb-1">Public URL (Slug)</label>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500 whitespace-nowrap">businesstuner.voler.ai/i/</span>
+                        <input
+                            name="slug"
+                            defaultValue={bot.slug}
+                            pattern="[a-z0-9-]+"
+                            title="Solo lettere minuscole, numeri e trattini"
+                            className="flex-1 border p-2 rounded font-mono text-sm"
+                            required
+                        />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">L'URL pubblico dell'intervista. Usa solo lettere minuscole, numeri e trattini.</p>
+                </div>
+                <div className="mt-4">
                     <label className="block text-sm font-medium mb-1">Tone & Persona</label>
                     <input name="tone" defaultValue={bot.tone || ''} placeholder="e.g. Professional, Empathetic, Casual" className="w-full border p-2 rounded" />
                 </div>

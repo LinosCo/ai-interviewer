@@ -27,23 +27,66 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     if (!bot) return {};
 
     const title = bot.landingTitle || bot.name;
-    const description = bot.landingDescription || bot.researchGoal || "Partecipa a questa intervista intelligente su Business Tuner.";
+    const brandName = bot.project?.organization?.name || 'Business Tuner';
+    const fullTitle = `${title} | ${brandName}`;
+    const description = bot.landingDescription || bot.researchGoal || `Partecipa all'intervista interattiva "${title}" - Un'esperienza conversazionale intelligente creata con Business Tuner.`;
     const image = bot.landingImageUrl || bot.logoUrl;
+    const canonicalUrl = `https://businesstuner.voler.ai/i/${slug}`;
 
     return {
-        title,
+        title: fullTitle,
         description,
+        keywords: [
+            'intervista AI', 'chatbot intelligente', 'feedback clienti',
+            'ricerca di mercato', 'survey conversazionale', brandName, title
+        ].filter(Boolean),
+        authors: [{ name: brandName }],
+        creator: brandName,
+        publisher: 'Business Tuner',
+        robots: {
+            index: true,
+            follow: true,
+            googleBot: {
+                index: true,
+                follow: true,
+                'max-video-preview': -1,
+                'max-image-preview': 'large',
+                'max-snippet': -1,
+            },
+        },
+        alternates: {
+            canonical: canonicalUrl,
+        },
         openGraph: {
-            title,
+            type: 'website',
+            locale: 'it_IT',
+            url: canonicalUrl,
+            siteName: 'Business Tuner',
+            title: fullTitle,
             description,
-            images: image ? [image] : undefined,
+            images: image ? [{
+                url: image,
+                width: 1200,
+                height: 630,
+                alt: `${title} - Intervista interattiva`,
+            }] : [{
+                url: 'https://businesstuner.voler.ai/og-default.png',
+                width: 1200,
+                height: 630,
+                alt: 'Business Tuner - Interviste AI',
+            }],
         },
         twitter: {
-            card: "summary_large_image",
-            title,
+            card: 'summary_large_image',
+            site: '@businesstuner',
+            creator: '@businesstuner',
+            title: fullTitle,
             description,
-            images: image ? [image] : undefined,
-        }
+            images: image ? [image] : ['https://businesstuner.voler.ai/og-default.png'],
+        },
+        other: {
+            'theme-color': bot.primaryColor || '#f59e0b',
+        },
     };
 }
 
@@ -92,5 +135,71 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
         redirect(`/i/chat/${conversation.id}`);
     };
 
-    return <LandingPage bot={bot} onStart={startInterview} />;
+    // JSON-LD Structured Data for SEO
+    const brandName = bot.project?.organization?.name || 'Business Tuner';
+    const title = bot.landingTitle || bot.name;
+    const description = bot.landingDescription || bot.researchGoal || `Intervista interattiva ${title}`;
+
+    const jsonLd = {
+        '@context': 'https://schema.org',
+        '@graph': [
+            {
+                '@type': 'WebPage',
+                '@id': `https://businesstuner.voler.ai/i/${slug}#webpage`,
+                url: `https://businesstuner.voler.ai/i/${slug}`,
+                name: `${title} | ${brandName}`,
+                description,
+                isPartOf: {
+                    '@type': 'WebSite',
+                    '@id': 'https://businesstuner.voler.ai/#website',
+                    name: 'Business Tuner',
+                    url: 'https://businesstuner.voler.ai',
+                },
+                inLanguage: 'it-IT',
+                potentialAction: {
+                    '@type': 'ReadAction',
+                    target: `https://businesstuner.voler.ai/i/${slug}`,
+                },
+            },
+            {
+                '@type': 'Organization',
+                '@id': 'https://businesstuner.voler.ai/#organization',
+                name: 'Business Tuner',
+                url: 'https://businesstuner.voler.ai',
+                logo: {
+                    '@type': 'ImageObject',
+                    url: 'https://businesstuner.voler.ai/logo.png',
+                },
+                sameAs: [
+                    'https://www.linkedin.com/company/business-tuner',
+                ],
+            },
+            {
+                '@type': 'SoftwareApplication',
+                name: title,
+                applicationCategory: 'BusinessApplication',
+                operatingSystem: 'Web',
+                offers: {
+                    '@type': 'Offer',
+                    price: '0',
+                    priceCurrency: 'EUR',
+                },
+                description,
+                provider: {
+                    '@type': 'Organization',
+                    name: brandName,
+                },
+            },
+        ],
+    };
+
+    return (
+        <>
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
+            <LandingPage bot={bot} onStart={startInterview} />
+        </>
+    );
 }

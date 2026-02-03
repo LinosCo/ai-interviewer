@@ -273,6 +273,34 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (formData.has('introMessage')) data.introMessage = getStr('introMessage');
     if (formData.has('maxDurationMins')) data.maxDurationMins = Number(formData.get('maxDurationMins'));
 
+    // Handle slug update with validation
+    if (formData.has('slug')) {
+        const rawSlug = getStr('slug') ?? '';
+        // Sanitize: lowercase, only alphanumeric and hyphens
+        const sanitizedSlug = rawSlug.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/--+/g, '-');
+
+        if (sanitizedSlug.length < 3) {
+            throw new Error("Lo slug deve essere di almeno 3 caratteri.");
+        }
+        if (sanitizedSlug.length > 100) {
+            throw new Error("Lo slug non può superare i 100 caratteri.");
+        }
+
+        // Check uniqueness (excluding current bot)
+        const existingBot = await prisma.bot.findFirst({
+            where: {
+                slug: sanitizedSlug,
+                id: { not: botId }
+            }
+        });
+
+        if (existingBot) {
+            throw new Error("Questo URL è già in uso. Scegli un altro slug.");
+        }
+
+        data.slug = sanitizedSlug;
+    }
+
     if (formData.has('modelProvider')) data.modelProvider = getStr('modelProvider');
     if (formData.has('modelName')) data.modelName = getStr('modelName');
 

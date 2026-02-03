@@ -57,7 +57,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
     const videoUrl = (isPro && (bot as any).landingVideoUrl) || null;
     const primaryColor = bot.primaryColor || colors.amber;
     const logoUrl = getImageUrl(bot.logoUrl);
-    console.log(`[LandingPage] Bot ID: ${bot.id}, LogoURL raw length: ${bot.logoUrl?.length}, Processed URL: ${logoUrl}`);
+    const brandName = bot.project.organization?.name || 'Business Tuner';
 
     const estimatedTime = bot.maxDurationMins || 10;
 
@@ -77,24 +77,24 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
 
             <main className="flex-1 relative z-10 w-full max-w-4xl mx-auto p-6 md:p-12 lg:p-16 flex flex-col items-center text-center gap-12 animate-in fade-in slide-in-from-bottom-4 duration-300">
 
-                {/* Logo Section (Centered & Large) */}
-                <div className="w-full flex justify-center mb-4">
+                {/* Header with Logo */}
+                <header className="w-full flex justify-center mb-4">
                     {logoUrl ? (
                         <img
                             src={logoUrl}
-                            alt="Logo"
+                            alt={`Logo ${brandName}`}
                             className="h-24 md:h-28 w-auto object-contain"
                         />
                     ) : (
                         <div className="flex items-center gap-3">
-                            <Icons.Logo className="w-10 h-10" style={{ color: primaryColor }} />
+                            <Icons.Logo className="w-10 h-10" aria-hidden="true" style={{ color: primaryColor }} />
                             <span className="text-2xl font-bold text-gray-900 tracking-tight">Business Tuner</span>
                         </div>
                     )}
-                </div>
+                </header>
 
                 {/* Hero Section */}
-                <div className="w-full space-y-10">
+                <article className="w-full space-y-10">
                     <div className="space-y-6 flex flex-col items-center">
                         <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] mb-2" style={{ color: primaryColor }}>
                             <span className="px-3 py-1 rounded-full border border-current bg-white/50 backdrop-blur-sm">
@@ -122,6 +122,8 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                                         frameBorder="0"
                                         allow="autoplay; fullscreen; picture-in-picture"
                                         allowFullScreen
+                                        title={`Video presentazione: ${title}`}
+                                        loading="lazy"
                                     />
                                 ) : computedImageUrl ? (
                                     <>
@@ -136,7 +138,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                                         )}
                                         <img
                                             src={computedImageUrl}
-                                            alt="Cover"
+                                            alt={`${title} - Immagine di presentazione`}
                                             className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                                             onLoad={() => setImageLoaded(true)}
                                             onError={() => {
@@ -207,7 +209,7 @@ export default function LandingPage({ bot, onStart }: LandingPageProps) {
                             </div>
                         </div>
                     </div>
-                </div>
+                </article>
 
                 {/* Footer Section */}
                 <footer className="w-full pt-12 border-t border-gray-100">

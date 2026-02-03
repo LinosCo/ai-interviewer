@@ -27,10 +27,10 @@ export default function KnowledgeSourcesEditor({ botId, sources, disabled = fals
                         <Icons.Lock size={24} />
                     </div>
                     <h3 className="font-bold text-gray-900 mb-1">Knowledge Base (PRO)</h3>
-                    <p className="text-xs text-gray-500 mb-4">Aggiungi file e manuali per rendere l'AI ancora più intelligente.</p>
+                    <p className="text-xs text-gray-500 mb-4">Aggiungi file e manuali per rendere l&apos;AI ancora più intelligente.</p>
                     <Link href="/dashboard/billing/plans">
                         <button className="bg-amber-500 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-amber-600 shadow-sm">
-                            Effettua l'upgrade
+                            Effettua l&apos;upgrade
                         </button>
                     </Link>
                 </div>

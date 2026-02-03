@@ -253,7 +253,7 @@ export default function UsagePage() {
                     </div>
                     <div>
                         <h3 className="font-bold text-red-900">Risorse quasi esaurite</h3>
-                        <p className="text-sm text-red-700">Hai utilizzato oltre l'85% di alcune risorse incluse nel tuo piano. Considera un upgrade o l'acquisto di un add-on per evitare interruzioni.</p>
+                        <p className="text-sm text-red-700">Hai utilizzato oltre l&apos;85% di alcune risorse incluse nel tuo piano. Considera un upgrade o l&apos;acquisto di un add-on per evitare interruzioni.</p>
                         <Link href="/dashboard/billing/plans" className="text-red-600 font-bold text-sm mt-1 hover:underline">
                             Vedi opzioni upgrade →
                         </Link>

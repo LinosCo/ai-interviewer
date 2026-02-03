@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment, @typescript-eslint/no-explicit-any */
 import { PrismaClient, PlanType, Role, MemberStatus } from '@prisma/client';
 import crypto from 'crypto';
 

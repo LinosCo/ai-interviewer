@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Check Migration Status
  * Verifica lo stato attuale del database e se le migrazioni sono necessarie
@@ -23,7 +24,7 @@ async function checkStatus() {
       await prisma.$queryRaw`SELECT 1 FROM "ProjectCMSConnection" LIMIT 1`;
       hasProjectCMSConnection = true;
       console.log('  ✅ ProjectCMSConnection esiste');
-    } catch (e) {
+    } catch (_e) {
       console.log('  ❌ ProjectCMSConnection NON esiste - migrazione necessaria');
     }
 
@@ -31,7 +32,7 @@ async function checkStatus() {
       await prisma.$queryRaw`SELECT 1 FROM "ProjectMCPConnection" LIMIT 1`;
       hasProjectMCPConnection = true;
       console.log('  ✅ ProjectMCPConnection esiste');
-    } catch (e) {
+    } catch (_e) {
       console.log('  ❌ ProjectMCPConnection NON esiste - migrazione necessaria');
     }
 
@@ -40,7 +41,7 @@ async function checkStatus() {
       await prisma.$queryRaw`SELECT "organizationId" FROM "MCPConnection" LIMIT 1`;
       mcpHasOrganizationId = true;
       console.log('  ✅ MCPConnection.organizationId esiste');
-    } catch (e) {
+    } catch (_e) {
       console.log('  ❌ MCPConnection.organizationId NON esiste - migrazione necessaria');
     }
 

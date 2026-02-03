@@ -62,7 +62,7 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                             required
                         />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">L'URL pubblico dell'intervista. Usa solo lettere minuscole, numeri e trattini.</p>
+                    <p className="text-xs text-gray-500 mt-1">L&apos;URL pubblico dell&apos;intervista. Usa solo lettere minuscole, numeri e trattini.</p>
                 </div>
                 <div className="mt-4">
                     <label className="block text-sm font-medium mb-1">Tone & Persona</label>
@@ -146,7 +146,7 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold uppercase rounded-full">Pro</span>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                    Ideale per Recruiting o Lead Generation. L'AI chiederà i dati di contatto alla fine.
+                                    Ideale per Recruiting o Lead Generation. L&apos;AI chiederà i dati di contatto alla fine.
                                 </p>
                             </div>
                         </div>
@@ -186,7 +186,7 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                 </div>
                                 <p className="text-[10px] text-blue-600 mt-3 flex items-center gap-1">
                                     <Info size={12} />
-                                    L'AI chiederà questi dati in modo colloquiale quando l'utente mostra interesse o alla fine.
+                                    L&apos;AI chiederà questi dati in modo colloquiale quando l&apos;utente mostra interesse o alla fine.
                                 </p>
                             </div>
                         )}

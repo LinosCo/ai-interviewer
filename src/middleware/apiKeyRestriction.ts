@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { UserRole, User } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 /**
  * API Key Restriction Middleware

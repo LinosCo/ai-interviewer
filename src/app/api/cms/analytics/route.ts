@@ -62,7 +62,7 @@ export async function GET(request: Request) {
 
         // Calculate date range
         const endDate = new Date();
-        let startDate = new Date();
+        const startDate = new Date();
         switch (range) {
             case '7d':
                 startDate.setDate(endDate.getDate() - 7);

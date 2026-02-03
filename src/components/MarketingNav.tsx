@@ -27,7 +27,7 @@ export function MarketingNav({ session }: MarketingNavProps) {
                             Come funziona
                         </Link>
                         <Link href="/#use-cases" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
-                            Casi d'uso
+                            Casi d&apos;uso
                         </Link>
                         <Link href="/#pricing" className="text-stone-600 hover:text-stone-900 text-sm font-medium transition-colors">
                             Prezzi
@@ -69,7 +69,7 @@ export function MarketingNav({ session }: MarketingNavProps) {
                             Come funziona
                         </Link>
                         <Link href="/#use-cases" onClick={() => setIsOpen(false)} className="text-stone-600 font-medium py-2">
-                            Casi d'uso
+                            Casi d&apos;uso
                         </Link>
                         <Link href="/#pricing" onClick={() => setIsOpen(false)} className="text-stone-600 font-medium py-2">
                             Prezzi

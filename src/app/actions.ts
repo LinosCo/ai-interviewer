@@ -894,9 +894,7 @@ export async function refineTextAction(currentText: string, fieldName: string, c
 
     const openai = createOpenAI({ apiKey });
 
-    // Load methodology for context
-    const fs = require('fs');
-    const path = require('path');
+    // Load methodology for context (using top-level imports)
     let methodology = '';
     try {
         methodology = fs.readFileSync(path.join(process.cwd(), 'knowledge', 'interview-methodology.md'), 'utf-8');

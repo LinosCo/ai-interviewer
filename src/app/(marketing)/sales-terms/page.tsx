@@ -13,15 +13,15 @@ export default function SalesTermsPage() {
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">1. Il Servizio</h2>
                     <p>
-                        Business Tuner (di seguito "il Servizio") è una piattaforma SaaS (Software as a Service) fornita da Voler.ai S.r.l., con sede legale in [INDIRIZZO], P.IVA [P.IVA].
-                        Le presenti Condizioni Generali di Vendita disciplinano l'acquisto e l'utilizzo degli abbonamenti ai piani a pagamento (Starter, Pro, Business).
+                        Business Tuner (di seguito &quot;il Servizio&quot;) è una piattaforma SaaS (Software as a Service) fornita da Voler.ai S.r.l., con sede legale in [INDIRIZZO], P.IVA [P.IVA].
+                        Le presenti Condizioni Generali di Vendita disciplinano l&apos;acquisto e l&apos;utilizzo degli abbonamenti ai piani a pagamento (Starter, Pro, Business).
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">2. Conclusione del Contratto</h2>
                     <p>
-                        Il contratto tra Business Tuner e il Cliente si conclude al momento della conferma del pagamento tramite la piattaforma Stripe. Il Cliente riceverà una conferma via email dell'avvenuto acquisto e della sottoscrizione del piano prescelto.
+                        Il contratto tra Business Tuner e il Cliente si conclude al momento della conferma del pagamento tramite la piattaforma Stripe. Il Cliente riceverà una conferma via email dell&apos;avvenuto acquisto e della sottoscrizione del piano prescelto.
                     </p>
                 </section>
 
@@ -29,14 +29,14 @@ export default function SalesTermsPage() {
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">3. Prezzi e Fatturazione</h2>
                     <p>
                         Tutti i prezzi sono indicati in Euro e si intendono IVA esclusa (se applicabile). La fatturazione avviene mensilmente o annualmente, in base alla scelta del Cliente.
-                        Per l'emissione della fattura elettronica (obbligatoria in Italia), il Cliente è tenuto a fornire i dati fiscali completi: Ragione Sociale/Nome e Cognome, Indirizzo, P.IVA/Codice Fiscale, Codice Destinatario (SDI) e/o PEC.
+                        Per l&apos;emissione della fattura elettronica (obbligatoria in Italia), il Cliente è tenuto a fornire i dati fiscali completi: Ragione Sociale/Nome e Cognome, Indirizzo, P.IVA/Codice Fiscale, Codice Destinatario (SDI) e/o PEC.
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">4. Pagamenti</h2>
                     <p>
-                        I pagamenti sono gestiti tramite Stripe. Business Tuner non memorizza i dati della carta di credito del Cliente. In caso di mancato pagamento, Business Tuner si riserva il diritto di sospendere l'accesso ai piani a pagamento fino alla regolarizzazione della posizione.
+                        I pagamenti sono gestiti tramite Stripe. Business Tuner non memorizza i dati della carta di credito del Cliente. In caso di mancato pagamento, Business Tuner si riserva il diritto di sospendere l&apos;accesso ai piani a pagamento fino alla regolarizzazione della posizione.
                     </p>
                 </section>
 
@@ -44,21 +44,21 @@ export default function SalesTermsPage() {
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">5. Right of Withdrawal (Recesso)</h2>
                     <p>
                         <strong>Per Clienti Professionisti (B2B):</strong> Non è previsto il diritto di recesso una volta attivato il servizio.
-                        <strong>Per Clienti Consumatori (B2C):</strong> Ai sensi dell'art. 59 del Codice del Consumo, il diritto di recesso è escluso per la fornitura di contenuto digitale mediante supporto non materiale se l'esecuzione è iniziata con l'accordo espresso del consumatore.
+                        <strong>Per Clienti Consumatori (B2C):</strong> Ai sensi dell&apos;art. 59 del Codice del Consumo, il diritto di recesso è escluso per la fornitura di contenuto digitale mediante supporto non materiale se l&apos;esecuzione è iniziata con l&apos;accordo espresso del consumatore.
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">6. Durata e Rinnovo</h2>
                     <p>
-                        Gli abbonamenti si rinnovano automaticamente alla scadenza del periodo (mese o anno) scelto, salvo disdetta da parte del Cliente tramite l'area "Impostazioni Billing" nel dashboard, da effettuarsi prima della data di rinnovo.
+                        Gli abbonamenti si rinnovano automaticamente alla scadenza del periodo (mese o anno) scelto, salvo disdetta da parte del Cliente tramite l&apos;area &quot;Impostazioni Billing&quot; nel dashboard, da effettuarsi prima della data di rinnovo.
                     </p>
                 </section>
 
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">7. Limitazione di Responsabilità</h2>
                     <p>
-                        Business Tuner non è responsabile per danni diretti o indiretti derivanti dall'uso del servizio o dall'impossibilità di utilizzarlo, salvo i casi di dolo o colpa grave.
+                        Business Tuner non è responsabile per danni diretti o indiretti derivanti dall&apos;uso del servizio o dall&apos;impossibilità di utilizzarlo, salvo i casi di dolo o colpa grave.
                     </p>
                 </section>
 

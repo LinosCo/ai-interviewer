@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { tokenTracker } from '@/services/tokenTracker';
 import { planService } from '@/services/planService';
-import { HIDDEN_LIMITS } from '@/config/limits';
 
 /**
  * Conversation Limits Middleware

@@ -36,7 +36,7 @@ export default function UpgradePrompt({ reason, currentTier, dismissable = true 
                         href="/dashboard/billing/plans"
                         className="inline-flex items-center gap-2 px-4 py-2 bg-white text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-50 transition-colors"
                     >
-                        Effettua l'upgrade
+                        Effettua l&apos;upgrade
                         <ArrowRight className="w-4 h-4" />
                     </Link>
                 </div>

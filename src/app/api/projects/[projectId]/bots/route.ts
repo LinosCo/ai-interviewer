@@ -237,7 +237,7 @@ export async function POST(
         }
 
         // Detect tool type and verify existence
-        let bot = await prisma.bot.findUnique({
+        const bot = await prisma.bot.findUnique({
             where: { id: botId },
             include: { project: { select: { id: true, ownerId: true } } }
         });

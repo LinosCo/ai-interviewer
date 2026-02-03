@@ -67,7 +67,7 @@ export function CMSQuickAccessCard({
         </div>
 
         <p className="text-white/80 text-sm mb-6">
-          Modifica i contenuti del tuo sito web con l'assistente AI.
+          Modifica i contenuti del tuo sito web con l&apos;assistente AI.
           I suggerimenti vengono generati automaticamente dai dati raccolti.
         </p>
 

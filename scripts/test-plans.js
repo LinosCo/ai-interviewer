@@ -1,4 +1,4 @@
-
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-vars */
 const { getPricingPlans } = require('../src/lib/stripe');
 // We need to mock prisma or avoid it if getPricingPlans connects to DB.
 // getPricingPlans accesses prisma.globalConfig.

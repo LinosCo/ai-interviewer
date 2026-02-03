@@ -35,7 +35,7 @@ export default function SalesPage() {
                     </div>
                     <h1 className="text-3xl font-bold text-stone-900 mb-4">Richiesta Ricevuta!</h1>
                     <p className="text-stone-600 mb-8 leading-relaxed">
-                        Grazie per l'interesse. Il nostro sales team analizzerà la tua richiesta e ti contatterà entro le prossime 24 ore lavorative.
+                        Grazie per l&apos;interesse. Il nostro sales team analizzerà la tua richiesta e ti contatterà entro le prossime 24 ore lavorative.
                     </p>
                     <Button fullWidth onClick={() => window.location.href = '/'}>
                         Torna alla Home
@@ -84,7 +84,7 @@ export default function SalesPage() {
 
                     <div className="pt-8 border-t border-stone-200">
                         <cite className="text-stone-500 italic block mb-4 text-sm">
-                            "L'integrazione del piano Business ci ha permesso di automatizzare completamente la raccolta feedback in 12 lingue diverse con un tasso di completamento dell'85%."
+                            &quot;L&apos;integrazione del piano Business ci ha permesso di automatizzare completamente la raccolta feedback in 12 lingue diverse con un tasso di completamento dell&apos;85%.&quot;
                         </cite>
                         <p className="font-bold text-stone-900 text-sm">— Responsabile CX, Tech Corporate</p>
                     </div>
@@ -163,7 +163,7 @@ export default function SalesPage() {
                         </div>
 
                         <p className="text-[10px] text-stone-400 text-center leading-tight">
-                            Cliccando su "Invia Richiesta" accetti che i tuoi dati vengano trattati per scopi commerciali in conformità con la nostra Privacy Policy.
+                            Cliccando su &quot;Invia Richiesta&quot; accetti che i tuoi dati vengano trattati per scopi commerciali in conformità con la nostra Privacy Policy.
                         </p>
                     </form>
                 </div>

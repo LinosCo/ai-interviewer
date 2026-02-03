@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { SubscriptionTier } from '@prisma/client';
-import { getPricingPlans, PlanKey } from './stripe';
+import { PlanKey } from './stripe';
 import { generateConversationInsightAction } from '@/lib/analytics-actions';
 import { PLANS, PlanType, isUnlimited } from '@/config/plans';
 
@@ -213,7 +213,7 @@ export async function getUsageStats(organizationId: string) {
         }
     });
 
-    const usersCount = await prisma.membership.count({
+    const _usersCount = await prisma.membership.count({
         where: { organizationId }
     });
 
@@ -318,15 +318,15 @@ export async function isFeatureEnabled(organizationId: string, featureKey: strin
     const plan = PLANS[subscription.tier as PlanType] || PLANS[PlanType.FREE];
 
     // Check in features first
-    // @ts-ignore
+    // @ts-expect-error - dynamic key access
     if (plan.features[featureKey] !== undefined) {
-        // @ts-ignore
+        // @ts-expect-error - dynamic key access
         const value = plan.features[featureKey];
         if (typeof value === 'boolean') return value;
         if (value === 'base' || value === 'full' || value === 'conditional') return true;
     }
 
     // Then check in limits (legacy/derived)
-    // @ts-ignore
+    // @ts-expect-error - dynamic key access
     return !!plan.limits[featureKey];
 }

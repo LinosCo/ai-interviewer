@@ -145,7 +145,7 @@ export default function WizardStepBoundaries({ initialConfig, onNext, onBack }: 
                     </li>
                     <li className="flex items-start gap-2">
                         <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5" />
-                        Includi sempre un'opzione per parlare con un umano
+                        Includi sempre un&apos;opzione per parlare con un umano
                     </li>
                     <li className="flex items-start gap-2">
                         <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mt-1.5" />

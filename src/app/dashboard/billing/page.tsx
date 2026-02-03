@@ -173,7 +173,7 @@ export default async function BillingPage() {
                     <div className="bg-stone-900 text-white rounded-[24px] p-8 flex flex-col">
                         <h3 className="text-xl font-bold mb-4">Passa al piano superiore</h3>
                         <p className="text-stone-400 text-sm mb-8 leading-relaxed">
-                            Hai bisogno di più crediti o di funzionalità avanzate? Fai l'upgrade in qualsiasi momento.
+                            Hai bisogno di più crediti o di funzionalità avanzate? Fai l&apos;upgrade in qualsiasi momento.
                         </p>
 
                         <ul className="space-y-4 flex-grow">

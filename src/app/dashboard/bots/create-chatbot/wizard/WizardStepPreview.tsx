@@ -88,7 +88,7 @@ export default function WizardStepPreview({ config, projectId, onBack }: WizardS
                         Anteprima Live
                     </h3>
                     <p className="text-gray-500 text-sm">
-                        Il tuo chatbot è pronto. Clicca sull'icona in basso a destra per provare la conversazione.
+                        Il tuo chatbot è pronto. Clicca sull&apos;icona in basso a destra per provare la conversazione.
                     </p>
                 </div>
 

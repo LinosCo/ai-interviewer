@@ -1,4 +1,4 @@
-import { PlanType, PlanConfig, PlanLimits, PLANS } from '@/config/plans';
+import { PlanConfig, PlanLimits, PLANS } from '@/config/plans';
 import { HIDDEN_LIMITS } from '@/config/limits';
 import { prisma as db } from '@/lib/prisma';
 

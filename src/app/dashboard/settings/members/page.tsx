@@ -78,7 +78,7 @@ export default function TeamManagementPage() {
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
                 <Building2 className="w-12 h-12 text-gray-300 mb-4" />
                 <h2 className="text-xl font-bold text-gray-900">Nessuna organizzazione selezionata</h2>
-                <p className="text-gray-500 max-w-xs mt-2">Seleziona un'organizzazione dalla barra laterale per gestire i membri.</p>
+                <p className="text-gray-500 max-w-xs mt-2">Seleziona un&apos;organizzazione dalla barra laterale per gestire i membri.</p>
             </div>
         );
     }
@@ -210,7 +210,7 @@ export default function TeamManagementPage() {
                             Gestione Ruoli
                         </h4>
                         <ul className="space-y-2 text-sm text-amber-800/80">
-                            <li>• <span className="font-bold text-amber-900">Owner:</span> Proprietario dell'organizzazione, gestione totale e billing.</li>
+                            <li>• <span className="font-bold text-amber-900">Owner:</span> Proprietario dell&apos;organizzazione, gestione totale e billing.</li>
                             <li>• <span className="font-bold text-amber-900">Admin:</span> Può creare progetti, invitare membri e modificare bot.</li>
                             <li>• <span className="font-bold text-amber-900">Member:</span> Può vedere i dati e interagire con i bot esistenti.</li>
                         </ul>

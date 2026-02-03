@@ -11,7 +11,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { PLANS, PlanType, PARTNER_THRESHOLDS } from '@/config/plans';
+import { PARTNER_THRESHOLDS } from '@/config/plans';
 import crypto from 'crypto';
 
 // ============================================

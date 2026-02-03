@@ -79,7 +79,7 @@ export default function ProjectSelector({ botId, botName = 'Bot', currentProject
                     )}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                    L'intervista sarà visibile solo agli utenti che hanno accesso a questo progetto. Per trasferirla a un altro utente, usa il tasto "Trasferisci" sopra.
+                    L&apos;intervista sarà visibile solo agli utenti che hanno accesso a questo progetto. Per trasferirla a un altro utente, usa il tasto &quot;Trasferisci&quot; sopra.
                 </p>
             </div>
 

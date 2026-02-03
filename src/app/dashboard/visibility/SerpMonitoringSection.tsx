@@ -182,7 +182,7 @@ export function SerpMonitoringSection() {
                             <div>
                                 <CardTitle className="text-xl">Monitoraggio Google</CardTitle>
                                 <CardDescription>
-                                    Menzioni del brand nelle ricerche Google e news dell'ultima settimana
+                                    Menzioni del brand nelle ricerche Google e news dell&apos;ultima settimana
                                 </CardDescription>
                             </div>
                         </div>

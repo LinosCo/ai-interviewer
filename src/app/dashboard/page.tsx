@@ -45,7 +45,7 @@ export default async function DashboardPage() {
     });
 
     if (!user || user.memberships.length === 0) {
-        return <div>Nessuna organizzazione trovata. Contatta l'assistenza se pensi sia un errore.</div>;
+        return <div>Nessuna organizzazione trovata. Contatta l&apos;assistenza se pensi sia un errore.</div>;
     }
 
     // Find active membership

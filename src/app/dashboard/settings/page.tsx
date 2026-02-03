@@ -47,7 +47,7 @@ export default function PlatformSettingsPage() {
     if (!currentOrganization) {
         return (
             <div className="max-w-5xl mx-auto p-6 text-center">
-                <h1 className="text-2xl font-bold">Seleziona un'organizzazione</h1>
+                <h1 className="text-2xl font-bold">Seleziona un&apos;organizzazione</h1>
                 <p className="text-gray-500 mt-2">Devi selezionare un team per gestire le impostazioni.</p>
             </div>
         );

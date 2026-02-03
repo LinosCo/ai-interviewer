@@ -109,7 +109,7 @@ export default function BillingSettingsPage() {
                                 ) : usage?.status === 'PAST_DUE' ? (
                                     <span className="text-red-600">Il pagamento è fallito. Aggiorna i dati di pagamento per continuare a usare il servizio.</span>
                                 ) : usage?.status === 'CANCELED' ? (
-                                    <>L'abbonamento è stato cancellato. Attiva un nuovo piano per continuare.</>
+                                    <>L&apos;abbonamento è stato cancellato. Attiva un nuovo piano per continuare.</>
                                 ) : (
                                     <>Il tuo prossimo rinnovo è previsto per il <span className="text-slate-900 font-bold">{new Date(usage?.period.end).toLocaleDateString('it-IT')}</span>.</>
                                 )}
@@ -137,7 +137,7 @@ export default function BillingSettingsPage() {
                         <div className="space-y-1">
                             <p className="text-sm font-bold text-blue-900">Dati di fatturazione</p>
                             <p className="text-xs text-blue-700 leading-relaxed font-medium">
-                                Puoi aggiornare la tua Partita IVA, il Codice SDI e l'indirizzo di fatturazione direttamente dal portale Stripe. Le fatture verranno generate automaticamente e inviate alla tua email.
+                                Puoi aggiornare la tua Partita IVA, il Codice SDI e l&apos;indirizzo di fatturazione direttamente dal portale Stripe. Le fatture verranno generate automaticamente e inviate alla tua email.
                             </p>
                         </div>
                     </div>

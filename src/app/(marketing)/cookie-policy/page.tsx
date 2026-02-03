@@ -8,7 +8,7 @@ export default function CookiePolicyPage() {
                 <h2>1. Introduzione</h2>
                 <p>
                     Questa Cookie Policy spiega come Business Tuner by Voler AI utilizza i cookie e tecnologie simili per riconoscere gli utenti quando visitano il nostro sito web.
-                    Spiega cosa sono queste tecnologie, perché le utilizziamo e i tuoi diritti di controllarne l'uso.
+                    Spiega cosa sono queste tecnologie, perché le utilizziamo e i tuoi diritti di controllarne l&apos;uso.
                 </p>
 
                 <h2>2. Cosa sono i cookie?</h2>
@@ -81,7 +81,7 @@ export default function CookiePolicyPage() {
                         <tr>
                             <td><code>consent_given</code></td>
                             <td>Business Tuner</td>
-                            <td>Memorizza il consenso privacy dell'utente</td>
+                            <td>Memorizza il consenso privacy dell&apos;utente</td>
                             <td>1 anno</td>
                         </tr>
                     </tbody>
@@ -131,10 +131,10 @@ export default function CookiePolicyPage() {
 
                 <h2>4. Cookie nelle Interviste Pubbliche</h2>
                 <p>
-                    Quando un utente partecipa a un'intervista tramite link pubblico (<code>/i/[slug]</code>), utilizziamo solo cookie strettamente necessari:
+                    Quando un utente partecipa a un&apos;intervista tramite link pubblico (<code>/i/[slug]</code>), utilizziamo solo cookie strettamente necessari:
                 </p>
                 <ul>
-                    <li><strong>Session ID:</strong> Identifica la sessione dell'intervista (eliminato automaticamente alla chiusura)</li>
+                    <li><strong>Session ID:</strong> Identifica la sessione dell&apos;intervista (eliminato automaticamente alla chiusura)</li>
                     <li><strong>Consent flag:</strong> Memorizza il consenso esplicito alla privacy policy</li>
                 </ul>
                 <p>
@@ -152,7 +152,7 @@ export default function CookiePolicyPage() {
                     <li>Preferenze UI (tema, layout dashboard)</li>
                 </ul>
                 <p className="text-sm text-gray-600">
-                    I dati nel Local Storage rimangono sul tuo dispositivo e non vengono trasmessi ai nostri server a meno che tu non completi esplicitamente un'azione.
+                    I dati nel Local Storage rimangono sul tuo dispositivo e non vengono trasmessi ai nostri server a meno che tu non completi esplicitamente un&apos;azione.
                 </p>
 
                 <h3>Session Storage</h3>
@@ -206,7 +206,7 @@ export default function CookiePolicyPage() {
                     Puoi modificare le tue preferenze in qualsiasi momento tramite:
                 </p>
                 <ul>
-                    <li>Link "Cookie Settings" nel footer del sito</li>
+                    <li>Link &quot;Cookie Settings&quot; nel footer del sito</li>
                     <li>Impostazioni account (per utenti registrati)</li>
                 </ul>
 
@@ -226,12 +226,12 @@ export default function CookiePolicyPage() {
                 </p>
                 <ul>
                     <li><strong>Email:</strong> hello@voler.ai</li>
-                    <li><strong>Oggetto:</strong> "Cookie Policy - Richiesta informazioni"</li>
+                    <li><strong>Oggetto:</strong> &quot;Cookie Policy - Richiesta informazioni&quot;</li>
                 </ul>
 
                 <h2>11. Base giuridica (GDPR)</h2>
                 <p>
-                    L'utilizzo dei cookie si basa su:
+                    L&apos;utilizzo dei cookie si basa su:
                 </p>
                 <ul>
                     <li><strong>Consenso esplicito:</strong> Per cookie analitici e marketing (Art. 6(1)(a) GDPR)</li>

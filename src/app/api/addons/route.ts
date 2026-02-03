@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { ADD_ONS, getAddOnsForTier, getAddOnById } from '@/config/addons';
 import { subscriptionTierToPlanType, PLANS } from '@/config/plans';
+import Stripe from 'stripe';
 
 /**
  * GET /api/addons
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
         }
 
         // Create Stripe checkout session
-        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
         const checkoutSession = await stripe.checkout.sessions.create({
             mode: 'payment',

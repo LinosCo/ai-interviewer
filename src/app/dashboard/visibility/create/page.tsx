@@ -242,11 +242,9 @@ export default function CreateVisibilityWizardPage() {
                         <WizardStepBrand config={config} setConfig={setConfig} projects={projects} />
                     )}
                     {currentStep === 2 && (
-                        // @ts-ignore
                         <WizardStepPrompts config={config} setConfig={setConfig} maxPrompts={limits.maxPrompts} />
                     )}
                     {currentStep === 3 && (
-                        // @ts-ignore
                         <WizardStepCompetitors config={config} setConfig={setConfig} maxCompetitors={limits.maxCompetitors} />
                     )}
                     {currentStep === 4 && (

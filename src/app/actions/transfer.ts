@@ -103,7 +103,7 @@ export async function acceptTransferInvite(token: string) {
             include: { organization: true }
         });
 
-        let targetOrgId = recipientMemberships[0]?.organizationId;
+        const targetOrgId = recipientMemberships[0]?.organizationId;
 
         // If no organization, we might need to create one (but the app usually ensures this)
         if (!targetOrgId) {

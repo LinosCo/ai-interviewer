@@ -217,7 +217,7 @@ export default function InsightHubPage() {
                         const data = await pollRes.json();
                         if (!data.isRunning && data.analysis) {
                             clearInterval(pollInterval);
-                            setWebsiteAnalysis(prev => ({ ...prev, ...data.analysis }));
+                            setWebsiteAnalysis((prev: any) => ({ ...prev, ...data.analysis }));
                             setWebsiteAnalysisLoading(false);
                             showToast("Analisi sito completata!");
                         }

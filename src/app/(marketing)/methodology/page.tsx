@@ -10,15 +10,15 @@ export default function MethodologyPage() {
                 <header className="mb-16">
                     <h1 className="text-4xl lg:text-5xl font-bold text-stone-900 mb-6 tracking-tight">Metodologia Business Tuner</h1>
                     <p className="text-xl text-stone-600 leading-relaxed font-medium">
-                        Cos'è e come funziona il "feedback conversazionale" a scala.
+                        Cos&apos;è e come funziona il &quot;feedback conversazionale&quot; a scala.
                     </p>
                 </header>
 
                 <div className="prose prose-stone prose-lg max-w-none">
                     <section className="mb-16">
-                        <h2 className="text-3xl font-bold text-stone-900 mb-6">Cos'è il "feedback conversazionale"</h2>
+                        <h2 className="text-3xl font-bold text-stone-900 mb-6">Cos&apos;è il &quot;feedback conversazionale&quot;</h2>
                         <p>
-                            Il feedback conversazionale è un approccio ibrido che combina la flessibilità delle domande aperte con l'adattività di un intervistatore umano e la scalabilità della tecnologia.
+                            Il feedback conversazionale è un approccio ibrido che combina la flessibilità delle domande aperte con l&apos;adattività di un intervistatore umano e la scalabilità della tecnologia.
                         </p>
                         <div className="grid md:grid-cols-3 gap-6 mt-8">
                             {[
@@ -91,7 +91,7 @@ export default function MethodologyPage() {
                                 </li>
                                 <li className="flex gap-4">
                                     <div className="text-amber-500 mt-1"><Icons.Star size={20} fill="currentColor" /></div>
-                                    <p className="text-stone-700"><strong>Durata ideale:</strong> Punta a 5-10 minuti. Oltre questa soglia, la qualità dell'attenzione cala drasticamente.</p>
+                                    <p className="text-stone-700"><strong>Durata ideale:</strong> Punta a 5-10 minuti. Oltre questa soglia, la qualità dell&apos;attenzione cala drasticamente.</p>
                                 </li>
                                 <li className="flex gap-4">
                                     <div className="text-amber-500 mt-1"><Icons.Star size={20} fill="currentColor" /></div>
@@ -99,7 +99,7 @@ export default function MethodologyPage() {
                                 </li>
                                 <li className="flex gap-4">
                                     <div className="text-amber-500 mt-1"><Icons.Star size={20} fill="currentColor" /></div>
-                                    <p className="text-stone-700"><strong>Itera:</strong> Testa l'intervista tu stesso, ascolta le prime risposte e aggiusta il tiro.</p>
+                                    <p className="text-stone-700"><strong>Itera:</strong> Testa l&apos;intervista tu stesso, ascolta le prime risposte e aggiusta il tiro.</p>
                                 </li>
                             </ul>
                         </div>

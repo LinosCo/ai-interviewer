@@ -3,6 +3,7 @@
 import React from 'react';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { colors, gradients } from '@/lib/design-system';
 import Link from 'next/link';
 import { FEATURE_MATRIX } from '@/config/featureMatrix';
@@ -23,7 +24,7 @@ export default function FeaturesPage() {
                         </span>
                     </h1>
                     <p className="text-xl text-stone-600 mb-10 max-w-2xl mx-auto leading-relaxed">
-                        Dalla creazione dell'intervista all'analisi dei trend. Business Tuner è la suite completa per la ricerca qualitativa AI.
+                        Dalla creazione dell&apos;intervista all&apos;analisi dei trend. Business Tuner è la suite completa per la ricerca qualitativa AI.
                     </p>
                     <div className="flex justify-center gap-4">
                         <Link href="/register">
@@ -49,7 +50,7 @@ export default function FeaturesPage() {
                         </div>
                         <h2 className="text-3xl font-bold mb-4 text-stone-900">Interviste pronte in 2 minuti</h2>
                         <p className="text-lg text-stone-600 mb-6 leading-relaxed">
-                            Dimentica le ore passate a scrivere domande. Descrivi il tuo obiettivo e l'AI genera un flusso di intervista professionale, ottimizzato per ottenere risposte profonde e oneste.
+                            Dimentica le ore passate a scrivere domande. Descrivi il tuo obiettivo e l&apos;AI genera un flusso di intervista professionale, ottimizzato per ottenere risposte profonde e oneste.
                         </p>
                         <ul className="space-y-3 mb-8">
                             {['Template validati da esperti', 'Adattamento automatico del tono', 'Ottimizzazione conversazionale'].map((item, i) => (
@@ -125,7 +126,7 @@ export default function FeaturesPage() {
                                         <tr className="bg-stone-50/80">
                                             <td colSpan={5} className="py-3 px-6 font-semibold text-stone-800 text-sm uppercase tracking-wider">{category.name}</td>
                                         </tr>
-                                        {category.features.map((feature: any, featIdx: number) => (
+                                        {category.features.map((feature: { label: string; new?: boolean; trial?: boolean; starter?: boolean; pro?: boolean; business?: boolean }, featIdx: number) => (
                                             <tr key={featIdx} className="border-b border-stone-100 hover:bg-stone-50/50 transition-colors">
                                                 <td className="py-4 px-6 text-stone-600 font-medium text-sm flex items-center gap-2">
                                                     {feature.label}

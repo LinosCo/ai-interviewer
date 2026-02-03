@@ -74,7 +74,7 @@ export function TokenUsageCard({ usage, onTopUp }: TokenUsageCardProps) {
                 <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
                     <p>
                         I token vengono consumati per ogni risposta generata dall'AI.
-                        Se esaurisci il budget, i tuoi chatbot smetteranno di rispondere fino al rinnovo o all'acquisto di un pacchetto extra.
+                        Se esaurisci il budget, i tuoi chatbot smetteranno di rispondere fino al rinnovo o all&apos;acquisto di un pacchetto extra.
                     </p>
                 </div>
             </div>

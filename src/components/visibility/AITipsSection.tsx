@@ -150,7 +150,7 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                     <Globe className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                     <h4 className="font-medium text-gray-700">AI Tips Non Disponibili</h4>
                     <p className="text-sm text-gray-500 mt-1">
-                        Aggiungi l'URL del sito nelle impostazioni per ricevere suggerimenti di ottimizzazione AI.
+                        Aggiungi l&apos;URL del sito nelle impostazioni per ricevere suggerimenti di ottimizzazione AI.
                     </p>
                 </CardContent>
             </Card>

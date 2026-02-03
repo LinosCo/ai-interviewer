@@ -345,7 +345,7 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                                                 )}
                                             </div>
                                             <p className="font-semibold text-slate-900 leading-tight">
-                                                "{res.promptText}"
+                                                &quot;{res.promptText}&quot;
                                             </p>
                                         </div>
 

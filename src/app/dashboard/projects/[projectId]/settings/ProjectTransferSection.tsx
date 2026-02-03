@@ -69,7 +69,7 @@ export function ProjectTransferSection({
                         <CardTitle>Trasferisci Progetto</CardTitle>
                     </div>
                     <CardDescription>
-                        Sposta questo progetto in un'altra organizzazione o trasferisci la proprietà a un altro utente.
+                        Sposta questo progetto in un&apos;altra organizzazione o trasferisci la proprietà a un altro utente.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -81,7 +81,7 @@ export function ProjectTransferSection({
                             className="border-amber-200 text-amber-700 hover:bg-amber-50 font-bold"
                         >
                             <ArrowLeftRight className="w-4 h-4 mr-2" />
-                            Trasferisci ad un'altra Organizzazione
+                            Trasferisci ad un&apos;altra Organizzazione
                         </Button>
                     </div>
 
@@ -164,12 +164,12 @@ export function ProjectTransferSection({
                                 {transferSuccess && (
                                     <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-3 rounded-lg">
                                         <CheckCircle className="w-4 h-4" />
-                                        Invito inviato con successo! Il destinatario riceverà un'email per accettare il trasferimento.
+                                        Invito inviato con successo! Il destinatario riceverà un&apos;email per accettare il trasferimento.
                                     </div>
                                 )}
 
                                 <p className="text-xs text-gray-500">
-                                    L'utente riceverà un'email con un link per accettare il trasferimento.
+                                    L&apos;utente riceverà un&apos;email con un link per accettare il trasferimento.
                                     Il link sarà valido per 7 giorni.
                                 </p>
 

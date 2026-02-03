@@ -11,7 +11,6 @@ export async function POST(req: Request) {
         const { conversationId, message, isHidden } = await req.json();
 
         // Load conversation with bot and session
-        // @ts-ignore: Prisma client might be stale in IDE
         const conversation: any = await (prisma.conversation as any).findUnique({
             where: { id: conversationId },
             include: {
@@ -253,7 +252,6 @@ export async function POST(req: Request) {
             data: { conversationId, role: 'assistant', content: finalResponse }
         });
 
-        // @ts-ignore: Prisma client might be stale
         await prisma.chatbotSession.update({
             where: { id: session.id },
             data: { messagesCount: { increment: 1 }, tokensUsed: { increment: responseTokens } }

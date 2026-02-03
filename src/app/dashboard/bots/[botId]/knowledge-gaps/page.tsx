@@ -35,7 +35,7 @@ export default async function KnowledgeGapsPage({ params }: { params: Promise<{ 
                     Knowledge Gaps
                 </h1>
                 <p className="text-slate-500">
-                    Review questions your bot couldn't answer and convert them into new knowledge.
+                    Review questions your bot couldn&apos;t answer and convert them into new knowledge.
                 </p>
             </div>
 

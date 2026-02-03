@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { CHATBOT_TEMPLATES } from '@/lib/templates/chatbot-templates';
 
 interface WizardStepPromptProps {
     onNext: (config: any) => void;
@@ -56,9 +57,8 @@ export default function WizardStepPrompt({ onNext }: WizardStepPromptProps) {
     // NOTE: We need to update imports at the top. I'll include CHATBOT_TEMPLATES in the write.
 
     const applyTemplate = (templateId: string) => {
-        const templates = require('@/lib/templates/chatbot-templates').CHATBOT_TEMPLATES;
         setSelectedTemplate(templateId);
-        const template = templates.find((t: any) => t.id === templateId);
+        const template = CHATBOT_TEMPLATES.find((t) => t.id === templateId);
         if (template) {
             onNext({ suggestedConfig: template.config });
         }
@@ -160,8 +160,6 @@ export default function WizardStepPrompt({ onNext }: WizardStepPromptProps) {
 }
 
 // Sub-component for templates to handle the import/rendering cleanly
-import { CHATBOT_TEMPLATES } from '@/lib/templates/chatbot-templates';
-
 function TemplateSelector({ onSelect }: { onSelect: (id: string) => void }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

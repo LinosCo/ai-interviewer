@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
-import { createOpenAI, openai } from '@ai-sdk/openai';
-import { createAnthropic, anthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText } from 'ai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -73,7 +73,7 @@ export async function getSystemLLM() {
                     provider
                 };
             }
-        } catch (e) {
+        } catch {
             continue;
         }
     }

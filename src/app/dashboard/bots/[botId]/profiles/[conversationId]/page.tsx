@@ -86,7 +86,7 @@ export default async function ProfileDetailPage({ params }: { params: Promise<{ 
                             <div>
                                 <label className="text-xs font-semibold text-gray-500 uppercase mb-2 block">Note di Sintesi</label>
                                 <p className="text-sm bg-gray-50 p-3 rounded-md italic text-gray-700 border border-gray-100">
-                                    "{note}"
+                                    &quot;{note}&quot;
                                 </p>
                             </div>
 
@@ -94,7 +94,7 @@ export default async function ProfileDetailPage({ params }: { params: Promise<{ 
                                 <div>
                                     <label className="text-xs font-semibold text-purple-600 uppercase mb-2 block">Messaggio Utente</label>
                                     <p className="text-sm bg-purple-50 p-3 rounded-md text-purple-900 border border-purple-100">
-                                        "{profile.userMessage}"
+                                        &quot;{profile.userMessage}&quot;
                                     </p>
                                 </div>
                             )}

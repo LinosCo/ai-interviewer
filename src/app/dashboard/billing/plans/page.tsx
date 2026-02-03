@@ -76,7 +76,7 @@ export default async function PlansPage() {
                 </Link>
                 <h1 className="text-3xl font-bold text-stone-900 mb-2">Scegli il tuo piano</h1>
                 <p className="text-stone-600">
-                    Seleziona l'opzione più adatta alle tue esigenze. Tutti i piani includono le funzionalità base.
+                    Seleziona l&apos;opzione più adatta alle tue esigenze. Tutti i piani includono le funzionalità base.
                 </p>
             </div>
 
@@ -227,7 +227,7 @@ export default async function PlansPage() {
             <div className="mt-8 bg-stone-900 rounded-[28px] p-8 flex flex-col md:flex-row items-center justify-between gap-6 max-w-6xl text-white">
                 <div>
                     <span className="text-amber-400 text-xs font-bold uppercase tracking-widest">Per consulenti</span>
-                    <h4 className="text-lg font-bold mt-2 mb-1">Sei un'agenzia o un consulente?</h4>
+                    <h4 className="text-lg font-bold mt-2 mb-1">Sei un&apos;agenzia o un consulente?</h4>
                     <p className="text-stone-400 text-sm">
                         Il piano Partner ti permette di gestire più clienti, trasferire progetti e guadagnare con Business Tuner.
                         €29/mese, gratuito con 3+ clienti attivi.

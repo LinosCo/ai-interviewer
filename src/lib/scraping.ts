@@ -85,6 +85,7 @@ const PAGE_TYPE_PATTERNS: Record<ScrapedPage['pageType'], RegExp[]> = {
     pricing: [/prezz/i, /pric/i, /pian/i, /tariff/i, /cost/i],
     faq: [/faq/i, /domande/i, /help/i, /support/i, /assistenza/i],
     contact: [/contatt/i, /contact/i, /dove-siamo/i, /location/i],
+    custom: [], // Custom pages added by user
     other: []
 };
 
@@ -176,6 +177,7 @@ function prioritizeLinks(links: string[], maxLinks: number = 10): string[] {
         pricing: [],
         faq: [],
         contact: [],
+        custom: [],
         other: []
     };
 

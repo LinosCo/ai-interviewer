@@ -263,7 +263,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                     <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                                     <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                 </div>
-                                <p className="text-gray-400 text-sm font-medium">L'IA sta pensando...</p>
+                                <p className="text-gray-400 text-sm font-medium">L&apos;IA sta pensando...</p>
                             </motion.div>
                         )}
                     </AnimatePresence>

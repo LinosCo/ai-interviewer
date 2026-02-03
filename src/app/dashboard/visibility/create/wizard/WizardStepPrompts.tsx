@@ -325,7 +325,7 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
                                     </div>
                                     {prompt.aiOverviewVariant && (
                                         <div className="text-xs text-gray-500 pl-6">
-                                            Query: "<span className="italic">{prompt.aiOverviewVariant}</span>"
+                                            Query: &quot;<span className="italic">{prompt.aiOverviewVariant}</span>&quot;
                                         </div>
                                     )}
 
@@ -436,7 +436,7 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
 
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <p className="text-sm text-amber-800">
-                    <strong>⚠️ Nota:</strong> I prompt disabilitati (toggle off) non verranno utilizzati nel monitoring ma rimarranno salvati. Usa il bottone <Wand2 className="w-3 h-3 inline" /> per raffinare un singolo prompt con l'AI.
+                    <strong>⚠️ Nota:</strong> I prompt disabilitati (toggle off) non verranno utilizzati nel monitoring ma rimarranno salvati. Usa il bottone <Wand2 className="w-3 h-3 inline" /> per raffinare un singolo prompt con l&apos;AI.
                 </p>
             </div>
         </div>

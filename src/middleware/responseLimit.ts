@@ -55,9 +55,8 @@ export async function checkResponseLimit(
     }
 }
 
-async function getNextMonthReset(orgId: string): Promise<string> {
+async function getNextMonthReset(_orgId: string): Promise<string> {
     // Get organization's monthly reset date
-    const org = await planService.getOrganizationPlan(orgId);
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     return nextMonth.toISOString();

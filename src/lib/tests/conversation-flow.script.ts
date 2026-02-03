@@ -118,7 +118,7 @@ function simulateStateMachine(
 ): { nextState: ConversationState; supervisorAction: string; shouldOverride: boolean } {
     const nextState = { ...currentState };
     let supervisorAction = '';
-    let shouldOverride = false;
+    const shouldOverride = false;
 
     const numTopics = config.topics.length;
     const SCAN_TURNS_PER_TOPIC = 3;

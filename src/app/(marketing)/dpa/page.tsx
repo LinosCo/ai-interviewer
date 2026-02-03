@@ -28,17 +28,17 @@ export default function DPAPage() {
                     <dd>Qualsiasi operazione eseguita sui dati: raccolta, registrazione, organizzazione, conservazione, consultazione, elaborazione, modifica, estrazione, analisi, cancellazione.</dd>
 
                     <dt><strong>Sub-Responsabile:</strong></dt>
-                    <dd>Servizi terzi autorizzati da Voler AI per supportare l'erogazione del servizio (es. hosting, AI providers).</dd>
+                    <dd>Servizi terzi autorizzati da Voler AI per supportare l&apos;erogazione del servizio (es. hosting, AI providers).</dd>
                 </dl>
 
                 <h2>2. Oggetto e durata</h2>
                 <p>
-                    Questo DPA regola le modalità con cui Voler AI tratta i Dati Personali per conto del Cliente nell'ambito dell'utilizzo di Business Tuner,
+                    Questo DPA regola le modalità con cui Voler AI tratta i Dati Personali per conto del Cliente nell&apos;ambito dell&apos;utilizzo di Business Tuner,
                     in conformità al <strong>Regolamento (UE) 2016/679 (GDPR)</strong> e alla normativa italiana applicabile.
                 </p>
                 <p>
                     <strong>Durata:</strong> Questo accordo è valido per tutta la durata del contratto di servizio tra Cliente e Voler AI,
-                    e termina al momento della cancellazione dell'account e della definitiva rimozione dei dati.
+                    e termina al momento della cancellazione dell&apos;account e della definitiva rimozione dei dati.
                 </p>
 
                 <h2>3. Ruoli e responsabilità</h2>
@@ -68,7 +68,7 @@ export default function DPAPage() {
                 <h3>Tipologie di dati trattati:</h3>
                 <ul>
                     <li><strong>Dati delle interviste:</strong> Risposte testuali, metadata (timestamp, durata, IP address anonimizzato)</li>
-                    <li><strong>Dati di contatto (opzionali):</strong> Email, nome, telefono se richiesti dal Cliente nel setup dell'intervista</li>
+                    <li><strong>Dati di contatto (opzionali):</strong> Email, nome, telefono se richiesti dal Cliente nel setup dell&apos;intervista</li>
                     <li><strong>Dati di recruitment (opzionali):</strong> Skill, esperienze, location se attivata la modalità Data Collection</li>
                     <li><strong>Dati analitici:</strong> Sentiment score, topic coverage, quotes estratte da AI</li>
                 </ul>
@@ -106,12 +106,12 @@ export default function DPAPage() {
                     <li><strong>Formazione:</strong> Personale formato su GDPR e data protection best practices</li>
                     <li><strong>Confidenzialità:</strong> Accordi di riservatezza firmati da tutti i dipendenti</li>
                     <li><strong>Incident response:</strong> Piano di risposta a data breach documentato</li>
-                    <li><strong>Accesso limitato:</strong> Principio del "least privilege", accesso ai dati solo per personale autorizzato</li>
+                    <li><strong>Accesso limitato:</strong> Principio del &quot;least privilege&quot;, accesso ai dati solo per personale autorizzato</li>
                 </ul>
 
                 <h2>6. Sub-responsabili autorizzati</h2>
                 <p>
-                    Voler AI si avvale dei seguenti sub-responsabili per l'erogazione del servizio:
+                    Voler AI si avvale dei seguenti sub-responsabili per l&apos;erogazione del servizio:
                 </p>
 
                 <table className="w-full text-sm">
@@ -164,7 +164,7 @@ export default function DPAPage() {
 
                 <h3>Diritto di obiezione:</h3>
                 <p>
-                    Il Cliente ha il diritto di obiettare all'ingaggio di un nuovo sub-responsabile entro 30 giorni dalla notifica.
+                    Il Cliente ha il diritto di obiettare all&apos;ingaggio di un nuovo sub-responsabile entro 30 giorni dalla notifica.
                     In caso di obiezione motivata, le parti cercheranno una soluzione alternativa o, se non possibile, il Cliente potrà recedere dal contratto.
                 </p>
 
@@ -195,7 +195,7 @@ export default function DPAPage() {
                     In caso di violazione dei dati personali (data breach), Voler AI:
                 </p>
                 <ol>
-                    <li><strong>Notifica al Cliente:</strong> Entro 72 ore dalla scoperta, via email a tutti gli admin dell'account</li>
+                    <li><strong>Notifica al Cliente:</strong> Entro 72 ore dalla scoperta, via email a tutti gli admin dell&apos;account</li>
                     <li><strong>Informazioni fornite:</strong>
                         <ul>
                             <li>Natura della violazione (tipo di dati coinvolti, numero di interessati)</li>
@@ -207,15 +207,15 @@ export default function DPAPage() {
                 </ol>
 
                 <p className="bg-amber-50 border-l-4 border-amber-500 p-4">
-                    <strong>Importante:</strong> Il Cliente, in qualità di Titolare, rimane responsabile della notifica all'Autorità Garante
-                    e agli interessati se richiesto dall'Art. 33 e 34 del GDPR.
+                    <strong>Importante:</strong> Il Cliente, in qualità di Titolare, rimane responsabile della notifica all&apos;Autorità Garante
+                    e agli interessati se richiesto dall&apos;Art. 33 e 34 del GDPR.
                 </p>
 
                 <h2>9. Conservazione e cancellazione dati</h2>
 
                 <h3>Retention policy:</h3>
                 <ul>
-                    <li><strong>Dati interviste attive:</strong> Conservati finché il Cliente mantiene l'account</li>
+                    <li><strong>Dati interviste attive:</strong> Conservati finché il Cliente mantiene l&apos;account</li>
                     <li><strong>Dati account cancellato:</strong> Cancellazione entro 30 giorni dalla richiesta</li>
                     <li><strong>Backup:</strong> Sovrascritti automaticamente dopo 30 giorni</li>
                     <li><strong>Log di sicurezza:</strong> Conservati per 90 giorni per finalità di audit</li>
@@ -237,7 +237,7 @@ export default function DPAPage() {
                 <ul>
                     <li>Questionari di audit (forniti entro 30 giorni dalla richiesta)</li>
                     <li>Certificazioni di sicurezza (SOC 2, ISO 27001 se disponibili)</li>
-                    <li>Audit on-site (previo accordo, a carico del Cliente, max 1 volta l'anno)</li>
+                    <li>Audit on-site (previo accordo, a carico del Cliente, max 1 volta l&apos;anno)</li>
                 </ul>
 
                 <h2>11. Modifiche al DPA</h2>
@@ -259,14 +259,14 @@ export default function DPAPage() {
                 <ul>
                     <li><strong>Email DPO:</strong> dpo@voler.ai</li>
                     <li><strong>Email generale:</strong> hello@voler.ai</li>
-                    <li><strong>Oggetto email:</strong> "DPA - [Nome Cliente] - [Richiesta]"</li>
+                    <li><strong>Oggetto email:</strong> &quot;DPA - [Nome Cliente] - [Richiesta]&quot;</li>
                 </ul>
 
                 <div className="bg-green-50 border-l-4 border-green-500 p-6 my-8">
                     <p className="font-semibold text-green-900 mb-2">✅ Versione firmata del DPA</p>
                     <p className="text-sm text-green-800">
                         I clienti con piano BUSINESS possono richiedere una versione firmata di questo DPA per archivio compliance.
-                        Inviare richiesta a <strong>hello@voler.ai</strong> con oggetto "DPA Signature Request" includendo:
+                        Inviare richiesta a <strong>hello@voler.ai</strong> con oggetto &quot;DPA Signature Request&quot; includendo:
                     </p>
                     <ul className="text-sm text-green-800 mt-2">
                         <li>Ragione sociale e P.IVA del Cliente</li>

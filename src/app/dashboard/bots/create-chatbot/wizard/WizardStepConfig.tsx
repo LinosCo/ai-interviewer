@@ -232,7 +232,7 @@ export default function WizardStepConfig({ initialConfig, onNext, onBack }: Wiza
                             autoFocus
                         />
                     ) : (
-                        <p className="text-gray-700 italic">"{config.welcomeMessage}"</p>
+                        <p className="text-gray-700 italic">&quot;{config.welcomeMessage}&quot;</p>
                     )}
                 </div>
             </div>

@@ -106,7 +106,7 @@ export default async function EmbedPage({ params }: { params: Promise<{ botId: s
                         <h3 className="font-semibold text-slate-800">React / Next.js</h3>
                         <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside">
                             <li>Aggiungi lo script in <code className="bg-slate-200 px-1 py-0.5 rounded text-xs">_document.tsx</code> o <code className="bg-slate-200 px-1 py-0.5 rounded text-xs">layout.tsx</code></li>
-                            <li>Oppure usa un componente Script con strategy="lazyOnload"</li>
+                            <li>Oppure usa un componente Script con strategy=&quot;lazyOnload&quot;</li>
                         </ol>
                     </div>
 

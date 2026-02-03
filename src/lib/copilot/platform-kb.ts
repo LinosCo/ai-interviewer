@@ -762,7 +762,7 @@ export async function searchPlatformKB(
     const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 2);
 
     // Filter by category if specified
-    let entries = category === 'all'
+    const entries = category === 'all'
         ? PLATFORM_KB
         : PLATFORM_KB.filter(e => e.category === category);
 

@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { HIDDEN_LIMITS } from '@/config/limits';
-import { planService } from '@/services/planService';
 import { prisma as db } from '@/lib/prisma';
 
 /**

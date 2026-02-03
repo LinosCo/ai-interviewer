@@ -120,7 +120,7 @@ export function ConnectionTransferOrgDialog({
               <p className="font-semibold mb-1">Attenzione</p>
               <p>
                 Il trasferimento rimuoverà tutte le associazioni progetti esistenti
-                e trasferirà la connessione all'organizzazione selezionata.
+                e trasferirà la connessione all&apos;organizzazione selezionata.
               </p>
             </div>
           </div>

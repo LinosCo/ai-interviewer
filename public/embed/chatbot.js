@@ -34,7 +34,7 @@
         botId: script.getAttribute('data-bot-id'),
         apiBase: script.getAttribute('data-domain') || scriptUrl.origin
       };
-    } catch (e) {
+    } catch (_e) {
       return {
         botId: script.getAttribute('data-bot-id'),
         apiBase: script.getAttribute('data-domain') || window.location.origin

@@ -49,7 +49,7 @@ export function Footer() {
                         <h4 style={{ fontWeight: 600, marginBottom: '1.5rem', color: colors.text }}>Prodotto</h4>
                         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <li><Link href="/#features" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Features</Link></li>
-                            <li><Link href="/#use-cases" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Casi d'uso</Link></li>
+                            <li><Link href="/#use-cases" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Casi d&apos;uso</Link></li>
                             <li><Link href="/#pricing" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Prezzi</Link></li>
                             <li><Link href="/onboarding/preview" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Simulatore</Link></li>
                         </ul>

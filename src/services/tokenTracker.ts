@@ -1,4 +1,5 @@
 import { prisma as db } from '@/lib/prisma';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { HIDDEN_LIMITS } from '@/config/limits';
 
 interface TokenUsage {

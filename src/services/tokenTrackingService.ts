@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { PLANS, isUnlimited, PlanType } from '@/config/plans';
+import { PLANS, PlanType } from '@/config/plans';
 import { TokenCategory } from '@prisma/client';
 import { CreditService } from './creditService';
 import { CreditAction, getCreditCost } from '@/config/creditCosts';
@@ -47,8 +47,8 @@ export class TokenTrackingService {
         resourceType?: string;
         resourceId?: string;
     }) {
-        let {
-            organizationId,
+        let { organizationId } = params;
+        const {
             userId,
             projectId,
             executedById,

@@ -62,13 +62,13 @@ export default function TransferProjectDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl">
                         <Building2 className="w-5 h-5 text-amber-500" />
-                        Trasferisci Progetto "{projectName}"
+                        Trasferisci Progetto &quot;{projectName}&quot;
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="py-4 space-y-4">
                     <p className="text-sm text-gray-500">
-                        Seleziona l'organizzazione di destinazione. Il progetto e tutti i suoi tool (bot, integrazioni, ecc.) verranno spostati nell'organizzazione selezionata.
+                        Seleziona l&apos;organizzazione di destinazione. Il progetto e tutti i suoi tool (bot, integrazioni, ecc.) verranno spostati nell&apos;organizzazione selezionata.
                     </p>
 
                     <div className="space-y-1">

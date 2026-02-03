@@ -229,7 +229,7 @@ async function completeInterview(
         // Profile extraction (slow LLM call)
         (async () => {
             try {
-                const { CandidateExtractor } = require('@/lib/llm/candidate-extractor');
+                const { CandidateExtractor } = await import('@/lib/llm/candidate-extractor');
                 return await CandidateExtractor.extractProfile(messages, apiKey, conversationId);
             } catch (e) {
                 console.error("Profile extraction failed:", e);
@@ -345,7 +345,7 @@ export async function POST(req: Request) {
         // ====================================================================
         // 3. PHASE MACHINE
         // ====================================================================
-        let nextState = { ...state };
+        const nextState = { ...state };
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: any = { status: 'SCANNING' };

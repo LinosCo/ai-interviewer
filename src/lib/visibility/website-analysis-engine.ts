@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { scrapeUrl, scrapeWebsiteWithSubpages, ScrapedContent, MultiPageScrapedContent, AdditionalUrl } from '@/lib/scraping';
+import { scrapeWebsiteWithSubpages, MultiPageScrapedContent, AdditionalUrl } from '@/lib/scraping';
 import { getSystemLLM } from './llm-providers';
 import { generateObject } from 'ai';
 import { z } from 'zod';
@@ -96,7 +96,7 @@ export class WebsiteAnalysisEngine {
         try {
             // 3. Parse additional URLs from config
             const additionalUrls: AdditionalUrl[] = Array.isArray(analysis.visibilityConfig.additionalUrls)
-                ? (analysis.visibilityConfig.additionalUrls as AdditionalUrl[])
+                ? (analysis.visibilityConfig.additionalUrls as unknown as AdditionalUrl[])
                 : [];
 
             // 4. Scrape website content (including subpages and additional URLs)

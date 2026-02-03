@@ -61,14 +61,14 @@ export function ProjectDeleteSection({ projectId, projectName }: ProjectDeleteSe
                         Elimina Progetto
                     </CardTitle>
                     <CardDescription>
-                        Elimina definitivamente questo progetto. I tool verranno spostati in un altro dei tuoi progetti.
+                        Elimina definitivamente questo progetto. I tool verranno spostati in un&apos;altro dei tuoi progetti.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="p-4 rounded-xl bg-red-50 border border-red-100 flex gap-3">
                         <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                         <div className="text-sm text-red-800">
-                            <strong>Attenzione:</strong> Questa azione non può essere annullata. Tutti i membri perderanno l'accesso a questo progetto. I bot e le configurazioni di visibilità verranno spostati in un altro dei tuoi progetti.
+                            <strong>Attenzione:</strong> Questa azione non può essere annullata. Tutti i membri perderanno l&apos;accesso a questo progetto. I bot e le configurazioni di visibilità verranno spostati in un&apos;altro dei tuoi progetti.
                         </div>
                     </div>
                     <Button

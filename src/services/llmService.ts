@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { Bot, GlobalConfig, User } from '@prisma/client';
+import { Bot, GlobalConfig } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 
@@ -83,7 +83,7 @@ export class LLMService {
                 'utf-8'
             );
             return methodologyCache;
-        } catch (e) {
+        } catch {
             console.warn("Methodology file missing, using empty string");
             methodologyCache = "";
             return methodologyCache;

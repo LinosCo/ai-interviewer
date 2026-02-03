@@ -60,7 +60,7 @@ export default function ChatbotWizardPage() {
                             Crea il tuo Assistente AI
                         </h1>
                         <p className="text-xl text-gray-500 max-w-lg mx-auto">
-                            Descrivi l'obiettivo del chatbot e l'AI lo configurerà automaticamente per te.
+                            Descrivi l&apos;obiettivo del chatbot e l&apos;AI lo configurerà automaticamente per te.
                         </p>
                     </div>
 

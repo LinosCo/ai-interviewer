@@ -21,14 +21,14 @@ export default function CookiesPage() {
                     <ul className="list-disc pl-6 space-y-2 mt-4">
                         <li>
                             <strong>Cookie Tecnici:</strong> Essenziali per il corretto funzionamento del sito e per consentire la navigazione.
-                            Non richiedono il consenso dell'utente.
+                            Non richiedono il consenso dell&apos;utente.
                         </li>
                         <li>
                             <strong>Cookie Analitici:</strong> Utilizzati per raccogliere informazioni, in forma aggregata,
                             sul numero degli utenti e su come questi visitano il sito (es. Google Analytics, Vercel Analytics).
                         </li>
                         <li>
-                            <strong>Cookie di Funzionalità:</strong> Permettono all'utente la navigazione in funzione di una serie
+                            <strong>Cookie di Funzionalità:</strong> Permettono all&apos;utente la navigazione in funzione di una serie
                             di criteri selezionati (ad esempio, la lingua) al fine di migliorare il servizio reso.
                         </li>
                     </ul>
@@ -37,7 +37,7 @@ export default function CookiesPage() {
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">3. Gestione dei cookie</h2>
                     <p>
-                        Puoi gestire le preferenze relative ai cookie direttamente all'interno del tuo browser ed impedire
+                        Puoi gestire le preferenze relative ai cookie direttamente all&apos;interno del tuo browser ed impedire
                         che terze parti possano installarne. Tramite le preferenze del browser è inoltre possibile eliminare
                         i cookie installati in passato.
                     </p>

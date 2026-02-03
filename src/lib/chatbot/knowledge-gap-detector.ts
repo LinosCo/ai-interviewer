@@ -91,7 +91,6 @@ export async function detectKnowledgeGaps(botId: string, lookbackDays: number = 
                         where: { id: existing.id },
                         data: {
                             evidence: {
-                                // @ts-ignore: simplified JSON update logic
                                 count: (existing.evidence as any)?.count + 1 || 2
                             }
                         }

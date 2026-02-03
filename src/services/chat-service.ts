@@ -1,7 +1,8 @@
 
 import { prisma } from '@/lib/prisma';
 import { checkInterviewStatus, markInterviewAsCompleted } from '@/lib/usage';
-import { Conversation, Message, Bot, TopicBlock } from '@prisma/client';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import type { Conversation, Message, Bot, TopicBlock } from '@prisma/client';
 
 export class ChatService {
 

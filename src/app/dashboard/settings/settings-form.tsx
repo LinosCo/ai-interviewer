@@ -210,8 +210,8 @@ export default function PlatformSettingsForm({
                 {!isKnowledgeOpen ? (
                     <div className="p-4 bg-stone-50 rounded-lg border border-stone-100">
                         <p className="text-sm text-stone-500 italic">
-                            La metodologia di intervista definisce come l'AI si comporta durante le conversazioni.
-                            Clicca su "Modifica metodologia" per visualizzare e cambiare il testo.
+                            La metodologia di intervista definisce come l&apos;AI si comporta durante le conversazioni.
+                            Clicca su &quot;Modifica metodologia&quot; per visualizzare e cambiare il testo.
                         </p>
                     </div>
                 ) : (
@@ -258,7 +258,7 @@ export default function PlatformSettingsForm({
                         <p className="text-sm text-stone-500 italic">
                             Il piano strategico definisce obiettivi, priorità e linee guida che il Copilot utilizzerà
                             per interpretare i dati e suggerire azioni concrete.
-                            Clicca su "Modifica piano" per personalizzarlo.
+                            Clicca su &quot;Modifica piano&quot; per personalizzarlo.
                         </p>
                     </div>
                 ) : (

@@ -10,7 +10,7 @@ const HERO_PHRASES = [
   'se il team è motivato?',
   'come parlano di te online?',
   'dove ottimizzare il budget?',
-  "se l'assistenza funziona?",
+  "se l&apos;assistenza funziona?",
   'come ti vede la filiera?',
   'perché i clienti comprano?',
   'cosa cercano i talenti?',

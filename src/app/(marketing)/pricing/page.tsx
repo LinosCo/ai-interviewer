@@ -193,7 +193,7 @@ export default function PricingPage() {
                     {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-5 h-5 fill-amber-400 text-amber-400" />)}
                 </div>
                 <p className="text-2xl font-medium text-slate-700 italic leading-relaxed">
-                    "Voler.ai ha rivoluzionato il modo in cui monitoriamo il nostro brand. I piano Pro è perfetto per un team che vuole dati concreti ogni giorno."
+                    &quot;Voler.ai ha rivoluzionato il modo in cui monitoriamo il nostro brand. I piano Pro è perfetto per un team che vuole dati concreti ogni giorno.&quot;
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-200" />
@@ -209,7 +209,7 @@ export default function PricingPage() {
                 <div className="absolute top-0 right-0 p-8 opacity-10">
                     <ShieldCheck className="w-32 h-32" />
                 </div>
-                <h3 className="text-2xl font-bold mb-4 relative z-10">Pronto a sbloccare l'AI per il tuo Business?</h3>
+                <h3 className="text-2xl font-bold mb-4 relative z-10">Pronto a sbloccare l&apos;AI per il tuo Business?</h3>
                 <p className="text-slate-400 mb-8 relative z-10">Unisciti a oltre 500 aziende che usano Voler.ai per crescere.</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
                     <Link href="/register" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 py-6 px-10 rounded-2xl font-black shadow-xl shadow-indigo-500/20 text-white transition-colors">

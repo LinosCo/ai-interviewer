@@ -25,7 +25,7 @@ export default function SLAPage() {
                     <dd>Interventi pianificati notificati con almeno 72 ore di anticipo, solitamente durante ore notturne (02:00-05:00 CET).</dd>
 
                     <dt><strong>Periodo di Fatturazione:</strong></dt>
-                    <dd>Intervallo mensile di riferimento per il calcolo dell'uptime (es. 1-31 gennaio).</dd>
+                    <dd>Intervallo mensile di riferimento per il calcolo dell&apos;uptime (es. 1-31 gennaio).</dd>
 
                     <dt><strong>Service Credit:</strong></dt>
                     <dd>Rimborso sotto forma di credito applicabile alla fattura successiva in caso di mancato rispetto degli SLA.</dd>
@@ -66,7 +66,7 @@ export default function SLAPage() {
                     <li><strong>Forza maggiore:</strong> Eventi fuori dal controllo di Voler AI (disastri naturali, interruzioni ISP, attacchi DDoS)</li>
                     <li><strong>Problemi lato cliente:</strong> Configurazioni errate, problemi di rete del cliente, browser non supportati</li>
                     <li><strong>Servizi terzi:</strong> Downtime di OpenAI/Anthropic, Stripe, o altri provider esterni</li>
-                    <li><strong>Beta features:</strong> Funzionalità contrassegnate come "Beta" o "Experimental"</li>
+                    <li><strong>Beta features:</strong> Funzionalità contrassegnate come &quot;Beta&quot; o &quot;Experimental&quot;</li>
                 </ul>
 
                 <h2>3. Tempi di Risposta Supporto</h2>
@@ -186,7 +186,7 @@ export default function SLAPage() {
                 <h2>6. Service Credits (Rimborsi)</h2>
 
                 <p>
-                    In caso di mancato rispetto dell'uptime garantito, Voler AI emetterà Service Credits automatici secondo questa tabella:
+                    In caso di mancato rispetto dell&apos;uptime garantito, Voler AI emetterà Service Credits automatici secondo questa tabella:
                 </p>
 
                 <h3>STARTER Plan:</h3>
@@ -264,13 +264,13 @@ export default function SLAPage() {
                 <h3>Procedura di richiesta:</h3>
                 <ol>
                     <li>Il cliente deve richiedere il Service Credit entro 30 giorni dalla fine del periodo di fatturazione</li>
-                    <li>Richiesta via email a <strong>billing@voler.ai</strong> con oggetto "Service Credit Request - [Mese/Anno]"</li>
+                    <li>Richiesta via email a <strong>billing@voler.ai</strong> con oggetto &quot;Service Credit Request - [Mese/Anno]&quot;</li>
                     <li>Voler AI verifica i log di uptime e risponde entro 5 giorni lavorativi</li>
                     <li>Credit applicato automaticamente alla fattura successiva</li>
                 </ol>
 
                 <p className="bg-amber-50 border-l-4 border-amber-500 p-4">
-                    <strong>Nota:</strong> I Service Credits sono l'unico rimedio per mancato rispetto dello SLA.
+                    <strong>Nota:</strong> I Service Credits sono l&apos;unico rimedio per mancato rispetto dello SLA.
                     Sono esclusi rimborsi in denaro, salvo diverso accordo scritto.
                 </p>
 
@@ -314,7 +314,7 @@ export default function SLAPage() {
                     Per incident P1 con downtime &gt; 1 ora, Voler AI pubblica un post-mortem pubblico entro 7 giorni contenente:
                 </p>
                 <ul>
-                    <li>Timeline dettagliato dell'incident</li>
+                    <li>Timeline dettagliato dell&apos;incident</li>
                     <li>Root cause analysis</li>
                     <li>Impatto quantificato</li>
                     <li>Action items per prevenire ricorrenze</li>

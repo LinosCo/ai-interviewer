@@ -300,7 +300,7 @@ export default function ProjectDetailView({
                                     </div>
                                     <div>
                                         <h2 className="text-2xl font-black text-gray-900 tracking-tight">Associa nuovi Tool</h2>
-                                        <p className="text-sm text-gray-500 font-medium">Trova tool esistenti nell'organizzazione.</p>
+                                        <p className="text-sm text-gray-500 font-medium">Trova tool esistenti nell&apos;organizzazione.</p>
                                     </div>
                                 </div>
                                 <button onClick={() => setIsManageToolsOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
@@ -332,7 +332,7 @@ export default function ProjectDetailView({
                                         ))}
                                         {availableBots.length === 0 && (
                                             <div className="text-center py-6 px-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                                <p className="text-xs text-gray-400 font-medium italic">Nessun altro bot trovato nell'organizzazione.</p>
+                                                <p className="text-xs text-gray-400 font-medium italic">Nessun altro bot trovato nell&apos;organizzazione.</p>
                                             </div>
                                         )}
                                     </div>
@@ -369,7 +369,7 @@ export default function ProjectDetailView({
                                         ))}
                                         {availableVisibilityConfigs.length === 0 && (
                                             <div className="text-center py-6 px-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                                <p className="text-xs text-gray-400 font-medium italic">Nessun altro brand trovato nell'organizzazione.</p>
+                                                <p className="text-xs text-gray-400 font-medium italic">Nessun altro brand trovato nell&apos;organizzazione.</p>
                                             </div>
                                         )}
                                     </div>

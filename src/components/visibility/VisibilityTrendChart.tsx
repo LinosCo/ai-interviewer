@@ -67,7 +67,7 @@ export function VisibilityTrendChart({ configId }: Props) {
                 <CardContent className="h-[200px] flex flex-col items-center justify-center text-muted-foreground">
                     <Calendar className="w-10 h-10 mb-3 opacity-20" />
                     <p className="text-sm">Servono almeno 2 scansioni per mostrare il trend</p>
-                    <p className="text-xs text-slate-400 mt-1">Esegui altre scansioni per vedere l'andamento</p>
+                    <p className="text-xs text-slate-400 mt-1">Esegui altre scansioni per vedere l&apos;andamento</p>
                 </CardContent>
             </Card>
         );
@@ -148,7 +148,7 @@ export function VisibilityTrendChart({ configId }: Props) {
                                 boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                                 padding: '12px'
                             }}
-                            formatter={(value: number) => [`${value}%`, 'Visibility Score']}
+                            formatter={(value) => [`${value ?? 0}%`, 'Visibility Score']}
                             labelFormatter={(label) => `Data: ${label}`}
                         />
                         <ReferenceLine y={avgScore} stroke="#94a3b8" strokeDasharray="5 5" label={{ value: `Media: ${avgScore}%`, position: 'right', fontSize: 10, fill: '#94a3b8' }} />

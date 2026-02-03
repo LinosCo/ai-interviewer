@@ -112,7 +112,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                        Opzionale. Inserisci l'URL per ricevere AI Tips di ottimizzazione per LLM e motori di ricerca.
+                        Opzionale. Inserisci l&apos;URL per ricevere AI Tips di ottimizzazione per LLM e motori di ricerca.
                     </p>
                 </div>
 
@@ -124,7 +124,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                             Pagine Aggiuntive Importanti
                         </label>
                         <p className="text-xs text-gray-500 mb-3">
-                            Aggiungi pagine specifiche del tuo sito che vuoi includere nell'analisi (es. pagina prodotto, pricing, FAQ).
+                            Aggiungi pagine specifiche del tuo sito che vuoi includere nell&apos;analisi (es. pagina prodotto, pricing, FAQ).
                         </p>
 
                         {/* List of added URLs */}

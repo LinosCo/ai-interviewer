@@ -888,6 +888,8 @@ model VisibilityConfig {
   brandName      String
   category       String
   description    String?
+  websiteUrl     String?
+  additionalUrls Json?                // Array of {url, label} for additional important pages to analyze
   language       String               @default("it")
   territory      String               @default("IT")
   isActive       Boolean              @default(true)
@@ -901,6 +903,7 @@ model VisibilityConfig {
   project        Project?             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   prompts        VisibilityPrompt[]
   scans          VisibilityScan[]
+  websiteAnalyses WebsiteAnalysis[]
 }
 
 model VisibilityPrompt {
@@ -913,6 +916,7 @@ model VisibilityPrompt {
   generatedByAI    Boolean              @default(false)
   lastEditedAt     DateTime             @default(now())
   orderIndex       Int                  @default(0)
+  referenceUrl     String?              // URL of the page that should be cited as source for this prompt
 
   // AI Overview tracking
   aiOverviewEnabled   Boolean   @default(true)  // User can disable AI Overview for this prompt
@@ -972,6 +976,41 @@ model VisibilityScanMetric {
   value      Float
   dimensions Json?
   scan       VisibilityScan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+}
+
+model WebsiteAnalysis {
+  id                    String           @id @default(cuid())
+  configId              String
+  websiteUrl            String
+  status                String           @default("pending")
+
+  // Scores (0-100)
+  overallScore          Int              @default(0)
+  structuredDataScore   Int              @default(0)
+  valuePropositionScore Int              @default(0)
+  keywordCoverageScore  Int              @default(0)
+  contentClarityScore   Int              @default(0)
+
+  // Analysis Details (JSON)
+  structuredDataFound   Json?
+  valuePropositions     Json?
+  keywordAnalysis       Json?
+  contentAnalysis       Json?
+  recommendations       Json?
+  promptsAddressed      Json?
+
+  pageTitle             String?
+  pageDescription       String?
+  contentLength         Int?
+  pagesScraped          Int              @default(1)
+
+  startedAt             DateTime         @default(now())
+  completedAt           DateTime?
+  errorMessage          String?
+
+  visibilityConfig      VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId, completedAt])
 }
 
 model SerpMonitoringScan {

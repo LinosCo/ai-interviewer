@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Edit2, Trash2, Loader2, Plus, Wand2, Globe, X } from 'lucide-react';
+import { Sparkles, Edit2, Trash2, Loader2, Plus, Wand2, Globe, X, Link2 } from 'lucide-react';
 import { VisibilityConfig } from '../page';
 
 interface Props {
@@ -15,8 +15,31 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
     const [refiningId, setRefiningId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editText, setEditText] = useState('');
+    const [editingRefUrlId, setEditingRefUrlId] = useState<string | null>(null);
+    const [refUrlText, setRefUrlText] = useState('');
 
     const isLimitReached = maxPrompts !== -1 && config.prompts.length >= maxPrompts;
+
+    const handleEditRefUrl = (prompt: typeof config.prompts[0]) => {
+        setEditingRefUrlId(prompt.id);
+        setRefUrlText(prompt.referenceUrl || '');
+    };
+
+    const handleSaveRefUrl = (promptId: string) => {
+        const updated = config.prompts.map(p =>
+            p.id === promptId ? { ...p, referenceUrl: refUrlText.trim() || undefined } : p
+        );
+        setConfig({ ...config, prompts: updated });
+        setEditingRefUrlId(null);
+        setRefUrlText('');
+    };
+
+    const handleRemoveRefUrl = (promptId: string) => {
+        const updated = config.prompts.map(p =>
+            p.id === promptId ? { ...p, referenceUrl: undefined } : p
+        );
+        setConfig({ ...config, prompts: updated });
+    };
 
     const handleGenerate = async () => {
         if (!config.brandName || !config.category) {
@@ -305,6 +328,79 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
                                             Query: "<span className="italic">{prompt.aiOverviewVariant}</span>"
                                         </div>
                                     )}
+
+                                    {/* Reference URL Section */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                        <div className="flex items-center gap-2 flex-1">
+                                            <Link2 className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                                            <span className="text-sm text-gray-600">URL di Riferimento</span>
+                                            {editingRefUrlId === prompt.id ? (
+                                                <div className="flex items-center gap-2 flex-1">
+                                                    <input
+                                                        type="url"
+                                                        value={refUrlText}
+                                                        onChange={(e) => setRefUrlText(e.target.value)}
+                                                        placeholder="https://esempio.it/pagina-rilevante"
+                                                        className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                        autoFocus
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                                handleSaveRefUrl(prompt.id);
+                                                            }
+                                                            if (e.key === 'Escape') {
+                                                                setEditingRefUrlId(null);
+                                                            }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        onClick={() => handleSaveRefUrl(prompt.id)}
+                                                        className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                                                    >
+                                                        OK
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingRefUrlId(null)}
+                                                        className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                                    >
+                                                        Annulla
+                                                    </button>
+                                                </div>
+                                            ) : prompt.referenceUrl ? (
+                                                <div className="flex items-center gap-2 flex-1">
+                                                    <a
+                                                        href={prompt.referenceUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-sm text-purple-600 hover:underline truncate max-w-[300px]"
+                                                    >
+                                                        {prompt.referenceUrl}
+                                                    </a>
+                                                    <button
+                                                        onClick={() => handleEditRefUrl(prompt)}
+                                                        className="p-1 text-gray-400 hover:text-purple-600 transition-colors"
+                                                        title="Modifica URL"
+                                                    >
+                                                        <Edit2 className="w-3 h-3" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRemoveRefUrl(prompt.id)}
+                                                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                                        title="Rimuovi URL"
+                                                    >
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleEditRefUrl(prompt)}
+                                                    className="text-xs text-purple-600 hover:underline"
+                                                >
+                                                    + Aggiungi URL
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>

@@ -156,7 +156,8 @@ export default async function VisibilityPage({
                 brandPosition: r.brandPosition,
                 sentiment: r.sentiment,
                 responseText: r.responseText,
-                competitorPositions: r.competitorPositions as Record<string, number | null>
+                competitorPositions: r.competitorPositions as Record<string, number | null>,
+                sourcesCited: r.sourcesCited || []
             })),
             partial: false
         };

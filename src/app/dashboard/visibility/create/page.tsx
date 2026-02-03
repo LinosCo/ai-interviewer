@@ -8,10 +8,17 @@ import { WizardStepPrompts } from './wizard/WizardStepPrompts';
 import { WizardStepCompetitors } from './wizard/WizardStepCompetitors';
 import { WizardStepReview } from './wizard/WizardStepReview';
 
+export interface AdditionalUrl {
+    url: string;
+    label: string;
+}
+
 export interface VisibilityConfig {
     brandName: string;
     category: string;
     description: string;
+    websiteUrl?: string;
+    additionalUrls?: AdditionalUrl[];
     language: string;
     territory: string;
     projectId?: string;
@@ -22,6 +29,7 @@ export interface VisibilityConfig {
         aiOverviewEnabled?: boolean;
         aiOverviewVariant?: string | null;
         aiOverviewLastFound?: Date | null;
+        referenceUrl?: string;
     }>;
     competitors: Array<{
         id: string;
@@ -50,6 +58,8 @@ export default function CreateVisibilityWizardPage() {
         brandName: '',
         category: '',
         description: '',
+        websiteUrl: undefined,
+        additionalUrls: [],
         language: 'it',
         territory: 'IT',
         projectId: projectIdParam || undefined,
@@ -74,6 +84,10 @@ export default function CreateVisibilityWizardPage() {
                                 brandName: data.config.brandName || '',
                                 category: data.config.category || '',
                                 description: data.config.description || '',
+                                websiteUrl: data.config.websiteUrl || undefined,
+                                additionalUrls: Array.isArray(data.config.additionalUrls)
+                                    ? data.config.additionalUrls
+                                    : [],
                                 language: data.config.language || 'it',
                                 territory: data.config.territory || 'IT',
                                 projectId: data.config.projectId || projectIdParam || undefined,
@@ -83,7 +97,8 @@ export default function CreateVisibilityWizardPage() {
                                     enabled: p.enabled,
                                     aiOverviewEnabled: p.aiOverviewEnabled ?? true,
                                     aiOverviewVariant: p.aiOverviewVariant || null,
-                                    aiOverviewLastFound: p.aiOverviewLastFound || null
+                                    aiOverviewLastFound: p.aiOverviewLastFound || null,
+                                    referenceUrl: p.referenceUrl || undefined
                                 })) || [],
                                 competitors: data.config.competitors?.map((c: any) => ({
                                     id: c.id,
@@ -110,7 +125,7 @@ export default function CreateVisibilityWizardPage() {
 
                     // Default limits (from our centralized config logic)
                     let maxComp = 15;
-                    let maxPrompts = 20;
+                    let maxPrompts = 10;
 
                     if (tier === 'FREE' || tier === 'STARTER') {
                         maxComp = 0;
@@ -155,11 +170,11 @@ export default function CreateVisibilityWizardPage() {
                 throw new Error(errData.error || 'Failed to save');
             }
 
-            if (config.projectId) {
-                router.push(`/dashboard/projects/${config.projectId}`);
-            } else {
-                router.push('/dashboard/visibility');
-            }
+            const data = await response.json();
+            const savedConfigId = data.configId || configId;
+
+            // Redirect to the monitoring page for this specific brand
+            router.push(`/dashboard/visibility?brandId=${savedConfigId}`);
         } catch (error: any) {
             console.error('Save error:', error);
             alert(error.message || 'Errore nel salvataggio. Riprova.');

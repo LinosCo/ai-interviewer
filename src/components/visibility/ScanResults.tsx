@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, ChevronDown, ChevronUp, ExternalLink, Info } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, ExternalLink, Info, Link2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 
 interface ScanData {
@@ -21,6 +21,7 @@ interface ScanData {
         sentiment: string | null;
         responseText: string;
         competitorPositions: Record<string, number | null>;
+        sourcesCited: string[];
     }[];
     partial: boolean;
 }
@@ -75,6 +76,36 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
         mentions: stats.mentions,
         avgPosition: stats.mentions > 0 ? Math.round((stats.avgPosition || 0) / stats.mentions * 10) / 10 : null
     })).sort((a, b) => b.score - a.score);
+
+    // Aggregate sources by frequency and brand mention association
+    const sourceStats: Record<string, { count: number, withBrand: number, platforms: Set<string> }> = {};
+    responses.forEach(r => {
+        const sources = r.sourcesCited || [];
+        sources.forEach(source => {
+            if (!source) return;
+            const normalizedSource = source.toLowerCase().trim();
+            if (!sourceStats[normalizedSource]) {
+                sourceStats[normalizedSource] = { count: 0, withBrand: 0, platforms: new Set() };
+            }
+            sourceStats[normalizedSource].count++;
+            sourceStats[normalizedSource].platforms.add(r.platform);
+            if (r.brandMentioned) {
+                sourceStats[normalizedSource].withBrand++;
+            }
+        });
+    });
+
+    const sourcesData = Object.entries(sourceStats)
+        .map(([source, stats]) => ({
+            source,
+            count: stats.count,
+            withBrand: stats.withBrand,
+            platforms: Array.from(stats.platforms),
+            // Importance score: frequency + brand association bonus
+            importance: stats.count + (stats.withBrand * 0.5)
+        }))
+        .sort((a, b) => b.importance - a.importance)
+        .slice(0, 15); // Top 15 sources
 
     const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
 
@@ -199,6 +230,80 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                 </Card>
             </div>
 
+            {/* Sources Cited Section */}
+            {sourcesData.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                            <Link2 className="w-5 h-5 text-amber-600" />
+                            Fonti Citate dagli LLM
+                        </CardTitle>
+                        <CardDescription>
+                            Le fonti più rilevanti citate nelle risposte, ordinate per importanza
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                            {sourcesData.map((source, idx) => (
+                                <div
+                                    key={source.source}
+                                    className={`p-3 rounded-lg border transition-colors ${
+                                        source.withBrand > 0
+                                            ? 'bg-green-50 border-green-200'
+                                            : 'bg-slate-50 border-slate-200'
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-sm text-slate-900 truncate" title={source.source}>
+                                                {source.source.startsWith('http')
+                                                    ? new URL(source.source).hostname.replace('www.', '')
+                                                    : source.source}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-xs text-slate-500">
+                                                    Citato {source.count}x
+                                                </span>
+                                                {source.withBrand > 0 && (
+                                                    <Badge variant="default" className="text-[10px] h-4 px-1.5 bg-green-600">
+                                                        {source.withBrand}x con brand
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge variant="outline" className="text-[10px] h-5">
+                                                #{idx + 1}
+                                            </Badge>
+                                            {source.source.startsWith('http') && (
+                                                <a
+                                                    href={source.source}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-slate-400 hover:text-amber-600 transition-colors"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {source.platforms.map(p => (
+                                            <span key={p} className="text-[9px] px-1.5 py-0.5 bg-white rounded border border-slate-200 text-slate-500 uppercase">
+                                                {p}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-4 text-center">
+                            Le fonti evidenziate in verde sono citate quando il brand viene menzionato
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Detailed Responses List */}
             <Card>
                 <CardHeader>
@@ -273,6 +378,36 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                                                                 <Badge key={c.name} variant="outline" className="bg-amber-50 border-amber-100 text-amber-800">
                                                                     {c.name}: Pos. {c.pos}
                                                                 </Badge>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Sources Cited in this response */}
+                                                {res.sourcesCited && res.sourcesCited.length > 0 && (
+                                                    <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm">
+                                                        <h5 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+                                                            <Link2 className="w-3.5 h-3.5" />
+                                                            Fonti Citate
+                                                        </h5>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {res.sourcesCited.map((source, idx) => (
+                                                                <a
+                                                                    key={idx}
+                                                                    href={source.startsWith('http') ? source : undefined}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border transition-colors ${
+                                                                        source.startsWith('http')
+                                                                            ? 'bg-blue-50 border-blue-100 text-blue-700 hover:bg-blue-100 cursor-pointer'
+                                                                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                                                                    }`}
+                                                                >
+                                                                    {source.startsWith('http')
+                                                                        ? new URL(source).hostname.replace('www.', '')
+                                                                        : source}
+                                                                    {source.startsWith('http') && <ExternalLink className="w-3 h-3" />}
+                                                                </a>
                                                             ))}
                                                         </div>
                                                     </div>

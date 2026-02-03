@@ -12,6 +12,8 @@ import {
     Eye,
     ArrowRight,
     ChevronRight,
+    ChevronDown,
+    ChevronUp,
     CheckCircle2,
     XCircle,
     Info,
@@ -23,7 +25,11 @@ import {
     Phone,
     Lightbulb,
     Save,
-    Folder
+    Folder,
+    Target,
+    Code,
+    FileText,
+    AlertCircle
 } from "lucide-react";
 import { showToast } from "@/components/toast";
 import { useProject } from '@/contexts/ProjectContext';
@@ -99,6 +105,9 @@ export default function InsightHubPage() {
     const [isSavingStrategy, setIsSavingStrategy] = useState(false);
     const [showStrategyEdit, setShowStrategyEdit] = useState(false);
     const [websiteAnalytics, setWebsiteAnalytics] = useState<any>(null);
+    const [websiteAnalysis, setWebsiteAnalysis] = useState<any>(null);
+    const [websiteAnalysisLoading, setWebsiteAnalysisLoading] = useState(false);
+    const [expandedWebsiteRec, setExpandedWebsiteRec] = useState<number | null>(null);
 
     // Get the project ID for API calls (null if "All Projects" is selected)
     const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
@@ -163,12 +172,77 @@ export default function InsightHubPage() {
         }
     };
 
+    const fetchWebsiteAnalysis = async () => {
+        try {
+            // Get the visibility config for the project/org
+            const configUrl = projectId
+                ? `/api/visibility/create?projectId=${projectId}`
+                : '/api/visibility/create';
+            const configRes = await fetch(configUrl);
+            if (configRes.ok) {
+                const configData = await configRes.json();
+                if (configData.config?.id && configData.config?.websiteUrl) {
+                    // Fetch website analysis for this config
+                    const analysisRes = await fetch(`/api/visibility/website-analysis?configId=${configData.config.id}`);
+                    if (analysisRes.ok) {
+                        const analysisData = await analysisRes.json();
+                        setWebsiteAnalysis({
+                            ...analysisData.analysis,
+                            configId: configData.config.id,
+                            websiteUrl: configData.config.websiteUrl,
+                            brandName: configData.config.brandName
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching website analysis:', err);
+        }
+    };
+
+    const runWebsiteAnalysis = async (configId: string) => {
+        setWebsiteAnalysisLoading(true);
+        try {
+            const res = await fetch('/api/visibility/website-analysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ configId })
+            });
+            if (res.ok) {
+                showToast("Analisi sito avviata. Attendere...");
+                // Poll for completion
+                const pollInterval = setInterval(async () => {
+                    const pollRes = await fetch(`/api/visibility/website-analysis?configId=${configId}`);
+                    if (pollRes.ok) {
+                        const data = await pollRes.json();
+                        if (!data.isRunning && data.analysis) {
+                            clearInterval(pollInterval);
+                            setWebsiteAnalysis(prev => ({ ...prev, ...data.analysis }));
+                            setWebsiteAnalysisLoading(false);
+                            showToast("Analisi sito completata!");
+                        }
+                    }
+                }, 3000);
+                setTimeout(() => {
+                    clearInterval(pollInterval);
+                    setWebsiteAnalysisLoading(false);
+                }, 120000);
+            }
+        } catch (err) {
+            console.error(err);
+            setWebsiteAnalysisLoading(false);
+            showToast("Errore durante l'analisi", "error");
+        }
+    };
+
     // Refetch when selected project changes
     useEffect(() => {
         setLoading(true);
         setHealthReport(null);
+        setWebsiteAnalysis(null);
         fetchInsights();
         fetchStrategy();
+        fetchWebsiteAnalysis();
     }, [projectId]);
 
     const handleSync = async () => {
@@ -445,6 +519,199 @@ Grazie`
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Website LLM Optimization Section - from Brand Monitor */}
+            {websiteAnalysis?.websiteUrl && (
+                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/30 to-white">
+                    <CardHeader className="pb-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-purple-100 rounded-xl">
+                                    <Globe className="w-5 h-5 text-purple-600" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-lg font-bold">Ottimizzazione Sito per LLM</CardTitle>
+                                    <CardDescription className="text-xs">
+                                        {websiteAnalysis.brandName && <span className="font-medium text-purple-600">{websiteAnalysis.brandName}</span>}
+                                        {' - '}Analisi del sito per visibilità su ChatGPT, Claude e Gemini
+                                    </CardDescription>
+                                </div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => runWebsiteAnalysis(websiteAnalysis.configId)}
+                                disabled={websiteAnalysisLoading}
+                                className="gap-2 border-purple-200 text-purple-700 hover:bg-purple-50"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${websiteAnalysisLoading ? 'animate-spin' : ''}`} />
+                                {websiteAnalysisLoading ? 'Analisi...' : 'Aggiorna'}
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {websiteAnalysis.overallScore !== undefined ? (
+                            <>
+                                {/* Scores */}
+                                <div className="grid grid-cols-5 gap-3">
+                                    <div className={`p-3 rounded-xl text-center border ${
+                                        websiteAnalysis.overallScore >= 80 ? 'bg-green-50 border-green-200 text-green-700' :
+                                        websiteAnalysis.overallScore >= 60 ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                        'bg-red-50 border-red-200 text-red-700'
+                                    }`}>
+                                        <div className="text-2xl font-black">{websiteAnalysis.overallScore}</div>
+                                        <div className="text-[10px] font-bold uppercase">Score Totale</div>
+                                    </div>
+                                    <div className="p-3 rounded-xl text-center bg-slate-50 border border-slate-100">
+                                        <div className="text-lg font-bold text-slate-700">{websiteAnalysis.structuredDataScore || 0}</div>
+                                        <div className="text-[9px] text-slate-500">Schema.org</div>
+                                    </div>
+                                    <div className="p-3 rounded-xl text-center bg-slate-50 border border-slate-100">
+                                        <div className="text-lg font-bold text-slate-700">{websiteAnalysis.valuePropositionScore || 0}</div>
+                                        <div className="text-[9px] text-slate-500">Value Prop</div>
+                                    </div>
+                                    <div className="p-3 rounded-xl text-center bg-slate-50 border border-slate-100">
+                                        <div className="text-lg font-bold text-slate-700">{websiteAnalysis.keywordCoverageScore || 0}</div>
+                                        <div className="text-[9px] text-slate-500">Keywords</div>
+                                    </div>
+                                    <div className="p-3 rounded-xl text-center bg-slate-50 border border-slate-100">
+                                        <div className="text-lg font-bold text-slate-700">{websiteAnalysis.contentClarityScore || 0}</div>
+                                        <div className="text-[9px] text-slate-500">Chiarezza</div>
+                                    </div>
+                                </div>
+
+                                {/* Prompt Coverage */}
+                                {websiteAnalysis.promptsAddressed && (
+                                    <div className="bg-white rounded-xl border p-4">
+                                        <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                            <Target className="w-4 h-4 text-purple-600" />
+                                            Copertura Query Monitorate
+                                        </h4>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div>
+                                                <div className="flex items-center gap-2 text-green-700 text-xs font-medium mb-2">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    Query Coperte ({websiteAnalysis.promptsAddressed.addressed?.length || 0})
+                                                </div>
+                                                <div className="space-y-1 max-h-24 overflow-y-auto">
+                                                    {websiteAnalysis.promptsAddressed.addressed?.slice(0, 4).map((prompt: string, i: number) => (
+                                                        <div key={i} className="text-xs text-slate-600 truncate bg-green-50 px-2 py-1 rounded">
+                                                            {prompt}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 text-amber-700 text-xs font-medium mb-2">
+                                                    <AlertCircle className="w-3.5 h-3.5" />
+                                                    Gap da Colmare ({websiteAnalysis.promptsAddressed.gaps?.length || 0})
+                                                </div>
+                                                <div className="space-y-1 max-h-24 overflow-y-auto">
+                                                    {websiteAnalysis.promptsAddressed.gaps?.slice(0, 4).map((prompt: string, i: number) => (
+                                                        <div key={i} className="text-xs text-slate-600 truncate bg-amber-50 px-2 py-1 rounded">
+                                                            {prompt}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Recommendations */}
+                                {websiteAnalysis.recommendations && websiteAnalysis.recommendations.length > 0 && (
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                            <Lightbulb className="w-4 h-4 text-amber-500" />
+                                            Raccomandazioni per Visibilità LLM ({websiteAnalysis.recommendations.length})
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {websiteAnalysis.recommendations.map((rec: any, idx: number) => (
+                                                <div key={idx} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                                                    <div
+                                                        className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors"
+                                                        onClick={() => setExpandedWebsiteRec(expandedWebsiteRec === idx ? null : idx)}
+                                                    >
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className={`p-1.5 rounded-lg shrink-0 ${
+                                                                rec.type === 'add_structured_data' ? 'bg-blue-100' :
+                                                                rec.type === 'improve_value_proposition' ? 'bg-purple-100' :
+                                                                rec.type === 'add_keyword_content' ? 'bg-green-100' :
+                                                                'bg-amber-100'
+                                                            }`}>
+                                                                {rec.type === 'add_structured_data' ? <Code className="w-4 h-4 text-blue-600" /> :
+                                                                 rec.type === 'improve_value_proposition' ? <Target className="w-4 h-4 text-purple-600" /> :
+                                                                 rec.type === 'add_keyword_content' ? <FileText className="w-4 h-4 text-green-600" /> :
+                                                                 <Sparkles className="w-4 h-4 text-amber-600" />}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="font-semibold text-sm text-slate-800 truncate">{rec.title}</div>
+                                                                <Badge variant="outline" className={`text-[9px] mt-0.5 ${
+                                                                    rec.priority === 'high' ? 'border-red-200 bg-red-50 text-red-700' :
+                                                                    rec.priority === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-700' :
+                                                                    'border-blue-200 bg-blue-50 text-blue-700'
+                                                                }`}>
+                                                                    {rec.priority === 'high' ? 'Alta Priorità' : rec.priority === 'medium' ? 'Media' : 'Bassa'}
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
+                                                        {expandedWebsiteRec === idx ?
+                                                            <ChevronUp className="w-5 h-5 text-slate-400 shrink-0" /> :
+                                                            <ChevronDown className="w-5 h-5 text-slate-400 shrink-0" />
+                                                        }
+                                                    </div>
+                                                    {expandedWebsiteRec === idx && (
+                                                        <div className="px-4 pb-4 pt-0 border-t bg-slate-50/50">
+                                                            <p className="text-sm text-slate-600 mt-3 leading-relaxed">{rec.description}</p>
+                                                            <div className="mt-3 p-3 bg-green-50 rounded-lg">
+                                                                <div className="text-xs font-bold text-green-700 mb-1">Impatto Atteso:</div>
+                                                                <p className="text-sm text-green-800">{rec.impact}</p>
+                                                            </div>
+                                                            {rec.relatedPrompts && rec.relatedPrompts.length > 0 && (
+                                                                <div className="mt-3 flex flex-wrap gap-1">
+                                                                    <span className="text-[10px] text-slate-500 mr-1">Query correlate:</span>
+                                                                    {rec.relatedPrompts.slice(0, 3).map((p: string, i: number) => (
+                                                                        <span key={i} className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                                                                            {p}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="text-[10px] text-slate-400 text-center pt-2 border-t">
+                                    Ultima analisi: {websiteAnalysis.completedAt ? new Date(websiteAnalysis.completedAt).toLocaleString('it-IT') : 'Mai'}
+                                    {websiteAnalysis.pagesScraped && websiteAnalysis.pagesScraped > 1 && (
+                                        <span className="ml-2">• {websiteAnalysis.pagesScraped} pagine analizzate</span>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-center py-8">
+                                <Globe className="w-12 h-12 text-purple-200 mx-auto mb-3" />
+                                <h4 className="font-semibold text-slate-700">Nessuna Analisi Disponibile</h4>
+                                <p className="text-sm text-slate-500 mt-1 mb-4">
+                                    Analizza il sito per scoprire come migliorare la visibilità su ChatGPT, Claude e Gemini.
+                                </p>
+                                <Button
+                                    onClick={() => runWebsiteAnalysis(websiteAnalysis.configId)}
+                                    disabled={websiteAnalysisLoading}
+                                    className="gap-2 bg-purple-600 hover:bg-purple-700"
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                    {websiteAnalysisLoading ? 'Analisi in corso...' : 'Avvia Analisi Sito'}
+                                </Button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             )}
 
             <div className="space-y-6">

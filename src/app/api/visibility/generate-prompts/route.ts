@@ -58,8 +58,8 @@ export async function POST(request: Request) {
         // Use user's plan (admin has unlimited access)
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
         const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
-        // Admin bypasses, 20 prompts if visibility enabled
-        const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 20 : 0);
+        // Admin bypasses, 10 prompts if visibility enabled
+        const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 10 : 0);
 
         if (!isAdmin && !plan.features.visibilityTracker) {
             return NextResponse.json(

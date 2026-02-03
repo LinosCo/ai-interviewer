@@ -236,20 +236,26 @@ export class VisibilityEngine {
                 model,
                 schema: AnalysisSchema,
                 prompt: `Analyze the following text which represents an LLM's response to a user query.
-                
-                Product/Brand to track: "${brandName}"
-                Competitors: ${JSON.stringify(competitors)}
-                
-                Determine:
-                1. Is "${brandName}" mentioned?
-                2. If yes, what is its position in the list/text (1-based index)?
-                3. For each competitor, are they mentioned and at what position?
-                4. What is the overall sentiment towards "${brandName}"?
-                
-                Text to analyze:
-                """
-                ${text.substring(0, 8000)}
-                """`,
+
+Product/Brand to track: "${brandName}"
+Competitors: ${JSON.stringify(competitors)}
+
+Determine:
+1. Is "${brandName}" mentioned?
+2. If yes, what is its position in the list/text (1-based index)?
+3. For each competitor, are they mentioned and at what position?
+4. What is the overall sentiment towards "${brandName}"?
+5. Extract ALL sources, websites, or references cited in the response:
+   - Include full URLs if mentioned (e.g., "https://example.com/article")
+   - Include domain names if full URL is not available (e.g., "TechCrunch", "example.com")
+   - Capture any named sources (e.g., "According to Forbes...", "Source: Gartner")
+   - Include markdown links (e.g., "[Site](https://site.com)")
+   - This is critical for understanding which sources inform LLM recommendations
+
+Text to analyze:
+"""
+${text.substring(0, 8000)}
+"""`,
                 temperature: 0
             });
 

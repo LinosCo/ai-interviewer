@@ -28,7 +28,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { brandName, category, description, language, territory, prompts, competitors, organizationId } = body;
+        const { brandName, category, description, language, territory, prompts, competitors, organizationId, websiteUrl, additionalUrls } = body;
 
         // Determine organizationId: use provided if admin, or fallback to first membership
         let finalOrganizationId = organizationId;
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         const enabledCompetitors = competitors?.filter((c: any) => c.enabled) || [];
 
         // Let's use more generous default limits from our plans
-        const maxPrompts = isAdmin ? 999 : (plan.limits.maxAiSuggestionsPerMonth || 20); // Reuse suggestion limit or default 20
+        const maxPrompts = isAdmin ? 999 : (plan.limits.maxAiSuggestionsPerMonth || 10); // Reuse suggestion limit or default 10
         const maxCompetitors = isAdmin ? 999 : (plan.limits.maxVisibilityQueriesPerMonth > 0 ? 15 : 5); // Default 15 for pro/business, 5 for trial
 
         if (!isAdmin && enabledPrompts.length > maxPrompts) {
@@ -117,6 +117,8 @@ export async function POST(request: Request) {
                 brandName,
                 category,
                 description: description || '',
+                websiteUrl: websiteUrl || null,
+                additionalUrls: additionalUrls || null,
                 language: language || 'it',
                 territory: territory || 'IT',
                 isActive: true,
@@ -129,7 +131,8 @@ export async function POST(request: Request) {
                         enabled: p.enabled ?? true,
                         orderIndex: index,
                         generatedByAI: true,
-                        lastEditedAt: new Date()
+                        lastEditedAt: new Date(),
+                        referenceUrl: p.referenceUrl || null
                     })) || []
                 },
                 competitors: {
@@ -262,7 +265,7 @@ export async function PATCH(request: Request) {
         const organizationId = user.memberships[0]?.organizationId;
 
         const body = await request.json();
-        const { id, brandName, category, description, language, territory, isActive, prompts, competitors, projectId } = body;
+        const { id, brandName, category, description, language, territory, isActive, prompts, competitors, projectId, websiteUrl, additionalUrls } = body;
 
         // Check if config exists
         const existingConfig = await prisma.visibilityConfig.findFirst({
@@ -287,7 +290,7 @@ export async function PATCH(request: Request) {
         const plan = PLANS[tier];
 
         // Limits validation
-        const maxPrompts = isAdmin ? 999 : (plan.limits.maxAiSuggestionsPerMonth || 20);
+        const maxPrompts = isAdmin ? 999 : (plan.limits.maxAiSuggestionsPerMonth || 10);
         const maxCompetitors = isAdmin ? 999 : (plan.limits.maxVisibilityQueriesPerMonth > 0 ? 15 : 5);
 
         if (!isAdmin && prompts) {
@@ -319,6 +322,8 @@ export async function PATCH(request: Request) {
                     ...(brandName && { brandName }),
                     ...(category && { category }),
                     ...(description !== undefined && { description }),
+                    ...(websiteUrl !== undefined && { websiteUrl }),
+                    ...(additionalUrls !== undefined && { additionalUrls }),
                     ...(language && { language }),
                     ...(territory && { territory }),
                     ...(isActive !== undefined && { isActive }),
@@ -342,7 +347,8 @@ export async function PATCH(request: Request) {
                             enabled: p.enabled ?? true,
                             orderIndex: index,
                             generatedByAI: p.generatedByAI ?? false,
-                            lastEditedAt: new Date()
+                            lastEditedAt: new Date(),
+                            referenceUrl: p.referenceUrl || null
                         }))
                     });
                 }

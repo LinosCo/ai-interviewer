@@ -255,6 +255,7 @@ async function completeInterview(
 // MAIN API HANDLER
 // ============================================================================
 export async function POST(req: Request) {
+    const startTime = Date.now();
     try {
         const body = await req.json();
         const { messages, conversationId, botId, effectiveDuration, introMessage } = body;
@@ -263,13 +264,16 @@ export async function POST(req: Request) {
         // ====================================================================
         // 1. LOAD DATA (with parallel operations for speed)
         // ====================================================================
+        const loadStart = Date.now();
         const conversation = await ChatService.loadConversation(conversationId, botId);
+        console.log(`⏱️ [TIMING] Data load: ${Date.now() - loadStart}ms`);
         const bot = conversation.bot;
         const language = bot.language || 'en';
         const shouldCollectData = (bot as any).collectCandidateData;
         const lastMessage = messages[messages.length - 1];
 
         // Run these operations in parallel - they don't depend on each other
+        const parallelStart = Date.now();
         const [, , openAIKey, prefetchedModel] = await Promise.all([
             // Save user message (fire and forget style, but await for consistency)
             lastMessage?.role === 'user'
@@ -282,6 +286,7 @@ export async function POST(req: Request) {
             // Pre-fetch model (this also warms up the connection)
             LLMService.getModel(bot)
         ]);
+        console.log(`⏱️ [TIMING] Parallel ops: ${Date.now() - parallelStart}ms`);
 
         // Topics
         const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -1275,7 +1280,9 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             })
         ]);
 
+        const totalTime = Date.now() - startTime;
         console.log(`✅ [CHAT_API] Finished. Response sent. Next Phase: ${nextState.phase}`);
+        console.log(`⏱️ [TIMING] TOTAL REQUEST: ${totalTime}ms`);
 
         // Memory update (fire and forget - don't block response)
         if (lastMessage?.role === 'user') {

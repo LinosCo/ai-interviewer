@@ -1,6 +1,8 @@
 'use client';
 
-import { VisibilityConfig } from '../page';
+import { useState } from 'react';
+import { Plus, X, Link } from 'lucide-react';
+import { VisibilityConfig, AdditionalUrl } from '../page';
 
 interface Props {
     config: VisibilityConfig;
@@ -9,6 +11,25 @@ interface Props {
 }
 
 export function WizardStepBrand({ config, setConfig, projects }: Props) {
+    const [newUrl, setNewUrl] = useState('');
+    const [newLabel, setNewLabel] = useState('');
+
+    const addAdditionalUrl = () => {
+        if (!newUrl.trim() || !newLabel.trim()) return;
+
+        const additionalUrls = [...(config.additionalUrls || [])];
+        additionalUrls.push({ url: newUrl.trim(), label: newLabel.trim() });
+        setConfig({ ...config, additionalUrls });
+        setNewUrl('');
+        setNewLabel('');
+    };
+
+    const removeAdditionalUrl = (index: number) => {
+        const additionalUrls = [...(config.additionalUrls || [])];
+        additionalUrls.splice(index, 1);
+        setConfig({ ...config, additionalUrls });
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-start">
@@ -78,6 +99,90 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                     />
                 </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        URL Sito Web
+                    </label>
+                    <input
+                        type="url"
+                        value={config.websiteUrl || ''}
+                        onChange={(e) => setConfig({ ...config, websiteUrl: e.target.value || undefined })}
+                        placeholder="https://www.esempio.it"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Opzionale. Inserisci l'URL per ricevere AI Tips di ottimizzazione per LLM e motori di ricerca.
+                    </p>
+                </div>
+
+                {/* Additional URLs Section */}
+                {config.websiteUrl && (
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">
+                            <Link className="w-4 h-4 inline mr-2" />
+                            Pagine Aggiuntive Importanti
+                        </label>
+                        <p className="text-xs text-gray-500 mb-3">
+                            Aggiungi pagine specifiche del tuo sito che vuoi includere nell'analisi (es. pagina prodotto, pricing, FAQ).
+                        </p>
+
+                        {/* List of added URLs */}
+                        {config.additionalUrls && config.additionalUrls.length > 0 && (
+                            <div className="space-y-2 mb-3">
+                                {config.additionalUrls.map((item, index) => (
+                                    <div key={index} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
+                                        <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                            {item.label}
+                                        </span>
+                                        <span className="text-sm text-gray-600 truncate flex-1">
+                                            {item.url}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeAdditionalUrl(index)}
+                                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Add new URL form */}
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                value={newLabel}
+                                onChange={(e) => setNewLabel(e.target.value)}
+                                placeholder="Etichetta (es. Pricing)"
+                                className="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                            <input
+                                type="url"
+                                value={newUrl}
+                                onChange={(e) => setNewUrl(e.target.value)}
+                                placeholder="https://esempio.it/pagina"
+                                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addAdditionalUrl();
+                                    }
+                                }}
+                            />
+                            <button
+                                type="button"
+                                onClick={addAdditionalUrl}
+                                disabled={!newUrl.trim() || !newLabel.trim()}
+                                className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

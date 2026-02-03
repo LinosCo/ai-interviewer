@@ -687,66 +687,45 @@ export default function InterviewChat({
                     </div>
                 )}
 
-                {/* Loading/Thinking Indicator - Shows while waiting for AI response */}
+                {/* Loading/Thinking Indicator - Minimal logo with animated bars */}
                 {isLoading && currentQuestion && (
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="w-full max-w-2xl"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-40 flex items-center justify-center"
                     >
-                        <div className="bg-white/60 backdrop-blur-md border border-white/80 rounded-3xl p-8 shadow-xl">
-                            <div className="flex flex-col items-center gap-5">
-                                {/* Animated thinking dots */}
-                                <div className="relative">
-                                    <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: `${brandColor}15` }}>
-                                        <div className="flex items-center gap-1.5">
-                                            <motion.div
-                                                className="w-3 h-3 rounded-full"
-                                                style={{ background: brandColor }}
-                                                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
-                                                transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
-                                            />
-                                            <motion.div
-                                                className="w-3 h-3 rounded-full"
-                                                style={{ background: brandColor }}
-                                                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
-                                                transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
-                                            />
-                                            <motion.div
-                                                className="w-3 h-3 rounded-full"
-                                                style={{ background: brandColor }}
-                                                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 1, 0.5] }}
-                                                transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
-                                            />
-                                        </div>
-                                    </div>
-                                    {/* Pulsing ring */}
-                                    <motion.div
-                                        className="absolute inset-0 rounded-full border-2"
-                                        style={{ borderColor: brandColor }}
-                                        animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
-                                        transition={{ duration: 1.5, repeat: Infinity }}
-                                    />
-                                </div>
+                        {/* Subtle backdrop */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
 
-                                <div className="text-center space-y-2">
-                                    <p className="text-base font-semibold text-gray-700">
-                                        {language?.toLowerCase().startsWith('it') ? 'Sto elaborando la tua risposta...' : 'Processing your answer...'}
-                                    </p>
-                                    <p className="text-sm text-gray-400">
-                                        {language?.toLowerCase().startsWith('it') ? 'Preparando la prossima domanda' : 'Preparing the next question'}
-                                    </p>
-                                </div>
+                        {/* Centered loading indicator */}
+                        <div className="relative flex flex-col items-center gap-6">
+                            {/* Logo */}
+                            <motion.div
+                                animate={{ scale: [1, 1.02, 1] }}
+                                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                            >
+                                <Icons.Logo size={48} style={{ color: brandColor }} />
+                            </motion.div>
 
-                                {/* Progress bar animation */}
-                                <div className="w-full max-w-xs h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            {/* Animated equalizer bars */}
+                            <div className="flex items-end gap-1 h-8">
+                                {[0, 1, 2, 3, 4].map((i) => (
                                     <motion.div
-                                        className="h-full rounded-full"
+                                        key={i}
+                                        className="w-1 rounded-full"
                                         style={{ background: brandColor }}
-                                        animate={{ x: ['-100%', '100%'] }}
-                                        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                                        animate={{
+                                            height: ['8px', '24px', '12px', '28px', '8px'],
+                                        }}
+                                        transition={{
+                                            duration: 1,
+                                            repeat: Infinity,
+                                            delay: i * 0.1,
+                                            ease: 'easeInOut',
+                                        }}
                                     />
-                                </div>
+                                ))}
                             </div>
                         </div>
                     </motion.div>

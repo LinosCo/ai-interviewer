@@ -51,7 +51,8 @@ export class VisibilityEngine {
             // 3. Iterate over prompts
             for (const prompt of config.prompts) {
                 // Run queries in parallel for all providers (including Google AI Overview)
-                const providerPromises = providers.map(async (provider) => {
+                type ProviderResult = { provider: string; response: any } | null;
+                const providerPromises: Promise<ProviderResult>[] = providers.map(async (provider) => {
                     // Query LLM (returns null if failed/missing key)
                     console.log(`[visibility] Querying ${provider}...`);
                     const llmResult = await queryVisibilityLLM(
@@ -130,7 +131,7 @@ export class VisibilityEngine {
                             }
                         });
 
-                        return { provider: 'google_ai_overview' as const, response };
+                        return { provider: 'google_ai_overview', response };
                     })());
                 }
 

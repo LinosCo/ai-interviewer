@@ -47,7 +47,7 @@ export default async function ChatPage({ params }: { params: Promise<{ conversat
             showAnonymityInfo={bot.showAnonymityInfo}
             showDataUsageInfo={bot.showDataUsageInfo}
             language={bot.language}
-            introMessage={bot.introMessage ? `Faremo prima una panoramica veloce sui temi principali, e poi approfondiremo i punti più interessanti.\n\n${bot.introMessage}` : null}
+            introMessage={bot.introMessage || null}
 
             // Onboarding
             welcomeTitle={bot.welcomeTitle}

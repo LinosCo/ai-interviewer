@@ -93,7 +93,7 @@ export const VISIBILITY_PROVIDERS = {
         displayName: 'Claude'
     },
     gemini: {
-        model: 'gemini-2.0-flash',
+        model: 'gemini-1.5-flash',
         displayName: 'Gemini'
     }
 } as const;
@@ -158,7 +158,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
                 const geminiProvider = await getLLMProvider('gemini');
                 result = await generateText({
-                    model: geminiProvider('gemini-2.0-flash') as any,
+                    model: geminiProvider('gemini-1.5-flash') as any,
                     system: systemPrompt,
                     prompt
                 });

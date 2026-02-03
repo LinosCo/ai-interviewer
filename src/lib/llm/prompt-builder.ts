@@ -17,20 +17,6 @@ const FIELD_LABELS: Record<string, { it: string, en: string }> = {
 
 export class PromptBuilder {
 
-    /**
-     * Helper: Get opening protocol message in the correct language
-     */
-    private static getOpeningProtocol(language: string): string {
-        const messages: Record<string, string> = {
-            'it': 'Faremo un giro veloce su alcuni temi key, e poi approfondiremo se avremo tempo.',
-            'en': 'We\'ll do a quick scan of key topics, then dive deeper into the most interesting points if we have time.',
-            'es': 'Haremos un recorrido rápido por los temas clave, y luego profundizaremos si tenemos tiempo.',
-            'fr': 'Nous ferons un tour rapide des sujets clés, puis nous approfondirons si nous avons le temps.',
-            'de': 'Wir machen einen schnellen Durchgang durch die wichtigsten Themen und vertiefen dann, wenn wir Zeit haben.'
-        };
-        return messages[language] || messages['en'];
-    }
-
     private static getRecruitmentPrompt(language: string): string {
         const prompts: Record<string, string> = {
             'it': `
@@ -104,8 +90,6 @@ ${knowledgeText}
      * Loads from system knowledge or hardcoded best practices.
      */
     static buildMethodologyPrompt(methodologyContent: string, language: string = 'en'): string {
-        const openingProtocol = this.getOpeningProtocol(language);
-
         const flowExplanation = language === 'it' ? `
 ## FLUSSO DELL'INTERVISTA (LEGGI ATTENTAMENTE)
 L'intervista segue un flusso RIGIDO. Tu NON decidi quando passare alla fase successiva - lo fa il SUPERVISOR.
@@ -214,7 +198,6 @@ ${flowExplanation}
 4. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
 5. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
 6. **NO REPETITION (STRICT)**: Always check the conversation history. Never ask a question that has already been answered or asked. Do not repeat the same concepts or words in consecutive turns.
-7. **Opening Protocol (MANDATORY)**: In the very first message of the interview, you MUST explicitly say: "${openingProtocol}" Do not skip this explanation.
 
 ## FINAL FAILSAFE RULE
 ALWAYS END YOUR RESPONSE WITH A QUESTION MARK (?). 

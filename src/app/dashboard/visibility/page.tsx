@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { ScanForm } from "./ScanForm";
 import { ScanResults } from "@/components/visibility/ScanResults";
 import { SerpMonitoringSection } from "./SerpMonitoringSection";
+import { VisibilityTrendChart } from "@/components/visibility/VisibilityTrendChart";
+import { GapAnalysisSection } from "@/components/visibility/GapAnalysisSection";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Settings, History, Calendar, Newspaper, Plus, Building2 } from "lucide-react";
@@ -210,10 +212,16 @@ export default async function VisibilityPage({
 
                 {/* LLM Visibility Tab */}
                 <TabsContent value="llm" className="space-y-6">
+                    {/* Trend Chart - Full Width */}
+                    <VisibilityTrendChart configId={config.id} />
+
                     <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                         {/* Main Content (3/4) */}
-                        <div className="lg:col-span-3">
+                        <div className="lg:col-span-3 space-y-6">
                             <ScanResults scan={scanData} totalScans={totalScans} />
+
+                            {/* GAP Analysis Section */}
+                            <GapAnalysisSection configId={config.id} />
                         </div>
 
                         {/* Sidebar History (1/4) */}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Edit2, Trash2, Loader2, Plus, Wand2 } from 'lucide-react';
+import { Sparkles, Edit2, Trash2, Loader2, Plus, Wand2, Globe, X } from 'lucide-react';
 import { VisibilityConfig } from '../page';
 
 interface Props {
@@ -129,6 +129,20 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
         setConfig({ ...config, prompts: updated });
     };
 
+    const handleToggleAiOverview = (id: string) => {
+        const updated = config.prompts.map(p =>
+            p.id === id ? { ...p, aiOverviewEnabled: !(p.aiOverviewEnabled ?? true) } : p
+        );
+        setConfig({ ...config, prompts: updated });
+    };
+
+    const handleClearAiOverviewVariant = (id: string) => {
+        const updated = config.prompts.map(p =>
+            p.id === id ? { ...p, aiOverviewVariant: null, aiOverviewLastFound: null } : p
+        );
+        setConfig({ ...config, prompts: updated });
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -200,47 +214,97 @@ export function WizardStepPrompts({ config, setConfig, maxPrompts = 10 }: Props)
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex items-start justify-between gap-4">
-                                    <div className="flex-1">
-                                        <p className="text-gray-900">{prompt.text || 'Prompt vuoto - clicca modifica'}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {/* Refine AI Button */}
-                                        <button
-                                            onClick={() => handleRefine(prompt)}
-                                            disabled={refiningId === prompt.id || !prompt.text}
-                                            className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                            title="Raffina con AI"
-                                        >
-                                            {refiningId === prompt.id ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                            ) : (
-                                                <Wand2 className="w-4 h-4" />
-                                            )}
-                                        </button>
+                                <div className="space-y-3">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                            <p className="text-gray-900">{prompt.text || 'Prompt vuoto - clicca modifica'}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {/* Refine AI Button */}
+                                            <button
+                                                onClick={() => handleRefine(prompt)}
+                                                disabled={refiningId === prompt.id || !prompt.text}
+                                                className="p-2 text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                title="Raffina con AI"
+                                            >
+                                                {refiningId === prompt.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <Wand2 className="w-4 h-4" />
+                                                )}
+                                            </button>
 
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={prompt.enabled}
-                                                onChange={() => handleToggle(prompt.id)}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                        </label>
-                                        <button
-                                            onClick={() => handleEdit(prompt)}
-                                            className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(prompt.id)}
-                                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={prompt.enabled}
+                                                    onChange={() => handleToggle(prompt.id)}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                                            </label>
+                                            <button
+                                                onClick={() => handleEdit(prompt)}
+                                                className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(prompt.id)}
+                                                className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {/* AI Overview Section */}
+                                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                        <div className="flex items-center gap-2">
+                                            <Globe className="w-4 h-4 text-blue-500" />
+                                            <span className="text-sm text-gray-600">Google AI Overview</span>
+                                            {prompt.aiOverviewVariant && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                                                    Variante trovata
+                                                    {prompt.aiOverviewLastFound && (
+                                                        <span className="text-green-600">
+                                                            ({new Date(prompt.aiOverviewLastFound).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            )}
+                                            {!prompt.aiOverviewVariant && (prompt.aiOverviewEnabled ?? true) && (
+                                                <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">
+                                                    Da cercare
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {prompt.aiOverviewVariant && (
+                                                <button
+                                                    onClick={() => handleClearAiOverviewVariant(prompt.id)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                    title="Rimuovi variante salvata"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            )}
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={prompt.aiOverviewEnabled ?? true}
+                                                    onChange={() => handleToggleAiOverview(prompt.id)}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {prompt.aiOverviewVariant && (
+                                        <div className="text-xs text-gray-500 pl-6">
+                                            Query: "<span className="italic">{prompt.aiOverviewVariant}</span>"
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

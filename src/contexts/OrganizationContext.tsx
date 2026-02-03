@@ -60,10 +60,15 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                     localStorage.setItem(SELECTED_ORG_KEY, data.organizations[0].id);
                     document.cookie = `${COOKIE_ORG_KEY}=${data.organizations[0].id}; path=/; max-age=31536000; SameSite=Lax`;
                 }
+
+                // Only set loading to false after we've set the current organization
+                // This ensures dependent contexts (like ProjectContext) don't start fetching too early
+                setLoading(false);
+            } else {
+                setLoading(false);
             }
         } catch (error) {
             console.error('Failed to fetch organizations:', error);
-        } finally {
             setLoading(false);
         }
     };

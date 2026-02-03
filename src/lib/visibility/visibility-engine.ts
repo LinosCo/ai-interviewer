@@ -97,16 +97,55 @@ export class VisibilityEngine {
                 });
 
                 // Add Google AI Overview query (AI-generated box in Google Search results)
-                if (hasGoogleAiOverview) {
+                // Only if enabled for this prompt and SERP API is configured
+                const promptData = prompt as any; // Cast to access new fields
+                if (hasGoogleAiOverview && promptData.aiOverviewEnabled !== false) {
                     providerPromises.push((async () => {
                         console.log(`[visibility] Querying Google AI Overview...`);
-                        const aiOverviewResult = await SerpMonitoringEngine.checkGoogleAiOverviewVisibility(
-                            config.brandName,
-                            config.competitors.map(c => c.name),
-                            prompt.text,
-                            config.language,
-                            config.territory
-                        );
+
+                        // Use saved variant if available, otherwise try to find one
+                        const queryToUse = promptData.aiOverviewVariant || prompt.text;
+                        const useSavedVariant = !!promptData.aiOverviewVariant;
+
+                        let aiOverviewResult;
+                        if (useSavedVariant) {
+                            // Use saved variant directly (faster, no multiple API calls)
+                            console.log(`[visibility] Using saved AI Overview variant: "${queryToUse}"`);
+                            aiOverviewResult = await SerpMonitoringEngine.checkGoogleAiOverviewVisibility(
+                                config.brandName,
+                                config.competitors.map(c => c.name),
+                                queryToUse,
+                                config.language,
+                                config.territory
+                            );
+                        } else {
+                            // First scan: try to find a working variant
+                            aiOverviewResult = await SerpMonitoringEngine.checkGoogleAiOverviewVisibility(
+                                config.brandName,
+                                config.competitors.map(c => c.name),
+                                prompt.text,
+                                config.language,
+                                config.territory
+                            );
+
+                            // If found with a variant, save it for future scans
+                            if (aiOverviewResult.aiOverview && aiOverviewResult.queryUsed) {
+                                console.log(`[visibility] Saving working AI Overview variant: "${aiOverviewResult.queryUsed}"`);
+                                await prisma.visibilityPrompt.update({
+                                    where: { id: prompt.id },
+                                    data: {
+                                        aiOverviewVariant: aiOverviewResult.queryUsed,
+                                        aiOverviewLastFound: new Date()
+                                    }
+                                });
+                            } else if (aiOverviewResult.aiOverview) {
+                                // Original query worked, save timestamp
+                                await prisma.visibilityPrompt.update({
+                                    where: { id: prompt.id },
+                                    data: { aiOverviewLastFound: new Date() }
+                                });
+                            }
+                        }
 
                         if (!aiOverviewResult.aiOverview) {
                             console.log(`[visibility] Google AI Overview not available for this query`);

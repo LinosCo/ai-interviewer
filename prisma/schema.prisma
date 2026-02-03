@@ -913,6 +913,12 @@ model VisibilityPrompt {
   generatedByAI    Boolean              @default(false)
   lastEditedAt     DateTime             @default(now())
   orderIndex       Int                  @default(0)
+
+  // AI Overview tracking
+  aiOverviewEnabled   Boolean   @default(true)  // User can disable AI Overview for this prompt
+  aiOverviewVariant   String?                   // The query variant that works (e.g., "quali sono i migliori X")
+  aiOverviewLastFound DateTime?                 // When AI Overview was last successfully found
+
   visibilityConfig VisibilityConfig?    @relation(fields: [configId], references: [id], onDelete: Cascade)
   responses        VisibilityResponse[]
 }

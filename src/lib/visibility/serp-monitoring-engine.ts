@@ -309,8 +309,44 @@ export class SerpMonitoringEngine {
     }
 
     /**
+     * Generate query variants more likely to trigger AI Overviews
+     * AI Overviews appear more for informational/question queries
+     */
+    private static generateQueryVariants(query: string, language: string): string[] {
+        const variants: string[] = [query]; // Original first
+
+        // Question prefixes by language
+        const questionPrefixes: Record<string, string[]> = {
+            it: ['quali sono i migliori', 'cosa sono', 'come scegliere'],
+            en: ['what are the best', 'what is', 'how to choose'],
+            de: ['was sind die besten', 'was ist', 'wie wählt man'],
+            es: ['cuáles son los mejores', 'qué es', 'cómo elegir'],
+            fr: ['quels sont les meilleurs', 'qu\'est-ce que', 'comment choisir']
+        };
+
+        const prefixes = questionPrefixes[language] || questionPrefixes.en;
+
+        // Check if query already starts with a question word
+        const queryLower = query.toLowerCase();
+        const isAlreadyQuestion = /^(what|how|which|quali|come|cosa|was|wie|welche|qué|cuál|cómo|quel|comment)/.test(queryLower);
+
+        if (!isAlreadyQuestion) {
+            // Add "best X" variant
+            variants.push(`${prefixes[0]} ${query}`);
+        }
+
+        // Try English variant if not already English (AI Overviews more common in English)
+        if (language !== 'en') {
+            variants.push(query); // Will be searched with gl=US later
+        }
+
+        return variants;
+    }
+
+    /**
      * Run a visibility check on Google AI Overview for a specific query
      * Returns what users see in the AI Overview box when they Google something
+     * Tries multiple query variants if original doesn't have an AI Overview
      */
     static async checkGoogleAiOverviewVisibility(
         brandName: string,
@@ -326,10 +362,37 @@ export class SerpMonitoringEngine {
         brandMentioned: boolean;
         brandPosition: number | null;
         competitorPositions: Record<string, number | null>;
+        queryUsed?: string; // Which variant worked
     }> {
-        const overview = await this.fetchGoogleAiOverview(query, language, territory);
+        // Generate query variants to try
+        const variants = this.generateQueryVariants(query, language);
+
+        let overview = null;
+        let usedQuery = query;
+
+        // Try each variant until we find one with AI Overview
+        for (const variant of variants) {
+            console.log(`[AI Overview] Trying query variant: "${variant}"`);
+            overview = await this.fetchGoogleAiOverview(variant, language, territory);
+
+            if (overview) {
+                usedQuery = variant;
+                console.log(`[AI Overview] Found AI Overview with variant: "${variant}"`);
+                break;
+            }
+        }
+
+        // If still no overview and language isn't English, try US/English as last resort
+        if (!overview && language !== 'en') {
+            console.log(`[AI Overview] Trying English fallback for: "${query}"`);
+            overview = await this.fetchGoogleAiOverview(query, 'en', 'US');
+            if (overview) {
+                usedQuery = `${query} (EN fallback)`;
+            }
+        }
 
         if (!overview) {
+            console.log(`[AI Overview] No AI Overview found after trying ${variants.length} variants`);
             return {
                 aiOverview: null,
                 brandMentioned: false,
@@ -382,7 +445,8 @@ export class SerpMonitoringEngine {
             },
             brandMentioned,
             brandPosition,
-            competitorPositions
+            competitorPositions,
+            queryUsed: usedQuery !== query ? usedQuery : undefined
         };
     }
 

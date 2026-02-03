@@ -33,13 +33,18 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 const SELECTED_PROJECT_KEY_PREFIX = 'bt_selected_project_id_';
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
-    const { currentOrganization } = useOrganization();
+    const { currentOrganization, loading: orgLoading } = useOrganization();
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProject, setSelectedProjectState] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
     const [isOrgAdmin, setIsOrgAdmin] = useState(false);
 
     const fetchProjects = useCallback(async () => {
+        // Don't fetch if organization context is still loading
+        if (orgLoading) {
+            return;
+        }
+
         if (!currentOrganization) {
             setLoading(false);
             setProjects([]);
@@ -96,12 +101,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [currentOrganization]);
+    }, [currentOrganization, orgLoading]);
 
     useEffect(() => {
-        // Re-fetch when organization changes
+        // Re-fetch when organization changes or when organization loading completes
         fetchProjects();
-    }, [currentOrganization?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [currentOrganization?.id, orgLoading, fetchProjects]);
 
     const setSelectedProject = (project: Project | null) => {
         setSelectedProjectState(project);

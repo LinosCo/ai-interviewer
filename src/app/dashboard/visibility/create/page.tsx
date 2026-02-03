@@ -19,6 +19,9 @@ export interface VisibilityConfig {
         id: string;
         text: string;
         enabled: boolean;
+        aiOverviewEnabled?: boolean;
+        aiOverviewVariant?: string | null;
+        aiOverviewLastFound?: Date | null;
     }>;
     competitors: Array<{
         id: string;
@@ -77,7 +80,10 @@ export default function CreateVisibilityWizardPage() {
                                 prompts: data.config.prompts?.map((p: any) => ({
                                     id: p.id,
                                     text: p.text,
-                                    enabled: p.enabled
+                                    enabled: p.enabled,
+                                    aiOverviewEnabled: p.aiOverviewEnabled ?? true,
+                                    aiOverviewVariant: p.aiOverviewVariant || null,
+                                    aiOverviewLastFound: p.aiOverviewLastFound || null
                                 })) || [],
                                 competitors: data.config.competitors?.map((c: any) => ({
                                     id: c.id,

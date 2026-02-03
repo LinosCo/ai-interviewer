@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Icons } from '@/components/ui/business-tuner/Icons';
-import GlobalProjectSelector from './GlobalProjectSelector';
-import OrganizationSwitcher from './OrganizationSwitcher';
+import OrganizationProjectSelector from './OrganizationProjectSelector';
 import { ChevronDown } from 'lucide-react';
 
 interface DashboardSidebarProps {
@@ -28,20 +28,43 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [adminExpanded, setAdminExpanded] = useState(false);
+    const pathname = usePathname();
 
     const toggleMenu = () => setIsOpen(!isOpen);
+
+    // Navigation items configuration
+    const navigationItems = [
+        { href: '/dashboard/interviews', icon: Icons.MessageSquare, label: 'Interviste AI', visible: true },
+        { href: '/dashboard/bots', icon: Icons.Bot, label: 'Chatbot AI', visible: hasChatbot },
+        { href: '/dashboard/visibility', icon: Icons.Search, label: 'Brand Monitor', visible: hasVisibilityTracker },
+        { href: '/dashboard/insights', icon: Icons.Layers, label: 'AI Tips', visible: hasAiTips },
+        { href: '/dashboard/cms', icon: Icons.Globe, label: 'Gestione Sito', visible: hasCMSIntegration, highlight: true },
+        { href: '/dashboard/templates', icon: Icons.LayoutTemplate, label: 'Template', visible: true },
+        { href: '/dashboard/projects', icon: Icons.FolderKanban, label: 'Progetti', visible: canManageProjects },
+        { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
+        { href: '/dashboard/settings/members', icon: Icons.Users, label: 'Team', visible: true },
+    ].filter(item => item.visible);
+
+    const adminItems = [
+        { href: '/dashboard/admin/usage', icon: Icons.Activity, label: 'Monitoraggio' },
+        { href: '/dashboard/admin/organizations', icon: Icons.Building, label: 'Organizzazioni' },
+        { href: '/dashboard/admin/users', icon: Icons.Users, label: 'Utenti' },
+        { href: '/dashboard/admin/projects', icon: Icons.FolderKanban, label: 'Progetti' },
+        { href: '/dashboard/admin/cms', icon: Icons.Link, label: 'CMS' },
+    ];
 
     return (
         <>
             {/* Mobile Header */}
-            <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-40">
+            <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-40">
                 <Link href="/dashboard" className="flex items-center gap-2">
                     <Icons.Logo size={24} />
                     <span className="font-bold text-lg text-gray-900">Business Tuner</span>
                 </Link>
                 <button
                     onClick={toggleMenu}
-                    className="p-2 text-gray-500 hover:text-amber-600 transition-colors"
+                    className="p-2 text-gray-500 hover:text-amber-600 hover:bg-gray-50 rounded-lg transition-colors"
+                    aria-label={isOpen ? 'Chiudi menu' : 'Apri menu'}
                 >
                     {isOpen ? <Icons.X size={24} /> : <Icons.Menu size={24} />}
                 </button>
@@ -50,108 +73,155 @@ export function DashboardSidebar({
             {/* Backdrop for mobile */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 md:hidden"
+                    className="fixed inset-0 bg-black/20 z-30 md:hidden"
                     onClick={() => setIsOpen(false)}
+                    aria-hidden="true"
                 />
             )}
 
             {/* Sidebar content */}
-            <div className={`
-                fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out bg-white md:bg-transparent
-                md:relative md:translate-x-0 md:z-20 md:flex md:flex-col p-6 h-full overflow-hidden
-                ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-            `}>
-                <div className="hidden md:block absolute inset-6 bg-white/65 backdrop-blur-md border border-white/40 shadow-md rounded-[24px] -z-1" />
-
-                <Link href="/dashboard" className="mb-6 hidden md:flex items-center gap-2.5 px-4 pt-[7px]">
-                    <Icons.Logo size={32} />
+            <aside
+                className={`
+                    fixed inset-y-0 left-0 z-40 w-[280px] transform transition-transform duration-300 ease-in-out
+                    bg-white border-r border-gray-200
+                    md:relative md:translate-x-0 md:z-20
+                    flex flex-col p-6 h-full overflow-hidden
+                    ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+                `}
+            >
+                {/* Logo Section */}
+                <Link
+                    href="/dashboard"
+                    className="hidden md:flex items-center gap-2.5 mb-8"
+                >
+                    <Icons.Logo size={28} />
                     <span className="font-bold text-xl text-gray-900 tracking-tight">Business Tuner</span>
                 </Link>
 
-                {/* Organization Switcher */}
-                <OrganizationSwitcher />
+                {/* Organization & Project Selector */}
+                <OrganizationProjectSelector />
 
-                {/* Project Selector */}
-                <div className="mb-6">
-                    <GlobalProjectSelector />
-                </div>
-
-                <nav className="flex flex-col gap-2 flex-1 overflow-y-auto scrollbar-hide pr-2 -mr-2">
-                    <DashboardLink href="/dashboard/interviews" icon={<Icons.MessageSquare size={20} />} label="Interviste AI" onClick={() => setIsOpen(false)} />
-                    {hasChatbot && (
-                        <DashboardLink href="/dashboard/bots" icon={<Icons.Bot size={20} />} label="Chatbot AI" onClick={() => setIsOpen(false)} />
-                    )}
-                    {hasVisibilityTracker && (
-                        <DashboardLink href="/dashboard/visibility" icon={<Icons.Search size={20} />} label="Brand Monitor" onClick={() => setIsOpen(false)} />
-                    )}
-                    {hasAiTips && (
-                        <DashboardLink href="/dashboard/insights" icon={<Icons.Layers size={20} />} label="AI Tips" onClick={() => setIsOpen(false)} />
-                    )}
-                    {hasCMSIntegration && (
-                        <DashboardLink href="/dashboard/cms" icon={<Icons.Globe size={20} />} label="Gestione Sito" highlight={true} onClick={() => setIsOpen(false)} />
-                    )}
-                    <DashboardLink href="/dashboard/templates" icon={<Icons.LayoutTemplate size={20} />} label="Template" onClick={() => setIsOpen(false)} />
-                    {canManageProjects && (
-                        <DashboardLink href="/dashboard/projects" icon={<Icons.FolderKanban size={20} />} label="Progetti" onClick={() => setIsOpen(false)} />
-                    )}
-                    <DashboardLink href="/dashboard/billing" icon={<Icons.CreditCard size={20} />} label="Abbonamento" onClick={() => setIsOpen(false)} />
-                    <DashboardLink href="/dashboard/settings/members" icon={<Icons.Users size={20} />} label="Team" onClick={() => setIsOpen(false)} />
+                {/* Main Navigation */}
+                <nav className="flex flex-col gap-1 flex-1 overflow-y-auto -mx-2 px-2">
+                    {navigationItems.map((item) => (
+                        <DashboardLink
+                            key={item.href}
+                            href={item.href}
+                            icon={<item.icon size={20} />}
+                            label={item.label}
+                            isActive={pathname?.startsWith(item.href)}
+                            highlight={item.highlight}
+                            onClick={() => setIsOpen(false)}
+                        />
+                    ))}
                 </nav>
 
                 {/* Bottom Section */}
-                <div className="border-t border-gray-200/50 pt-4 mt-auto space-y-1">
+                <div className="border-t border-gray-200 pt-4 mt-4 space-y-1 -mx-2 px-2">
+                    {/* Admin Section */}
                     {isAdmin && (
-                        <div className="mb-1">
+                        <div className="mb-2">
                             <button
                                 onClick={() => setAdminExpanded(!adminExpanded)}
-                                className="flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all text-amber-700 hover:bg-amber-50 group font-medium"
+                                className={`
+                                    flex items-center justify-between w-full px-3 py-2.5 rounded-lg
+                                    text-sm font-medium transition-colors
+                                    ${adminExpanded || pathname?.startsWith('/dashboard/admin')
+                                        ? 'bg-amber-50 text-amber-900'
+                                        : 'text-amber-700 hover:bg-amber-50'
+                                    }
+                                `}
+                                aria-expanded={adminExpanded}
                             >
                                 <div className="flex items-center gap-3">
                                     <Icons.Shield size={20} className="text-amber-600" />
                                     <span>Admin</span>
                                 </div>
-                                <ChevronDown size={16} className={`text-amber-500 transition-transform duration-200 ${adminExpanded ? 'rotate-180' : ''}`} />
+                                <ChevronDown
+                                    size={16}
+                                    className={`text-amber-500 transition-transform duration-200 ${adminExpanded ? 'rotate-180' : ''}`}
+                                />
                             </button>
                             {adminExpanded && (
-                                <div className="ml-4 mt-1 space-y-1 border-l-2 border-amber-100 pl-2">
-                                    <DashboardLink href="/dashboard/admin/usage" icon={<Icons.Activity size={18} />} label="Monitoraggio" isAdmin onClick={() => setIsOpen(false)} />
-                                    <DashboardLink href="/dashboard/admin/organizations" icon={<Icons.Building size={18} />} label="Organizzazioni" isAdmin onClick={() => setIsOpen(false)} />
-                                    <DashboardLink href="/dashboard/admin/users" icon={<Icons.Users size={18} />} label="Utenti" isAdmin onClick={() => setIsOpen(false)} />
-                                    <DashboardLink href="/dashboard/admin/projects" icon={<Icons.FolderKanban size={18} />} label="Progetti" isAdmin onClick={() => setIsOpen(false)} />
-                                    <DashboardLink href="/dashboard/admin/cms" icon={<Icons.Link size={18} />} label="CMS" isAdmin onClick={() => setIsOpen(false)} />
+                                <div className="mt-1 ml-3 pl-3 border-l-2 border-amber-100 space-y-0.5">
+                                    {adminItems.map((item) => (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            onClick={() => setIsOpen(false)}
+                                            className={`
+                                                flex items-center gap-2.5 px-2.5 py-2 rounded-lg
+                                                text-sm transition-colors
+                                                ${pathname === item.href
+                                                    ? 'bg-amber-50 text-amber-900 font-medium'
+                                                    : 'text-amber-700 hover:bg-amber-50'
+                                                }
+                                            `}
+                                        >
+                                            <item.icon size={16} className="text-amber-600" />
+                                            <span>{item.label}</span>
+                                        </Link>
+                                    ))}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    <DashboardLink href="/dashboard/settings" icon={<Icons.Settings size={20} />} label="Impostazioni" onClick={() => setIsOpen(false)} />
+                    {/* Settings */}
+                    <DashboardLink
+                        href="/dashboard/settings"
+                        icon={<Icons.Settings size={20} />}
+                        label="Impostazioni"
+                        isActive={pathname === '/dashboard/settings'}
+                        onClick={() => setIsOpen(false)}
+                    />
 
+                    {/* Sign Out */}
                     <button
                         onClick={() => signOutAction()}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left transition-all text-gray-500 hover:text-red-600 hover:bg-red-50 group font-medium"
+                        className="
+                            flex items-center gap-3 px-3 py-2.5 rounded-lg w-full text-left
+                            text-sm font-medium transition-colors
+                            text-gray-500 hover:text-red-600 hover:bg-red-50
+                            group
+                        "
                     >
-                        <Icons.LogOut size={20} className="text-gray-400 group-hover:text-red-500" />
+                        <Icons.LogOut size={20} className="text-gray-400 group-hover:text-red-500 transition-colors" />
                         <span>Esci</span>
                     </button>
                 </div>
-            </div>
+            </aside>
         </>
     );
 }
 
-function DashboardLink({ href, icon, label, isAdmin = false, highlight = false, onClick }: { href: string, icon: React.ReactNode, label: string, isAdmin?: boolean, highlight?: boolean, onClick: () => void }) {
+interface DashboardLinkProps {
+    href: string;
+    icon: React.ReactNode;
+    label: string;
+    isActive?: boolean;
+    highlight?: boolean;
+    onClick?: () => void;
+}
+
+function DashboardLink({ href, icon, label, isActive = false, highlight = false, onClick }: DashboardLinkProps) {
     if (highlight) {
         return (
             <Link
                 href={href}
                 onClick={onClick}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl transition-all group bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200"
+                className={`
+                    flex items-center gap-3 px-3 py-2.5 rounded-lg
+                    text-sm font-medium transition-colors
+                    ${isActive
+                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                        : 'bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100'
+                    }
+                `}
             >
-                <span className="text-emerald-600">
-                    {icon}
-                </span>
-                <span className="font-medium">{label}</span>
-                <span className="ml-auto text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full">
+                <span className="text-emerald-600">{icon}</span>
+                <span>{label}</span>
+                <span className="ml-auto text-[10px] font-bold bg-emerald-500 text-white px-1.5 py-0.5 rounded uppercase">
                     CMS
                 </span>
             </Link>
@@ -162,12 +232,20 @@ function DashboardLink({ href, icon, label, isAdmin = false, highlight = false, 
         <Link
             href={href}
             onClick={onClick}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${isAdmin ? 'text-amber-700 hover:bg-amber-50' : 'text-gray-600 hover:text-gray-900 hover:bg-stone-50 md:hover:bg-white/50 hover:shadow-sm'}`}
+            className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-lg
+                text-sm font-medium transition-colors
+                ${isActive
+                    ? 'bg-amber-50 text-amber-900'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }
+            `}
+            aria-current={isActive ? 'page' : undefined}
         >
-            <span className={isAdmin ? 'text-amber-600' : 'text-gray-400 group-hover:text-amber-500 transition-colors'}>
+            <span className={`transition-colors ${isActive ? 'text-amber-500' : 'text-gray-400'}`}>
                 {icon}
             </span>
-            <span className="font-medium">{label}</span>
+            <span>{label}</span>
         </Link>
     );
 }

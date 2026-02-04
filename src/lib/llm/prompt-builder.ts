@@ -345,6 +345,7 @@ Puoi proporre un breve approfondimento opzionale.
 - NON chiedere dati di contatto ora
 - NON fare altre domande sui topic
 - SOLO offri la scelta di continuare o meno
+- NON concludere l'intervista
 ` : `
 ## PHASE: DEEP DIVE OFFER
 You may propose a short optional deep-dive.
@@ -358,6 +359,7 @@ You may propose a short optional deep-dive.
 - DO NOT ask for contact details now
 - DO NOT ask other topic questions
 - ONLY offer the choice to continue or not
+- DO NOT conclude the interview
 `;
                 return offerPrompt.trim();
             }

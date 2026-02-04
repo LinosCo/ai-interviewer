@@ -517,7 +517,19 @@ export async function POST(req: Request) {
                 } else if (state.deepAccepted === false) {
                     // We asked, now check user's response
                     console.log(`🎁 [DEEP_OFFER] Checking user response: "${lastMessage?.content}"`);
-                    const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
+                    const DATA_REQUEST_IT = /\b(dati|contatti|email|telefono|nome|azienda|ruolo)\b/i;
+                    const DATA_REQUEST_EN = /\b(data|contact|contacts|email|phone|name|company|role)\b/i;
+                    const dataRequestPattern = language === 'it' ? DATA_REQUEST_IT : DATA_REQUEST_EN;
+                    const userAsksForData = lastMessage?.role === 'user' && dataRequestPattern.test(lastMessage.content);
+
+                    if (userAsksForData && shouldCollectData) {
+                        console.log(`🎁 [DEEP_OFFER] User asked for data collection. Jumping to consent.`);
+                        nextState.phase = 'DATA_COLLECTION';
+                        supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                        nextState.consentGiven = false;
+                        nextState.deepAccepted = false;
+                    } else {
+                        const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
                     console.log(`🎁 [DEEP_OFFER] Intent detected: ${intent}`);
 
                     if (intent === 'ACCEPT') {
@@ -539,7 +551,6 @@ export async function POST(req: Request) {
                             supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
                             nextState.consentGiven = false;
                         } else {
-                            // Let the AI say goodbye
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         }
@@ -547,6 +558,7 @@ export async function POST(req: Request) {
                         // NEUTRAL - re-ask
                         console.log(`🎁 [DEEP_OFFER] Neutral response, re-asking`);
                         supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                    }
                     }
                 }
             }
@@ -1001,7 +1013,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         });
 
         let messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
-        if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT') {
+        if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' || supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             messagesForAI = lastMessage?.role === 'user'
                 ? [{ role: 'user', content: lastMessage.content }]
                 : [];

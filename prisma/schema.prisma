@@ -501,6 +501,19 @@ model Bot {
   rewardConfig          RewardConfig?
   themes                Theme[]
   topics                TopicBlock[]
+  interviewPlan         InterviewPlan?
+}
+
+model InterviewPlan {
+  id        String   @id @default(cuid())
+  botId     String   @unique
+  basePlan  Json
+  overrides Json?
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
 model KnowledgeSource {

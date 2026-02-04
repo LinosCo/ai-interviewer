@@ -14,6 +14,7 @@ import fs from 'fs';
 import path from 'path';
 import { User, Prisma } from '@prisma/client';
 import { transferBotToProject } from './actions/project-tools';
+import { regenerateInterviewPlan } from '@/lib/interview/plan-service';
 
 async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
     // 1. Bot-specific key always wins (decrypt if needed)
@@ -271,6 +272,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (formData.has('language')) data.language = getStr('language');
     if (formData.has('tone')) data.tone = getStr('tone');
     if (formData.has('introMessage')) data.introMessage = getStr('introMessage');
+    const shouldRegeneratePlan = formData.has('maxDurationMins');
     if (formData.has('maxDurationMins')) data.maxDurationMins = Number(formData.get('maxDurationMins'));
 
     // Handle slug update with validation
@@ -413,6 +415,10 @@ export async function updateBotAction(botId: string, formData: FormData) {
         where: { id: botId },
         data
     });
+
+    if (shouldRegeneratePlan) {
+        await regenerateInterviewPlan(botId);
+    }
 
     revalidatePath(`/dashboard/bots/${botId}`);
     return { success: true };
@@ -689,6 +695,7 @@ export async function addTopicAction(botId: string, orderIndex: number) {
             subGoals: [],
         }
     });
+    await regenerateInterviewPlan(botId);
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -710,6 +717,7 @@ export async function updateTopicAction(topicId: string, botId: string, data: an
             maxTurns: Number(data.maxTurns || 5)
         }
     });
+    await regenerateInterviewPlan(botId);
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -736,6 +744,7 @@ export async function deleteTopicAction(topicId: string, botId: string) {
         }
     }
 
+    await regenerateInterviewPlan(botId);
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -970,5 +979,3 @@ export async function saveBotMessageAction(conversationId: string, content: stri
         }
     });
 }
-
-

@@ -19,9 +19,17 @@ export default function TopicsEditor({ botId, topics, canUseConditionalLogic = f
         <div className="bg-white p-6 rounded shadow">
             <div className="flex justify-between items-center mb-4 border-b pb-2">
                 <h2 className="text-lg font-semibold">Conversation Flow</h2>
-                <button onClick={handleAdd} className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded hover:bg-blue-100">
-                    + Add Topic
-                </button>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href={`/dashboard/bots/${botId}/plan`}
+                        className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
+                    >
+                        Interview Plan
+                    </Link>
+                    <button onClick={handleAdd} className="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded hover:bg-blue-100">
+                        + Add Topic
+                    </button>
+                </div>
             </div>
 
             <div className="space-y-4">

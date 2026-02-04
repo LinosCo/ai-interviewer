@@ -95,13 +95,14 @@ ${knowledgeText}
 L'intervista segue un flusso RIGIDO. Tu NON decidi quando passare alla fase successiva - lo fa il SUPERVISOR.
 
 **FASE 1: SCAN** (Panoramica veloce) - OBBLIGATORIA
-- Esplori TUTTI i topic con 2-3 domande ciascuno
+- Esplori TUTTI i topic con almeno 1 domanda ciascuno
+- Il numero di domande per topic è definito dal **piano** (stabilito a monte)
 - Obiettivo: capire le opinioni generali dell'utente su ogni tema
 - ⛔ NON chiedere contatti. NON concludere. NON dire "prima di salutarci".
 
 **FASE 2: DEEP** (Approfondimento) - DURATA VARIABILE
-- Alla fine dello SCAN, il sistema calcola quanto tempo resta e lo distribuisce equamente tra TUTTI i topic
-- **STRUTTURA**: Si ritorna su OGNI topic già esplorato, uno alla volta, per approfondirlo
+- Parte solo se c'è tempo residuo **oppure** se l'utente accetta di continuare
+- **STRUTTURA**: Si ritorna su alcuni topic già esplorati (non necessariamente tutti)
 - **OBIETTIVO DEL DEEP** (per ogni topic):
   1. **Chiarire risposte interessanti**: Se l'utente ha detto qualcosa di significativo in SCAN su questo topic, approfondiscilo ("Hai menzionato X, puoi spiegarmi meglio...?")
   2. **Esplorare sub-goal mancanti**: Se alcuni sub-goal del topic NON sono stati toccati in SCAN, affrontali ora
@@ -128,13 +129,14 @@ NON anticipare mai le fasi successive. Il SUPERVISOR ti guida passo passo.
 The interview follows a STRICT flow. YOU do not decide when to move to the next phase - the SUPERVISOR does.
 
 **PHASE 1: SCAN** (Quick Overview) - MANDATORY
-- Explore ALL topics with 2-3 questions each
+- Explore ALL topics with at least 1 question each
+- The number of questions per topic is defined by the **plan** (set upstream)
 - Goal: understand the user's general opinions on each theme
 - ⛔ DO NOT ask for contacts. DO NOT conclude. DO NOT say "before we wrap up".
 
 **PHASE 2: DEEP** (Deep Dive) - VARIABLE DURATION
-- At the end of SCAN, the system calculates remaining time and distributes it equally among ALL topics
-- **STRUCTURE**: We return to EACH topic already explored, one at a time, for deeper probing
+- Only starts if there is remaining time **or** the user agrees to continue
+- **STRUCTURE**: We return to some topics already explored (not necessarily all)
 - **DEEP OBJECTIVES** (for each topic):
   1. **Clarify interesting responses**: If the user said something significant in SCAN about this topic, probe deeper ("You mentioned X, can you explain more...?")
   2. **Explore missing sub-goals**: If some sub-goals of the topic were NOT covered in SCAN, address them now
@@ -327,119 +329,6 @@ You may propose a short optional deep-dive.
                 return offerPrompt.trim();
             }
 
-            // ========== TIME_UP_DECLARATION ==========
-            // Time is up - declare it explicitly and offer to continue on specific topics
-            if (supervisorInsight.status === 'TIME_UP_DECLARATION') {
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-                const suggestedTopics = (supervisorInsight as any).suggestedTopics || [];
-                const topicLabels = suggestedTopics.map((t: any) => {
-                    const detail = t.detail ? ` "${t.detail}"` : '';
-                    return `${t.label}${detail}`;
-                }).join(isItalian ? ' e ' : ' and ');
-
-                const timeUpPrompt = isItalian ? `
-## FASE: DICHIARAZIONE TEMPO CONCLUSO
-
-**IL TEMPO È CONCLUSO.** Devi comunicarlo chiaramente all'utente.
-
-**ISTRUZIONI OBBLIGATORIE**:
-1. **DICHIARA** esplicitamente che il tempo dell'intervista è concluso
-   - Usa la frase: "Il tempo a disposizione è concluso" o simile
-2. **RINGRAZIA** brevemente per le risposte interessanti
-3. **OFFRI** la possibilità di continuare brevemente su 1-2 argomenti specifici che hanno suscitato interesse
-   - Argomenti suggeriti: ${topicLabels || 'gli argomenti emersi'}
-4. **ATTENDI** la risposta dell'utente (sì/no)
-
-**STRUTTURA ESEMPIO**:
-"Il tempo a disposizione è concluso. Grazie per le tue risposte, sono state molto interessanti! Se hai ancora qualche minuto, potremmo approfondire ${topicLabels ? `"${topicLabels}"` : 'alcuni temi che hai menzionato'}. Ti andrebbe di continuare brevemente, oppure preferisci concludere qui?"
-
-**DIVIETI**:
-- NON chiedere dati di contatto ora
-- NON saltare la dichiarazione del tempo concluso
-- NON fare domande sui topic
-- SOLO offri la scelta di continuare o concludere
-` : `
-## PHASE: TIME UP DECLARATION
-
-**TIME IS UP.** You must clearly communicate this to the user.
-
-**MANDATORY INSTRUCTIONS**:
-1. **DECLARE** explicitly that the interview time is up
-   - Use the phrase: "Our scheduled time is up" or similar
-2. **THANK** briefly for the interesting answers
-3. **OFFER** the possibility to continue briefly on 1-2 specific topics that sparked interest
-   - Suggested topics: ${topicLabels || 'the topics that emerged'}
-4. **WAIT** for the user's response (yes/no)
-
-**EXAMPLE STRUCTURE**:
-"Our scheduled time is up. Thank you for your answers, they've been very insightful! If you have a few more minutes, we could dive deeper into ${topicLabels ? `"${topicLabels}"` : 'some topics you mentioned'}. Would you like to continue briefly, or would you prefer to wrap up here?"
-
-**PROHIBITIONS**:
-- DO NOT ask for contact details now
-- DO NOT skip the time up declaration
-- DO NOT ask topic questions
-- ONLY offer the choice to continue or conclude
-`;
-                return timeUpPrompt.trim();
-            }
-
-            // ========== START_DEEP_BRIEF ==========
-            // Starting brief extension after TIME_UP_OFFER accepted
-            if (supervisorInsight.status === 'START_DEEP_BRIEF') {
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-                const topicLabel = currentTopic?.label || (isItalian ? 'il tema' : 'the topic');
-
-                const startDeepBriefPrompt = isItalian ? `
-## FASE: APPROFONDIMENTO BREVE (ESTENSIONE TEMPO)
-L'utente ha accettato di continuare brevemente.
-Ora approfondiamo il tema: "${topicLabel}".
-
-**ISTRUZIONI**:
-1. Riconosci brevemente che l'utente ha scelto di continuare (es. "Perfetto, grazie!")
-2. **IMPORTANTE**: Ricorda che questo è un approfondimento breve - 1-2 domande per tema
-3. Fai una domanda specifica di approfondimento su "${topicLabel}"
-4. Cita un dettaglio che l'utente ha menzionato prima
-
-**ESEMPIO**:
-"Perfetto, grazie per voler continuare! Tornando a ${topicLabel}, mi hai parlato di [dettaglio]. Puoi dirmi di più su...?"
-
-**DIVIETI**:
-- NON fare lunghe introduzioni
-- NON chiedere dati di contatto
-- VAI DRITTO alla domanda di approfondimento
-` : `
-## PHASE: BRIEF DEEP DIVE (TIME EXTENSION)
-The user has agreed to continue briefly.
-Now we dive deeper into: "${topicLabel}".
-
-**INSTRUCTIONS**:
-1. Briefly acknowledge that the user chose to continue (e.g., "Perfect, thank you!")
-2. **IMPORTANT**: Remember this is a brief extension - 1-2 questions per topic
-3. Ask a specific follow-up question about "${topicLabel}"
-4. Reference a detail the user mentioned before
-
-**EXAMPLE**:
-"Great, thanks for continuing! Going back to ${topicLabel}, you mentioned [detail]. Can you tell me more about...?"
-
-**PROHIBITIONS**:
-- DO NOT make long introductions
-- DO NOT ask for contact details
-- GO STRAIGHT to the follow-up question
-`;
-                return startDeepBriefPrompt.trim();
-            }
-
-            // ========== START_DEEP ==========
-            // Transitioning to DEEP phase after SCAN is complete
-            if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
-                const lang = bot?.language || 'en';
-                return lang === 'it'
-                    ? "## FASE: OFFERTA APPROFONDIMENTO\nAbbiamo quasi esaurito il tempo del colloquio. Offri all'utente la possibilità di approfondire i temi trattati con qualche altra domanda, o di concludere qui.\n**ESEMPIO**: \"Abbiamo quasi finito il tempo a disposizione. Vorresti approfondire qualche argomento con qualche altra domanda, oppure preferisci concludere?\""
-                    : "## PHASE: DEEP OFFER\nWe're almost out of interview time. Offer the user the choice to explore topics in more depth with a few more questions, or to wrap up here.\n**EXAMPLE**: \"We're almost out of time. Would you like to explore some topics in more depth with a few more questions, or would you prefer to wrap up?\"";
-            }
-
             if (supervisorInsight.status === 'START_DEEP') {
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
@@ -452,12 +341,8 @@ Ora approfondiamo alcuni punti interessanti, partendo da: "${focusTopic}".
 
 **ISTRUZIONI**:
 1. Fai una breve transizione naturale riconoscendo che l'utente ha accettato di continuare.
-2. **IMPORTANTE**: Di' chiaramente che continuerai ad approfondire ma che l'utente può fermarti in qualsiasi momento se si stanca o se si annoia.
-3. Torna al tema "${focusTopic}" e fai una domanda specifica di approfondimento.
-4. Cita un dettaglio specifico che l'utente ha menzionato prima su questo tema.
-
-**ESEMPIO**:
-"Ottimo! Continuo con qualche domanda di approfondimento allora. Dimmi pure se ti stanchi o se preferisci fermarti. Tornando a ${focusTopic}, hai menzionato [dettaglio]. Mi spieghi meglio...?"
+2. Torna al tema "${focusTopic}" e fai una domanda specifica di approfondimento.
+3. Cita un dettaglio specifico che l'utente ha menzionato prima su questo tema.
 ` : `
 ## PHASE: START DEEP DIVE
 We have completed the general overview of all topics.
@@ -465,11 +350,7 @@ Now we dive deeper into interesting points, starting with: "${focusTopic}".
 
 **INSTRUCTIONS**:
 1. Make a brief natural transition acknowledging the user's agreement to continue.
-2. **IMPORTANT**: Explicitly tell the user that you'll continue with deeper questions but they should let you know if they get tired or bored and want to stop.
-3. Return to "${focusTopic}" and ask a specific follow-up question referencing a previous detail.
-
-**EXAMPLE**:
-"Great! I'll continue with some deeper questions then. Just let me know if you get tired or bored and want to move on. Going back to ${focusTopic}, you mentioned [detail]. Can you elaborate on...?"
+2. Return to "${focusTopic}" and ask a specific follow-up question referencing a previous detail.
 `;
                 return startDeepPrompt.trim();
             }
@@ -491,11 +372,8 @@ NON fare domande sui contenuti dell'intervista. L'intervista è FINITA.
 
 **ISTRUZIONI**:
 1. Ringrazia sinceramente l'utente per il tempo e le risposte.
-2. **MOLTO IMPORTANTE**: Spega chiaramente che l'intervista è conclusa (completed).
+2. Indica chiaramente che l'intervista è conclusa.
 3. Chiedi se puoi fare alcune domande per raccogliere i dati di contatto per restare in contatto.
-
-**ESEMPIO**:
-"Ti ringrazio molto per questa conversazione, è stata davvero interessante! L'intervista è conclusa. Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?"
 ` : `
 ## PHASE: DATA COLLECTION CONSENT
 The content interview is complete.
@@ -503,11 +381,8 @@ Now you must ask for PERMISSION to collect contact data.
 
 **INSTRUCTIONS**:
 1. Sincerely thank the user for their time and answers.
-2. **VERY IMPORTANT**: Explicitly state that the interview is completed.
+2. Explicitly state that the interview is completed.
 3. Ask if you can ask for some contact details to stay in touch.
-
-**EXAMPLE**:
-"Thank you so much for this conversation! The interview is completed. Before we go, can I ask you for some contact details to stay in touch?"
 `;
                 return consentPrompt.trim();
             }
@@ -515,15 +390,15 @@ Now you must ask for PERMISSION to collect contact data.
             if (supervisorInsight.status === 'COMPLETE_WITHOUT_DATA') {
                 const lang = bot?.language || 'en';
                 return lang === 'it'
-                    ? "## FASE: CONCLUSIONE\nL'intervista è finita. Ringrazia calorosamente e saluta. Non fare altre domande. Aggiungi alla fine del messaggio: INTERVIEW_COMPLETED\n**ESEMPIO**: \"Grazie mille per il tuo tempo! L'intervista è conclusa. Ti auguro una buona giornata! INTERVIEW_COMPLETED\""
-                    : "## PHASE: COMPLETION\nThe interview is over. Warmly thank the user and say goodbye. Do not ask any more questions. Add at the end of the message: INTERVIEW_COMPLETED\n**EXAMPLE**: \"Thank you so much for your time! The interview is complete. Have a great day! INTERVIEW_COMPLETED\"";
+                    ? "## FASE: CONCLUSIONE\nL'intervista è finita. Ringrazia calorosamente e saluta. Non fare altre domande. Aggiungi alla fine del messaggio: INTERVIEW_COMPLETED"
+                    : "## PHASE: COMPLETION\nThe interview is over. Warmly thank the user and say goodbye. Do not ask any more questions. Add at the end of the message: INTERVIEW_COMPLETED";
             }
 
             if (supervisorInsight.status === 'FINAL_GOODBYE') {
                 const lang = bot?.language || 'en';
                 return lang === 'it'
-                    ? "## FASE: SALUTO FINALE\nHai raccolto tutte le informazioni necessarie. Ringrazia l'utente per la collaborazione e saluta cordialmente. Di' che verranno ricontattati presto. Aggiungi alla fine: INTERVIEW_COMPLETED\n**ESEMPIO**: \"Grazie mille per tutte le informazioni. L'intervista è conclusa, ti contatteremo presto! INTERVIEW_COMPLETED\""
-                    : "## PHASE: FINAL GOODBYE\nYou have collected all necessary information. Thank the user for their cooperation and say goodbye cordially. Mention they will be contacted soon. Add at the end: INTERVIEW_COMPLETED\n**EXAMPLE**: \"Thank you for all the information. The interview is complete, we will contact you soon! INTERVIEW_COMPLETED\"";
+                    ? "## FASE: SALUTO FINALE\nHai raccolto tutte le informazioni necessarie. Ringrazia l'utente per la collaborazione e saluta cordialmente. Di' che verranno ricontattati presto. Aggiungi alla fine: INTERVIEW_COMPLETED"
+                    : "## PHASE: FINAL GOODBYE\nYou have collected all necessary information. Thank the user for their cooperation and say goodbye cordially. Mention they will be contacted soon. Add at the end: INTERVIEW_COMPLETED";
             }
 
             if (supervisorInsight.status === 'CONFIRM_STOP') {
@@ -638,6 +513,7 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
                 const nextTopicLabel = (supervisorInsight as any).nextTopic || nextTopic?.label || 'the next topic';
                 const nextTopicObj = allTopics.find(t => t.label === nextTopicLabel) || nextTopic;
                 const firstSubGoal = nextTopicObj?.subGoals?.[0] || nextTopicLabel;
+                const transitionFocus = supervisorInsight.nextSubGoal || firstSubGoal;
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
 
@@ -652,10 +528,8 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > 2. **CONNESSIONE NATURALE** al nuovo topic (opzionale, 5-10 parole)
 > 3. **UNA DOMANDA** su "${nextTopicLabel}"
 >
-> **FOCUS DOMANDA**: ${firstSubGoal}
-> **VINCOLO**: La domanda deve contenere il riferimento esplicito a "${nextTopicLabel}".
->
-> **ESEMPIO COMPLETO**: "È interessante quello che dici sulla gestione del tempo. Questo mi fa pensare a ${nextTopicLabel} - ${firstSubGoal.toLowerCase().includes('come') ? '' : 'come'} [domanda su ${firstSubGoal}]?"
+> **FOCUS DOMANDA**: ${transitionFocus}
+> **VINCOLO**: La domanda deve essere chiaramente sul topic "${nextTopicLabel}".
 >
 > **DIVIETI**:
 > - ❌ NON dire "Ora passiamo a..." o "Cambiamo argomento..."
@@ -674,10 +548,8 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > 2. **NATURAL CONNECTION** to the new topic (optional, 5-10 words)
 > 3. **ONE QUESTION** about "${nextTopicLabel}"
 >
-> **QUESTION FOCUS**: ${firstSubGoal}
-> **CONSTRAINT**: The question must explicitly reference "${nextTopicLabel}".
->
-> **FULL EXAMPLE**: "That's an interesting point about time management. This makes me think about ${nextTopicLabel} - ${firstSubGoal.toLowerCase().includes('how') ? '' : 'how'} [question about ${firstSubGoal}]?"
+> **QUESTION FOCUS**: ${transitionFocus}
+> **CONSTRAINT**: The question must clearly be about "${nextTopicLabel}".
 >
 > **PROHIBITIONS**:
 > - ❌ Do NOT say "Now let's move to..." or "Let's change topic..."
@@ -808,7 +680,6 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > The active phase is now DATA COLLECTION.
 > **DO NOT SAY GOODBYE YET.**
 > You MUST explicitly ask for permission to collect contact details first.
-> Phrase: "Before we finish, may I ask for your contact details to stay in touch?" (or Italian: "Prima di salutarci, posso chiederti i contatti per restare aggiornati?")
 > ONLY after they agree can you proceed to collect fields.
 `;
             } else {

@@ -1114,6 +1114,43 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         let responseText = result.object.response;
         console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
 
+        // ====================================================================
+        // 5.4 TRANSITION / DEEP_OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
+        // ====================================================================
+        const transitionTopicLabel = supervisorInsight?.nextTopic;
+        const responseLower = (responseText || '').toLowerCase();
+
+        if (supervisorInsight?.status === 'TRANSITION' && transitionTopicLabel) {
+            const mustMention = transitionTopicLabel.toLowerCase();
+            if (!responseLower.includes(mustMention)) {
+                console.log(`⚠️ [SUPERVISOR] Transition response missing next topic label "${transitionTopicLabel}". Regenerating.`);
+                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your response MUST explicitly mention the next topic label: "${transitionTopicLabel}". Ask exactly one question about it.`;
+                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                responseText = retry.object.response?.trim() || responseText;
+            }
+        }
+
+        if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
+            const openai = createOpenAI({ apiKey: openAIKey });
+            const offerSchema = z.object({ isOffer: z.boolean() });
+            try {
+                const offerCheck = await generateObject({
+                    model: openai('gpt-4o-mini'),
+                    schema: offerSchema,
+                    prompt: `Determine if the assistant is explicitly offering the user to continue with extra/deeper questions and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isOffer: true/false }.`,
+                    temperature: 0
+                });
+                if (!offerCheck.object.isOffer) {
+                    console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
+                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY offer the choice to continue with extra deeper questions and wait for yes/no. Do NOT ask any topic question.`;
+                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    responseText = retry.object.response?.trim() || responseText;
+                }
+            } catch (e) {
+                console.error('Deep offer validation failed:', e);
+            }
+        }
+
         // Track token usage - NUOVO: usa userId (owner del progetto) per il sistema crediti
         const organizationId = (bot as any).project?.organization?.id;
         const projectOwnerId = (bot as any).project?.ownerId;
@@ -1215,7 +1252,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             };
 
             // CONSENT PHASE: bot should ask for permission
-            if (nextState.consentGiven === false) {
+            if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' && nextState.consentGiven === false) {
                 console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
 
                 // Varied consent questions

@@ -95,14 +95,20 @@ async function extractFieldFromMessage(
     });
 
     try {
-        const nameSpecificRules = (fieldName === 'name' || fieldName === 'fullName')
-            ? `\n- For name: Accept first name only (e.g., "Marco", "Franco", "Anna"). Don't require full name.\n- If the message contains a word that looks like a name, extract it.`
-            : '';
+        // Field-specific extraction rules
+        let fieldSpecificRules = '';
+        if (fieldName === 'name' || fieldName === 'fullName') {
+            fieldSpecificRules = `\n- For name: Accept first name only (e.g., "Marco", "Franco", "Anna"). Don't require full name.\n- If the message contains a word that looks like a name, extract it.`;
+        } else if (fieldName === 'company') {
+            fieldSpecificRules = `\n- For company: Look for business names, often ending in spa, srl, ltd, inc, llc, or containing words like "azienda", "società", "company".\n- Extract the company name even if mixed with other info (e.g., "Ferri spa e sono ceo" → extract "Ferri spa").\n- Accept any business/organization name the user provides.`;
+        } else if (fieldName === 'role') {
+            fieldSpecificRules = `\n- For role: Look for job titles like CEO, CTO, manager, developer, designer, etc.\n- Extract the role even if mixed with other info (e.g., "Ferri spa e sono ceo" → extract "ceo").`;
+        }
 
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
-            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${nameSpecificRules}`,
+            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
             temperature: 0
         });
         return { value: result.object.extractedValue, confidence: result.object.confidence };
@@ -747,8 +753,17 @@ export async function POST(req: Request) {
                     if (userFrustrated) {
                         console.log(`⚠️ [DATA_COLLECTION] User frustrated - attempting to extract from history and complete`);
 
+                        // Determine which name field is configured (name or fullName)
+                        const configuredNameField = candidateFields.find((f: any) => {
+                            const fieldName = typeof f === 'string' ? f : (f.id || f.field);
+                            return fieldName === 'name' || fieldName === 'fullName';
+                        });
+                        const nameFieldKey = configuredNameField
+                            ? (typeof configuredNameField === 'string' ? configuredNameField : (configuredNameField.id || configuredNameField.field))
+                            : 'fullName';
+
                         // Try to find the name in previous messages if we don't have it
-                        if (!currentProfile.fullName) {
+                        if (!currentProfile[nameFieldKey]) {
                             // Look for a short reply (1-3 words) after a "name" question
                             for (let i = messages.length - 1; i >= 0; i--) {
                                 const msg = messages[i];
@@ -759,8 +774,8 @@ export async function POST(req: Request) {
                                     if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content)) {
                                         const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
                                         if (cleanedName.length > 1) {
-                                            currentProfile = { ...currentProfile, fullName: cleanedName };
-                                            console.log(`✅ [DATA_COLLECTION] Recovered name from history: "${cleanedName}"`);
+                                            currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
+                                            console.log(`✅ [DATA_COLLECTION] Recovered name from history for "${nameFieldKey}": "${cleanedName}"`);
                                             await prisma.conversation.update({
                                                 where: { id: conversationId },
                                                 data: { candidateProfile: currentProfile }
@@ -791,21 +806,53 @@ export async function POST(req: Request) {
 
                         console.log(`📋 [DATA_COLLECTION] Attempting to extract fields: ${fieldsToExtract.join(', ')} from: "${lastMessage.content}"`);
 
-                        // SPECIAL HANDLING FOR NAME: If we asked for name and user replied with 1-3 words, use it directly
+                        // SPECIAL HANDLING: If we asked for a specific field and user replied with a short answer, use it directly
                         const userReply = lastMessage.content.trim();
                         const wordCount = userReply.split(/\s+/).length;
-                        if (state.lastAskedField === 'fullName' && wordCount <= 3 && !currentProfile.fullName) {
-                            // User probably just gave their name - use it directly
+                        const lastAsked = state.lastAskedField;
+
+                        // Direct capture for NAME (1-3 words, no special chars)
+                        const isNameField = lastAsked === 'fullName' || lastAsked === 'name';
+                        const nameFieldKey = lastAsked === 'name' ? 'name' : 'fullName';
+                        if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey]) {
                             const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
-                            if (cleanedName.length > 0 && cleanedName.length < 50) {
-                                currentProfile = { ...currentProfile, fullName: cleanedName };
-                                console.log(`✅ [DATA_COLLECTION] Direct name capture: "${cleanedName}"`);
+                            if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
+                                currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
+                                console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}": "${cleanedName}"`);
+                            }
+                        }
+
+                        // Direct capture for COMPANY (1-5 words, reasonable length)
+                        if (lastAsked === 'company' && wordCount <= 5 && !currentProfile.company) {
+                            const cleanedCompany = userReply.replace(/[.!?,;:]/g, '').trim();
+                            // Accept if it looks like a company name (not a refusal or question)
+                            if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
+                                !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
+                                currentProfile = { ...currentProfile, company: cleanedCompany };
+                                console.log(`✅ [DATA_COLLECTION] Direct company capture: "${cleanedCompany}"`);
+                            }
+                        }
+
+                        // Direct capture for ROLE (1-4 words)
+                        if (lastAsked === 'role' && wordCount <= 4 && !currentProfile.role) {
+                            const cleanedRole = userReply.replace(/[.!?,;:]/g, '').trim();
+                            if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
+                                !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
+                                currentProfile = { ...currentProfile, role: cleanedRole };
+                                console.log(`✅ [DATA_COLLECTION] Direct role capture: "${cleanedRole}"`);
                             }
                         }
 
                         const extractions = await Promise.all(
                             fieldsToExtract.map(async (fieldName) => {
-                                if (fieldName === 'fullName' && currentProfile.fullName) return { fieldName, extraction: { value: null, confidence: 'none' } };
+                                // Skip if field already captured by direct capture above
+                                if ((fieldName === 'fullName' && currentProfile.fullName) ||
+                                    (fieldName === 'name' && currentProfile.name) ||
+                                    (fieldName === 'company' && currentProfile.company) ||
+                                    (fieldName === 'role' && currentProfile.role)) {
+                                    console.log(`⏭️ [DATA_COLLECTION] Skipping extraction for "${fieldName}" - already captured directly`);
+                                    return { fieldName, extraction: { value: null, confidence: 'none' } };
+                                }
 
                                 const extraction = await extractFieldFromMessage(
                                     fieldName,
@@ -813,6 +860,7 @@ export async function POST(req: Request) {
                                     openAIKey,
                                     language
                                 );
+                                console.log(`🔍 [DATA_COLLECTION] Extraction result for "${fieldName}": value="${extraction.value}", confidence="${extraction.confidence}"`);
                                 return { fieldName, extraction };
                             })
                         );
@@ -821,6 +869,8 @@ export async function POST(req: Request) {
                             if (extraction.value && extraction.confidence !== 'none') {
                                 currentProfile = { ...currentProfile, [fieldName]: extraction.value };
                                 console.log(`✅ [DATA_COLLECTION] Extracted "${fieldName}": "${extraction.value}"`);
+                            } else {
+                                console.log(`⚠️ [DATA_COLLECTION] Could not extract "${fieldName}" (value=${extraction.value}, confidence=${extraction.confidence})`);
                             }
                         }
 
@@ -1037,14 +1087,23 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             });
             const currentProfile = (freshConversation?.candidateProfile as any) || {};
 
-            // Find first missing field
+            // Find first missing field (must match logic in data collection phase)
+            // Consider: already collected, explicitly skipped, or asked too many times
+            const MAX_FIELD_ATTEMPTS_SUPERVISOR = 3;
             let missingField: string | null = null;
             for (const field of candidateFields) {
                 const fieldName = typeof field === 'string' ? field : (field.id || field.field);
-                if (!currentProfile[fieldName]) {
-                    missingField = fieldName;
-                    break;
-                }
+                const attempts = nextState.fieldAttemptCounts?.[fieldName] || 0;
+
+                // Skip if already collected (and not skipped marker)
+                if (currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__') continue;
+                // Skip if explicitly skipped
+                if (currentProfile[fieldName] === '__SKIPPED__') continue;
+                // Skip if asked too many times
+                if (attempts >= MAX_FIELD_ATTEMPTS_SUPERVISOR) continue;
+
+                missingField = fieldName;
+                break;
             }
 
             // Helper to get field label
@@ -1232,9 +1291,15 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 select: { candidateProfile: true }
             });
             const currentProfileForCompletion = (freshConvForCompletion?.candidateProfile as any) || {};
+            // A field is considered "done" if: collected, skipped, or asked too many times
+            const MAX_FIELD_ATTEMPTS_COMPLETION = 3;
             const allFieldsCollected = candidateFields.every((field: any) => {
                 const fieldName = typeof field === 'string' ? field : (field.id || field.field);
-                return !!currentProfileForCompletion[fieldName];
+                const attempts = nextState.fieldAttemptCounts?.[fieldName] || 0;
+                // Field is done if: has value (not skipped), is skipped, or exceeded attempts
+                return (currentProfileForCompletion[fieldName] && currentProfileForCompletion[fieldName] !== '__SKIPPED__') ||
+                       currentProfileForCompletion[fieldName] === '__SKIPPED__' ||
+                       attempts >= MAX_FIELD_ATTEMPTS_COMPLETION;
             });
 
             if (shouldCollectData && !allFieldsCollected && nextState.consentGiven !== false) {

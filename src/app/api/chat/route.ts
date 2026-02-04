@@ -1206,7 +1206,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             };
 
             // CONSENT PHASE: bot should ask for permission
-            if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' && nextState.consentGiven === false && !nextState.dataCollectionRefused) {
+            if (nextState.consentGiven === false && !nextState.dataCollectionRefused) {
                 console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask for consent to collect contact details. One question only. Do not ask any topic question.`;
                 const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });

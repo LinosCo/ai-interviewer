@@ -50,6 +50,7 @@ interface InterviewState {
     deepTurnsByTopic?: Record<string, number>;
     topicSubGoalHistory?: Record<string, string[]>; // Track used sub-goals per topic
     lastUserTopicId?: string | null;
+    deepLastSubGoalByTopic?: Record<string, string>;
 }
 
 // ============================================================================ 
@@ -358,6 +359,7 @@ export async function POST(req: Request) {
             deepTurnsByTopic: rawMetadata.deepTurnsByTopic ?? {},
             topicSubGoalHistory: rawMetadata.topicSubGoalHistory ?? {},
             lastUserTopicId: rawMetadata.lastUserTopicId ?? null,
+            deepLastSubGoalByTopic: rawMetadata.deepLastSubGoalByTopic ?? {},
         };
 
         const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -421,11 +423,24 @@ export async function POST(req: Request) {
                         const remainingSec = maxDurationSec - effectiveSec;
                         console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
 
-                        // Always offer extra time before DEEP. User must accept to proceed.
-                        nextState.phase = 'DEEP_OFFER';
-                        nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
-                        supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                        console.log(`🎁 [SCAN→DEEP_OFFER] Offering DEEP with ${remainingSec}s remaining`);
+                        if (remainingSec > 0) {
+                            const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
+                            nextState.deepTopicOrder = deepPlan.deepTopicOrder;
+                            nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
+                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
+
+                            nextState.phase = 'DEEP';
+                            nextState.topicIndex = 0;
+                            nextState.turnInTopic = 0;
+                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
+                            supervisorInsight = { status: 'START_DEEP' };
+                        } else {
+                            // Offer DEEP only when time is over
+                            nextState.phase = 'DEEP_OFFER';
+                            nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
+                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                            console.log(`🎁 [SCAN→DEEP_OFFER] Offering DEEP with ${remainingSec}s remaining`);
+                        }
                     }
                 } else {
                     // Continue SCAN on current topic
@@ -558,7 +573,19 @@ export async function POST(req: Request) {
 
                 console.log(`📊 [DEEP] Topic ${state.topicIndex + 1}/${deepTotal}, Turn ${state.turnInTopic + 1}/${turnsLimit}`);
 
-                if (state.turnInTopic >= turnsLimit) {
+                // If time is over during DEEP, offer extra time before continuing
+                const maxDurationSec = maxDurationMins * 60;
+                const remainingSec = maxDurationSec - effectiveSec;
+                if (remainingSec <= 0 && state.deepAccepted !== true) {
+                    nextState.phase = 'DEEP_OFFER';
+                    nextState.deepAccepted = null;
+                    supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                    console.log(`🎁 [DEEP→DEEP_OFFER] Time over during DEEP. Offering extra time.`);
+                }
+
+                if (nextState.phase === 'DEEP_OFFER') {
+                    // Skip DEEP progression until user responds to offer
+                } else if (state.turnInTopic >= turnsLimit) {
                     // Move to next topic
                     if (state.topicIndex + 1 < deepTotal) {
                         nextState.topicIndex = state.topicIndex + 1;
@@ -590,9 +617,12 @@ export async function POST(req: Request) {
                     // Continue DEEP on current topic
                     nextState.turnInTopic = state.turnInTopic + 1;
 
-                    // Ask TopicManager for focus point (MUST be different each turn)
+                    // Ask for a DEEP focus point (avoid repetition)
                     const usedSubGoals = (state.topicSubGoalHistory || {})[deepCurrent.id] || [];
-                    const availableSubGoals = (deepCurrent.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
+                    const lastDeepGoal = (state.deepLastSubGoalByTopic || {})[deepCurrent.id];
+                    const availableSubGoals = (deepCurrent.subGoals || [])
+                        .filter((sg: string) => !usedSubGoals.includes(sg))
+                        .filter((sg: string) => (lastDeepGoal ? sg !== lastDeepGoal : true));
 
                     if (availableSubGoals.length === 0) {
                         const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
@@ -603,6 +633,10 @@ export async function POST(req: Request) {
                         nextState.topicSubGoalHistory = {
                             ...(state.topicSubGoalHistory || {}),
                             [deepCurrent.id]: [...usedSubGoals, focusPoint]
+                        };
+                        nextState.deepLastSubGoalByTopic = {
+                            ...(state.deepLastSubGoalByTopic || {}),
+                            [deepCurrent.id]: focusPoint
                         };
                         supervisorInsight = { status: 'DEEPENING', focusPoint };
                     }

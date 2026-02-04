@@ -1009,6 +1009,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         // ====================================================================
         const transitionTopicLabel = supervisorInsight?.nextTopic;
         const responseLower = (responseText || '').toLowerCase();
+        let didRegenerate = false;
 
         if (supervisorInsight?.status === 'TRANSITION' && transitionTopicLabel) {
             const mustMention = transitionTopicLabel.toLowerCase();
@@ -1017,6 +1018,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your response MUST explicitly mention the next topic label: "${transitionTopicLabel}". Ask exactly one question about it.`;
                 const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
+                didRegenerate = true;
             }
         }
 
@@ -1035,6 +1037,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY offer the choice to continue with extra deeper questions and wait for yes/no. Do NOT ask any topic question.`;
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
+                    didRegenerate = true;
                 }
             } catch (e) {
                 console.error('Deep offer validation failed:', e);
@@ -1042,7 +1045,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         }
 
         const isTopicPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
-        if (isTopicPhase && targetTopic) {
+        if (isTopicPhase && targetTopic && !didRegenerate) {
             const responseLower = (responseText || '').toLowerCase();
             const topicLabel = (targetTopic.label || '').toLowerCase();
             const subGoals = (targetTopic.subGoals || []).map((sg: string) => sg.toLowerCase());
@@ -1055,6 +1058,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your question must explicitly reference the topic "${targetTopic.label}". If possible, tie it to one of these sub-goals: ${focusList}. Ask exactly one question.`;
                 const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
+                didRegenerate = true;
             }
         }
 
@@ -1106,6 +1110,16 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         const isPrematureContactRequest = contactRequestPattern.test(responseText) && nextState.phase !== 'DATA_COLLECTION';
         if (isPrematureContactRequest) {
             console.log(`⚠️ [SUPERVISOR] Bot tried to ask for contacts during ${nextState.phase} phase - intercepting!`);
+        }
+
+        const PROMO_PATTERNS = /\b(www\.|https?:\/\/|@|email|scrivi a|contatta|offerta|promo|premio|reward|coupon|sconto)\b/i;
+        const isPromoContent = PROMO_PATTERNS.test(responseText) && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP' || nextState.phase === 'DEEP_OFFER');
+        if (isPromoContent) {
+            console.log(`⚠️ [SUPERVISOR] Promo/CTA detected during active phase. Regenerating.`);
+            const enforceTopic = targetTopic?.label || currentTopic.label;
+            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Remove any promo/CTA. Ask exactly ONE question about "${enforceTopic}".`;
+            const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+            responseText = retry.object.response?.trim() || responseText;
         }
 
         // Supervisor logic (no hardcoded overrides to respect AI reasoning)
@@ -1204,56 +1218,12 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         // NEW STRATEGY: Track closure attempts and respect user's intent after 2 attempts
         else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isPrematureContactRequest)) {
             nextState.closureAttempts = (state.closureAttempts || 0) + 1;
-            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Closure attempt #${nextState.closureAttempts}`);
-            console.log(`   Original response: "${responseText.substring(0, 100)}..."`);
+            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Forcing topic question. Attempt #${nextState.closureAttempts}`);
 
-            const MAX_CLOSURE_ATTEMPTS = 2;
-
-            if (nextState.closureAttempts >= MAX_CLOSURE_ATTEMPTS) {
-                // Respect user's implicit desire to end - transition to DATA_COLLECTION
-                console.log(`   ✓ Max closure attempts reached. Respecting user intent, transitioning to DATA_COLLECTION.`);
-
-                if (shouldCollectData) {
-                    nextState.phase = 'DATA_COLLECTION';
-                    nextState.consentGiven = null;
-                    supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask for consent to collect contact details. One question only.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-                    responseText = retry.object.response?.trim() || responseText;
-                } else {
-                    nextState.phase = 'DATA_COLLECTION';
-                    supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Close the interview politely without asking any questions. Append \"INTERVIEW_COMPLETED\".`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-                    responseText = retry.object.response?.trim() || responseText;
-                    if (!/INTERVIEW_COMPLETED/i.test(responseText)) {
-                        responseText = `${responseText.trim()} INTERVIEW_COMPLETED`.trim();
-                    }
-                }
-            } else {
-                // First closure attempt - try to move to next topic instead of appending generic questions
-                const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
-                const topicLabel = targetTopic?.label || 'questo argomento';
-
-                // Check if we can move to next topic
-                if (nextState.topicIndex + 1 < numTopics) {
-                    nextState.topicIndex = nextState.topicIndex + 1;
-                    nextState.turnInTopic = 0;
-                    const nextTopic = botTopics[nextState.topicIndex];
-                    nextTopicId = nextTopic.id;
-                    supervisorInsight = { status: 'TRANSITION', nextTopic: nextTopic.label, nextSubGoal: (nextTopic.subGoals || [])[0] || nextTopic.label };
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask one question about the topic "${nextTopic.label}". Mention it explicitly.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-                    responseText = retry.object.response?.trim() || responseText;
-                    console.log(`   ✓ Moving to next topic: ${nextTopic.label}`);
-                } else {
-                    // No more topics - generate a closing question for current topic
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask one final question about "${topicLabel}". Do not say goodbye.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-                    responseText = retry.object.response?.trim() || responseText;
-                    console.log(`   ✓ Asking closing question for current topic`);
-                }
-            }
+            const enforceTopic = targetTopic?.label || currentTopic.label;
+            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing.`;
+            const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+            responseText = retry.object.response?.trim() || responseText;
         }
         // Reset closure attempts when bot generates a valid question (not trying to close)
         else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && !isGoodbyeResponse && !hasNoQuestion) {

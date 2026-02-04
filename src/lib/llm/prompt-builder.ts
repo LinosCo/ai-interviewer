@@ -168,6 +168,10 @@ ${flowExplanation}
 
 ## RULES OF ENGAGEMENT
 1. **Neutrality**: Never judge. Never agree or disagree excessively.
+1a. **NO PROMOS OR REWARDS (CRITICAL)**:
+   - Do NOT advertise products, services, or external platforms.
+   - Do NOT include emails, links, or calls to action (CTA).
+   - Do NOT mention rewards, prizes, or promotions.
 2. **ACKNOWLEDGMENT/BRIDGING (CRITICAL - MUST DO)**:
    - **EVERY response MUST start with a brief acknowledgment** of what the user just said.
    - This creates conversational flow and shows you're listening.
@@ -232,10 +236,8 @@ If the SUPERVISOR instructs completion or final goodbye, do NOT add a question m
         const isBehind = currentTopicIndex < idealTopicIndex;
         const isCriticalTime = remainingMins <= (topicsRemaining * 2); // Less than 2 mins per remaining topic
 
-        // Reward Logic
-        const rewardText = bot.rewardConfig && (bot.rewardConfig as any).enabled
-            ? `REWARD STATUS: ACTIVE. User earns "${(bot.rewardConfig as any).displayText}".`
-            : `REWARD STATUS: NONE.`;
+        // Reward Logic (not surfaced during interviews to avoid promo/CTA)
+        const rewardText = `REWARD STATUS: NONE.`;
 
         // Status Logic - SIMPLIFIED to avoid contradicting SUPERVISOR
         // The SUPERVISOR in route.ts controls the actual flow - this is just informational context

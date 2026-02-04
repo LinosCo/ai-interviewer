@@ -1047,7 +1047,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             const topicLabel = (targetTopic.label || '').toLowerCase();
             const subGoals = (targetTopic.subGoals || []).map((sg: string) => sg.toLowerCase());
             const mentionsTopic = topicLabel && responseLower.includes(topicLabel);
-            const mentionsSubGoal = subGoals.some(sg => sg.length > 3 && responseLower.includes(sg));
+            const mentionsSubGoal = subGoals.some((sg: string) => sg.length > 3 && responseLower.includes(sg));
 
             if (!mentionsTopic && !mentionsSubGoal) {
                 console.log(`⚠️ [SUPERVISOR] Response drifted from topic "${targetTopic.label}". Regenerating.`);

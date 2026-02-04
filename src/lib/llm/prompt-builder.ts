@@ -1,6 +1,7 @@
 
 import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
 import { MemoryManager } from '@/lib/memory/memory-manager';
+import { buildTopicAnchors } from '@/lib/interview/topic-anchors';
 
 const FIELD_LABELS: Record<string, { it: string, en: string }> = {
     name: { it: 'Nome Completo', en: 'Full Name' },
@@ -337,7 +338,7 @@ Puoi proporre un breve approfondimento opzionale.
 
 **ISTRUZIONI**:
 1. Ringrazia brevemente l'utente per le risposte finora.
-2. Offri la possibilità di continuare con alcune domande extra di approfondimento.
+2. Chiedi in modo leggero se ha qualche minuto in più per continuare con alcune domande extra di approfondimento.
 3. Attendi la risposta dell'utente.
 
 **DIVIETI**:
@@ -350,7 +351,7 @@ You may propose a short optional deep-dive.
 
 **INSTRUCTIONS**:
 1. Briefly thank the user for their answers so far.
-2. Offer the opportunity to continue with a few extra deep-dive questions.
+2. Ask lightly if they have a few extra minutes to continue with a few extra deep-dive questions.
 3. Wait for user's response.
 
 **PROHIBITIONS**:
@@ -723,6 +724,16 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
             }
         }
 
+        const lang = bot?.language || 'en';
+        const isItalian = lang === 'it';
+        const anchorData = buildTopicAnchors(currentTopic, lang);
+        const anchorList = anchorData.anchors.join(', ');
+        const anchorSection = anchorList
+            ? (isItalian
+                ? `## ANCORE TOPIC (OBBLIGATORIE)\nUsa almeno UN termine tra: ${anchorList}.\n`
+                : `## TOPIC ANCHORS (REQUIRED)\nUse at least ONE term from: ${anchorList}.\n`)
+            : '';
+
         return `
 ## CURRENT TOPIC: ${currentTopic.label} (${progress})
 Description: ${currentTopic.description}
@@ -732,6 +743,8 @@ Sub-Goals to Cover:
 ${supervisorInstruction}
 
 ${supervisorSupremacyInstruction}
+
+${anchorSection}
 
 INSTRUCTION:
 ${primaryInstruction}

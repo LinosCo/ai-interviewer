@@ -177,7 +177,6 @@ export default function InterviewChat({
     // Effective Time Tracking
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
     const [isTyping, setIsTyping] = useState(false);
-    const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const [isCompleted, setIsCompleted] = useState(false);
 
     // Active Timer
@@ -256,12 +255,26 @@ export default function InterviewChat({
         }
     };
 
-    // Auto-resize textarea function
+    const resizeRafRef = useRef<number | null>(null);
+    const lastTextareaHeightRef = useRef<number | null>(null);
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Auto-resize textarea function (deferred to next frame to avoid blocking input)
     const autoResizeTextarea = () => {
-        if (inputRef.current) {
-            inputRef.current.style.height = 'auto';
-            inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 150)}px`;
+        if (!inputRef.current) return;
+        if (resizeRafRef.current) {
+            cancelAnimationFrame(resizeRafRef.current);
         }
+        resizeRafRef.current = requestAnimationFrame(() => {
+            const el = inputRef.current;
+            if (!el) return;
+            el.style.height = 'auto';
+            const nextHeight = Math.min(el.scrollHeight, 150);
+            if (lastTextareaHeightRef.current !== nextHeight) {
+                el.style.height = `${nextHeight}px`;
+                lastTextareaHeightRef.current = nextHeight;
+            }
+        });
     };
 
     // Auto-focus input when question changes
@@ -278,6 +291,31 @@ export default function InterviewChat({
     // Auto-resize on input change
     useEffect(() => {
         autoResizeTextarea();
+        return () => {
+            if (resizeRafRef.current) {
+                cancelAnimationFrame(resizeRafRef.current);
+                resizeRafRef.current = null;
+            }
+        };
+    }, [input]);
+
+    // Typing indicator debounce (avoid heavy work in onChange)
+    useEffect(() => {
+        if (!input) {
+            setIsTyping(false);
+            return;
+        }
+        setIsTyping(true);
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 1200);
+        return () => {
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+                typingTimeoutRef.current = null;
+            }
+        };
     }, [input]);
 
     const handleSendMessage = async (messageContent: string, isInitial = false, overrideHistory?: Message[]) => {
@@ -892,9 +930,6 @@ export default function InterviewChat({
                                     value={input}
                                     onChange={(e) => {
                                         setInput(e.target.value);
-                                        if (!isTyping) { setIsTyping(true); }
-                                        if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
-                                        typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
                                     }}
                                     onKeyDown={handleKeyDown}
                                     onFocus={() => {

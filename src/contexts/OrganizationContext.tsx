@@ -30,11 +30,17 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
+    const [retryCount, setRetryCount] = useState(0);
+    const maxRetries = 2;
 
     const fetchOrganizations = async () => {
-        if (!session) return;
+        if (!session) {
+            setLoading(false);
+            return;
+        }
 
         try {
+            setLoading(true);
             const res = await fetch('/api/organizations');
             if (res.ok) {
                 const data = await res.json();
@@ -66,6 +72,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                 setLoading(false);
             } else {
                 setLoading(false);
+                if ((res.status === 401 || res.status === 403) && retryCount < maxRetries) {
+                    setTimeout(() => setRetryCount((count) => count + 1), 600);
+                }
+            } else {
+                setLoading(false);
             }
         } catch (error) {
             console.error('Failed to fetch organizations:', error);
@@ -86,7 +97,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         if (status === 'authenticated') {
             fetchOrganizations();
         }
-    }, [status, session]);
+    }, [status, session, retryCount]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);

@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
+import { buildTopicAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
 
 export const maxDuration = 60;
 
@@ -1008,20 +1009,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         // ====================================================================
         // 5.4 TRANSITION / DEEP_OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
         // ====================================================================
-        const transitionTopicLabel = supervisorInsight?.nextTopic;
-        const responseLower = (responseText || '').toLowerCase();
         let didRegenerate = false;
-
-        if (supervisorInsight?.status === 'TRANSITION' && transitionTopicLabel) {
-            const mustMention = transitionTopicLabel.toLowerCase();
-            if (!responseLower.includes(mustMention)) {
-                console.log(`⚠️ [SUPERVISOR] Transition response missing next topic label "${transitionTopicLabel}". Regenerating.`);
-                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your response MUST explicitly mention the next topic label: "${transitionTopicLabel}". Ask exactly one question about it.`;
-                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-                responseText = retry.object.response?.trim() || responseText;
-                didRegenerate = true;
-            }
-        }
 
         if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             const openai = createOpenAI({ apiKey: openAIKey });
@@ -1030,12 +1018,12 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 const offerCheck = await generateObject({
                     model: openai('gpt-4o-mini'),
                     schema: offerSchema,
-                    prompt: `Determine if the assistant is explicitly offering the user to continue with extra/deeper questions and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isOffer: true/false }.`,
+                    prompt: `Determine if the assistant is explicitly asking (lightly) whether the user has a bit more time to continue with a few extra/deeper questions, and is waiting for a yes/no.\nAssistant message: "${responseText}"\nReturn { isOffer: true/false }.`,
                     temperature: 0
                 });
                 if (!offerCheck.object.isOffer) {
                     console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY offer the choice to continue with extra deeper questions and wait for yes/no. Do NOT ask any topic question.`;
+                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY ask (lightly) if the user has a bit more time to continue with a few extra/deeper questions, and wait for yes/no. Do NOT ask any topic question.`;
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                     didRegenerate = true;
@@ -1047,16 +1035,13 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
 
         const isTopicPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
         if (isTopicPhase && targetTopic && !didRegenerate) {
-            const responseLower = (responseText || '').toLowerCase();
-            const topicLabel = (targetTopic.label || '').toLowerCase();
-            const subGoals = (targetTopic.subGoals || []).map((sg: string) => sg.toLowerCase());
-            const mentionsTopic = topicLabel && responseLower.includes(topicLabel);
-            const mentionsSubGoal = subGoals.some((sg: string) => sg.length > 3 && responseLower.includes(sg));
+            const anchorData = buildTopicAnchors(targetTopic, language);
+            const mentionsAnchor = responseMentionsAnchors(responseText, anchorData.anchorRoots);
 
-            if (!mentionsTopic && !mentionsSubGoal) {
-                console.log(`⚠️ [SUPERVISOR] Response drifted from topic "${targetTopic.label}". Regenerating.`);
-                const focusList = subGoals.slice(0, 5).join(' | ');
-                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your question must explicitly reference the topic "${targetTopic.label}". If possible, tie it to one of these sub-goals: ${focusList}. Ask exactly one question.`;
+            if (anchorData.anchorRoots.length > 0 && !mentionsAnchor) {
+                console.log(`⚠️ [SUPERVISOR] Possible topic drift from "${targetTopic.label}". Regenerating with anchors.`);
+                const anchorList = anchorData.anchors.slice(0, 5).join(', ');
+                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your question must stay on topic "${targetTopic.label}". Include at least ONE of these anchor terms: ${anchorList}. Ask exactly one question.`;
                 const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
                 didRegenerate = true;

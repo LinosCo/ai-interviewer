@@ -6,7 +6,7 @@ import { getOrCreateInterviewPlan, updateInterviewPlanOverrides } from '@/lib/in
 
 const overridesSchema = z.object({
   scan: z.object({
-    topics: z.record(z.object({
+    topics: z.record(z.string(), z.object({
       minTurns: z.number().optional(),
       maxTurns: z.number().optional()
     })).optional()
@@ -14,7 +14,7 @@ const overridesSchema = z.object({
   deep: z.object({
     maxTurnsPerTopic: z.number().optional(),
     fallbackTurns: z.number().optional(),
-    topics: z.record(z.object({
+    topics: z.record(z.string(), z.object({
       maxTurns: z.number().optional()
     })).optional()
   }).optional()

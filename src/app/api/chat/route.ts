@@ -33,6 +33,7 @@ interface InitialBudget {
     estimatedScanDurationSec: number;
     reservedForDeepSec: number;
     reservedForDataCollectionSec: number;
+    perTopicTimeSec: number;
 }
 
 interface InterestingTopic {
@@ -262,6 +263,7 @@ function calculateInitialBudget(
     numTopics: number
 ): InitialBudget {
     const totalSec = maxDurationMins * 60;
+    const perTopicTimeSec = totalSec / Math.max(1, numTopics);
 
     // Available time for SCAN (data collection is outside interview time)
     const availableForScanSec = totalSec;
@@ -269,17 +271,20 @@ function calculateInitialBudget(
     // Calculate turns per topic for SCAN (min 1, max 5)
     const totalScanTurns = Math.floor(availableForScanSec / CONFIG.SECONDS_PER_TURN);
     const rawTurnsPerTopic = Math.floor(totalScanTurns / numTopics);
-    const scanTurnsPerTopic = Math.max(1, Math.min(5, rawTurnsPerTopic));
+    const scanTurnsPerTopic = perTopicTimeSec < 60
+        ? 1
+        : Math.max(1, Math.min(5, rawTurnsPerTopic));
 
     const estimatedScanDurationSec = numTopics * scanTurnsPerTopic * CONFIG.SECONDS_PER_TURN;
 
-    console.log(`📊 [INITIAL_BUDGET] Total: ${totalSec}s, Topics: ${numTopics}, SCAN: ${scanTurnsPerTopic} turns/topic (${estimatedScanDurationSec}s)`);
+    console.log(`📊 [INITIAL_BUDGET] Total: ${totalSec}s, Topics: ${numTopics}, PerTopic: ${Math.round(perTopicTimeSec)}s, SCAN: ${scanTurnsPerTopic} turns/topic (${estimatedScanDurationSec}s)`);
 
     return {
         scanTurnsPerTopic,
         estimatedScanDurationSec,
         reservedForDeepSec: 0,
-        reservedForDataCollectionSec: 0
+        reservedForDataCollectionSec: 0,
+        perTopicTimeSec
     };
 }
 

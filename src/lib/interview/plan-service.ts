@@ -168,7 +168,7 @@ export async function getOrCreateInterviewPlan(bot: Bot & { topics: TopicBlock[]
       data: {
         botId: bot.id,
         basePlan: basePlan as any,
-        overrides: null,
+        overrides: undefined,
         version: 1
       }
     });

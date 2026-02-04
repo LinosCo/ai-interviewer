@@ -1040,7 +1040,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             // Find first missing field
             let missingField: string | null = null;
             for (const field of candidateFields) {
-                const fieldName = typeof field === 'string' ? field : field.field;
+                const fieldName = typeof field === 'string' ? field : (field.id || field.field);
                 if (!currentProfile[fieldName]) {
                     missingField = fieldName;
                     break;
@@ -1233,7 +1233,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             });
             const currentProfileForCompletion = (freshConvForCompletion?.candidateProfile as any) || {};
             const allFieldsCollected = candidateFields.every((field: any) => {
-                const fieldName = typeof field === 'string' ? field : field.field;
+                const fieldName = typeof field === 'string' ? field : (field.id || field.field);
                 return !!currentProfileForCompletion[fieldName];
             });
 

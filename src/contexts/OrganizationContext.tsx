@@ -75,8 +75,6 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                 if ((res.status === 401 || res.status === 403) && retryCount < maxRetries) {
                     setTimeout(() => setRetryCount((count) => count + 1), 600);
                 }
-            } else {
-                setLoading(false);
             }
         } catch (error) {
             console.error('Failed to fetch organizations:', error);

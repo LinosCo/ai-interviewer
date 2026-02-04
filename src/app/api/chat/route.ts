@@ -236,36 +236,7 @@ async function checkUserStopSignal(
     if (pattern.test(userMessage)) {
         return 'ACCEPT';
     }
-
-    const openai = createOpenAI({ apiKey });
-    const schema = z.object({
-        intent: z.enum(['ACCEPT', 'REFUSE', 'NEUTRAL']),
-        reason: z.string()
-    });
-
-    const prompt = `
-Determine if the user explicitly wants to STOP the interview now.
-Language: ${language}
-User message: "${userMessage}"
-
-Classify:
-- ACCEPT only if the user is clearly asking to stop/end now.
-- REFUSE if the user clearly wants to continue.
-- NEUTRAL if it's a normal answer to the question.
-`.trim();
-
-    try {
-        const result = await generateObject({
-            model: openai('gpt-4o-mini'),
-            schema,
-            prompt,
-            temperature: 0
-        });
-        return result.object.intent;
-    } catch (e) {
-        console.error('Stop intent check failed:', e);
-        return 'NEUTRAL';
-    }
+    return 'NEUTRAL';
 }
 
 // ============================================================================
@@ -307,11 +278,8 @@ function calculateInitialBudget(
 ): InitialBudget {
     const totalSec = maxDurationMins * 60;
 
-    // Reserve minimum time for potential DEEP phase (at least 1 turn per topic)
-    const reservedForDeepSec = numTopics * 1 * CONFIG.SECONDS_PER_TURN;
-
-    // Available time for SCAN
-    const availableForScanSec = totalSec - reservedForDeepSec;
+    // Available time for SCAN (data collection is outside interview time)
+    const availableForScanSec = totalSec;
 
     // Calculate turns per topic for SCAN (min 1, max 5)
     const totalScanTurns = Math.floor(availableForScanSec / CONFIG.SECONDS_PER_TURN);
@@ -320,12 +288,12 @@ function calculateInitialBudget(
 
     const estimatedScanDurationSec = numTopics * scanTurnsPerTopic * CONFIG.SECONDS_PER_TURN;
 
-    console.log(`📊 [INITIAL_BUDGET] Total: ${totalSec}s, Topics: ${numTopics}, SCAN: ${scanTurnsPerTopic} turns/topic (${estimatedScanDurationSec}s), DEEP reserve: ${reservedForDeepSec}s`);
+    console.log(`📊 [INITIAL_BUDGET] Total: ${totalSec}s, Topics: ${numTopics}, SCAN: ${scanTurnsPerTopic} turns/topic (${estimatedScanDurationSec}s)`);
 
     return {
         scanTurnsPerTopic,
         estimatedScanDurationSec,
-        reservedForDeepSec,
+        reservedForDeepSec: 0,
         reservedForDataCollectionSec: 0
     };
 }

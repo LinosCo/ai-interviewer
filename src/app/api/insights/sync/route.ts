@@ -57,6 +57,9 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const { searchParams } = new URL(request.url);
+        const projectId = searchParams.get('projectId');
+
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             include: { memberships: { take: 1 } }
@@ -67,8 +70,22 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
 
+        if (projectId) {
+            const access = await prisma.projectAccess.findUnique({
+                where: {
+                    userId_projectId: { userId: session.user.id, projectId }
+                }
+            });
+            if (!access) {
+                return NextResponse.json({ error: 'Project access denied' }, { status: 403 });
+            }
+        }
+
         const insights = await prisma.crossChannelInsight.findMany({
-            where: { organizationId: orgId },
+            where: {
+                organizationId: orgId,
+                ...(projectId ? { projectId } : {})
+            },
             orderBy: { priorityScore: 'desc' }
         });
 

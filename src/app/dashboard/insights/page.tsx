@@ -22,17 +22,18 @@ import {
     Globe,
     Zap,
     Search,
-    Phone,
     Lightbulb,
     Save,
     Folder,
     Target,
     Code,
     FileText,
-    AlertCircle
+    AlertCircle,
+    Archive
 } from "lucide-react";
 import { showToast } from "@/components/toast";
 import { useProject } from '@/contexts/ProjectContext';
+import { updateInsightStatus } from './actions';
 
 interface Action {
     type: string;
@@ -41,6 +42,7 @@ interface Action {
     body: string;
     reasoning: string;
     status: 'pending' | 'approved' | 'rejected';
+    autoApply?: boolean;
 }
 
 interface Insight {
@@ -53,11 +55,9 @@ interface Insight {
     status: string;
 }
 
-// Helper: determine if action can be auto-applied (only FAQ and interview topics) or needs consultation
-const canBeAutoApplied = (type: string): boolean => {
-    // Only these two types can be applied automatically
-    const automaticTypes = ['add_faq', 'add_interview_topic'];
-    return automaticTypes.includes(type);
+// Helper: determine if action can be auto-applied (only if explicitly flagged)
+const canBeAutoApplied = (action: Action): boolean => {
+    return action.autoApply === true;
 };
 
 // Helper: get human-readable action type label in Italian
@@ -108,6 +108,8 @@ export default function InsightHubPage() {
     const [websiteAnalysis, setWebsiteAnalysis] = useState<any>(null);
     const [websiteAnalysisLoading, setWebsiteAnalysisLoading] = useState(false);
     const [expandedWebsiteRec, setExpandedWebsiteRec] = useState<number | null>(null);
+    const [showArchived, setShowArchived] = useState(false);
+    const [updatingInsightId, setUpdatingInsightId] = useState<string | null>(null);
 
     // Get the project ID for API calls (null if "All Projects" is selected)
     const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
@@ -292,29 +294,24 @@ export default function InsightHubPage() {
         }
     };
 
-    const handleConsultation = (action: Action) => {
-        // Open mailto with pre-filled subject and body including tip details
-        const subject = encodeURIComponent(`[AI Tips] Richiesta consulenza: ${action.title || action.type}`);
-        const body = encodeURIComponent(
-            `Buongiorno,
+    const normalizeInsightStatus = (status: string | null | undefined) => {
+        const normalized = (status || 'new').toLowerCase();
+        if (normalized === 'actioned') return 'completed';
+        if (normalized === 'dismissed') return 'archived';
+        return normalized;
+    };
 
-Vorrei richiedere una consulenza per implementare il seguente suggerimento generato dall'AI:
-
-📌 SUGGERIMENTO:
-${action.title || action.type}
-
-📝 DETTAGLI:
-${action.body}
-
-💡 MOTIVAZIONE (dall'analisi AI):
-${action.reasoning}
-
----
-Rimango in attesa di un vostro riscontro.
-Grazie`
-        );
-        window.open(`mailto:info@voler.ai?subject=${subject}&body=${body}`);
-        showToast("Email di richiesta consulenza aperta");
+    const handleInsightStatus = async (insightId: string, status: 'completed' | 'archived') => {
+        setUpdatingInsightId(insightId);
+        try {
+            await updateInsightStatus(insightId, status);
+            setInsights(prev => prev.map(i => i.id === insightId ? { ...i, status } : i));
+        } catch (err) {
+            console.error(err);
+            showToast('Errore aggiornando lo stato del tip', 'error');
+        } finally {
+            setUpdatingInsightId(null);
+        }
     };
 
     return (
@@ -722,13 +719,16 @@ Grazie`
                     </div>
                     <div className="flex items-center gap-4 text-xs">
                         <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span className="text-slate-500 font-medium">Automatico</span>
+                            <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                            <span className="text-slate-500 font-medium">Manuale</span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                            <span className="text-slate-500 font-medium">Richiede consulenza</span>
-                        </div>
+                        <button
+                            onClick={() => setShowArchived(!showArchived)}
+                            className="flex items-center gap-1.5 text-slate-500 font-medium hover:text-slate-700"
+                        >
+                            <Archive className="w-3.5 h-3.5" />
+                            {showArchived ? 'Nascondi archiviati' : 'Mostra archiviati'}
+                        </button>
                     </div>
                 </div>
 
@@ -738,125 +738,155 @@ Grazie`
                             <div key={i} className="h-48 bg-slate-100 animate-pulse rounded-2xl" />
                         ))}
                     </div>
-                ) : insights.filter(i => i.topicName !== "Health Report: Brand & Sito").length === 0 ? (
-                    <Card className="border-dashed border-2 bg-slate-50">
-                        <CardContent className="flex flex-col items-center py-16 text-center">
-                            <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-md mb-6 rotate-3">
-                                <Lightbulb className="w-10 h-10 text-slate-200" />
-                            </div>
-                            <h3 className="text-xl font-bold text-slate-900">Suggerimenti in arrivo</h3>
-                            <p className="text-sm text-slate-500 max-w-sm mt-2">
-                                Stiamo analizzando feedback, domande dei clienti e reputazione online. Clicca su "Aggiorna Analisi" per generare i primi suggerimenti.
-                            </p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="grid gap-6">
-                        {insights.filter(i => i.topicName !== "Health Report: Brand & Sito").map((insight) => (
-                            <Card key={insight.id} className="overflow-hidden border-slate-200 hover:border-amber-200 transition-all group hover:shadow-xl hover:shadow-slate-200/50">
-                                <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                <CardHeader className="pb-4">
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <CardTitle className="text-xl font-extrabold text-slate-900 leading-tight">
-                                                    {insight.topicName}
-                                                </CardTitle>
-                                                <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-100 font-bold">
-                                                    CC Score: {insight.crossChannelScore}%
-                                                </Badge>
-                                            </div>
-                                            <CardDescription className="flex items-center gap-4 pt-2">
-                                                <span className="flex items-center gap-1.5 text-slate-500 font-bold text-[10px] uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-full">
-                                                    <Mic className="w-3 h-3" /> Feedback
-                                                </span>
-                                                <span className="flex items-center gap-1.5 text-slate-500 font-bold text-[10px] uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-full">
-                                                    <MessageSquare className="w-3 h-3" /> Domande clienti
-                                                </span>
-                                                <span className="flex items-center gap-1.5 text-slate-500 font-bold text-[10px] uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-full">
-                                                    <Eye className="w-3 h-3" /> Reputazione
-                                                </span>
-                                            </CardDescription>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-3xl font-black text-slate-900">
-                                                {insight.priorityScore}
-                                            </div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                Priority
-                                            </div>
-                                        </div>
+                ) : (() => {
+                    const filtered = insights
+                        .filter(i => i.topicName !== "Health Report: Brand & Sito")
+                        .filter(i => {
+                            const status = normalizeInsightStatus(i.status);
+                            if (showArchived) return true;
+                            return status !== 'archived' && status !== 'completed';
+                        });
+
+                    if (filtered.length === 0) {
+                        return (
+                            <Card className="border-dashed border-2 bg-slate-50">
+                                <CardContent className="flex flex-col items-center py-16 text-center">
+                                    <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-md mb-6 rotate-3">
+                                        <Lightbulb className="w-10 h-10 text-slate-200" />
                                     </div>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                            Azioni Suggerite
-                                        </h4>
-                                        <div className="grid gap-4">
-                                            {insight.suggestedActions.map((action, idx) => {
-                                                const canApply = canBeAutoApplied(action.type);
-                                                return (
-                                                    <div key={idx} className={`flex flex-col md:flex-row md:items-start justify-between gap-4 p-5 rounded-2xl border group/action hover:shadow-lg transition-all duration-300 ${canApply ? 'bg-slate-50 border-slate-100 hover:bg-white hover:border-green-300' : 'bg-purple-50/50 border-purple-100 hover:bg-white hover:border-purple-300'}`}>
-                                                        <div className="flex-1 space-y-2">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                {/* Action type indicator */}
-                                                                <div className={`w-2 h-2 rounded-full ${canApply ? 'bg-green-500' : 'bg-purple-500'}`} title={canApply ? 'Applicabile automaticamente' : 'Richiede consulenza'} />
-                                                                <Badge className={`${action.target === 'website' || action.target === 'strategy' ? 'bg-blue-100 text-blue-700' :
-                                                                    action.target === 'chatbot' || action.target === 'interview' ? 'bg-green-100 text-green-700' :
-                                                                        action.target === 'product' ? 'bg-indigo-100 text-indigo-700' :
-                                                                            action.target === 'marketing' || action.target === 'pr' ? 'bg-pink-100 text-pink-700' :
-                                                                                'bg-amber-100 text-amber-700'
-                                                                    } hover:bg-opacity-80 border-none px-2.5 py-0.5 font-bold uppercase text-[9px]`}>
-                                                                    {getTargetLabel(action.target)}
-                                                                </Badge>
-                                                                <Badge variant="outline" className={`text-[9px] uppercase font-bold ${canApply ? 'border-green-200 bg-green-50' : 'border-purple-200 bg-purple-50'}`}>
-                                                                    {getActionTypeLabel(action.type)}
-                                                                </Badge>
-                                                            </div>
-                                                            <p className="text-sm font-extrabold text-slate-800">
-                                                                {action.title || getActionTypeLabel(action.type)}
-                                                            </p>
-                                                            <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                                                                {action.body}
-                                                            </p>
-                                                            <div className="pt-2 flex items-start gap-2">
-                                                                <Lightbulb className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
-                                                                <p className="text-xs text-slate-500 font-medium">
-                                                                    {action.reasoning}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 md:pt-1">
-                                                            {canApply ? (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-green-200 text-green-700 hover:border-green-500 hover:bg-green-50 group/btn transition-all"
-                                                                >
-                                                                    Applica <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
-                                                                </Button>
-                                                            ) : (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => handleConsultation(action)}
-                                                                    className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-purple-200 text-purple-700 hover:border-purple-500 hover:bg-purple-50 group/btn transition-all"
-                                                                >
-                                                                    <Phone className="h-3.5 w-3.5" /> Richiedi consulenza
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
+                                    <h3 className="text-xl font-bold text-slate-900">Suggerimenti in arrivo</h3>
+                                    <p className="text-sm text-slate-500 max-w-sm mt-2">
+                                        Stiamo analizzando feedback, domande dei clienti e reputazione online. Clicca su "Aggiorna Analisi" per generare i primi suggerimenti.
+                                    </p>
                                 </CardContent>
                             </Card>
-                        ))}
-                    </div>
-                )}
+                        );
+                    }
+
+                    return (
+                        <div className="grid gap-6">
+                            {filtered.map((insight) => {
+                                const status = normalizeInsightStatus(insight.status);
+                                return (
+                                    <Card key={insight.id} className={`overflow-hidden border-slate-200 hover:border-amber-200 transition-all group hover:shadow-xl hover:shadow-slate-200/50 ${status === 'archived' ? 'opacity-60' : ''}`}>
+                                        <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <CardHeader className="pb-4">
+                                            <div className="flex justify-between items-start">
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <CardTitle className="text-xl font-extrabold text-slate-900 leading-tight">
+                                                            {insight.topicName}
+                                                        </CardTitle>
+                                                        <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-100 font-bold">
+                                                            CC Score: {insight.crossChannelScore}%
+                                                        </Badge>
+                                                        <Badge variant="outline" className="text-[9px] uppercase font-bold">
+                                                            {status}
+                                                        </Badge>
+                                                    </div>
+                                                    <CardDescription className="flex items-center gap-4 pt-2">
+                                                        <span className="flex items-center gap-1.5 text-slate-500 font-bold text-[10px] uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-full">
+                                                            <Mic className="w-3 h-3" /> Feedback
+                                                        </span>
+                                                        <span className="flex items-center gap-1.5 text-slate-500 font-bold text-[10px] uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-full">
+                                                            <MessageSquare className="w-3 h-3" /> Domande clienti
+                                                        </span>
+                                                        <span className="flex items-center gap-1.5 text-slate-500 font-bold text-[10px] uppercase tracking-wider bg-slate-100 px-2 py-1 rounded-full">
+                                                            <Eye className="w-3 h-3" /> Reputazione
+                                                        </span>
+                                                    </CardDescription>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-3xl font-black text-slate-900">
+                                                        {insight.priorityScore}
+                                                    </div>
+                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                        Priority
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="space-y-6">
+                                            <div className="space-y-4">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                                    Azioni Suggerite
+                                                </h4>
+                                                <div className="grid gap-4">
+                                                    {insight.suggestedActions.map((action: Action, idx: number) => {
+                                                        const canApply = canBeAutoApplied(action);
+                                                        return (
+                                                            <div key={idx} className={`flex flex-col md:flex-row md:items-start justify-between gap-4 p-5 rounded-2xl border group/action hover:shadow-lg transition-all duration-300 ${canApply ? 'bg-slate-50 border-slate-100 hover:bg-white hover:border-green-300' : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-300'}`}>
+                                                                <div className="flex-1 space-y-2">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <div className={`w-2 h-2 rounded-full ${canApply ? 'bg-green-500' : 'bg-slate-400'}`} title={canApply ? 'Applicabile automaticamente' : 'Manuale'} />
+                                                                        <Badge className={`${action.target === 'website' || action.target === 'strategy' ? 'bg-blue-100 text-blue-700' :
+                                                                            action.target === 'chatbot' || action.target === 'interview' ? 'bg-green-100 text-green-700' :
+                                                                                action.target === 'product' ? 'bg-indigo-100 text-indigo-700' :
+                                                                                    action.target === 'marketing' || action.target === 'pr' ? 'bg-pink-100 text-pink-700' :
+                                                                                        'bg-amber-100 text-amber-700'
+                                                                            } hover:bg-opacity-80 border-none px-2.5 py-0.5 font-bold uppercase text-[9px]`}>
+                                                                            {getTargetLabel(action.target)}
+                                                                        </Badge>
+                                                                        <Badge variant="outline" className={`text-[9px] uppercase font-bold ${canApply ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
+                                                                            {getActionTypeLabel(action.type)}
+                                                                        </Badge>
+                                                                    </div>
+                                                                    <p className="text-sm font-extrabold text-slate-800">
+                                                                        {action.title || getActionTypeLabel(action.type)}
+                                                                    </p>
+                                                                    <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                                                                        {action.body}
+                                                                    </p>
+                                                                    <div className="pt-2 flex items-start gap-2">
+                                                                        <Lightbulb className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                                                                        <p className="text-xs text-slate-500 font-medium">
+                                                                            {action.reasoning}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                {canApply && (
+                                                                    <div className="flex items-center gap-2 md:pt-1">
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-green-200 text-green-700 hover:border-green-500 hover:bg-green-50 group/btn transition-all"
+                                                                        >
+                                                                            Applica <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
+                                                                        </Button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleInsightStatus(insight.id, 'archived')}
+                                                    disabled={updatingInsightId === insight.id}
+                                                    className="h-8 px-3 rounded-full text-xs"
+                                                >
+                                                    Archivia
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleInsightStatus(insight.id, 'completed')}
+                                                    disabled={updatingInsightId === insight.id}
+                                                    className="h-8 px-3 rounded-full text-xs"
+                                                >
+                                                    Segna completato
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );

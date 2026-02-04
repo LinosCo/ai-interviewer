@@ -361,49 +361,86 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             temperature: 0.15
         });
 
-        // 8. Save to DB
-        // Save the summary report as a special record
-        const healthInsight = await prisma.crossChannelInsight.create({
-            data: {
+        // 8. Save to DB (upsert by topic to avoid duplicates and preserve status)
+        const existingInsights = await prisma.crossChannelInsight.findMany({
+            where: {
                 organizationId,
-                projectId: projectId || null,
-                topicName: "Health Report: Brand & Sito",
-                visibilityData: {
-                    report: object.healthReport,
-                    serpSummary: serpSummary || null
-                } as any,
-                interviewData: interviewSummary as any,
-                chatbotData: chatbotSummary as any,
-                crossChannelScore: 100,
-                priorityScore: 0,
-                suggestedActions: [
-                    {
-                        type: 'create_content',
-                        target: 'website',
-                        title: "Analisi Efficacia Brand & Sito",
-                        body: `Soddisfazione Chatbot: ${object.healthReport.chatbotSatisfaction.score}%. Efficacia Sito: ${object.healthReport.websiteEffectiveness.score}%. Visibilità Brand: ${object.healthReport.brandVisibility.score}%.${serpSummary ? ` Menzioni Google: ${serpSummary.totalMentions} (${serpSummary.sentimentBreakdown.positive} positive, ${serpSummary.sentimentBreakdown.negative} negative).` : ''}`,
-                        reasoning: object.healthReport.websiteEffectiveness.feedbackSummary
-                    }
-                ],
-                status: 'new'
+                ...(projectId ? { projectId } : { projectId: null })
             }
         });
+        const existingByTopic = new Map(existingInsights.map(i => [i.topicName, i]));
+        const lockedStatuses = new Set(['archived', 'completed', 'dismissed', 'actioned']);
+        const normalizeStatus = (status?: string | null) => (status || 'new').toLowerCase();
 
-        const savedInsights = [healthInsight];
-        for (const rawInsight of object.insights) {
-            const insight = await prisma.crossChannelInsight.create({
+        const upsertInsight = async (topicName: string, data: any, options?: { forceUpdate?: boolean }) => {
+            const existing = existingByTopic.get(topicName);
+            if (existing) {
+                if (!options?.forceUpdate && lockedStatuses.has(normalizeStatus(existing.status))) {
+                    return existing;
+                }
+                const updated = await prisma.crossChannelInsight.update({
+                    where: { id: existing.id },
+                    data
+                });
+                existingByTopic.set(topicName, updated);
+                return updated;
+            }
+
+            const created = await prisma.crossChannelInsight.create({
                 data: {
                     organizationId,
                     projectId: projectId || null,
-                    topicName: rawInsight.topicName,
-                    visibilityData: visibilitySummary as any,
-                    interviewData: interviewSummary as any,
-                    chatbotData: chatbotSummary as any,
-                    crossChannelScore: 100,
-                    priorityScore: rawInsight.priorityScore,
-                    suggestedActions: rawInsight.suggestedActions as any,
-                    status: 'new'
+                    topicName,
+                    status: 'new',
+                    ...data
                 }
+            });
+            existingByTopic.set(topicName, created);
+            return created;
+        };
+
+        const savedInsights: any[] = [];
+
+        // Save the summary report as a special record (single, updatable)
+        const healthInsight = await upsertInsight("Health Report: Brand & Sito", {
+            visibilityData: {
+                report: object.healthReport,
+                serpSummary: serpSummary || null
+            } as any,
+            interviewData: interviewSummary as any,
+            chatbotData: chatbotSummary as any,
+            crossChannelScore: 100,
+            priorityScore: 0,
+            suggestedActions: [
+                {
+                    type: 'create_content',
+                    target: 'website',
+                    title: "Analisi Efficacia Brand & Sito",
+                    body: `Soddisfazione Chatbot: ${object.healthReport.chatbotSatisfaction.score}%. Efficacia Sito: ${object.healthReport.websiteEffectiveness.score}%. Visibilità Brand: ${object.healthReport.brandVisibility.score}%.${serpSummary ? ` Menzioni Google: ${serpSummary.totalMentions} (${serpSummary.sentimentBreakdown.positive} positive, ${serpSummary.sentimentBreakdown.negative} negative).` : ''}`,
+                    reasoning: object.healthReport.websiteEffectiveness.feedbackSummary,
+                    autoApply: false
+                }
+            ]
+        }, { forceUpdate: true });
+        savedInsights.push(healthInsight);
+
+        const seenTopics = new Set<string>();
+        for (const rawInsight of object.insights) {
+            if (!rawInsight?.topicName || seenTopics.has(rawInsight.topicName)) continue;
+            seenTopics.add(rawInsight.topicName);
+
+            const preparedActions = (rawInsight.suggestedActions || []).map((action: any) => ({
+                ...action,
+                autoApply: action.autoApply === true ? true : false
+            }));
+
+            const insight = await upsertInsight(rawInsight.topicName, {
+                visibilityData: visibilitySummary as any,
+                interviewData: interviewSummary as any,
+                chatbotData: chatbotSummary as any,
+                crossChannelScore: 100,
+                priorityScore: rawInsight.priorityScore,
+                suggestedActions: preparedActions as any
             });
             savedInsights.push(insight);
         }

@@ -292,23 +292,19 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
         if (supervisorInsight) {
 
             // ========== DEEP_OFFER_ASK ==========
-            // Time is running low - offer user to continue with deeper questions
+            // Offer user to continue with deeper questions (no hardcoded time phrasing)
             if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
 
                 const offerPrompt = isItalian ? `
 ## FASE: OFFERTA APPROFONDIMENTO
-Il tempo previsto per l'intervista sta per terminare, ma abbiamo ancora qualche domanda di approfondimento.
+Puoi proporre un breve approfondimento opzionale.
 
 **ISTRUZIONI**:
-1. Ringrazia brevemente l'utente per le risposte finora
-2. Spiega che il tempo indicativo è quasi finito
-3. Offri la possibilità di continuare con alcune domande extra di approfondimento
-4. Attendi la risposta dell'utente
-
-**ESEMPIO**:
-"Grazie mille per queste risposte interessanti! Il tempo che avevamo previsto sta per terminare, ma se hai ancora qualche minuto, avrei alcune domande di approfondimento che mi piacerebbe farti. Ti va di continuare?"
+1. Ringrazia brevemente l'utente per le risposte finora.
+2. Offri la possibilità di continuare con alcune domande extra di approfondimento.
+3. Attendi la risposta dell'utente.
 
 **DIVIETI**:
 - NON chiedere dati di contatto ora
@@ -316,16 +312,12 @@ Il tempo previsto per l'intervista sta per terminare, ma abbiamo ancora qualche 
 - SOLO offri la scelta di continuare o meno
 ` : `
 ## PHASE: DEEP DIVE OFFER
-The scheduled interview time is almost up, but we have some deeper follow-up questions.
+You may propose a short optional deep-dive.
 
 **INSTRUCTIONS**:
-1. Briefly thank the user for their answers so far
-2. Explain that the expected time is almost up
-3. Offer the opportunity to continue with a few extra deep-dive questions
-4. Wait for user's response
-
-**EXAMPLE**:
-"Thank you so much for these insightful answers! Our scheduled time is almost up, but if you have a few more minutes, I'd love to ask some deeper follow-up questions. Would you like to continue?"
+1. Briefly thank the user for their answers so far.
+2. Offer the opportunity to continue with a few extra deep-dive questions.
+3. Wait for user's response.
 
 **PROHIBITIONS**:
 - DO NOT ask for contact details now
@@ -661,6 +653,7 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > 3. **UNA DOMANDA** su "${nextTopicLabel}"
 >
 > **FOCUS DOMANDA**: ${firstSubGoal}
+> **VINCOLO**: La domanda deve contenere il riferimento esplicito a "${nextTopicLabel}".
 >
 > **ESEMPIO COMPLETO**: "È interessante quello che dici sulla gestione del tempo. Questo mi fa pensare a ${nextTopicLabel} - ${firstSubGoal.toLowerCase().includes('come') ? '' : 'come'} [domanda su ${firstSubGoal}]?"
 >
@@ -682,6 +675,7 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > 3. **ONE QUESTION** about "${nextTopicLabel}"
 >
 > **QUESTION FOCUS**: ${firstSubGoal}
+> **CONSTRAINT**: The question must explicitly reference "${nextTopicLabel}".
 >
 > **FULL EXAMPLE**: "That's an interesting point about time management. This makes me think about ${nextTopicLabel} - ${firstSubGoal.toLowerCase().includes('how') ? '' : 'how'} [question about ${firstSubGoal}]?"
 >

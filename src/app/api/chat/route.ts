@@ -224,6 +224,50 @@ async function checkUserIntent(
     }
 }
 
+async function checkUserStopSignal(
+    userMessage: string,
+    apiKey: string,
+    language: string
+): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> {
+    // Fast pattern check for explicit stop intent
+    const stopPatternIt = /\b(basta|fermiamoci|fermiamoci qui|chiudiamo|concludiamo|non ho tempo|preferisco fermarmi|stop|fine)\b/i;
+    const stopPatternEn = /\b(stop|let's stop|wrap up|end here|no time|I'd like to stop|finish)\b/i;
+    const pattern = language === 'it' ? stopPatternIt : stopPatternEn;
+    if (pattern.test(userMessage)) {
+        return 'ACCEPT';
+    }
+
+    const openai = createOpenAI({ apiKey });
+    const schema = z.object({
+        intent: z.enum(['ACCEPT', 'REFUSE', 'NEUTRAL']),
+        reason: z.string()
+    });
+
+    const prompt = `
+Determine if the user explicitly wants to STOP the interview now.
+Language: ${language}
+User message: "${userMessage}"
+
+Classify:
+- ACCEPT only if the user is clearly asking to stop/end now.
+- REFUSE if the user clearly wants to continue.
+- NEUTRAL if it's a normal answer to the question.
+`.trim();
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt,
+            temperature: 0
+        });
+        return result.object.intent;
+    } catch (e) {
+        console.error('Stop intent check failed:', e);
+        return 'NEUTRAL';
+    }
+}
+
 // ============================================================================
 // HELPER: Calculate time budget for DEEP phase
 // ============================================================================
@@ -259,34 +303,30 @@ function calculateDeepBudget(
 // ============================================================================
 function calculateInitialBudget(
     maxDurationMins: number,
-    numTopics: number,
-    hasDataCollection: boolean
+    numTopics: number
 ): InitialBudget {
     const totalSec = maxDurationMins * 60;
-
-    // Reserve time for DATA_COLLECTION if configured (~90 seconds)
-    const reservedForDataCollectionSec = hasDataCollection ? 90 : 0;
 
     // Reserve minimum time for potential DEEP phase (at least 1 turn per topic)
     const reservedForDeepSec = numTopics * 1 * CONFIG.SECONDS_PER_TURN;
 
     // Available time for SCAN
-    const availableForScanSec = totalSec - reservedForDataCollectionSec - reservedForDeepSec;
+    const availableForScanSec = totalSec - reservedForDeepSec;
 
-    // Calculate turns per topic for SCAN (min 2, max 5)
+    // Calculate turns per topic for SCAN (min 1, max 5)
     const totalScanTurns = Math.floor(availableForScanSec / CONFIG.SECONDS_PER_TURN);
     const rawTurnsPerTopic = Math.floor(totalScanTurns / numTopics);
-    const scanTurnsPerTopic = Math.max(2, Math.min(5, rawTurnsPerTopic));
+    const scanTurnsPerTopic = Math.max(1, Math.min(5, rawTurnsPerTopic));
 
     const estimatedScanDurationSec = numTopics * scanTurnsPerTopic * CONFIG.SECONDS_PER_TURN;
 
-    console.log(`📊 [INITIAL_BUDGET] Total: ${totalSec}s, Topics: ${numTopics}, SCAN: ${scanTurnsPerTopic} turns/topic (${estimatedScanDurationSec}s), DEEP reserve: ${reservedForDeepSec}s, DATA_COLLECTION reserve: ${reservedForDataCollectionSec}s`);
+    console.log(`📊 [INITIAL_BUDGET] Total: ${totalSec}s, Topics: ${numTopics}, SCAN: ${scanTurnsPerTopic} turns/topic (${estimatedScanDurationSec}s), DEEP reserve: ${reservedForDeepSec}s`);
 
     return {
         scanTurnsPerTopic,
         estimatedScanDurationSec,
         reservedForDeepSec,
-        reservedForDataCollectionSec
+        reservedForDataCollectionSec: 0
     };
 }
 
@@ -402,7 +442,7 @@ export async function POST(req: Request) {
         // 2.5 INITIALIZE BUDGET ON FIRST MESSAGE
         // ====================================================================
         if (!state.initialBudget) {
-            state.initialBudget = calculateInitialBudget(maxDurationMins, numTopics, shouldCollectData);
+            state.initialBudget = calculateInitialBudget(maxDurationMins, numTopics);
             console.log(`📊 [INIT] First message - calculated budget: ${state.initialBudget.scanTurnsPerTopic} turns/topic`);
         }
 
@@ -452,8 +492,8 @@ export async function POST(req: Request) {
                 }
             } else {
                 // Check if they want to stop for the first time
-                const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
-                if (intent === 'REFUSE') {
+                const intent = await checkUserStopSignal(lastMessage?.content || '', openAIKey, language);
+                if (intent === 'ACCEPT') {
                     console.log(`🚫 [INTENT] User might want to stop during ${state.phase}. Asking for confirmation.`);
                     nextState.isConfirmingExit = true;
                     supervisorInsight = { status: 'CONFIRM_STOP' };
@@ -464,60 +504,12 @@ export async function POST(req: Request) {
         // --------------------------------------------------------------------
         // PHASE: MACHINE (only if not confirming exit)
         // --------------------------------------------------------------------
-        if (!nextState.isConfirmingExit && supervisorInsight.status !== 'COMPLETE_WITHOUT_DATA' && supervisorInsight.status !== 'DATA_COLLECTION_CONSENT') {
+        if (!nextState.isConfirmingExit && supervisorInsight.status !== 'COMPLETE_WITHOUT_DATA' && supervisorInsight.status !== 'DATA_COLLECTION_CONSENT' && supervisorInsight.status !== 'CONFIRM_STOP') {
 
-            // ========= TIME CHECK: Transition to TIME_UP_OFFER when time is almost up =========
-            const maxDurationSec = maxDurationMins * 60;
-            const remainingSec = maxDurationSec - effectiveSec;
-            const remainingPercent = remainingSec / maxDurationSec;
-            const TIME_CRITICAL_PERCENT = 0.10; // 10% remaining = time up
-
-            const timeIsUp = (state.phase === 'SCAN' || state.phase === 'DEEP') &&
-                remainingPercent <= TIME_CRITICAL_PERCENT &&
-                remainingSec > 0;
-
-            if (timeIsUp && state.phase !== 'TIME_UP_OFFER' && state.timeUpOfferAccepted !== true) {
-                console.log(`⏰ [TIME_CHECK] Time is up! ${remainingSec}s (${Math.round(remainingPercent * 100)}%) remaining. Transitioning to TIME_UP_OFFER.`);
-
-                // Select top 2 most interesting topics for continuation offer
-                const rankedTopics = [...(state.interestingTopics || [])]
-                    .sort((a, b) => b.engagementScore - a.engagementScore);
-
-                let sortedTopics = rankedTopics.slice(0, 2);
-                if (sortedTopics.length < 2) {
-                    const existingIds = new Set(sortedTopics.map(t => t.topicId));
-                    for (const t of botTopics) {
-                        if (!existingIds.has(t.id)) {
-                            sortedTopics.push({
-                                topicId: t.id,
-                                topicLabel: t.label,
-                                engagementScore: 0,
-                                bestSnippet: undefined
-                            });
-                        }
-                        if (sortedTopics.length >= 2) break;
-                    }
-                }
-
-                console.log(`📊 [TIME_UP] Suggested topics for continuation:`, sortedTopics.map(t => `${t.topicLabel} (${t.engagementScore.toFixed(2)})`));
-
-                nextState.phase = 'TIME_UP_OFFER';
-                nextState.timeUpOfferAccepted = false; // Ready to check user's response to the offer
-                nextState.timeUpSelectedTopics = sortedTopics.map(t => t.topicId);
-
-                supervisorInsight = {
-                    status: 'TIME_UP_DECLARATION',
-                    suggestedTopics: sortedTopics.map(t => ({
-                        id: t.topicId,
-                        label: t.topicLabel,
-                        detail: t.bestSnippet
-                    }))
-                };
-            }
-            // ========= END TIME CHECK =========
+            // NOTE: Time-based early exit removed. We always complete SCAN across all topics.
 
             // Only process SCAN if time isn't up and we're in SCAN phase
-            if (!timeIsUp && state.phase === 'SCAN') {
+            if (state.phase === 'SCAN') {
                 // Check if we should transition to next topic (use dynamic budget)
                 if (state.turnInTopic >= scanTurnsPerTopic) {
                     // Move to next topic
@@ -535,7 +527,7 @@ export async function POST(req: Request) {
                         const remainingSec = maxDurationSec - effectiveSec;
                         console.log("📊 [SCAN] Complete. Budget:", budget, `remainingSec: ${remainingSec}`);
 
-                        if (budget.canDoDeep && !budget.isLowTime) {
+                        if (remainingSec > 0 && budget.canDoDeep && !budget.isLowTime) {
                             // Plenty of time - go directly to DEEP (order by value)
                             nextState.deepTopicOrder = buildDeepTopicOrder(botTopics, state.interestingTopics);
                             const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
@@ -546,23 +538,12 @@ export async function POST(req: Request) {
                             nextState.deepTurnsPerTopic = budget.turnsPerTopic;
                             nextTopicId = deepTopics[0]?.id || botTopics[0].id;
                             supervisorInsight = { status: 'START_DEEP' };
-                        } else if (remainingSec >= 60) {
-                            // Some time remaining (>60s) - offer DEEP to let user decide
-                            // This covers both isLowTime and !canDoDeep cases
+                        } else {
+                            // Offer DEEP after scan regardless of remaining time (can be time extension)
                             nextState.phase = 'DEEP_OFFER';
                             nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
                             supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                             console.log(`🎁 [SCAN→DEEP_OFFER] Offering DEEP with ${remainingSec}s remaining`);
-                        } else {
-                            // Very little time (<60s) - go to DATA_COLLECTION
-                            if (shouldCollectData) {
-                                nextState.phase = 'DATA_COLLECTION';
-                                supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                                nextState.consentGiven = false; // Waiting for consent
-                            } else {
-                                nextState.phase = 'DATA_COLLECTION';
-                                supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                            }
                         }
                     }
                 } else {
@@ -629,7 +610,7 @@ export async function POST(req: Request) {
             // --------------------------------------------------------------------
             // PHASE: DEEP_OFFER
             // --------------------------------------------------------------------
-            else if (!timeIsUp && state.phase === 'DEEP_OFFER') {
+            else if (state.phase === 'DEEP_OFFER') {
                 console.log(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted}`);
 
                 if (state.deepAccepted === null) {
@@ -765,7 +746,7 @@ export async function POST(req: Request) {
             // --------------------------------------------------------------------
             // PHASE: DEEP
             // --------------------------------------------------------------------
-            else if (!timeIsUp && state.phase === 'DEEP') {
+            else if (state.phase === 'DEEP') {
                 // Use the budget calculated at end of SCAN (stored in state.deepTurnsPerTopic)
                 // DATA_COLLECTION is OUTSIDE time budget - it's extra!
                 const turnsLimit = state.deepTurnsPerTopic || CONFIG.DEEP_QUICK_TURNS;
@@ -1115,7 +1096,10 @@ export async function POST(req: Request) {
         // Phase-specific injections
 
         // Final reinforcement based on phase - CLEAR STATUS BANNER
-        if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
+        const shouldShowStatusBanner = (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') &&
+            ['SCANNING', 'DEEPENING', 'TRANSITION', 'START_DEEP', 'START_DEEP_BRIEF'].includes(supervisorInsight?.status);
+
+        if (shouldShowStatusBanner) {
             const currentTopicLabel = botTopics[nextState.topicIndex]?.label || 'current topic';
             const turnsInfo = nextState.phase === 'SCAN'
                 ? `Turn ${nextState.turnInTopic}/${scanTurnsPerTopic}`
@@ -1282,7 +1266,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             };
 
             // CONSENT PHASE: bot should ask for permission
-            if (nextState.consentGiven === false && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isVagueDataRequest)) {
+            if (nextState.consentGiven === false) {
                 console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
 
                 // Varied consent questions

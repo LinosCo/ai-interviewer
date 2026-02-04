@@ -21,9 +21,8 @@ export class TopicManager {
             ? availableSubGoals
             : (topic.subGoals || []);
 
-        // Deterministic: pick sub-goal based on turn index
-        const subGoalIndex = turnIndex % subGoals.length;
-        const nextSubGoal = subGoals[subGoalIndex] || topic.label;
+        // Deterministic: always pick the first available sub-goal
+        const nextSubGoal = subGoals[0] || topic.label;
 
         console.log(`🎯 [TopicManager] SCAN: Turn ${turnIndex}, SubGoal: "${nextSubGoal}"`);
 

@@ -277,8 +277,8 @@ ${statusInstruction}
         const deepMap = new Map<string, any>((interviewPlan.deep?.topics || []).map((t: any) => [t.topicId, t]));
 
         const topicLines = topics.map((t, idx) => {
-            const scan = scanMap.get(t.id);
-            const deep = deepMap.get(t.id);
+            const scan = scanMap.get(t.id) as { maxTurns?: number } | undefined;
+            const deep = deepMap.get(t.id) as { maxTurns?: number } | undefined;
             const scanTurns = scan?.maxTurns ?? 1;
             const deepTurns = deep?.maxTurns ?? interviewPlan.deep?.maxTurnsPerTopic ?? 1;
             const subGoals = (t.subGoals || []).join(' | ') || 'N/A';

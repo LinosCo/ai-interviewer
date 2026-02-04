@@ -273,8 +273,8 @@ ${statusInstruction}
     ): string {
         if (!interviewPlan) return '';
         const topics = [...(bot.topics || [])].sort((a, b) => a.orderIndex - b.orderIndex);
-        const scanMap = new Map((interviewPlan.scan?.topics || []).map((t: any) => [t.topicId, t]));
-        const deepMap = new Map((interviewPlan.deep?.topics || []).map((t: any) => [t.topicId, t]));
+        const scanMap = new Map<string, any>((interviewPlan.scan?.topics || []).map((t: any) => [t.topicId, t]));
+        const deepMap = new Map<string, any>((interviewPlan.deep?.topics || []).map((t: any) => [t.topicId, t]));
 
         const topicLines = topics.map((t, idx) => {
             const scan = scanMap.get(t.id);

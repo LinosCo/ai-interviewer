@@ -914,7 +914,8 @@ export async function POST(req: Request) {
             targetTopic,
             methodology,
             effectiveSec,
-            supervisorInsight
+            supervisorInsight,
+            interviewPlan
         );
 
         console.log("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);

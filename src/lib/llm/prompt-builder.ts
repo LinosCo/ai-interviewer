@@ -267,6 +267,36 @@ ${statusInstruction}
 `.trim();
     }
 
+    static buildPlanSummary(
+        bot: Bot & { topics: TopicBlock[] },
+        interviewPlan?: any
+    ): string {
+        if (!interviewPlan) return '';
+        const topics = [...(bot.topics || [])].sort((a, b) => a.orderIndex - b.orderIndex);
+        const scanMap = new Map((interviewPlan.scan?.topics || []).map((t: any) => [t.topicId, t]));
+        const deepMap = new Map((interviewPlan.deep?.topics || []).map((t: any) => [t.topicId, t]));
+
+        const topicLines = topics.map((t, idx) => {
+            const scan = scanMap.get(t.id);
+            const deep = deepMap.get(t.id);
+            const scanTurns = scan?.maxTurns ?? 1;
+            const deepTurns = deep?.maxTurns ?? interviewPlan.deep?.maxTurnsPerTopic ?? 1;
+            const subGoals = (t.subGoals || []).join(' | ') || 'N/A';
+            return `${idx + 1}. ${t.label} | scan: ${scanTurns} turn | deep: ${deepTurns} turn | sub-goals: ${subGoals}`;
+        }).join('\n');
+
+        return `
+## INTERVIEW GAME PLAN (COACH MODE)
+- Flow: SCAN all topics → DEEP on missing sub-goals → DATA COLLECTION (if enabled)
+- Never end the interview during SCAN/DEEP
+- Never ask for contacts during SCAN/DEEP
+- Ask exactly one question per turn
+
+TOPIC PLAN:
+${topicLines}
+`.trim();
+    }
+
     /**
      * 4. Topic Prompt: WHAT to ask right now.
      * Focuses heavily on the current active topic.
@@ -864,7 +894,8 @@ Interview time / turns limit reached or topics completed.
         currentTopic: TopicBlock | null,
         methodologyContent: string,
         effectiveDurationSeconds: number,
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string } | string // Can be a string for custom transition logic
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string } | string,
+        interviewPlan?: any
     ): Promise<string> {
         const persona = this.buildPersonaPrompt(bot);
         const methodology = this.buildMethodologyPrompt(methodologyContent, bot.language || 'en');
@@ -881,6 +912,7 @@ Interview time / turns limit reached or topics completed.
         }
 
         const context = this.buildContextPrompt(conversation, bot, effectiveDurationSeconds);
+        const planSummary = this.buildPlanSummary(bot, interviewPlan);
 
         let specificPrompt = '';
         if (typeof supervisorInsight === 'string') {
@@ -896,6 +928,8 @@ ${persona}
 ${methodology}
 
 ${memoryContext ? memoryContext + '\n\n' : ''}${context}
+
+${planSummary}
 
 ${specificPrompt}
 

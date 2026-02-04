@@ -55,6 +55,7 @@ interface InterviewState {
     deepTurnsPerTopic: number;      // Calculated budget for DEEP phase
     fieldAttemptCounts: Record<string, number>;  // Track attempts per field to prevent loops
     closureAttempts: number;        // Track consecutive closure attempts to prevent infinite loops
+    dataCollectionRefused?: boolean;
     // NEW: Dynamic time budget
     initialBudget?: InitialBudget;
     interestingTopics?: InterestingTopic[];
@@ -771,6 +772,11 @@ export async function POST(req: Request) {
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                 }
 
+                if (state.dataCollectionRefused) {
+                    await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
+                    supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                }
+
                 const candidateFields = (bot.candidateDataFields as any[]) || [];
                 let currentProfile = (conversation.candidateProfile as any) || {};
                 console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFields.map((f: any) => typeof f === 'string' ? f : (f.id || f.field)).join(', ')}`);
@@ -801,6 +807,7 @@ export async function POST(req: Request) {
                         nextState.dataCollectionAttempts = CONFIG.MAX_DATA_COLLECTION_ATTEMPTS;
                         nextState.consentGiven = false;
                         nextState.lastAskedField = null;
+                        nextState.dataCollectionRefused = true;
                     } else {
                         // NEUTRAL - re-ask consent
                         console.log(`📋 [DATA_COLLECTION] Neutral response, re-asking consent`);
@@ -828,6 +835,7 @@ export async function POST(req: Request) {
                         console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
                         await completeInterview(conversationId, messages, openAIKey, currentProfile);
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                        nextState.dataCollectionRefused = true;
                     }
 
                     // If user is frustrated about repeated questions, try to extract info from conversation history
@@ -1252,7 +1260,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             };
 
             // CONSENT PHASE: bot should ask for permission
-            if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' && nextState.consentGiven === false) {
+            if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' && nextState.consentGiven === false && !nextState.dataCollectionRefused) {
                 console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
 
                 // Varied consent questions

@@ -224,21 +224,6 @@ async function checkUserIntent(
     }
 }
 
-async function checkUserStopSignal(
-    userMessage: string,
-    apiKey: string,
-    language: string
-): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> {
-    // Fast pattern check for explicit stop intent
-    const stopPatternIt = /\b(basta|fermiamoci|fermiamoci qui|chiudiamo|concludiamo|non ho tempo|preferisco fermarmi|stop|fine)\b/i;
-    const stopPatternEn = /\b(stop|let's stop|wrap up|end here|no time|I'd like to stop|finish)\b/i;
-    const pattern = language === 'it' ? stopPatternIt : stopPatternEn;
-    if (pattern.test(userMessage)) {
-        return 'ACCEPT';
-    }
-    return 'NEUTRAL';
-}
-
 // ============================================================================
 // HELPER: Calculate time budget for DEEP phase
 // ============================================================================
@@ -441,7 +426,6 @@ export async function POST(req: Request) {
         const isScanOrDeep = state.phase === 'SCAN' || state.phase === 'DEEP';
         if (isScanOrDeep && lastMessage?.role === 'user') {
             if (state.isConfirmingExit) {
-                // We were waiting for confirmation to stop
                 const confIntent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'stop_confirmation');
                 if (confIntent === 'ACCEPT') {
                     console.log("🚫 [INTENT] User confirmed STOP. Moving to conclusion/data collection.");
@@ -457,14 +441,6 @@ export async function POST(req: Request) {
                 } else {
                     console.log("✅ [INTENT] User wants to continue. Clearing confirmation flag.");
                     nextState.isConfirmingExit = false;
-                }
-            } else {
-                // Check if they want to stop for the first time
-                const intent = await checkUserStopSignal(lastMessage?.content || '', openAIKey, language);
-                if (intent === 'ACCEPT') {
-                    console.log(`🚫 [INTENT] User might want to stop during ${state.phase}. Asking for confirmation.`);
-                    nextState.isConfirmingExit = true;
-                    supervisorInsight = { status: 'CONFIRM_STOP' };
                 }
             }
         }

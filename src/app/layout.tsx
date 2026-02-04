@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastContainer } from "@/components/toast";
 import { Providers } from "@/components/Providers";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { AnalyticsGate } from "@/components/AnalyticsGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -84,7 +84,7 @@ export default function RootLayout({
           <ToastContainer />
           <CookieConsent />
         </Providers>
-        <SpeedInsights />
+        <AnalyticsGate />
       </body>
     </html>
   );

@@ -14,9 +14,12 @@ export class TopicManager {
         topic: TopicBlock,
         turnIndex: number,
         apiKey: string,
-        language: string = 'en'
+        language: string = 'en',
+        availableSubGoals?: string[]
     ): Promise<{ nextSubGoal: string }> {
-        const subGoals = topic.subGoals || [];
+        const subGoals = (availableSubGoals && availableSubGoals.length > 0)
+            ? availableSubGoals
+            : (topic.subGoals || []);
 
         // Deterministic: pick sub-goal based on turn index
         const subGoalIndex = turnIndex % subGoals.length;
@@ -37,11 +40,14 @@ export class TopicManager {
         turnIndex: number,
         recentMessages: any[],
         apiKey: string,
-        language: string = 'en'
+        language: string = 'en',
+        availableSubGoals?: string[]
     ): Promise<{ focusPoint: string }> {
         const openai = createOpenAI({ apiKey });
 
-        const subGoals = topic.subGoals || [];
+        const subGoals = (availableSubGoals && availableSubGoals.length > 0)
+            ? availableSubGoals
+            : (topic.subGoals || []);
         const recentHistory = recentMessages
             .slice(-6)
             .map(m => `${m.role}: ${m.content}`)

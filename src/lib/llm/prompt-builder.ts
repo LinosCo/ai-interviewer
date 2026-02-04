@@ -200,8 +200,8 @@ ${flowExplanation}
 6. **NO REPETITION (STRICT)**: Always check the conversation history. Never ask a question that has already been answered or asked. Do not repeat the same concepts or words in consecutive turns.
 
 ## FINAL FAILSAFE RULE
-ALWAYS END YOUR RESPONSE WITH A QUESTION MARK (?). 
-Even if you are thanking the user or transitioning to a new topic, the very last character of your output MUST be a question mark.
+End your response with a question mark (?) when you are asking a question (SCAN, DEEP, consent, data collection).
+If the SUPERVISOR instructs completion or final goodbye, do NOT add a question mark.
 `.trim();
     }
 
@@ -341,7 +341,10 @@ The scheduled interview time is almost up, but we have some deeper follow-up que
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
                 const suggestedTopics = (supervisorInsight as any).suggestedTopics || [];
-                const topicLabels = suggestedTopics.map((t: any) => t.label).join(isItalian ? ' e ' : ' and ');
+                const topicLabels = suggestedTopics.map((t: any) => {
+                    const detail = t.detail ? ` "${t.detail}"` : '';
+                    return `${t.label}${detail}`;
+                }).join(isItalian ? ' e ' : ' and ');
 
                 const timeUpPrompt = isItalian ? `
 ## FASE: DICHIARAZIONE TEMPO CONCLUSO
@@ -394,7 +397,7 @@ The scheduled interview time is almost up, but we have some deeper follow-up que
             if (supervisorInsight.status === 'START_DEEP_BRIEF') {
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
-                const topicLabel = allTopics[0]?.label || (isItalian ? 'il tema' : 'the topic');
+                const topicLabel = currentTopic?.label || (isItalian ? 'il tema' : 'the topic');
 
                 const startDeepBriefPrompt = isItalian ? `
 ## FASE: APPROFONDIMENTO BREVE (ESTENSIONE TEMPO)

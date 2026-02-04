@@ -39,6 +39,7 @@ interface InterestingTopic {
     topicId: string;
     topicLabel: string;
     engagementScore: number;  // 0-1 based on response length
+    bestSnippet?: string;
 }
 
 interface InterviewState {
@@ -58,6 +59,75 @@ interface InterviewState {
     interestingTopics?: InterestingTopic[];
     timeUpOfferAccepted?: boolean | null;  // null = not asked, false = waiting, true = accepted
     timeUpSelectedTopics?: string[];       // Topic IDs selected for continuation
+    deepTopicOrder?: string[];             // Ordered topic IDs for DEEP based on value
+    topicSubGoalHistory?: Record<string, string[]>; // Track used sub-goals per topic
+}
+
+// ============================================================================ 
+// HELPERS: Engagement scoring and snippets
+// ============================================================================
+function extractSnippet(text: string, maxLen: number = 120): string {
+    const clean = text.replace(/\s+/g, ' ').trim();
+    if (!clean) return '';
+    // Prefer first sentence if available
+    const firstSentence = clean.split(/[.!?]/)[0]?.trim();
+    const snippet = (firstSentence && firstSentence.length >= 20) ? firstSentence : clean;
+    return snippet.length > maxLen ? snippet.slice(0, maxLen - 1) + '…' : snippet;
+}
+
+function computeEngagementScore(text: string, language: string): number {
+    const clean = text.trim();
+    if (!clean) return 0;
+
+    const words = clean.split(/\s+/).length;
+    const lengthScore = Math.min(1, words / 60);
+
+    const examplePattern = language === 'it'
+        ? /\b(ad esempio|per esempio|ad es\.|esempio)\b/i
+        : /\b(for example|for instance|e\.g\.)\b/i;
+    const hasExample = examplePattern.test(clean) ? 1 : 0;
+
+    const hasNumbers = /\b\d{1,4}\b/.test(clean) ? 1 : 0;
+
+    const specificityPattern = language === 'it'
+        ? /\b(srl|spa|s\.p\.a|snc|sas|societ[aà]|azienda|cliente|fornitore)\b/i
+        : /\b(ltd|inc|llc|gmbh|company|client|customer|supplier)\b/i;
+    const hasSpecificity = specificityPattern.test(clean) ? 1 : 0;
+
+    const emotionPattern = language === 'it'
+        ? /\b(adoro|odio|frustrante|entusiasmante|deluso|soddisfatto|preoccupato)\b/i
+        : /\b(love|hate|frustrating|exciting|disappointed|satisfied|concerned)\b/i;
+    const hasEmotion = emotionPattern.test(clean) ? 1 : 0;
+
+    const score = (
+        lengthScore * 0.4 +
+        hasExample * 0.2 +
+        hasNumbers * 0.15 +
+        hasSpecificity * 0.15 +
+        hasEmotion * 0.1
+    );
+
+    return Math.max(0, Math.min(1, score));
+}
+
+function getDeepTopics(botTopics: any[], deepOrder?: string[]) {
+    if (!deepOrder || deepOrder.length === 0) return botTopics;
+    return deepOrder
+        .map(id => botTopics.find(t => t.id === id))
+        .filter(Boolean);
+}
+
+function buildDeepTopicOrder(botTopics: any[], interestingTopics: InterestingTopic[] | undefined): string[] {
+    const scored = botTopics.map((t, idx) => {
+        const match = (interestingTopics || []).find(it => it.topicId === t.id);
+        return {
+            id: t.id,
+            score: match?.engagementScore ?? 0,
+            idx
+        };
+    }).sort((a, b) => (b.score - a.score) || (a.idx - b.idx));
+
+    return scored.map(s => s.id);
 }
 
 // ============================================================================
@@ -319,9 +389,12 @@ export async function POST(req: Request) {
             interestingTopics: rawMetadata.interestingTopics ?? [],
             timeUpOfferAccepted: rawMetadata.timeUpOfferAccepted ?? null,
             timeUpSelectedTopics: rawMetadata.timeUpSelectedTopics ?? [],
+            deepTopicOrder: rawMetadata.deepTopicOrder ?? [],
+            topicSubGoalHistory: rawMetadata.topicSubGoalHistory ?? {},
         };
 
-        const currentTopic = botTopics[state.topicIndex] || botTopics[0];
+        const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
+        const currentTopic = activeTopics[state.topicIndex] || botTopics[0];
         const effectiveSec = Number(effectiveDuration || conversation.effectiveDuration) || 0;
         const maxDurationMins = bot.maxDurationMins || 10;
 
@@ -403,13 +476,28 @@ export async function POST(req: Request) {
                 remainingPercent <= TIME_CRITICAL_PERCENT &&
                 remainingSec > 0;
 
-            if (timeIsUp && state.phase !== 'TIME_UP_OFFER') {
+            if (timeIsUp && state.phase !== 'TIME_UP_OFFER' && state.timeUpOfferAccepted !== true) {
                 console.log(`⏰ [TIME_CHECK] Time is up! ${remainingSec}s (${Math.round(remainingPercent * 100)}%) remaining. Transitioning to TIME_UP_OFFER.`);
 
                 // Select top 2 most interesting topics for continuation offer
-                const sortedTopics = [...(state.interestingTopics || [])]
-                    .sort((a, b) => b.engagementScore - a.engagementScore)
-                    .slice(0, 2);
+                const rankedTopics = [...(state.interestingTopics || [])]
+                    .sort((a, b) => b.engagementScore - a.engagementScore);
+
+                let sortedTopics = rankedTopics.slice(0, 2);
+                if (sortedTopics.length < 2) {
+                    const existingIds = new Set(sortedTopics.map(t => t.topicId));
+                    for (const t of botTopics) {
+                        if (!existingIds.has(t.id)) {
+                            sortedTopics.push({
+                                topicId: t.id,
+                                topicLabel: t.label,
+                                engagementScore: 0,
+                                bestSnippet: undefined
+                            });
+                        }
+                        if (sortedTopics.length >= 2) break;
+                    }
+                }
 
                 console.log(`📊 [TIME_UP] Suggested topics for continuation:`, sortedTopics.map(t => `${t.topicLabel} (${t.engagementScore.toFixed(2)})`));
 
@@ -421,7 +509,8 @@ export async function POST(req: Request) {
                     status: 'TIME_UP_DECLARATION',
                     suggestedTopics: sortedTopics.map(t => ({
                         id: t.topicId,
-                        label: t.topicLabel
+                        label: t.topicLabel,
+                        detail: t.bestSnippet
                     }))
                 };
             }
@@ -447,12 +536,15 @@ export async function POST(req: Request) {
                         console.log("📊 [SCAN] Complete. Budget:", budget, `remainingSec: ${remainingSec}`);
 
                         if (budget.canDoDeep && !budget.isLowTime) {
-                            // Plenty of time - go directly to DEEP
+                            // Plenty of time - go directly to DEEP (order by value)
+                            nextState.deepTopicOrder = buildDeepTopicOrder(botTopics, state.interestingTopics);
+                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
+
                             nextState.phase = 'DEEP';
                             nextState.topicIndex = 0;
                             nextState.turnInTopic = 0;
                             nextState.deepTurnsPerTopic = budget.turnsPerTopic;
-                            nextTopicId = botTopics[0].id;
+                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
                             supervisorInsight = { status: 'START_DEEP' };
                         } else if (remainingSec >= 60) {
                             // Some time remaining (>60s) - offer DEEP to let user decide
@@ -477,25 +569,29 @@ export async function POST(req: Request) {
                     // Continue SCAN on current topic
                     nextState.turnInTopic = state.turnInTopic + 1;
 
-                    // Track engagement for TIME_UP_OFFER (based on user response length)
+                    // Track engagement for TIME_UP_OFFER (value-based)
                     if (lastMessage?.role === 'user') {
-                        const responseWords = lastMessage.content.split(' ').length;
-                        const engagementScore = Math.min(1, responseWords / 50); // Normalize 0-1
+                        const engagementScore = computeEngagementScore(lastMessage.content, language);
+                        const snippet = extractSnippet(lastMessage.content);
 
                         const existingTopics = [...(nextState.interestingTopics || [])];
                         const existingIndex = existingTopics.findIndex(t => t.topicId === currentTopic.id);
 
                         if (existingIndex >= 0) {
                             // Update with running average
+                            const prev = existingTopics[existingIndex];
+                            const averaged = (prev.engagementScore + engagementScore) / 2;
                             existingTopics[existingIndex] = {
-                                ...existingTopics[existingIndex],
-                                engagementScore: (existingTopics[existingIndex].engagementScore + engagementScore) / 2
+                                ...prev,
+                                engagementScore: averaged,
+                                bestSnippet: engagementScore >= prev.engagementScore ? snippet : prev.bestSnippet
                             };
                         } else {
                             existingTopics.push({
                                 topicId: currentTopic.id,
                                 topicLabel: currentTopic.label,
-                                engagementScore
+                                engagementScore,
+                                bestSnippet: snippet
                             });
                         }
                         nextState.interestingTopics = existingTopics;
@@ -503,13 +599,30 @@ export async function POST(req: Request) {
                     }
 
                     // Ask TopicManager for next sub-goal
-                    const insight = await TopicManager.generateScanQuestion(
-                        currentTopic,
-                        state.turnInTopic,
-                        openAIKey,
-                        language
-                    );
-                    supervisorInsight = { status: 'SCANNING', nextSubGoal: insight.nextSubGoal };
+                    const usedSubGoals = (state.topicSubGoalHistory || {})[currentTopic.id] || [];
+                    const availableSubGoals = (currentTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
+                    let nextSubGoal = '';
+
+                    if (availableSubGoals.length > 0) {
+                        const insight = await TopicManager.generateScanQuestion(
+                            currentTopic,
+                            state.turnInTopic,
+                            openAIKey,
+                            language,
+                            availableSubGoals
+                        );
+                        nextSubGoal = insight.nextSubGoal;
+                        nextState.topicSubGoalHistory = {
+                            ...(state.topicSubGoalHistory || {}),
+                            [currentTopic.id]: [...usedSubGoals, nextSubGoal]
+                        };
+                    } else {
+                        // Sub-goals exhausted: deepen on user's last detail
+                        const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
+                        nextSubGoal = fallbackSnippet ? `Approfondisci: "${fallbackSnippet}"` : `Approfondisci: "${currentTopic.label}"`;
+                    }
+
+                    supervisorInsight = { status: 'SCANNING', nextSubGoal };
                 }
             }
 
@@ -536,7 +649,9 @@ export async function POST(req: Request) {
                         nextState.topicIndex = 0;
                         nextState.turnInTopic = 0;
                         nextState.deepTurnsPerTopic = CONFIG.DEEP_QUICK_TURNS;
-                        nextTopicId = botTopics[0].id;
+                        nextState.deepTopicOrder = buildDeepTopicOrder(botTopics, state.interestingTopics);
+                        const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
+                        nextTopicId = deepTopics[0]?.id || botTopics[0].id;
                         supervisorInsight = { status: 'START_DEEP' };
                         console.log("✅ [DEEP_OFFER] User accepted quick DEEP");
                     } else if (intent === 'REFUSE') {
@@ -575,17 +690,18 @@ export async function POST(req: Request) {
 
                         // Brief extension: go to DEEP on selected topics only
                         const selectedTopicIds = state.timeUpSelectedTopics || [];
-                        const firstSelectedIndex = botTopics.findIndex(t => selectedTopicIds.includes(t.id));
-
-                        if (firstSelectedIndex >= 0) {
+                        const filteredSelected = selectedTopicIds.filter(id => botTopics.some(t => t.id === id));
+                        if (filteredSelected.length > 0) {
+                            nextState.deepTopicOrder = filteredSelected;
+                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
                             nextState.phase = 'DEEP';
-                            nextState.topicIndex = firstSelectedIndex;
+                            nextState.topicIndex = 0;
                             nextState.turnInTopic = 0;
                             nextState.deepTurnsPerTopic = 2; // Brief extension: 2 turns per selected topic
-                            nextTopicId = botTopics[firstSelectedIndex].id;
+                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
                             supervisorInsight = {
                                 status: 'START_DEEP_BRIEF',
-                                selectedTopics: selectedTopicIds,
+                                selectedTopics: filteredSelected,
                                 isTimeExtension: true
                             };
                             console.log(`✅ [TIME_UP_OFFER] User accepted continuation on selected topics`);
@@ -617,14 +733,29 @@ export async function POST(req: Request) {
                     } else {
                         // NEUTRAL - re-ask
                         console.log(`⏰ [TIME_UP_OFFER] Neutral response, re-asking`);
-                        const sortedTopics = [...(state.interestingTopics || [])]
-                            .sort((a, b) => b.engagementScore - a.engagementScore)
-                            .slice(0, 2);
+                        const rankedTopics = [...(state.interestingTopics || [])]
+                            .sort((a, b) => b.engagementScore - a.engagementScore);
+                        let sortedTopics = rankedTopics.slice(0, 2);
+                        if (sortedTopics.length < 2) {
+                            const existingIds = new Set(sortedTopics.map(t => t.topicId));
+                            for (const t of botTopics) {
+                                if (!existingIds.has(t.id)) {
+                                    sortedTopics.push({
+                                        topicId: t.id,
+                                        topicLabel: t.label,
+                                        engagementScore: 0,
+                                        bestSnippet: undefined
+                                    });
+                                }
+                                if (sortedTopics.length >= 2) break;
+                            }
+                        }
                         supervisorInsight = {
                             status: 'TIME_UP_DECLARATION',
                             suggestedTopics: sortedTopics.map(t => ({
                                 id: t.topicId,
-                                label: t.topicLabel
+                                label: t.topicLabel,
+                                detail: t.bestSnippet
                             }))
                         };
                     }
@@ -638,21 +769,24 @@ export async function POST(req: Request) {
                 // Use the budget calculated at end of SCAN (stored in state.deepTurnsPerTopic)
                 // DATA_COLLECTION is OUTSIDE time budget - it's extra!
                 const turnsLimit = state.deepTurnsPerTopic || CONFIG.DEEP_QUICK_TURNS;
+                const deepTopics = getDeepTopics(botTopics, state.deepTopicOrder);
+                const deepTotal = deepTopics.length || numTopics;
+                const deepCurrent = deepTopics[state.topicIndex] || currentTopic;
 
-                console.log(`📊 [DEEP] Topic ${state.topicIndex + 1}/${numTopics}, Turn ${state.turnInTopic + 1}/${turnsLimit}`);
+                console.log(`📊 [DEEP] Topic ${state.topicIndex + 1}/${deepTotal}, Turn ${state.turnInTopic + 1}/${turnsLimit}`);
 
                 if (state.turnInTopic >= turnsLimit) {
                     // Move to next topic
-                    if (state.topicIndex + 1 < numTopics) {
+                    if (state.topicIndex + 1 < deepTotal) {
                         nextState.topicIndex = state.topicIndex + 1;
                         nextState.turnInTopic = 0;
-                        nextTopicId = botTopics[nextState.topicIndex].id;
+                        nextTopicId = deepTopics[nextState.topicIndex]?.id || botTopics[nextState.topicIndex]?.id;
 
-                        console.log(`➡️ [DEEP] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
-                        supervisorInsight = { status: 'TRANSITION', nextTopic: botTopics[nextState.topicIndex].label };
+                        console.log(`➡️ [DEEP] Topic transition: ${deepCurrent.label} → ${deepTopics[nextState.topicIndex]?.label || botTopics[nextState.topicIndex]?.label}`);
+                        supervisorInsight = { status: 'TRANSITION', nextTopic: deepTopics[nextState.topicIndex]?.label || botTopics[nextState.topicIndex]?.label };
                     } else {
                         // End of DEEP - ALL topics done, move to DATA_COLLECTION
-                        console.log(`✅ [DEEP] All ${numTopics} topics completed. Moving to DATA_COLLECTION.`);
+                        console.log(`✅ [DEEP] All ${deepTotal} topics completed. Moving to DATA_COLLECTION.`);
                         if (shouldCollectData) {
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
@@ -668,15 +802,30 @@ export async function POST(req: Request) {
                     nextState.turnInTopic = state.turnInTopic + 1;
 
                     // Ask TopicManager for focus point (MUST be different each turn)
-                    const insight = await TopicManager.generateDeepQuestion(
-                        currentTopic,
-                        state.turnInTopic,
-                        messages.slice(-10),
-                        openAIKey,
-                        language
-                    );
-                    supervisorInsight = { status: 'DEEPENING', focusPoint: insight.focusPoint };
-                    console.log(`🔍 [DEEP] Continuing topic "${currentTopic.label}", turn ${nextState.turnInTopic}/${turnsLimit}`);
+                    const usedSubGoals = (state.topicSubGoalHistory || {})[deepCurrent.id] || [];
+                    const availableSubGoals = (deepCurrent.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
+
+                    if (availableSubGoals.length === 0) {
+                        const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
+                        const focusPoint = fallbackSnippet ? `Approfondisci: "${fallbackSnippet}"` : `Approfondisci: "${deepCurrent.label}"`;
+                        supervisorInsight = { status: 'DEEPENING', focusPoint };
+                    } else {
+                        const insight = await TopicManager.generateDeepQuestion(
+                            deepCurrent,
+                            state.turnInTopic,
+                            messages.slice(-10),
+                            openAIKey,
+                            language,
+                            availableSubGoals
+                        );
+                        nextState.topicSubGoalHistory = {
+                            ...(state.topicSubGoalHistory || {}),
+                            [deepCurrent.id]: [...usedSubGoals, insight.focusPoint]
+                        };
+                        supervisorInsight = { status: 'DEEPENING', focusPoint: insight.focusPoint };
+                    }
+
+                    console.log(`🔍 [DEEP] Continuing topic "${deepCurrent.label}", turn ${nextState.turnInTopic}/${turnsLimit}`);
                 }
             }
 
@@ -719,6 +868,9 @@ export async function POST(req: Request) {
                         await completeInterview(conversationId, messages, openAIKey, currentProfile);
                         // Set status for AI to say goodbye
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                        nextState.dataCollectionAttempts = CONFIG.MAX_DATA_COLLECTION_ATTEMPTS;
+                        nextState.consentGiven = false;
+                        nextState.lastAskedField = null;
                     } else {
                         // NEUTRAL - re-ask consent
                         console.log(`📋 [DATA_COLLECTION] Neutral response, re-asking consent`);
@@ -915,19 +1067,19 @@ export async function POST(req: Request) {
                     if (!nextField) {
                         // All fields collected or skipped!
                         console.log(`✅ [DATA_COLLECTION] All fields collected/skipped, letting AI say final goodbye`);
-                        // We will add the tag via supervisor or just instruct AI
                         supervisorInsight = { status: 'FINAL_GOODBYE' };
+                        nextState.lastAskedField = null;
+                    } else {
+                        // Set up to ask next field - track attempt count
+                        nextState.lastAskedField = nextField;
+                        nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                        nextState.consentGiven = true;
+                        nextState.fieldAttemptCounts = {
+                            ...state.fieldAttemptCounts,
+                            [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
+                        };
+                        supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
                     }
-
-                    // Set up to ask next field - track attempt count
-                    nextState.lastAskedField = nextField;
-                    nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
-                    nextState.consentGiven = true;
-                    nextState.fieldAttemptCounts = {
-                        ...state.fieldAttemptCounts,
-                        [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
-                    };
-                    supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
                 }
             }
         }
@@ -937,7 +1089,10 @@ export async function POST(req: Request) {
         // ====================================================================
         const methodology = LLMService.getMethodology();
         const model = prefetchedModel; // Use pre-fetched model from parallel init
-        const targetTopic = botTopics[nextState.topicIndex] || currentTopic;
+        const nextActiveTopics = nextState.phase === 'DEEP'
+            ? getDeepTopics(botTopics, nextState.deepTopicOrder || state.deepTopicOrder)
+            : botTopics;
+        const targetTopic = nextActiveTopics[nextState.topicIndex] || currentTopic;
 
 
         systemPrompt = await PromptBuilder.build(
@@ -987,7 +1142,10 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
 `;
         }
 
-        systemPrompt += `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
+        const shouldEndWithQuestion = !['COMPLETE_WITHOUT_DATA', 'FINAL_GOODBYE'].includes(supervisorInsight?.status);
+        if (shouldEndWithQuestion) {
+            systemPrompt += `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
+        }
 
         // ====================================================================
         // 5. GENERATE RESPONSE

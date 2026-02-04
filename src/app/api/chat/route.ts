@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
-import { buildTopicAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
+import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
 
 export const maxDuration = 60;
 
@@ -49,6 +49,7 @@ interface InterviewState {
     deepTopicOrder?: string[];             // Ordered topic IDs for DEEP based on value
     deepTurnsByTopic?: Record<string, number>;
     topicSubGoalHistory?: Record<string, string[]>; // Track used sub-goals per topic
+    lastUserTopicId?: string | null;
 }
 
 // ============================================================================ 
@@ -356,6 +357,7 @@ export async function POST(req: Request) {
             deepTopicOrder: rawMetadata.deepTopicOrder ?? [],
             deepTurnsByTopic: rawMetadata.deepTurnsByTopic ?? {},
             topicSubGoalHistory: rawMetadata.topicSubGoalHistory ?? {},
+            lastUserTopicId: rawMetadata.lastUserTopicId ?? null,
         };
 
         const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -382,6 +384,10 @@ export async function POST(req: Request) {
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: any = { status: 'SCANNING' };
+
+        if (lastMessage?.role === 'user') {
+            nextState.lastUserTopicId = currentTopic.id;
+        }
 
         // --------------------------------------------------------------------
         // PHASE: MACHINE
@@ -415,24 +421,11 @@ export async function POST(req: Request) {
                         const remainingSec = maxDurationSec - effectiveSec;
                         console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
 
-                        if (remainingSec > 0) {
-                            const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
-                            nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                            nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
-
-                            nextState.phase = 'DEEP';
-                            nextState.topicIndex = 0;
-                            nextState.turnInTopic = 0;
-                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                            supervisorInsight = { status: 'START_DEEP' };
-                        } else {
-                            // Offer DEEP after scan only if time is over (user can accept extra time)
-                            nextState.phase = 'DEEP_OFFER';
-                            nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
-                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                            console.log(`🎁 [SCAN→DEEP_OFFER] Offering DEEP with ${remainingSec}s remaining`);
-                        }
+                        // Always offer extra time before DEEP. User must accept to proceed.
+                        nextState.phase = 'DEEP_OFFER';
+                        nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
+                        supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                        console.log(`🎁 [SCAN→DEEP_OFFER] Offering DEEP with ${remainingSec}s remaining`);
                     }
                 } else {
                     // Continue SCAN on current topic
@@ -606,19 +599,12 @@ export async function POST(req: Request) {
                         const focusPoint = fallbackSnippet ? `Approfondisci: "${fallbackSnippet}"` : `Approfondisci: "${deepCurrent.label}"`;
                         supervisorInsight = { status: 'DEEPENING', focusPoint };
                     } else {
-                        const insight = await TopicManager.generateDeepQuestion(
-                            deepCurrent,
-                            state.turnInTopic,
-                            messages.slice(-10),
-                            openAIKey,
-                            language,
-                            availableSubGoals
-                        );
+                        const focusPoint = availableSubGoals[0];
                         nextState.topicSubGoalHistory = {
                             ...(state.topicSubGoalHistory || {}),
-                            [deepCurrent.id]: [...usedSubGoals, insight.focusPoint]
+                            [deepCurrent.id]: [...usedSubGoals, focusPoint]
                         };
-                        supervisorInsight = { status: 'DEEPENING', focusPoint: insight.focusPoint };
+                        supervisorInsight = { status: 'DEEPENING', focusPoint };
                     }
 
                     console.log(`🔍 [DEEP] Continuing topic "${deepCurrent.label}", turn ${nextState.turnInTopic}/${turnsLimit}`);
@@ -980,7 +966,12 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             meta_comment: z.string().optional()
         });
 
-        const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
+        let messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
+        if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT') {
+            messagesForAI = lastMessage?.role === 'user'
+                ? [{ role: 'user', content: lastMessage.content }]
+                : [];
+        }
 
         console.log("⏳ [CHAT] Generating response...");
         console.time("LLM");
@@ -1036,9 +1027,14 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         const isTopicPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
         if (isTopicPhase && targetTopic && !didRegenerate) {
             const anchorData = buildTopicAnchors(targetTopic, language);
-            const mentionsAnchor = responseMentionsAnchors(responseText, anchorData.anchorRoots);
+            const allowUserAnchors = supervisorInsight?.status === 'SCANNING' || supervisorInsight?.status === 'DEEPENING';
+            const userAnchorData = allowUserAnchors && lastMessage?.role === 'user'
+                ? buildMessageAnchors(lastMessage.content, language)
+                : { anchorRoots: [], anchors: [] };
+            const mentionsTopicAnchor = responseMentionsAnchors(responseText, anchorData.anchorRoots);
+            const mentionsUserAnchor = allowUserAnchors && responseMentionsAnchors(responseText, userAnchorData.anchorRoots);
 
-            if (anchorData.anchorRoots.length > 0 && !mentionsAnchor) {
+            if (anchorData.anchorRoots.length > 0 && !mentionsTopicAnchor && !mentionsUserAnchor) {
                 console.log(`⚠️ [SUPERVISOR] Possible topic drift from "${targetTopic.label}". Regenerating with anchors.`);
                 const anchorList = anchorData.anchors.slice(0, 5).join(', ');
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your question must stay on topic "${targetTopic.label}". Include at least ONE of these anchor terms: ${anchorList}. Ask exactly one question.`;

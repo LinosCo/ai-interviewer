@@ -55,3 +55,22 @@ export function responseMentionsAnchors(responseText: string, anchorRoots: strin
   const lower = responseText.toLowerCase();
   return anchorRoots.some(root => root && lower.includes(root));
 }
+
+export function buildMessageAnchors(text: string, language: string) {
+  if (!text) return { anchors: [], anchorRoots: [] };
+  const tokens = extractTokens(text);
+  const stopwords = (language || '').toLowerCase().startsWith('it') ? STOPWORDS_IT : STOPWORDS_EN;
+
+  const anchors: string[] = [];
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (lower.length < 4) continue;
+    if (stopwords.has(lower)) continue;
+    anchors.push(lower);
+  }
+
+  const unique = Array.from(new Set(anchors));
+  const limited = unique.slice(0, 4);
+  const anchorRoots = limited.map(a => (a.length >= 6 ? a.slice(0, 6) : a));
+  return { anchors: limited, anchorRoots };
+}

@@ -295,7 +295,8 @@ export class WebsiteAnalysisEngine {
 
             const cmsConnection = (project as any)?.newCmsConnection
                 || project?.cmsConnection
-                || (project?.cmsShares && project.cmsShares.length > 0 ? project.cmsShares[0].connection : null);
+                || (project as any)?.cmsShares?.[0]?.connection
+                || null;
 
             if (cmsConnection?.id) {
                 const latestAnalytics = await prisma.websiteAnalytics.findFirst({

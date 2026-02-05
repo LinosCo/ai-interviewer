@@ -16,9 +16,25 @@ interface StrategicContext {
     organizationValueProp?: string;
     knowledgeGaps: Array<{ topic: string; priority: string; evidence: string }>;
     interviewThemes: Array<{ name: string; category?: string; description?: string; occurrenceCount: number }>;
-    visibilityScanInsights: Array<{ prompt: string; brandMentioned: boolean; position?: number; sentiment?: string }>;
+    visibilityScanInsights: Array<{
+        prompt: string;
+        brandMentioned: boolean;
+        position?: number;
+        sentiment?: string;
+        sourcesCited?: string[];
+        confidence?: 'high' | 'medium' | 'low';
+        platform?: string;
+    }>;
     chatbotFaqSuggestions: Array<{ question: string; occurrences: number }>;
     crossChannelInsights: Array<{ topic: string; suggestedActions: any; priorityScore: number }>;
+    knowledgeSources: Array<{ title?: string; type?: string; snippet: string }>;
+    websiteAnalytics?: {
+        avgBounceRate?: number;
+        avgSessionDuration?: number;
+        topPages?: Array<{ path: string; views: number; bounceRate?: number }>;
+        topSearchQueries?: Array<{ query: string; impressions: number; clicks: number; position: number }>;
+        topSearchPages?: Array<{ page: string; impressions: number; clicks: number; position: number }>;
+    };
 }
 
 // Zod schemas for structured LLM output
@@ -49,7 +65,14 @@ const RecommendationSchema = z.object({
     description: z.string(),
     impact: z.string(),
     relatedPrompts: z.array(z.string()).optional(),
-    dataSource: z.string().optional() // Which data source this recommendation came from
+    dataSource: z.string().optional(), // Which data source this recommendation came from
+    contentDraft: z.object({
+        title: z.string(),
+        slug: z.string(),
+        body: z.string(),
+        metaDescription: z.string().optional(),
+        targetSection: z.string()
+    }).optional()
 });
 
 const FullAnalysisSchema = z.object({
@@ -83,6 +106,72 @@ const FullAnalysisSchema = z.object({
 });
 
 export class WebsiteAnalysisEngine {
+    private static normalizeText(input: string): string {
+        return input
+            .toLowerCase()
+            .replace(/https?:\/\/\S+/g, ' ')
+            .replace(/[^a-z0-9àèéìòùäöüßçñ\s]/gi, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    private static tokenize(input: string): Set<string> {
+        const normalized = this.normalizeText(input);
+        const tokens = normalized.split(' ').filter(t => t.length >= 4);
+        return new Set(tokens);
+    }
+
+    private static jaccardSimilarity(a: string, b: string): number {
+        const aTokens = this.tokenize(a);
+        const bTokens = this.tokenize(b);
+        if (aTokens.size === 0 || bTokens.size === 0) return 0;
+        let intersection = 0;
+        for (const t of aTokens) {
+            if (bTokens.has(t)) intersection += 1;
+        }
+        const union = aTokens.size + bTokens.size - intersection;
+        return union === 0 ? 0 : intersection / union;
+    }
+
+    private static postProcessRecommendations(
+        recommendations: Array<z.infer<typeof RecommendationSchema>>,
+        content: MultiPageScrapedContent,
+        context: StrategicContext
+    ) {
+        if (!recommendations.length) return recommendations;
+
+        const existingText = [
+            content.homepage.title,
+            content.homepage.description || '',
+            content.totalContent.substring(0, 15000),
+            ...(context.knowledgeSources || []).map(k => k.snippet)
+        ].join(' ');
+
+        const pageTitles = [
+            content.homepage.title,
+            ...content.subpages.map(p => p.title)
+        ].filter(Boolean).map(t => t.toLowerCase());
+
+        return recommendations.map(rec => {
+            if (!rec.contentDraft) return rec;
+
+            const draftTitle = (rec.contentDraft.title || '').toLowerCase();
+            const draftText = `${rec.contentDraft.title}\n${rec.contentDraft.body || ''}`;
+            const similarity = this.jaccardSimilarity(draftText, existingText);
+            const titleMatch = pageTitles.some(t => draftTitle && (t.includes(draftTitle) || draftTitle.includes(t)));
+
+            if (similarity >= 0.45 || titleMatch) {
+                return {
+                    ...rec,
+                    type: 'modify_content',
+                    description: `${rec.description} Nota: contenuto simile già presente sul sito; proponi un aggiornamento/estensione invece di una nuova pagina.`
+                };
+            }
+
+            return rec;
+        });
+    }
+
     /**
      * Fetch strategic context from multiple data sources
      */
@@ -142,12 +231,25 @@ export class WebsiteAnalysisEngine {
             }
         });
 
-        const visibilityScanInsights = recentScan?.responses.map(r => ({
-            prompt: r.prompt.text,
-            brandMentioned: r.brandMentioned,
-            position: r.brandPosition ?? undefined,
-            sentiment: r.sentiment ?? undefined
-        })) || [];
+        const visibilityScanInsights = recentScan?.responses.map(r => {
+            const sources = (r.sourcesCited || []).filter(Boolean);
+            const confidence: 'high' | 'medium' | 'low' =
+                sources.length > 0 || r.platform === 'google_ai_overview'
+                    ? 'high'
+                    : r.brandMentioned
+                        ? 'medium'
+                        : 'low';
+
+            return {
+                prompt: r.prompt.text,
+                brandMentioned: r.brandMentioned,
+                position: r.brandPosition ?? undefined,
+                sentiment: r.sentiment ?? undefined,
+                sourcesCited: sources,
+                confidence,
+                platform: r.platform
+            };
+        }) || [];
 
         // Fetch FAQ suggestions (frequently asked questions from chatbot)
         const faqSuggestions = botIds.length > 0 ? await prisma.faqSuggestion.findMany({
@@ -160,6 +262,14 @@ export class WebsiteAnalysisEngine {
             select: { question: true, occurrences: true }
         }) : [];
 
+        // Fetch knowledge sources (official KB snippets)
+        const knowledgeSources = botIds.length > 0 ? await prisma.knowledgeSource.findMany({
+            where: { botId: { in: botIds } },
+            orderBy: { createdAt: 'desc' },
+            take: 6,
+            select: { title: true, type: true, content: true }
+        }) : [];
+
         // Fetch cross-channel insights
         const crossChannelInsights = await prisma.crossChannelInsight.findMany({
             where: {
@@ -170,6 +280,58 @@ export class WebsiteAnalysisEngine {
             take: 5,
             select: { topicName: true, suggestedActions: true, priorityScore: true }
         });
+
+        // Fetch latest website analytics (GA/GSC) if CMS connection exists
+        let websiteAnalytics: StrategicContext['websiteAnalytics'] | undefined;
+        if (config?.projectId) {
+            const project = await prisma.project.findUnique({
+                where: { id: config.projectId },
+                include: {
+                    cmsConnection: true,
+                    newCmsConnection: true,
+                    cmsShares: { include: { connection: true } }
+                } as any
+            });
+
+            const cmsConnection = (project as any)?.newCmsConnection
+                || project?.cmsConnection
+                || (project?.cmsShares && project.cmsShares.length > 0 ? project.cmsShares[0].connection : null);
+
+            if (cmsConnection?.id) {
+                const latestAnalytics = await prisma.websiteAnalytics.findFirst({
+                    where: { connectionId: cmsConnection.id },
+                    orderBy: { date: 'desc' }
+                });
+
+                if (latestAnalytics) {
+                    const topPages = (latestAnalytics.topPages as any[] || []).slice(0, 6).map(p => ({
+                        path: p.path || p.page || p.url || p.title || 'unknown',
+                        views: p.views || p.pageviews || 0,
+                        bounceRate: p.bounceRate
+                    }));
+                    const topSearchQueries = (latestAnalytics.topSearchQueries as any[] || []).slice(0, 8).map(q => ({
+                        query: q.query || q.keyword || '',
+                        impressions: q.impressions || 0,
+                        clicks: q.clicks || 0,
+                        position: q.position || q.avgPosition || 0
+                    }));
+                    const topSearchPages = (latestAnalytics.topSearchPages as any[] || []).slice(0, 6).map(p => ({
+                        page: p.page || p.url || '',
+                        impressions: p.impressions || 0,
+                        clicks: p.clicks || 0,
+                        position: p.position || p.avgPosition || 0
+                    }));
+
+                    websiteAnalytics = {
+                        avgBounceRate: latestAnalytics.bounceRate,
+                        avgSessionDuration: latestAnalytics.avgSessionDuration,
+                        topPages,
+                        topSearchQueries,
+                        topSearchPages
+                    };
+                }
+            }
+        }
 
         return {
             organizationVision: organization?.strategicVision ?? undefined,
@@ -191,7 +353,13 @@ export class WebsiteAnalysisEngine {
                 topic: i.topicName,
                 suggestedActions: i.suggestedActions,
                 priorityScore: i.priorityScore
-            }))
+            })),
+            knowledgeSources: knowledgeSources.map(k => ({
+                title: k.title ?? undefined,
+                type: k.type ?? undefined,
+                snippet: (k.content || '').replace(/\s+/g, ' ').slice(0, 220)
+            })),
+            websiteAnalytics
         };
     }
 
@@ -253,7 +421,8 @@ export class WebsiteAnalysisEngine {
                 analysis.visibilityConfig.brandName,
                 promptsWithRef,
                 analysis.visibilityConfig.competitors.map(c => c.name),
-                strategicContext
+                strategicContext,
+                analysis.visibilityConfig.language || 'it'
             );
 
             // 7. Calculate overall score (weighted average)
@@ -274,7 +443,14 @@ export class WebsiteAnalysisEngine {
                     .map(p => p.promptText)
             };
 
-            // 9. Update analysis record
+            // 9. Post-process recommendations (dedupe vs existing content)
+            const cleanedRecommendations = this.postProcessRecommendations(
+                analysisResult.recommendations || [],
+                scrapedContent,
+                strategicContext
+            );
+
+            // 10. Update analysis record
             await prisma.websiteAnalysis.update({
                 where: { id: analysisId },
                 data: {
@@ -293,7 +469,7 @@ export class WebsiteAnalysisEngine {
                     valuePropositions: analysisResult.valueProposition,
                     keywordAnalysis: analysisResult.keywordCoverage,
                     contentAnalysis: analysisResult.contentClarity,
-                    recommendations: analysisResult.recommendations,
+                    recommendations: cleanedRecommendations,
                     promptsAddressed
                 }
             });
@@ -322,7 +498,8 @@ export class WebsiteAnalysisEngine {
         brandName: string,
         prompts: PromptWithRef[],
         competitors: string[],
-        strategicContext: StrategicContext
+        strategicContext: StrategicContext,
+        language: string
     ) {
         const { model } = await getSystemLLM();
 
@@ -348,6 +525,15 @@ export class WebsiteAnalysisEngine {
 
         // Build strategic context section
         const strategicContextSection = this.buildStrategicContextSection(strategicContext);
+
+        const languageMap: Record<string, string> = {
+            it: 'Scrivi in italiano.',
+            en: 'Write in English.',
+            es: 'Escribe en español.',
+            fr: 'Écris en français.',
+            de: 'Schreibe auf Deutsch.'
+        };
+        const languageInstruction = languageMap[language] || languageMap.it;
 
         const { object } = await generateObject({
             model,
@@ -387,6 +573,7 @@ ${content.totalContent.substring(0, 12000)}
 """
 
 === ISTRUZIONI PER L'ANALISI ===
+${languageInstruction}
 
 La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandazioni generiche tipo "migliora la SEO" o "aggiungi keyword".
 
@@ -414,6 +601,7 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
    - STRATEGICHE: Basate sui dati reali dell'organizzazione
    - PRIORITIZZATE: Le azioni con maggior impatto sulla visibilità AI prima
    - MISURABILI: Con impatto chiaro e verificabile
+   - FATTUALI: Non inventare prodotti, brand o claim non presenti nelle fonti ufficiali (KB + sito)
 
    Per ogni raccomandazione indica:
    - Titolo: Azione specifica (es: "Crea pagina dedicata a [tema X] emerso dalle interviste")
@@ -426,7 +614,17 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
    - address_knowledge_gap: Risponde a gap identificato dal chatbot
    - leverage_interview_insight: Sfrutta insight dalle interviste
    - competitive_positioning: Miglioramento posizionamento vs competitor
-   - add_structured_data, improve_value_proposition, add_keyword_content, improve_clarity, add_page, modify_content, add_faq, improve_meta`,
+   - add_structured_data, improve_value_proposition, add_keyword_content, improve_clarity, add_page, modify_content, add_faq, improve_meta
+
+   CONTENUTO OPERATIVO (solo per add_page, add_faq, modify_content, competitive_positioning):
+   - Aggiungi "contentDraft" con:
+     • title (SEO-friendly)
+     • slug (breve, con trattini)
+     • body (Markdown con H2/H3, paragrafi brevi, liste, CTA)
+     • metaDescription (<= 160 caratteri)
+     • targetSection (faq, news, pages, blog, support o equivalente)
+   - Il testo deve essere ottimizzato per LLM: esplicita brand, prodotto/servizio e termini chiave del prompt.
+   - Non includere claim non verificati; se un dato non è nelle fonti, riformula come ipotesi o suggerisci verifica.`,
             temperature: 0.2
         });
 
@@ -457,17 +655,19 @@ Questi temi sono emersi direttamente dalla voce dei clienti e rappresentano ciò
 
         // Visibility Scan Results
         if (context.visibilityScanInsights.length > 0) {
-            const mentioned = context.visibilityScanInsights.filter(i => i.brandMentioned);
-            const notMentioned = context.visibilityScanInsights.filter(i => !i.brandMentioned);
+            const highConfidence = context.visibilityScanInsights.filter(i => i.confidence === 'high');
+            const lowConfidence = context.visibilityScanInsights.filter(i => i.confidence !== 'high');
+            const mentioned = highConfidence.filter(i => i.brandMentioned);
+            const notMentioned = highConfidence.filter(i => !i.brandMentioned);
 
             sections.push(`🔍 RISULTATI ULTIMO VISIBILITY SCAN:
-✅ Prompt dove il brand È MENZIONATO (${mentioned.length}):
+✅ Prompt ad alta affidabilità dove il brand È MENZIONATO (${mentioned.length}):
 ${mentioned.slice(0, 5).map(i => `- "${i.prompt}" - Posizione: ${i.position ?? 'N/A'}, Sentiment: ${i.sentiment ?? 'N/A'}`).join('\n')}
 
-❌ Prompt dove il brand NON È MENZIONATO (${notMentioned.length}):
+❌ Prompt ad alta affidabilità dove il brand NON È MENZIONATO (${notMentioned.length}):
 ${notMentioned.slice(0, 5).map(i => `- "${i.prompt}"`).join('\n')}
 
-PRIORITÀ STRATEGICA: Migliorare la visibilità sui prompt dove il brand non viene menzionato.`);
+${lowConfidence.length > 0 ? `⚠️ Risposte a bassa affidabilità (senza fonti o prove): ${lowConfidence.slice(0, 5).map(i => `"${i.prompt}"`).join(', ')}. Trattale come segnali deboli.` : ''}`);
         }
 
         // FAQ Suggestions from Chatbot
@@ -482,6 +682,25 @@ Queste domande vengono poste ripetutamente dagli utenti - il sito dovrebbe rispo
         if (context.crossChannelInsights.length > 0) {
             sections.push(`🔗 INSIGHT CROSS-CANALE:
 ${context.crossChannelInsights.map(i => `- ${i.topic} (priorità: ${i.priorityScore.toFixed(1)})`).join('\n')}`);
+        }
+
+        if (context.knowledgeSources.length > 0) {
+            sections.push(`📚 FONTI UFFICIALI (KB CHATBOT):
+${context.knowledgeSources.map(k => `- ${k.title || k.type || 'Documento'}: ${k.snippet}`).join('\n')}`);
+        }
+
+        if (context.websiteAnalytics) {
+            const analytics = context.websiteAnalytics;
+            const topPages = analytics.topPages?.slice(0, 5) || [];
+            const topQueries = analytics.topSearchQueries?.slice(0, 6) || [];
+            const topSearchPages = analytics.topSearchPages?.slice(0, 5) || [];
+
+            sections.push(`📈 ANALYTICS (GA/GSC):
+- Bounce medio: ${analytics.avgBounceRate !== undefined ? Math.round(analytics.avgBounceRate * 100) + '%' : 'N/D'}
+- Durata sessione media: ${analytics.avgSessionDuration !== undefined ? Math.round(analytics.avgSessionDuration) + 's' : 'N/D'}
+${topPages.length ? `- Pagine più viste:\n${topPages.map(p => `  • ${p.path} (${p.views} views${p.bounceRate !== undefined ? `, bounce ${(p.bounceRate * 100).toFixed(0)}%` : ''})`).join('\n')}` : ''}
+${topQueries.length ? `- Query più cercate (GSC):\n${topQueries.map(q => `  • "${q.query}" (${q.impressions} imp, pos ${q.position.toFixed(1)})`).join('\n')}` : ''}
+${topSearchPages.length ? `- Pagine più viste da search:\n${topSearchPages.map(p => `  • ${p.page} (${p.impressions} imp, pos ${p.position.toFixed(1)})`).join('\n')}` : ''}`);
         }
 
         if (sections.length === 0) {

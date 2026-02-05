@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Lightbulb,
@@ -30,6 +32,14 @@ interface Recommendation {
     description: string;
     impact: string;
     relatedPrompts?: string[];
+    dataSource?: string;
+    contentDraft?: {
+        title: string;
+        slug: string;
+        body: string;
+        metaDescription?: string;
+        targetSection?: string;
+    };
 }
 
 interface TipAction {
@@ -83,6 +93,18 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
     const [expandedRec, setExpandedRec] = useState<number | null>(null);
     const [activeTab, setActiveTab] = useState('active');
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [draftOpen, setDraftOpen] = useState(false);
+    const [draftRec, setDraftRec] = useState<Recommendation | null>(null);
+    const [draftForm, setDraftForm] = useState({
+        title: '',
+        slug: '',
+        body: '',
+        metaDescription: '',
+        targetSection: 'pages'
+    });
+    const [draftSaving, setDraftSaving] = useState(false);
+    const [draftError, setDraftError] = useState<string | null>(null);
+    const [draftSuccessId, setDraftSuccessId] = useState<string | null>(null);
 
     const fetchTipActions = useCallback(async () => {
         try {
@@ -214,6 +236,63 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
         };
         const Icon = icons[type] || Lightbulb;
         return <Icon className="w-4 h-4" />;
+    };
+
+    const slugify = (value: string) =>
+        value
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9àèéìòùäöüßçñ\s-]/gi, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .slice(0, 80);
+
+    const openDraftDialog = (rec: Recommendation) => {
+        const draft = rec.contentDraft;
+        setDraftRec(rec);
+        setDraftSuccessId(null);
+        setDraftError(null);
+        setDraftForm({
+            title: draft?.title || rec.title || '',
+            slug: draft?.slug || (draft?.title ? slugify(draft.title) : rec.title ? slugify(rec.title) : ''),
+            body: draft?.body || rec.description || '',
+            metaDescription: draft?.metaDescription || '',
+            targetSection: draft?.targetSection || 'pages'
+        });
+        setDraftOpen(true);
+    };
+
+    const handleCreateDraft = async () => {
+        if (!draftRec) return;
+        setDraftSaving(true);
+        setDraftError(null);
+
+        try {
+            const res = await fetch('/api/visibility/website-analysis/suggestions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    configId,
+                    recommendation: draftRec,
+                    draft: {
+                        ...draftForm,
+                        slug: draftForm.slug || slugify(draftForm.title)
+                    }
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                setDraftError(data.error || 'Errore durante la creazione della bozza');
+                return;
+            }
+
+            setDraftSuccessId(data.suggestionId);
+        } catch (error) {
+            setDraftError('Errore di rete durante la creazione della bozza');
+        } finally {
+            setDraftSaving(false);
+        }
     };
 
     // Filter recommendations by status
@@ -351,6 +430,31 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                                 ))}
                             </div>
                         )}
+                        {rec.dataSource && (
+                            <div className="mt-1.5 text-[9px] text-slate-500">
+                                Fonte: {rec.dataSource}
+                            </div>
+                        )}
+                        {rec.contentDraft && (
+                            <div className="mt-2 p-2 bg-white border border-slate-200 rounded">
+                                <div className="text-[10px] font-semibold text-slate-700 mb-1">Bozza contenuto</div>
+                                <div className="text-[10px] text-slate-600 line-clamp-3 whitespace-pre-wrap">
+                                    {rec.contentDraft.body?.slice(0, 220)}
+                                    {rec.contentDraft.body && rec.contentDraft.body.length > 220 ? '…' : ''}
+                                </div>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="mt-2 h-7 text-[10px]"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openDraftDialog(rec);
+                                    }}
+                                >
+                                    Modifica & crea bozza CMS
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -358,6 +462,7 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
     };
 
     return (
+        <>
         <Card className="border-amber-200 bg-gradient-to-br from-amber-50/50 to-white">
             <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
@@ -540,5 +645,95 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                 )}
             </CardContent>
         </Card>
+        <Dialog open={draftOpen} onOpenChange={setDraftOpen}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Bozza contenuto per il sito</DialogTitle>
+                    <DialogDescription>
+                        Personalizza il testo prima di inviarlo al CMS come bozza.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-600">Titolo</label>
+                        <Input
+                            value={draftForm.title}
+                            onChange={(e) => setDraftForm(prev => ({ ...prev, title: e.target.value, slug: prev.slug || slugify(e.target.value) }))}
+                            placeholder="Titolo della pagina"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-slate-600">Slug</label>
+                            <Input
+                                value={draftForm.slug}
+                                onChange={(e) => setDraftForm(prev => ({ ...prev, slug: e.target.value }))}
+                                placeholder="titolo-pagina"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-slate-600">Sezione</label>
+                            <select
+                                value={draftForm.targetSection}
+                                onChange={(e) => setDraftForm(prev => ({ ...prev, targetSection: e.target.value }))}
+                                className="h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+                            >
+                                <option value="pages">Pagine</option>
+                                <option value="faq">FAQ</option>
+                                <option value="news">News</option>
+                                <option value="blog">Blog</option>
+                                <option value="support">Supporto</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-600">Meta Description</label>
+                        <Input
+                            value={draftForm.metaDescription}
+                            onChange={(e) => setDraftForm(prev => ({ ...prev, metaDescription: e.target.value }))}
+                            placeholder="Meta description (max 160 caratteri)"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-medium text-slate-600">Contenuto (Markdown)</label>
+                        <textarea
+                            value={draftForm.body}
+                            onChange={(e) => setDraftForm(prev => ({ ...prev, body: e.target.value }))}
+                            className="w-full min-h-[220px] rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+                            placeholder="Contenuto della pagina in Markdown"
+                        />
+                    </div>
+                    {draftError && (
+                        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+                            {draftError}
+                        </div>
+                    )}
+                    {draftSuccessId && (
+                        <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">
+                            Bozza creata. Puoi modificarla o inviarla dal CMS.
+                            <a href={`/dashboard/cms/suggestions?id=${draftSuccessId}`} className="ml-2 underline">
+                                Apri suggerimento
+                            </a>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button
+                        variant="outline"
+                        onClick={() => setDraftOpen(false)}
+                        disabled={draftSaving}
+                    >
+                        Chiudi
+                    </Button>
+                    <Button
+                        onClick={handleCreateDraft}
+                        disabled={draftSaving || !draftForm.title || !draftForm.body}
+                    >
+                        {draftSaving ? 'Creazione...' : 'Crea bozza CMS'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

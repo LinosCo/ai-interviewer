@@ -33,6 +33,16 @@ export default function SuggestionsPage() {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [filter, setFilter] = useState<string>('');
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState({
+        title: '',
+        slug: '',
+        body: '',
+        metaDescription: '',
+        targetSection: ''
+    });
+    const [saveLoading, setSaveLoading] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     useEffect(() => {
         loadSuggestions();
@@ -45,6 +55,20 @@ export default function SuggestionsPage() {
             setSelectedSuggestion(null);
         }
     }, [selectedId]);
+
+    useEffect(() => {
+        if (selectedSuggestion) {
+            setDraft({
+                title: selectedSuggestion.title || '',
+                slug: selectedSuggestion.slug || '',
+                body: selectedSuggestion.body || '',
+                metaDescription: selectedSuggestion.metaDescription || '',
+                targetSection: selectedSuggestion.targetSection || ''
+            });
+            setEditing(false);
+            setSaveError(null);
+        }
+    }, [selectedSuggestion]);
 
     async function loadSuggestions() {
         try {
@@ -111,6 +135,36 @@ export default function SuggestionsPage() {
             alert('Errore di rete');
         } finally {
             setActionLoading(false);
+        }
+    }
+
+    async function handleSaveDraft() {
+        if (!selectedSuggestion) return;
+        setSaveLoading(true);
+        setSaveError(null);
+        try {
+            const res = await fetch(`/api/cms/suggestions/${selectedSuggestion.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: draft.title,
+                    slug: draft.slug,
+                    body: draft.body,
+                    metaDescription: draft.metaDescription,
+                    targetSection: draft.targetSection
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setSaveError(data.error || 'Errore durante il salvataggio');
+                return;
+            }
+            await loadSuggestionDetail(selectedSuggestion.id);
+            setEditing(false);
+        } catch (err) {
+            setSaveError('Errore di rete');
+        } finally {
+            setSaveLoading(false);
         }
     }
 
@@ -215,10 +269,80 @@ export default function SuggestionsPage() {
                         </div>
 
                         <div className="mb-6">
-                            <h3 className="text-sm font-semibold text-gray-700 mb-2">Bozza Contenuto</h3>
-                            <div className="prose prose-sm max-w-none bg-gray-50 p-4 rounded border border-gray-200 max-h-64 overflow-y-auto">
-                                <pre className="whitespace-pre-wrap text-sm">{selectedSuggestion.body}</pre>
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-sm font-semibold text-gray-700">Bozza Contenuto</h3>
+                                {selectedSuggestion.status === 'PENDING' && (
+                                    <button
+                                        onClick={() => setEditing(!editing)}
+                                        className="text-xs text-amber-600 hover:text-amber-700"
+                                    >
+                                        {editing ? 'Annulla' : 'Modifica bozza'}
+                                    </button>
+                                )}
                             </div>
+                            {editing ? (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-600">Titolo</label>
+                                        <input
+                                            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                                            value={draft.title}
+                                            onChange={(e) => setDraft(prev => ({ ...prev, title: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-xs font-medium text-gray-600">Slug</label>
+                                            <input
+                                                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                                                value={draft.slug}
+                                                onChange={(e) => setDraft(prev => ({ ...prev, slug: e.target.value }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-medium text-gray-600">Sezione</label>
+                                            <input
+                                                className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                                                value={draft.targetSection}
+                                                onChange={(e) => setDraft(prev => ({ ...prev, targetSection: e.target.value }))}
+                                                placeholder="faq, pages, blog..."
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-600">Meta Description</label>
+                                        <input
+                                            className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm"
+                                            value={draft.metaDescription}
+                                            onChange={(e) => setDraft(prev => ({ ...prev, metaDescription: e.target.value }))}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-600">Contenuto</label>
+                                        <textarea
+                                            className="mt-1 w-full min-h-[220px] rounded border border-gray-300 px-3 py-2 text-sm"
+                                            value={draft.body}
+                                            onChange={(e) => setDraft(prev => ({ ...prev, body: e.target.value }))}
+                                        />
+                                    </div>
+                                    {saveError && (
+                                        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+                                            {saveError}
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={handleSaveDraft}
+                                        disabled={saveLoading}
+                                        className="px-4 py-2 rounded bg-amber-600 text-white text-sm hover:bg-amber-700 disabled:opacity-50"
+                                    >
+                                        {saveLoading ? 'Salvataggio...' : 'Salva modifiche'}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="prose prose-sm max-w-none bg-gray-50 p-4 rounded border border-gray-200 max-h-64 overflow-y-auto">
+                                    <pre className="whitespace-pre-wrap text-sm">{selectedSuggestion.body}</pre>
+                                </div>
+                            )}
                         </div>
 
                         {selectedSuggestion.metaDescription && (

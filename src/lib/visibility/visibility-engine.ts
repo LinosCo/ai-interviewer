@@ -9,7 +9,7 @@ const AnalysisSchema = z.object({
     brandMentioned: z.boolean(),
     brandPosition: z.number().nullable().describe("Position in the list (1-based), or null if not mentioned"),
     competitorPositions: z
-        .record(z.any())
+        .record(z.string(), z.any())
         .transform((value) => VisibilityEngine.normalizeCompetitorPositions(value))
         .describe("Map of competitor names to their positions (number or null)"),
     sentiment: z.enum(['positive', 'neutral', 'negative']).nullable(),

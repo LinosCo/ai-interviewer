@@ -197,6 +197,28 @@ export class CrossChannelSyncEngine {
         // 6. Summarize data for LLM with compact identifiers for citations
         const truncate = (value: string, max: number) => (value || '').slice(0, max);
         const limitArray = <T>(arr: T[] | null | undefined, max: number) => (arr || []).slice(0, max);
+        const stopwords = new Set([
+            'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'una', 'uno', 'di', 'del', 'della', 'dei', 'delle',
+            'a', 'al', 'alla', 'ai', 'alle', 'da', 'dal', 'dalla', 'dai', 'dalle', 'in', 'nel', 'nella',
+            'su', 'sul', 'sulla', 'per', 'con', 'tra', 'fra', 'che', 'e', 'o', 'ma', 'non', 'piu', 'meno',
+            'the', 'and', 'or', 'to', 'of', 'in', 'for', 'with', 'on', 'at', 'by', 'from', 'is', 'are'
+        ]);
+        const tokenize = (text: string) => {
+            return (text || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9àèéìòùÀÈÉÌÒÙ]+/gi, ' ')
+                .split(/\s+/)
+                .filter(t => t.length >= 4 && !stopwords.has(t));
+        };
+        const jaccardScore = (a: string[], b: string[]) => {
+            if (a.length === 0 || b.length === 0) return 0;
+            const setA = new Set(a);
+            const setB = new Set(b);
+            let inter = 0;
+            for (const t of setA) if (setB.has(t)) inter += 1;
+            const union = setA.size + setB.size - inter;
+            return union === 0 ? 0 : inter / union;
+        };
 
         const visibilitySummary = limitArray(
             visibilityConfig?.scans[0]?.responses?.map(r => ({
@@ -237,6 +259,30 @@ export class CrossChannelSyncEngine {
             clusterCount: Array.isArray(a.questionClusters) ? a.questionClusters.length : 0,
             leads: a.leadsCollected
         }));
+
+        const contentIndex = (knowledgeSources || []).map(s => {
+            const contentSnippet = truncate(s.content || '', 500);
+            return {
+                title: s.title || 'Senza titolo',
+                type: s.type,
+                tokens: tokenize(`${s.title || ''} ${contentSnippet}`),
+                snippet: contentSnippet
+            };
+        });
+
+        const findContentMatch = (title: string, body: string) => {
+            const actionTokens = tokenize(`${title || ''} ${body || ''}`);
+            if (actionTokens.length < 4) return null;
+            let best: { title: string; type: string; score: number } | null = null;
+            for (const item of contentIndex) {
+                const score = jaccardScore(actionTokens, item.tokens);
+                if (!best || score > best.score) {
+                    best = { title: item.title, type: item.type, score };
+                }
+            }
+            if (best && best.score >= 0.38) return best;
+            return null;
+        };
 
         // 7. Query LLM for Unified Evaluation
         const { model } = await getSystemLLM();
@@ -364,7 +410,10 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
    Genera solo i suggerimenti più impattanti e rilevanti.
 
 7. STRATEGIA MANCANTE:
-   Se non c'è visione o value proposition definite, genera SOLO 1-2 suggerimenti per costruirle e fermati.`,
+   Se non c'è visione o value proposition definite, genera SOLO 1-2 suggerimenti per costruirle e fermati.
+
+8. CONTENUTI:
+   Per create_content/modify_content cita una KB o una query GSC rilevante. Se il contenuto esiste già, proponi un aggiornamento mirato (non un nuovo contenuto).`,
             temperature: 0.15
         });
 
@@ -436,10 +485,29 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             if (!rawInsight?.topicName || seenTopics.has(rawInsight.topicName)) continue;
             seenTopics.add(rawInsight.topicName);
 
-            const preparedActions = (rawInsight.suggestedActions || []).map((action: any) => ({
-                ...action,
-                autoApply: ['add_faq', 'add_interview_topic', 'add_visibility_prompt'].includes(action.type)
-            }));
+            const preparedActions = (rawInsight.suggestedActions || []).flatMap((action: any) => {
+                const match = findContentMatch(action.title || '', action.body || '');
+                if (action.type === 'add_faq' && match) {
+                    return [];
+                }
+                if (action.type === 'create_content' && match) {
+                    return [{
+                        ...action,
+                        type: 'modify_content',
+                        target: 'website',
+                        title: `Aggiorna contenuto esistente: ${match.title}`,
+                        body: `${action.body}\n\nNota: contenuto simile già presente ("${match.title}"). Trasforma il suggerimento in un aggiornamento mirato di quel contenuto.`,
+                        validation: { status: 'duplicate', matchTitle: match.title, score: match.score }
+                    }];
+                }
+                return [{
+                    ...action,
+                    autoApply: ['add_faq', 'add_interview_topic', 'add_visibility_prompt'].includes(action.type),
+                    ...(match ? { validation: { status: 'overlap', matchTitle: match.title, score: match.score } } : {})
+                }];
+            });
+
+            if (preparedActions.length === 0) continue;
 
             const insight = await upsertInsight(rawInsight.topicName, {
                 visibilityData: visibilitySummary as any,

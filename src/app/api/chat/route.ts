@@ -1207,10 +1207,43 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
 
             // CONSENT PHASE: bot should ask for permission
             if (nextState.consentGiven === false && !nextState.dataCollectionRefused) {
-                console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
-                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask for consent to collect contact details. One question only. Do not ask any topic question.`;
-                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-                responseText = retry.object.response?.trim() || responseText;
+                const openai = createOpenAI({ apiKey: openAIKey });
+                const consentSchema = z.object({ isConsent: z.boolean() });
+                let isConsent = false;
+                try {
+                    const consentCheck = await generateObject({
+                        model: openai('gpt-4o-mini'),
+                        schema: consentSchema,
+                        prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
+                        temperature: 0
+                    });
+                    isConsent = consentCheck.object.isConsent;
+                } catch (e) {
+                    console.error('Consent validation failed:', e);
+                }
+
+                if (!isConsent) {
+                    console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
+                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for consent to collect contact details. One question only. Do not ask any topic question.`;
+                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    responseText = retry.object.response?.trim() || responseText;
+
+                    try {
+                        const consentCheck2 = await generateObject({
+                            model: openai('gpt-4o-mini'),
+                            schema: consentSchema,
+                            prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
+                            temperature: 0
+                        });
+                        if (!consentCheck2.object.isConsent) {
+                            const enforcedSystem2 = `You must ask a single yes/no question asking permission to collect contact details.`;
+                            const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
+                            responseText = retry2.object.response?.trim() || responseText;
+                        }
+                    } catch (e) {
+                        console.error('Consent validation retry failed:', e);
+                    }
+                }
             }
             // FIELD COLLECTION PHASE: bot should ask for specific field
             else if (nextState.consentGiven === true && missingField) {

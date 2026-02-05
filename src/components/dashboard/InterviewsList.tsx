@@ -18,6 +18,7 @@ interface Interview {
     status: string;
     updatedAt: string;
     botType: string;
+    language?: string;
     conversations: Conversation[];
     project?: { id: string; name: string } | null;
 }

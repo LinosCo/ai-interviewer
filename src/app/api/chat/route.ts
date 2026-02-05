@@ -45,6 +45,7 @@ interface InterviewState {
     fieldAttemptCounts: Record<string, number>;  // Track attempts per field to prevent loops
     closureAttempts: number;        // Track consecutive closure attempts to prevent infinite loops
     dataCollectionRefused?: boolean;
+    forceConsentQuestion?: boolean;
     interestingTopics?: InterestingTopic[];
     deepTopicOrder?: string[];             // Ordered topic IDs for DEEP based on value
     deepTurnsByTopic?: Record<string, number>;
@@ -248,10 +249,15 @@ async function checkUserIntent(
     });
 
     try {
+        const classificationHints = context === 'consent'
+            ? `ACCEPT = user agrees to share contact details; REFUSE = user declines; NEUTRAL = unrelated`
+            : context === 'deep_offer'
+                ? `ACCEPT = user agrees to continue with extra/deeper questions; REFUSE = user declines; NEUTRAL = unrelated`
+                : `ACCEPT = user confirms they want to stop; REFUSE = user wants to continue; NEUTRAL = unclear`;
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
-            prompt: `${contextPrompts[context]}\nLanguage: ${language}\nUser message: "${userMessage}"\n\nClassify: ACCEPT (yes, ok, sure, va bene), REFUSE (no, skip, basta), NEUTRAL (question or unrelated)`,
+            prompt: `${contextPrompts[context]}\nLanguage: ${language}\nUser message: "${userMessage}"\n\nClassify intent. ${classificationHints}.`,
             temperature: 0
         });
         return result.object.intent;
@@ -360,6 +366,7 @@ export async function POST(req: Request) {
             topicSubGoalHistory: rawMetadata.topicSubGoalHistory ?? {},
             lastUserTopicId: rawMetadata.lastUserTopicId ?? null,
             deepLastSubGoalByTopic: rawMetadata.deepLastSubGoalByTopic ?? {},
+            forceConsentQuestion: rawMetadata.forceConsentQuestion ?? false,
         };
 
         const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -517,26 +524,7 @@ export async function POST(req: Request) {
                 } else if (state.deepAccepted === false) {
                     // We asked, now check user's response
                     console.log(`🎁 [DEEP_OFFER] Checking user response: "${lastMessage?.content}"`);
-                    const DATA_REQUEST_IT = /\b(dati|contatti|email|telefono|nome)\b/i;
-                    const DATA_REQUEST_EN = /\b(data|contact|contacts|email|phone|name)\b/i;
-                    const DATA_REQUEST_ASK_IT = /\b(posso|mi chiedi|mi chiedete|posso lasciarvi|posso lasciare|ti lascio|vi lascio|ti do|vi do)\b/i;
-                    const DATA_REQUEST_ASK_EN = /\b(can i|may i|should i|do you want|can i share|i can share|i'll share|i can give)\b/i;
-                    const dataRequestPattern = language === 'it' ? DATA_REQUEST_IT : DATA_REQUEST_EN;
-                    const askPattern = language === 'it' ? DATA_REQUEST_ASK_IT : DATA_REQUEST_ASK_EN;
-                    const isQuestion = /\?/.test(lastMessage?.content || '');
-                    const isShort = (lastMessage?.content || '').trim().length <= 30;
-                    const userAsksForData = lastMessage?.role === 'user' &&
-                        dataRequestPattern.test(lastMessage.content) &&
-                        (isQuestion || (askPattern.test(lastMessage.content) && isShort));
-
-                    if (userAsksForData && shouldCollectData) {
-                        console.log(`🎁 [DEEP_OFFER] User asked for data collection. Jumping to consent.`);
-                        nextState.phase = 'DATA_COLLECTION';
-                        supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                        nextState.consentGiven = false;
-                        nextState.deepAccepted = false;
-                    } else {
-                        const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
+                    const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
                     console.log(`🎁 [DEEP_OFFER] Intent detected: ${intent}`);
 
                     if (intent === 'ACCEPT') {
@@ -557,6 +545,7 @@ export async function POST(req: Request) {
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
                             nextState.consentGiven = false;
+                            nextState.forceConsentQuestion = true;
                         } else {
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
@@ -565,7 +554,6 @@ export async function POST(req: Request) {
                         // NEUTRAL - re-ask
                         console.log(`🎁 [DEEP_OFFER] Neutral response, re-asking`);
                         supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                    }
                     }
                 }
             }
@@ -1197,23 +1185,24 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
 
             // Helper to get field label
             const getFieldLabel = (field: string, lang: string) => {
-                const labels: Record<string, { it: string; en: string }> = {
-                    name: { it: 'il tuo nome e cognome', en: 'your full name' },
-                    fullName: { it: 'il tuo nome e cognome', en: 'your full name' },
-                    email: { it: 'il tuo indirizzo email', en: 'your email address' },
-                    phone: { it: 'il tuo numero di telefono', en: 'your phone number' },
-                    company: { it: 'il nome della tua azienda', en: 'your company name' },
-                    linkedin: { it: 'il tuo profilo LinkedIn', en: 'your LinkedIn profile' },
-                    role: { it: 'il tuo ruolo attuale', en: 'your current role' },
-                    location: { it: 'la tua città', en: 'your city' },
-                    budget: { it: 'il tuo budget', en: 'your budget' },
-                    availability: { it: 'la tua disponibilità', en: 'your availability' },
+                const labels: Record<string, { it: string; en: string; fr: string; de: string; es: string }> = {
+                    name: { it: 'il tuo nome e cognome', en: 'your full name', fr: 'votre nom et prénom', de: 'dein Vor- und Nachname', es: 'tu nombre y apellido' },
+                    fullName: { it: 'il tuo nome e cognome', en: 'your full name', fr: 'votre nom et prénom', de: 'dein Vor- und Nachname', es: 'tu nombre y apellido' },
+                    email: { it: 'il tuo indirizzo email', en: 'your email address', fr: 'votre adresse e-mail', de: 'deine E-Mail-Adresse', es: 'tu dirección de correo electrónico' },
+                    phone: { it: 'il tuo numero di telefono', en: 'your phone number', fr: 'votre numéro de téléphone', de: 'deine Telefonnummer', es: 'tu número de teléfono' },
+                    company: { it: 'il nome della tua azienda', en: 'your company name', fr: 'le nom de votre entreprise', de: 'den Namen deines Unternehmens', es: 'el nombre de tu empresa' },
+                    linkedin: { it: 'il tuo profilo LinkedIn', en: 'your LinkedIn profile', fr: 'votre profil LinkedIn', de: 'dein LinkedIn-Profil', es: 'tu perfil de LinkedIn' },
+                    role: { it: 'il tuo ruolo attuale', en: 'your current role', fr: 'votre rôle actuel', de: 'deine aktuelle Rolle', es: 'tu rol actual' },
+                    location: { it: 'la tua città', en: 'your city', fr: 'votre ville', de: 'deine Stadt', es: 'tu ciudad' },
+                    budget: { it: 'il tuo budget', en: 'your budget', fr: 'votre budget', de: 'dein Budget', es: 'tu presupuesto' },
+                    availability: { it: 'la tua disponibilità', en: 'your availability', fr: 'votre disponibilité', de: 'deine Verfügbarkeit', es: 'tu disponibilidad' },
                 };
-                return labels[field]?.[lang as 'it' | 'en'] || field;
+                return labels[field]?.[lang as 'it' | 'en' | 'fr' | 'de' | 'es'] || field;
             };
 
             // CONSENT PHASE: bot should ask for permission
-            if (nextState.consentGiven === false && !nextState.dataCollectionRefused) {
+            const forceConsent = nextState.forceConsentQuestion === true;
+            if ((forceConsent || nextState.consentGiven === false) && !nextState.dataCollectionRefused) {
                 const openai = createOpenAI({ apiKey: openAIKey });
                 const consentSchema = z.object({ isConsent: z.boolean() });
                 let isConsent = false;
@@ -1229,7 +1218,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                     console.error('Consent validation failed:', e);
                 }
 
-                if (!isConsent) {
+                if (!isConsent || forceConsent) {
                     console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for consent to collect contact details. One question only. Do not ask any topic question.`;
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
@@ -1250,6 +1239,9 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                     } catch (e) {
                         console.error('Consent validation retry failed:', e);
                     }
+                }
+                if (forceConsent) {
+                    nextState.forceConsentQuestion = false;
                 }
             }
             // FIELD COLLECTION PHASE: bot should ask for specific field
@@ -1305,7 +1297,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         }
 
         // Check for completion tag - only valid if we're actually done
-        if (/INTERVIEW_COMPLETED/i.test(responseText)) {
+            if (/INTERVIEW_COMPLETED/i.test(responseText)) {
             // Verify we're actually done - MUST re-read from DB for fresh data
             const candidateFields = (bot.candidateDataFields as any[]) || [];
             const freshConvForCompletion = await prisma.conversation.findUnique({
@@ -1328,17 +1320,13 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 // Not done yet! Override with data collection consent question
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but fields are missing. OVERRIDING with consent question.`);
 
-                const consentMessages = language === 'it' ? [
-                    `Ti ringrazio molto per questa conversazione! Prima di salutarci, posso chiederti i tuoi dati di contatto per restare in contatto?`,
-                    `Grazie per il tempo dedicato! L'intervista è finita, ma mi piacerebbe restare in contatto. Posso chiederti i tuoi dati?`,
-                    `È stato un piacere! Abbiamo concluso, ma vorrei poterti ricontattare. Ti andrebbe di lasciarmi i tuoi contatti?`,
-                ] : [
-                    `Thank you so much for this conversation! Before we go, may I ask for your contact details to stay in touch?`,
-                    `Thanks for your time! The interview is done, but I'd love to stay in touch. May I ask for your details?`,
-                    `It was a pleasure! We're finished, but I'd like to follow up. Would you mind sharing your contact info?`,
-                ];
-
-                responseText = consentMessages[Math.floor(Math.random() * consentMessages.length)];
+                const enforcedSystem = `You must ask a single yes/no question asking permission to collect contact details.`;
+                try {
+                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    responseText = retry.object.response?.trim() || responseText;
+                } catch (e) {
+                    console.error('Consent regeneration after completion failed:', e);
+                }
             } else {
                 // Actually complete
                 await completeInterview(conversationId, messages, openAIKey, currentProfileForCompletion || {});

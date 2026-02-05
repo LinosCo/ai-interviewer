@@ -3,18 +3,21 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Bot, Trash2, Loader2, Users } from 'lucide-react';
-import { deleteBotAction } from '@/actions/bot-actions';
+import { MessageSquare, Bot, Trash2, Loader2, Users, Copy } from 'lucide-react';
+import { deleteBotAction, duplicateBotAction } from '@/actions/bot-actions';
 import { BotStatusToggle } from './BotStatusToggle';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface BotListItemProps {
     bot: {
         id: string;
         name: string;
         botType: string;
+        language?: string;
         conversations: { id: string; status: string; completedAt: string | null }[];
         updatedAt: string;
+        status?: string;
         project?: { id: string; name: string } | null;
     };
     compact?: boolean;
@@ -26,6 +29,11 @@ export function BotListItem({ bot, compact = false, showProject = false }: BotLi
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+    const [duplicateName, setDuplicateName] = useState(`${bot.name} (copia)`);
+    const [duplicateLanguage, setDuplicateLanguage] = useState(bot.language || 'it');
+    const [isDuplicating, setIsDuplicating] = useState(false);
+    const [duplicateError, setDuplicateError] = useState<string | null>(null);
 
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -44,6 +52,38 @@ export function BotListItem({ bot, compact = false, showProject = false }: BotLi
             setDeleteError(result.error || 'Errore durante la cancellazione');
             setIsDeleting(false);
             throw new Error(result.error);
+        }
+    };
+
+    const handleDuplicateClick = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDuplicateName(`${bot.name} (copia)`);
+        setDuplicateLanguage(bot.language || 'it');
+        setDuplicateError(null);
+        setShowDuplicateDialog(true);
+    };
+
+    const handleConfirmDuplicate = async () => {
+        if (!duplicateName.trim()) {
+            setDuplicateError('Inserisci un nome valido');
+            return;
+        }
+        setIsDuplicating(true);
+        setDuplicateError(null);
+
+        const result = await duplicateBotAction(bot.id, {
+            name: duplicateName.trim(),
+            language: duplicateLanguage
+        });
+
+        if (result.success && result.botId) {
+            setShowDuplicateDialog(false);
+            router.refresh();
+            router.push(`/dashboard/bots/${result.botId}`);
+        } else {
+            setDuplicateError(result.error || 'Errore durante la duplicazione');
+            setIsDuplicating(false);
         }
     };
 
@@ -101,6 +141,15 @@ export function BotListItem({ bot, compact = false, showProject = false }: BotLi
                     <div className="w-px h-4 bg-gray-200 mx-1" />
 
                     <button
+                        onClick={handleDuplicateClick}
+                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        title="Duplica"
+                        aria-label={`Duplica bot ${bot.name}`}
+                    >
+                        <Copy className="w-4 h-4" aria-hidden="true" />
+                    </button>
+
+                    <button
                         onClick={handleDeleteClick}
                         disabled={isDeleting}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -123,6 +172,66 @@ export function BotListItem({ bot, compact = false, showProject = false }: BotLi
                 onConfirm={handleConfirmDelete}
                 loading={isDeleting}
             />
+
+            <Dialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Duplica intervista</DialogTitle>
+                        <DialogDescription>
+                            Crea una nuova versione basata su questa intervista, cambiando lingua o altri parametri.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-sm font-medium text-gray-700">Nome</label>
+                            <input
+                                type="text"
+                                value={duplicateName}
+                                onChange={(e) => setDuplicateName(e.target.value)}
+                                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                placeholder="Nome nuova intervista"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium text-gray-700">Lingua</label>
+                            <select
+                                value={duplicateLanguage}
+                                onChange={(e) => setDuplicateLanguage(e.target.value)}
+                                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            >
+                                <option value="it">Italiano</option>
+                                <option value="en">English</option>
+                                <option value="fr">Français</option>
+                                <option value="de">Deutsch</option>
+                                <option value="es">Español</option>
+                            </select>
+                        </div>
+                        {duplicateError && (
+                            <p className="text-sm text-red-600">{duplicateError}</p>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+                            onClick={() => setShowDuplicateDialog(false)}
+                            disabled={isDuplicating}
+                        >
+                            Annulla
+                        </button>
+                        <button
+                            type="button"
+                            className="px-4 py-2 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60"
+                            onClick={handleConfirmDuplicate}
+                            disabled={isDuplicating}
+                        >
+                            {isDuplicating ? 'Duplicazione...' : 'Duplica'}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

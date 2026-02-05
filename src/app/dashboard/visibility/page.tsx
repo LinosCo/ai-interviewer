@@ -146,6 +146,7 @@ export default async function VisibilityPage({
 
         scanData = {
             id: activeScan.id,
+            brandName: config.brandName,
             completedAt: activeScan.completedAt || new Date(),
             score: activeScan.score,
             platformScores,

@@ -48,6 +48,7 @@ interface SerpResult {
 interface SerpScan {
     id: string;
     query: string;
+    scanType?: string;
     dateRange: string;
     completedAt: string;
     totalResults: number;
@@ -68,6 +69,8 @@ export function SerpMonitoringSection() {
     const [scanning, setScanning] = useState(false);
     const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
+    const [dateRange, setDateRange] = useState<'last_day' | 'last_week' | 'last_month' | 'since_last_scan'>('last_week');
+    const [resultType, setResultType] = useState<'news' | 'web'>('news');
 
     const fetchData = async () => {
         try {
@@ -94,7 +97,7 @@ export function SerpMonitoringSection() {
             const response = await fetch('/api/visibility/serp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dateRange: 'last_week' })
+                body: JSON.stringify({ dateRange, resultType })
             });
 
             if (!response.ok) {
@@ -155,6 +158,31 @@ export function SerpMonitoringSection() {
         });
     };
 
+    const getDateRangeLabel = (value: string) => {
+        switch (value) {
+            case 'last_day':
+                return 'Ultime 24 ore';
+            case 'last_week':
+                return 'Ultimi 7 giorni';
+            case 'last_month':
+                return 'Ultimi 30 giorni';
+            case 'since_last_scan':
+                return "Dall'ultimo scan";
+            default:
+                return 'Ultimi 7 giorni';
+        }
+    };
+
+    const getResultTypeLabel = (value: string) => {
+        return value === 'web' ? 'Web (contenuti recenti)' : 'News';
+    };
+
+    const getScanTypeLabel = (scanType?: string) => {
+        if (!scanType) return 'News';
+        if (scanType.includes('web')) return 'Web (contenuti recenti)';
+        return 'News';
+    };
+
     if (loading) {
         return (
             <Card className="border-0 shadow-lg">
@@ -182,27 +210,47 @@ export function SerpMonitoringSection() {
                             <div>
                                 <CardTitle className="text-xl">Monitoraggio Google</CardTitle>
                                 <CardDescription>
-                                    Menzioni del brand nelle ricerche Google e news dell&apos;ultima settimana
+                                    Menzioni del brand nelle ricerche Google (news o contenuti web recenti)
                                 </CardDescription>
                             </div>
                         </div>
-                        <Button
-                            onClick={runScan}
-                            disabled={scanning}
-                            className="bg-blue-600 hover:bg-blue-700"
-                        >
-                            {scanning ? (
-                                <>
-                                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                    Scansione...
-                                </>
-                            ) : (
-                                <>
-                                    <RefreshCw className="w-4 h-4 mr-2" />
-                                    Nuova Scansione
-                                </>
-                            )}
-                        </Button>
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                            <select
+                                value={resultType}
+                                onChange={(e) => setResultType(e.target.value as 'news' | 'web')}
+                                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="news">News</option>
+                                <option value="web">Web (contenuti recenti)</option>
+                            </select>
+                            <select
+                                value={dateRange}
+                                onChange={(e) => setDateRange(e.target.value as typeof dateRange)}
+                                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="last_day">Ultime 24 ore</option>
+                                <option value="last_week">Ultimi 7 giorni</option>
+                                <option value="last_month">Ultimi 30 giorni</option>
+                                <option value="since_last_scan">Dall'ultimo scan</option>
+                            </select>
+                            <Button
+                                onClick={runScan}
+                                disabled={scanning}
+                                className="bg-blue-600 hover:bg-blue-700"
+                            >
+                                {scanning ? (
+                                    <>
+                                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                        Scansione...
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw className="w-4 h-4 mr-2" />
+                                        Nuova Scansione
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
 
@@ -238,8 +286,14 @@ export function SerpMonitoringSection() {
                                 <p className="text-sm font-medium text-gray-700">
                                     {formatDate(latestScan.completedAt)}
                                 </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {getScanTypeLabel(latestScan.scanType)} • {getDateRangeLabel(latestScan.dateRange)}
+                                </p>
                             </div>
                         </div>
+                        <p className="text-xs text-blue-700 mt-3">
+                            Scansione pronta: {getResultTypeLabel(resultType)} • {getDateRangeLabel(dateRange)}
+                        </p>
                     </CardContent>
                 )}
             </Card>

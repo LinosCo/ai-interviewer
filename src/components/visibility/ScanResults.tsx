@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 interface ScanData {
     id: string;
+    brandName: string;
     completedAt: Date;
     score: number;
     platformScores: { platform: string; score: number; total: number; mentions: number }[];
@@ -43,7 +44,7 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
         );
     }
 
-    const { score, platformScores, responses, partial } = scan;
+    const { score, platformScores, responses, partial, brandName } = scan;
 
     // Prepare chart data for platforms
     const chartData = platformScores.map(p => ({
@@ -76,36 +77,6 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
         mentions: stats.mentions,
         avgPosition: stats.mentions > 0 ? Math.round((stats.avgPosition || 0) / stats.mentions * 10) / 10 : null
     })).sort((a, b) => b.score - a.score);
-
-    // Aggregate sources by frequency and brand mention association
-    const sourceStats: Record<string, { count: number, withBrand: number, platforms: Set<string> }> = {};
-    responses.forEach(r => {
-        const sources = r.sourcesCited || [];
-        sources.forEach(source => {
-            if (!source) return;
-            const normalizedSource = source.toLowerCase().trim();
-            if (!sourceStats[normalizedSource]) {
-                sourceStats[normalizedSource] = { count: 0, withBrand: 0, platforms: new Set() };
-            }
-            sourceStats[normalizedSource].count++;
-            sourceStats[normalizedSource].platforms.add(r.platform);
-            if (r.brandMentioned) {
-                sourceStats[normalizedSource].withBrand++;
-            }
-        });
-    });
-
-    const sourcesData = Object.entries(sourceStats)
-        .map(([source, stats]) => ({
-            source,
-            count: stats.count,
-            withBrand: stats.withBrand,
-            platforms: Array.from(stats.platforms),
-            // Importance score: frequency + brand association bonus
-            importance: stats.count + (stats.withBrand * 0.5)
-        }))
-        .sort((a, b) => b.importance - a.importance)
-        .slice(0, 15); // Top 15 sources
 
     const COLORS = ['#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4'];
 
@@ -150,6 +121,63 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
         } catch {
             return { domain: url, isUrl: false, fullUrl: '' };
         }
+    };
+
+    // Aggregate sources by frequency and brand mention association
+    const sourceStats: Record<string, { count: number, withBrand: number, platforms: Set<string>, display: string }> = {};
+    responses.forEach(r => {
+        const sources = r.sourcesCited || [];
+        sources.forEach(source => {
+            if (!source) return;
+            const trimmedSource = source.trim();
+            const normalizedSource = trimmedSource.toLowerCase();
+            if (!sourceStats[normalizedSource]) {
+                sourceStats[normalizedSource] = { count: 0, withBrand: 0, platforms: new Set(), display: trimmedSource };
+            }
+            sourceStats[normalizedSource].count++;
+            sourceStats[normalizedSource].platforms.add(r.platform);
+            if (r.brandMentioned) {
+                sourceStats[normalizedSource].withBrand++;
+            }
+        });
+    });
+
+    const sourcesData = Object.entries(sourceStats)
+        .map(([source, stats]) => ({
+            source: stats.display,
+            count: stats.count,
+            withBrand: stats.withBrand,
+            platforms: Array.from(stats.platforms),
+            // Importance score: frequency + brand association bonus
+            importance: stats.count + (stats.withBrand * 0.5)
+        }))
+        .filter((entry) => {
+            if (entry.withBrand > 0) {
+                return extractDomain(entry.source).isUrl;
+            }
+            return true;
+        })
+        .sort((a, b) => b.importance - a.importance)
+        .slice(0, 15); // Top 15 sources
+
+    const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const highlightBrand = (text: string) => {
+        if (!brandName) return text;
+        const safe = escapeRegExp(brandName);
+        if (!safe) return text;
+        const regex = new RegExp(`(${safe})`, 'gi');
+        const parts = text.split(regex);
+        return parts.map((part, idx) => {
+            if (part.toLowerCase() === brandName.toLowerCase()) {
+                return (
+                    <mark key={idx} className="bg-amber-200 text-amber-900 rounded px-1">
+                        {part}
+                    </mark>
+                );
+            }
+            return <span key={idx}>{part}</span>;
+        });
     };
 
     return (
@@ -463,7 +491,13 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                                                             Fonti Citate
                                                         </h5>
                                                         <div className="flex flex-wrap gap-2">
-                                                            {res.sourcesCited.map((source, idx) => {
+                                                            {res.sourcesCited
+                                                                .filter((source) => {
+                                                                    if (!source) return false;
+                                                                    if (!res.brandMentioned) return true;
+                                                                    return extractDomain(source).isUrl;
+                                                                })
+                                                                .map((source, idx) => {
                                                                 const sInfo = extractDomain(source);
                                                                 return sInfo.isUrl ? (
                                                                     <a
@@ -494,7 +528,7 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                                                 <div className="space-y-2">
                                                     <h5 className="text-xs font-bold uppercase tracking-wider text-slate-400">Trascrizione Risposta LLM</h5>
                                                     <div className="bg-white p-4 rounded-lg border border-slate-100 shadow-sm text-slate-700 text-sm leading-relaxed whitespace-pre-wrap font-mono max-h-[400px] overflow-y-auto">
-                                                        {res.responseText}
+                                                        {highlightBrand(res.responseText)}
                                                     </div>
                                                 </div>
                                             </div>

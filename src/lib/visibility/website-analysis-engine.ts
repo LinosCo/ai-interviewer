@@ -591,6 +591,11 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
    - USA I DATI DEL VISIBILITY SCAN: se un prompt ha performance scarsa, è una priorità
    - I knowledge gaps del chatbot indicano domande reali degli utenti
 
+   Se sono presenti query da Search Console:
+   - Seleziona le keyword con molte impression e posizione media > 10, coerenti con Vision e Value Proposition
+   - Genera almeno 1 raccomandazione "add_page" o "modify_content" per migliorare il posizionamento SEO su quelle keyword
+   - Imposta dataSource = "search_console" e includi contentDraft completo
+
 4. CONTENT CLARITY (20%):
    - Valuta chiarezza e struttura
    - Il tono deve essere coerente con i temi delle interviste

@@ -14,6 +14,24 @@ const AnalysisSchema = z.object({
 });
 
 export class VisibilityEngine {
+    private static normalizeSourceUrl(source: string): string | null {
+        const trimmed = source.trim().replace(/[)\],.;:]+$/g, '');
+        if (!trimmed) return null;
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+            return trimmed;
+        }
+        if (trimmed.includes('.') && !/\s/.test(trimmed)) {
+            return `https://${trimmed.replace(/^www\./, '')}`;
+        }
+        return null;
+    }
+
+    private static normalizeSources(sources: string[]): string[] {
+        const normalized = sources
+            .map(s => this.normalizeSourceUrl(s))
+            .filter((s): s is string => !!s);
+        return Array.from(new Set(normalized));
+    }
     /**
      * Run a visibility scan for a specific configuration
      */
@@ -74,6 +92,7 @@ export class VisibilityEngine {
                         config.brandName,
                         config.competitors.map(c => c.name)
                     );
+                    const normalizedSources = this.normalizeSources(analysis.sourcesCited || []);
 
                     // Save response
                     console.log(`[visibility] Saving response for ${provider}...`);
@@ -88,7 +107,7 @@ export class VisibilityEngine {
                             brandPosition: analysis.brandPosition,
                             competitorPositions: analysis.competitorPositions as any,
                             sentiment: analysis.sentiment,
-                            sourcesCited: analysis.sourcesCited,
+                            sourcesCited: normalizedSources,
                             tokenUsage: llmResult.usage // Save token usage!
                         }
                     });
@@ -246,11 +265,10 @@ Determine:
 3. For each competitor, are they mentioned and at what position?
 4. What is the overall sentiment towards "${brandName}"?
 5. Extract ALL sources, websites, or references cited in the response:
-   - Include full URLs if mentioned (e.g., "https://example.com/article")
-   - Include domain names if full URL is not available (e.g., "TechCrunch", "example.com")
-   - Capture any named sources (e.g., "According to Forbes...", "Source: Gartner")
-   - Include markdown links (e.g., "[Site](https://site.com)")
-   - This is critical for understanding which sources inform LLM recommendations
+   - Return only full URLs (http/https). If only a domain is present, return it as "example.com" so it can be converted to https://example.com
+   - Include markdown links by extracting the URL target (e.g., "[Site](https://site.com)" -> "https://site.com")
+   - Do NOT include source names without a URL or domain (e.g., "Forbes" alone)
+   - If you cannot identify a URL or domain, return an empty list
 
 Text to analyze:
 """

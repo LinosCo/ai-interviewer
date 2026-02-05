@@ -50,6 +50,9 @@ const SOURCE_REPUTATIONS: Record<string, { score: number; type: string }> = {
     'mise.gov.it': { score: 88, type: 'government' },
 };
 
+type SerpDateRange = 'last_day' | 'last_week' | 'last_month' | 'since_last_scan';
+type SerpResultType = 'news' | 'web';
+
 // AI Analysis Schema
 const SerpAnalysisSchema = z.object({
     sentiment: z.enum(['positive', 'negative', 'neutral', 'mixed']),
@@ -79,7 +82,11 @@ export class SerpMonitoringEngine {
     /**
      * Run a SERP monitoring scan for a visibility configuration
      */
-    static async runScan(configId: string, dateRange: 'last_day' | 'last_week' | 'last_month' = 'last_week') {
+    static async runScan(
+        configId: string,
+        dateRange: SerpDateRange = 'last_week',
+        resultType: SerpResultType = 'news'
+    ) {
         // 1. Fetch config
         const config = await prisma.visibilityConfig.findUnique({
             where: { id: configId },
@@ -94,25 +101,47 @@ export class SerpMonitoringEngine {
             throw new Error('Google SERP API key not configured. Please add it in admin settings.');
         }
 
-        // 3. Build search query
-        const dateFilter = this.getDateFilter(dateRange);
-        const query = `"${config.brandName}" ${dateFilter}`;
+        // 3. Resolve date range (support "since_last_scan")
+        let effectiveRange: SerpDateRange = dateRange;
+        let sinceDate: Date | null = null;
+        if (dateRange === 'since_last_scan') {
+            const lastScan = await prisma.serpMonitoringScan.findFirst({
+                where: { configId: config.id, status: 'completed' },
+                orderBy: { completedAt: 'desc' },
+                select: { completedAt: true }
+            });
+            if (lastScan?.completedAt) {
+                sinceDate = lastScan.completedAt;
+            } else {
+                effectiveRange = 'last_month';
+            }
+        }
 
-        // 4. Create scan record
+        // 4. Build search query
+        const dateFilter = this.getDateFilter(effectiveRange, sinceDate);
+        const query = `"${config.brandName}"${dateFilter.querySuffix ? ` ${dateFilter.querySuffix}` : ''}`;
+
+        // 5. Create scan record
         const scan = await prisma.serpMonitoringScan.create({
             data: {
                 configId: config.id,
-                scanType: 'manual',
+                scanType: resultType === 'news' ? 'manual_news' : 'manual_web',
                 query,
-                dateRange,
+                dateRange: effectiveRange,
                 status: 'running',
                 startedAt: new Date()
             }
         });
 
         try {
-            // 5. Fetch SERP results
-            const serpResults = await this.fetchSerpResults(serpApiKey, query, config.language, config.territory);
+            // 6. Fetch SERP results
+            const serpResults = await this.fetchSerpResults(
+                serpApiKey,
+                query,
+                config.language,
+                config.territory,
+                { resultType }
+            );
 
             if (serpResults.length === 0) {
                 await prisma.serpMonitoringScan.update({
@@ -122,10 +151,10 @@ export class SerpMonitoringEngine {
                 return { success: true, scanId: scan.id, resultsCount: 0 };
             }
 
-            // 6. Analyze results with AI (batch for efficiency)
+            // 7. Analyze results with AI (batch for efficiency)
             const analyzedResults = await this.analyzeResults(serpResults, config.brandName, config.competitors.map(c => c.name));
 
-            // 7. Save results to database
+            // 8. Save results to database
             const savedResults = [];
             let positiveCount = 0, negativeCount = 0, neutralCount = 0;
             let totalImportance = 0;
@@ -168,7 +197,7 @@ export class SerpMonitoringEngine {
                 else neutralCount++;
             }
 
-            // 8. Update scan with aggregates
+            // 9. Update scan with aggregates
             await prisma.serpMonitoringScan.update({
                 where: { id: scan.id },
                 data: {
@@ -207,16 +236,19 @@ export class SerpMonitoringEngine {
     /**
      * Get date filter string for Google search
      */
-    private static getDateFilter(dateRange: string): string {
+    private static getDateFilter(dateRange: SerpDateRange, sinceDate?: Date | null): { querySuffix: string } {
+        if (dateRange === 'since_last_scan' && sinceDate) {
+            return { querySuffix: `after:${this.formatDate(sinceDate)}` };
+        }
         switch (dateRange) {
             case 'last_day':
-                return 'after:' + this.formatDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+                return { querySuffix: `after:${this.formatDate(new Date(Date.now() - 24 * 60 * 60 * 1000))}` };
             case 'last_week':
-                return 'after:' + this.formatDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+                return { querySuffix: `after:${this.formatDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))}` };
             case 'last_month':
-                return 'after:' + this.formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+                return { querySuffix: `after:${this.formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))}` };
             default:
-                return 'after:' + this.formatDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+                return { querySuffix: `after:${this.formatDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))}` };
         }
     }
 
@@ -457,7 +489,8 @@ export class SerpMonitoringEngine {
         apiKey: string,
         query: string,
         language: string,
-        territory: string
+        territory: string,
+        options?: { resultType?: SerpResultType }
     ): Promise<Array<{
         title: string;
         url: string;
@@ -470,13 +503,14 @@ export class SerpMonitoringEngine {
         sourceReputation: number;
     }>> {
         // Using SerpAPI format (most common SERP API)
+        const resultType = options?.resultType || 'news';
         const params = new URLSearchParams({
             api_key: apiKey,
             q: query,
             hl: language,
             gl: territory,
             num: '20', // Get top 20 results
-            tbm: 'nws' // News search for recent mentions
+            ...(resultType === 'news' ? { tbm: 'nws' } : {})
         });
 
         const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
@@ -719,6 +753,7 @@ Restituisci un array di analisi, una per ogni risultato nell'ordine dato.`,
             scans: recentScans.map(s => ({
                 id: s.id,
                 query: s.query,
+                scanType: s.scanType,
                 dateRange: s.dateRange,
                 completedAt: s.completedAt,
                 totalResults: s.totalResults,

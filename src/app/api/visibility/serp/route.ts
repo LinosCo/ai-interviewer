@@ -104,9 +104,10 @@ export async function POST(request: Request) {
         // Parse request body
         const body = await request.json().catch(() => ({}));
         const dateRange = body.dateRange || 'last_week';
+        const resultType = body.resultType || 'news';
 
         // Run scan
-        const result = await SerpMonitoringEngine.runScan(config.id, dateRange);
+        const result = await SerpMonitoringEngine.runScan(config.id, dateRange, resultType);
 
         return NextResponse.json(result);
 

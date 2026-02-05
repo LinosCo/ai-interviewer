@@ -181,7 +181,7 @@ export async function duplicateBotAction(
                 consentText: bot.consentText,
                 showAnonymityInfo: bot.showAnonymityInfo,
                 showDataUsageInfo: bot.showDataUsageInfo,
-                analyticsMetadata: (bot.analyticsMetadata ?? undefined) as any,
+                analyticsMetadata: undefined,
                 formatExplanation: bot.formatExplanation,
                 progressBarStyle: bot.progressBarStyle,
                 showProgressBar: bot.showProgressBar,
@@ -222,7 +222,7 @@ export async function duplicateBotAction(
                         description: t.description,
                         subGoals: t.subGoals || [],
                         maxTurns: t.maxTurns,
-                        keywords: (t.keywords ?? undefined) as any
+                        keywords: undefined
                     }))
                 },
                 knowledgeSources: {

@@ -73,12 +73,12 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 <div>
                     <h2 className="text-lg font-bold flex items-center gap-2">
                         <BrainCircuit className="w-5 h-5 text-amber-600" />
-                        AI Deep Insights
+                        Insight AI
                     </h2>
                     <p className="text-sm text-gray-500">
                         {hasMetadata
-                            ? `Last analyzed: ${new Date(bot.analyticsMetadata.lastAnalyzed).toLocaleDateString()}`
-                            : "Run analysis to generate themes, sentiment, and quotes."}
+                            ? `Ultima analisi: ${new Date(bot.analyticsMetadata.lastAnalyzed).toLocaleDateString()}`
+                            : "Esegui l’analisi per generare temi, sentiment e citazioni."}
                     </p>
                 </div>
                 <div className="flex gap-3">
@@ -87,7 +87,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                         className="border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 flex items-center gap-2 text-sm"
                     >
                         <Download className="w-4 h-4" />
-                        Export CSV
+                        Esporta CSV
                     </button>
                     <button
                         onClick={handleRunAnalysis}
@@ -99,7 +99,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                         ) : (
                             <>
                                 <Sparkles className="w-4 h-4" />
-                                Run AI Analysis
+                                Avvia analisi AI
                             </>
                         )}
                     </button>
@@ -112,7 +112,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 {/* Sentiment Score */}
                 <div className="bg-white p-6 rounded shadow md:col-span-1 flex flex-col items-center justify-center text-center relative overflow-hidden">
                     <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 absolute top-6 left-6">
-                        Overall Sentiment
+                        Sentiment complessivo
                     </h3>
                     <div className="mt-8 relative">
                         <svg className="w-32 h-32 transform -rotate-90">
@@ -135,7 +135,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                         </div>
                     </div>
                     <p className="text-sm text-gray-500 mt-4">
-                        {sentimentScore > 70 ? "Excellent user reception" : sentimentScore > 40 ? "Mixed feedback" : "Negative feedback detected"}
+                        {sentimentScore > 70 ? "Ottima percezione" : sentimentScore > 40 ? "Feedback misti" : "Feedback negativo rilevato"}
                     </p>
                 </div>
 
@@ -143,7 +143,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 <div className="bg-white p-6 rounded shadow md:col-span-2 flex flex-col">
                     <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
                         <TrendingUp className="w-4 h-4" />
-                        Engagement (User Messages per Session)
+                        Coinvolgimento (messaggi utente per sessione)
                     </h3>
                     <div className="flex-1 min-h-[250px]">
                         <ResponsiveContainer width="100%" height="100%">
@@ -154,7 +154,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                 <Tooltip
                                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
                                 />
-                                <Bar dataKey="messages" name="Messages" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="messages" name="Messaggi" fill="#F59E0B" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -167,10 +167,10 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 <div className="bg-white p-6 rounded shadow lg:col-span-1">
                     <h3 className="font-semibold mb-4 text-amber-600 flex items-center gap-2">
                         <Quote className="w-5 h-5" />
-                        Golden Quotes
+                        Citazioni chiave
                     </h3>
                     {goldenQuotes.length === 0 ? (
-                        <p className="text-gray-400 text-sm">No quotes extracted yet.</p>
+                        <p className="text-gray-400 text-sm">Nessuna citazione estratta.</p>
                     ) : (
                         <div className="space-y-4">
                             {goldenQuotes.map((q: any) => {
@@ -185,7 +185,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                                     href={`/dashboard/bots/${bot.id}/conversations/${citation.conversationId}`}
                                                     className="inline-flex items-center text-xs text-amber-600 hover:text-amber-800 font-medium opacity-80 hover:opacity-100 transition-opacity"
                                                 >
-                                                    View Context <ExternalLink className="w-3 h-3 ml-1" />
+                                                    Vedi contesto <ExternalLink className="w-3 h-3 ml-1" />
                                                 </Link>
                                             </div>
                                         )}
@@ -200,10 +200,10 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 <div className="bg-white p-6 rounded shadow lg:col-span-1">
                     <h3 className="font-semibold mb-4 text-amber-800 flex items-center gap-2">
                         <MessageSquare className="w-5 h-5" />
-                        Key Themes
+                        Temi principali
                     </h3>
                     {themes.length === 0 ? (
-                        <p className="text-gray-400 text-sm">No themes identified yet.</p>
+                        <p className="text-gray-400 text-sm">Nessun tema identificato.</p>
                     ) : (
                         <div className="space-y-4">
                             {themes.map((theme: any) => (
@@ -222,7 +222,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                     </summary>
 
                                     <div className="pl-4 pb-3 space-y-2 mt-1 border-l-2 border-amber-100 bg-gray-50/50 p-3 rounded-r text-xs">
-                                        <p className="font-semibold text-gray-500 text-xs uppercase tracking-wide">Evidence:</p>
+                                        <p className="font-semibold text-gray-500 text-xs uppercase tracking-wide">Evidenze:</p>
                                         {theme.occurrences.map((occ: any, idx: number) => (
                                             <div key={idx} className="bg-white p-2 rounded border border-gray-100 shadow-sm relative">
                                                 <p className="italic text-gray-600 mb-1">"{occ.snippet}"</p>
@@ -231,7 +231,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                                         href={`/dashboard/bots/${bot.id}/conversations/${occ.conversationId}`}
                                                         className="text-amber-600 hover:underline inline-flex items-center gap-1 mt-1"
                                                     >
-                                                        Review source <ExternalLink className="w-3 h-3" />
+                                                        Vedi fonte <ExternalLink className="w-3 h-3" />
                                                     </Link>
                                                 )}
                                             </div>
@@ -247,10 +247,10 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 <div className="bg-white p-6 rounded shadow lg:col-span-1">
                     <h3 className="font-semibold mb-4 text-amber-800 flex items-center gap-2">
                         <Sparkles className="w-5 h-5" />
-                        Strategic Suggestions
+                        Suggerimenti strategici
                     </h3>
                     {strategicInsights.length === 0 ? (
-                        <p className="text-gray-400 text-sm">No insights generated yet.</p>
+                        <p className="text-gray-400 text-sm">Nessun insight generato.</p>
                     ) : (
                         <ul className="space-y-3">
                             {strategicInsights.map((insight: any) => {
@@ -265,7 +265,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                         </summary>
                                         {citations && citations.length > 0 && (
                                             <div className="px-3 pb-3 pt-0 border-t border-amber-100/50 mt-2">
-                                                <p className="font-semibold text-amber-800/60 text-xs uppercase tracking-wide mt-2 mb-1">Basis:</p>
+                                                <p className="font-semibold text-amber-800/60 text-xs uppercase tracking-wide mt-2 mb-1">Base:</p>
                                                 <ul className="space-y-2">
                                                     {citations.map((c: any, idx: number) => (
                                                         <li key={idx} className="text-xs bg-white/60 p-2 rounded">
@@ -275,7 +275,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                                                     href={`/dashboard/bots/${bot.id}/conversations/${c.conversationId}`}
                                                                     className="block text-amber-600 hover:text-amber-800 mt-1 flex items-center gap-1"
                                                                 >
-                                                                    View in context <ExternalLink className="w-3 h-3" />
+                                                                    Vedi nel contesto <ExternalLink className="w-3 h-3" />
                                                                 </Link>
                                                             )}
                                                         </li>
@@ -291,16 +291,16 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 </div>
             </div>
 
-            {/* Topic Deep Dive - Word Clouds */}
+            {/* Approfondimento temi - Word cloud */}
             < div className="bg-white p-6 rounded shadow" >
                 <h3 className="font-semibold mb-6 flex items-center gap-2 text-gray-800">
                     <BrainCircuit className="w-5 h-5 text-amber-600" />
-                    Topic Analysis & Word Clouds
+                    Analisi temi e word cloud
                 </h3>
 
                 {
                     !bot.topics || bot.topics.length === 0 ? (
-                        <p className="text-gray-400 text-sm">No topic analysis available.</p>
+                        <p className="text-gray-400 text-sm">Nessuna analisi temi disponibile.</p>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {bot.topics.map((topic: any) => (
@@ -334,7 +334,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                             })
                                         ) : (
                                             <p className="text-xs text-gray-400 italic w-full text-center py-4">
-                                                No keywords extracted yet. Run analysis to populate.
+                                                Nessuna keyword estratta. Esegui l’analisi per popolare.
                                             </p>
                                         )}
                                     </div>
@@ -345,18 +345,18 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                 }
             </div >
 
-            {/* Recent Sessions & Transcripts */}
+            {/* Sessioni recenti e trascrizioni */}
             <div className="bg-white p-6 rounded shadow">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-semibold flex items-center gap-2 text-gray-800">
                         <MessageSquare className="w-5 h-5 text-amber-600" />
-                        Recent Sessions & Transcripts
+                        Sessioni recenti e trascrizioni
                     </h3>
                     <Link
                         href={`/dashboard/bots/${bot.id}/profiles`}
                         className="text-sm text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1"
                     >
-                        View All Collected Profiles <ExternalLink className="w-3 h-3" />
+                        Vedi tutti i profili raccolti <ExternalLink className="w-3 h-3" />
                     </Link>
                 </div>
 
@@ -364,11 +364,11 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                             <tr>
-                                <th className="px-4 py-3">Date</th>
-                                <th className="px-4 py-3">Status</th>
-                                <th className="px-4 py-3">Messages</th>
-                                <th className="px-4 py-3">Duration</th>
-                                <th className="px-4 py-3 text-right">Action</th>
+                                <th className="px-4 py-3">Data</th>
+                                <th className="px-4 py-3">Stato</th>
+                                <th className="px-4 py-3">Messaggi</th>
+                                <th className="px-4 py-3">Durata</th>
+                                <th className="px-4 py-3 text-right">Azioni</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -385,7 +385,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-gray-600">
-                                            {c.messages?.filter((m: any) => m.role === 'user').length || 0} user msgs
+                                            {c.messages?.filter((m: any) => m.role === 'user').length || 0} msg utente
                                         </td>
                                         <td className="px-4 py-3 text-gray-600">
                                             {c.durationSeconds ? `${Math.floor(c.durationSeconds / 60)}m ${c.durationSeconds % 60}s` : '-'}
@@ -395,7 +395,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                                                 href={`/dashboard/bots/${bot.id}/conversations/${c.id}`}
                                                 className="bg-gray-100 text-gray-700 px-3 py-1 rounded hover:bg-gray-200 text-xs inline-flex items-center gap-1"
                                             >
-                                                View Transcript <ExternalLink className="w-3 h-3" />
+                                                Vedi trascrizione <ExternalLink className="w-3 h-3" />
                                             </Link>
                                         </td>
                                     </tr>
@@ -403,7 +403,7 @@ export default function AnalyticsView({ bot, themes, insights }: any) {
                             ) : (
                                 <tr>
                                     <td colSpan={5} className="px-4 py-10 text-center italic text-gray-400">
-                                        No sessions recorded yet.
+                                        Nessuna sessione registrata.
                                     </td>
                                 </tr>
                             )}

@@ -84,23 +84,23 @@ export async function getSystemLLM() {
 /**
  * Configuration for visibility tracking LLM providers
  *
- * IMPORTANT: These models should match what free-tier users actually see
+ * IMPORTANT: These models should match what users see
  * when using each AI assistant's web interface:
- * - ChatGPT Free: GPT-4o (not mini)
- * - Claude Free: Claude 3.5 Sonnet (not Haiku)
- * - Gemini Free: Gemini 2.0 Flash
+ * - ChatGPT: GPT-5.2
+ * - Claude: Sonnet 4.5
+ * - Gemini: 3.0 Flash
  */
 export const VISIBILITY_PROVIDERS = {
     openai: {
-        model: 'gpt-4o',
+        model: 'gpt-5.2',
         displayName: 'ChatGPT'
     },
     anthropic: {
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-5',
         displayName: 'Claude'
     },
     gemini: {
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.0-flash-latest',
         displayName: 'Gemini'
     }
 } as const;

@@ -59,7 +59,132 @@ export async function getLLMProvider(provider: 'openai' | 'anthropic' | 'gemini'
  * Get any available configured LLM provider for internal tasks
  * Tries OpenAI first, then Anthropic, then Gemini
  */
-export async function getSystemLLM() {
+type LLMProvider = 'openai' | 'anthropic' | 'gemini';
+
+const latestModelCache = new Map<LLMProvider, { model: string; fetchedAt: number }>();
+const LATEST_MODEL_TTL_MS = 1000 * 60 * 60 * 6;
+
+async function listModelsOpenAI(apiKey: string): Promise<Array<{ id: string; created?: number }>> {
+    const response = await fetch('https://api.openai.com/v1/models', {
+        headers: {
+            Authorization: `Bearer ${apiKey}`
+        }
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`OpenAI list models failed: ${text}`);
+    }
+    const data = await response.json();
+    return Array.isArray(data?.data) ? data.data.map((m: any) => ({ id: m.id, created: m.created })) : [];
+}
+
+async function listModelsAnthropic(apiKey: string): Promise<Array<{ id: string; created?: string }>> {
+    const response = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01'
+        }
+    });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Anthropic list models failed: ${text}`);
+    }
+    const data = await response.json();
+    return Array.isArray(data?.data) ? data.data.map((m: any) => ({ id: m.id, created: m.created_at })) : [];
+}
+
+async function listModelsGemini(apiKey: string): Promise<string[]> {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Gemini list models failed: ${text}`);
+    }
+    const data = await response.json();
+    const models = Array.isArray(data?.models) ? data.models : [];
+    return models
+        .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+        .map((m: any) => String(m.name || '').replace(/^models\//, ''))
+        .filter(Boolean);
+}
+
+function pickLatestOpenAIModel(models: Array<{ id: string; created?: number }>): string | null {
+    const candidates = models
+        .filter(m => m.id.startsWith('gpt-5') && !m.id.includes('mini') && !m.id.includes('nano'));
+    if (candidates.length === 0) return null;
+    const sorted = [...candidates].sort((a, b) => (b.created || 0) - (a.created || 0));
+    return sorted[0]?.id || null;
+}
+
+function pickLatestAnthropicModel(models: Array<{ id: string; created?: string }>): string | null {
+    const preference = ['claude-sonnet-4-5', 'claude-3-7-sonnet', 'claude-3-5-sonnet'];
+    for (const prefix of preference) {
+        const found = models.find(m => m.id.includes(prefix));
+        if (found?.id) return found.id;
+    }
+    return null;
+}
+
+function pickLatestGeminiModel(models: string[]): string | null {
+    const preference = [
+        'gemini-3.0-flash-latest',
+        'gemini-3.0-pro',
+        'gemini-3.0',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro-latest'
+    ];
+    for (const pref of preference) {
+        if (models.includes(pref)) return pref;
+    }
+    return models[0] || null;
+}
+
+async function getLatestVisibilityModel(provider: LLMProvider): Promise<string> {
+    const cached = latestModelCache.get(provider);
+    if (cached && Date.now() - cached.fetchedAt < LATEST_MODEL_TTL_MS) {
+        return cached.model;
+    }
+
+    try {
+        if (provider === 'openai') {
+            const apiKey = (await getAdminApiKey('OPENAI')) || process.env.OPENAI_API_KEY;
+            if (!apiKey) return VISIBILITY_PROVIDERS.openai.model;
+            const models = await listModelsOpenAI(apiKey);
+            const latest = pickLatestOpenAIModel(models);
+            if (latest) {
+                latestModelCache.set('openai', { model: latest, fetchedAt: Date.now() });
+                return latest;
+            }
+        }
+
+        if (provider === 'anthropic') {
+            const apiKey = (await getAdminApiKey('ANTHROPIC')) || process.env.ANTHROPIC_API_KEY;
+            if (!apiKey) return VISIBILITY_PROVIDERS.anthropic.model;
+            const models = await listModelsAnthropic(apiKey);
+            const latest = pickLatestAnthropicModel(models);
+            if (latest) {
+                latestModelCache.set('anthropic', { model: latest, fetchedAt: Date.now() });
+                return latest;
+            }
+        }
+
+        if (provider === 'gemini') {
+            const apiKey = (await getAdminApiKey('GEMINI')) || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+            if (!apiKey) return VISIBILITY_PROVIDERS.gemini.model;
+            const models = await listModelsGemini(apiKey);
+            const latest = pickLatestGeminiModel(models);
+            if (latest) {
+                latestModelCache.set('gemini', { model: latest, fetchedAt: Date.now() });
+                return latest;
+            }
+        }
+    } catch (error) {
+        console.warn(`[visibility] Failed to refresh latest model for ${provider}:`, error);
+    }
+
+    return VISIBILITY_PROVIDERS[provider].model;
+}
+
+export async function getSystemLLM(options?: { preferLatestVisibilityModel?: boolean }) {
     const providers: ('openai' | 'anthropic' | 'gemini')[] = ['openai', 'anthropic', 'gemini'];
 
     for (const provider of providers) {
@@ -67,7 +192,9 @@ export async function getSystemLLM() {
             const config = await checkProviderConfiguration(provider);
             if (config.configured) {
                 const modelProvider = await getLLMProvider(provider);
-                const modelName = VISIBILITY_PROVIDERS[provider].model;
+                const modelName = options?.preferLatestVisibilityModel
+                    ? await getLatestVisibilityModel(provider)
+                    : VISIBILITY_PROVIDERS[provider].model;
                 return {
                     model: modelProvider(modelName) as any,
                     provider
@@ -101,6 +228,7 @@ export const VISIBILITY_PROVIDERS = {
     },
     gemini: {
         model: 'gemini-3.0-flash-latest',
+        fallbackModels: ['gemini-1.5-flash-latest'],
         displayName: 'Gemini'
     }
 } as const;
@@ -162,8 +290,9 @@ Target market: ${territory}`;
                 const config = await checkProviderConfiguration('openai');
                 if (!config.configured) return null;
                 const openaiProvider = await getLLMProvider('openai');
+                const modelName = await getLatestVisibilityModel('openai');
                 result = await generateText({
-                    model: openaiProvider(VISIBILITY_PROVIDERS.openai.model) as any,
+                    model: openaiProvider(modelName) as any,
                     system: systemPrompt,
                     prompt: finalPrompt
                 });
@@ -174,8 +303,9 @@ Target market: ${territory}`;
                 const config = await checkProviderConfiguration('anthropic');
                 if (!config.configured) return null;
                 const anthropicProvider = await getLLMProvider('anthropic');
+                const modelName = await getLatestVisibilityModel('anthropic');
                 result = await generateText({
-                    model: anthropicProvider(VISIBILITY_PROVIDERS.anthropic.model) as any,
+                    model: anthropicProvider(modelName) as any,
                     system: systemPrompt,
                     prompt: finalPrompt
                 });
@@ -192,26 +322,43 @@ Target market: ${territory}`;
                 if (!apiKey) return null;
 
                 const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: VISIBILITY_PROVIDERS.gemini.model });
+                const primaryModel = await getLatestVisibilityModel('gemini');
+                const modelCandidates = [
+                    primaryModel,
+                    ...(VISIBILITY_PROVIDERS.gemini.fallbackModels || [])
+                ];
 
-                // In realistic mode, just send the user prompt directly (simulates free user)
                 const geminiPrompt = systemPrompt ? `${systemPrompt}\n\n${finalPrompt}` : finalPrompt;
 
-                const geminiResult = await model.generateContent({
-                    contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }]
-                });
+                for (const modelName of modelCandidates) {
+                    try {
+                        const model = genAI.getGenerativeModel({ model: modelName });
+                        const geminiResult = await model.generateContent({
+                            contents: [{ role: 'user', parts: [{ text: geminiPrompt }] }]
+                        });
 
-                const response = geminiResult.response;
-                const text = response.text();
-                const usageMetadata = response.usageMetadata;
+                        const response = geminiResult.response;
+                        const text = response.text();
+                        const usageMetadata = response.usageMetadata;
 
-                return {
-                    text,
-                    usage: {
-                        inputTokens: usageMetadata?.promptTokenCount ?? 0,
-                        outputTokens: usageMetadata?.candidatesTokenCount ?? 0
+                        return {
+                            text,
+                            usage: {
+                                inputTokens: usageMetadata?.promptTokenCount ?? 0,
+                                outputTokens: usageMetadata?.candidatesTokenCount ?? 0
+                            }
+                        };
+                    } catch (err: any) {
+                        const message = String(err?.message || '');
+                        const status = err?.status || err?.statusCode;
+                        const isModelNotFound = status === 404 || message.includes('not found') || message.includes('not supported');
+                        if (!isModelNotFound) {
+                            throw err;
+                        }
+                        console.warn(`[visibility] Gemini model not available: ${modelName}. Trying fallback...`);
                     }
-                };
+                }
+                return null;
             }
 
             default:

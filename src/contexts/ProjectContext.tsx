@@ -38,6 +38,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const [selectedProject, setSelectedProjectState] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
     const [isOrgAdmin, setIsOrgAdmin] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
+    const maxRetries = 2;
 
     const fetchProjects = useCallback(async () => {
         // Don't fetch if organization context is still loading
@@ -95,18 +97,23 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
                 } else {
                     setSelectedProjectState(null);
                 }
+                setLoading(false);
+                return;
+            }
+            if ((res.status === 401 || res.status === 403) && retryCount < maxRetries) {
+                setTimeout(() => setRetryCount((count) => count + 1), 600);
+                return;
             }
         } catch (error) {
             console.error('Failed to fetch projects:', error);
-        } finally {
-            setLoading(false);
         }
-    }, [currentOrganization, orgLoading]);
+        setLoading(false);
+    }, [currentOrganization, orgLoading, retryCount]);
 
     useEffect(() => {
         // Re-fetch when organization changes or when organization loading completes
         fetchProjects();
-    }, [currentOrganization?.id, orgLoading, fetchProjects]);
+    }, [currentOrganization?.id, orgLoading, retryCount, fetchProjects]);
 
     const setSelectedProject = (project: Project | null) => {
         setSelectedProjectState(project);

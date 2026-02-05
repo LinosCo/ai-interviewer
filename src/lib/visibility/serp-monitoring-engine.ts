@@ -619,7 +619,7 @@ export class SerpMonitoringEngine {
         brandName: string,
         competitors: string[]
     ) {
-        const { model } = await getSystemLLM();
+        const { model } = await getSystemLLM({ preferLatestVisibilityModel: true });
 
         // Batch analyze for efficiency (max 5 at a time to avoid token limits)
         const batchSize = 5;

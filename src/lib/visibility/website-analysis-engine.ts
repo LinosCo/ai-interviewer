@@ -502,7 +502,7 @@ export class WebsiteAnalysisEngine {
         strategicContext: StrategicContext,
         language: string
     ) {
-        const { model } = await getSystemLLM();
+        const { model } = await getSystemLLM({ preferLatestVisibilityModel: true });
 
         // Build pages summary for context
         const pagesSummary = [

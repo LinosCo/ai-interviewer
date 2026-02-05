@@ -35,7 +35,6 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
     const fetchOrganizations = async () => {
         if (!session) {
-            setLoading(false);
             return;
         }
 
@@ -71,10 +70,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                 // This ensures dependent contexts (like ProjectContext) don't start fetching too early
                 setLoading(false);
             } else {
-                setLoading(false);
                 if ((res.status === 401 || res.status === 403) && retryCount < maxRetries) {
                     setTimeout(() => setRetryCount((count) => count + 1), 600);
+                    return;
                 }
+                setLoading(false);
             }
         } catch (error) {
             console.error('Failed to fetch organizations:', error);
@@ -96,6 +96,13 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             fetchOrganizations();
         }
     }, [status, session, retryCount]);
+
+    useEffect(() => {
+        if (status !== 'authenticated') return;
+        if (!loading && organizations.length === 0) {
+            fetchOrganizations();
+        }
+    }, [status, loading, organizations.length]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);

@@ -111,7 +111,7 @@ export default function OrganizationProjectSelector() {
     }, [dropdownMode, filteredOrganizations, filteredProjects, highlightedIndex, handleOrgSelect, handleProjectSelect]);
 
     // Loading state
-    if (orgLoading || (!currentOrganization && organizations.length === 0)) {
+    if (orgLoading || !currentOrganization || organizations.length === 0) {
         return (
             <div className="space-y-2 mb-6">
                 <div className="w-full h-11 bg-gray-50 animate-pulse rounded-lg border border-gray-200" />

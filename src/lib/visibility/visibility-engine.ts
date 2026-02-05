@@ -8,12 +8,36 @@ import { CrossChannelSyncEngine } from '../insights/sync-engine';
 const AnalysisSchema = z.object({
     brandMentioned: z.boolean(),
     brandPosition: z.number().nullable().describe("Position in the list (1-based), or null if not mentioned"),
-    competitorPositions: z.record(z.string(), z.number().nullable()).describe("Map of competitor names to their positions"),
+    competitorPositions: z
+        .record(z.any())
+        .transform((value) => VisibilityEngine.normalizeCompetitorPositions(value))
+        .describe("Map of competitor names to their positions (number or null)"),
     sentiment: z.enum(['positive', 'neutral', 'negative']).nullable(),
     sourcesCited: z.array(z.string()).describe("List of sources/links cited if any")
 });
 
 export class VisibilityEngine {
+    private static normalizeCompetitorPositions(input: Record<string, any>): Record<string, number | null> {
+        if (!input || typeof input !== 'object') return {};
+        const result: Record<string, number | null> = {};
+        for (const [key, value] of Object.entries(input)) {
+            if (value === null || value === undefined) {
+                result[key] = null;
+                continue;
+            }
+            if (typeof value === 'number') {
+                result[key] = Number.isFinite(value) ? value : null;
+                continue;
+            }
+            if (typeof value === 'object') {
+                const pos = (value as any).position;
+                result[key] = typeof pos === 'number' && Number.isFinite(pos) ? pos : null;
+                continue;
+            }
+            result[key] = null;
+        }
+        return result;
+    }
     private static normalizeSourceUrl(source: string): string | null {
         const trimmed = source.trim().replace(/[)\],.;:]+$/g, '');
         if (!trimmed) return null;
@@ -249,7 +273,7 @@ export class VisibilityEngine {
     private static async analyzeResponse(text: string, brandName: string, competitors: string[]) {
         try {
             console.log(`[visibility] Analyzing response for brand "${brandName}"...`);
-            const { model, provider } = await getSystemLLM();
+            const { model, provider } = await getSystemLLM({ preferLatestVisibilityModel: true });
             console.log(`[visibility] Using ${provider} for analysis`);
             const { object } = await generateObject({
                 model,
@@ -278,7 +302,10 @@ ${text.substring(0, 8000)}
             });
 
             console.log(`[visibility] Analysis complete: brandMentioned=${object.brandMentioned}, position=${object.brandPosition}`);
-            return object;
+            return {
+                ...object,
+                competitorPositions: this.normalizeCompetitorPositions(object.competitorPositions as any)
+            };
         } catch (error) {
             console.error('[visibility] Analysis failed:', error);
             // Fallback default

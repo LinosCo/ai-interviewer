@@ -222,7 +222,7 @@ export async function duplicateBotAction(
                         description: t.description,
                         subGoals: t.subGoals || [],
                         maxTurns: t.maxTurns,
-                        keywords: t.keywords
+                        keywords: (t.keywords ?? undefined) as any
                     }))
                 },
                 knowledgeSources: {

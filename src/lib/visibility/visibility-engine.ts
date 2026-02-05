@@ -17,7 +17,7 @@ const AnalysisSchema = z.object({
 });
 
 export class VisibilityEngine {
-    private static normalizeCompetitorPositions(input: Record<string, any>): Record<string, number | null> {
+    static normalizeCompetitorPositions(input: Record<string, any>): Record<string, number | null> {
         if (!input || typeof input !== 'object') return {};
         const result: Record<string, number | null> = {};
         for (const [key, value] of Object.entries(input)) {

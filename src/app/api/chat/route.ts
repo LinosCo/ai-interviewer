@@ -517,10 +517,17 @@ export async function POST(req: Request) {
                 } else if (state.deepAccepted === false) {
                     // We asked, now check user's response
                     console.log(`🎁 [DEEP_OFFER] Checking user response: "${lastMessage?.content}"`);
-                    const DATA_REQUEST_IT = /\b(dati|contatti|email|telefono|nome|azienda|ruolo)\b/i;
-                    const DATA_REQUEST_EN = /\b(data|contact|contacts|email|phone|name|company|role)\b/i;
+                    const DATA_REQUEST_IT = /\b(dati|contatti|email|telefono|nome)\b/i;
+                    const DATA_REQUEST_EN = /\b(data|contact|contacts|email|phone|name)\b/i;
+                    const DATA_REQUEST_ASK_IT = /\b(posso|mi chiedi|mi chiedete|posso lasciarvi|posso lasciare|ti lascio|vi lascio|ti do|vi do)\b/i;
+                    const DATA_REQUEST_ASK_EN = /\b(can i|may i|should i|do you want|can i share|i can share|i'll share|i can give)\b/i;
                     const dataRequestPattern = language === 'it' ? DATA_REQUEST_IT : DATA_REQUEST_EN;
-                    const userAsksForData = lastMessage?.role === 'user' && dataRequestPattern.test(lastMessage.content);
+                    const askPattern = language === 'it' ? DATA_REQUEST_ASK_IT : DATA_REQUEST_ASK_EN;
+                    const isQuestion = /\?/.test(lastMessage?.content || '');
+                    const isShort = (lastMessage?.content || '').trim().length <= 30;
+                    const userAsksForData = lastMessage?.role === 'user' &&
+                        dataRequestPattern.test(lastMessage.content) &&
+                        (isQuestion || (askPattern.test(lastMessage.content) && isShort));
 
                     if (userAsksForData && shouldCollectData) {
                         console.log(`🎁 [DEEP_OFFER] User asked for data collection. Jumping to consent.`);

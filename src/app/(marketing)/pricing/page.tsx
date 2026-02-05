@@ -66,14 +66,14 @@ export default function PricingPage() {
     };
 
     return (
-        <div className="bg-white min-h-screen py-24 px-6 md:px-12 selection:bg-indigo-100 selection:text-indigo-900">
+        <div className="bg-white min-h-screen py-24 px-6 md:px-12 selection:bg-amber-100 selection:text-amber-900">
             {/* Header */}
             <div className="max-w-4xl mx-auto text-center mb-20">
-                <Badge className="mb-6 bg-indigo-50 text-indigo-600 border-indigo-100 px-4 py-1 font-bold text-xs uppercase tracking-widest">
+                <Badge className="mb-6 bg-amber-50 text-amber-700 border-amber-100 px-4 py-1 font-bold text-xs uppercase tracking-widest">
                     Pricing & Plans
                 </Badge>
                 <h1 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tight mb-6">
-                    Investi nella tua <span className="text-indigo-600 italic">Market Intelligence</span>
+                    Investi nella tua <span className="text-amber-700 italic">Market Intelligence</span>
                 </h1>
                 <p className="text-xl text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto">
                     Scegli il piano che meglio si adatta alle tue ambizioni. Inizia oggi con 14 giorni di prova gratuita su tutti i piani.
@@ -86,7 +86,7 @@ export default function PricingPage() {
                         onClick={() => setIsYearly(!isYearly)}
                         className="w-16 h-8 bg-slate-100 rounded-full p-1 relative transition-colors hover:bg-slate-200"
                     >
-                        <div className={`w-6 h-6 bg-white shadow-md rounded-full absolute top-1 transition-all duration-300 ${isYearly ? 'left-9 bg-indigo-600 shadow-indigo-200' : 'left-1'}`} />
+                        <div className={`w-6 h-6 bg-white shadow-md rounded-full absolute top-1 transition-all duration-300 ${isYearly ? 'left-9 bg-amber-600 shadow-amber-200' : 'left-1'}`} />
                     </button>
                     <span className={`text-sm font-bold flex items-center gap-2 ${isYearly ? 'text-slate-900' : 'text-slate-400'}`}>
                         Annuale
@@ -100,10 +100,10 @@ export default function PricingPage() {
                 {displayPlans.map((plan) => (
                     <div
                         key={plan.id}
-                        className={`relative rounded-3xl p-8 transition-all duration-500 flex flex-col h-full bg-white border ${plan.popular ? 'border-indigo-600 ring-4 ring-indigo-50 scale-105 z-10' : 'border-slate-100 hover:border-slate-300'}`}
+                        className={`relative rounded-3xl p-8 transition-all duration-500 flex flex-col h-full bg-white border ${plan.popular ? 'border-amber-600 ring-4 ring-amber-50 scale-105 z-10' : 'border-slate-100 hover:border-slate-300'}`}
                     >
                         {plan.popular && (
-                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 px-4 rounded-full shadow-lg flex items-center gap-2">
+                            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest py-1.5 px-4 rounded-full shadow-lg flex items-center gap-2">
                                 <Star className="w-3 h-3 fill-current" /> Il più scelto
                             </div>
                         )}
@@ -129,7 +129,7 @@ export default function PricingPage() {
                             <p className="text-xs font-black text-slate-900 uppercase tracking-widest">Cosa include:</p>
                             {plan.featureList.map((feature, i) => (
                                 <div key={i} className="flex items-start gap-3">
-                                    <div className={`mt-0.5 p-0.5 rounded-full ${plan.popular ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                                    <div className={`mt-0.5 p-0.5 rounded-full ${plan.popular ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
                                         <Check className="w-3.5 h-3.5" strokeWidth={3} />
                                     </div>
                                     <span className="text-sm font-medium text-slate-600">{feature}</span>
@@ -147,7 +147,7 @@ export default function PricingPage() {
                         <Button
                             onClick={() => handleSubscribe(plan.id)}
                             disabled={isLoading === plan.id}
-                            className={`w-full py-7 rounded-2xl font-black text-lg shadow-xl transition-all duration-300 ${plan.popular ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200' : 'bg-slate-900 hover:bg-slate-800 shadow-slate-200'}`}
+                            className={`w-full py-7 rounded-2xl font-black text-lg shadow-xl transition-all duration-300 ${plan.popular ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-slate-900 hover:bg-slate-800 shadow-slate-200'}`}
                         >
                             {isLoading === plan.id ? 'Attendi...' : 'Inizia Prova Gratuita'}
                             <ArrowRight className="ml-3 w-5 h-5" />
@@ -166,7 +166,7 @@ export default function PricingPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {ADD_ONS.filter(a => !a.recurring).slice(0, 6).map((addon) => (
-                        <div key={addon.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col h-full hover:border-indigo-200 transition-colors">
+                        <div key={addon.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col h-full hover:border-amber-200 transition-colors">
                             <div className="flex items-center justify-between mb-4">
                                 <Badge className="bg-white text-slate-600 border-slate-200 font-bold">{addon.type.replace('_', ' ')}</Badge>
                                 <span className="text-lg font-black text-slate-900">€{(addon.price / 100).toFixed(2)}</span>
@@ -212,7 +212,7 @@ export default function PricingPage() {
                 <h3 className="text-2xl font-bold mb-4 relative z-10">Pronto a sbloccare l&apos;AI per il tuo Business?</h3>
                 <p className="text-slate-400 mb-8 relative z-10">Unisciti a oltre 500 aziende che usano Voler.ai per crescere.</p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
-                    <Link href="/register" className="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 py-6 px-10 rounded-2xl font-black shadow-xl shadow-indigo-500/20 text-white transition-colors">
+                    <Link href="/register" className="inline-flex items-center justify-center bg-amber-600 hover:bg-amber-700 py-6 px-10 rounded-2xl font-black shadow-xl shadow-amber-500/20 text-white transition-colors">
                         Crea Account Gratis
                     </Link>
                     <Link href="/sales" className="inline-flex items-center justify-center text-white hover:bg-white/10 py-6 px-10 rounded-2xl font-bold transition-colors">

@@ -35,10 +35,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
         // Variant styles - improved contrast and loading states
         const variants: Record<string, string> = {
-            primary: `bg-violet-600 text-white hover:bg-violet-700 shadow-md hover:shadow-lg focus-visible:ring-violet-500 ${isLoading ? 'bg-violet-500' : ''}`,
-            secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200 focus-visible:ring-slate-400",
-            outline: "border-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-slate-400",
-            ghost: "hover:bg-slate-100 text-slate-700 focus-visible:ring-slate-400",
+            primary: `bg-gradient-to-br from-orange-500 via-amber-500 to-amber-400 text-white hover:from-orange-600 hover:via-amber-600 hover:to-amber-500 shadow-[0_8px_30px_rgba(245,158,11,0.35)] focus-visible:ring-amber-500 ${isLoading ? 'opacity-90' : ''}`,
+            secondary: "bg-amber-50 text-amber-900 hover:bg-amber-100 focus-visible:ring-amber-300",
+            outline: "border-2 border-amber-200 text-amber-900 hover:bg-amber-50 hover:border-amber-300 focus-visible:ring-amber-300",
+            ghost: "hover:bg-amber-50 text-amber-900 focus-visible:ring-amber-300",
             danger: "bg-red-600 text-white hover:bg-red-700 shadow-md focus-visible:ring-red-500",
             white: "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm focus-visible:ring-slate-400"
         };

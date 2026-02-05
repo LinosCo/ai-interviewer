@@ -19,14 +19,12 @@ function generateSlug(name: string): string {
 
 export async function POST(req: Request) {
     try {
-        console.log('🔐 [CREATE-BOT] Starting authentication check...');
+        console.log('🔐 [CREATE-BOT] Starting authentication check');
         const session = await auth();
 
-        console.log('🔐 [CREATE-BOT] Session:', {
+        console.log('🔐 [CREATE-BOT] Session check:', {
             hasSession: !!session,
-            hasUser: !!session?.user,
-            email: session?.user?.email,
-            userId: session?.user?.id
+            hasUser: !!session?.user
         });
 
         if (!session?.user?.email) {
@@ -40,14 +38,12 @@ export async function POST(req: Request) {
         });
 
         console.log('👤 [CREATE-BOT] User lookup:', {
-            email: session.user.email,
             found: !!user,
-            userId: user?.id,
             projectsCount: user?.ownedProjects?.length || 0
         });
 
         if (!user) {
-            console.error('❌ [CREATE-BOT] User not found in database:', session.user.email);
+            console.error('❌ [CREATE-BOT] User not found in database');
             return new Response('User not found', { status: 404 });
         }
 
@@ -108,13 +104,16 @@ export async function POST(req: Request) {
             project.organizationId = organization.id;
         }
 
-        console.log('🎯 [CREATE-BOT] Checking usage limits for org:', project.organizationId);
+        console.log('🎯 [CREATE-BOT] Checking usage limits for org');
 
         const publishCheck = await canPublishBot(project.organizationId);
-        console.log('📊 [CREATE-BOT] Usage check result:', publishCheck);
+        console.log('📊 [CREATE-BOT] Usage check result:', {
+            allowed: publishCheck.allowed,
+            reason: publishCheck.reason
+        });
 
         if (!publishCheck.allowed) {
-            console.log('⛔ [CREATE-BOT] Publishing not allowed:', publishCheck.reason);
+        console.log('⛔ [CREATE-BOT] Publishing not allowed');
             return new Response(JSON.stringify({
                 error: 'LIMIT_REACHED',
                 message: publishCheck.reason
@@ -124,7 +123,7 @@ export async function POST(req: Request) {
             });
         }
 
-        console.log('✅ [CREATE-BOT] Usage check passed, proceeding to create bot...');
+        console.log('✅ [CREATE-BOT] Usage check passed, proceeding to create bot');
 
         // Create the bot with topics/KB based on type
         const slug = generateSlug(config.name || 'intervista');

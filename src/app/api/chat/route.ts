@@ -300,7 +300,7 @@ async function completeInterview(
             where: { id: conversationId },
             data: { candidateProfile: mergedProfile }
         });
-        console.log("👤 Profile saved:", mergedProfile.email || 'partial');
+        console.log("👤 Profile saved");
     }
 }
 
@@ -523,7 +523,7 @@ export async function POST(req: Request) {
                     nextState.deepAccepted = false; // Mark that we're waiting for response
                 } else if (state.deepAccepted === false) {
                     // We asked, now check user's response
-                    console.log(`🎁 [DEEP_OFFER] Checking user response: "${lastMessage?.content}"`);
+                    console.log(`🎁 [DEEP_OFFER] Checking user response`);
                     const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
                     console.log(`🎁 [DEEP_OFFER] Intent detected: ${intent}`);
 
@@ -675,7 +675,7 @@ export async function POST(req: Request) {
                     const candidateFields = (bot.candidateDataFields as any[]) || [];
                     let currentProfile = (conversation.candidateProfile as any) || {};
                     console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFields.map((f: any) => typeof f === 'string' ? f : (f.id || f.field)).join(', ')}`);
-                    console.log(`📋 [DATA_COLLECTION] Current profile: ${JSON.stringify(currentProfile)}`);
+                    console.log(`📋 [DATA_COLLECTION] Current profile keys: ${Object.keys(currentProfile).join(', ') || 'none'}`);
 
                 // STEP 1: Handle consent flow
                 if (state.consentGiven === null) {
@@ -686,7 +686,7 @@ export async function POST(req: Request) {
                     nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
                 } else if (state.consentGiven === false) {
                     // We asked for consent, now check user's response
-                    console.log(`📋 [DATA_COLLECTION] Checking consent response: "${lastMessage?.content}"`);
+                    console.log(`📋 [DATA_COLLECTION] Checking consent response`);
                     const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'consent');
                     console.log(`📋 [DATA_COLLECTION] Intent detected: ${intent}`);
 
@@ -762,7 +762,7 @@ export async function POST(req: Request) {
                                         const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
                                         if (cleanedName.length > 1) {
                                             currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
-                                            console.log(`✅ [DATA_COLLECTION] Recovered name from history for "${nameFieldKey}": "${cleanedName}"`);
+                                            console.log(`✅ [DATA_COLLECTION] Recovered name from history for "${nameFieldKey}"`);
                                             await prisma.conversation.update({
                                                 where: { id: conversationId },
                                                 data: { candidateProfile: currentProfile }
@@ -793,7 +793,7 @@ export async function POST(req: Request) {
                                 .map((f: any) => typeof f === 'string' ? f : (f.id || f.field))
                                 .filter((fieldName: string) => !currentProfile[fieldName]); // Only missing fields
 
-                            console.log(`📋 [DATA_COLLECTION] Attempting to extract fields: ${fieldsToExtract.join(', ')} from: "${lastMessage.content}"`);
+                            console.log(`📋 [DATA_COLLECTION] Attempting to extract fields: ${fieldsToExtract.join(', ')}`);
 
                             // SPECIAL HANDLING: If we asked for a specific field and user replied with a short answer, use it directly
                             const userReply = lastMessage.content.trim();
@@ -807,7 +807,7 @@ export async function POST(req: Request) {
                                 const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
                                 if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
                                     currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
-                                    console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}": "${cleanedName}"`);
+                                    console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}"`);
                                 }
                             }
 
@@ -818,7 +818,7 @@ export async function POST(req: Request) {
                                 if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
                                     !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
                                     currentProfile = { ...currentProfile, company: cleanedCompany };
-                                    console.log(`✅ [DATA_COLLECTION] Direct company capture: "${cleanedCompany}"`);
+                                    console.log(`✅ [DATA_COLLECTION] Direct company capture`);
                                 }
                             }
 
@@ -828,7 +828,7 @@ export async function POST(req: Request) {
                                 if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
                                     !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
                                     currentProfile = { ...currentProfile, role: cleanedRole };
-                                    console.log(`✅ [DATA_COLLECTION] Direct role capture: "${cleanedRole}"`);
+                                    console.log(`✅ [DATA_COLLECTION] Direct role capture`);
                                 }
                             }
 
@@ -849,7 +849,7 @@ export async function POST(req: Request) {
                                         openAIKey,
                                         language
                                     );
-                                    console.log(`🔍 [DATA_COLLECTION] Extraction result for "${fieldName}": value="${extraction.value}", confidence="${extraction.confidence}"`);
+                                    console.log(`🔍 [DATA_COLLECTION] Extraction result for "${fieldName}": confidence="${extraction.confidence}"`);
                                     return { fieldName, extraction };
                                 })
                             );
@@ -857,9 +857,9 @@ export async function POST(req: Request) {
                             for (const { fieldName, extraction } of extractions) {
                                 if (extraction.value && extraction.confidence !== 'none') {
                                     currentProfile = { ...currentProfile, [fieldName]: extraction.value };
-                                    console.log(`✅ [DATA_COLLECTION] Extracted "${fieldName}": "${extraction.value}"`);
+                                    console.log(`✅ [DATA_COLLECTION] Extracted "${fieldName}"`);
                                 } else {
-                                    console.log(`⚠️ [DATA_COLLECTION] Could not extract "${fieldName}" (value=${extraction.value}, confidence=${extraction.confidence})`);
+                                    console.log(`⚠️ [DATA_COLLECTION] Could not extract "${fieldName}" (confidence=${extraction.confidence})`);
                                 }
                             }
 
@@ -869,7 +869,7 @@ export async function POST(req: Request) {
                                     where: { id: conversationId },
                                     data: { candidateProfile: currentProfile }
                                 });
-                                console.log(`✅ [DATA_COLLECTION] Saved profile: ${JSON.stringify(currentProfile)}`);
+                                console.log(`✅ [DATA_COLLECTION] Saved profile`);
                             }
                         } else if (userWantsToSkip && state.lastAskedField) {
                             // User wants to skip this field - mark it as skipped so we don't ask again

@@ -46,7 +46,7 @@ export async function getProjects() {
 
 export async function transferProject(projectId: string, newOwnerId: string) {
     await requireAdmin();
-    console.log(`[AdminAction] Transfer Project: projectId=${projectId} to newOwner=${newOwnerId}`);
+    console.log(`[AdminAction] Transfer Project: projectId=${projectId}`);
 
     const project = await prisma.project.update({
         where: { id: projectId },
@@ -99,20 +99,13 @@ export async function updateUser(userId: string, data: { name?: string; email?: 
     await requireAdmin();
 
     console.log(`[AdminAction] Update User Attempt: userId=${userId}`);
-    console.log(`[AdminAction] Data received:`, {
-        ...data,
-        password: data.password ? `[PRESENT length=${data.password.length}]` : '[UNDEFINED/EMPTY]'
-    });
     const { name, email, password, role, projectIds } = data;
     const updateData: any = {};
 
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (password) {
-        console.log('[AdminAction] Hashing new password...');
         updateData.password = await bcrypt.hash(password, 10);
-    } else {
-        console.log('[AdminAction] No password provided, skipping update.');
     }
     if (role) updateData.role = role;
 
@@ -142,7 +135,7 @@ export async function deleteUser(userId: string) {
     const admin = await requireAdmin();
     if (admin.id === userId) throw new Error('Cannot delete yourself');
 
-    console.log(`Delete User Attempt: userId=${userId} by admin=${admin.email}`);
+    console.log(`Delete User Attempt: userId=${userId}`);
     await prisma.user.delete({ where: { id: userId } });
     console.log(`Delete User Success: userId=${userId}`);
     revalidatePath('/dashboard/admin/users');
@@ -177,7 +170,7 @@ export async function createProject(name: string, ownerId: string) {
 
 export async function createBot(projectId: string, name: string, goal: string) {
     await requireAdmin();
-    console.log(`[AdminAction] Create Bot: projectId=${projectId} name=${name}`);
+    console.log(`[AdminAction] Create Bot: projectId=${projectId}`);
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
 
@@ -198,7 +191,7 @@ export async function createBot(projectId: string, name: string, goal: string) {
 
 export async function transferBot(botId: string, targetProjectId: string) {
     await requireAdmin();
-    console.log(`[AdminAction] Transfer Bot: botId=${botId} to projectId=${targetProjectId}`);
+    console.log(`[AdminAction] Transfer Bot: botId=${botId}`);
 
     const bot = await prisma.bot.update({
         where: { id: botId },

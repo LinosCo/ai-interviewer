@@ -194,19 +194,22 @@ export class CrossChannelSyncEngine {
             }
         }
 
-        // 6. Summarize data for LLM with specific identifiers for citations
-        const visibilitySummary = visibilityConfig?.scans[0]?.responses?.map(r => ({
+        // 6. Summarize data for LLM with compact identifiers for citations
+        const truncate = (value: string, max: number) => (value || '').slice(0, max);
+        const limitArray = <T>(arr: T[] | null | undefined, max: number) => (arr || []).slice(0, max);
+
+        const visibilitySummary = limitArray(
+            visibilityConfig?.scans[0]?.responses?.map(r => ({
             platform: r.platform,
-            responseText: r.responseText.substring(0, 300),
+            responseText: truncate(r.responseText || '', 220),
             brandMentioned: r.brandMentioned,
             competitors: r.competitorPositions
-        })) || [];
+        })) || [],
+            6
+        );
 
-        // Include conversation IDs, dates, and candidate names for specific citations
-        const interviewSummary = analyses.map(a => {
-            const candidate = a.conversation?.candidateProfile as any;
-            const candidateName = candidate?.nome || candidate?.name || 'Anonimo';
-            const candidateCompany = candidate?.azienda || candidate?.company || '';
+        // Include conversation IDs and dates (avoid PII in summaries)
+        const interviewSummary = limitArray(analyses, 12).map(a => {
             const dateStr = a.conversation?.startedAt
                 ? new Date(a.conversation.startedAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })
                 : '';
@@ -214,24 +217,24 @@ export class CrossChannelSyncEngine {
 
             return {
                 id: a.conversation?.id?.slice(-4) || 'N/A', // Last 4 chars of ID for citation
-                source: `${interviewName} - ${candidateName}${candidateCompany ? ` (${candidateCompany})` : ''} - ${dateStr}`,
+                source: `${interviewName} - ${dateStr}`,
                 themes: a.themes,
-                quotes: (a.keyQuotes as string[] || []).slice(0, 3),
+                quotes: limitArray((a.keyQuotes as string[]) || [], 2).map(q => truncate(q || '', 160)),
                 sentiment: a.sentiment,
                 nps: (a as any).npsScore
             };
         });
 
-        const websiteSummary = knowledgeSources.map(s => ({
+        const websiteSummary = limitArray(knowledgeSources, 8).map(s => ({
             title: s.title,
             type: s.type,
-            contentSnippet: s.content.substring(0, 400)
+            contentSnippet: truncate(s.content || '', 220)
         }));
 
-        const chatbotSummary = chatbotAnalytics.map(a => ({
-            gaps: a.knowledgeGaps,
+        const chatbotSummary = limitArray(chatbotAnalytics, 6).map(a => ({
+            gapsCount: Array.isArray(a.knowledgeGaps) ? a.knowledgeGaps.length : 0,
             sentiment: a.sentiment,
-            clusters: a.questionClusters,
+            clusterCount: Array.isArray(a.questionClusters) ? a.questionClusters.length : 0,
             leads: a.leadsCollected
         }));
 
@@ -251,13 +254,14 @@ export class CrossChannelSyncEngine {
             ⚠️ IMPORTANTE: Ogni suggerimento DEVE essere direttamente collegato a questa visione.
             Se un suggerimento non supporta la visione strategica, NON includerlo.`
             : `
-            ⚠️ L'utente non ha ancora definito una visione strategica.
-            Fornisci suggerimenti generali basati sui dati disponibili, ma invitalo a definire una vision.`;
+            ⚠️ L'utente non ha ancora definito una visione strategica o una value proposition.
+            In questo caso genera SOLO 1-2 suggerimenti mirati a definire vision e value proposition, con domande concrete da fare agli stakeholder.
+            Non generare altri suggerimenti operativi finché la strategia non è definita.`;
 
         const { object } = await generateObject({
             model,
             schema: SyncResultSchema,
-            prompt: `Sei un consulente strategico senior specializzato in PMI italiane. Il tuo compito è analizzare TUTTI i dati raccolti sul brand e generare suggerimenti PRATICI, SPECIFICI e ALLINEATI ALLA VISIONE STRATEGICA.
+            prompt: `Sei un consulente strategico senior specializzato in PMI italiane. Il tuo compito è analizzare i dati raccolti sul brand e generare suggerimenti PRATICI, SPECIFICI e ALLINEATI ALLA VISIONE STRATEGICA.
 
 =============================================================
 🎯 CONTESTO STRATEGICO (questo guida OGNI suggerimento)
@@ -269,16 +273,16 @@ ${strategicContextText}
 =============================================================
 
 1️⃣ KNOWLEDGE BASE DEL CHATBOT (cosa risponde il chatbot):
-${JSON.stringify(websiteSummary, null, 2)}
+${JSON.stringify(websiteSummary)}
 
 2️⃣ ANALISI CHATBOT (gap, domande frequenti, sentiment):
-${JSON.stringify(chatbotSummary, null, 2)}
+${JSON.stringify(chatbotSummary)}
 
 3️⃣ FEEDBACK DALLE INTERVISTE (con ID per citazioni):
-${JSON.stringify(interviewSummary, null, 2)}
+${JSON.stringify(interviewSummary)}
 
 4️⃣ REPUTAZIONE SUGLI AI (ChatGPT, Claude, Perplexity):
-${JSON.stringify(visibilitySummary, null, 2)}
+${JSON.stringify(visibilitySummary)}
 
 5️⃣ MENZIONI SU GOOGLE/NEWS:
 ${serpSummary ? JSON.stringify({
@@ -286,7 +290,7 @@ ${serpSummary ? JSON.stringify({
                 sentimentBreakdown: serpSummary.sentimentBreakdown,
                 topCategories: serpSummary.topCategories,
                 recentAlerts: serpSummary.recentAlerts
-            }, null, 2) : 'Nessun dato SERP disponibile'}
+            }) : 'Nessun dato SERP disponibile'}
 
 6️⃣ ANALYTICS SITO WEB (Google Analytics + Search Console):
 ${websiteAnalytics ? JSON.stringify({
@@ -295,7 +299,7 @@ ${websiteAnalytics ? JSON.stringify({
                 paginePiuVisitate: (websiteAnalytics.topPages as any[]).slice(0, 5),
                 queryDiRicerca: (websiteAnalytics.searchQueries as any[]).slice(0, 10),
                 pagineConAltoBounce: websiteAnalytics.lowPerformingPages
-            }, null, 2) : 'Dati non disponibili - CMS non connesso o Google Analytics non configurato'}
+            }) : 'Dati non disponibili - CMS non connesso o Google Analytics non configurato'}
 
 =============================================================
 📈 HEALTH REPORT RICHIESTO
@@ -357,7 +361,10 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
    0-29: Nice-to-have
 
 6. MAX 5-7 INSIGHTS:
-   Genera solo i suggerimenti più impattanti e rilevanti.`,
+   Genera solo i suggerimenti più impattanti e rilevanti.
+
+7. STRATEGIA MANCANTE:
+   Se non c'è visione o value proposition definite, genera SOLO 1-2 suggerimenti per costruirle e fermati.`,
             temperature: 0.15
         });
 
@@ -431,7 +438,7 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
 
             const preparedActions = (rawInsight.suggestedActions || []).map((action: any) => ({
                 ...action,
-                autoApply: action.autoApply === true ? true : false
+                autoApply: ['add_faq', 'add_interview_topic', 'add_visibility_prompt'].includes(action.type)
             }));
 
             const insight = await upsertInsight(rawInsight.topicName, {

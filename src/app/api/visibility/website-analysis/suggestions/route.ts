@@ -88,7 +88,8 @@ export async function POST(request: Request) {
 
         const cmsConnection = (project as any)?.newCmsConnection
             || project?.cmsConnection
-            || (project?.cmsShares && project.cmsShares.length > 0 ? project.cmsShares[0].connection : null);
+            || (project as any)?.cmsShares?.[0]?.connection
+            || null;
 
         if (!cmsConnection?.id) {
             return NextResponse.json({ error: 'CMS integration not enabled for this project' }, { status: 400 });

@@ -14,18 +14,31 @@ export default function LoginPage() {
     const router = useRouter();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
     const [isNavigating, setIsNavigating] = useState(false);
+    const [hasSubmitted, setHasSubmitted] = useState(false);
 
     // Combined loading state: pending action OR navigating to dashboard
     const isLoading = isPending || isNavigating;
 
     useEffect(() => {
-        if (!isPending && errorMessage === null && !isNavigating) {
-            // Login successful, start navigation
+        if (errorMessage) {
+            setIsNavigating(false);
+            setHasSubmitted(false);
+            return;
+        }
+
+        if (!isPending && errorMessage === null && hasSubmitted) {
+            // Login successful, start navigation and refresh session
             setIsNavigating(true);
-            router.push('/dashboard');
+            router.refresh();
+            router.replace('/dashboard');
             // Note: isNavigating stays true - page will unmount during navigation
         }
-    }, [errorMessage, isPending, router, isNavigating]);
+    }, [errorMessage, isPending, router, hasSubmitted]);
+
+    const handleSubmit = () => {
+        setHasSubmitted(true);
+        setIsNavigating(true);
+    };
 
     return (
         <div style={{
@@ -53,7 +66,7 @@ export default function LoginPage() {
                 </div>
 
                 <Card variant="glass" padding="2.5rem">
-                    <form action={dispatch}>
+                    <form action={dispatch} onSubmit={handleSubmit}>
                         <div style={{ marginBottom: '1.5rem' }}>
                             <Input
                                 label="Email"

@@ -11,6 +11,7 @@ interface ScanData {
     brandName: string;
     completedAt: Date;
     score: number;
+    language?: string;
     platformScores: { platform: string; score: number; total: number; mentions: number }[];
     responses: {
         id: string;
@@ -44,7 +45,17 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
         );
     }
 
-    const { score, platformScores, responses, partial, brandName } = scan;
+    const { score, platformScores, responses, partial, brandName, language } = scan;
+
+    const languageLabel = (() => {
+        const value = (language || 'it').toLowerCase();
+        if (value === 'it') return 'Italiano';
+        if (value === 'en') return 'English';
+        if (value === 'es') return 'Español';
+        if (value === 'fr') return 'Français';
+        if (value === 'de') return 'Deutsch';
+        return value.toUpperCase();
+    })();
 
     // Prepare chart data for platforms
     const chartData = platformScores.map(p => ({
@@ -203,6 +214,7 @@ export function ScanResults({ scan, totalScans }: { scan: ScanData | null, total
                     <CardContent>
                         <div className="text-4xl font-bold">{score}%</div>
                         <p className="text-xs opacity-80 mt-1">Menzioni totali del brand</p>
+                        <p className="text-[11px] opacity-90 mt-2">Lingua: {languageLabel}</p>
                     </CardContent>
                 </Card>
                 <Card>

@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
@@ -150,6 +153,7 @@ export default async function VisibilityPage({
             completedAt: activeScan.completedAt || new Date(),
             score: activeScan.score,
             platformScores,
+            language: config.language || 'it',
             responses: activeScan.responses.map(r => ({
                 id: r.id,
                 platform: r.platform,

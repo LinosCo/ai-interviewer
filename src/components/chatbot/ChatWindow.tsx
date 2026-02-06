@@ -342,16 +342,28 @@ export default function ChatWindow({
 
             const data = await res.json();
 
-            // Add bot response
-            setMessages(prev => [
-                ...prev,
-                {
-                    id: Date.now().toString(),
-                    role: 'assistant',
-                    content: data.response || data.message, // handle both keys if API varies
-                    timestamp: new Date()
-                }
-            ]);
+            // Add bot response(s)
+            if (Array.isArray(data.responses) && data.responses.length > 0) {
+                setMessages(prev => [
+                    ...prev,
+                    ...data.responses.map((content: string, idx: number) => ({
+                        id: `${Date.now()}_${idx}`,
+                        role: 'assistant' as const,
+                        content,
+                        timestamp: new Date()
+                    }))
+                ]);
+            } else {
+                setMessages(prev => [
+                    ...prev,
+                    {
+                        id: Date.now().toString(),
+                        role: 'assistant',
+                        content: data.response || data.message, // handle both keys if API varies
+                        timestamp: new Date()
+                    }
+                ]);
+            }
 
         } catch (err) {
             console.error(err);

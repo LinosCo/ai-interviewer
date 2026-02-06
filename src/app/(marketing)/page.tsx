@@ -13,6 +13,7 @@ import {
   FAQSection,
   CTASection,
 } from '@/components/landing';
+import Script from 'next/script';
 
 export default function LandingPage() {
   return (
@@ -55,6 +56,11 @@ export default function LandingPage() {
         <div className="h-24 section-fade-to-transparent" />
         <CTASection />
       </main>
+      <Script
+        src="https://businesstuner.voler.ai/embed/chatbot.js"
+        data-bot-id="cmkfq2fuq0001q5yy3wnk6yvq"
+        strategy="afterInteractive"
+      />
     </div>
   );
 }

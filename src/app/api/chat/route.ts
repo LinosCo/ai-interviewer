@@ -1360,6 +1360,20 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 } catch (e) {
                     console.error('Deep offer regeneration after closure failed:', e);
                 }
+            } else if (shouldCollectData && nextState.phase === 'DEEP') {
+                // If DEEP is closing without data collection, force consent question
+                console.log(`⚠️ [SUPERVISOR] Closure attempt in DEEP. Forcing data collection consent.`);
+                nextState.phase = 'DATA_COLLECTION';
+                nextState.consentGiven = false;
+                nextState.forceConsentQuestion = true;
+                supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                try {
+                    const enforcedSystem = `You must ask a single yes/no question asking permission to collect contact details.`;
+                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    responseText = retry.object.response?.trim() || responseText;
+                } catch (e) {
+                    console.error('Consent regeneration after DEEP closure failed:', e);
+                }
             } else {
             nextState.closureAttempts = (state.closureAttempts || 0) + 1;
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Forcing topic question. Attempt #${nextState.closureAttempts}`);

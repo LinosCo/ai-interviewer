@@ -126,13 +126,13 @@ Return shouldAsk=true only when it is natural.`,
         let justExtractedField = null;  // Track what we just extracted THIS turn
 
         let shouldAttemptExtraction = false;
+        let extraction: any = null;
         if (nextMissingField && shouldCollect) {
             isLeadGenTurn = true;
 
             // Only try extraction if we actually asked this field recently
             shouldAttemptExtraction = leadCapture.lastAskedField === nextMissingField.field;
 
-            let extraction: any = null;
             if (shouldAttemptExtraction) {
                 extraction = await generateObject({
                     model: openai('gpt-4o-mini'),

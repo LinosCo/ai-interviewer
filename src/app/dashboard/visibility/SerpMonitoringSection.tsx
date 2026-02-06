@@ -236,19 +236,12 @@ export function SerpMonitoringSection() {
                             <Button
                                 onClick={runScan}
                                 disabled={scanning}
+                                loading={scanning}
+                                loadingText="Scansione..."
                                 className="bg-blue-600 hover:bg-blue-700"
                             >
-                                {scanning ? (
-                                    <>
-                                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                        Scansione...
-                                    </>
-                                ) : (
-                                    <>
-                                        <RefreshCw className="w-4 h-4 mr-2" />
-                                        Nuova Scansione
-                                    </>
-                                )}
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Nuova Scansione
                             </Button>
                         </div>
                     </div>

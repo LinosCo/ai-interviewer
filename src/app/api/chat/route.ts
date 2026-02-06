@@ -345,6 +345,18 @@ export async function POST(req: Request) {
         const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
         const numTopics = botTopics.length;
         const interviewPlan = await getOrCreateInterviewPlan(bot);
+        console.log("📊 [PLAN] Meta:", {
+            maxDurationMins: interviewPlan.meta.maxDurationMins,
+            totalTimeSec: interviewPlan.meta.totalTimeSec,
+            perTopicTimeSec: interviewPlan.meta.perTopicTimeSec,
+            secondsPerTurn: interviewPlan.meta.secondsPerTurn,
+            topics: interviewPlan.scan.topics.map(t => ({
+                topicId: t.topicId,
+                label: t.label,
+                minTurns: t.minTurns,
+                maxTurns: t.maxTurns
+            }))
+        });
 
         // ====================================================================
         // 2. LOAD STATE
@@ -376,6 +388,10 @@ export async function POST(req: Request) {
 
         console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
         console.log(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
+        if (lastMessage?.role === 'user') {
+            const userPreview = String(lastMessage.content || '').slice(0, 400);
+            console.log("💬 [USER] Preview:", userPreview);
+        }
 
         console.log("📊 [CHAT] State:", {
             phase: state.phase,
@@ -408,6 +424,11 @@ export async function POST(req: Request) {
             // Only process SCAN if time isn't up and we're in SCAN phase
             if (state.phase === 'SCAN') {
                 const scanMaxTurns = getScanPlanTurns(interviewPlan, currentTopic.id);
+                const scanPlanTopic = interviewPlan.scan.topics.find(t => t.topicId === currentTopic.id);
+                console.log(`📊 [SCAN] Topic "${currentTopic.label}" turn=${state.turnInTopic} maxTurns=${scanMaxTurns} plan=`, {
+                    minTurns: scanPlanTopic?.minTurns,
+                    maxTurns: scanPlanTopic?.maxTurns
+                });
                 // Check if we should transition to next topic (use dynamic budget)
                 if (state.turnInTopic >= scanMaxTurns) {
                     // Move to next topic
@@ -452,6 +473,7 @@ export async function POST(req: Request) {
                 } else {
                     // Continue SCAN on current topic
                     nextState.turnInTopic = state.turnInTopic + 1;
+                    console.log(`📊 [SCAN] Increment turn -> ${nextState.turnInTopic}`);
 
                     // Track engagement for value-based DEEP ordering
                     if (lastMessage?.role === 'user') {
@@ -1037,6 +1059,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         console.timeEnd("LLM");
         let responseText = result.object.response;
         console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
+        console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
 
         // ====================================================================
         // 5.4 TRANSITION / DEEP_OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
@@ -1118,6 +1141,16 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         const isGoodbyeResponse = goodbyePattern.test(responseText);
         const isVagueDataRequest = vagueDataPattern.test(responseText);
         const hasNoQuestion = !responseText.includes('?');
+
+        console.log("🔎 [SUPERVISOR] Flags:", {
+            phase: nextState.phase,
+            isGoodbyeResponse,
+            isGoodbyeWithQuestion: isGoodbyeResponse && responseText.includes('?'),
+            hasNoQuestion,
+            isPrematureContactRequest,
+            isVagueDataRequest,
+            responseLength: responseText.length
+        });
 
         // CRITICAL: Detect "goodbye with question" pattern (e.g., "Buona giornata! Ci vediamo?")
         // This is a closure attempt disguised as a question

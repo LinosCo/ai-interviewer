@@ -36,6 +36,7 @@ export async function checkResourceAccess(
     }
 
     const currentUserId = session.user.id;
+    const currentUserRole = (session.user as any).role;
     let organizationId: string | null = null;
 
     // 1. Determina l'organizzazione
@@ -54,6 +55,14 @@ export async function checkResourceAccess(
             select: { organizationId: true }
         });
         organizationId = membership?.organizationId || null;
+    }
+
+    if (currentUserRole === 'ADMIN') {
+        return {
+            allowed: true,
+            userId: currentUserId,
+            organizationId
+        };
     }
 
     if (!organizationId) {
@@ -129,6 +138,7 @@ export async function checkCreditsForAction(
     }
 
     const currentUserId = session.user.id;
+    const currentUserRole = (session.user as any).role;
     let organizationId: string | null = null;
 
     if (projectId) {
@@ -145,6 +155,14 @@ export async function checkCreditsForAction(
             select: { organizationId: true }
         });
         organizationId = membership?.organizationId || null;
+    }
+
+    if (currentUserRole === 'ADMIN') {
+        return {
+            allowed: true,
+            userId: currentUserId,
+            organizationId
+        };
     }
 
     if (!organizationId) {

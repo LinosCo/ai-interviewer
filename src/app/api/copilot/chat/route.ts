@@ -10,6 +10,7 @@ import { searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { PLANS, PlanType, isUnlimited } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { cookies } from 'next/headers';
 
 export const maxDuration = 60;
 
@@ -34,7 +35,6 @@ export async function POST(req: Request) {
                 name: true,
                 role: true,
                 memberships: {
-                    take: 1,
                     include: {
                         organization: {
                             select: {
@@ -55,7 +55,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'No organization found' }, { status: 400 });
         }
 
-        const organization = userWithMembership.memberships[0].organization;
+        const cookieStore = await cookies();
+        const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
+        const activeMembership = userWithMembership.memberships.find(
+            m => m.organizationId === selectedOrgId && m.status === 'ACTIVE'
+        ) || userWithMembership.memberships.find(m => m.status === 'ACTIVE');
+
+        if (!activeMembership) {
+            return NextResponse.json({ error: 'No active organization found' }, { status: 400 });
+        }
+
+        const organization = activeMembership.organization;
 
         // Use organization's plan (admin has unlimited access)
         const isAdmin = userWithMembership.role === 'ADMIN' || organization.plan === 'ADMIN';

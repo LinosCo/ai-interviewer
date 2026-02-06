@@ -1,12 +1,5 @@
 import { isConsentPendingForDataCollection } from './flow-guards';
 
-export function shouldOfferContinuationAfterDeep(params: {
-    remainingSec: number;
-    deepAccepted: boolean | null | undefined;
-}): boolean {
-    return params.remainingSec > 0 && params.deepAccepted !== true;
-}
-
 export function shouldInterceptTopicPhaseClosure(params: {
     phase: string;
     isGoodbyeResponse: boolean;

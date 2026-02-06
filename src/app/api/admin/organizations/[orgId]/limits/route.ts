@@ -138,15 +138,28 @@ export async function PATCH(
         // Update organization plan or limits if changed
         if (plan || monthlyCreditsLimit !== undefined) {
             const orgUpdate: any = {};
+            const existingCustomLimits =
+                typeof org.customLimits === 'object' && org.customLimits !== null
+                    ? (org.customLimits as Record<string, unknown>)
+                    : {};
+
             if (plan && plan !== org.plan) {
                 orgUpdate.plan = plan;
                 if (monthlyCreditsLimit === undefined) {
                     const defaultPlanConfig = PLANS[plan as PlanType] || PLANS[PlanType.FREE];
                     orgUpdate.monthlyCreditsLimit = BigInt(defaultPlanConfig.monthlyCredits);
+                    orgUpdate.customLimits = {
+                        ...existingCustomLimits,
+                        monthlyCreditsLimitCustom: false
+                    };
                 }
             }
             if (monthlyCreditsLimit !== undefined) {
                 orgUpdate.monthlyCreditsLimit = BigInt(monthlyCreditsLimit);
+                orgUpdate.customLimits = {
+                    ...existingCustomLimits,
+                    monthlyCreditsLimitCustom: true
+                };
             }
 
             if (Object.keys(orgUpdate).length > 0) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     onCompletionTag,
     onDeepCompleted,
-    onDeepOfferUserIntent,
+    onScanCompleted,
     onTopicPhaseClosureAttempt,
     type PhaseSimulatorState
 } from '@/lib/interview/phase-simulator';
@@ -22,15 +22,25 @@ function baseState(overrides: Partial<PhaseSimulatorState> = {}): PhaseSimulator
 }
 
 describe('phase-simulator integration-like sequences', () => {
-    it('follows DEEP -> DEEP_OFFER -> DATA_COLLECTION consent when user declines continuation', () => {
-        const deepDone = onDeepCompleted(baseState({ phase: 'DEEP', remainingSec: 90 }));
-        expect(deepDone.action).toBe('ASK_DEEP_OFFER');
-        expect(deepDone.state.phase).toBe('DEEP_OFFER');
+    it('starts DEEP when SCAN is completed with remaining time', () => {
+        const scanDone = onScanCompleted(baseState({ phase: 'SCAN', remainingSec: 59 }));
+        expect(scanDone.action).toBe('START_DEEP');
+        expect(scanDone.state.phase).toBe('DEEP');
+        expect(scanDone.state.deepAccepted).toBeNull();
+    });
 
-        const offerDeclined = onDeepOfferUserIntent(deepDone.state, 'REFUSE');
-        expect(offerDeclined.action).toBe('ASK_DATA_CONSENT');
-        expect(offerDeclined.state.phase).toBe('DATA_COLLECTION');
-        expect(offerDeclined.state.consentGiven).toBe(false);
+    it('asks DEEP_OFFER when SCAN is completed with no remaining time', () => {
+        const scanDone = onScanCompleted(baseState({ phase: 'SCAN', remainingSec: 0 }));
+        expect(scanDone.action).toBe('ASK_DEEP_OFFER');
+        expect(scanDone.state.phase).toBe('DEEP_OFFER');
+        expect(scanDone.state.deepAccepted).toBeNull();
+    });
+
+    it('moves directly from DEEP completion to DATA_COLLECTION consent', () => {
+        const deepDone = onDeepCompleted(baseState({ phase: 'DEEP', remainingSec: 90 }));
+        expect(deepDone.action).toBe('ASK_DATA_CONSENT');
+        expect(deepDone.state.phase).toBe('DATA_COLLECTION');
+        expect(deepDone.state.consentGiven).toBe(false);
     });
 
     it('intercepts premature closure attempt in DEEP and keeps topic questioning', () => {

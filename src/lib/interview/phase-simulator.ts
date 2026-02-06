@@ -1,4 +1,4 @@
-import { getCompletionGuardAction, shouldInterceptTopicPhaseClosure, shouldOfferContinuationAfterDeep } from './phase-flow';
+import { getCompletionGuardAction, shouldInterceptTopicPhaseClosure } from './phase-flow';
 
 export type InterviewPhase = 'SCAN' | 'DEEP' | 'DEEP_OFFER' | 'DATA_COLLECTION';
 export type UserIntent = 'ACCEPT' | 'REFUSE' | 'NEUTRAL';
@@ -29,23 +29,29 @@ export interface PhaseTransitionResult {
     action: PhaseAction;
 }
 
-export function onDeepCompleted(state: PhaseSimulatorState): PhaseTransitionResult {
-    const shouldOffer = shouldOfferContinuationAfterDeep({
-        remainingSec: state.remainingSec,
-        deepAccepted: state.deepAccepted
-    });
-
-    if (shouldOffer) {
+export function onScanCompleted(state: PhaseSimulatorState): PhaseTransitionResult {
+    if (state.remainingSec > 0) {
         return {
             state: {
                 ...state,
-                phase: 'DEEP_OFFER',
+                phase: 'DEEP',
                 deepAccepted: null
             },
-            action: 'ASK_DEEP_OFFER'
+            action: 'START_DEEP'
         };
     }
 
+    return {
+        state: {
+            ...state,
+            phase: 'DEEP_OFFER',
+            deepAccepted: null
+        },
+        action: 'ASK_DEEP_OFFER'
+    };
+}
+
+export function onDeepCompleted(state: PhaseSimulatorState): PhaseTransitionResult {
     if (state.shouldCollectData) {
         return {
             state: {

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { CreditAction } from '@/config/creditCosts';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 
 type GuardResult = {
     allowed: boolean;
@@ -26,6 +27,45 @@ const resourceToAction: Record<string, CreditAction> = {
     'AI_SUGGESTION': 'ai_tip_generation'
 };
 
+async function resolveOrganizationIdForUser(userId: string, projectId?: string): Promise<string | null> {
+    if (projectId) {
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { organizationId: true }
+        });
+        if (project?.organizationId) {
+            return project.organizationId;
+        }
+    }
+
+    const cookieStore = await cookies();
+    const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
+
+    if (selectedOrgId) {
+        const selectedMembership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId: selectedOrgId
+                }
+            },
+            select: { organizationId: true, status: true }
+        });
+
+        if (selectedMembership?.status === 'ACTIVE') {
+            return selectedMembership.organizationId;
+        }
+    }
+
+    const membership = await prisma.membership.findFirst({
+        where: { userId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'asc' },
+        select: { organizationId: true }
+    });
+
+    return membership?.organizationId || null;
+}
+
 /**
  * Verifica se l'utente può usare una risorsa
  *
@@ -48,25 +88,7 @@ export async function checkResourceAccess(
 
     const currentUserId = session.user.id;
     const currentUserRole = ('role' in session.user ? (session.user as { role?: string }).role : undefined);
-    let organizationId: string | null = null;
-
-    // 1. Determina l'organizzazione
-    if (options?.projectId) {
-        const project = await prisma.project.findUnique({
-            where: { id: options.projectId },
-            select: { organizationId: true }
-        });
-        organizationId = project?.organizationId || null;
-    }
-
-    // 2. Fallback alla prima organizzazione dell'utente (o quella personale) se manca projectId o orgId
-    if (!organizationId) {
-        const membership = await prisma.membership.findFirst({
-            where: { userId: currentUserId, status: 'ACTIVE' },
-            select: { organizationId: true }
-        });
-        organizationId = membership?.organizationId || null;
-    }
+    const organizationId = await resolveOrganizationIdForUser(currentUserId, options?.projectId);
 
     if (currentUserRole === 'ADMIN') {
         return {
@@ -153,23 +175,7 @@ export async function checkCreditsForAction(
 
     const currentUserId = session.user.id;
     const currentUserRole = ('role' in session.user ? (session.user as { role?: string }).role : undefined);
-    let organizationId: string | null = null;
-
-    if (projectId) {
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { organizationId: true }
-        });
-        organizationId = project?.organizationId || null;
-    }
-
-    if (!organizationId) {
-        const membership = await prisma.membership.findFirst({
-            where: { userId: currentUserId, status: 'ACTIVE' },
-            select: { organizationId: true }
-        });
-        organizationId = membership?.organizationId || null;
-    }
+    const organizationId = await resolveOrganizationIdForUser(currentUserId, projectId);
 
     if (currentUserRole === 'ADMIN') {
         return {

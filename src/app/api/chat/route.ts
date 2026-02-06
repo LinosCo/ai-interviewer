@@ -14,7 +14,7 @@ import type { InterviewPlan } from '@/lib/interview/plan-types';
 import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
 import { getFieldLabel, getNextMissingCandidateField } from '@/lib/interview/flow-guards';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
-import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure, shouldOfferContinuationAfterDeep } from '@/lib/interview/phase-flow';
+import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
 import { evaluateInterviewQuestionQuality } from '@/lib/interview/qualitative-evaluator';
 
 export const maxDuration = 60;
@@ -738,28 +738,29 @@ export async function POST(req: Request) {
                             nextSubGoal: nextAvailableSubGoals[0] || nextTopic.label
                         };
                     } else {
-                        // End of SCAN - check time for DEEP
+                        // End of SCAN: go directly to DEEP if there is still time.
+                        // Ask DEEP_OFFER only when hard time is already over.
                         const maxDurationSec = maxDurationMins * 60;
                         const remainingSec = maxDurationSec - effectiveSec;
                         console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
 
                         if (remainingSec > 0) {
+                            nextState.phase = 'DEEP';
+                            nextState.deepAccepted = null;
+                            nextState.topicIndex = 0;
+                            nextState.turnInTopic = 0;
                             const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
                             nextState.deepTopicOrder = deepPlan.deepTopicOrder;
                             nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                             const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
-
-                            nextState.phase = 'DEEP';
-                            nextState.topicIndex = 0;
-                            nextState.turnInTopic = 0;
                             nextTopicId = deepTopics[0]?.id || botTopics[0].id;
                             supervisorInsight = { status: 'START_DEEP' };
+                            console.log(`✅ [SCAN→DEEP] SCAN complete with time left (${remainingSec}s). Starting DEEP.`);
                         } else {
-                            // Offer DEEP only when time is over
                             nextState.phase = 'DEEP_OFFER';
-                            nextState.deepAccepted = null; // Reset to trigger DEEP_OFFER_ASK
+                            nextState.deepAccepted = null;
                             supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                            console.log(`🎁 [SCAN→DEEP_OFFER] Offering DEEP with ${remainingSec}s remaining`);
+                            console.log(`🎁 [SCAN→DEEP_OFFER] SCAN complete with no time left. Asking continuation consent.`);
                         }
                     }
                 } else {
@@ -926,17 +927,9 @@ export async function POST(req: Request) {
                         console.log(`✅ [DEEP] All ${deepTotal} topics completed. Moving to DATA_COLLECTION.`);
                         const maxDurationSec = maxDurationMins * 60;
                         const remainingSecAfterDeep = maxDurationSec - effectiveSec;
-                        const canOfferOptionalExtension = shouldOfferContinuationAfterDeep({
-                            remainingSec: remainingSecAfterDeep,
-                            deepAccepted: state.deepAccepted
-                        });
+                        console.log(`✅ [DEEP] Remaining time after DEEP: ${remainingSecAfterDeep}s. Proceeding to DATA_COLLECTION.`);
 
-                        if (canOfferOptionalExtension) {
-                            nextState.phase = 'DEEP_OFFER';
-                            nextState.deepAccepted = null;
-                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                            console.log(`🎁 [DEEP→DEEP_OFFER] DEEP complete with time left (${remainingSecAfterDeep}s). Asking if user wants to continue.`);
-                        } else if (shouldCollectData) {
+                        if (shouldCollectData) {
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
                             nextState.consentGiven = false;
@@ -1813,6 +1806,55 @@ ${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up an
             qualityTelemetry.score = qualitative.score;
             qualityTelemetry.passed = qualitative.passed;
             qualityTelemetry.issues = qualitative.issues.slice(0, 8);
+        }
+
+        // Final fail-safe: never send closure/completion text during active topic phases.
+        if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
+            const hasGoodbyeNow = goodbyePattern.test(responseText);
+            const hasNoQuestionNow = !responseText.includes('?');
+            const hasCompletionNow = /INTERVIEW_COMPLETED/i.test(responseText);
+            const hasPrematureContactNow = contactRequestPattern.test(responseText);
+
+            if (hasGoodbyeNow || hasNoQuestionNow || hasCompletionNow || hasPrematureContactNow) {
+                flowTelemetry.topicClosureIntercepted = true;
+                const enforceTopic = targetTopic?.label || currentTopic.label;
+                console.log(`🛡️ [FINAL_GUARD] Blocking invalid ${nextState.phase} response. Forcing question-only fallback.`);
+                try {
+                    responseText = await generateQuestionOnly({
+                        model,
+                        language,
+                        topicLabel: enforceTopic,
+                        lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null
+                    });
+                } catch (e) {
+                    console.error('Final guard question-only generation failed:', e);
+                    responseText = buildDeterministicQualityQuestion({
+                        phase: nextState.phase as 'SCAN' | 'DEEP',
+                        language,
+                        topicLabel: enforceTopic,
+                        userResponse: lastMessage?.role === 'user' ? lastMessage.content : ''
+                    });
+                }
+                responseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
+            }
+        }
+
+        // Final fail-safe for DEEP_OFFER: must remain a continuation yes/no question.
+        if (nextState.phase === 'DEEP_OFFER') {
+            const invalidDeepOffer =
+                !responseText.includes('?') ||
+                goodbyePattern.test(responseText) ||
+                /INTERVIEW_COMPLETED/i.test(responseText);
+            if (invalidDeepOffer) {
+                flowTelemetry.deepOfferClosureIntercepted = true;
+                console.log(`🛡️ [FINAL_GUARD] Blocking invalid DEEP_OFFER response. Using deterministic offer question.`);
+                responseText = buildDeterministicQualityQuestion({
+                    phase: 'DEEP_OFFER',
+                    language,
+                    topicLabel: targetTopic?.label || currentTopic.label,
+                    userResponse: lastMessage?.role === 'user' ? lastMessage.content : ''
+                });
+            }
         }
 
         const buildAssistantMetadata = (isCompletion: boolean = false) => ({

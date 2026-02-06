@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { cookies } from 'next/headers';
 
 const RefinePromptSchema = z.object({
     refinedPrompt: z.string().describe("The improved version of the original prompt"),
@@ -43,13 +44,17 @@ export async function POST(request: Request) {
             select: {
                 id: true,
                 memberships: {
-                    take: 1,
-                    select: { organizationId: true }
+                    select: { organizationId: true, status: true }
                 }
             }
         });
 
-        const organizationId = user?.memberships[0]?.organizationId;
+        const cookieStore = await cookies();
+        const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
+        const activeMembership = user?.memberships.find(
+            m => m.organizationId === selectedOrgId && m.status === 'ACTIVE'
+        ) || user?.memberships.find(m => m.status === 'ACTIVE');
+        const organizationId = activeMembership?.organizationId;
 
         const body = await request.json();
         const { promptText, brandName, language = 'it', territory = 'IT' } = body;

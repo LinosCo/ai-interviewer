@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { cookies } from 'next/headers';
 
 const CompetitorSuggestionSchema = z.object({
     suggestions: z.array(z.string()).describe("List of competitor names")
@@ -28,8 +29,7 @@ export async function POST(request: Request) {
                 plan: true,
                 role: true,
                 memberships: {
-                    take: 1,
-                    select: { organizationId: true }
+                    select: { organizationId: true, status: true }
                 }
             }
         });
@@ -38,7 +38,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const cookieStore = await cookies();
+        const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
+        const activeMembership = user.memberships.find(
+            m => m.organizationId === selectedOrgId && m.status === 'ACTIVE'
+        ) || user.memberships.find(m => m.status === 'ACTIVE');
+        const organizationId = activeMembership?.organizationId;
 
         // Use user's plan (admin has unlimited access)
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';

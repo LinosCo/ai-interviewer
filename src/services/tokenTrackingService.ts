@@ -199,7 +199,8 @@ export class TokenTrackingService {
                 plan: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
-                packCreditsAvailable: true
+                packCreditsAvailable: true,
+                customLimits: true
             }
         });
 
@@ -208,6 +209,25 @@ export class TokenTrackingService {
         }
 
         const organization = org as any; // Bypass Prisma selection typing lag
+        const planConfig = PLANS[organization.plan as PlanType] || PLANS[PlanType.FREE];
+        const defaultPlanLimit = planConfig.monthlyCredits;
+        const hasCustomMonthlyLimit =
+            typeof organization.customLimits === 'object' &&
+            organization.customLimits !== null &&
+            (organization.customLimits as Record<string, unknown>).monthlyCreditsLimitCustom === true;
+
+        // Auto-heal stale prelaunch data: paid/business orgs left with old 500k default.
+        if (
+            !hasCustomMonthlyLimit &&
+            defaultPlanLimit > 500_000 &&
+            organization.monthlyCreditsLimit === BigInt(500_000)
+        ) {
+            await prisma.organization.update({
+                where: { id: organizationId },
+                data: { monthlyCreditsLimit: BigInt(defaultPlanLimit) }
+            });
+            organization.monthlyCreditsLimit = BigInt(defaultPlanLimit);
+        }
 
         // Admin role o piano ADMIN hanno accesso illimitato
         if (organization.plan === 'ADMIN' || organization.monthlyCreditsLimit === BigInt(-1)) {
@@ -215,8 +235,7 @@ export class TokenTrackingService {
         }
 
         // Verifica feature disponibile per il piano
-        const plan = PLANS[organization.plan as PlanType] || PLANS[PlanType.FREE];
-        const featureCheck = this.checkFeatureForAction(action, plan);
+        const featureCheck = this.checkFeatureForAction(action, planConfig);
         if (!featureCheck.allowed) {
             return featureCheck;
         }

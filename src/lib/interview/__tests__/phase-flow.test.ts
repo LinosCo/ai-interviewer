@@ -2,23 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
     getCompletionGuardAction,
     shouldInterceptDeepOfferClosure,
-    shouldInterceptTopicPhaseClosure,
-    shouldOfferContinuationAfterDeep
+    shouldInterceptTopicPhaseClosure
 } from '@/lib/interview/phase-flow';
 
 describe('phase-flow', () => {
-    describe('shouldOfferContinuationAfterDeep', () => {
-        it('offers continuation when DEEP ended before hard time and no prior explicit accept', () => {
-            expect(shouldOfferContinuationAfterDeep({ remainingSec: 120, deepAccepted: null })).toBe(true);
-            expect(shouldOfferContinuationAfterDeep({ remainingSec: 120, deepAccepted: false })).toBe(true);
-        });
-
-        it('does not offer continuation when no time remains or continuation already accepted', () => {
-            expect(shouldOfferContinuationAfterDeep({ remainingSec: 0, deepAccepted: null })).toBe(false);
-            expect(shouldOfferContinuationAfterDeep({ remainingSec: 45, deepAccepted: true })).toBe(false);
-        });
-    });
-
     describe('shouldInterceptTopicPhaseClosure', () => {
         it('blocks premature completion/closure in SCAN or DEEP', () => {
             expect(shouldInterceptTopicPhaseClosure({

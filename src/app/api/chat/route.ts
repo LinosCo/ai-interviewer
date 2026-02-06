@@ -1314,9 +1314,20 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Forcing topic question. Attempt #${nextState.closureAttempts}`);
 
             const enforceTopic = targetTopic?.label || currentTopic.label;
-            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing.`;
+            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing. The response MUST end with a question mark.`;            
             const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
             responseText = retry.object.response?.trim() || responseText;
+            console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
+
+            // If the override still isn't a proper question, retry with stricter constraints
+            const stillBad = !responseText.includes('?') || goodbyePattern.test(responseText);
+            if (stillBad) {
+                console.log("🧭 [SUPERVISOR] Override still invalid, retrying with stricter constraints.");
+                const enforcedSystem2 = `You must ask exactly ONE question about "${enforceTopic}". Do NOT include any closing, thanks, or future contact. End with "?".`;
+                const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.2 });
+                responseText = retry2.object.response?.trim() || responseText;
+                console.log("🧭 [SUPERVISOR] Override response #2:", responseText.slice(0, 300));
+            }
         }
         // Reset closure attempts when bot generates a valid question (not trying to close)
         else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && !isGoodbyeResponse && !hasNoQuestion) {

@@ -56,19 +56,19 @@ export default function SalesPage() {
                             Business Plan
                         </span>
                         <h1 className="text-4xl md:text-5xl font-bold text-stone-900 leading-tight mb-6">
-                            Scaliamo insieme le tue interviste AI.
+                            Costruiamo il tuo piano Business su misura.
                         </h1>
                         <p className="text-xl text-stone-600 leading-relaxed max-w-lg">
-                            Il piano Business è pensato per aziende che hanno bisogno di volumi elevati, integrazioni custom e supporto dedicato.
+                            Business viene attivato solo via Sales, con crediti, integrazioni e supporto definiti sulle esigenze della tua organizzazione.
                         </p>
                     </div>
 
                     <div className="space-y-6 pt-10">
                         {[
-                            { title: 'Volumi Illimitati', desc: 'Gestisci migliaia di interviste mensili senza preoccuparti dei limiti.' },
-                            { title: 'White Label Complato', desc: 'Rimuovi ogni riferimento a Business Tuner e usa il tuo dominio.' },
-                            { title: 'Supporto Dedicato', desc: 'Un account manager dedicato per ottimizzare i tuoi prompt e workflow.' },
-                            { title: 'Security & Compliance', desc: 'SSO (SAML), contratti personalizzati e audit di sicurezza.' },
+                            { title: 'Crediti su misura', desc: 'Definiamo budget crediti e soglie operative in base ai tuoi volumi reali.' },
+                            { title: 'Integrazioni dedicate', desc: 'Connettiamo CRM, CMS e workflow con piano tecnico condiviso.' },
+                            { title: 'Supporto dedicato', desc: 'Onboarding e supporto commerciale con referente dedicato.' },
+                            { title: 'Compliance enterprise', desc: 'Requisiti security e clausole contrattuali gestite in trattativa.' },
                         ].map((item, i) => (
                             <div key={i} className="flex gap-4">
                                 <div className="mt-1 w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center flex-shrink-0 font-bold text-xs italic">

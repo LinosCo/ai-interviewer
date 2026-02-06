@@ -566,8 +566,7 @@ export const PLAN_ORDER: PlanType[] = [
  */
 export const PURCHASABLE_PLANS: PlanType[] = [
     PlanType.STARTER,
-    PlanType.PRO,
-    PlanType.BUSINESS
+    PlanType.PRO
 ];
 
 // ============================================

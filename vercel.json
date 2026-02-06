@@ -15,6 +15,10 @@
         {
             "path": "/api/cron/serp-monitoring",
             "schedule": "0 8 * * 1"
+        },
+        {
+            "path": "/api/cron/interview-quality-alerts",
+            "schedule": "20 * * * *"
         }
     ]
 }

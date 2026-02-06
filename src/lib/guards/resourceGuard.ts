@@ -4,6 +4,17 @@ import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { CreditAction } from '@/config/creditCosts';
 import { NextResponse } from 'next/server';
 
+type GuardResult = {
+    allowed: boolean;
+    error?: string;
+    status?: number;
+    code?: 'CREDITS_EXHAUSTED' | 'ACCESS_DENIED';
+    userId?: string;
+    organizationId?: string | null;
+    creditsNeeded?: number;
+    creditsAvailable?: number;
+};
+
 /**
  * Mappa i vecchi resourceType ai nuovi CreditAction
  */
@@ -36,7 +47,7 @@ export async function checkResourceAccess(
     }
 
     const currentUserId = session.user.id;
-    const currentUserRole = (session.user as any).role;
+    const currentUserRole = ('role' in session.user ? (session.user as { role?: string }).role : undefined);
     let organizationId: string | null = null;
 
     // 1. Determina l'organizzazione
@@ -78,10 +89,12 @@ export async function checkResourceAccess(
     });
 
     if (!check.allowed) {
+        const isCreditsExhausted = check.reason === 'Crediti insufficienti';
         return {
             allowed: false,
             error: check.reason || 'Crediti insufficienti',
-            status: 403,
+            status: isCreditsExhausted ? 429 : 403,
+            code: isCreditsExhausted ? 'CREDITS_EXHAUSTED' : 'ACCESS_DENIED',
             userId: currentUserId,
             organizationId,
             creditsNeeded: check.creditsNeeded,
@@ -102,14 +115,15 @@ export async function checkResourceAccess(
  * Wrapper per API route handler con verifica crediti
  */
 export function withResourceGuard(
-    handler: Function,
+    handler: (req: Request, context: Record<string, unknown>) => Promise<Response>,
     resourceType: 'TOKENS' | 'INTERVIEW' | 'CHATBOT_SESSION' | 'VISIBILITY_QUERY' | 'AI_SUGGESTION'
 ) {
-    return async (req: Request, ...args: any[]) => {
-        const access = await checkResourceAccess(resourceType);
+    return async (req: Request, ...args: unknown[]) => {
+        const access = await checkResourceAccess(resourceType) as GuardResult;
 
         if (!access.allowed) {
             return NextResponse.json({
+                code: access.code || 'ACCESS_DENIED',
                 error: access.error,
                 creditsNeeded: access.creditsNeeded,
                 creditsAvailable: access.creditsAvailable
@@ -117,10 +131,10 @@ export function withResourceGuard(
         }
 
         return handler(req, {
-            ...args[0],
-            userId: access.userId,
-            organizationId: access.organizationId
-        });
+                ...((args[0] as Record<string, unknown>) || {}),
+                userId: access.userId,
+                organizationId: access.organizationId
+            });
     };
 }
 
@@ -138,7 +152,7 @@ export async function checkCreditsForAction(
     }
 
     const currentUserId = session.user.id;
-    const currentUserRole = (session.user as any).role;
+    const currentUserRole = ('role' in session.user ? (session.user as { role?: string }).role : undefined);
     let organizationId: string | null = null;
 
     if (projectId) {
@@ -176,10 +190,12 @@ export async function checkCreditsForAction(
     });
 
     if (!check.allowed) {
+        const isCreditsExhausted = check.reason === 'Crediti insufficienti';
         return {
             allowed: false,
             error: check.reason || 'Crediti insufficienti',
-            status: 403,
+            status: isCreditsExhausted ? 429 : 403,
+            code: isCreditsExhausted ? 'CREDITS_EXHAUSTED' : 'ACCESS_DENIED',
             userId: currentUserId,
             organizationId,
             creditsNeeded: check.creditsNeeded,

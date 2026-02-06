@@ -3,6 +3,7 @@ import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 
 export const maxDuration = 30;
 
@@ -26,6 +27,20 @@ export async function POST(req: Request) {
         const bot = conversation.bot;
         const session = conversation.chatbotSession;
         if (!session) return Response.json({ error: 'Session not found' }, { status: 404 });
+
+        const creditsCheck = await checkCreditsForAction(
+            'chatbot_session_message',
+            undefined,
+            bot.project?.id
+        );
+        if (!creditsCheck.allowed) {
+            return Response.json({
+                code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                error: creditsCheck.error,
+                creditsNeeded: creditsCheck.creditsNeeded,
+                creditsAvailable: creditsCheck.creditsAvailable
+            }, { status: creditsCheck.status || 403 });
+        }
 
         // 1. Check Limits (simplified for brevity, keep existing checks)
         // ... (Limits check omitted for brevity, assume valid)
@@ -158,18 +173,22 @@ Rules:
             const organizationId = bot.project?.organizationId;
             const projectOwnerId = bot.project?.ownerId;
             if (projectOwnerId && extraction?.usage) {
-                TokenTrackingService.logTokenUsage({
-                    userId: projectOwnerId,
-                    organizationId,
-                    projectId: bot.project?.id,
-                    inputTokens: extraction.usage?.inputTokens || 0,
-                    outputTokens: extraction.usage?.outputTokens || 0,
-                    category: 'CHATBOT',
-                    model: 'gpt-4o-mini',
-                    operation: 'chatbot-extraction',
-                    resourceType: 'chatbot',
-                    resourceId: bot.id
-                }).catch(err => console.error('Token tracking failed:', err));
+                try {
+                    await TokenTrackingService.logTokenUsage({
+                        userId: projectOwnerId,
+                        organizationId,
+                        projectId: bot.project?.id,
+                        inputTokens: extraction.usage?.inputTokens || 0,
+                        outputTokens: extraction.usage?.outputTokens || 0,
+                        category: 'CHATBOT',
+                        model: 'gpt-4o-mini',
+                        operation: 'chatbot-extraction',
+                        resourceType: 'chatbot',
+                        resourceId: bot.id
+                    });
+                } catch (err) {
+                    console.error('Token tracking failed:', err);
+                }
             }
 
             if (extraction?.object?.[nextMissingField.field] && extraction.object.isRelevantAnswer) {
@@ -313,18 +332,22 @@ Rules:
         const orgId = bot.project?.organizationId;
         const ownerId = bot.project?.ownerId;
         if (ownerId && result.usage) {
-            TokenTrackingService.logTokenUsage({
-                userId: ownerId,
-                organizationId: orgId,
-                projectId: bot.project?.id,
-                inputTokens: result.usage.inputTokens || 0,
-                outputTokens: result.usage.outputTokens || 0,
-                category: 'CHATBOT',
-                model: 'gpt-4o-mini',
-                operation: 'chatbot-response',
-                resourceType: 'chatbot',
-                resourceId: bot.id
-            }).catch(err => console.error('Token tracking failed:', err));
+            try {
+                await TokenTrackingService.logTokenUsage({
+                    userId: ownerId,
+                    organizationId: orgId,
+                    projectId: bot.project?.id,
+                    inputTokens: result.usage.inputTokens || 0,
+                    outputTokens: result.usage.outputTokens || 0,
+                    category: 'CHATBOT',
+                    model: 'gpt-4o-mini',
+                    operation: 'chatbot-response',
+                    resourceType: 'chatbot',
+                    resourceId: bot.id
+                });
+            } catch (err) {
+                console.error('Token tracking failed:', err);
+            }
         }
 
         // 5. Save and Return

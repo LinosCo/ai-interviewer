@@ -7,6 +7,7 @@ import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 
 const CompetitorSuggestionSchema = z.object({
     suggestions: z.array(z.string()).describe("List of competitor names")
@@ -49,6 +50,16 @@ export async function POST(request: Request) {
         // Handle AI suggestion (Stateless, no config needed)
         if (action === 'suggest' && category && brandName) {
             try {
+                const creditsCheck = await checkCreditsForAction('visibility_query');
+                if (!creditsCheck.allowed) {
+                    return NextResponse.json({
+                        code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                        error: creditsCheck.error,
+                        creditsNeeded: creditsCheck.creditsNeeded,
+                        creditsAvailable: creditsCheck.creditsAvailable
+                    }, { status: creditsCheck.status || 403 });
+                }
+
                 // Default limit for suggestions if config not present
                 const suggestionLimit = 5;
 
@@ -65,16 +76,20 @@ Return only the company/product names, without descriptions.`,
 
                 // Track credit usage
                 if (result.usage) {
-                    TokenTrackingService.logTokenUsage({
-                        organizationId: organizationId || 'unknown',
-                        userId: user.id,
-                        inputTokens: result.usage.inputTokens || 0,
-                        outputTokens: result.usage.outputTokens || 0,
-                        category: 'VISIBILITY',
-                        model: 'gpt-4o-mini',
-                        operation: 'visibility-suggest-competitors',
-                        resourceType: 'visibility'
-                    }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+                    try {
+                        await TokenTrackingService.logTokenUsage({
+                            organizationId: organizationId || 'unknown',
+                            userId: user.id,
+                            inputTokens: result.usage.inputTokens || 0,
+                            outputTokens: result.usage.outputTokens || 0,
+                            category: 'VISIBILITY',
+                            model: 'gpt-4o-mini',
+                            operation: 'visibility-suggest-competitors',
+                            resourceType: 'visibility'
+                        });
+                    } catch (err) {
+                        console.error('[Visibility] Credit tracking failed:', err);
+                    }
                 }
 
                 return NextResponse.json({

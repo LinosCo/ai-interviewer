@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { PLANS, PlanType } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 
 const PromptGenerationSchema = z.object({
     prompts: z.array(z.string()).describe("Array of monitoring prompts in the specified language")
@@ -71,6 +72,16 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { brandName, category, description, language = 'it', territory = 'IT', count } = body;
 
+        const creditsCheck = await checkCreditsForAction('visibility_query');
+        if (!creditsCheck.allowed) {
+            return NextResponse.json({
+                code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                error: creditsCheck.error,
+                creditsNeeded: creditsCheck.creditsNeeded,
+                creditsAvailable: creditsCheck.creditsAvailable
+            }, { status: creditsCheck.status || 403 });
+        }
+
         if (!brandName || !category) {
             return NextResponse.json(
                 { error: 'brandName and category are required' },
@@ -127,16 +138,20 @@ Examples of good prompt types:
 
         // Track credit usage
         if (result.usage) {
-            TokenTrackingService.logTokenUsage({
-                organizationId: organizationId || 'unknown',
-                userId: user.id,
-                inputTokens: result.usage.inputTokens || 0,
-                outputTokens: result.usage.outputTokens || 0,
-                category: 'VISIBILITY',
-                model: 'gpt-4o-mini',
-                operation: 'visibility-generate-prompts',
-                resourceType: 'visibility'
-            }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+            try {
+                await TokenTrackingService.logTokenUsage({
+                    organizationId: organizationId || 'unknown',
+                    userId: user.id,
+                    inputTokens: result.usage.inputTokens || 0,
+                    outputTokens: result.usage.outputTokens || 0,
+                    category: 'VISIBILITY',
+                    model: 'gpt-4o-mini',
+                    operation: 'visibility-generate-prompts',
+                    resourceType: 'visibility'
+                });
+            } catch (err) {
+                console.error('[Visibility] Credit tracking failed:', err);
+            }
         }
 
         return NextResponse.json({

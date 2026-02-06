@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { PLANS, PlanType } from '@/config/plans';
-import { ADD_ONS } from '@/config/addons';
+import { LANDING_CREDIT_PACKS } from '@/config/landingPricing';
 import { Check, Zap, ArrowRight, ShieldCheck, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,9 +16,9 @@ export default function PricingPage() {
 
     const displayPlans = [
         PLANS[PlanType.STARTER],
-        PLANS[PlanType.PRO],
-        PLANS[PlanType.BUSINESS]
+        PLANS[PlanType.PRO]
     ];
+    const businessPlan = PLANS[PlanType.BUSINESS];
 
     const handleSubscribe = async (tier: string) => {
         setIsLoading(tier);
@@ -38,25 +38,6 @@ export default function PricingPage() {
             } else {
                 // Se non loggato, vai alla registrazione
                 router.push(`/register?plan=${tier}&billing=${isYearly ? 'yearly' : 'monthly'}`);
-            }
-        } catch (err) {
-            console.error('Error:', err);
-        } finally {
-            setIsLoading(null);
-        }
-    };
-
-    const handleBuyAddon = async (addOnId: string) => {
-        setIsLoading(addOnId);
-        try {
-            const res = await fetch('/api/stripe/addon', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ addOnId })
-            });
-            const data = await res.json();
-            if (data.url) {
-                window.location.href = data.url;
             }
         } catch (err) {
             console.error('Error:', err);
@@ -96,7 +77,7 @@ export default function PricingPage() {
             </div>
 
             {/* Plans Grid */}
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
                 {displayPlans.map((plan) => (
                     <div
                         key={plan.id}
@@ -157,31 +138,62 @@ export default function PricingPage() {
                 ))}
             </div>
 
-            {/* Add-ons Section */}
+            {/* Business Section */}
+            <div className="max-w-5xl mx-auto mt-20">
+                <div className="relative rounded-3xl p-8 bg-slate-900 text-white border border-slate-800">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                        <div className="max-w-2xl">
+                            <Badge className="mb-4 bg-amber-50 text-amber-700 border-amber-100 px-3 py-1 font-bold text-[10px] uppercase tracking-widest">
+                                Business via Sales
+                            </Badge>
+                            <h3 className="text-3xl font-black mb-3">{businessPlan.name}</h3>
+                            <p className="text-slate-300 text-sm">
+                                Piano su misura con crediti, onboarding e integrazioni personalizzate. Il piano Business non è acquistabile self-serve.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+                                {businessPlan.featureList.slice(0, 6).map((feature, index) => (
+                                    <div key={index} className="flex items-start gap-2 text-sm text-slate-200">
+                                        <Check className="w-4 h-4 mt-0.5 text-amber-400" />
+                                        <span>{feature}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-3 min-w-[220px]">
+                            <Link href="/sales">
+                                <Button className="w-full py-6 rounded-2xl font-black text-base bg-amber-600 hover:bg-amber-700">
+                                    Contatta Sales
+                                    <ArrowRight className="ml-2 w-5 h-5" />
+                                </Button>
+                            </Link>
+                            <p className="text-[11px] text-slate-400 text-center">Preventivo personalizzato in base a volumi e requisiti</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Credit Packs Section */}
             <div id="addons" className="max-w-5xl mx-auto mt-32">
                 <div className="text-center mb-12">
-                    <h2 className="text-3xl font-black text-slate-900 mb-4">Potenzia il tuo piano</h2>
-                    <p className="text-slate-500 font-medium">Acquista risorse extra quando ne hai bisogno, senza cambiare abbonamento.</p>
+                    <h2 className="text-3xl font-black text-slate-900 mb-4">Credit Pack extra</h2>
+                    <p className="text-slate-500 font-medium">I pack non scadono e si attivano subito sul saldo crediti della tua organizzazione.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {ADD_ONS.filter(a => !a.recurring).slice(0, 6).map((addon) => (
-                        <div key={addon.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col h-full hover:border-amber-200 transition-colors">
+                    {LANDING_CREDIT_PACKS.map((pack) => (
+                        <div key={pack.id} className="bg-slate-50 p-6 rounded-2xl border border-slate-100 flex flex-col h-full hover:border-amber-200 transition-colors">
                             <div className="flex items-center justify-between mb-4">
-                                <Badge className="bg-white text-slate-600 border-slate-200 font-bold">{addon.type.replace('_', ' ')}</Badge>
-                                <span className="text-lg font-black text-slate-900">€{(addon.price / 100).toFixed(2)}</span>
+                                <Badge className="bg-white text-slate-600 border-slate-200 font-bold">Credit Pack</Badge>
+                                <span className="text-lg font-black text-slate-900">€{pack.price.toFixed(2)}</span>
                             </div>
-                            <h3 className="font-bold text-slate-900 mb-1">{addon.name}</h3>
-                            <p className="text-xs text-slate-500 font-medium mb-6 flex-1">{addon.description}</p>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleBuyAddon(addon.id)}
-                                disabled={isLoading === addon.id}
-                                className="w-full rounded-xl border-slate-200 font-bold bg-white"
-                            >
-                                {isLoading === addon.id ? 'Loading...' : 'Acquista Ora'}
-                            </Button>
+                            <h3 className="font-bold text-slate-900 mb-1">{pack.name}</h3>
+                            <p className="text-xs text-slate-500 font-medium mb-1">{pack.credits} crediti</p>
+                            <p className="text-xs text-slate-500 font-medium mb-6 flex-1">€{pack.pricePerMillion.toFixed(2)} per milione di crediti</p>
+                            <Link href={`/register?plan=starter&focus=pack-${pack.id}`}>
+                                <Button variant="outline" size="sm" className="w-full rounded-xl border-slate-200 font-bold bg-white">
+                                    Acquista Ora
+                                </Button>
+                            </Link>
                         </div>
                     ))}
                 </div>

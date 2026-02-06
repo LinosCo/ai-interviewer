@@ -12,6 +12,10 @@ import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
 import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
+import { getFieldLabel, getNextMissingCandidateField } from '@/lib/interview/flow-guards';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure, shouldOfferContinuationAfterDeep } from '@/lib/interview/phase-flow';
+import { evaluateInterviewQuestionQuality } from '@/lib/interview/qualitative-evaluator';
 
 export const maxDuration = 60;
 
@@ -20,6 +24,8 @@ export const maxDuration = 60;
 // ============================================================================
 const CONFIG = {
     MAX_DATA_COLLECTION_ATTEMPTS: 15,
+    SAFETY_MAX_ASSISTANT_TURNS: 120,
+    SAFETY_MAX_TOTAL_MESSAGES: 260,
 };
 
 // ============================================================================
@@ -53,6 +59,39 @@ interface InterviewState {
     lastUserTopicId?: string | null;
     deepLastSubGoalByTopic?: Record<string, string>;
 }
+
+interface QualityTelemetry {
+    eligible: boolean;
+    evaluated: boolean;
+    score: number | null;
+    passed: boolean | null;
+    gateTriggered: boolean;
+    regenerated: boolean;
+    fallbackUsed: boolean;
+    issues: string[];
+}
+
+interface FlowGuardTelemetry {
+    topicClosureIntercepted: boolean;
+    deepOfferClosureIntercepted: boolean;
+    completionGuardIntercepted: boolean;
+    completionBlockedForConsent: boolean;
+    completionBlockedForMissingField: boolean;
+}
+
+const ChatRequestSchema = z.object({
+    messages: z.array(z.object({
+        role: z.enum(['user', 'assistant', 'system']),
+        content: z.string()
+    })).default([]),
+    conversationId: z.string().min(1),
+    botId: z.string().min(1),
+    effectiveDuration: z.union([z.number(), z.string(), z.null()]).optional(),
+    introMessage: z.string().optional().nullable(),
+    clientMessageId: z.string().min(8).max(128).optional()
+});
+
+type ClientMessage = z.infer<typeof ChatRequestSchema>['messages'][number];
 
 // ============================================================================ 
 // HELPERS: Engagement scoring and snippets
@@ -108,15 +147,25 @@ function getDeepTopics(botTopics: any[], deepOrder?: string[]) {
         .filter(Boolean);
 }
 
-function buildDeepTopicOrder(botTopics: any[], interestingTopics: InterestingTopic[] | undefined): string[] {
+function buildDeepTopicOrder(
+    botTopics: any[],
+    interestingTopics: InterestingTopic[] | undefined,
+    history?: Record<string, string[]>
+): string[] {
     const scored = botTopics.map((t, idx) => {
         const match = (interestingTopics || []).find(it => it.topicId === t.id);
+        const remainingSubGoals = getRemainingSubGoals(t, history).length;
         return {
             id: t.id,
             score: match?.engagementScore ?? 0,
+            remainingSubGoals,
             idx
         };
-    }).sort((a, b) => (b.score - a.score) || (a.idx - b.idx));
+    }).sort((a, b) =>
+        (b.remainingSubGoals - a.remainingSubGoals) ||
+        (b.score - a.score) ||
+        (a.idx - b.idx)
+    );
 
     return scored.map(s => s.id);
 }
@@ -145,7 +194,7 @@ function buildDeepPlan(
 ) {
     const topicsWithRemaining = botTopics.filter(t => getRemainingSubGoals(t, history).length > 0);
     if (topicsWithRemaining.length > 0) {
-        const ordered = buildDeepTopicOrder(botTopics, interestingTopics).filter(id =>
+        const ordered = buildDeepTopicOrder(botTopics, interestingTopics, history).filter(id =>
             topicsWithRemaining.some(t => t.id === id)
         );
         const deepTurnsByTopic: Record<string, number> = {};
@@ -160,12 +209,43 @@ function buildDeepPlan(
     }
 
     const fallbackCount = Math.max(1, plan.deep.fallbackTurns || 2);
-    const ordered = buildDeepTopicOrder(botTopics, interestingTopics).slice(0, fallbackCount);
+    const ordered = buildDeepTopicOrder(botTopics, interestingTopics, history).slice(0, fallbackCount);
     const deepTurnsByTopic: Record<string, number> = {};
     ordered.forEach(id => {
         deepTurnsByTopic[id] = 1;
     });
     return { deepTopicOrder: ordered, deepTurnsByTopic };
+}
+
+function normalizeCandidateFieldIds(rawFields: any[]): string[] {
+    if (!Array.isArray(rawFields)) return [];
+    const normalized = rawFields
+        .map((f: any) => (typeof f === 'string' ? f : (f?.id || f?.field || '')))
+        .map((f: string) => String(f || '').trim())
+        .filter(Boolean);
+    return Array.from(new Set(normalized));
+}
+
+function extractDeterministicFieldValue(fieldName: string, userMessage: string): string | null {
+    const text = userMessage.trim();
+    if (!text) return null;
+
+    if (fieldName === 'email') {
+        const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+        return emailMatch ? emailMatch[0] : null;
+    }
+
+    if (fieldName === 'phone') {
+        const phoneMatch = text.match(/\+?[0-9][0-9\s().-]{6,}[0-9]/);
+        return phoneMatch ? phoneMatch[0].replace(/\s+/g, ' ').trim() : null;
+    }
+
+    if (fieldName === 'linkedin' || fieldName === 'portfolio') {
+        const urlMatch = text.match(/https?:\/\/[^\s]+/i);
+        return urlMatch ? urlMatch[0] : null;
+    }
+
+    return null;
 }
 
 // ============================================================================
@@ -301,6 +381,43 @@ async function generateQuestionOnly(params: {
     return question;
 }
 
+function sanitizeUserSnippet(input: string, maxWords: number = 10): string {
+    const compact = (input || '').replace(/\s+/g, ' ').trim();
+    if (!compact) return '';
+    const withoutPunctuation = compact.replace(/[?!.,;:()[\]{}"“”'’`]/g, '').trim();
+    return withoutPunctuation.split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ');
+}
+
+function buildDeterministicQualityQuestion(params: {
+    phase: 'SCAN' | 'DEEP' | 'DEEP_OFFER';
+    language: string;
+    topicLabel: string;
+    userResponse: string;
+}): string {
+    const isItalian = (params.language || 'en').toLowerCase().startsWith('it');
+    if (params.phase === 'DEEP_OFFER') {
+        return isItalian
+            ? 'Ti va di continuare con qualche domanda piu approfondita?'
+            : 'Would you like to continue with a few deeper questions?';
+    }
+
+    const topic = (params.topicLabel || '').trim() || (isItalian ? 'questo tema' : 'this topic');
+    const snippet = sanitizeUserSnippet(params.userResponse);
+    const userWordCount = sanitizeUserSnippet(params.userResponse, 50).split(/\s+/).filter(Boolean).length;
+    const shortAnswer = userWordCount <= 4;
+    const safeSnippet = snippet || (isItalian ? 'quello che hai appena condiviso' : 'what you just shared');
+
+    if (isItalian) {
+        return shortAnswer
+            ? `Hai detto "${safeSnippet}": puoi farmi un esempio concreto di come questo aspetto incide su ${topic}?`
+            : `Hai menzionato "${safeSnippet}": qual e l'impatto piu significativo che ha su ${topic}?`;
+    }
+
+    return shortAnswer
+        ? `You said "${safeSnippet}": can you share one concrete example of how this affects ${topic}?`
+        : `You mentioned "${safeSnippet}": what is the most significant impact this has on ${topic}?`;
+}
+
 // ============================================================================
 // HELPER: Complete interview and save profile
 // ============================================================================
@@ -345,7 +462,22 @@ export async function POST(req: Request) {
     const startTime = Date.now();
     try {
         const body = await req.json();
-        const { messages, conversationId, botId, effectiveDuration, introMessage } = body;
+        const parsedBody = ChatRequestSchema.safeParse(body);
+        if (!parsedBody.success) {
+            return Response.json(
+                { error: 'Invalid chat payload', details: parsedBody.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const {
+            messages: incomingMessages,
+            conversationId,
+            botId,
+            effectiveDuration,
+            introMessage,
+            clientMessageId
+        } = parsedBody.data;
         console.log(`\n🚀 [CHAT_API] Processing message for conversation: ${conversationId}`);
 
         // ====================================================================
@@ -357,23 +489,147 @@ export async function POST(req: Request) {
         const bot = conversation.bot;
         const language = bot.language || 'en';
         const shouldCollectData = (bot as any).collectCandidateData;
-        const lastMessage = messages[messages.length - 1];
+        const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
+
+        // Idempotent replay: if we already answered this client message, return the saved answer.
+        if (clientMessageId) {
+            const replayedAssistant = await prisma.message.findFirst({
+                where: {
+                    conversationId,
+                    role: 'assistant',
+                    metadata: {
+                        path: ['replyToClientMessageId'],
+                        equals: clientMessageId
+                    }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+
+            if (replayedAssistant) {
+                return Response.json({
+                    text: replayedAssistant.content,
+                    currentTopicId: conversation.currentTopicId,
+                    isCompleted: conversation.status === 'COMPLETED'
+                });
+            }
+        }
+
+        const creditsCheck = await checkCreditsForAction(
+            'interview_question',
+            undefined,
+            (bot as any).project?.id
+        );
+        if (!creditsCheck.allowed) {
+            return Response.json(
+                {
+                    code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                    error: creditsCheck.error,
+                    creditsNeeded: creditsCheck.creditsNeeded,
+                    creditsAvailable: creditsCheck.creditsAvailable
+                },
+                { status: creditsCheck.status || 403 }
+            );
+        }
 
         // Run these operations in parallel - they don't depend on each other
         const parallelStart = Date.now();
-        const [, , openAIKey, prefetchedModel] = await Promise.all([
-            // Save user message (fire and forget style, but await for consistency)
-            lastMessage?.role === 'user'
-                ? ChatService.saveUserMessage(conversationId, lastMessage.content)
-                : Promise.resolve(null),
+        const previousEffectiveDuration = Number(conversation.effectiveDuration || 0);
+        const parsedEffectiveDuration = Number(effectiveDuration ?? previousEffectiveDuration);
+        const safeEffectiveDuration = Number.isFinite(parsedEffectiveDuration)
+            ? Math.min(
+                Math.max(previousEffectiveDuration, parsedEffectiveDuration),
+                previousEffectiveDuration + 600 // Prevent extreme client-side jumps in one turn.
+            )
+            : previousEffectiveDuration;
+
+        const saveUserMessagePromise = (async () => {
+            if (lastIncomingMessage?.role !== 'user') return null;
+
+            if (clientMessageId) {
+                const existingUserMessage = await prisma.message.findFirst({
+                    where: {
+                        conversationId,
+                        role: 'user',
+                        metadata: {
+                            path: ['clientMessageId'],
+                            equals: clientMessageId
+                        }
+                    },
+                    orderBy: { createdAt: 'desc' }
+                });
+                if (existingUserMessage) {
+                    return existingUserMessage;
+                }
+
+                return prisma.message.create({
+                    data: {
+                        conversationId,
+                        role: 'user',
+                        content: lastIncomingMessage.content,
+                        metadata: { clientMessageId }
+                    }
+                });
+            }
+
+            return ChatService.saveUserMessage(conversationId, lastIncomingMessage.content);
+        })();
+
+        const [savedUserMessage, , openAIKey, prefetchedModel] = await Promise.all([
+            saveUserMessagePromise,
             // Update progress
-            ChatService.updateProgress(conversationId, Number(effectiveDuration || conversation.effectiveDuration)),
+            ChatService.updateProgress(conversationId, safeEffectiveDuration),
             // Get API key
             LLMService.getApiKey(bot, 'openai').then(key => key || process.env.OPENAI_API_KEY || ''),
             // Pre-fetch model (this also warms up the connection)
             LLMService.getModel(bot)
         ]);
         console.log(`⏱️ [TIMING] Parallel ops: ${Date.now() - parallelStart}ms`);
+
+        const canonicalMessages: ClientMessage[] = conversation.messages.map(m => ({
+            role: (m.role as ClientMessage['role']) || 'assistant',
+            content: m.content
+        }));
+
+        if (savedUserMessage && !conversation.messages.some(m => m.id === savedUserMessage.id)) {
+            canonicalMessages.push({
+                role: 'user',
+                content: savedUserMessage.content
+            });
+        }
+
+        const lastMessage = canonicalMessages[canonicalMessages.length - 1];
+
+        const assistantTurnsSoFar = canonicalMessages.reduce(
+            (count, message) => (message.role === 'assistant' ? count + 1 : count),
+            0
+        );
+        const reachedSafetyCap =
+            assistantTurnsSoFar >= CONFIG.SAFETY_MAX_ASSISTANT_TURNS ||
+            canonicalMessages.length >= CONFIG.SAFETY_MAX_TOTAL_MESSAGES;
+
+        if (reachedSafetyCap) {
+            const safetyMessage = language === 'it'
+                ? 'Per sicurezza concludo qui l’intervista. Grazie per il contributo: le informazioni raccolte sono già molto utili.'
+                : 'For safety, I will conclude the interview here. Thank you: the information collected is already very useful.';
+
+            await completeInterview(conversationId, canonicalMessages, openAIKey, conversation.candidateProfile || {});
+            await prisma.message.create({
+                data: {
+                    conversationId,
+                    role: 'assistant',
+                    content: safetyMessage,
+                    metadata: clientMessageId
+                        ? { replyToClientMessageId: clientMessageId, safetyStop: true }
+                        : { safetyStop: true }
+                }
+            });
+
+            return Response.json({
+                text: safetyMessage,
+                currentTopicId: conversation.currentTopicId,
+                isCompleted: true
+            });
+        }
 
         // Topics
         const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -417,7 +673,9 @@ export async function POST(req: Request) {
 
         const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
         const currentTopic = activeTopics[state.topicIndex] || botTopics[0];
-        const effectiveSec = Number(effectiveDuration || conversation.effectiveDuration) || 0;
+        const effectiveSec = Number.isFinite(safeEffectiveDuration)
+            ? safeEffectiveDuration
+            : Number(conversation.effectiveDuration || 0);
         const maxDurationMins = bot.maxDurationMins || 10;
 
         console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
@@ -666,7 +924,19 @@ export async function POST(req: Request) {
                     } else {
                         // End of DEEP - ALL topics done, move to DATA_COLLECTION
                         console.log(`✅ [DEEP] All ${deepTotal} topics completed. Moving to DATA_COLLECTION.`);
-                        if (shouldCollectData) {
+                        const maxDurationSec = maxDurationMins * 60;
+                        const remainingSecAfterDeep = maxDurationSec - effectiveSec;
+                        const canOfferOptionalExtension = shouldOfferContinuationAfterDeep({
+                            remainingSec: remainingSecAfterDeep,
+                            deepAccepted: state.deepAccepted
+                        });
+
+                        if (canOfferOptionalExtension) {
+                            nextState.phase = 'DEEP_OFFER';
+                            nextState.deepAccepted = null;
+                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                            console.log(`🎁 [DEEP→DEEP_OFFER] DEEP complete with time left (${remainingSecAfterDeep}s). Asking if user wants to continue.`);
+                        } else if (shouldCollectData) {
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
                             nextState.consentGiven = false;
@@ -716,12 +986,12 @@ export async function POST(req: Request) {
 
                 // Anti-loop protection
                 if (state.dataCollectionAttempts >= CONFIG.MAX_DATA_COLLECTION_ATTEMPTS) {
-                    await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
+                    await completeInterview(conversationId, canonicalMessages, openAIKey, conversation.candidateProfile || {});
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                 }
 
                 if (state.dataCollectionRefused) {
-                    await completeInterview(conversationId, messages, openAIKey, conversation.candidateProfile || {});
+                    await completeInterview(conversationId, canonicalMessages, openAIKey, conversation.candidateProfile || {});
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                     nextState.dataCollectionRefused = true;
                 }
@@ -729,8 +999,9 @@ export async function POST(req: Request) {
                 const shouldContinueDataCollection = supervisorInsight.status !== 'COMPLETE_WITHOUT_DATA';
                 if (shouldContinueDataCollection) {
                     const candidateFields = (bot.candidateDataFields as any[]) || [];
+                    const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
                     let currentProfile = (conversation.candidateProfile as any) || {};
-                    console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFields.map((f: any) => typeof f === 'string' ? f : (f.id || f.field)).join(', ')}`);
+                    console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFieldIds.join(', ')}`);
                     console.log(`📋 [DATA_COLLECTION] Current profile keys: ${Object.keys(currentProfile).join(', ') || 'none'}`);
 
                 // STEP 1: Handle consent flow
@@ -752,7 +1023,7 @@ export async function POST(req: Request) {
                         // Don't set supervisorInsight here - let it fall through to ask first field
                     } else if (intent === 'REFUSE') {
                         console.log(`📋 [DATA_COLLECTION] User refused consent.`);
-                        await completeInterview(conversationId, messages, openAIKey, currentProfile);
+                        await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfile);
                         // Set status for AI to say goodbye
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         nextState.dataCollectionAttempts = CONFIG.MAX_DATA_COLLECTION_ATTEMPTS;
@@ -785,7 +1056,7 @@ export async function POST(req: Request) {
 
                     if (lastMessage?.role === 'user' && refusalPattern.test(lastMessage.content)) {
                         console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
-                        await completeInterview(conversationId, messages, openAIKey, currentProfile);
+                        await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfile);
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         nextState.dataCollectionRefused = true;
                         haltCollection = true;
@@ -797,19 +1068,16 @@ export async function POST(req: Request) {
                         console.log(`⚠️ [DATA_COLLECTION] User frustrated - attempting to extract from history and complete`);
 
                         // Determine which name field is configured (name or fullName)
-                        const configuredNameField = candidateFields.find((f: any) => {
-                            const fieldName = typeof f === 'string' ? f : (f.id || f.field);
-                            return fieldName === 'name' || fieldName === 'fullName';
-                        });
-                        const nameFieldKey = configuredNameField
-                            ? (typeof configuredNameField === 'string' ? configuredNameField : (configuredNameField.id || configuredNameField.field))
-                            : 'fullName';
+                        const configuredNameField = candidateFieldIds.find((fieldName: string) =>
+                            fieldName === 'name' || fieldName === 'fullName'
+                        );
+                        const nameFieldKey = configuredNameField || 'fullName';
 
                         // Try to find the name in previous messages if we don't have it
                         if (!currentProfile[nameFieldKey]) {
                             // Look for a short reply (1-3 words) after a "name" question
-                            for (let i = messages.length - 1; i >= 0; i--) {
-                                const msg = messages[i];
+                            for (let i = canonicalMessages.length - 1; i >= 0; i--) {
+                                const msg = canonicalMessages[i];
                                 if (msg.role === 'user') {
                                     const content = msg.content.trim();
                                     const words = content.split(/\s+/);
@@ -831,7 +1099,7 @@ export async function POST(req: Request) {
                         }
 
                         // Complete with what we have
-                        await completeInterview(conversationId, messages, openAIKey, currentProfile);
+                        await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfile);
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         haltCollection = true;
                     }
@@ -843,84 +1111,103 @@ export async function POST(req: Request) {
                         const skipPattern = language === 'it' ? SKIP_FIELD_IT : SKIP_FIELD_EN;
                         const userWantsToSkip = lastMessage?.role === 'user' && skipPattern.test(lastMessage.content);
 
-                        // Extract ALL possible fields from user message (user might provide multiple at once)
+                        // Targeted extraction strategy:
+                        // 1) prioritize the field we just asked,
+                        // 2) opportunistically capture deterministic structured fields (email/phone/url),
+                        // 3) avoid broad multi-field LLM extraction to reduce false positives.
                         if (lastMessage?.role === 'user' && !userWantsToSkip) {
-                            const fieldsToExtract = candidateFields
-                                .map((f: any) => typeof f === 'string' ? f : (f.id || f.field))
-                                .filter((fieldName: string) => !currentProfile[fieldName]); // Only missing fields
+                            const missingFieldIds = candidateFieldIds.filter((fieldName: string) =>
+                                !currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__'
+                            );
+                            const lastAsked = state.lastAskedField;
+                            const prioritizedField = (lastAsked && missingFieldIds.includes(lastAsked))
+                                ? lastAsked
+                                : (missingFieldIds[0] || null);
 
-                            console.log(`📋 [DATA_COLLECTION] Attempting to extract fields: ${fieldsToExtract.join(', ')}`);
+                            console.log(`📋 [DATA_COLLECTION] Missing fields: ${missingFieldIds.join(', ') || 'none'}`);
+                            console.log(`📋 [DATA_COLLECTION] Prioritized field: ${prioritizedField || 'none'}`);
 
-                            // SPECIAL HANDLING: If we asked for a specific field and user replied with a short answer, use it directly
                             const userReply = lastMessage.content.trim();
                             const wordCount = userReply.split(/\s+/).length;
-                            const lastAsked = state.lastAskedField;
+                            let profileChanged = false;
 
-                            // Direct capture for NAME (1-3 words, no special chars)
-                            const isNameField = lastAsked === 'fullName' || lastAsked === 'name';
-                            const nameFieldKey = lastAsked === 'name' ? 'name' : 'fullName';
-                            if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey]) {
-                                const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
-                                if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
-                                    currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
-                                    console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}"`);
+                            // Opportunistic deterministic extraction for structured fields present in free text.
+                            const opportunisticFields = missingFieldIds.filter((fieldName: string) =>
+                                ['email', 'phone', 'linkedin', 'portfolio'].includes(fieldName) && fieldName !== prioritizedField
+                            );
+                            for (const fieldName of opportunisticFields) {
+                                const deterministicValue = extractDeterministicFieldValue(fieldName, lastMessage.content);
+                                if (deterministicValue) {
+                                    currentProfile = { ...currentProfile, [fieldName]: deterministicValue };
+                                    profileChanged = true;
+                                    console.log(`✅ [DATA_COLLECTION] Opportunistic deterministic capture for "${fieldName}"`);
                                 }
                             }
 
-                            // Direct capture for COMPANY (1-5 words, reasonable length)
-                            if (lastAsked === 'company' && wordCount <= 5 && !currentProfile.company) {
-                                const cleanedCompany = userReply.replace(/[.!?,;:]/g, '').trim();
-                                // Accept if it looks like a company name (not a refusal or question)
-                                if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
-                                    !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
-                                    currentProfile = { ...currentProfile, company: cleanedCompany };
-                                    console.log(`✅ [DATA_COLLECTION] Direct company capture`);
-                                }
-                            }
-
-                            // Direct capture for ROLE (1-4 words)
-                            if (lastAsked === 'role' && wordCount <= 4 && !currentProfile.role) {
-                                const cleanedRole = userReply.replace(/[.!?,;:]/g, '').trim();
-                                if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
-                                    !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
-                                    currentProfile = { ...currentProfile, role: cleanedRole };
-                                    console.log(`✅ [DATA_COLLECTION] Direct role capture`);
-                                }
-                            }
-
-                            const extractions = await Promise.all(
-                                fieldsToExtract.map(async (fieldName) => {
-                                    // Skip if field already captured by direct capture above
-                                    if ((fieldName === 'fullName' && currentProfile.fullName) ||
-                                        (fieldName === 'name' && currentProfile.name) ||
-                                        (fieldName === 'company' && currentProfile.company) ||
-                                        (fieldName === 'role' && currentProfile.role)) {
-                                        console.log(`⏭️ [DATA_COLLECTION] Skipping extraction for "${fieldName}" - already captured directly`);
-                                        return { fieldName, extraction: { value: null, confidence: 'none' } };
+                            if (prioritizedField) {
+                                // Direct capture for NAME (1-3 words, no special chars)
+                                const isNameField = prioritizedField === 'fullName' || prioritizedField === 'name';
+                                const nameFieldKey = prioritizedField === 'name' ? 'name' : 'fullName';
+                                if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey]) {
+                                    const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
+                                    if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
+                                        currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
+                                        profileChanged = true;
+                                        console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}"`);
                                     }
+                                }
 
+                                // Direct capture for COMPANY (1-5 words, reasonable length)
+                                if (prioritizedField === 'company' && wordCount <= 5 && !currentProfile.company) {
+                                    const cleanedCompany = userReply.replace(/[.!?,;:]/g, '').trim();
+                                    if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
+                                        !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
+                                        currentProfile = { ...currentProfile, company: cleanedCompany };
+                                        profileChanged = true;
+                                        console.log(`✅ [DATA_COLLECTION] Direct company capture`);
+                                    }
+                                }
+
+                                // Direct capture for ROLE (1-4 words)
+                                if (prioritizedField === 'role' && wordCount <= 4 && !currentProfile.role) {
+                                    const cleanedRole = userReply.replace(/[.!?,;:]/g, '').trim();
+                                    if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
+                                        !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
+                                        currentProfile = { ...currentProfile, role: cleanedRole };
+                                        profileChanged = true;
+                                        console.log(`✅ [DATA_COLLECTION] Direct role capture`);
+                                    }
+                                }
+
+                                if (!currentProfile[prioritizedField]) {
+                                    const deterministicValue = extractDeterministicFieldValue(prioritizedField, lastMessage.content);
+                                    if (deterministicValue) {
+                                        currentProfile = { ...currentProfile, [prioritizedField]: deterministicValue };
+                                        profileChanged = true;
+                                        console.log(`✅ [DATA_COLLECTION] Deterministic extraction for "${prioritizedField}"`);
+                                    }
+                                }
+
+                                if (!currentProfile[prioritizedField]) {
                                     const extraction = await extractFieldFromMessage(
-                                        fieldName,
+                                        prioritizedField,
                                         lastMessage.content,
                                         openAIKey,
                                         language
                                     );
-                                    console.log(`🔍 [DATA_COLLECTION] Extraction result for "${fieldName}": confidence="${extraction.confidence}"`);
-                                    return { fieldName, extraction };
-                                })
-                            );
-
-                            for (const { fieldName, extraction } of extractions) {
-                                if (extraction.value && extraction.confidence !== 'none') {
-                                    currentProfile = { ...currentProfile, [fieldName]: extraction.value };
-                                    console.log(`✅ [DATA_COLLECTION] Extracted "${fieldName}"`);
-                                } else {
-                                    console.log(`⚠️ [DATA_COLLECTION] Could not extract "${fieldName}" (confidence=${extraction.confidence})`);
+                                    console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}"`);
+                                    if (extraction.value && extraction.confidence !== 'none') {
+                                        currentProfile = { ...currentProfile, [prioritizedField]: extraction.value };
+                                        profileChanged = true;
+                                        console.log(`✅ [DATA_COLLECTION] LLM extraction for "${prioritizedField}"`);
+                                    } else {
+                                        console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}" (confidence=${extraction.confidence})`);
+                                    }
                                 }
                             }
 
-                            // Save all extracted fields at once
-                            if (Object.keys(currentProfile).length > 0) {
+                            // Save only when profile changed in this turn.
+                            if (profileChanged) {
                                 await prisma.conversation.update({
                                     where: { id: conversationId },
                                     data: { candidateProfile: currentProfile }
@@ -939,22 +1226,12 @@ export async function POST(req: Request) {
 
                         // Find next missing field (skip fields marked as __SKIPPED__ or asked too many times)
                         const MAX_FIELD_ATTEMPTS = 3; // Skip field if asked more than 3 times
-                        let nextField = null;
-                        for (const field of candidateFields) {
-                            const fieldName = typeof field === 'string' ? field : (field.id || field.field);
-                            const attempts = state.fieldAttemptCounts[fieldName] || 0;
-
-                            // Skip if already collected, explicitly skipped, or asked too many times
-                            if (currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__') continue;
-                            if (currentProfile[fieldName] === '__SKIPPED__') continue;
-                            if (attempts >= MAX_FIELD_ATTEMPTS) {
-                                console.log(`⚠️ [DATA_COLLECTION] Skipping "${fieldName}" - asked ${attempts} times without success`);
-                                continue;
-                            }
-
-                            nextField = fieldName;
-                            break;
-                        }
+                        const nextField = getNextMissingCandidateField(
+                            candidateFieldIds,
+                            currentProfile,
+                            state.fieldAttemptCounts,
+                            MAX_FIELD_ATTEMPTS
+                        );
                         console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected/skipped'}`);
 
                         if (!nextField) {
@@ -1006,7 +1283,7 @@ export async function POST(req: Request) {
         // console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 500) + "...");
 
         // Inject intro message at start
-        if (introMessage && messages.length <= 1) {
+        if (introMessage && canonicalMessages.length <= 1) {
             systemPrompt += `\n\nIMPORTANT: Start your response with exactly:\n"${introMessage}"\nThen follow with your first question.`;
         }
 
@@ -1030,23 +1307,15 @@ export async function POST(req: Request) {
                 : `Turn ${nextState.turnInTopic}/${deepTurns}`;
 
             systemPrompt += `
-
-## ═══════════════════════════════════════════════════════
-## 📍 CURRENT STATUS: ${nextState.phase} PHASE
-## Topic: "${currentTopicLabel}" (${nextState.topicIndex + 1}/${numTopics})
-## Progress: ${turnsInfo}
-## ═══════════════════════════════════════════════════════
-
-🚫 **FORBIDDEN ACTIONS (will be blocked by system):**
-- Asking for contacts/email/phone/name
-- Saying goodbye or wrapping up
-- Mentioning "before we conclude" or similar
-
-✅ **YOUR ONLY TASK:**
-- Ask ONE question about "${currentTopicLabel}"
-- End with a question mark (?)
-
-The SUPERVISOR controls phase transitions. Just focus on asking good questions.
+[SUPERVISOR_RUNTIME]
+phase=${nextState.phase}
+topic="${currentTopicLabel}" (${nextState.topicIndex + 1}/${numTopics})
+progress=${turnsInfo}
+hard_rules:
+- Ask exactly ONE question about "${currentTopicLabel}".
+- Do NOT ask for contacts.
+- Do NOT close or wrap up.
+- Do NOT add promo/CTA.
 `;
         }
 
@@ -1063,7 +1332,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             meta_comment: z.string().optional()
         });
 
-        let messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
+        let messagesForAI = canonicalMessages.map((m: any) => ({ role: m.role, content: m.content }));
         if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' || supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             messagesForAI = lastMessage?.role === 'user'
                 ? [{ role: 'user', content: lastMessage.content }]
@@ -1084,7 +1353,16 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 const fallback = language === 'it'
                     ? "Mi scuso, ho bisogno di un momento. Puoi ripetere?"
                     : "I apologize, I need a moment. Could you repeat that?";
-                await ChatService.saveAssistantMessage(conversationId, fallback);
+                await prisma.message.create({
+                    data: {
+                        conversationId,
+                        role: 'assistant',
+                        content: fallback,
+                        metadata: clientMessageId
+                            ? { replyToClientMessageId: clientMessageId, type: 'timeout_fallback' }
+                            : { type: 'timeout_fallback' }
+                    }
+                });
                 return Response.json({ text: fallback, currentTopicId: nextTopicId, isCompleted: false });
             }
             throw error;
@@ -1099,6 +1377,23 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         // 5.4 TRANSITION / DEEP_OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
         // ====================================================================
         let didRegenerate = false;
+        const qualityTelemetry: QualityTelemetry = {
+            eligible: false,
+            evaluated: false,
+            score: null,
+            passed: null,
+            gateTriggered: false,
+            regenerated: false,
+            fallbackUsed: false,
+            issues: []
+        };
+        const flowTelemetry: FlowGuardTelemetry = {
+            topicClosureIntercepted: false,
+            deepOfferClosureIntercepted: false,
+            completionGuardIntercepted: false,
+            completionBlockedForConsent: false,
+            completionBlockedForMissingField: false
+        };
 
         if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             const openai = createOpenAI({ apiKey: openAIKey });
@@ -1146,18 +1441,22 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         const organizationId = (bot as any).project?.organization?.id;
         const projectOwnerId = (bot as any).project?.ownerId;
         if (projectOwnerId && result.usage) {
-            TokenTrackingService.logTokenUsage({
-                userId: projectOwnerId,
-                organizationId,
-                projectId: (bot as any).project?.id,
-                inputTokens: result.usage.inputTokens || 0,
-                outputTokens: result.usage.outputTokens || 0,
-                category: 'INTERVIEW',
-                model: model.modelId || 'gpt-4o',
-                operation: 'interview-response',
-                resourceType: 'interview',
-                resourceId: bot.id
-            }).catch(err => console.error('Token tracking failed:', err));
+            try {
+                await TokenTrackingService.logTokenUsage({
+                    userId: projectOwnerId,
+                    organizationId,
+                    projectId: (bot as any).project?.id,
+                    inputTokens: result.usage.inputTokens || 0,
+                    outputTokens: result.usage.outputTokens || 0,
+                    category: 'INTERVIEW',
+                    model: model.modelId || 'gpt-4o',
+                    operation: 'interview-response',
+                    resourceType: 'interview',
+                    resourceId: bot.id
+                });
+            } catch (err) {
+                console.error('Token tracking failed:', err);
+            }
         }
 
         // ====================================================================
@@ -1175,6 +1474,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         const isGoodbyeResponse = goodbyePattern.test(responseText);
         const isVagueDataRequest = vagueDataPattern.test(responseText);
         const hasNoQuestion = !responseText.includes('?');
+        const hasCompletionTag = /INTERVIEW_COMPLETED/i.test(responseText);
 
         // CRITICAL: Detect "goodbye with question" pattern (e.g., "Buona giornata! Ci vediamo?")
         // This is a closure attempt disguised as a question
@@ -1197,9 +1497,26 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             isGoodbyeResponse,
             isGoodbyeWithQuestion,
             hasNoQuestion,
+            hasCompletionTag,
             isPrematureContactRequest,
             isVagueDataRequest,
             responseLength: responseText.length
+        });
+
+        const shouldBlockTopicClosure = shouldInterceptTopicPhaseClosure({
+            phase: nextState.phase,
+            isGoodbyeResponse,
+            isGoodbyeWithQuestion,
+            hasNoQuestion,
+            isPrematureContactRequest,
+            hasCompletionTag
+        });
+        const shouldBlockDeepOfferClosure = shouldInterceptDeepOfferClosure({
+            phase: nextState.phase,
+            isGoodbyeResponse,
+            isGoodbyeWithQuestion,
+            hasNoQuestion,
+            hasCompletionTag
         });
 
         const PROMO_PATTERNS = /\b(www\.|https?:\/\/|@|email|scrivi a|contatta|offerta|promo|premio|reward|coupon|sconto)\b/i;
@@ -1230,6 +1547,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 }
             } else {
             const candidateFields = (bot.candidateDataFields as any[]) || [];
+            const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
 
             // CRITICAL: Re-read profile from DB to get updated values after extraction
             // The `conversation.candidateProfile` is stale (from start of request)
@@ -1242,38 +1560,12 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             // Find first missing field (must match logic in data collection phase)
             // Consider: already collected, explicitly skipped, or asked too many times
             const MAX_FIELD_ATTEMPTS_SUPERVISOR = 3;
-            let missingField: string | null = null;
-            for (const field of candidateFields) {
-                const fieldName = typeof field === 'string' ? field : (field.id || field.field);
-                const attempts = nextState.fieldAttemptCounts?.[fieldName] || 0;
-
-                // Skip if already collected (and not skipped marker)
-                if (currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__') continue;
-                // Skip if explicitly skipped
-                if (currentProfile[fieldName] === '__SKIPPED__') continue;
-                // Skip if asked too many times
-                if (attempts >= MAX_FIELD_ATTEMPTS_SUPERVISOR) continue;
-
-                missingField = fieldName;
-                break;
-            }
-
-            // Helper to get field label
-            const getFieldLabel = (field: string, lang: string) => {
-                const labels: Record<string, { it: string; en: string; fr: string; de: string; es: string }> = {
-                    name: { it: 'il tuo nome e cognome', en: 'your full name', fr: 'votre nom et prénom', de: 'dein Vor- und Nachname', es: 'tu nombre y apellido' },
-                    fullName: { it: 'il tuo nome e cognome', en: 'your full name', fr: 'votre nom et prénom', de: 'dein Vor- und Nachname', es: 'tu nombre y apellido' },
-                    email: { it: 'il tuo indirizzo email', en: 'your email address', fr: 'votre adresse e-mail', de: 'deine E-Mail-Adresse', es: 'tu dirección de correo electrónico' },
-                    phone: { it: 'il tuo numero di telefono', en: 'your phone number', fr: 'votre numéro de téléphone', de: 'deine Telefonnummer', es: 'tu número de teléfono' },
-                    company: { it: 'il nome della tua azienda', en: 'your company name', fr: 'le nom de votre entreprise', de: 'den Namen deines Unternehmens', es: 'el nombre de tu empresa' },
-                    linkedin: { it: 'il tuo profilo LinkedIn', en: 'your LinkedIn profile', fr: 'votre profil LinkedIn', de: 'dein LinkedIn-Profil', es: 'tu perfil de LinkedIn' },
-                    role: { it: 'il tuo ruolo attuale', en: 'your current role', fr: 'votre rôle actuel', de: 'deine aktuelle Rolle', es: 'tu rol actual' },
-                    location: { it: 'la tua città', en: 'your city', fr: 'votre ville', de: 'deine Stadt', es: 'tu ciudad' },
-                    budget: { it: 'il tuo budget', en: 'your budget', fr: 'votre budget', de: 'dein Budget', es: 'tu presupuesto' },
-                    availability: { it: 'la tua disponibilità', en: 'your availability', fr: 'votre disponibilité', de: 'deine Verfügbarkeit', es: 'tu disponibilidad' },
-                };
-                return labels[field]?.[lang as 'it' | 'en' | 'fr' | 'de' | 'es'] || field;
-            };
+            const missingField = getNextMissingCandidateField(
+                candidateFieldIds,
+                currentProfile,
+                nextState.fieldAttemptCounts,
+                MAX_FIELD_ATTEMPTS_SUPERVISOR
+            );
 
             // CONSENT PHASE: bot should ask for permission
             const forceConsent = nextState.forceConsentQuestion === true;
@@ -1351,7 +1643,8 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         }
         // Other phases - Handle bot trying to close during SCAN/DEEP
         // NEW STRATEGY: Track closure attempts and respect user's intent after 2 attempts
-        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isPrematureContactRequest)) {
+        else if (shouldBlockTopicClosure) {
+            flowTelemetry.topicClosureIntercepted = true;
             const maxDurationSec = maxDurationMins * 60;
             const remainingSec = maxDurationSec - effectiveSec;
             const shouldOfferExtraTime = nextState.phase === 'DEEP' && remainingSec <= 0 && state.deepAccepted !== true;
@@ -1367,20 +1660,6 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Deep offer regeneration after closure failed:', e);
-                }
-            } else if (shouldCollectData && nextState.phase === 'DEEP') {
-                // If DEEP is closing without data collection, force consent question
-                console.log(`⚠️ [SUPERVISOR] Closure attempt in DEEP. Forcing data collection consent.`);
-                nextState.phase = 'DATA_COLLECTION';
-                nextState.consentGiven = false;
-                nextState.forceConsentQuestion = true;
-                supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                try {
-                    const enforcedSystem = `You must ask a single yes/no question asking permission to collect contact details.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
-                    responseText = retry.object.response?.trim() || responseText;
-                } catch (e) {
-                    console.error('Consent regeneration after DEEP closure failed:', e);
                 }
             } else {
             nextState.closureAttempts = (state.closureAttempts || 0) + 1;
@@ -1422,17 +1701,135 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && !isGoodbyeResponse && !hasNoQuestion) {
             nextState.closureAttempts = 0;
         }
-        else if (nextState.phase === 'DEEP_OFFER' && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion)) {
+        else if (shouldBlockDeepOfferClosure) {
+            flowTelemetry.deepOfferClosureIntercepted = true;
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. OVERRIDING with offer question.`);
             const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Offer the choice to continue with deeper questions. One question only. Do not ask any topic question.`;
             const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
             responseText = retry.object.response?.trim() || responseText;
         }
 
+        // Qualitative guardrail: keep questions context-aware and probing,
+        // especially after very short user answers.
+        const qualityGatePhases = new Set(['SCAN', 'DEEP', 'DEEP_OFFER']);
+        qualityTelemetry.eligible = qualityGatePhases.has(nextState.phase);
+        const shouldRunQualitativeGate =
+            qualityGatePhases.has(nextState.phase) &&
+            lastMessage?.role === 'user' &&
+            !/INTERVIEW_COMPLETED/i.test(responseText);
+
+        if (shouldRunQualitativeGate) {
+            qualityTelemetry.evaluated = true;
+            const phaseForQuality = nextState.phase as 'SCAN' | 'DEEP' | 'DEEP_OFFER';
+            const isTopicPhaseForQuality = phaseForQuality === 'SCAN' || phaseForQuality === 'DEEP';
+            const isDeepOfferPhaseForQuality = phaseForQuality === 'DEEP_OFFER';
+            const qualityTopicLabel = targetTopic?.label || currentTopic?.label || 'current topic';
+            const userSnippet = String(lastMessage.content || '').trim().slice(0, 200);
+            const userWordCount = userSnippet.split(/\s+/).filter(Boolean).length;
+            const lastAssistantBeforeCurrent = [...canonicalMessages]
+                .reverse()
+                .find(m => m.role === 'assistant')?.content || null;
+
+            const mustFixForQuality = (qualitativeResult: ReturnType<typeof evaluateInterviewQuestionQuality>): boolean => (
+                !qualitativeResult.checks.oneQuestion ||
+                !qualitativeResult.checks.avoidsClosure ||
+                !qualitativeResult.checks.avoidsPrematureContact ||
+                (isTopicPhaseForQuality && !qualitativeResult.checks.referencesUserContext) ||
+                (isTopicPhaseForQuality && !qualitativeResult.checks.topicalAnchor) ||
+                (isTopicPhaseForQuality && !qualitativeResult.checks.nonRepetitive) ||
+                (isTopicPhaseForQuality && !qualitativeResult.checks.probingWhenUserIsBrief) ||
+                (isDeepOfferPhaseForQuality && !qualitativeResult.checks.deepOfferIntent)
+            );
+
+            let qualitative = evaluateInterviewQuestionQuality({
+                phase: phaseForQuality,
+                topicLabel: qualityTopicLabel,
+                userResponse: lastMessage.content,
+                assistantResponse: responseText,
+                previousAssistantResponse: lastAssistantBeforeCurrent,
+                language
+            });
+
+            const requiresFix = mustFixForQuality(qualitative);
+            qualityTelemetry.gateTriggered = requiresFix;
+
+            if (requiresFix) {
+                qualityTelemetry.regenerated = true;
+                const qualityInstruction = isDeepOfferPhaseForQuality
+                    ? `CRITICAL QUALITY FIX:
+- Ask ONLY if the user has a bit more time to continue.
+- Ask exactly ONE yes/no question.
+- Do NOT ask topic questions, contacts, or goodbye.`
+                    : `CRITICAL QUALITY FIX:
+- Start with a brief acknowledgment tied to this user message: "${userSnippet}".
+- Ask exactly ONE question about "${qualityTopicLabel}".
+- Keep it specific and contextual, avoid generic phrasing.
+- Avoid repeating the previous assistant question wording.
+- Do NOT ask for contacts. Do NOT close the interview.
+${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up and request one concrete example.' : ''}`;
+
+                try {
+                    const retry = await generateObject({
+                        model,
+                        schema,
+                        messages: messagesForAI,
+                        system: `${systemPrompt}\n\n${qualityInstruction}`,
+                        temperature: 0.25
+                    });
+                    responseText = retry.object.response?.trim() || responseText;
+                } catch (e) {
+                    console.error('Qualitative regeneration failed:', e);
+                }
+
+                qualitative = evaluateInterviewQuestionQuality({
+                    phase: phaseForQuality,
+                    topicLabel: qualityTopicLabel,
+                    userResponse: lastMessage.content,
+                    assistantResponse: responseText,
+                    previousAssistantResponse: lastAssistantBeforeCurrent,
+                    language
+                });
+
+                if (mustFixForQuality(qualitative)) {
+                    responseText = buildDeterministicQualityQuestion({
+                        phase: phaseForQuality,
+                        language,
+                        topicLabel: qualityTopicLabel,
+                        userResponse: lastMessage.content
+                    });
+                    qualityTelemetry.fallbackUsed = true;
+                    console.log('⚠️ [SUPERVISOR] Applied deterministic quality fallback question.');
+                    qualitative = evaluateInterviewQuestionQuality({
+                        phase: phaseForQuality,
+                        topicLabel: qualityTopicLabel,
+                        userResponse: lastMessage.content,
+                        assistantResponse: responseText,
+                        previousAssistantResponse: lastAssistantBeforeCurrent,
+                        language
+                    });
+                }
+            }
+
+            qualityTelemetry.score = qualitative.score;
+            qualityTelemetry.passed = qualitative.passed;
+            qualityTelemetry.issues = qualitative.issues.slice(0, 8);
+        }
+
+        const buildAssistantMetadata = (isCompletion: boolean = false) => ({
+            ...(clientMessageId ? { replyToClientMessageId: clientMessageId } : {}),
+            phase: nextState.phase,
+            supervisorStatus: supervisorInsight?.status,
+            ...(isCompletion ? { isCompletion: true } : {}),
+            quality: qualityTelemetry,
+            flowFlags: flowTelemetry,
+            responseLatencyMs: Date.now() - startTime
+        });
+
         // Check for completion tag - only valid if we're actually done
             if (/INTERVIEW_COMPLETED/i.test(responseText)) {
             // Verify we're actually done - MUST re-read from DB for fresh data
             const candidateFields = (bot.candidateDataFields as any[]) || [];
+            const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
             const freshConvForCompletion = await prisma.conversation.findUnique({
                 where: { id: conversationId },
                 select: { candidateProfile: true }
@@ -1440,19 +1837,25 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
             const currentProfileForCompletion = (freshConvForCompletion?.candidateProfile as any) || {};
             // A field is considered "done" if: collected, skipped, or asked too many times
             const MAX_FIELD_ATTEMPTS_COMPLETION = 3;
-            const allFieldsCollected = candidateFields.every((field: any) => {
-                const fieldName = typeof field === 'string' ? field : (field.id || field.field);
-                const attempts = nextState.fieldAttemptCounts?.[fieldName] || 0;
-                // Field is done if: has value (not skipped), is skipped, or exceeded attempts
-                return (currentProfileForCompletion[fieldName] && currentProfileForCompletion[fieldName] !== '__SKIPPED__') ||
-                       currentProfileForCompletion[fieldName] === '__SKIPPED__' ||
-                       attempts >= MAX_FIELD_ATTEMPTS_COMPLETION;
+            const missingFieldForCompletion = getNextMissingCandidateField(
+                candidateFieldIds,
+                currentProfileForCompletion,
+                nextState.fieldAttemptCounts,
+                MAX_FIELD_ATTEMPTS_COMPLETION
+            );
+            const completionGuardAction = getCompletionGuardAction({
+                shouldCollectData,
+                candidateFieldIds,
+                consentGiven: nextState.consentGiven,
+                dataCollectionRefused: nextState.dataCollectionRefused,
+                missingField: missingFieldForCompletion
             });
 
-            if (shouldCollectData && !allFieldsCollected && nextState.consentGiven !== false) {
-                // Not done yet! Override with data collection consent question
-                console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but fields are missing. OVERRIDING with consent question.`);
-
+            if (completionGuardAction === 'ask_consent') {
+                flowTelemetry.completionGuardIntercepted = true;
+                flowTelemetry.completionBlockedForConsent = true;
+                // Guardrail: never allow completion before an explicit contact-consent step.
+                console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED before consent resolution. OVERRIDING with consent question.`);
                 const enforcedSystem = `You must ask a single yes/no question asking permission to collect contact details.`;
                 try {
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
@@ -1460,11 +1863,33 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 } catch (e) {
                     console.error('Consent regeneration after completion failed:', e);
                 }
+            } else if (completionGuardAction === 'ask_missing_field' && missingFieldForCompletion) {
+                flowTelemetry.completionGuardIntercepted = true;
+                flowTelemetry.completionBlockedForMissingField = true;
+                // Guardrail: consent granted but fields still missing -> ask the specific field, not completion.
+                const fieldLabel = getFieldLabel(missingFieldForCompletion, language);
+                console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but "${missingFieldForCompletion}" is still missing. OVERRIDING with field question.`);
+                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT conclude. Ask ONLY for ${fieldLabel}. One question only.`;
+                try {
+                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    responseText = retry.object.response?.trim() || responseText;
+                } catch (e) {
+                    console.error('Field regeneration after premature completion failed:', e);
+                }
             } else {
                 // Actually complete
-                await completeInterview(conversationId, messages, openAIKey, currentProfileForCompletion || {});
+                await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfileForCompletion || {});
+                const finalResponseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
+                await prisma.message.create({
+                    data: {
+                        conversationId,
+                        role: 'assistant',
+                        content: finalResponseText,
+                        metadata: buildAssistantMetadata(true)
+                    }
+                });
                 return Response.json({
-                    text: responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim(),
+                    text: finalResponseText,
                     currentTopicId: nextTopicId,
                     isCompleted: true
                 });
@@ -1477,7 +1902,14 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         // Run save operations in parallel - they're independent
         await Promise.all([
             // Save assistant message
-            ChatService.saveAssistantMessage(conversationId, responseText),
+            prisma.message.create({
+                data: {
+                    conversationId,
+                    role: 'assistant',
+                    content: responseText,
+                    metadata: buildAssistantMetadata(false)
+                }
+            }),
             // Update conversation state (metadata + topic in one query)
             prisma.conversation.update({
                 where: { id: conversationId },

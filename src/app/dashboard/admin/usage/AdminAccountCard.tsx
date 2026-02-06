@@ -152,7 +152,15 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                     {isEditing ? (
                         <select
                             value={editLimits.plan}
-                            onChange={(e) => setEditLimits(prev => ({ ...prev, plan: e.target.value }))}
+                            onChange={(e) => {
+                                const nextPlan = e.target.value as PlanType;
+                                const planConfig = PLANS[nextPlan] || PLANS[PlanType.FREE];
+                                setEditLimits(prev => ({
+                                    ...prev,
+                                    plan: nextPlan,
+                                    monthlyCreditsLimit: planConfig.monthlyCredits
+                                }));
+                            }}
                             className="px-2 py-1 rounded text-xs font-bold border border-gray-300"
                         >
                             <option value="FREE">FREE</option>

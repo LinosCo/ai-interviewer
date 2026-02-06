@@ -369,6 +369,18 @@ model OrgInvoice {
   @@index([stripeInvoiceId])
 }
 
+model StripeWebhookEvent {
+  id              String   @id @default(cuid())
+  eventId         String   @unique
+  eventType       String
+  payload         Json?
+  processedAt     DateTime?
+  processingError String?
+  createdAt       DateTime @default(now())
+
+  @@index([eventType, createdAt])
+}
+
 model ProjectTransfer {
   id                  String   @id @default(cuid())
   originalProjectId   String

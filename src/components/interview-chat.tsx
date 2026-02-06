@@ -154,6 +154,7 @@ export default function InterviewChat({
     // ... (rest of the file) ...
 
     const [messages, setMessages] = useState<Message[]>(initialMessages);
+    const messagesRef = useRef<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -178,6 +179,11 @@ export default function InterviewChat({
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
     const [isTyping, setIsTyping] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
+    const inFlightRequestRef = useRef(false);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
 
     // Active Timer
     useEffect(() => {
@@ -319,15 +325,20 @@ export default function InterviewChat({
     }, [input]);
 
     const handleSendMessage = async (messageContent: string, isInitial = false, overrideHistory?: Message[]) => {
-        if ((!messageContent.trim() || isLoading) && !isInitial) return;
+        if ((!messageContent.trim() || isLoading || inFlightRequestRef.current) && !isInitial) return;
+        if (inFlightRequestRef.current) return;
 
         // If isInitial=true and we have overrideHistory (intro), we DON'T add a user message to UI
         // We just use 'messageContent' as a hidden trigger for the AI
 
         const isHiddenTrigger = isInitial && overrideHistory && overrideHistory.length > 0;
 
+        const userMessageId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
         const userMessage: Message = {
-            id: Date.now().toString(),
+            id: userMessageId,
             role: 'user',
             content: messageContent
         };
@@ -341,6 +352,7 @@ export default function InterviewChat({
         }
 
         setIsLoading(true);
+        inFlightRequestRef.current = true;
 
         try {
             // Construct payload
@@ -353,8 +365,10 @@ export default function InterviewChat({
             } else if (isInitial) {
                 messagesPayload = [];
             } else {
-                messagesPayload = [...messages, userMessage];
+                messagesPayload = [...messagesRef.current, userMessage];
             }
+
+            const requestClientMessageId = (!isInitial || isHiddenTrigger) ? userMessage.id : undefined;
 
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -363,7 +377,8 @@ export default function InterviewChat({
                     messages: messagesPayload,
                     conversationId,
                     botId,
-                    effectiveDuration: Math.floor(effectiveSeconds)
+                    effectiveDuration: Math.floor(effectiveSeconds),
+                    clientMessageId: requestClientMessageId
                 })
             });
 
@@ -406,6 +421,7 @@ export default function InterviewChat({
             }]);
         } finally {
             setIsLoading(false);
+            inFlightRequestRef.current = false;
         }
     };
 

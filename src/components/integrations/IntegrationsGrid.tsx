@@ -233,7 +233,7 @@ export function IntegrationsGrid({
             Con BUSINESS puoi pubblicare direttamente su WordPress e WooCommerce.
           </p>
           <a
-            href="/dashboard/settings/billing"
+            href="/dashboard/billing"
             className="inline-flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 font-semibold rounded-lg hover:bg-indigo-50 transition-colors"
           >
             Scopri i piani

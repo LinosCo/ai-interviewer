@@ -5,6 +5,11 @@ import { getStripeClient } from '@/lib/stripe';
 import { PLANS, PlanType } from '@/config/plans';
 import { redirect } from 'next/navigation';
 
+const PURCHASABLE_CHECKOUT_PLANS = new Set<PlanType>([
+    PlanType.STARTER,
+    PlanType.PRO
+]);
+
 // Helper function to create checkout session
 async function createCheckoutSession(tier: string, billingPeriod: string = 'monthly') {
     const session = await auth();
@@ -12,7 +17,12 @@ async function createCheckoutSession(tier: string, billingPeriod: string = 'mont
         return { error: 'Non autorizzato', status: 401 };
     }
 
-    const plan = PLANS[tier as PlanType];
+    const normalizedTier = tier?.toUpperCase() as PlanType;
+    if (!PURCHASABLE_CHECKOUT_PLANS.has(normalizedTier)) {
+        return { error: 'Questo piano è acquistabile solo tramite Sales', status: 400 };
+    }
+
+    const plan = PLANS[normalizedTier];
     if (!plan || plan.monthlyPrice === 0) {
         return { error: 'Piano non valido', status: 400 };
     }
@@ -88,7 +98,7 @@ async function createCheckoutSession(tier: string, billingPeriod: string = 'mont
             trial_period_days: subscription?.status === 'TRIALING' ? undefined : 14,
             metadata: {
                 organizationId,
-                tier
+                tier: normalizedTier
             }
         },
         success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true`,
@@ -104,7 +114,7 @@ async function createCheckoutSession(tier: string, billingPeriod: string = 'mont
         },
         metadata: {
             organizationId,
-            tier,
+            tier: normalizedTier,
             billingPeriod
         }
     });
@@ -116,7 +126,7 @@ async function createCheckoutSession(tier: string, billingPeriod: string = 'mont
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
-        const tier = searchParams.get('tier');
+        const tier = searchParams.get('tier') || searchParams.get('plan');
         const billingPeriod = searchParams.get('billing') || 'monthly';
 
         if (!tier) {

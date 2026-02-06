@@ -1,58 +1,37 @@
 import { NextResponse } from 'next/server';
 import { tokenTracker } from '@/services/tokenTracker';
-import { planService } from '@/services/planService';
+
+const SAFETY_MAX_CHARS_PER_MESSAGE = 30000;
+const SAFETY_APPROACHING_THRESHOLD_EXCHANGES = 500;
+const SAFETY_APPROACHING_THRESHOLD_TOKENS = 2_000_000;
 
 /**
- * Conversation Limits Middleware
- * Enforces hidden limits: exchanges, tokens, message length, inactivity
+ * Conversation limits middleware
+ * Legacy hard limits are removed; this only applies high safety guardrails.
  */
 export async function enforceConversationLimits(
     conversationId: string,
     sessionId: string,
-    orgId: string,
+    _orgId: string,
     messageContent?: string
 ): Promise<{ allowed: boolean; error?: NextResponse; shouldClose?: boolean; closingMessage?: string }> {
     try {
-        // Get plan limits
-        const limits = await planService.getHiddenLimits(orgId);
+        void conversationId;
+        void sessionId;
+        void _orgId;
 
-        // Get current usage
-        const usage = tokenTracker.getUsage(conversationId, sessionId);
-
-        if (usage) {
-            const check = tokenTracker.checkLimits(usage, limits);
-
-            if (!check.allowed && check.shouldClose) {
-                // Generate graceful closing message
-                const closingMessage = getClosingMessage(check.reason || 'unknown');
-
-                return {
-                    allowed: false,
-                    shouldClose: true,
-                    closingMessage,
-                    error: NextResponse.json(
-                        {
-                            action: 'CLOSE_INTERVIEW',
-                            reason: check.reason,
-                            message: closingMessage
-                        },
-                        { status: 200 }
-                    )
-                };
-            }
-        }
-
-        // Check message length if provided
+        // Legacy hard limits have been removed.
+        // Keep only a high safety guardrail against oversized payload abuse.
         if (messageContent) {
             const messageLength = messageContent.length;
-            if (messageLength > limits.maxCharsPerMessage) {
+            if (messageLength > SAFETY_MAX_CHARS_PER_MESSAGE) {
                 return {
                     allowed: false,
                     error: NextResponse.json(
                         {
                             error: 'Message too long',
                             code: 'MESSAGE_TOO_LONG',
-                            maxLength: limits.maxCharsPerMessage,
+                            maxLength: SAFETY_MAX_CHARS_PER_MESSAGE,
                             actualLength: messageLength
                         },
                         { status: 400 }
@@ -74,43 +53,29 @@ export async function enforceConversationLimits(
     }
 }
 
-function getClosingMessage(reason: string): string {
-    switch (reason) {
-        case 'max_exchanges_reached':
-            return "Grazie mille per il tempo che ci hai dedicato! Abbiamo raccolto informazioni molto utili. C'è qualcos'altro che vorresti aggiungere in chiusura?";
-        case 'max_tokens_reached':
-            return "Grazie per questa conversazione così ricca! Prima di concludere, c'è un ultimo pensiero che vorresti condividere?";
-        case 'inactivity_timeout':
-            return "Sembra che tu sia stato occupato. Grazie per le risposte che ci hai dato, sono state molto utili!";
-        default:
-            return "Grazie per aver partecipato a questa intervista!";
-    }
-}
-
 /**
  * Check if conversation is approaching limits (for proactive closing)
  */
 export async function checkConversationApproachingLimits(
     conversationId: string,
     sessionId: string,
-    orgId: string
+    _orgId: string
 ): Promise<{ approaching: boolean; exchangesRemaining: number; tokensRemaining: number }> {
-    const limits = await planService.getHiddenLimits(orgId);
+    void _orgId;
+
     const usage = tokenTracker.getUsage(conversationId, sessionId);
 
     if (!usage) {
         return {
             approaching: false,
-            exchangesRemaining: limits.maxExchanges,
-            tokensRemaining: limits.maxTokensTotal
+            exchangesRemaining: Number.POSITIVE_INFINITY,
+            tokensRemaining: Number.POSITIVE_INFINITY
         };
     }
 
-    const exchangesRemaining = limits.maxExchanges - usage.exchangeCount;
-    const tokensRemaining = limits.maxTokensTotal - usage.totalTokens;
-
-    // Consider "approaching" if within 2 exchanges or 5000 tokens
-    const approaching = exchangesRemaining <= 2 || tokensRemaining < 5000;
+    const exchangesRemaining = Math.max(0, SAFETY_APPROACHING_THRESHOLD_EXCHANGES - usage.exchangeCount);
+    const tokensRemaining = Math.max(0, SAFETY_APPROACHING_THRESHOLD_TOKENS - usage.totalTokens);
+    const approaching = exchangesRemaining <= 25 || tokensRemaining <= 100000;
 
     return {
         approaching,

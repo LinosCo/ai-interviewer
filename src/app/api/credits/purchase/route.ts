@@ -118,6 +118,7 @@ export async function POST(request: Request) {
             cancel_url: `${baseUrl}/dashboard/billing?pack_cancelled=true`,
             metadata: {
                 userId: session.user.id,
+                organizationId: org.id,
                 packType,
                 credits: pack.credits.toString(),
                 type: 'credit_pack'

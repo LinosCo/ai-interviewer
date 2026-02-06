@@ -9,6 +9,7 @@ import { canAccessProjectData } from '@/lib/copilot/permissions';
 import { searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { PLANS, PlanType, isUnlimited } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 
 export const maxDuration = 60;
 
@@ -74,6 +75,16 @@ export async function POST(req: Request) {
                     message: 'La tua organizzazione ha raggiunto il limite di crediti per questo mese. Effettua l\'upgrade per continuare.'
                 }, { status: 429 });
             }
+        }
+
+        const creditsCheck = await checkCreditsForAction('copilot_message', undefined, projectId);
+        if (!creditsCheck.allowed) {
+            return NextResponse.json({
+                code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                error: creditsCheck.error,
+                creditsNeeded: creditsCheck.creditsNeeded,
+                creditsAvailable: creditsCheck.creditsAvailable
+            }, { status: creditsCheck.status || 403 });
         }
 
         // 3. Get organization's strategic plan from platform settings
@@ -171,18 +182,22 @@ export async function POST(req: Request) {
 
         // 9. Track token usage with new credits system
         if (result.usage) {
-            TokenTrackingService.logTokenUsage({
-                userId: session.user.id,
-                organizationId: organization?.id,
-                projectId: projectId || undefined,
-                inputTokens: result.usage.inputTokens || 0,
-                outputTokens: result.usage.outputTokens || 0,
-                category: 'SUGGESTION', // COPILOT uses SUGGESTION category
-                model: 'claude-opus-4-5-20251101',
-                operation: 'copilot-chat',
-                resourceType: 'copilot',
-                resourceId: session.user.id
-            }).catch(err => console.error('[Copilot] Credit tracking failed:', err));
+            try {
+                await TokenTrackingService.logTokenUsage({
+                    userId: session.user.id,
+                    organizationId: organization?.id,
+                    projectId: projectId || undefined,
+                    inputTokens: result.usage.inputTokens || 0,
+                    outputTokens: result.usage.outputTokens || 0,
+                    category: 'SUGGESTION', // COPILOT uses SUGGESTION category
+                    model: 'claude-opus-4-5-20251101',
+                    operation: 'copilot-chat',
+                    resourceType: 'copilot',
+                    resourceId: session.user.id
+                });
+            } catch (err) {
+                console.error('[Copilot] Credit tracking failed:', err);
+            }
         }
 
         // 10. Log copilot session

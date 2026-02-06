@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { PLANS, PlanType } from '@/config/plans';
 
 /**
  * GET /api/admin/organizations/[orgId]/limits
@@ -137,7 +138,13 @@ export async function PATCH(
         // Update organization plan or limits if changed
         if (plan || monthlyCreditsLimit !== undefined) {
             const orgUpdate: any = {};
-            if (plan && plan !== org.plan) orgUpdate.plan = plan;
+            if (plan && plan !== org.plan) {
+                orgUpdate.plan = plan;
+                if (monthlyCreditsLimit === undefined) {
+                    const defaultPlanConfig = PLANS[plan as PlanType] || PLANS[PlanType.FREE];
+                    orgUpdate.monthlyCreditsLimit = BigInt(defaultPlanConfig.monthlyCredits);
+                }
+            }
             if (monthlyCreditsLimit !== undefined) {
                 orgUpdate.monthlyCreditsLimit = BigInt(monthlyCreditsLimit);
             }

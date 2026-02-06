@@ -147,7 +147,7 @@ export default async function PlansPage() {
                                     </button>
                                 </Link>
                             ) : (
-                                <Link href={`/api/stripe/checkout?plan=${plan.id}`} className="w-full">
+                                <Link href={`/api/stripe/checkout?tier=${plan.id}`} className="w-full">
                                     <button className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${
                                         isPopular
                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20'
@@ -160,6 +160,20 @@ export default async function PlansPage() {
                         </div>
                     );
                 })}
+            </div>
+
+            <div className="mt-8 max-w-6xl bg-stone-900 text-white rounded-[24px] p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">Business via Sales</p>
+                    <p className="text-sm text-stone-300 mt-1">
+                        Per esigenze enterprise, volumi personalizzati e integrazioni avanzate, il piano Business viene attivato solo tramite team commerciale.
+                    </p>
+                </div>
+                <Link href="/sales" className="shrink-0">
+                    <button className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center gap-2">
+                        Contatta Sales <Icons.ArrowRight size={16} />
+                    </button>
+                </Link>
             </div>
 
             {/* Feature Comparison Table */}

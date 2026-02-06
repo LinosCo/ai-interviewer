@@ -60,7 +60,7 @@ export function UsageMeterCompact({
 
     return (
         <Link
-            href="/dashboard/settings/billing"
+            href="/dashboard/billing"
             className="block p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
         >
             <div className="flex items-center gap-2 mb-2">

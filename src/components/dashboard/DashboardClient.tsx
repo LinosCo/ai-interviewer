@@ -154,7 +154,7 @@ export default function DashboardClient({
                         </div>
                     </div>
                     <Link
-                        href="/dashboard/settings/billing"
+                        href="/dashboard/billing"
                         className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all shadow-md active:scale-95"
                     >
                         Attiva Piano Pro
@@ -173,7 +173,7 @@ export default function DashboardClient({
                             <p className="text-sm text-red-700">Il tuo abbonamento è sospeso. Aggiorna il metodo di pagamento per riattivare i tuoi bot.</p>
                         </div>
                     </div>
-                    <Link href="/dashboard/settings/billing" className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">
+                    <Link href="/dashboard/billing" className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">
                         Risolvi Ora
                     </Link>
                 </div>
@@ -240,7 +240,7 @@ export default function DashboardClient({
                         </Link>
                     )}
                     <Link
-                        href="/dashboard/settings/billing"
+                        href="/dashboard/billing"
                         className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
                     >
                         <TrendingUp className="w-4 h-4" />
@@ -324,7 +324,7 @@ export default function DashboardClient({
                         <p className="text-xs text-indigo-100/80">Acquista pacchetti extra senza abbonamento.</p>
                     </div>
                     <Link
-                        href="/dashboard/settings/billing#packages"
+                        href="/dashboard/billing#packages"
                         className="mt-3 flex items-center justify-center gap-2 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-all"
                     >
                         Compra Pacchetti <ArrowRight className="w-3 h-3" />
@@ -400,7 +400,7 @@ export default function DashboardClient({
                             </div>
                             <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-3 border-t border-gray-100 flex items-center justify-between px-6">
                                 <span className="text-xs font-semibold text-gray-600">Sblocca altre interviste</span>
-                                <Link href="/dashboard/settings/billing" className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-gray-800">
+                                <Link href="/dashboard/billing" className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-gray-800">
                                     Upgrade Piano
                                 </Link>
                             </div>

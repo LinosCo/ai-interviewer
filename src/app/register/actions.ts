@@ -108,9 +108,13 @@ export async function registerUser(prevState: string | undefined, formData: Form
         return 'Registration failed.';
     }
 
-    // Redirect logic - include all paid plans
-    if (plan && ['STARTER', 'PRO', 'BUSINESS'].includes(plan.toUpperCase())) {
-        redirect(`/api/stripe/checkout?tier=${plan.toUpperCase()}${billing ? `&billing=${billing}` : ''}`);
+    // Redirect logic: BUSINESS is sales-assisted only
+    const normalizedPlan = plan?.toUpperCase();
+    if (normalizedPlan === 'BUSINESS') {
+        redirect('/sales');
+    }
+    if (normalizedPlan && ['STARTER', 'PRO'].includes(normalizedPlan)) {
+        redirect(`/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`);
     } else {
         redirect('/dashboard');
     }

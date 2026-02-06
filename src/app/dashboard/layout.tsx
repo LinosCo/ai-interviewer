@@ -4,6 +4,8 @@ import { gradients } from '@/lib/design-system';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardProviders } from '@/components/dashboard/DashboardProviders';
 import { StrategyCopilot } from '@/components/copilot/StrategyCopilot';
+import { CreditsAlertBanner } from '@/components/dashboard/CreditsAlertBanner';
+import { CreditsExhaustedModal } from '@/components/dashboard/CreditsExhaustedModal';
 import { PLANS, PlanType } from '@/config/plans';
 import { cookies } from 'next/headers';
 
@@ -116,9 +118,12 @@ export default async function DashboardLayout({
                 {/* Main Content Area */}
                 <div className="flex-grow overflow-y-auto p-4 md:p-8 relative z-10">
                     <div style={{ maxWidth: '1200px', margin: '0 auto', minHeight: '100%' }}>
+                        <CreditsAlertBanner />
                         {children}
                     </div>
                 </div>
+
+                <CreditsExhaustedModal />
 
                 {/* Strategy Copilot - AI Assistant */}
                 <StrategyCopilot
@@ -129,4 +134,3 @@ export default async function DashboardLayout({
         </DashboardProviders>
     );
 }
-

@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import OrganizationProjectSelector from './OrganizationProjectSelector';
 import { ChevronDown } from 'lucide-react';
+import CreditsWidget from './CreditsWidget';
 
 interface DashboardSidebarProps {
     isAdmin: boolean;
@@ -47,6 +48,7 @@ export function DashboardSidebar({
 
     const adminItems = [
         { href: '/dashboard/admin/usage', icon: Icons.Activity, label: 'Monitoraggio' },
+        { href: '/dashboard/admin/interviews', icon: Icons.BarChart, label: 'Qualita Interviste' },
         { href: '/dashboard/admin/organizations', icon: Icons.Building, label: 'Organizzazioni' },
         { href: '/dashboard/admin/users', icon: Icons.Users, label: 'Utenti' },
         { href: '/dashboard/admin/projects', icon: Icons.FolderKanban, label: 'Progetti' },
@@ -118,6 +120,10 @@ export function DashboardSidebar({
 
                 {/* Bottom Section */}
                 <div className="border-t border-gray-200 pt-4 mt-4 space-y-1 -mx-2 px-2">
+                    <div className="mb-3">
+                        <CreditsWidget />
+                    </div>
+
                     {/* Admin Section */}
                     {isAdmin && (
                         <div className="mb-2">

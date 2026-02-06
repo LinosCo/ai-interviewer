@@ -34,7 +34,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     const maxRetries = 2;
 
     const fetchOrganizations = async () => {
-        if (!session) {
+        if (status !== 'authenticated') {
             return;
         }
 

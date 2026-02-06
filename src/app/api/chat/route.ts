@@ -1344,6 +1344,23 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         // Other phases - Handle bot trying to close during SCAN/DEEP
         // NEW STRATEGY: Track closure attempts and respect user's intent after 2 attempts
         else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && (isGoodbyeResponse || isGoodbyeWithQuestion || hasNoQuestion || isPrematureContactRequest)) {
+            const maxDurationSec = maxDurationMins * 60;
+            const remainingSec = maxDurationSec - effectiveSec;
+            const shouldOfferExtraTime = nextState.phase === 'DEEP' && remainingSec <= 0 && state.deepAccepted !== true;
+
+            if (shouldOfferExtraTime) {
+                console.log(`⚠️ [SUPERVISOR] Closure attempt while time is over. Switching to DEEP_OFFER.`);
+                nextState.phase = 'DEEP_OFFER';
+                nextState.deepAccepted = null;
+                supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                try {
+                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask (lightly) if the user has a bit more time to continue with a few extra/deeper questions. One question only.`;
+                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    responseText = retry.object.response?.trim() || responseText;
+                } catch (e) {
+                    console.error('Deep offer regeneration after closure failed:', e);
+                }
+            } else {
             nextState.closureAttempts = (state.closureAttempts || 0) + 1;
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Forcing topic question. Attempt #${nextState.closureAttempts}`);
 
@@ -1376,6 +1393,7 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                         console.error("Question-only generation failed:", e);
                     }
                 }
+            }
             }
         }
         // Reset closure attempts when bot generates a valid question (not trying to close)

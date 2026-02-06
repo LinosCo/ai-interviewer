@@ -267,6 +267,40 @@ async function checkUserIntent(
     }
 }
 
+async function generateQuestionOnly(params: {
+    model: any;
+    language: string;
+    topicLabel: string;
+    subGoal?: string | null;
+    lastUserMessage?: string | null;
+}) {
+    const { model, language, topicLabel, subGoal, lastUserMessage } = params;
+    const questionSchema = z.object({
+        question: z.string().describe("A single interview question ending with a question mark.")
+    });
+
+    const prompt = [
+        `Language: ${language}`,
+        `Topic: ${topicLabel}`,
+        subGoal ? `Sub-goal: ${subGoal}` : null,
+        lastUserMessage ? `User last message: "${lastUserMessage}"` : null,
+        `Task: Ask exactly ONE concise interview question about the topic. Do NOT close the interview. Do NOT ask for contact data. End with a question mark.`
+    ].filter(Boolean).join('\n');
+
+    const result = await generateObject({
+        model,
+        schema: questionSchema,
+        prompt,
+        temperature: 0.2
+    });
+
+    let question = (result.object.question || '').trim();
+    if (!question.endsWith('?')) {
+        question = `${question.replace(/[.!?…]+$/g, '').trim()}?`;
+    }
+    return question;
+}
+
 // ============================================================================
 // HELPER: Complete interview and save profile
 // ============================================================================
@@ -1327,6 +1361,21 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
                 const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.2 });
                 responseText = retry2.object.response?.trim() || responseText;
                 console.log("🧭 [SUPERVISOR] Override response #2:", responseText.slice(0, 300));
+                const stillBadAfterRetry = !responseText.includes('?') || goodbyePattern.test(responseText);
+                if (stillBadAfterRetry) {
+                    console.log("🧭 [SUPERVISOR] Override still invalid after retry #2. Forcing question-only generation.");
+                    try {
+                        responseText = await generateQuestionOnly({
+                            model,
+                            language,
+                            topicLabel: enforceTopic,
+                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null
+                        });
+                        console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
+                    } catch (e) {
+                        console.error("Question-only generation failed:", e);
+                    }
+                }
             }
         }
         // Reset closure attempts when bot generates a valid question (not trying to close)

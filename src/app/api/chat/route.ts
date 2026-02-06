@@ -1217,6 +1217,14 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         // If in DATA_COLLECTION phase, ALWAYS ensure we ask for the specific field
         if (nextState.phase === 'DATA_COLLECTION') {
             if (nextState.dataCollectionRefused || supervisorInsight?.status === 'COMPLETE_WITHOUT_DATA') {
+                console.log(`⚠️ [SUPERVISOR] Forcing final closure after data collection refusal/completion.`);
+                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Conclude the interview now. Thank the user, and if a reward is configured, provide it. Do NOT ask any questions. Append "INTERVIEW_COMPLETED".`;
+                try {
+                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    responseText = retry.object.response?.trim() || responseText;
+                } catch (e) {
+                    console.error('Final closure regeneration failed:', e);
+                }
                 if (!/INTERVIEW_COMPLETED/i.test(responseText)) {
                     responseText = `${responseText.trim()} INTERVIEW_COMPLETED`.trim();
                 }

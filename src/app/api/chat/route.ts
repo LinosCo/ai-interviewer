@@ -1142,16 +1142,6 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         const isVagueDataRequest = vagueDataPattern.test(responseText);
         const hasNoQuestion = !responseText.includes('?');
 
-        console.log("🔎 [SUPERVISOR] Flags:", {
-            phase: nextState.phase,
-            isGoodbyeResponse,
-            isGoodbyeWithQuestion: isGoodbyeResponse && responseText.includes('?'),
-            hasNoQuestion,
-            isPrematureContactRequest,
-            isVagueDataRequest,
-            responseLength: responseText.length
-        });
-
         // CRITICAL: Detect "goodbye with question" pattern (e.g., "Buona giornata! Ci vediamo?")
         // This is a closure attempt disguised as a question
         const isGoodbyeWithQuestion = isGoodbyeResponse && responseText.includes('?');
@@ -1167,6 +1157,16 @@ The SUPERVISOR controls phase transitions. Just focus on asking good questions.
         if (isPrematureContactRequest) {
             console.log(`⚠️ [SUPERVISOR] Bot tried to ask for contacts during ${nextState.phase} phase - intercepting!`);
         }
+
+        console.log("🔎 [SUPERVISOR] Flags:", {
+            phase: nextState.phase,
+            isGoodbyeResponse,
+            isGoodbyeWithQuestion,
+            hasNoQuestion,
+            isPrematureContactRequest,
+            isVagueDataRequest,
+            responseLength: responseText.length
+        });
 
         const PROMO_PATTERNS = /\b(www\.|https?:\/\/|@|email|scrivi a|contatta|offerta|promo|premio|reward|coupon|sconto)\b/i;
         const isPromoContent = PROMO_PATTERNS.test(responseText) && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP' || nextState.phase === 'DEEP_OFFER');

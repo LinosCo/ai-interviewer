@@ -163,7 +163,8 @@ export async function POST(req: Request) {
 
         // Retrieve Global Config for API Key fallback
         const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' }
+            where: { id: 'default' },
+            select: { openaiApiKey: true }
         });
 
         const apiKey = bot.openaiApiKey || globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';

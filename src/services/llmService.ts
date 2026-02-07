@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { Bot, GlobalConfig } from '@prisma/client';
+import { Bot } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 
@@ -10,8 +10,13 @@ export type ModelProvider = 'openai' | 'anthropic';
 // Cache for methodology file - loaded once at startup
 let methodologyCache: string | null = null;
 
+type LLMGlobalConfig = {
+    openaiApiKey: string | null;
+    anthropicApiKey: string | null;
+};
+
 // Cache for GlobalConfig - TTL 5 minutes
-let globalConfigCache: GlobalConfig | null = null;
+let globalConfigCache: LLMGlobalConfig | null = null;
 let globalConfigCacheTime: number = 0;
 const GLOBAL_CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -19,13 +24,19 @@ export class LLMService {
     /**
      * Get GlobalConfig with caching (5 min TTL)
      */
-    static async getGlobalConfig(): Promise<GlobalConfig | null> {
+    static async getGlobalConfig(): Promise<LLMGlobalConfig | null> {
         const now = Date.now();
         if (globalConfigCache && (now - globalConfigCacheTime) < GLOBAL_CONFIG_CACHE_TTL) {
             return globalConfigCache;
         }
 
-        globalConfigCache = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        globalConfigCache = await prisma.globalConfig.findUnique({
+            where: { id: "default" },
+            select: {
+                openaiApiKey: true,
+                anthropicApiKey: true
+            }
+        });
         globalConfigCacheTime = now;
         return globalConfigCache;
     }

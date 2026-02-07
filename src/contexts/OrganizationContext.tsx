@@ -31,11 +31,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [retryCount, setRetryCount] = useState(0);
-    const [sessionLoadTimedOut, setSessionLoadTimedOut] = useState(false);
     const maxRetries = 2;
 
     const fetchOrganizations = useCallback(async () => {
-        if (status === 'unauthenticated') {
+        if (status !== 'authenticated') {
             return;
         }
 
@@ -92,19 +91,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }, [maxRetries, retryCount, status]);
 
     useEffect(() => {
-        if (status !== 'loading') {
-            setSessionLoadTimedOut(false);
+        if (status === 'loading') {
+            setLoading(true);
             return;
         }
 
-        const timer = setTimeout(() => {
-            setSessionLoadTimedOut(true);
-        }, 2500);
-
-        return () => clearTimeout(timer);
-    }, [status]);
-
-    useEffect(() => {
         if (status === 'unauthenticated') {
             setLoading(false);
             setOrganizations([]);
@@ -112,10 +103,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        if (status === 'authenticated' || sessionLoadTimedOut) {
+        if (status === 'authenticated') {
             fetchOrganizations();
         }
-    }, [status, retryCount, sessionLoadTimedOut, fetchOrganizations]);
+    }, [status, retryCount, fetchOrganizations]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);

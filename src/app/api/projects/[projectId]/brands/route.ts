@@ -16,29 +16,54 @@ export async function GET(
         const { projectId } = await params;
 
         // Verify user has access to project
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            include: {
-                organization: {
-                    include: {
-                        subscription: true,
-                        visibilityConfigs: {
-                            include: {
-                                projectShares: {
-                                    select: { projectId: true }
-                                },
-                                scans: {
-                                    where: { status: 'completed' },
-                                    orderBy: { completedAt: 'desc' },
-                                    take: 1
+        let project = null as any;
+        try {
+            project = await prisma.project.findUnique({
+                where: { id: projectId },
+                include: {
+                    organization: {
+                        include: {
+                            subscription: true,
+                            visibilityConfigs: {
+                                include: {
+                                    projectShares: {
+                                        select: { projectId: true }
+                                    },
+                                    scans: {
+                                        where: { status: 'completed' },
+                                        orderBy: { completedAt: 'desc' },
+                                        take: 1
+                                    }
                                 }
                             }
                         }
-                    }
-                },
-                accessList: true
-            }
-        });
+                    },
+                    accessList: true
+                }
+            });
+        } catch (error: any) {
+            if (error?.code !== 'P2021') throw error;
+            project = await prisma.project.findUnique({
+                where: { id: projectId },
+                include: {
+                    organization: {
+                        include: {
+                            subscription: true,
+                            visibilityConfigs: {
+                                include: {
+                                    scans: {
+                                        where: { status: 'completed' },
+                                        orderBy: { completedAt: 'desc' },
+                                        take: 1
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    accessList: true
+                }
+            });
+        }
 
         if (!project || !project.organization) {
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
@@ -48,7 +73,7 @@ export async function GET(
 
         // Check access
         const hasAccess = project.ownerId === userId ||
-            project.accessList.some(a => a.userId === userId);
+            project.accessList.some((a: any) => a.userId === userId);
 
         if (!hasAccess) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -67,8 +92,8 @@ export async function GET(
 
         // Separate linked and unlinked brands
         const linkedBrands = allBrands
-            .filter(b => b.projectId === projectId || b.projectShares.some(s => s.projectId === projectId))
-            .map(b => ({
+            .filter((b: any) => b.projectId === projectId || b.projectShares?.some((s: any) => s.projectId === projectId))
+            .map((b: any) => ({
                 id: b.id,
                 brandName: b.brandName,
                 category: b.category,
@@ -77,8 +102,8 @@ export async function GET(
             }));
 
         const unlinkedBrands = allBrands
-            .filter(b => b.projectId !== projectId && !b.projectShares.some(s => s.projectId === projectId))
-            .map(b => ({
+            .filter((b: any) => b.projectId !== projectId && !b.projectShares?.some((s: any) => s.projectId === projectId))
+            .map((b: any) => ({
                 id: b.id,
                 brandName: b.brandName,
                 category: b.category,
@@ -134,7 +159,7 @@ export async function POST(
         }
 
         const userId = session.user.id;
-        const userAccess = project.accessList.find(a => a.userId === userId);
+        const userAccess = project.accessList.find((a: any) => a.userId === userId);
         const isOwner = project.ownerId === userId || userAccess?.role === 'OWNER';
 
         if (!isOwner) {
@@ -158,20 +183,24 @@ export async function POST(
 
         if (action === 'link') {
             await prisma.$transaction(async (tx) => {
-                await tx.projectVisibilityConfig.upsert({
-                    where: {
-                        projectId_configId: {
+                try {
+                    await tx.projectVisibilityConfig.upsert({
+                        where: {
+                            projectId_configId: {
+                                projectId,
+                                configId: brandId
+                            }
+                        },
+                        update: {},
+                        create: {
                             projectId,
-                            configId: brandId
+                            configId: brandId,
+                            createdBy: userId
                         }
-                    },
-                    update: {},
-                    create: {
-                        projectId,
-                        configId: brandId,
-                        createdBy: userId
-                    }
-                });
+                    });
+                } catch (error: any) {
+                    if (error?.code !== 'P2021') throw error;
+                }
 
                 // Keep backward compatibility: ensure a primary project exists.
                 if (!brand.projectId) {
@@ -186,30 +215,43 @@ export async function POST(
 
         } else if (action === 'unlink') {
             await prisma.$transaction(async (tx) => {
-                await tx.projectVisibilityConfig.deleteMany({
-                    where: {
-                        projectId,
-                        configId: brandId
-                    }
-                });
+                try {
+                    await tx.projectVisibilityConfig.deleteMany({
+                        where: {
+                            projectId,
+                            configId: brandId
+                        }
+                    });
+                } catch (error: any) {
+                    if (error?.code !== 'P2021') throw error;
+                }
 
                 // If this project is the primary one, switch primary to another shared project if available.
-                const currentBrand = await tx.visibilityConfig.findUnique({
-                    where: { id: brandId },
-                    select: {
-                        projectId: true,
-                        projectShares: {
-                            where: { projectId: { not: projectId } },
-                            orderBy: { createdAt: 'asc' },
-                            select: { projectId: true }
+                let currentBrand: { projectId: string | null; projectShares?: Array<{ projectId: string }> } | null = null;
+                try {
+                    currentBrand = await tx.visibilityConfig.findUnique({
+                        where: { id: brandId },
+                        select: {
+                            projectId: true,
+                            projectShares: {
+                                where: { projectId: { not: projectId } },
+                                orderBy: { createdAt: 'asc' },
+                                select: { projectId: true }
+                            }
                         }
-                    }
-                });
+                    });
+                } catch (error: any) {
+                    if (error?.code !== 'P2021') throw error;
+                    currentBrand = await tx.visibilityConfig.findUnique({
+                        where: { id: brandId },
+                        select: { projectId: true }
+                    });
+                }
 
                 if (currentBrand?.projectId === projectId) {
                     await tx.visibilityConfig.update({
                         where: { id: brandId },
-                        data: { projectId: currentBrand.projectShares[0]?.projectId || null }
+                        data: { projectId: currentBrand.projectShares?.[0]?.projectId || null }
                     });
                 }
             });

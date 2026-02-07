@@ -51,17 +51,30 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
 
     const interviews = project.bots.filter(b => (b as any).botType === 'interview' || !(b as any).botType);
     const chatbots = project.bots.filter(b => (b as any).botType === 'chatbot');
-    const trackers = await prisma.visibilityConfig.findMany({
-        where: {
-            organizationId: project.organizationId || undefined,
-            OR: [
-                { projectId },
-                { projectShares: { some: { projectId } } }
-            ]
-        },
-        orderBy: { createdAt: 'desc' },
-        include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
-    });
+    let trackers = [];
+    try {
+        trackers = await prisma.visibilityConfig.findMany({
+            where: {
+                organizationId: project.organizationId || undefined,
+                OR: [
+                    { projectId },
+                    { projectShares: { some: { projectId } } }
+                ]
+            },
+            orderBy: { createdAt: 'desc' },
+            include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
+        });
+    } catch (error: any) {
+        if (error?.code !== 'P2021') throw error;
+        trackers = await prisma.visibilityConfig.findMany({
+            where: {
+                organizationId: project.organizationId || undefined,
+                projectId
+            },
+            orderBy: { createdAt: 'desc' },
+            include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
+        });
+    }
 
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto">

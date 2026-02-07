@@ -31,7 +31,8 @@ export async function POST(req: Request) {
         let apiKey;
         try {
             const globalConfig = await prisma.globalConfig.findUnique({
-                where: { id: 'default' }
+                where: { id: 'default' },
+                select: { openaiApiKey: true }
             });
             apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
             console.log('API Key source:', globalConfig?.openaiApiKey ? 'DB' : (process.env.OPENAI_API_KEY ? 'ENV' : 'NONE'));

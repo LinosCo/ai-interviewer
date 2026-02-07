@@ -39,21 +39,36 @@ export default async function VisibilityPage({
     if (!orgId) redirect("/login");
 
     // 1. Check if config exists (optionally filtered by project or brandId)
-    const config = await prisma.visibilityConfig.findFirst({
-        where: {
-            organizationId: orgId,
-            ...(brandIdFilter ? { id: brandIdFilter } : {}),
-            ...(projectIdFilter && projectIdFilter !== '__ALL__' && !brandIdFilter
-                ? {
-                    OR: [
-                        { projectId: projectIdFilter },
-                        { projectShares: { some: { projectId: projectIdFilter } } }
-                    ]
-                }
-                : {})
-        },
-        include: { prompts: true, project: { select: { id: true, name: true } } }
-    });
+    let config = null;
+    try {
+        config = await prisma.visibilityConfig.findFirst({
+            where: {
+                organizationId: orgId,
+                ...(brandIdFilter ? { id: brandIdFilter } : {}),
+                ...(projectIdFilter && projectIdFilter !== '__ALL__' && !brandIdFilter
+                    ? {
+                        OR: [
+                            { projectId: projectIdFilter },
+                            { projectShares: { some: { projectId: projectIdFilter } } }
+                        ]
+                    }
+                    : {})
+            },
+            include: { prompts: true, project: { select: { id: true, name: true } } }
+        });
+    } catch (error: any) {
+        if (error?.code !== 'P2021') throw error;
+        config = await prisma.visibilityConfig.findFirst({
+            where: {
+                organizationId: orgId,
+                ...(brandIdFilter ? { id: brandIdFilter } : {}),
+                ...(projectIdFilter && projectIdFilter !== '__ALL__' && !brandIdFilter
+                    ? { projectId: projectIdFilter }
+                    : {})
+            },
+            include: { prompts: true, project: { select: { id: true, name: true } } }
+        });
+    }
 
     // Count all brands for this org
     const allBrands = await prisma.visibilityConfig.findMany({

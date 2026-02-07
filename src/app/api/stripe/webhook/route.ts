@@ -339,9 +339,8 @@ async function resolvePlanAndCycleFromPriceId(priceId?: string | null): Promise<
             stripePricePro: true,
             stripePriceProYearly: true,
             stripePriceBusiness: true,
-            stripePriceBusinessYearly: true
         }
-    });
+    }).catch(() => null);
 
     const plansToCheck = [PlanType.STARTER, PlanType.PRO, PlanType.BUSINESS];
     for (const planType of plansToCheck) {
@@ -355,7 +354,7 @@ async function resolvePlanAndCycleFromPriceId(priceId?: string | null): Promise<
         const yearlyId =
             (planType === PlanType.STARTER ? globalConfig?.stripePriceStarterYearly : null) ||
             (planType === PlanType.PRO ? globalConfig?.stripePriceProYearly : null) ||
-            (planType === PlanType.BUSINESS ? globalConfig?.stripePriceBusinessYearly : null) ||
+            (planType === PlanType.BUSINESS ? process.env.STRIPE_PRICE_BUSINESS_YEARLY : null) ||
             plan.stripePriceIdYearly;
 
         if (monthlyId && monthlyId === priceId) {

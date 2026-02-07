@@ -25,7 +25,10 @@ async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
 
     // 3. ADMIN Logic: Fallback to Global/Env allowed
     if (user.role === 'ADMIN') {
-        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        const globalConfig = await prisma.globalConfig.findUnique({
+            where: { id: "default" },
+            select: { openaiApiKey: true }
+        });
         if (globalConfig?.openaiApiKey) return decryptIfNeeded(globalConfig.openaiApiKey);
         // Never expose env key directly - should be set in DB encrypted
         return process.env.OPENAI_API_KEY;

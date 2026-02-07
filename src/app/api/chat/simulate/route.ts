@@ -86,7 +86,10 @@ export async function POST(req: Request) {
 
         // Fallback to Global Settings if env var is missing
         if (!apiKey) {
-            const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } }).catch(() => null);
+            const globalConfig = await prisma.globalConfig.findUnique({
+                where: { id: "default" },
+                select: { openaiApiKey: true }
+            }).catch(() => null);
             apiKey = globalConfig?.openaiApiKey || undefined;
         }
 

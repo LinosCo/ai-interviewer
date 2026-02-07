@@ -36,8 +36,15 @@ export async function GET(
         let globalConfig = null;
         if ((session.user as any).role === 'ADMIN') {
             globalConfig = await prisma.globalConfig.findUnique({
-                where: { id: "default" }
-            });
+                where: { id: "default" },
+                select: {
+                    openaiApiKey: true,
+                    anthropicApiKey: true,
+                    geminiApiKey: true,
+                    googleSerpApiKey: true,
+                    stripeSecretKey: true
+                }
+            }).catch(() => null);
         }
 
         return NextResponse.json({

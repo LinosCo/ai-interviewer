@@ -155,7 +155,11 @@ export async function POST(req: Request) {
 
         // 6. Get API key (Anthropic for Claude 4.5 Opus)
         const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' }
+            where: { id: 'default' },
+            select: {
+                anthropicApiKey: true,
+                openaiApiKey: true
+            }
         });
 
         const anthropicApiKey = globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';

@@ -42,7 +42,20 @@ async function getStripeConfig() {
 
     // 2. DB fallback
     try {
-        const config = await prisma.globalConfig.findUnique({ where: { id: 'default' } });
+        const config = await prisma.globalConfig.findUnique({
+            where: { id: 'default' },
+            select: {
+                stripeSecretKey: true,
+                stripePriceStarter: true,
+                stripePriceStarterYearly: true,
+                stripePricePro: true,
+                stripePriceProYearly: true,
+                stripePriceBusiness: true,
+                stripePricePackSmall: true,
+                stripePricePackMedium: true,
+                stripePricePackLarge: true
+            }
+        });
         if (config?.stripeSecretKey) {
             return {
                 secretKey: config.stripeSecretKey,
@@ -52,7 +65,7 @@ async function getStripeConfig() {
                     PRO: config.stripePricePro,
                     PRO_YEARLY: config.stripePriceProYearly,
                     BUSINESS: config.stripePriceBusiness,
-                    BUSINESS_YEARLY: config.stripePriceBusinessYearly,
+                    BUSINESS_YEARLY: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
                     PACK_SMALL: config.stripePricePackSmall,
                     PACK_MEDIUM: config.stripePricePackMedium,
                     PACK_LARGE: config.stripePricePackLarge

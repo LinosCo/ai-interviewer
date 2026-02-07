@@ -58,20 +58,35 @@ export async function GET(
             });
 
             // 2. Fetch Trackers (VisibilityConfigs)
-            const linkedTrackers = await prisma.visibilityConfig.findMany({
-                where: {
-                    organizationId: project.organizationId || undefined,
-                    OR: [
-                        { projectId },
-                        { projectShares: { some: { projectId } } }
-                    ]
-                },
-                include: {
-                    project: { select: { name: true, organization: { select: { name: true } } } },
-                    projectShares: { select: { projectId: true } }
-                },
-                orderBy: { updatedAt: 'desc' }
-            });
+            let linkedTrackers: any[] = [];
+            try {
+                linkedTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: project.organizationId || undefined,
+                        OR: [
+                            { projectId },
+                            { projectShares: { some: { projectId } } }
+                        ]
+                    },
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } },
+                        projectShares: { select: { projectId: true } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            } catch (error: any) {
+                if (error?.code !== 'P2021') throw error;
+                linkedTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: project.organizationId || undefined,
+                        projectId
+                    },
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            }
 
             // Get all accessible projects
             const userMemberships = await prisma.membership.findMany({
@@ -99,26 +114,41 @@ export async function GET(
                 orderBy: { updatedAt: 'desc' }
             });
 
-            const availableTrackers = await prisma.visibilityConfig.findMany({
-                where: {
-                    organizationId: { in: orgIds },
-                    NOT: {
+            let availableTrackers: any[] = [];
+            try {
+                availableTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: { in: orgIds },
+                        NOT: {
+                            OR: [
+                                { projectId },
+                                { projectShares: { some: { projectId } } }
+                            ]
+                        },
                         OR: [
-                            { projectId },
-                            { projectShares: { some: { projectId } } }
+                            { projectId: { in: allProjectIds, not: projectId } },
+                            { projectShares: { some: { projectId: { in: allProjectIds, not: projectId } } } }
                         ]
                     },
-                    OR: [
-                        { projectId: { in: allProjectIds, not: projectId } },
-                        { projectShares: { some: { projectId: { in: allProjectIds, not: projectId } } } }
-                    ]
-                },
-                include: {
-                    project: { select: { name: true, organization: { select: { name: true } } } },
-                    projectShares: { select: { projectId: true } }
-                },
-                orderBy: { updatedAt: 'desc' }
-            });
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } },
+                        projectShares: { select: { projectId: true } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            } catch (error: any) {
+                if (error?.code !== 'P2021') throw error;
+                availableTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: { in: orgIds },
+                        projectId: { in: allProjectIds, not: projectId }
+                    },
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            }
 
             // Find the owner's personal project ID
             const personalProject = await prisma.project.findFirst({

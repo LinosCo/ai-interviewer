@@ -36,29 +36,54 @@ export async function GET(request: Request) {
             where.projectId = projectId;
         }
 
-        const brands = await prisma.visibilityConfig.findMany({
-            where,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                project: { select: { id: true, name: true } },
-                projectShares: {
-                    ...(projectId ? { where: { projectId } } : {}),
-                    select: { projectId: true }
-                },
-                scans: {
-                    orderBy: { completedAt: 'desc' },
-                    take: 1,
-                    where: { status: 'completed' },
-                    select: {
-                        score: true,
-                        completedAt: true
+        let brands: any[] = [];
+        try {
+            brands = await prisma.visibilityConfig.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    project: { select: { id: true, name: true } },
+                    projectShares: {
+                        ...(projectId ? { where: { projectId } } : {}),
+                        select: { projectId: true }
+                    },
+                    scans: {
+                        orderBy: { completedAt: 'desc' },
+                        take: 1,
+                        where: { status: 'completed' },
+                        select: {
+                            score: true,
+                            completedAt: true
+                        }
+                    },
+                    _count: {
+                        select: { prompts: true, competitors: true }
                     }
-                },
-                _count: {
-                    select: { prompts: true, competitors: true }
                 }
-            }
-        });
+            });
+        } catch (err: any) {
+            // Backward compatibility: DB not migrated yet (missing ProjectVisibilityConfig)
+            if (err?.code !== 'P2021') throw err;
+            brands = await prisma.visibilityConfig.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    project: { select: { id: true, name: true } },
+                    scans: {
+                        orderBy: { completedAt: 'desc' },
+                        take: 1,
+                        where: { status: 'completed' },
+                        select: {
+                            score: true,
+                            completedAt: true
+                        }
+                    },
+                    _count: {
+                        select: { prompts: true, competitors: true }
+                    }
+                }
+            });
+        }
 
         const filteredBrands = projectId
             ? brands.filter((b: any) => b.projectId === projectId || (b.projectShares?.length ?? 0) > 0)

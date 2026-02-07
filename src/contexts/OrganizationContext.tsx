@@ -31,7 +31,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [retryCount, setRetryCount] = useState(0);
-    const maxRetries = 2;
+    const maxRetries = 6;
 
     const fetchOrganizations = useCallback(async () => {
         if (status !== 'authenticated') {
@@ -41,7 +41,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         let scheduledRetry = false;
         try {
             setLoading(true);
-            const res = await fetch('/api/organizations', {
+            const res = await fetch(`/api/organizations?_ts=${Date.now()}`, {
                 cache: 'no-store',
                 credentials: 'include',
                 headers: { Accept: 'application/json' }
@@ -51,7 +51,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                 if (!data || !Array.isArray(data.organizations)) {
                     throw new Error('Invalid organizations payload');
                 }
-                setOrganizations(data.organizations);
+                if (data.organizations.length > 0) {
+                    setOrganizations(data.organizations);
+                }
 
                 // Ripristina organizzazione selezionata
                 const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
@@ -74,15 +76,25 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                     document.cookie = `${COOKIE_ORG_KEY}=${data.organizations[0].id}; path=/; max-age=31536000; SameSite=Lax`;
                 }
 
+                if (data.organizations.length > 0) {
+                    setRetryCount(0);
+                }
             } else {
-                if ((res.status === 401 || res.status === 403) && retryCount < maxRetries) {
+                if ((res.status === 401 || res.status === 403 || res.status >= 500) && retryCount < maxRetries) {
                     scheduledRetry = true;
-                    setTimeout(() => setRetryCount((count) => count + 1), 600);
+                    const delayMs = Math.min(5000, 500 * Math.pow(2, retryCount));
+                    setTimeout(() => setRetryCount((count) => count + 1), delayMs);
                     return;
                 }
             }
         } catch (error) {
             console.error('Failed to fetch organizations:', error);
+            if (retryCount < maxRetries) {
+                scheduledRetry = true;
+                const delayMs = Math.min(5000, 500 * Math.pow(2, retryCount));
+                setTimeout(() => setRetryCount((count) => count + 1), delayMs);
+                return;
+            }
         } finally {
             if (!scheduledRetry) {
                 setLoading(false);
@@ -119,6 +131,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     };
 
     const refetchOrganizations = async () => {
+        setRetryCount(0);
         setLoading(true);
         await fetchOrganizations();
     };

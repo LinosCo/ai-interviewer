@@ -22,6 +22,11 @@ interface ChatWindowProps {
     companyName?: string; // For GDPR disclosure
     privacyPolicyUrl?: string;
     termsUrl?: string;
+    consentText?: string;
+    privacyNotice?: string;
+    dataUsageInfo?: string;
+    showAnonymityInfo?: boolean;
+    showDataUsageInfo?: boolean;
     hostPageContext?: {
         url?: string;
         title?: string;
@@ -84,6 +89,11 @@ function GDPRWelcomeScreen({
     primaryColor,
     privacyPolicyUrl,
     termsUrl,
+    consentText,
+    privacyNotice,
+    dataUsageInfo,
+    showAnonymityInfo,
+    showDataUsageInfo,
     onAccept,
     onClose
 }: {
@@ -92,6 +102,11 @@ function GDPRWelcomeScreen({
     primaryColor: string;
     privacyPolicyUrl: string;
     termsUrl: string;
+    consentText?: string;
+    privacyNotice?: string;
+    dataUsageInfo?: string;
+    showAnonymityInfo?: boolean;
+    showDataUsageInfo?: boolean;
     onAccept: (marketingConsent: boolean) => void;
     onClose: () => void;
 }) {
@@ -151,19 +166,23 @@ function GDPRWelcomeScreen({
 
                     {/* Data Processing Info */}
                     <div className="space-y-4">
-                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                            <h5 className="font-semibold text-gray-800 text-sm mb-2">📋 Conservazione della conversazione</h5>
-                            <p className="text-xs text-gray-600 leading-relaxed">
-                                La tua conversazione verrà conservata in forma <strong>anonima</strong> per migliorare il servizio e analizzare le domande frequenti. I dati anonimi vengono conservati per massimo 90 giorni.
-                            </p>
-                        </div>
+                        {(showAnonymityInfo ?? true) && (
+                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <h5 className="font-semibold text-gray-800 text-sm mb-2">📋 Conservazione della conversazione</h5>
+                                <p className="text-xs text-gray-600 leading-relaxed">
+                                    {privacyNotice || 'La tua conversazione verrà conservata in forma anonima per migliorare il servizio e analizzare le domande frequenti. I dati anonimi vengono conservati per massimo 90 giorni.'}
+                                </p>
+                            </div>
+                        )}
 
-                        <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                            <h5 className="font-semibold text-amber-800 text-sm mb-2">👤 Dati personali (opzionale)</h5>
-                            <p className="text-xs text-amber-700 leading-relaxed">
-                                Se durante la conversazione sceglierai di fornire dati personali (nome, email, telefono) per essere ricontattato, questi verranno conservati e trattati secondo il <strong>GDPR</strong> e la nostra Privacy Policy. Potrai richiederne la modifica o cancellazione in qualsiasi momento.
-                            </p>
-                        </div>
+                        {(showDataUsageInfo ?? true) && (
+                            <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                                <h5 className="font-semibold text-amber-800 text-sm mb-2">👤 Dati personali (opzionale)</h5>
+                                <p className="text-xs text-amber-700 leading-relaxed">
+                                    {dataUsageInfo || 'Se durante la conversazione sceglierai di fornire dati personali (nome, email, telefono) per essere ricontattato, questi verranno conservati e trattati secondo il GDPR e la nostra Privacy Policy. Potrai richiederne la modifica o cancellazione in qualsiasi momento.'}
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Consent Checkboxes */}
@@ -177,7 +196,7 @@ function GDPRWelcomeScreen({
                                 style={{ accentColor: primaryColor }}
                             />
                             <span className="text-sm text-gray-700 leading-relaxed group-hover:text-gray-900">
-                                Acconsento alla conservazione e al trattamento dei dati della conversazione come descritto sopra. <span className="text-red-500">*</span>
+                                {consentText || 'Acconsento alla conservazione e al trattamento dei dati della conversazione come descritto sopra.'} <span className="text-red-500">*</span>
                             </span>
                         </label>
 
@@ -255,6 +274,11 @@ export default function ChatWindow({
     companyName = 'Business Tuner',
     privacyPolicyUrl = '/privacy',
     termsUrl = '/terms',
+    consentText,
+    privacyNotice,
+    dataUsageInfo,
+    showAnonymityInfo = true,
+    showDataUsageInfo = true,
     hostPageContext = null,
     enablePageContext = true
 }: ChatWindowProps) {
@@ -482,6 +506,11 @@ export default function ChatWindow({
                             primaryColor={primaryColor}
                             privacyPolicyUrl={privacyPolicyUrl}
                             termsUrl={termsUrl}
+                            consentText={consentText}
+                            privacyNotice={privacyNotice}
+                            dataUsageInfo={dataUsageInfo}
+                            showAnonymityInfo={showAnonymityInfo}
+                            showDataUsageInfo={showDataUsageInfo}
                             onAccept={handleConsentAccept}
                             onClose={onClose}
                         />

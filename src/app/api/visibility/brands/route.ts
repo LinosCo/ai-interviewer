@@ -15,12 +15,23 @@ export async function GET(request: Request) {
 
         const url = new URL(request.url);
         const projectId = url.searchParams.get('projectId');
+        const selectedOrganizationId = url.searchParams.get('organizationId');
 
-        // Get user's organization
-        const membership = await prisma.membership.findFirst({
-            where: { userId: session.user.id },
-            select: { organizationId: true }
-        });
+        // Get selected organization if provided, otherwise fallback to first
+        const membership = selectedOrganizationId
+            ? await prisma.membership.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: session.user.id,
+                        organizationId: selectedOrganizationId
+                    }
+                },
+                select: { organizationId: true }
+            })
+            : await prisma.membership.findFirst({
+                where: { userId: session.user.id },
+                select: { organizationId: true }
+            });
 
         if (!membership?.organizationId) {
             return NextResponse.json({ error: 'No organization found' }, { status: 404 });

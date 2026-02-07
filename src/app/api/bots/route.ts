@@ -10,6 +10,7 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
         const botType = searchParams.get('type'); // 'chatbot' or 'interview'
+        const selectedOrganizationId = searchParams.get('organizationId');
 
         // Get user with organization membership
         const user = await prisma.user.findUnique({
@@ -30,9 +31,14 @@ export async function GET(req: Request) {
             return new Response('Access denied - Admin only', { status: 403 });
         }
 
-        // Get organization ID
-        const orgId = user.memberships[0]?.organizationId;
+        // Get selected organization ID (fallback to first membership)
+        const orgId = selectedOrganizationId || user.memberships[0]?.organizationId;
         if (!orgId) return new Response('Organization not found', { status: 404 });
+
+        const hasOrgMembership = user.memberships.some((m) => m.organizationId === orgId);
+        if (!hasOrgMembership) {
+            return new Response('Organization not found or access denied', { status: 403 });
+        }
 
         // Fetch all bots from all projects in the organization
         const bots = await prisma.bot.findMany({

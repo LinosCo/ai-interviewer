@@ -16,6 +16,7 @@ import {
     DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useProject } from '@/contexts/ProjectContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -47,6 +48,7 @@ interface BrandsListProps {
 
 export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
     const { selectedProject, isAllProjectsSelected, loading: projectLoading, projects } = useProject();
+    const { currentOrganization } = useOrganization();
     const [brands, setBrands] = useState<Brand[]>([]);
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
@@ -127,8 +129,8 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
             try {
                 // If a specific project is selected, filter by it
                 const url = isAllProjectsSelected || !selectedProject
-                    ? '/api/visibility/brands'
-                    : `/api/visibility/brands?projectId=${selectedProject.id}`;
+                    ? `/api/visibility/brands${currentOrganization?.id ? `?organizationId=${currentOrganization.id}` : ''}`
+                    : `/api/visibility/brands?projectId=${selectedProject.id}${currentOrganization?.id ? `&organizationId=${currentOrganization.id}` : ''}`;
 
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to fetch brands');
@@ -143,7 +145,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
         };
 
         fetchBrands();
-    }, [selectedProject?.id, isAllProjectsSelected, projectLoading]);
+    }, [selectedProject?.id, isAllProjectsSelected, projectLoading, currentOrganization?.id]);
 
     useEffect(() => {
         const fetchOrganizations = async () => {

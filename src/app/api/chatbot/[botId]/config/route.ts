@@ -18,6 +18,11 @@ export async function GET(
                 introMessage: true,
                 privacyPolicyUrl: true,
                 enablePageContext: true,
+                consentText: true,
+                privacyNotice: true,
+                dataUsageInfo: true,
+                showAnonymityInfo: true,
+                showDataUsageInfo: true,
                 // Only include other PUBLIC fields needed for UI
             }
         });

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useProject, ALL_PROJECTS_OPTION } from '@/contexts/ProjectContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface UseProjectDataOptions<T> {
     endpoint: string; // e.g., 'bots', 'interviews', etc.
@@ -10,6 +11,7 @@ interface UseProjectDataOptions<T> {
 
 export function useProjectData<T>({ endpoint, queryParams }: UseProjectDataOptions<T>) {
     const { selectedProject, loading: projectLoading, isAllProjectsSelected } = useProject();
+    const { currentOrganization } = useOrganization();
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,9 @@ export function useProjectData<T>({ endpoint, queryParams }: UseProjectDataOptio
 
             try {
                 const params = new URLSearchParams(queryParams);
+                if (currentOrganization?.id) {
+                    params.set('organizationId', currentOrganization.id);
+                }
                 // For "All Projects", use a different API path
                 const url = isAllProjectsSelected
                     ? `/api/${endpoint}${params.toString() ? `?${params.toString()}` : ''}`
@@ -45,7 +50,7 @@ export function useProjectData<T>({ endpoint, queryParams }: UseProjectDataOptio
         };
 
         fetchData();
-    }, [selectedProject?.id, projectLoading, endpoint, isAllProjectsSelected, JSON.stringify(queryParams)]);
+    }, [selectedProject?.id, projectLoading, endpoint, isAllProjectsSelected, JSON.stringify(queryParams), currentOrganization?.id]);
 
     const refetch = async () => {
         if (!selectedProject) return;
@@ -53,6 +58,9 @@ export function useProjectData<T>({ endpoint, queryParams }: UseProjectDataOptio
         setLoading(true);
         try {
             const params = new URLSearchParams(queryParams);
+            if (currentOrganization?.id) {
+                params.set('organizationId', currentOrganization.id);
+            }
             const url = isAllProjectsSelected
                 ? `/api/${endpoint}${params.toString() ? `?${params.toString()}` : ''}`
                 : `/api/projects/${selectedProject.id}/${endpoint}${params.toString() ? `?${params.toString()}` : ''}`;

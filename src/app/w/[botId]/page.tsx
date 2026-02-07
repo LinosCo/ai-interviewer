@@ -22,6 +22,11 @@ type PublicBotConfig = {
     introMessage?: string | null;
     privacyPolicyUrl?: string | null;
     enablePageContext?: boolean | null;
+    consentText?: string | null;
+    privacyNotice?: string | null;
+    dataUsageInfo?: string | null;
+    showAnonymityInfo?: boolean | null;
+    showDataUsageInfo?: boolean | null;
 };
 
 export default function PublicWidgetPage({ params }: WidgetPageProps) {
@@ -130,14 +135,16 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
 
     return (
         <div className="relative w-full h-full min-h-screen bg-transparent">
-            <ChatBubble
-                botId={botId}
-                primaryColor={bot.primaryColor || '#7C3AED'}
-                welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
-                isOpen={isOpen}
-                onToggle={setIsOpen}
-                position="bottom-right"
-            />
+            {!isOpen && (
+                <ChatBubble
+                    botId={botId}
+                    primaryColor={bot.primaryColor || '#7C3AED'}
+                    welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
+                    isOpen={isOpen}
+                    onToggle={setIsOpen}
+                    position="bottom-right"
+                />
+            )}
             <ChatWindow
                 botId={botId}
                 isOpen={isOpen}
@@ -146,6 +153,11 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                 primaryColor={bot.primaryColor || '#7C3AED'}
                 welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
                 privacyPolicyUrl={bot.privacyPolicyUrl ?? undefined}
+                consentText={bot.consentText ?? undefined}
+                privacyNotice={bot.privacyNotice ?? undefined}
+                dataUsageInfo={bot.dataUsageInfo ?? undefined}
+                showAnonymityInfo={bot.showAnonymityInfo ?? undefined}
+                showDataUsageInfo={bot.showDataUsageInfo ?? undefined}
                 hostPageContext={hostPageContext}
                 enablePageContext={bot.enablePageContext !== false}
             />

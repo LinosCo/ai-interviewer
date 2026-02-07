@@ -33,6 +33,7 @@ export default function OrganizationProjectSelector() {
 
     const containerRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const hasAutoRetriedRef = useRef(false);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -52,6 +53,16 @@ export default function OrganizationProjectSelector() {
             searchInputRef.current.focus();
         }
     }, [dropdownMode]);
+
+    useEffect(() => {
+        if (!orgLoading && organizations.length === 0 && !hasAutoRetriedRef.current) {
+            hasAutoRetriedRef.current = true;
+            void refetchOrganizations();
+        }
+        if (organizations.length > 0) {
+            hasAutoRetriedRef.current = false;
+        }
+    }, [orgLoading, organizations.length, refetchOrganizations]);
 
     const filteredOrganizations = organizations.filter(org =>
         org.name.toLowerCase().includes(searchQuery.toLowerCase())

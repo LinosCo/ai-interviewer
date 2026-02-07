@@ -25,12 +25,13 @@ export async function GET(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
 
         // Get user info to check if admin
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: currentUserId },
             select: { role: true }
         });
         const isAdmin = user?.role === 'ADMIN';
@@ -52,13 +53,13 @@ export async function GET(
         }
 
         // Check if user is project owner (via ownerId)
-        const isProjectOwnerById = project.ownerId === session.user.id;
+        const isProjectOwnerById = project.ownerId === currentUserId;
 
         // Check if user has access via ProjectAccess
         const userAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId
                 }
             }
@@ -134,6 +135,7 @@ export async function POST(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
         const { email } = await req.json();
@@ -156,14 +158,14 @@ export async function POST(
 
         // Check if user is admin
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: currentUserId },
             select: { role: true }
         });
         const isAdmin = user?.role === 'ADMIN';
 
         // Verify user is OWNER or ADMIN
-        const ownerCheck = await isProjectOwner(session.user.id, projectId);
-        const isProjectOwnerById = project.ownerId === session.user.id;
+        const ownerCheck = await isProjectOwner(currentUserId, projectId);
+        const isProjectOwnerById = project.ownerId === currentUserId;
 
         if (!ownerCheck && !isProjectOwnerById && !isAdmin) {
             return new Response('Solo il proprietario può invitare membri', { status: 403 });
@@ -219,6 +221,7 @@ export async function PATCH(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
         const { action, targetUserId } = await req.json();
@@ -229,12 +232,12 @@ export async function PATCH(
 
         // Verify caller is OWNER (or system admin)
         const actor = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: currentUserId },
             select: { role: true }
         });
         const isAdmin = actor?.role === 'ADMIN';
 
-        if (!isAdmin && !(await isProjectOwner(session.user.id, projectId))) {
+        if (!isAdmin && !(await isProjectOwner(currentUserId, projectId))) {
             return new Response('Solo il proprietario può trasferire la proprietà', { status: 403 });
         }
 
@@ -268,11 +271,11 @@ export async function PATCH(
             // Demote current owner to member (upsert to handle legacy missing rows)
             await tx.projectAccess.upsert({
                 where: {
-                    userId_projectId: { userId: session.user.id, projectId }
+                    userId_projectId: { userId: currentUserId, projectId }
                 },
                 update: { role: 'MEMBER' },
                 create: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId,
                     role: 'MEMBER'
                 }
@@ -308,6 +311,7 @@ export async function DELETE(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
         const { searchParams } = new URL(req.url);
@@ -317,7 +321,7 @@ export async function DELETE(
 
         // Handle "self" as current user
         if (userId === 'self') {
-            userId = session.user.id;
+            userId = currentUserId;
         }
 
         // Get project info
@@ -347,12 +351,12 @@ export async function DELETE(
 
         // Check if current user is OWNER or is removing themselves (leave)
         const actor = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: currentUserId },
             select: { role: true }
         });
         const isAdmin = actor?.role === 'ADMIN';
-        const isOwner = await isProjectOwner(session.user.id, projectId);
-        const isSelf = userId === session.user.id;
+        const isOwner = await isProjectOwner(currentUserId, projectId);
+        const isSelf = userId === currentUserId;
 
         if (!isOwner && !isSelf && !isAdmin) {
             return new Response('Solo il proprietario può rimuovere membri', { status: 403 });

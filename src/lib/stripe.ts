@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
-import { PLANS, PlanType, PlanLimits } from '@/config/plans';
+import { PLANS, PlanType, PlanLimits, PlanFeatures } from '@/config/plans';
 
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
@@ -18,7 +18,7 @@ interface PriceConfig {
     priceYearly: number | null;
     priceIdYearly: string | null;
     limits: PlanLimits;
-    features: string[];
+    features: PlanFeatures;
 }
 
 async function getStripeConfig() {
@@ -84,7 +84,7 @@ export async function getStripeClient(): Promise<Stripe> {
 
 export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
     const config = await getStripeConfig();
-    const dbPrices = config?.prices || {};
+    const dbPrices = (config?.prices || {}) as Record<string, string | undefined>;
 
     const getPriceId = (tier: PlanType) => {
         const upperTier = tier.toUpperCase() as keyof typeof dbPrices;
@@ -120,7 +120,7 @@ export async function getStripePriceIdForPlan(
     billingPeriod: 'monthly' | 'yearly'
 ): Promise<string | null> {
     const config = await getStripeConfig();
-    const dbPrices = config?.prices || {};
+    const dbPrices = (config?.prices || {}) as Record<string, string | undefined>;
     const key =
         billingPeriod === 'yearly'
             ? `${tier.toUpperCase()}_YEARLY`
@@ -139,7 +139,7 @@ export async function getStripePriceIdForPlan(
 
 export async function getStripePriceIdForPack(packType: string): Promise<string | null> {
     const config = await getStripeConfig();
-    const dbPrices = config?.prices || {};
+    const dbPrices = (config?.prices || {}) as Record<string, string | undefined>;
     const normalized = packType.toLowerCase();
 
     if (normalized === 'small') {

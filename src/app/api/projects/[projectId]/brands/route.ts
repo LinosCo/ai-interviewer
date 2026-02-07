@@ -169,7 +169,7 @@ export async function POST(
                     create: {
                         projectId,
                         configId: brandId,
-                        createdBy: session.user.id
+                        createdBy: userId
                     }
                 });
 

@@ -161,7 +161,7 @@ export async function POST(request: Request) {
                 create: {
                     projectId,
                     configId: config.id,
-                    createdBy: session.user.id
+                    createdBy: user.id
                 }
             });
         }
@@ -368,7 +368,7 @@ export async function PATCH(request: Request) {
                     create: {
                         projectId,
                         configId: config.id,
-                        createdBy: session.user.id
+                        createdBy: user.id
                     }
                 });
             }

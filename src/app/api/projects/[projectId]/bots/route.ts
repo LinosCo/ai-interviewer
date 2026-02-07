@@ -9,6 +9,7 @@ export async function GET(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
         const { searchParams } = new URL(req.url);
@@ -19,7 +20,7 @@ export async function GET(
         const access = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId
                 }
             }
@@ -30,14 +31,17 @@ export async function GET(
             where: { id: projectId },
             select: { ownerId: true, organizationId: true }
         });
+        if (!project) {
+            return new Response('Project not found', { status: 404 });
+        }
 
         // Admin can access all
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: currentUserId },
             select: { role: true }
         });
 
-        const isOwner = project?.ownerId === session.user.id;
+        const isOwner = project.ownerId === currentUserId;
         const isAdmin = user?.role === 'ADMIN';
 
         if (!access && !isOwner && !isAdmin) {
@@ -71,7 +75,7 @@ export async function GET(
 
             // Get all accessible projects
             const userMemberships = await prisma.membership.findMany({
-                where: { userId: session.user.id },
+                where: { userId: currentUserId },
                 select: { organizationId: true }
             });
             const orgIds = userMemberships.map(m => m.organizationId);
@@ -80,7 +84,7 @@ export async function GET(
                 where: {
                     OR: [
                         { organizationId: { in: orgIds } },
-                        { ownerId: session.user.id }
+                        { ownerId: currentUserId }
                     ]
                 },
                 select: { id: true }
@@ -118,7 +122,7 @@ export async function GET(
 
             // Find the owner's personal project ID
             const personalProject = await prisma.project.findFirst({
-                where: { ownerId: session.user.id, isPersonal: true },
+                where: { ownerId: currentUserId, isPersonal: true },
                 select: { id: true }
             });
 
@@ -188,6 +192,7 @@ export async function POST(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
         const body = await req.json();
@@ -204,7 +209,7 @@ export async function POST(
         const currentAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId
                 }
             }
@@ -216,7 +221,7 @@ export async function POST(
             select: { ownerId: true }
         });
 
-        const isOwner = currentProject?.ownerId === session.user.id;
+        const isOwner = currentProject?.ownerId === currentUserId;
         const hasOwnerAccess = currentAccess?.role === 'OWNER';
 
         if (!isOwner && !hasOwnerAccess) {
@@ -230,7 +235,7 @@ export async function POST(
         const targetAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId: targetProjectId
                 }
             }
@@ -249,7 +254,7 @@ export async function POST(
             );
         }
 
-        const isTargetOwner = targetProject.ownerId === session.user.id;
+        const isTargetOwner = targetProject.ownerId === currentUserId;
 
         if (!targetAccess && !isTargetOwner) {
             return NextResponse.json(
@@ -293,14 +298,14 @@ export async function POST(
         const botProjectAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId: toolCurrentProjectId
                 }
             }
         });
 
         // Also check if user is owner of tool's current project
-        const isToolProjectOwner = tool?.project?.ownerId === session.user.id;
+        const isToolProjectOwner = tool?.project?.ownerId === currentUserId;
 
         if (!botProjectAccess && !isToolProjectOwner) {
             return NextResponse.json(
@@ -337,7 +342,7 @@ export async function POST(
                     create: {
                         projectId: targetProjectId,
                         configId: botId,
-                        createdBy: session.user.id
+                        createdBy: currentUserId
                     }
                 });
 

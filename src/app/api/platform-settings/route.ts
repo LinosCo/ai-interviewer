@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export async function POST(req: NextRequest) {
     try {
@@ -84,120 +84,111 @@ export async function POST(req: NextRequest) {
 
         // If Admin, update Global Config API Keys and Stripe Config
         if (currentUser?.role === 'ADMIN') {
+            const availableColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'GlobalConfig'
+            `).catch(() => []);
+            const available = new Set(availableColumns.map((c) => c.column_name));
+
             const updateData: Prisma.GlobalConfigUpdateInput = {};
             const createData: Prisma.GlobalConfigCreateInput = {
                 id: 'default'
             };
+            const assignIfAvailable = (column: string, key: keyof Prisma.GlobalConfigUpdateInput, value: unknown) => {
+                if (!available.has(column)) return;
+                (updateData as any)[key] = value;
+                (createData as any)[key] = value;
+            };
 
             if (platformOpenaiApiKey !== undefined) {
                 const value = platformOpenaiApiKey || null;
-                updateData.openaiApiKey = value;
-                createData.openaiApiKey = value;
+                assignIfAvailable('openaiApiKey', 'openaiApiKey', value);
             }
             if (platformAnthropicApiKey !== undefined) {
                 const value = platformAnthropicApiKey || null;
-                updateData.anthropicApiKey = value;
-                createData.anthropicApiKey = value;
+                assignIfAvailable('anthropicApiKey', 'anthropicApiKey', value);
             }
             if (platformGeminiApiKey !== undefined) {
                 const value = platformGeminiApiKey || null;
-                updateData.geminiApiKey = value;
-                createData.geminiApiKey = value;
+                assignIfAvailable('geminiApiKey', 'geminiApiKey', value);
             }
             if (googleSerpApiKey !== undefined) {
                 const value = googleSerpApiKey || null;
-                updateData.googleSerpApiKey = value;
-                createData.googleSerpApiKey = value;
+                assignIfAvailable('googleSerpApiKey', 'googleSerpApiKey', value);
             }
             if (stripeSecretKey !== undefined) {
                 const value = stripeSecretKey || null;
-                updateData.stripeSecretKey = value;
-                createData.stripeSecretKey = value;
+                assignIfAvailable('stripeSecretKey', 'stripeSecretKey', value);
             }
             if (stripeWebhookSecret !== undefined) {
                 const value = stripeWebhookSecret || null;
-                updateData.stripeWebhookSecret = value;
-                createData.stripeWebhookSecret = value;
+                assignIfAvailable('stripeWebhookSecret', 'stripeWebhookSecret', value);
             }
             if (stripePriceStarter !== undefined) {
                 const value = stripePriceStarter || null;
-                updateData.stripePriceStarter = value;
-                createData.stripePriceStarter = value;
+                assignIfAvailable('stripePriceStarter', 'stripePriceStarter', value);
             }
             if (stripePriceStarterYearly !== undefined) {
                 const value = stripePriceStarterYearly || null;
-                updateData.stripePriceStarterYearly = value;
-                createData.stripePriceStarterYearly = value;
+                assignIfAvailable('stripePriceStarterYearly', 'stripePriceStarterYearly', value);
             }
             if (stripePricePro !== undefined) {
                 const value = stripePricePro || null;
-                updateData.stripePricePro = value;
-                createData.stripePricePro = value;
+                assignIfAvailable('stripePricePro', 'stripePricePro', value);
             }
             if (stripePriceProYearly !== undefined) {
                 const value = stripePriceProYearly || null;
-                updateData.stripePriceProYearly = value;
-                createData.stripePriceProYearly = value;
+                assignIfAvailable('stripePriceProYearly', 'stripePriceProYearly', value);
             }
             if (stripePriceBusiness !== undefined) {
                 const value = stripePriceBusiness || null;
-                updateData.stripePriceBusiness = value;
-                createData.stripePriceBusiness = value;
+                assignIfAvailable('stripePriceBusiness', 'stripePriceBusiness', value);
             }
             if (stripePriceBusinessYearly !== undefined) {
                 const value = stripePriceBusinessYearly || null;
-                updateData.stripePriceBusinessYearly = value;
-                createData.stripePriceBusinessYearly = value;
+                assignIfAvailable('stripePriceBusinessYearly', 'stripePriceBusinessYearly', value);
             }
             if (stripePricePackSmall !== undefined) {
                 const value = stripePricePackSmall || null;
-                updateData.stripePricePackSmall = value;
-                createData.stripePricePackSmall = value;
+                assignIfAvailable('stripePricePackSmall', 'stripePricePackSmall', value);
             }
             if (stripePricePackMedium !== undefined) {
                 const value = stripePricePackMedium || null;
-                updateData.stripePricePackMedium = value;
-                createData.stripePricePackMedium = value;
+                assignIfAvailable('stripePricePackMedium', 'stripePricePackMedium', value);
             }
             if (stripePricePackLarge !== undefined) {
                 const value = stripePricePackLarge || null;
-                updateData.stripePricePackLarge = value;
-                createData.stripePricePackLarge = value;
+                assignIfAvailable('stripePricePackLarge', 'stripePricePackLarge', value);
             }
             if (smtpHost !== undefined) {
                 const value = smtpHost || null;
-                updateData.smtpHost = value;
-                createData.smtpHost = value;
+                assignIfAvailable('smtpHost', 'smtpHost', value);
             }
             if (smtpPort !== undefined) {
                 const value = smtpPort ? Number(smtpPort) : null;
-                updateData.smtpPort = value;
-                createData.smtpPort = value;
+                assignIfAvailable('smtpPort', 'smtpPort', value);
             }
             if (smtpSecure !== undefined) {
                 const value = Boolean(smtpSecure);
-                updateData.smtpSecure = value;
-                createData.smtpSecure = value;
+                assignIfAvailable('smtpSecure', 'smtpSecure', value);
             }
             if (smtpUser !== undefined) {
                 const value = smtpUser || null;
-                updateData.smtpUser = value;
-                createData.smtpUser = value;
+                assignIfAvailable('smtpUser', 'smtpUser', value);
             }
             if (smtpPass !== undefined) {
                 const value = smtpPass || null;
-                updateData.smtpPass = value;
-                createData.smtpPass = value;
+                assignIfAvailable('smtpPass', 'smtpPass', value);
             }
             if (smtpFromEmail !== undefined) {
                 const value = smtpFromEmail || null;
-                updateData.smtpFromEmail = value;
-                createData.smtpFromEmail = value;
+                assignIfAvailable('smtpFromEmail', 'smtpFromEmail', value);
             }
             if (smtpNotificationEmail !== undefined) {
                 const value = smtpNotificationEmail || null;
-                updateData.smtpNotificationEmail = value;
-                createData.smtpNotificationEmail = value;
+                assignIfAvailable('smtpNotificationEmail', 'smtpNotificationEmail', value);
             }
 
             await prisma.globalConfig.upsert({

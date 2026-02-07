@@ -1,6 +1,60 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { Prisma } from '@prisma/client';
+
+const GLOBAL_CONFIG_FIELDS = [
+    'openaiApiKey',
+    'anthropicApiKey',
+    'geminiApiKey',
+    'googleSerpApiKey',
+    'stripeSecretKey',
+    'stripeWebhookSecret',
+    'stripePriceStarter',
+    'stripePriceStarterYearly',
+    'stripePricePro',
+    'stripePriceProYearly',
+    'stripePriceBusiness',
+    'stripePriceBusinessYearly',
+    'stripePricePackSmall',
+    'stripePricePackMedium',
+    'stripePricePackLarge',
+    'smtpHost',
+    'smtpPort',
+    'smtpSecure',
+    'smtpUser',
+    'smtpPass',
+    'smtpFromEmail',
+    'smtpNotificationEmail'
+] as const;
+
+async function getGlobalConfigCompat() {
+    try {
+        const columns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'GlobalConfig'
+        `);
+        const available = new Set(columns.map((c) => c.column_name));
+        const selectable = GLOBAL_CONFIG_FIELDS.filter((f) => available.has(f));
+
+        if (selectable.length === 0) return null;
+
+        const columnSql = Prisma.join(selectable.map((f) => Prisma.raw(`"${f}"`)));
+        const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+            SELECT ${columnSql}
+            FROM "GlobalConfig"
+            WHERE id = 'default'
+            LIMIT 1
+        `);
+
+        return rows[0] ?? null;
+    } catch (error) {
+        console.error('Error loading global config compat:', error);
+        return null;
+    }
+}
 
 export async function GET(
     req: Request,
@@ -35,16 +89,7 @@ export async function GET(
         // If admin, also return global config
         let globalConfig = null;
         if ((session.user as any).role === 'ADMIN') {
-            globalConfig = await prisma.globalConfig.findUnique({
-                where: { id: "default" },
-                select: {
-                    openaiApiKey: true,
-                    anthropicApiKey: true,
-                    geminiApiKey: true,
-                    googleSerpApiKey: true,
-                    stripeSecretKey: true
-                }
-            }).catch(() => null);
+            globalConfig = await getGlobalConfigCompat();
         }
 
         return NextResponse.json({

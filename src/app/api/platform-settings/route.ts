@@ -85,37 +85,125 @@ export async function POST(req: NextRequest) {
         // If Admin, update Global Config API Keys and Stripe Config
         if (currentUser?.role === 'ADMIN') {
             const updateData: Prisma.GlobalConfigUpdateInput = {};
+            const createData: Prisma.GlobalConfigCreateInput = {
+                id: 'default'
+            };
 
-            if (platformOpenaiApiKey !== undefined) updateData.openaiApiKey = platformOpenaiApiKey || null;
-            if (platformAnthropicApiKey !== undefined) updateData.anthropicApiKey = platformAnthropicApiKey || null;
-            if (platformGeminiApiKey !== undefined) updateData.geminiApiKey = platformGeminiApiKey || null;
-            if (googleSerpApiKey !== undefined) updateData.googleSerpApiKey = googleSerpApiKey || null;
-            if (stripeSecretKey !== undefined) updateData.stripeSecretKey = stripeSecretKey || null;
-            if (stripeWebhookSecret !== undefined) updateData.stripeWebhookSecret = stripeWebhookSecret || null;
-            if (stripePriceStarter !== undefined) updateData.stripePriceStarter = stripePriceStarter || null;
-            if (stripePriceStarterYearly !== undefined) updateData.stripePriceStarterYearly = stripePriceStarterYearly || null;
-            if (stripePricePro !== undefined) updateData.stripePricePro = stripePricePro || null;
-            if (stripePriceProYearly !== undefined) updateData.stripePriceProYearly = stripePriceProYearly || null;
-            if (stripePriceBusiness !== undefined) updateData.stripePriceBusiness = stripePriceBusiness || null;
-            if (stripePriceBusinessYearly !== undefined) updateData.stripePriceBusinessYearly = stripePriceBusinessYearly || null;
-            if (stripePricePackSmall !== undefined) updateData.stripePricePackSmall = stripePricePackSmall || null;
-            if (stripePricePackMedium !== undefined) updateData.stripePricePackMedium = stripePricePackMedium || null;
-            if (stripePricePackLarge !== undefined) updateData.stripePricePackLarge = stripePricePackLarge || null;
-            if (smtpHost !== undefined) updateData.smtpHost = smtpHost || null;
-            if (smtpPort !== undefined) updateData.smtpPort = smtpPort ? Number(smtpPort) : null;
-            if (smtpSecure !== undefined) updateData.smtpSecure = Boolean(smtpSecure);
-            if (smtpUser !== undefined) updateData.smtpUser = smtpUser || null;
-            if (smtpPass !== undefined) updateData.smtpPass = smtpPass || null;
-            if (smtpFromEmail !== undefined) updateData.smtpFromEmail = smtpFromEmail || null;
-            if (smtpNotificationEmail !== undefined) updateData.smtpNotificationEmail = smtpNotificationEmail || null;
+            if (platformOpenaiApiKey !== undefined) {
+                const value = platformOpenaiApiKey || null;
+                updateData.openaiApiKey = value;
+                createData.openaiApiKey = value;
+            }
+            if (platformAnthropicApiKey !== undefined) {
+                const value = platformAnthropicApiKey || null;
+                updateData.anthropicApiKey = value;
+                createData.anthropicApiKey = value;
+            }
+            if (platformGeminiApiKey !== undefined) {
+                const value = platformGeminiApiKey || null;
+                updateData.geminiApiKey = value;
+                createData.geminiApiKey = value;
+            }
+            if (googleSerpApiKey !== undefined) {
+                const value = googleSerpApiKey || null;
+                updateData.googleSerpApiKey = value;
+                createData.googleSerpApiKey = value;
+            }
+            if (stripeSecretKey !== undefined) {
+                const value = stripeSecretKey || null;
+                updateData.stripeSecretKey = value;
+                createData.stripeSecretKey = value;
+            }
+            if (stripeWebhookSecret !== undefined) {
+                const value = stripeWebhookSecret || null;
+                updateData.stripeWebhookSecret = value;
+                createData.stripeWebhookSecret = value;
+            }
+            if (stripePriceStarter !== undefined) {
+                const value = stripePriceStarter || null;
+                updateData.stripePriceStarter = value;
+                createData.stripePriceStarter = value;
+            }
+            if (stripePriceStarterYearly !== undefined) {
+                const value = stripePriceStarterYearly || null;
+                updateData.stripePriceStarterYearly = value;
+                createData.stripePriceStarterYearly = value;
+            }
+            if (stripePricePro !== undefined) {
+                const value = stripePricePro || null;
+                updateData.stripePricePro = value;
+                createData.stripePricePro = value;
+            }
+            if (stripePriceProYearly !== undefined) {
+                const value = stripePriceProYearly || null;
+                updateData.stripePriceProYearly = value;
+                createData.stripePriceProYearly = value;
+            }
+            if (stripePriceBusiness !== undefined) {
+                const value = stripePriceBusiness || null;
+                updateData.stripePriceBusiness = value;
+                createData.stripePriceBusiness = value;
+            }
+            if (stripePriceBusinessYearly !== undefined) {
+                const value = stripePriceBusinessYearly || null;
+                updateData.stripePriceBusinessYearly = value;
+                createData.stripePriceBusinessYearly = value;
+            }
+            if (stripePricePackSmall !== undefined) {
+                const value = stripePricePackSmall || null;
+                updateData.stripePricePackSmall = value;
+                createData.stripePricePackSmall = value;
+            }
+            if (stripePricePackMedium !== undefined) {
+                const value = stripePricePackMedium || null;
+                updateData.stripePricePackMedium = value;
+                createData.stripePricePackMedium = value;
+            }
+            if (stripePricePackLarge !== undefined) {
+                const value = stripePricePackLarge || null;
+                updateData.stripePricePackLarge = value;
+                createData.stripePricePackLarge = value;
+            }
+            if (smtpHost !== undefined) {
+                const value = smtpHost || null;
+                updateData.smtpHost = value;
+                createData.smtpHost = value;
+            }
+            if (smtpPort !== undefined) {
+                const value = smtpPort ? Number(smtpPort) : null;
+                updateData.smtpPort = value;
+                createData.smtpPort = value;
+            }
+            if (smtpSecure !== undefined) {
+                const value = Boolean(smtpSecure);
+                updateData.smtpSecure = value;
+                createData.smtpSecure = value;
+            }
+            if (smtpUser !== undefined) {
+                const value = smtpUser || null;
+                updateData.smtpUser = value;
+                createData.smtpUser = value;
+            }
+            if (smtpPass !== undefined) {
+                const value = smtpPass || null;
+                updateData.smtpPass = value;
+                createData.smtpPass = value;
+            }
+            if (smtpFromEmail !== undefined) {
+                const value = smtpFromEmail || null;
+                updateData.smtpFromEmail = value;
+                createData.smtpFromEmail = value;
+            }
+            if (smtpNotificationEmail !== undefined) {
+                const value = smtpNotificationEmail || null;
+                updateData.smtpNotificationEmail = value;
+                createData.smtpNotificationEmail = value;
+            }
 
             await prisma.globalConfig.upsert({
-                where: { id: "default" },
+                where: { id: 'default' },
                 update: updateData,
-                create: {
-                    id: "default",
-                    ...updateData
-                }
+                create: createData
             });
         }
 

@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 // GET all bots across all projects (admin only)
 export async function GET(req: Request) {
@@ -17,27 +18,27 @@ export async function GET(req: Request) {
             where: { id: session.user.id },
             include: {
                 memberships: {
-                    select: { role: true, organizationId: true }
+                    select: { role: true, organizationId: true, status: true }
                 }
             }
         });
 
         if (!user) return new Response('User not found', { status: 404 });
 
-        // Check if user is ADMIN or OWNER in organization
-        const isOrgAdmin = user.memberships.some(m => ['OWNER', 'ADMIN'].includes(m.role));
-
-        if (!isOrgAdmin) {
-            return new Response('Access denied - Admin only', { status: 403 });
-        }
-
-        // Get selected organization ID (fallback to first membership)
-        const orgId = selectedOrganizationId || user.memberships[0]?.organizationId;
+        const orgId = await resolveActiveOrganizationIdForUser(session.user.id, {
+            preferredOrganizationId: selectedOrganizationId
+        });
         if (!orgId) return new Response('Organization not found', { status: 404 });
 
-        const hasOrgMembership = user.memberships.some((m) => m.organizationId === orgId);
-        if (!hasOrgMembership) {
+        const orgMembership = user.memberships.find((m) => m.organizationId === orgId);
+        if (!orgMembership) {
             return new Response('Organization not found or access denied', { status: 403 });
+        }
+        if (orgMembership.status !== 'ACTIVE') {
+            return new Response('Organization membership is not active', { status: 403 });
+        }
+        if (!['OWNER', 'ADMIN'].includes(orgMembership.role)) {
+            return new Response('Access denied - Admin only', { status: 403 });
         }
 
         // Fetch all bots from all projects in the organization

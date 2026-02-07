@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { WebsiteAnalysisEngine } from '@/lib/visibility/website-analysis-engine';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 export async function POST(request: Request) {
     try {
@@ -12,20 +13,17 @@ export async function POST(request: Request) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                id: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
-            }
+            select: { id: true }
         });
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
 
         const body = await request.json();
         const { configId } = body;
@@ -97,15 +95,13 @@ export async function GET(request: Request) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
-            }
+            select: { id: true }
         });
 
-        const organizationId = user?.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
 
         // Verify config belongs to user's organization
         const config = await prisma.visibilityConfig.findFirst({

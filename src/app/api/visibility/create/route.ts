@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { PLANS, PlanType } from '@/config/plans';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 export async function POST(request: Request) {
     try {
@@ -30,11 +31,11 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { brandName, category, description, language, territory, prompts, competitors, organizationId, websiteUrl, additionalUrls } = body;
 
-        // Determine organizationId: use provided if admin, or fallback to first membership
+        // Determine organizationId: use provided if admin, or fallback to selected org cookie
         let finalOrganizationId = organizationId;
 
         if (!finalOrganizationId || user.role !== 'ADMIN') {
-            finalOrganizationId = user.memberships[0]?.organizationId;
+            finalOrganizationId = await resolveActiveOrganizationIdForUser(user.id);
         }
 
         if (!finalOrganizationId) {
@@ -199,20 +200,17 @@ export async function GET(request: Request) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                id: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
-            }
+            select: { id: true }
         });
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        }
 
         let config;
         try {
@@ -300,11 +298,7 @@ export async function PATCH(request: Request) {
             select: {
                 id: true,
                 plan: true,
-                role: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
+                role: true
             }
         });
 
@@ -312,7 +306,10 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        }
 
         const body = await request.json();
         const { id, brandName, category, description, language, territory, isActive, prompts, competitors, projectId, websiteUrl, additionalUrls } = body;

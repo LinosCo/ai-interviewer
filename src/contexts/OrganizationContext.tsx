@@ -51,9 +51,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                 if (!data || !Array.isArray(data.organizations)) {
                     throw new Error('Invalid organizations payload');
                 }
-                if (data.organizations.length > 0) {
-                    setOrganizations(data.organizations);
-                }
+                setOrganizations(data.organizations);
 
                 // Ripristina organizzazione selezionata
                 const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
@@ -78,6 +76,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
                 if (data.organizations.length > 0) {
                     setRetryCount(0);
+                } else {
+                    setCurrentOrganizationState(null);
                 }
             } else {
                 if ((res.status === 401 || res.status === 403 || res.status >= 500) && retryCount < maxRetries) {

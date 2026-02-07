@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createHash } from 'crypto';
+import { auth } from '@/auth';
 
 /**
  * Generate a unique key for a tip based on its content
@@ -15,12 +16,52 @@ function generateTipKey(title: string, type: string): string {
  */
 export async function GET(req: NextRequest) {
     try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { searchParams } = new URL(req.url);
         const configId = searchParams.get('configId');
+        const projectId = searchParams.get('projectId');
         const status = searchParams.get('status'); // active, completed, dismissed
 
         if (!configId) {
             return NextResponse.json({ error: 'configId required' }, { status: 400 });
+        }
+
+        const configSelect: any = {
+            id: true,
+            organizationId: true,
+            projectId: true,
+            projectShares: { select: { projectId: true } }
+        };
+
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
+            select: configSelect
+        }) as { organizationId: string; projectId: string | null; projectShares: Array<{ projectId: string }> } | null;
+
+        if (!config) {
+            return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
+        if (projectId && config.projectId !== projectId && !(config.projectShares as Array<{ projectId: string }>).some((p) => p.projectId === projectId)) {
+            return NextResponse.json({ error: 'Configuration not in selected project' }, { status: 404 });
         }
 
         const where: any = { configId };
@@ -45,6 +86,11 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
     try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const body = await req.json();
         const { configId, tipTitle, tipType, action, notes } = body;
 
@@ -53,6 +99,29 @@ export async function POST(req: NextRequest) {
                 { error: 'configId, tipTitle, tipType, and action required' },
                 { status: 400 }
             );
+        }
+
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
+            select: { organizationId: true }
+        });
+
+        if (!config) {
+            return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
         const tipKey = generateTipKey(tipTitle, tipType);
@@ -111,12 +180,40 @@ export async function POST(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
     try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { searchParams } = new URL(req.url);
         const configId = searchParams.get('configId');
         const tipKey = searchParams.get('tipKey');
 
         if (!configId || !tipKey) {
             return NextResponse.json({ error: 'configId and tipKey required' }, { status: 400 });
+        }
+
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
+            select: { organizationId: true }
+        });
+
+        if (!config) {
+            return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
         await prisma.tipAction.delete({

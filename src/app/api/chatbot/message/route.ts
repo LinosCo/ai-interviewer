@@ -139,7 +139,8 @@ export async function POST(req: Request) {
         const creditsCheck = await checkCreditsForAction(
             'chatbot_session_message',
             undefined,
-            bot.project?.id
+            bot.project?.id,
+            bot.project?.organizationId
         );
         if (!creditsCheck.allowed) {
             return Response.json({

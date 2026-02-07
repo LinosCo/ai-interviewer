@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET /api/visibility/analytics?configId=xxx
@@ -21,12 +22,7 @@ export async function GET(request: Request) {
         }
 
         // Verify access to config
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { memberships: { take: 1, select: { organizationId: true } } }
-        });
-
-        const orgId = user?.memberships[0]?.organizationId;
+        const orgId = await resolveActiveOrganizationIdForUser(session.user.id);
         if (!orgId) {
             return NextResponse.json({ error: 'No organization' }, { status: 403 });
         }

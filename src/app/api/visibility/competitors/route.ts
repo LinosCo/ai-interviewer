@@ -55,7 +55,12 @@ export async function POST(request: Request) {
         // Handle AI suggestion (Stateless, no config needed)
         if (action === 'suggest' && category && brandName) {
             try {
-                const creditsCheck = await checkCreditsForAction('visibility_query');
+                const creditsCheck = await checkCreditsForAction(
+                    'visibility_query',
+                    undefined,
+                    undefined,
+                    organizationId
+                );
                 if (!creditsCheck.allowed) {
                     return NextResponse.json({
                         code: (creditsCheck as any).code || 'ACCESS_DENIED',
@@ -64,6 +69,7 @@ export async function POST(request: Request) {
                         creditsAvailable: creditsCheck.creditsAvailable
                     }, { status: creditsCheck.status || 403 });
                 }
+                const chargedOrganizationId = (creditsCheck as { organizationId?: string | null }).organizationId || organizationId || null;
 
                 // Default limit for suggestions if config not present
                 const suggestionLimit = 5;
@@ -82,16 +88,18 @@ Return only the company/product names, without descriptions.`,
                 // Track credit usage
                 if (result.usage) {
                     try {
-                        await TokenTrackingService.logTokenUsage({
-                            organizationId: organizationId || 'unknown',
-                            userId: user.id,
-                            inputTokens: result.usage.inputTokens || 0,
-                            outputTokens: result.usage.outputTokens || 0,
-                            category: 'VISIBILITY',
-                            model: 'gpt-4o-mini',
-                            operation: 'visibility-suggest-competitors',
-                            resourceType: 'visibility'
-                        });
+                        if (chargedOrganizationId) {
+                            await TokenTrackingService.logTokenUsage({
+                                organizationId: chargedOrganizationId,
+                                userId: user.id,
+                                inputTokens: result.usage.inputTokens || 0,
+                                outputTokens: result.usage.outputTokens || 0,
+                                category: 'VISIBILITY',
+                                model: 'gpt-4o-mini',
+                                operation: 'visibility-suggest-competitors',
+                                resourceType: 'visibility'
+                            });
+                        }
                     } catch (err) {
                         console.error('[Visibility] Credit tracking failed:', err);
                     }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
 import { PLANS, PlanType } from '@/config/plans';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET - Fetch recent SERP monitoring results
@@ -17,11 +18,7 @@ export async function GET(request: Request) {
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
-                id: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
+                id: true
             }
         });
 
@@ -29,7 +26,10 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
 
         // Get URL params
         const { searchParams } = new URL(request.url);
@@ -63,11 +63,7 @@ export async function POST(request: Request) {
             select: {
                 id: true,
                 plan: true,
-                role: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
+                role: true
             }
         });
 
@@ -75,7 +71,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
 
         // Use user's plan (admin has unlimited access)
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';

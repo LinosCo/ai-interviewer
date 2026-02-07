@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET /api/visibility/brands
@@ -17,34 +18,25 @@ export async function GET(request: Request) {
         const projectId = url.searchParams.get('projectId');
         const selectedOrganizationId = url.searchParams.get('organizationId');
 
-        // Get selected organization if provided, otherwise fallback to first
-        const membership = selectedOrganizationId
-            ? await prisma.membership.findUnique({
-                where: {
-                    userId_organizationId: {
-                        userId: session.user.id,
-                        organizationId: selectedOrganizationId
-                    }
-                },
-                select: { organizationId: true }
-            })
-            : await prisma.membership.findFirst({
-                where: { userId: session.user.id },
-                select: { organizationId: true }
-            });
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id, {
+            preferredOrganizationId: selectedOrganizationId
+        });
 
-        if (!membership?.organizationId) {
+        if (!organizationId) {
             return NextResponse.json({ error: 'No organization found' }, { status: 404 });
         }
 
         // Build filter
         const where: any = {
-            organizationId: membership.organizationId
+            organizationId
         };
 
-        // If projectId is provided, filter by it
+        // If projectId is provided, include direct and shared associations.
         if (projectId) {
-            where.projectId = projectId;
+            where.OR = [
+                { projectId },
+                { projectShares: { some: { projectId } } }
+            ];
         }
 
         let brands: any[] = [];
@@ -54,10 +46,7 @@ export async function GET(request: Request) {
                 orderBy: { createdAt: 'desc' },
                 include: {
                     project: { select: { id: true, name: true } },
-                    projectShares: {
-                        ...(projectId ? { where: { projectId } } : {}),
-                        select: { projectId: true }
-                    },
+                    projectShares: { select: { projectId: true } },
                     scans: {
                         orderBy: { completedAt: 'desc' },
                         take: 1,
@@ -75,8 +64,14 @@ export async function GET(request: Request) {
         } catch (err: any) {
             // Backward compatibility: DB not migrated yet (missing ProjectVisibilityConfig)
             if (err?.code !== 'P2021') throw err;
+            const legacyWhere: any = {
+                organizationId
+            };
+            if (projectId) {
+                legacyWhere.projectId = projectId;
+            }
             brands = await prisma.visibilityConfig.findMany({
-                where,
+                where: legacyWhere,
                 orderBy: { createdAt: 'desc' },
                 include: {
                     project: { select: { id: true, name: true } },
@@ -97,7 +92,7 @@ export async function GET(request: Request) {
         }
 
         const filteredBrands = projectId
-            ? brands.filter((b: any) => b.projectId === projectId || (b.projectShares?.length ?? 0) > 0)
+            ? brands.filter((b: any) => b.projectId === projectId || b.projectShares?.some((s: any) => s.projectId === projectId))
             : brands;
 
         return NextResponse.json({ brands: filteredBrands });

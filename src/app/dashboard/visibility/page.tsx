@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisibilityProjectFilter } from "./VisibilityProjectFilter";
+import { cookies } from "next/headers";
 
 export default async function VisibilityPage({
     searchParams
@@ -30,12 +31,18 @@ export default async function VisibilityPage({
     const projectIdFilter = params.projectId;
     const brandIdFilter = params.brandId;
 
+    const cookieStore = await cookies();
+    const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
+
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        include: { memberships: { take: 1, include: { organization: true } } }
+        include: { memberships: { include: { organization: true } } }
     });
 
-    const orgId = user?.memberships[0]?.organizationId;
+    const activeMembership = activeOrgId
+        ? user?.memberships.find(m => m.organizationId === activeOrgId) || user?.memberships[0]
+        : user?.memberships[0];
+    const orgId = activeMembership?.organizationId;
     if (!orgId) redirect("/login");
 
     // 1. Check if config exists (optionally filtered by project or brandId)

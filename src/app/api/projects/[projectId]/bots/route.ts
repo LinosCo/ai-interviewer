@@ -50,6 +50,8 @@ export async function GET(
 
         // If includeAll, return both linked and available tools (bots + trackers)
         if (includeAll) {
+            const projectOrganizationId = project.organizationId;
+
             // 1. Fetch Bots
             const linkedBots = await prisma.bot.findMany({
                 where: { projectId },
@@ -62,7 +64,7 @@ export async function GET(
             try {
                 linkedTrackers = await prisma.visibilityConfig.findMany({
                     where: {
-                        organizationId: project.organizationId || undefined,
+                        organizationId: projectOrganizationId || undefined,
                         OR: [
                             { projectId },
                             { projectShares: { some: { projectId } } }
@@ -78,7 +80,7 @@ export async function GET(
                 if (error?.code !== 'P2021') throw error;
                 linkedTrackers = await prisma.visibilityConfig.findMany({
                     where: {
-                        organizationId: project.organizationId || undefined,
+                        organizationId: projectOrganizationId || undefined,
                         projectId
                     },
                     include: {
@@ -88,19 +90,11 @@ export async function GET(
                 });
             }
 
-            // Get all accessible projects
-            const userMemberships = await prisma.membership.findMany({
-                where: { userId: currentUserId },
-                select: { organizationId: true }
-            });
-            const orgIds = userMemberships.map(m => m.organizationId);
-
+            // Keep tool association scope consistent with current project organization.
+            // This avoids cross-organization leakage in the project tools manager.
             const allAccessibleProjects = await prisma.project.findMany({
                 where: {
-                    OR: [
-                        { organizationId: { in: orgIds } },
-                        { ownerId: currentUserId }
-                    ]
+                    organizationId: projectOrganizationId || undefined
                 },
                 select: { id: true }
             });
@@ -118,7 +112,7 @@ export async function GET(
             try {
                 availableTrackers = await prisma.visibilityConfig.findMany({
                     where: {
-                        organizationId: { in: orgIds },
+                        organizationId: projectOrganizationId || undefined,
                         NOT: {
                             OR: [
                                 { projectId },
@@ -140,7 +134,7 @@ export async function GET(
                 if (error?.code !== 'P2021') throw error;
                 availableTrackers = await prisma.visibilityConfig.findMany({
                     where: {
-                        organizationId: { in: orgIds },
+                        organizationId: projectOrganizationId || undefined,
                         projectId: { in: allProjectIds, not: projectId }
                     },
                     include: {

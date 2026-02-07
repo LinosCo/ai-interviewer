@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { showToast } from "@/components/toast";
 import { useProject } from '@/contexts/ProjectContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { updateInsightStatus } from './actions';
 
 interface Action {
@@ -96,6 +97,7 @@ const getTargetLabel = (target: string): string => {
 
 export default function InsightHubPage() {
     const { selectedProject, isAllProjectsSelected } = useProject();
+    const { currentOrganization } = useOrganization();
     const [insights, setInsights] = useState<Insight[]>([]);
     const [healthReport, setHealthReport] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -113,12 +115,13 @@ export default function InsightHubPage() {
 
     // Get the project ID for API calls (null if "All Projects" is selected)
     const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
+    const organizationId = currentOrganization?.id || null;
 
     const fetchInsights = async () => {
         try {
             const url = projectId
-                ? `/api/insights/sync?projectId=${projectId}`
-                : '/api/insights/sync';
+                ? `/api/insights/sync?projectId=${projectId}${organizationId ? `&organizationId=${organizationId}` : ''}`
+                : `/api/insights/sync${organizationId ? `?organizationId=${organizationId}` : ''}`;
             const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
@@ -178,8 +181,8 @@ export default function InsightHubPage() {
         try {
             // Get the visibility config for the project/org
             const configUrl = projectId
-                ? `/api/visibility/create?projectId=${projectId}`
-                : '/api/visibility/create';
+                ? `/api/visibility/create?projectId=${projectId}${organizationId ? `&organizationId=${organizationId}` : ''}`
+                : `/api/visibility/create${organizationId ? `?organizationId=${organizationId}` : ''}`;
             const configRes = await fetch(configUrl);
             if (configRes.ok) {
                 const configData = await configRes.json();
@@ -245,14 +248,14 @@ export default function InsightHubPage() {
         fetchInsights();
         fetchStrategy();
         fetchWebsiteAnalysis();
-    }, [projectId]);
+    }, [projectId, organizationId]);
 
     const handleSync = async () => {
         setSyncing(true);
         try {
             const url = projectId
-                ? `/api/insights/sync?projectId=${projectId}`
-                : '/api/insights/sync';
+                ? `/api/insights/sync?projectId=${projectId}${organizationId ? `&organizationId=${organizationId}` : ''}`
+                : `/api/insights/sync${organizationId ? `?organizationId=${organizationId}` : ''}`;
             const res = await fetch(url, { method: 'POST' });
             if (res.ok) {
                 showToast("Insights sincronizzati con successo!");

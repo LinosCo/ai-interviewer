@@ -63,7 +63,7 @@ export async function POST(req: Request) {
             }
         });
 
-        if (!userWithMembership || !userWithMembership.memberships[0]) {
+        if (!userWithMembership || userWithMembership.memberships.length === 0) {
             return NextResponse.json({ error: 'No organization found' }, { status: 400 });
         }
 
@@ -99,7 +99,12 @@ export async function POST(req: Request) {
             }
         }
 
-        const creditsCheck = await checkCreditsForAction('copilot_message', undefined, projectId);
+        const creditsCheck = await checkCreditsForAction(
+            'copilot_message',
+            undefined,
+            projectId,
+            organization.id
+        );
         if (!creditsCheck.allowed) {
             return NextResponse.json({
                 code: (creditsCheck as any).code || 'ACCESS_DENIED',
@@ -251,11 +256,12 @@ export async function POST(req: Request) {
                     projectId: projectId || undefined,
                     inputTokens: result.usage.inputTokens || 0,
                     outputTokens: result.usage.outputTokens || 0,
-                    category: 'SUGGESTION', // COPILOT uses SUGGESTION category
+                    category: 'SUGGESTION',
                     model: modelUsed,
                     operation: 'copilot-chat',
                     resourceType: 'copilot',
-                    resourceId: session.user.id
+                    resourceId: session.user.id,
+                    actionOverride: 'copilot_message'
                 });
             } catch (err) {
                 console.error('[Copilot] Credit tracking failed:', err);

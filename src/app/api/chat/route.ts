@@ -518,7 +518,8 @@ export async function POST(req: Request) {
         const creditsCheck = await checkCreditsForAction(
             'interview_question',
             undefined,
-            (bot as any).project?.id
+            (bot as any).project?.id,
+            (bot as any).project?.organization?.id
         );
         if (!creditsCheck.allowed) {
             return Response.json(

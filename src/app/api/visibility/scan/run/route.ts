@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { VisibilityEngine } from '@/lib/visibility/visibility-engine';
 import { checkResourceAccess } from '@/lib/guards/resourceGuard';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 // Extend timeout for long-running scans (5 minutes)
 export const maxDuration = 300;
@@ -18,26 +19,16 @@ export async function POST(request: Request) {
         const body = await request.json().catch(() => ({}));
         const { configId } = body;
 
-        // Find the specific config (with security check)
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
+
+        // Find the specific config in active organization
         const config = await prisma.visibilityConfig.findFirst({
             where: {
-                ...(configId ? { id: configId } : {}),
-                OR: [
-                    // Config legata a un progetto di cui l'utente è owner
-                    {
-                        project: {
-                            ownerId: session.user.id
-                        }
-                    },
-                    // Fallback: config dell'org di cui è membro (legacy)
-                    {
-                        organization: {
-                            members: {
-                                some: { userId: session.user.id }
-                            }
-                        }
-                    }
-                ]
+                organizationId,
+                ...(configId ? { id: configId } : {})
             },
             include: {
                 project: {

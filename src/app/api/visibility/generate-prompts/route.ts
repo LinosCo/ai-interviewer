@@ -77,7 +77,12 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { brandName, category, description, language = 'it', territory = 'IT', count } = body;
 
-        const creditsCheck = await checkCreditsForAction('visibility_query');
+        const creditsCheck = await checkCreditsForAction(
+            'visibility_query',
+            undefined,
+            undefined,
+            organizationId
+        );
         if (!creditsCheck.allowed) {
             return NextResponse.json({
                 code: (creditsCheck as any).code || 'ACCESS_DENIED',
@@ -86,6 +91,7 @@ export async function POST(request: Request) {
                 creditsAvailable: creditsCheck.creditsAvailable
             }, { status: creditsCheck.status || 403 });
         }
+        const chargedOrganizationId = (creditsCheck as { organizationId?: string | null }).organizationId || organizationId || null;
 
         if (!brandName || !category) {
             return NextResponse.json(
@@ -144,16 +150,18 @@ Examples of good prompt types:
         // Track credit usage
         if (result.usage) {
             try {
-                await TokenTrackingService.logTokenUsage({
-                    organizationId: organizationId || 'unknown',
-                    userId: user.id,
-                    inputTokens: result.usage.inputTokens || 0,
-                    outputTokens: result.usage.outputTokens || 0,
-                    category: 'VISIBILITY',
-                    model: 'gpt-4o-mini',
-                    operation: 'visibility-generate-prompts',
-                    resourceType: 'visibility'
-                });
+                if (chargedOrganizationId) {
+                    await TokenTrackingService.logTokenUsage({
+                        organizationId: chargedOrganizationId,
+                        userId: user.id,
+                        inputTokens: result.usage.inputTokens || 0,
+                        outputTokens: result.usage.outputTokens || 0,
+                        category: 'VISIBILITY',
+                        model: 'gpt-4o-mini',
+                        operation: 'visibility-generate-prompts',
+                        resourceType: 'visibility'
+                    });
+                }
             } catch (err) {
                 console.error('[Visibility] Credit tracking failed:', err);
             }

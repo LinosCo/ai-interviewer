@@ -46,6 +46,7 @@ export class TokenTrackingService {
         operation: string;
         resourceType?: string;
         resourceId?: string;
+        actionOverride?: CreditAction;
     }) {
         let { organizationId } = params;
         const {
@@ -58,17 +59,31 @@ export class TokenTrackingService {
             model,
             operation,
             resourceType,
-            resourceId
+            resourceId,
+            actionOverride
         } = params;
 
-        // Fallback: if organizationId is missing, try to find it from the user
+        // Fallback: if organizationId is missing, resolve from project first, then user membership
         if (!organizationId && (userId || executedById)) {
-            const userWithOrg = await prisma.user.findUnique({
-                where: { id: userId || executedById },
-                include: { memberships: { take: 1 } }
-            });
-            if (userWithOrg?.memberships?.[0]) {
-                organizationId = userWithOrg.memberships[0].organizationId;
+            if (projectId) {
+                const project = await prisma.project.findUnique({
+                    where: { id: projectId },
+                    select: { organizationId: true }
+                });
+                if (project?.organizationId) {
+                    organizationId = project.organizationId;
+                }
+            }
+
+            if (!organizationId) {
+                const membership = await prisma.membership.findFirst({
+                    where: { userId: userId || executedById, status: 'ACTIVE' },
+                    orderBy: { joinedAt: 'asc' },
+                    select: { organizationId: true }
+                });
+                if (membership?.organizationId) {
+                    organizationId = membership.organizationId;
+                }
             }
         }
 
@@ -96,7 +111,7 @@ export class TokenTrackingService {
         const totalTokens = inputTokens + outputTokens;
 
         // 1. Determina l'azione crediti dalla categoria
-        const action = this.categoryToAction[category] || 'interview_question';
+        const action = actionOverride || this.categoryToAction[category] || 'interview_question';
 
         // 2. Calcola crediti da consumare
         const baseCost = getCreditCost(action);

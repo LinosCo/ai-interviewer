@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { CreditAction } from '@/config/creditCosts';
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 type GuardResult = {
     allowed: boolean;
@@ -38,32 +38,7 @@ async function resolveOrganizationIdForUser(userId: string, projectId?: string):
         }
     }
 
-    const cookieStore = await cookies();
-    const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
-
-    if (selectedOrgId) {
-        const selectedMembership = await prisma.membership.findUnique({
-            where: {
-                userId_organizationId: {
-                    userId,
-                    organizationId: selectedOrgId
-                }
-            },
-            select: { organizationId: true, status: true }
-        });
-
-        if (selectedMembership?.status === 'ACTIVE') {
-            return selectedMembership.organizationId;
-        }
-    }
-
-    const membership = await prisma.membership.findFirst({
-        where: { userId, status: 'ACTIVE' },
-        orderBy: { createdAt: 'asc' },
-        select: { organizationId: true }
-    });
-
-    return membership?.organizationId || null;
+    return resolveActiveOrganizationIdForUser(userId);
 }
 
 /**
@@ -166,7 +141,8 @@ export function withResourceGuard(
 export async function checkCreditsForAction(
     action: CreditAction,
     customAmount?: number,
-    projectId?: string
+    projectId?: string,
+    forcedOrganizationId?: string
 ) {
     const session = await auth();
     if (!session?.user?.id) {
@@ -175,14 +151,35 @@ export async function checkCreditsForAction(
 
     const currentUserId = session.user.id;
     const currentUserRole = ('role' in session.user ? (session.user as { role?: string }).role : undefined);
-    const organizationId = await resolveOrganizationIdForUser(currentUserId, projectId);
 
     if (currentUserRole === 'ADMIN') {
         return {
             allowed: true,
             userId: currentUserId,
-            organizationId
+            organizationId: forcedOrganizationId || await resolveOrganizationIdForUser(currentUserId, projectId)
         };
+    }
+
+    let organizationId: string | null = null;
+
+    if (forcedOrganizationId) {
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: currentUserId,
+                    organizationId: forcedOrganizationId
+                }
+            },
+            select: { organizationId: true, status: true }
+        });
+
+        if (membership?.status !== 'ACTIVE') {
+            return { allowed: false, error: 'Organizzazione non accessibile', status: 403 };
+        }
+
+        organizationId = forcedOrganizationId;
+    } else {
+        organizationId = await resolveOrganizationIdForUser(currentUserId, projectId);
     }
 
     if (!organizationId) {

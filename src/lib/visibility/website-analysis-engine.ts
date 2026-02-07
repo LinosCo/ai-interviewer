@@ -534,8 +534,8 @@ export class WebsiteAnalysisEngine {
 
         return {
             strategicPlan: organization?.platformSettings?.strategicPlan ?? undefined,
-            organizationVision: projectStrategy?.strategicVision || organization?.strategicVision ?? undefined,
-            organizationValueProp: projectStrategy?.valueProposition || organization?.valueProposition ?? undefined,
+            organizationVision: projectStrategy?.strategicVision ?? organization?.strategicVision ?? undefined,
+            organizationValueProp: projectStrategy?.valueProposition ?? organization?.valueProposition ?? undefined,
             knowledgeGaps: knowledgeGaps.map(g => ({
                 topic: g.topic,
                 priority: g.priority,

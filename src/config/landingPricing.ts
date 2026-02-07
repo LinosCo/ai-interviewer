@@ -104,9 +104,9 @@ export const LANDING_PLANS: LandingPlan[] = [
         id: 'business',
         name: 'Business',
         description: 'Include tutto Pro +',
-        monthlyPrice: null,
-        yearlyPrice: null,
-        showPrice: false,
+        monthlyPrice: 399,
+        yearlyPrice: 299,
+        showPrice: true,
         features: [
             'Crediti su misura',
             'Integrazioni CMS su misura',
@@ -114,8 +114,8 @@ export const LANDING_PLANS: LandingPlan[] = [
             'API Access',
             'Account manager dedicato',
         ],
-        cta: 'Contattaci',
-        ctaHref: '/sales',
+        cta: 'Inizia 14 giorni gratis',
+        ctaHref: '/register?plan=business',
         popular: false,
     },
 ];

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import type { Prisma } from '@prisma/client';
 
 export async function POST(req: NextRequest) {
     try {
@@ -12,7 +13,6 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const {
             organizationId,
-            settingsId,
             methodologyKnowledge,
             strategicPlan,
             platformOpenaiApiKey,
@@ -24,8 +24,25 @@ export async function POST(req: NextRequest) {
             stripePriceStarter,
             stripePriceStarterYearly,
             stripePricePro,
-            stripePriceProYearly
+            stripePriceProYearly,
+            stripePriceBusiness,
+            stripePriceBusinessYearly,
+            stripePricePackSmall,
+            stripePricePackMedium,
+            stripePricePackLarge,
+            smtpHost,
+            smtpPort,
+            smtpSecure,
+            smtpUser,
+            smtpPass,
+            smtpFromEmail,
+            smtpNotificationEmail
         } = body;
+
+        const currentUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
+        });
 
         if (!organizationId) {
             return NextResponse.json({ error: 'Organization ID required' }, { status: 400 });
@@ -41,7 +58,7 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        if (!membership && (session.user as any).role !== 'ADMIN') {
+        if (!membership && currentUser?.role !== 'ADMIN') {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
@@ -66,8 +83,8 @@ export async function POST(req: NextRequest) {
         });
 
         // If Admin, update Global Config API Keys and Stripe Config
-        if ((session.user as any).role === 'ADMIN') {
-            const updateData: any = {};
+        if (currentUser?.role === 'ADMIN') {
+            const updateData: Prisma.GlobalConfigUpdateInput = {};
 
             if (platformOpenaiApiKey !== undefined) updateData.openaiApiKey = platformOpenaiApiKey || null;
             if (platformAnthropicApiKey !== undefined) updateData.anthropicApiKey = platformAnthropicApiKey || null;
@@ -79,6 +96,18 @@ export async function POST(req: NextRequest) {
             if (stripePriceStarterYearly !== undefined) updateData.stripePriceStarterYearly = stripePriceStarterYearly || null;
             if (stripePricePro !== undefined) updateData.stripePricePro = stripePricePro || null;
             if (stripePriceProYearly !== undefined) updateData.stripePriceProYearly = stripePriceProYearly || null;
+            if (stripePriceBusiness !== undefined) updateData.stripePriceBusiness = stripePriceBusiness || null;
+            if (stripePriceBusinessYearly !== undefined) updateData.stripePriceBusinessYearly = stripePriceBusinessYearly || null;
+            if (stripePricePackSmall !== undefined) updateData.stripePricePackSmall = stripePricePackSmall || null;
+            if (stripePricePackMedium !== undefined) updateData.stripePricePackMedium = stripePricePackMedium || null;
+            if (stripePricePackLarge !== undefined) updateData.stripePricePackLarge = stripePricePackLarge || null;
+            if (smtpHost !== undefined) updateData.smtpHost = smtpHost || null;
+            if (smtpPort !== undefined) updateData.smtpPort = smtpPort ? Number(smtpPort) : null;
+            if (smtpSecure !== undefined) updateData.smtpSecure = Boolean(smtpSecure);
+            if (smtpUser !== undefined) updateData.smtpUser = smtpUser || null;
+            if (smtpPass !== undefined) updateData.smtpPass = smtpPass || null;
+            if (smtpFromEmail !== undefined) updateData.smtpFromEmail = smtpFromEmail || null;
+            if (smtpNotificationEmail !== undefined) updateData.smtpNotificationEmail = smtpNotificationEmail || null;
 
             await prisma.globalConfig.upsert({
                 where: { id: "default" },

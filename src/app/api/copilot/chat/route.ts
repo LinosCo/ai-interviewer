@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { generateObject } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
+import { createOpenAI } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
@@ -13,6 +14,17 @@ import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
 
 export const maxDuration = 60;
+
+function isConnectionError(error: unknown): boolean {
+    const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
+    return (
+        message.includes('econnreset') ||
+        message.includes('cannot connect to api') ||
+        message.includes('fetch failed') ||
+        message.includes('socket hang up') ||
+        message.includes('timeout')
+    );
+}
 
 export async function POST(req: Request) {
     try {
@@ -146,16 +158,15 @@ export async function POST(req: Request) {
             where: { id: 'default' }
         });
 
-        const apiKey = globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
+        const anthropicApiKey = globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
+        const openaiApiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
 
-        if (!apiKey) {
+        if (!anthropicApiKey && !openaiApiKey) {
             return NextResponse.json({
                 error: 'API key not configured',
-                message: 'Chiave API Anthropic non configurata. Contatta l\'amministratore.'
+                message: 'Nessuna chiave API LLM configurata (Anthropic/OpenAI). Contatta l\'amministratore.'
             }, { status: 500 });
         }
-
-        const anthropic = createAnthropic({ apiKey });
 
         // 7. Build enhanced system prompt with KB context and strategic plan
         let systemPrompt = buildCopilotSystemPrompt({
@@ -171,24 +182,61 @@ export async function POST(req: Request) {
             systemPrompt += `\n\n## Informazioni dalla Knowledge Base\n${kbContext}`;
         }
 
-        // 8. Generate response with Claude 4.5 Opus
-        const result = await generateObject({
-            model: anthropic('claude-opus-4-5-20251101'),
-            schema: z.object({
-                response: z.string().describe('La risposta completa per l\'utente in markdown'),
-                usedKnowledgeBase: z.boolean().describe('Se la risposta usa informazioni dalla knowledge base'),
-                suggestedFollowUp: z.string().optional().describe('Domanda di follow-up suggerita (opzionale)')
-            }),
-            system: systemPrompt,
-            messages: [
-                ...history.slice(-10).map((m: any) => ({
-                    role: m.role as 'user' | 'assistant',
-                    content: m.content
-                })),
-                { role: 'user' as const, content: message }
-            ],
-            temperature: 0.3
+        const schema = z.object({
+            response: z.string().describe('La risposta completa per l\'utente in markdown'),
+            usedKnowledgeBase: z.boolean().describe('Se la risposta usa informazioni dalla knowledge base'),
+            suggestedFollowUp: z.string().optional().describe('Domanda di follow-up suggerita (opzionale)')
         });
+
+        const inputMessages = [
+            ...history.slice(-10).map((m: any) => ({
+                role: m.role as 'user' | 'assistant',
+                content: m.content
+            })),
+            { role: 'user' as const, content: message }
+        ];
+
+        const runWithAnthropic = (apiKey: string, model: string) => {
+            const anthropic = createAnthropic({ apiKey });
+            return generateObject({
+                model: anthropic(model),
+                schema,
+                system: systemPrompt,
+                messages: inputMessages,
+                temperature: 0.3
+            });
+        };
+
+        const runWithOpenAI = (apiKey: string, model: string) => {
+            const openai = createOpenAI({ apiKey });
+            return generateObject({
+                model: openai(model),
+                schema,
+                system: systemPrompt,
+                messages: inputMessages,
+                temperature: 0.3
+            });
+        };
+
+        // 8. Generate response (Anthropic primary, OpenAI fallback on network failures)
+        let modelUsed = 'claude-opus-4-5-20251101';
+        let result: Awaited<ReturnType<typeof runWithAnthropic>>;
+
+        if (anthropicApiKey) {
+            try {
+                result = await runWithAnthropic(anthropicApiKey, modelUsed);
+            } catch (anthropicError) {
+                const canFallback = !!openaiApiKey && isConnectionError(anthropicError);
+                if (!canFallback) throw anthropicError;
+
+                console.warn('[Copilot] Anthropic connection error, fallback to OpenAI:', anthropicError);
+                modelUsed = 'gpt-4o-mini';
+                result = await runWithOpenAI(openaiApiKey, modelUsed);
+            }
+        } else {
+            modelUsed = 'gpt-4o-mini';
+            result = await runWithOpenAI(openaiApiKey, modelUsed);
+        }
 
         // 9. Track token usage with new credits system
         if (result.usage) {
@@ -200,7 +248,7 @@ export async function POST(req: Request) {
                     inputTokens: result.usage.inputTokens || 0,
                     outputTokens: result.usage.outputTokens || 0,
                     category: 'SUGGESTION', // COPILOT uses SUGGESTION category
-                    model: 'claude-opus-4-5-20251101',
+                    model: modelUsed,
                     operation: 'copilot-chat',
                     resourceType: 'copilot',
                     resourceId: session.user.id

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { CMSConnectionStatus, CMSSuggestionType, WebhookDirection } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
 import { WORDPRESS_TOOLS } from '@/lib/integrations/mcp/wordpress.adapter';
 import { WOOCOMMERCE_TOOLS } from '@/lib/integrations/mcp/woocommerce.adapter';
@@ -727,14 +728,14 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
                 return result;
             }
 
-            const updatedSignals = {
+            const updatedSignals = JSON.parse(JSON.stringify({
                 ...sourceSignals,
                 publishRouting: effectiveRouting,
                 lastPush: {
                     channel: effectiveRouting.publishChannel,
                     pushedAt: new Date().toISOString()
                 }
-            };
+            })) as Prisma.InputJsonValue;
 
             await prisma.cMSSuggestion.update({
                 where: { id: suggestionId },

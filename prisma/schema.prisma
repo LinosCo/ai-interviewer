@@ -129,11 +129,23 @@ model GlobalConfig {
   stripePriceStarter       String?
   stripePricePro           String?
   stripePriceBusiness      String?
+  stripePriceBusinessYearly String?
+  stripePricePackSmall     String?
+  stripePricePackMedium    String?
+  stripePricePackLarge     String?
   updatedAt                DateTime @updatedAt
   stripePriceProYearly     String?
   stripePriceStarterYearly String?
   geminiApiKey             String?
   googleSerpApiKey         String?
+  smtpHost                 String?
+  smtpPort                 Int?
+  smtpSecure               Boolean?
+  smtpUser                 String?
+  smtpPass                 String?
+  smtpFromEmail            String?
+  smtpNotificationEmail    String?
+  resendApiKey             String?
 }
 
 model Organization {
@@ -302,6 +314,7 @@ model Project {
   mcpConnections       MCPConnection[]
   cmsShares            ProjectCMSConnection[]
   mcpShares            ProjectMCPConnection[]
+  visibilityShares     ProjectVisibilityConfig[]
   firstAttributions    PartnerClientAttribution[] @relation("FirstAttributionProject")
 
   organization         Organization?      @relation(fields: [organizationId], references: [id])
@@ -930,6 +943,7 @@ model VisibilityConfig {
   scans          VisibilityScan[]
   websiteAnalyses WebsiteAnalysis[]
   tipActions      TipAction[]
+  projectShares   ProjectVisibilityConfig[]
 }
 
 model VisibilityPrompt {
@@ -1439,6 +1453,21 @@ model ProjectMCPConnection {
   @@unique([projectId, connectionId])
   @@index([projectId])
   @@index([connectionId])
+}
+
+model ProjectVisibilityConfig {
+  id        String           @id @default(cuid())
+  projectId String
+  configId  String
+  role      String           @default("VIEWER")
+  createdAt DateTime         @default(now())
+  createdBy String?
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  config    VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, configId])
+  @@index([projectId])
+  @@index([configId])
 }
 
 enum MemberStatus {

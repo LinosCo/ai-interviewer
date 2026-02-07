@@ -12,6 +12,11 @@ export async function GET() {
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             include: {
+                ownedProjects: {
+                    select: {
+                        organizationId: true
+                    }
+                },
                 memberships: {
                     include: {
                         organization: {
@@ -31,7 +36,48 @@ export async function GET() {
             return new Response('User not found', { status: 404 });
         }
 
-        let organizations = user.memberships.map(m => ({
+        // Backfill membership rows for legacy cases where ownerId was updated
+        // but membership was not created for the target organization.
+        const membershipOrgIds = new Set(user.memberships.map((m) => m.organizationId));
+        const missingOwnedOrgIds = Array.from(
+            new Set(
+                user.ownedProjects
+                    .map((p) => p.organizationId)
+                    .filter((orgId): orgId is string => Boolean(orgId))
+                    .filter((orgId) => !membershipOrgIds.has(orgId))
+            )
+        );
+
+        if (missingOwnedOrgIds.length > 0) {
+            const now = new Date();
+            await prisma.membership.createMany({
+                data: missingOwnedOrgIds.map((organizationId) => ({
+                    userId: user.id,
+                    organizationId,
+                    role: 'MEMBER',
+                    status: 'ACTIVE',
+                    acceptedAt: now,
+                    joinedAt: now
+                })),
+                skipDuplicates: true
+            });
+        }
+
+        const memberships = await prisma.membership.findMany({
+            where: { userId: user.id },
+            include: {
+                organization: {
+                    select: {
+                        id: true,
+                        name: true,
+                        slug: true,
+                        plan: true
+                    }
+                }
+            }
+        });
+
+        let organizations = memberships.map(m => ({
             ...m.organization,
             role: m.role
         }));

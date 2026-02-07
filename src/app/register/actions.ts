@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { hash } from 'bcryptjs';
 import { signIn } from '@/auth';
 import { redirect } from 'next/navigation';
-import { sendSystemNotification } from '@/lib/email';
+import { sendSystemNotification, sendWelcomeEmail } from '@/lib/email';
 
 export async function registerUser(prevState: string | undefined, formData: FormData) {
     const email = formData.get('email') as string;
@@ -31,7 +31,7 @@ export async function registerUser(prevState: string | undefined, formData: Form
         const hashedPassword = await hash(password, 10);
 
         // Create user, organization and membership in a transaction
-        const result = await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx) => {
             const user = await tx.user.create({
                 data: {
                     email,
@@ -103,17 +103,19 @@ export async function registerUser(prevState: string | undefined, formData: Form
              <p>Piano selezionato: ${plan || 'FREE'}</p>`
         );
 
+        await sendWelcomeEmail({
+            to: email,
+            userName: name
+        });
+
     } catch (error) {
         console.error('Registration error:', error);
         return 'Registration failed.';
     }
 
-    // Redirect logic: BUSINESS is sales-assisted only
+    // Redirect logic for paid plans
     const normalizedPlan = plan?.toUpperCase();
-    if (normalizedPlan === 'BUSINESS') {
-        redirect('/sales');
-    }
-    if (normalizedPlan && ['STARTER', 'PRO'].includes(normalizedPlan)) {
+    if (normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)) {
         redirect(`/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`);
     } else {
         redirect('/dashboard');

@@ -3,20 +3,41 @@ import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType, PURCHASABLE_PLANS, formatMonthlyCredits } from '@/config/plans';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 
-export default async function PlansPage() {
+export default async function PlansPage({
+    searchParams
+}: {
+    searchParams?: Promise<{ billing?: string }>
+}) {
     const session = await auth();
     if (!session?.user?.email) return null;
+    const resolvedSearchParams = await searchParams;
+    const billingPeriod = resolvedSearchParams?.billing === 'yearly' ? 'yearly' : 'monthly';
+
+    const cookieStore = await cookies();
+    const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         select: {
-            id: true,
-            plan: true
+            memberships: {
+                select: {
+                    organizationId: true,
+                    organization: {
+                        select: {
+                            plan: true
+                        }
+                    }
+                }
+            }
         }
     });
 
-    const currentPlan = (user?.plan as PlanType) || PlanType.FREE;
+    const activeMembership = activeOrgId
+        ? user?.memberships.find(m => m.organizationId === activeOrgId) || user?.memberships[0]
+        : user?.memberships[0];
+    const currentPlan = (activeMembership?.organization.plan as PlanType) || PlanType.FREE;
 
     // Build plans array with current plan info
     const plans = PURCHASABLE_PLANS.map(planType => ({
@@ -103,13 +124,15 @@ export default async function PlansPage() {
                             <p className="text-sm text-stone-500 mb-4">{plan.description}</p>
 
                             <div className="mb-4 flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-stone-900">€{plan.monthlyPrice}</span>
+                                <span className="text-4xl font-black text-stone-900">
+                                    €{billingPeriod === 'yearly' ? plan.yearlyMonthlyEquivalent : plan.monthlyPrice}
+                                </span>
                                 <span className="text-stone-400 text-sm">/mese</span>
                             </div>
 
-                            {plan.yearlyMonthlyEquivalent < plan.monthlyPrice && (
+                            {billingPeriod === 'yearly' && plan.yearlyMonthlyEquivalent < plan.monthlyPrice && (
                                 <div className="mb-4 text-sm text-green-600 font-medium bg-green-50 rounded-lg px-3 py-2">
-                                    €{plan.yearlyMonthlyEquivalent}/mese con piano annuale
+                                    Fatturato annualmente: €{plan.yearlyPrice}/anno
                                 </div>
                             )}
 
@@ -140,14 +163,8 @@ export default async function PlansPage() {
                                 <button disabled className="w-full bg-stone-100 text-stone-400 font-bold py-4 rounded-2xl cursor-not-allowed">
                                     Piano attuale
                                 </button>
-                            ) : plan.id === PlanType.BUSINESS ? (
-                                <Link href="mailto:hello@voler.ai?subject=Richiesta%20Piano%20Business" className="w-full">
-                                    <button className="w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 bg-stone-900 text-white hover:bg-stone-800">
-                                        Contatta Sales <Icons.ArrowRight size={18} />
-                                    </button>
-                                </Link>
                             ) : (
-                                <Link href={`/api/stripe/checkout?tier=${plan.id}`} className="w-full">
+                                <Link href={`/api/stripe/checkout?tier=${plan.id}&billing=${billingPeriod}`} className="w-full">
                                     <button className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${
                                         isPopular
                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20'
@@ -162,17 +179,18 @@ export default async function PlansPage() {
                 })}
             </div>
 
-            <div className="mt-8 max-w-6xl bg-stone-900 text-white rounded-[24px] p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">Business via Sales</p>
-                    <p className="text-sm text-stone-300 mt-1">
-                        Per esigenze enterprise, volumi personalizzati e integrazioni avanzate, il piano Business viene attivato solo tramite team commerciale.
-                    </p>
-                </div>
-                <Link href="/sales" className="shrink-0">
-                    <button className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-xl transition-all flex items-center gap-2">
-                        Contatta Sales <Icons.ArrowRight size={16} />
-                    </button>
+            <div className="mt-6 max-w-6xl flex items-center justify-center gap-3">
+                <Link
+                    href="/dashboard/billing/plans?billing=monthly"
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'monthly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
+                >
+                    Mensile
+                </Link>
+                <Link
+                    href="/dashboard/billing/plans?billing=yearly"
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'yearly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
+                >
+                    Annuale
                 </Link>
             </div>
 

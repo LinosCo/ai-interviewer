@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 
 interface Organization {
@@ -31,18 +31,27 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [retryCount, setRetryCount] = useState(0);
+    const [sessionLoadTimedOut, setSessionLoadTimedOut] = useState(false);
     const maxRetries = 2;
 
-    const fetchOrganizations = async () => {
-        if (status !== 'authenticated') {
+    const fetchOrganizations = useCallback(async () => {
+        if (status === 'unauthenticated') {
             return;
         }
 
+        let scheduledRetry = false;
         try {
             setLoading(true);
-            const res = await fetch('/api/organizations');
+            const res = await fetch('/api/organizations', {
+                cache: 'no-store',
+                credentials: 'include',
+                headers: { Accept: 'application/json' }
+            });
             if (res.ok) {
-                const data = await res.json();
+                const data = await res.json().catch(() => null);
+                if (!data || !Array.isArray(data.organizations)) {
+                    throw new Error('Invalid organizations payload');
+                }
                 setOrganizations(data.organizations);
 
                 // Ripristina organizzazione selezionata
@@ -66,25 +75,36 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                     document.cookie = `${COOKIE_ORG_KEY}=${data.organizations[0].id}; path=/; max-age=31536000; SameSite=Lax`;
                 }
 
-                // Only set loading to false after we've set the current organization
-                // This ensures dependent contexts (like ProjectContext) don't start fetching too early
-                setLoading(false);
             } else {
                 if ((res.status === 401 || res.status === 403) && retryCount < maxRetries) {
+                    scheduledRetry = true;
                     setTimeout(() => setRetryCount((count) => count + 1), 600);
                     return;
                 }
-                setLoading(false);
             }
         } catch (error) {
             console.error('Failed to fetch organizations:', error);
-            setLoading(false);
+        } finally {
+            if (!scheduledRetry) {
+                setLoading(false);
+            }
         }
-    };
+    }, [maxRetries, retryCount, status]);
 
     useEffect(() => {
-        if (status === 'loading') return;
+        if (status !== 'loading') {
+            setSessionLoadTimedOut(false);
+            return;
+        }
 
+        const timer = setTimeout(() => {
+            setSessionLoadTimedOut(true);
+        }, 2500);
+
+        return () => clearTimeout(timer);
+    }, [status]);
+
+    useEffect(() => {
         if (status === 'unauthenticated') {
             setLoading(false);
             setOrganizations([]);
@@ -92,17 +112,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        if (status === 'authenticated') {
+        if (status === 'authenticated' || sessionLoadTimedOut) {
             fetchOrganizations();
         }
-    }, [status, session, retryCount]);
-
-    useEffect(() => {
-        if (status !== 'authenticated') return;
-        if (!loading && organizations.length === 0) {
-            fetchOrganizations();
-        }
-    }, [status, loading, organizations.length]);
+    }, [status, retryCount, sessionLoadTimedOut, fetchOrganizations]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);

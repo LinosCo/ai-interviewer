@@ -24,7 +24,7 @@ interface Project {
 type DropdownMode = 'org' | 'project' | null;
 
 export default function OrganizationProjectSelector() {
-    const { organizations, currentOrganization, setCurrentOrganization, loading: orgLoading } = useOrganization();
+    const { organizations, currentOrganization, setCurrentOrganization, loading: orgLoading, refetchOrganizations } = useOrganization();
     const { projects, selectedProject, setSelectedProject, loading: projectLoading, isOrgAdmin } = useProject();
 
     const [dropdownMode, setDropdownMode] = useState<DropdownMode>(null);
@@ -111,7 +111,30 @@ export default function OrganizationProjectSelector() {
     }, [dropdownMode, filteredOrganizations, filteredProjects, highlightedIndex, handleOrgSelect, handleProjectSelect]);
 
     // Loading state
-    if (orgLoading || !currentOrganization || organizations.length === 0) {
+    if (orgLoading) {
+        return (
+            <div className="space-y-2 mb-6">
+                <div className="w-full h-11 bg-gray-50 animate-pulse rounded-lg border border-gray-200" />
+                <div className="w-full h-11 bg-gray-50 animate-pulse rounded-lg border border-gray-200" />
+            </div>
+        );
+    }
+
+    if (organizations.length === 0) {
+        return (
+            <div className="mb-6 rounded-lg border border-gray-200 bg-white p-3">
+                <p className="text-xs text-gray-500 mb-2">Nessuna organizzazione disponibile</p>
+                <button
+                    onClick={() => refetchOrganizations()}
+                    className="text-xs font-medium text-amber-700 hover:text-amber-800"
+                >
+                    Riprova caricamento
+                </button>
+            </div>
+        );
+    }
+
+    if (!currentOrganization) {
         return (
             <div className="space-y-2 mb-6">
                 <div className="w-full h-11 bg-gray-50 animate-pulse rounded-lg border border-gray-200" />

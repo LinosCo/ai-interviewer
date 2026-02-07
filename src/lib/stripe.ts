@@ -32,6 +32,10 @@ async function getStripeConfig() {
                 PRO: process.env.STRIPE_PRICE_PRO,
                 PRO_YEARLY: process.env.STRIPE_PRICE_PRO_YEARLY,
                 BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
+                BUSINESS_YEARLY: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
+                PACK_SMALL: process.env.STRIPE_PRICE_PACK_SMALL,
+                PACK_MEDIUM: process.env.STRIPE_PRICE_PACK_MEDIUM,
+                PACK_LARGE: process.env.STRIPE_PRICE_PACK_LARGE
             }
         };
     }
@@ -48,6 +52,10 @@ async function getStripeConfig() {
                     PRO: config.stripePricePro,
                     PRO_YEARLY: config.stripePriceProYearly,
                     BUSINESS: config.stripePriceBusiness,
+                    BUSINESS_YEARLY: config.stripePriceBusinessYearly,
+                    PACK_SMALL: config.stripePricePackSmall,
+                    PACK_MEDIUM: config.stripePricePackMedium,
+                    PACK_LARGE: config.stripePricePackLarge
                 }
             };
         }
@@ -88,10 +96,11 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
         return dbPrices[upperTier] || PLANS[tier].stripePriceIdYearly || null;
     };
 
-    const result: any = {};
+    const result: Partial<Record<PlanKey, PriceConfig>> = {};
 
     for (const key of PRICING_CONSTANTS.PLANS) {
         const plan = PLANS[key as PlanType];
+        if (!plan) continue;
         result[key] = {
             name: plan.name,
             price: plan.monthlyPrice,
@@ -104,4 +113,44 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
     }
 
     return result as Record<PlanKey, PriceConfig>;
+}
+
+export async function getStripePriceIdForPlan(
+    tier: PlanType,
+    billingPeriod: 'monthly' | 'yearly'
+): Promise<string | null> {
+    const config = await getStripeConfig();
+    const dbPrices = config?.prices || {};
+    const key =
+        billingPeriod === 'yearly'
+            ? `${tier.toUpperCase()}_YEARLY`
+            : tier.toUpperCase();
+
+    const fromConfig = dbPrices[key as keyof typeof dbPrices];
+    if (fromConfig) return fromConfig;
+
+    const plan = PLANS[tier];
+    if (!plan) return null;
+
+    return billingPeriod === 'yearly'
+        ? plan.stripePriceIdYearly || null
+        : plan.stripePriceIdMonthly || null;
+}
+
+export async function getStripePriceIdForPack(packType: string): Promise<string | null> {
+    const config = await getStripeConfig();
+    const dbPrices = config?.prices || {};
+    const normalized = packType.toLowerCase();
+
+    if (normalized === 'small') {
+        return dbPrices.PACK_SMALL || process.env.STRIPE_PRICE_PACK_SMALL || null;
+    }
+    if (normalized === 'medium') {
+        return dbPrices.PACK_MEDIUM || process.env.STRIPE_PRICE_PACK_MEDIUM || null;
+    }
+    if (normalized === 'large') {
+        return dbPrices.PACK_LARGE || process.env.STRIPE_PRICE_PACK_LARGE || null;
+    }
+
+    return null;
 }

@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getCreditPack, CREDIT_PACKS } from '@/config/creditPacks';
-import { getStripeClient } from '@/lib/stripe';
+import { getStripeClient, getStripePriceIdForPack } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
@@ -35,8 +35,10 @@ export async function POST(request: Request) {
             );
         }
 
+        const stripePackPriceId = await getStripePriceIdForPack(pack.id);
+
         // Check for Stripe price ID
-        if (!pack.stripePriceId) {
+        if (!stripePackPriceId) {
             return NextResponse.json(
                 { error: 'Prezzo Stripe non configurato per questo pack' },
                 { status: 503 }
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
             customer: customerId,
             line_items: [
                 {
-                    price: pack.stripePriceId,
+                    price: stripePackPriceId,
                     quantity: 1
                 }
             ],

@@ -149,6 +149,23 @@ export async function POST(request: Request) {
             }
         });
 
+        if (projectId) {
+            await prisma.projectVisibilityConfig.upsert({
+                where: {
+                    projectId_configId: {
+                        projectId,
+                        configId: config.id
+                    }
+                },
+                update: {},
+                create: {
+                    projectId,
+                    configId: config.id,
+                    createdBy: session.user.id
+                }
+            });
+        }
+
         return NextResponse.json({
             success: true,
             configId: config.id,
@@ -201,13 +218,21 @@ export async function GET(request: Request) {
             where: {
                 organizationId,
                 ...(configId ? { id: configId } : {}),
-                ...(projectId ? { projectId } : {})
+                ...(projectId ? {
+                    OR: [
+                        { projectId },
+                        { projectShares: { some: { projectId } } }
+                    ]
+                } : {})
             },
             include: {
                 prompts: {
                     orderBy: { orderIndex: 'asc' }
                 },
                 competitors: true,
+                projectShares: {
+                    select: { projectId: true }
+                },
                 scans: {
                     orderBy: { startedAt: 'desc' },
                     take: 1,
@@ -330,6 +355,23 @@ export async function PATCH(request: Request) {
                     ...(projectId !== undefined && { projectId })
                 }
             });
+
+            if (projectId !== undefined && projectId) {
+                await tx.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
+                            projectId,
+                            configId: config.id
+                        }
+                    },
+                    update: {},
+                    create: {
+                        projectId,
+                        configId: config.id,
+                        createdBy: session.user.id
+                    }
+                });
+            }
 
             // 2. Sync Prompts if provided
             if (prompts) {

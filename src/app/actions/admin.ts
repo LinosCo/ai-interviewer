@@ -48,22 +48,92 @@ export async function transferProject(projectId: string, newOwnerId: string) {
     await requireAdmin();
     console.log(`[AdminAction] Transfer Project: projectId=${projectId}`);
 
-    const project = await prisma.project.update({
-        where: { id: projectId },
-        data: {
-            ownerId: newOwnerId
+    const project = await prisma.$transaction(async (tx) => {
+        const existingProject = await tx.project.findUnique({
+            where: { id: projectId },
+            select: { id: true, ownerId: true, organizationId: true }
+        });
+
+        if (!existingProject) {
+            throw new Error('Project not found');
         }
+
+        const previousOwnerId = existingProject.ownerId;
+
+        const updatedProject = await tx.project.update({
+            where: { id: projectId },
+            data: {
+                ownerId: newOwnerId
+            }
+        });
+
+        // New owner must always be explicitly OWNER in ProjectAccess
+        await tx.projectAccess.upsert({
+            where: {
+                userId_projectId: {
+                    userId: newOwnerId,
+                    projectId
+                }
+            },
+            update: { role: 'OWNER' },
+            create: {
+                userId: newOwnerId,
+                projectId,
+                role: 'OWNER'
+            }
+        });
+
+        // Keep previous owner as MEMBER (unless same user)
+        if (previousOwnerId && previousOwnerId !== newOwnerId) {
+            await tx.projectAccess.upsert({
+                where: {
+                    userId_projectId: {
+                        userId: previousOwnerId,
+                        projectId
+                    }
+                },
+                update: { role: 'MEMBER' },
+                create: {
+                    userId: previousOwnerId,
+                    projectId,
+                    role: 'MEMBER'
+                }
+            });
+        }
+
+        // Ensure the new owner is also a member of the project organization.
+        if (existingProject.organizationId) {
+            await tx.membership.upsert({
+                where: {
+                    userId_organizationId: {
+                        userId: newOwnerId,
+                        organizationId: existingProject.organizationId
+                    }
+                },
+                update: {
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                },
+                create: {
+                    userId: newOwnerId,
+                    organizationId: existingProject.organizationId,
+                    role: 'MEMBER',
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                }
+            });
+        }
+
+        return updatedProject;
     });
 
-    // Also update access list to ensure new owner has access? 
-    // Usually owner has implicit access, but we might want to ensure it.
-    // The schema says Project has ownerId.
-    // Let's also ensure the user is in ProjectAccess if that's how we track basic visibility?
-    // Or does ownerId suffice?
-    // Looking at schema: User ownedProjects Project[].
-    // Usually owner implies full access.
-
     revalidatePath('/dashboard/admin/projects');
+    revalidatePath(`/dashboard/admin/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath('/dashboard/projects');
+    revalidatePath('/dashboard/settings/members');
     return project;
 }
 
@@ -158,7 +228,8 @@ export async function createProject(name: string, ownerId: string) {
             // Also add owner to access list for clarity
             accessList: {
                 create: {
-                    userId: ownerId
+                    userId: ownerId,
+                    role: 'OWNER'
                 }
             }
         }

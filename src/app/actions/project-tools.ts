@@ -50,9 +50,19 @@ async function verifyTransferPermissions(sourceProjectId: string, targetProjectI
 
     if (!user) throw new Error('User not found');
 
+    const projects = await prisma.project.findMany({
+        where: { id: { in: [sourceProjectId, targetProjectId] } },
+        select: { id: true, ownerId: true }
+    });
+
+    const sourceProject = projects.find((p) => p.id === sourceProjectId);
+    const targetProject = projects.find((p) => p.id === targetProjectId);
+
     const isAdmin = user.role === 'ADMIN';
-    const hasSourceAccess = isAdmin || user.projectAccess.some(pa => pa.projectId === sourceProjectId && pa.role === 'OWNER');
-    const hasTargetAccess = isAdmin || user.projectAccess.some(pa => pa.projectId === targetProjectId && pa.role === 'OWNER');
+    const isSourceOwnerById = sourceProject?.ownerId === user.id;
+    const isTargetOwnerById = targetProject?.ownerId === user.id;
+    const hasSourceAccess = isAdmin || isSourceOwnerById || user.projectAccess.some(pa => pa.projectId === sourceProjectId && pa.role === 'OWNER');
+    const hasTargetAccess = isAdmin || isTargetOwnerById || user.projectAccess.some(pa => pa.projectId === targetProjectId && pa.role === 'OWNER');
 
     if (!hasSourceAccess || !hasTargetAccess) {
         throw new Error('Insufficient permissions. You must be the owner of both projects to transfer items.');
@@ -153,16 +163,43 @@ export async function transferProjectToOrganization(projectId: string, targetOrg
     if (!project) throw new Error('Project not found');
 
     const isAdmin = user.role === 'ADMIN';
-    const hasProjectOwnerAccess = isAdmin || user.projectAccess.some(pa => pa.projectId === projectId && pa.role === 'OWNER');
+    const isProjectOwnerById = project.ownerId === session.user.id;
+    const hasProjectOwnerAccess = isAdmin || isProjectOwnerById || user.projectAccess.some(pa => pa.projectId === projectId && pa.role === 'OWNER');
     const hasTargetOrgAccess = isAdmin || user.memberships.some(m => m.organizationId === targetOrgId && ['OWNER', 'ADMIN'].includes(m.role));
 
     if (!hasProjectOwnerAccess || !hasTargetOrgAccess) {
         throw new Error('Insufficient permissions. You must be the project owner and an admin of the target organization.');
     }
 
-    await prisma.project.update({
-        where: { id: projectId },
-        data: { organizationId: targetOrgId }
+    await prisma.$transaction(async (tx) => {
+        await tx.project.update({
+            where: { id: projectId },
+            data: { organizationId: targetOrgId }
+        });
+
+        if (project.ownerId) {
+            await tx.membership.upsert({
+                where: {
+                    userId_organizationId: {
+                        userId: project.ownerId,
+                        organizationId: targetOrgId
+                    }
+                },
+                update: {
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                },
+                create: {
+                    userId: project.ownerId,
+                    organizationId: targetOrgId,
+                    role: 'MEMBER',
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                }
+            });
+        }
     });
 
     revalidatePath(`/dashboard/projects/${projectId}`);

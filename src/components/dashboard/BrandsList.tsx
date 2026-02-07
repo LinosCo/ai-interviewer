@@ -34,6 +34,12 @@ interface Brand {
     };
 }
 
+interface Organization {
+    id: string;
+    name: string;
+    slug: string;
+}
+
 interface BrandsListProps {
     hasVisibility: boolean;
     planType: string;
@@ -42,10 +48,12 @@ interface BrandsListProps {
 export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
     const { selectedProject, isAllProjectsSelected, loading: projectLoading, projects } = useProject();
     const [brands, setBrands] = useState<Brand[]>([]);
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [movingId, setMovingId] = useState<string | null>(null);
+    const [transferringOrgId, setTransferringOrgId] = useState<string | null>(null);
     const router = useRouter();
 
     const handleDeleteBrand = async (brandId: string, brandName: string) => {
@@ -136,6 +144,47 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
 
         fetchBrands();
     }, [selectedProject?.id, isAllProjectsSelected, projectLoading]);
+
+    useEffect(() => {
+        const fetchOrganizations = async () => {
+            try {
+                const res = await fetch('/api/organizations');
+                if (!res.ok) return;
+                const data = await res.json();
+                setOrganizations(data.organizations || []);
+            } catch (err) {
+                console.error('Failed to fetch organizations:', err);
+            }
+        };
+        fetchOrganizations();
+    }, []);
+
+    const handleTransferBrandToOrganization = async (brandId: string, brandName: string, targetOrganizationId: string, targetOrganizationName: string) => {
+        if (!confirm(`Vuoi trasferire il brand "${brandName}" nell'organizzazione "${targetOrganizationName}"? L'associazione ai progetti verrà rimossa.`)) {
+            return;
+        }
+
+        setTransferringOrgId(brandId);
+        try {
+            const res = await fetch(`/api/visibility/${brandId}/transfer-organization`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetOrganizationId })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Errore durante il trasferimento organizzazione');
+            }
+
+            setBrands(prev => prev.filter(b => b.id !== brandId));
+            router.refresh();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Errore durante il trasferimento organizzazione');
+        } finally {
+            setTransferringOrgId(null);
+        }
+    };
 
     const canAddMore = hasVisibility;
 
@@ -351,6 +400,25 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                                                         </DropdownMenuItem>
                                                                     </>
                                                                 )}
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuSub>
+                                                    )}
+                                                    {organizations.length > 1 && (
+                                                        <DropdownMenuSub>
+                                                            <DropdownMenuSubTrigger>
+                                                                <ArrowRightLeft className="w-4 h-4 mr-2" />
+                                                                Trasferisci organizzazione
+                                                            </DropdownMenuSubTrigger>
+                                                            <DropdownMenuSubContent>
+                                                                {organizations.map(org => (
+                                                                    <DropdownMenuItem
+                                                                        key={org.id}
+                                                                        onClick={() => handleTransferBrandToOrganization(brand.id, brand.brandName, org.id, org.name)}
+                                                                        disabled={transferringOrgId === brand.id}
+                                                                    >
+                                                                        {org.name}
+                                                                    </DropdownMenuItem>
+                                                                ))}
                                                             </DropdownMenuSubContent>
                                                         </DropdownMenuSub>
                                                     )}

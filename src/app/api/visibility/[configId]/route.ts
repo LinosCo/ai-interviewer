@@ -143,6 +143,23 @@ export async function PATCH(
             }
         });
 
+        if (body.projectId) {
+            await prisma.projectVisibilityConfig.upsert({
+                where: {
+                    projectId_configId: {
+                        projectId: body.projectId,
+                        configId
+                    }
+                },
+                update: {},
+                create: {
+                    projectId: body.projectId,
+                    configId,
+                    createdBy: session.user.id
+                }
+            });
+        }
+
         return NextResponse.json({
             success: true,
             config: updatedConfig

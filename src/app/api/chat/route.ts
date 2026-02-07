@@ -8,6 +8,7 @@ import { LLMService } from '@/services/llmService';
 import { TopicManager } from '@/lib/llm/topic-manager';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
@@ -1857,15 +1858,17 @@ ${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up an
             }
         }
 
-        const buildAssistantMetadata = (isCompletion: boolean = false) => ({
-            ...(clientMessageId ? { replyToClientMessageId: clientMessageId } : {}),
-            phase: nextState.phase,
-            supervisorStatus: supervisorInsight?.status,
-            ...(isCompletion ? { isCompletion: true } : {}),
-            quality: qualityTelemetry,
-            flowFlags: flowTelemetry,
-            responseLatencyMs: Date.now() - startTime
-        });
+        const buildAssistantMetadata = (isCompletion: boolean = false): Prisma.InputJsonObject => {
+            return {
+                ...(clientMessageId ? { replyToClientMessageId: clientMessageId } : {}),
+                phase: nextState.phase,
+                supervisorStatus: supervisorInsight?.status ?? null,
+                quality: qualityTelemetry as unknown as Prisma.InputJsonValue,
+                flowFlags: flowTelemetry as unknown as Prisma.InputJsonValue,
+                responseLatencyMs: Date.now() - startTime,
+                ...(isCompletion ? { isCompletion: true } : {})
+            };
+        };
 
         // Check for completion tag - only valid if we're actually done
             if (/INTERVIEW_COMPLETED/i.test(responseText)) {

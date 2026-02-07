@@ -43,7 +43,14 @@ export default async function VisibilityPage({
         where: {
             organizationId: orgId,
             ...(brandIdFilter ? { id: brandIdFilter } : {}),
-            ...(projectIdFilter && projectIdFilter !== '__ALL__' && !brandIdFilter ? { projectId: projectIdFilter } : {})
+            ...(projectIdFilter && projectIdFilter !== '__ALL__' && !brandIdFilter
+                ? {
+                    OR: [
+                        { projectId: projectIdFilter },
+                        { projectShares: { some: { projectId: projectIdFilter } } }
+                    ]
+                }
+                : {})
         },
         include: { prompts: true, project: { select: { id: true, name: true } } }
     });

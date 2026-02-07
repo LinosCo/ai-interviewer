@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
-import { PlanType, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
+import { BillingCycle, PlanType, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
 import { CreditService } from '@/services/creditService';
@@ -27,11 +28,12 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+        const eventPayload = JSON.parse(JSON.stringify(event)) as Prisma.InputJsonValue;
         await prisma.stripeWebhookEvent.create({
             data: {
                 eventId: event.id,
                 eventType: event.type,
-                payload: event
+                payload: eventPayload
             }
         });
     } catch (error: any) {
@@ -133,17 +135,24 @@ async function handleCreditPackCheckout(session: Stripe.Checkout.Session) {
 }
 
 async function handleSubscriptionCreated(session: Stripe.Checkout.Session, stripe: Stripe) {
-    const { organizationId, tier } = session.metadata || {};
+    const { organizationId, tier, billingPeriod } = session.metadata || {};
     const stripeSubscriptionId = typeof session.subscription === 'string' ? session.subscription : null;
 
-    if (!organizationId || !tier || !stripeSubscriptionId) {
+    if (!organizationId || !stripeSubscriptionId) {
         return;
     }
 
     const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
-    const planType = mapTierToPlanType(tier);
-    const planConfig = PLANS[planType] || PLANS[PlanType.FREE];
+    const priceId = stripeSubscription.items.data[0]?.price?.id || null;
+    const inferredFromPrice = await resolvePlanAndCycleFromPriceId(priceId);
+    const planType = tier
+        ? mapTierToPlanType(tier)
+        : inferredFromPrice.planType;
+    const cycle = billingPeriod
+        ? normalizeBillingCycle(billingPeriod)
+        : inferredFromPrice.billingCycle;
+    const orgUpdateData = await buildOrganizationPlanUpdate(organizationId, planType, cycle);
 
     await prisma.$transaction([
         prisma.subscription.upsert({
@@ -181,10 +190,7 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session, strip
         }),
         prisma.organization.update({
             where: { id: organizationId },
-            data: {
-                plan: planType,
-                monthlyCreditsLimit: BigInt(planConfig.monthlyCredits)
-            }
+            data: orgUpdateData
         })
     ]);
 }
@@ -201,23 +207,36 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
         trialing: SubscriptionStatus.TRIALING,
         past_due: SubscriptionStatus.PAST_DUE,
         canceled: SubscriptionStatus.CANCELED,
-        incomplete: SubscriptionStatus.INCOMPLETE,
-        paused: SubscriptionStatus.PAUSED,
+        incomplete: SubscriptionStatus.PAST_DUE,
+        incomplete_expired: SubscriptionStatus.CANCELED,
+        paused: SubscriptionStatus.PAST_DUE,
         unpaid: SubscriptionStatus.PAST_DUE
     };
 
-    await prisma.subscription.update({
-        where: { id: subscription.id },
-        data: {
-            status: statusMap[stripeSubscription.status] || SubscriptionStatus.ACTIVE,
-            currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
-            currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
-            cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-            canceledAt: stripeSubscription.canceled_at
-                ? new Date(stripeSubscription.canceled_at * 1000)
-                : null
-        }
-    });
+    const priceId = stripeSubscription.items.data[0]?.price?.id || null;
+    const { planType, billingCycle } = await resolvePlanAndCycleFromPriceId(priceId);
+    const orgUpdateData = await buildOrganizationPlanUpdate(subscription.organizationId, planType, billingCycle);
+
+    await prisma.$transaction([
+        prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+                tier: mapTierToSubscriptionTier(planType),
+                stripePriceId: priceId,
+                status: statusMap[stripeSubscription.status] || SubscriptionStatus.ACTIVE,
+                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
+                cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+                canceledAt: stripeSubscription.canceled_at
+                    ? new Date(stripeSubscription.canceled_at * 1000)
+                    : null
+            }
+        }),
+        prisma.organization.update({
+            where: { id: subscription.organizationId },
+            data: orgUpdateData
+        })
+    ]);
 }
 
 async function handleSubscriptionCanceled(stripeSubscription: Stripe.Subscription) {
@@ -242,6 +261,7 @@ async function handleSubscriptionCanceled(stripeSubscription: Stripe.Subscriptio
             where: { id: subscription.organizationId },
             data: {
                 plan: PlanType.TRIAL,
+                billingCycle: BillingCycle.MONTHLY,
                 monthlyCreditsLimit: BigInt(trialPlan.monthlyCredits)
             }
         })
@@ -249,7 +269,7 @@ async function handleSubscriptionCanceled(stripeSubscription: Stripe.Subscriptio
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-    const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
+    const stripeSubscriptionId = getInvoiceSubscriptionId(invoice);
     if (!stripeSubscriptionId) return;
 
     await prisma.subscription.updateMany({
@@ -271,13 +291,24 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-    const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
+    const stripeSubscriptionId = getInvoiceSubscriptionId(invoice);
     if (!stripeSubscriptionId) return;
 
     await prisma.subscription.updateMany({
         where: { stripeSubscriptionId },
         data: { status: SubscriptionStatus.PAST_DUE }
     });
+}
+
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+    const rawSubscription =
+        (invoice as any)?.subscription ??
+        (invoice as any)?.parent?.subscription_details?.subscription ??
+        null;
+
+    if (typeof rawSubscription === 'string') return rawSubscription;
+    if (rawSubscription && typeof rawSubscription.id === 'string') return rawSubscription.id;
+    return null;
 }
 
 function mapTierToPlanType(tier: string): PlanType {
@@ -288,7 +319,93 @@ function mapTierToPlanType(tier: string): PlanType {
     return PlanType.TRIAL;
 }
 
-function mapTierToSubscriptionTier(tier: string): SubscriptionTier {
+function normalizeBillingCycle(value: string): BillingCycle {
+    return value?.toLowerCase() === 'yearly' ? BillingCycle.YEARLY : BillingCycle.MONTHLY;
+}
+
+async function resolvePlanAndCycleFromPriceId(priceId?: string | null): Promise<{
+    planType: PlanType;
+    billingCycle: BillingCycle;
+}> {
+    if (!priceId) {
+        return { planType: PlanType.TRIAL, billingCycle: BillingCycle.MONTHLY };
+    }
+
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: {
+            stripePriceStarter: true,
+            stripePriceStarterYearly: true,
+            stripePricePro: true,
+            stripePriceProYearly: true,
+            stripePriceBusiness: true,
+            stripePriceBusinessYearly: true
+        }
+    });
+
+    const plansToCheck = [PlanType.STARTER, PlanType.PRO, PlanType.BUSINESS];
+    for (const planType of plansToCheck) {
+        const plan = PLANS[planType];
+        const monthlyId =
+            (planType === PlanType.STARTER ? globalConfig?.stripePriceStarter : null) ||
+            (planType === PlanType.PRO ? globalConfig?.stripePricePro : null) ||
+            (planType === PlanType.BUSINESS ? globalConfig?.stripePriceBusiness : null) ||
+            plan.stripePriceIdMonthly;
+
+        const yearlyId =
+            (planType === PlanType.STARTER ? globalConfig?.stripePriceStarterYearly : null) ||
+            (planType === PlanType.PRO ? globalConfig?.stripePriceProYearly : null) ||
+            (planType === PlanType.BUSINESS ? globalConfig?.stripePriceBusinessYearly : null) ||
+            plan.stripePriceIdYearly;
+
+        if (monthlyId && monthlyId === priceId) {
+            return { planType, billingCycle: BillingCycle.MONTHLY };
+        }
+        if (yearlyId && yearlyId === priceId) {
+            return { planType, billingCycle: BillingCycle.YEARLY };
+        }
+    }
+
+    return { planType: PlanType.TRIAL, billingCycle: BillingCycle.MONTHLY };
+}
+
+async function buildOrganizationPlanUpdate(
+    organizationId: string,
+    planType: PlanType,
+    billingCycle: BillingCycle
+): Promise<Prisma.OrganizationUpdateInput> {
+    const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: {
+            customLimits: true
+        }
+    });
+
+    const existingCustomLimits =
+        typeof organization?.customLimits === 'object' && organization.customLimits !== null
+            ? (organization.customLimits as Record<string, unknown>)
+            : {};
+    const hasCustomMonthlyLimit = existingCustomLimits.monthlyCreditsLimitCustom === true;
+    const planConfig = PLANS[planType] || PLANS[PlanType.FREE];
+
+    const data: Prisma.OrganizationUpdateInput = {
+        plan: planType,
+        billingCycle
+    };
+
+    if (!hasCustomMonthlyLimit) {
+        data.monthlyCreditsLimit = BigInt(planConfig.monthlyCredits);
+        data.customLimits = {
+            ...existingCustomLimits,
+            monthlyCreditsLimitCustom: false
+        };
+    }
+    return data;
+}
+
+function mapTierToSubscriptionTier(tier: PlanType): SubscriptionTier;
+function mapTierToSubscriptionTier(tier: string): SubscriptionTier;
+function mapTierToSubscriptionTier(tier: string | PlanType): SubscriptionTier {
     const t = tier.toUpperCase();
     if (t === 'STARTER') return SubscriptionTier.STARTER;
     if (t === 'PRO') return SubscriptionTier.PRO;

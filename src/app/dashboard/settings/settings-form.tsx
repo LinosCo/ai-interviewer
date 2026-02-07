@@ -8,7 +8,6 @@ interface PlatformSettingsFormProps {
     organizationId: string;
     currentKnowledge: string;
     currentStrategicPlan: string;
-    settingsId?: string;
 
     platformOpenaiApiKey: string;
     platformAnthropicApiKey: string;
@@ -23,13 +22,24 @@ interface PlatformSettingsFormProps {
     stripePriceStarterYearly?: string;
     stripePricePro?: string;
     stripePriceProYearly?: string;
+    stripePriceBusiness?: string;
+    stripePriceBusinessYearly?: string;
+    stripePricePackSmall?: string;
+    stripePricePackMedium?: string;
+    stripePricePackLarge?: string;
+    smtpHost?: string;
+    smtpPort?: number | null;
+    smtpSecure?: boolean | null;
+    smtpUser?: string;
+    smtpPass?: string;
+    smtpFromEmail?: string;
+    smtpNotificationEmail?: string;
 }
 
 export default function PlatformSettingsForm({
     organizationId,
     currentKnowledge,
     currentStrategicPlan,
-    settingsId,
     platformOpenaiApiKey,
     platformAnthropicApiKey,
     platformGeminiApiKey = '',
@@ -40,7 +50,19 @@ export default function PlatformSettingsForm({
     stripePriceStarter = '',
     stripePriceStarterYearly = '',
     stripePricePro = '',
-    stripePriceProYearly = ''
+    stripePriceProYearly = '',
+    stripePriceBusiness = '',
+    stripePriceBusinessYearly = '',
+    stripePricePackSmall = '',
+    stripePricePackMedium = '',
+    stripePricePackLarge = '',
+    smtpHost = '',
+    smtpPort = null,
+    smtpSecure = null,
+    smtpUser = '',
+    smtpPass = '',
+    smtpFromEmail = '',
+    smtpNotificationEmail = ''
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
     const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
@@ -59,6 +81,22 @@ export default function PlatformSettingsForm({
     const [sPriceStarterYearly, setSPriceStarterYearly] = useState(stripePriceStarterYearly);
     const [sPricePro, setSPricePro] = useState(stripePricePro);
     const [sPriceProYearly, setSPriceProYearly] = useState(stripePriceProYearly);
+    const [sPriceBusiness, setSPriceBusiness] = useState(stripePriceBusiness);
+    const [sPriceBusinessYearly, setSPriceBusinessYearly] = useState(stripePriceBusinessYearly);
+    const [sPricePackSmall, setSPricePackSmall] = useState(stripePricePackSmall);
+    const [sPricePackMedium, setSPricePackMedium] = useState(stripePricePackMedium);
+    const [sPricePackLarge, setSPricePackLarge] = useState(stripePricePackLarge);
+
+    // SMTP State
+    const [smtpHostValue, setSmtpHostValue] = useState(smtpHost);
+    const [smtpPortValue, setSmtpPortValue] = useState(smtpPort ? String(smtpPort) : '');
+    const [smtpSecureValue, setSmtpSecureValue] = useState(
+        smtpSecure === null || smtpSecure === undefined ? true : smtpSecure
+    );
+    const [smtpUserValue, setSmtpUserValue] = useState(smtpUser);
+    const [smtpPassValue, setSmtpPassValue] = useState(smtpPass);
+    const [smtpFromEmailValue, setSmtpFromEmailValue] = useState(smtpFromEmail);
+    const [smtpNotificationEmailValue, setSmtpNotificationEmailValue] = useState(smtpNotificationEmail);
 
     const isDirty = (
         (openaiKey && openaiKey !== platformOpenaiApiKey) ||
@@ -71,6 +109,18 @@ export default function PlatformSettingsForm({
         sPriceStarterYearly !== stripePriceStarterYearly ||
         sPricePro !== stripePricePro ||
         sPriceProYearly !== stripePriceProYearly ||
+        sPriceBusiness !== stripePriceBusiness ||
+        sPriceBusinessYearly !== stripePriceBusinessYearly ||
+        sPricePackSmall !== stripePricePackSmall ||
+        sPricePackMedium !== stripePricePackMedium ||
+        sPricePackLarge !== stripePricePackLarge ||
+        smtpHostValue !== smtpHost ||
+        smtpPortValue !== (smtpPort ? String(smtpPort) : '') ||
+        smtpSecureValue !== (smtpSecure === null || smtpSecure === undefined ? true : smtpSecure) ||
+        smtpUserValue !== smtpUser ||
+        smtpPassValue !== smtpPass ||
+        smtpFromEmailValue !== smtpFromEmail ||
+        smtpNotificationEmailValue !== smtpNotificationEmail ||
         knowledge !== currentKnowledge ||
         strategicPlan !== currentStrategicPlan
     );
@@ -86,7 +136,6 @@ export default function PlatformSettingsForm({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     organizationId,
-                    settingsId,
                     methodologyKnowledge: knowledge,
                     strategicPlan: strategicPlan,
                     platformOpenaiApiKey: openaiKey || undefined,
@@ -100,7 +149,19 @@ export default function PlatformSettingsForm({
                     stripePriceStarter: sPriceStarter,
                     stripePriceStarterYearly: sPriceStarterYearly,
                     stripePricePro: sPricePro,
-                    stripePriceProYearly: sPriceProYearly
+                    stripePriceProYearly: sPriceProYearly,
+                    stripePriceBusiness: sPriceBusiness,
+                    stripePriceBusinessYearly: sPriceBusinessYearly,
+                    stripePricePackSmall: sPricePackSmall,
+                    stripePricePackMedium: sPricePackMedium,
+                    stripePricePackLarge: sPricePackLarge,
+                    smtpHost: smtpHostValue,
+                    smtpPort: smtpPortValue ? Number(smtpPortValue) : null,
+                    smtpSecure: smtpSecureValue,
+                    smtpUser: smtpUserValue,
+                    smtpPass: smtpPassValue || undefined,
+                    smtpFromEmail: smtpFromEmailValue,
+                    smtpNotificationEmail: smtpNotificationEmailValue
                 })
             });
 
@@ -396,6 +457,149 @@ export default function PlatformSettingsForm({
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none transition-all placeholder:text-gray-400"
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Business Price ID (Monthly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceBusiness}
+                                    onChange={(e) => setSPriceBusiness(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Business Price ID (Yearly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceBusinessYearly}
+                                    onChange={(e) => setSPriceBusinessYearly(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Credit Pack Small Price ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPricePackSmall}
+                                    onChange={(e) => setSPricePackSmall(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Credit Pack Medium Price ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPricePackMedium}
+                                    onChange={(e) => setSPricePackMedium(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Credit Pack Large Price ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPricePackLarge}
+                                    onChange={(e) => setSPricePackLarge(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <h3 className="text-md font-semibold text-gray-900 mb-3">SMTP Transazionali</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">SMTP Host</label>
+                                    <input
+                                        type="text"
+                                        value={smtpHostValue}
+                                        onChange={(e) => setSmtpHostValue(e.target.value)}
+                                        placeholder="mail.example.com"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">SMTP Port</label>
+                                    <input
+                                        type="number"
+                                        value={smtpPortValue}
+                                        onChange={(e) => setSmtpPortValue(e.target.value)}
+                                        placeholder="465"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        SMTP User
+                                        {smtpUser && <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">● Configured</span>}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={smtpUserValue}
+                                        onChange={(e) => setSmtpUserValue(e.target.value)}
+                                        placeholder="no-reply@example.com"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        SMTP Password
+                                        {smtpPass && <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">● Configured</span>}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={smtpPassValue}
+                                        onChange={(e) => setSmtpPassValue(e.target.value)}
+                                        placeholder={smtpPass ? "•••••••••••••••• (Enter new to replace)" : "Password SMTP"}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Mittente (From)</label>
+                                    <input
+                                        type="text"
+                                        value={smtpFromEmailValue}
+                                        onChange={(e) => setSmtpFromEmailValue(e.target.value)}
+                                        placeholder="Business Tuner <noreply@example.com>"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Email Notifiche interne</label>
+                                    <input
+                                        type="text"
+                                        value={smtpNotificationEmailValue}
+                                        onChange={(e) => setSmtpNotificationEmailValue(e.target.value)}
+                                        placeholder="ops@example.com"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={smtpSecureValue}
+                                            onChange={(e) => setSmtpSecureValue(e.target.checked)}
+                                            className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                        />
+                                        SMTP Secure (TLS/SSL)
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -405,7 +609,7 @@ export default function PlatformSettingsForm({
             <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
                 <button
                     onClick={handleSave}
-                    disabled={isSaving}
+                    disabled={isSaving || !isDirty}
                     className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20 active:scale-[0.98] transition-all"
                 >
                     {isSaving ? 'Salvataggio...' : 'Salva tutte le impostazioni'}

@@ -41,6 +41,10 @@ export async function GET(request: Request) {
             orderBy: { createdAt: 'desc' },
             include: {
                 project: { select: { id: true, name: true } },
+                projectShares: {
+                    ...(projectId ? { where: { projectId } } : {}),
+                    select: { projectId: true }
+                },
                 scans: {
                     orderBy: { completedAt: 'desc' },
                     take: 1,
@@ -56,7 +60,11 @@ export async function GET(request: Request) {
             }
         });
 
-        return NextResponse.json({ brands });
+        const filteredBrands = projectId
+            ? brands.filter((b: any) => b.projectId === projectId || (b.projectShares?.length ?? 0) > 0)
+            : brands;
+
+        return NextResponse.json({ brands: filteredBrands });
 
     } catch (error: any) {
         console.error('Error fetching visibility brands:', error);

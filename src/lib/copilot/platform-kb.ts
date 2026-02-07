@@ -231,6 +231,19 @@ Questo ti aiuta a capire quanto sei "visibile" nel nuovo mondo delle ricerche AI
         keywords: ['configurare', 'brand', 'competitor', 'prompt', 'scansione', 'setup']
     },
     {
+        id: 'vis-2b',
+        title: 'Spostare un Brand Monitor tra progetti e organizzazioni',
+        content: `Il Brand Monitor puo essere gestito come gli altri tool:
+
+- puoi associarlo a piu progetti della stessa organizzazione;
+- puoi spostarlo da un progetto a un altro;
+- puoi trasferirlo in un'altra organizzazione (se hai permessi OWNER/ADMIN su entrambe).
+
+Quando trasferisci un Brand Monitor verso un'altra organizzazione, le associazioni ai progetti vengono azzerate e puoi ricollegarlo ai progetti della nuova organizzazione.`,
+        category: 'visibility',
+        keywords: ['trasferire', 'organizzazione', 'progetti', 'spostare', 'brand monitor', 'associazione']
+    },
+    {
         id: 'vis-3',
         title: 'SERP Monitoring (Google Search)',
         content: `Il SERP Monitoring traccia come il tuo brand appare nei risultati di ricerca Google.
@@ -834,18 +847,21 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
         title: 'Piani e prezzi',
         content: `Business Tuner offre diversi piani:
 
-**Starter** (da 49€/mese):
+**Starter**:
+- 69€/mese oppure 588€/anno (49€/mese equivalente)
 - 6M crediti/mese
 - Interviste e chatbot base
 - Analytics base
 
-**Pro** (da 149€/mese):
+**Pro**:
+- 199€/mese oppure 1788€/anno (149€/mese equivalente)
 - 20M crediti/mese
 - Brand Monitor (1 brand)
 - Strategy Copilot con analisi dati
 - Cross-channel insights
 
-**Business** (da 349€/mese):
+**Business**:
+- 399€/mese oppure 3588€/anno (299€/mese equivalente)
 - 50M crediti/mese
 - Brand Monitor (3 brand)
 - White label, API, dominio custom
@@ -855,28 +871,31 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 - 2M crediti
 - Accesso a tutte le funzionalita Pro
 
-Tutti i prezzi sono mensili. Sconto 20% con fatturazione annuale.`,
+Puoi scegliere fatturazione mensile o annuale direttamente in checkout.`,
         category: 'account',
-        keywords: ['piani', 'prezzi', 'costo', 'abbonamento', 'upgrade', 'starter', 'pro', 'business']
+        keywords: ['piani', 'prezzi', 'costo', 'abbonamento', 'upgrade', 'starter', 'pro', 'business', 'annuale', 'mensile']
     },
     {
         id: 'acc-2',
         title: 'Gestire l\'abbonamento',
         content: `Per gestire il tuo abbonamento:
 
-1. Vai in "Impostazioni" > "Abbonamento"
+1. Vai in "Dashboard" > "Billing"
 2. Qui puoi:
    - Vedere il piano attuale e utilizzo
    - Effettuare upgrade o downgrade
+   - Cambiare ciclo (mensile/annuale)
    - Gestire metodi di pagamento
    - Scaricare fatture
    - Annullare (alla fine del periodo)
 
-Per cambio piano contatta il supporto se hai esigenze particolari.
+**Upgrade/Downgrade**
+- Se hai una subscription attiva, il cambio piano aggiorna la subscription esistente.
+- Stripe applica automaticamente la prorazione in base al tempo residuo del periodo.
 
 Le fatture sono emesse automaticamente e disponibili nel portale.`,
         category: 'account',
-        keywords: ['abbonamento', 'gestire', 'upgrade', 'fatture', 'pagamento', 'annullare']
+        keywords: ['abbonamento', 'gestire', 'upgrade', 'downgrade', 'fatture', 'pagamento', 'annullare', 'billing', 'prorazione']
     },
     {
         id: 'acc-3',
@@ -903,6 +922,17 @@ Ogni operazione AI consuma crediti in base alla complessita:
 - BUSINESS: 50M crediti
 - ADMIN: Illimitati
 
+**Credit Pack extra (one-time):**
+- Small: 2M
+- Medium: 6M
+- Large: 15M
+
+I pack non scadono e si acquistano da Billing.
+
+**Ordine di consumo:**
+1. Prima usa i crediti mensili
+2. Poi usa i crediti pack
+
 **Monitoraggio:**
 - Dashboard mostra crediti usati/rimanenti
 - Notifica automatica al 80% e 95%
@@ -910,9 +940,9 @@ Ogni operazione AI consuma crediti in base alla complessita:
 
 **Cosa succede a esaurimento:**
 - Le funzionalita AI si bloccano
-- Puoi fare upgrade o attendere il reset mensile`,
+- Puoi acquistare un Credit Pack, fare upgrade o attendere il reset mensile`,
         category: 'account',
-        keywords: ['crediti', 'credits', 'limiti', 'utilizzo', 'token', 'quota', 'reset', 'budget']
+        keywords: ['crediti', 'credits', 'limiti', 'utilizzo', 'token', 'quota', 'reset', 'budget', 'pack', 'small', 'medium', 'large']
     },
     {
         id: 'acc-4',
@@ -931,16 +961,16 @@ Ogni operazione AI consuma crediti in base alla complessita:
 - Chatbot: max messaggi per sessione configurabile
 
 **Monitoraggio utilizzo:**
-- Dashboard "Usage" mostra tutti i consumi
+- Dashboard "Billing" mostra tutti i consumi
 - Breakdown per categoria (interviste, chatbot, visibility)
 - Storico mensile
 
 **Al raggiungimento limiti:**
 - Ricevi notifica
-- Funzionalita specifica si blocca
-- Upgrade o attendi reset mensile`,
+- Le API AI vengono bloccate con errore crediti esauriti
+- Acquista pack, fai upgrade o attendi reset mensile`,
         category: 'account',
-        keywords: ['limiti', 'utilizzo', 'quota', 'reset', 'extra', 'cooldown']
+        keywords: ['limiti', 'utilizzo', 'quota', 'reset', 'extra', 'cooldown', 'billing', 'credits_exhausted']
     },
 
     // Troubleshooting

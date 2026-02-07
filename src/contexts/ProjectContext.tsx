@@ -43,7 +43,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
     const fetchProjects = useCallback(async () => {
         // Don't fetch if organization context is still loading
-        if (orgLoading) {
+        if (orgLoading && !currentOrganization) {
             return;
         }
 
@@ -55,14 +55,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         }
 
         setLoading(true);
-        // Reset state before fetching new data to avoid showing stale data
-        setProjects([]);
-        setSelectedProjectState(null);
+        let scheduledRetry = false;
 
         try {
-            const res = await fetch(`/api/projects?organizationId=${currentOrganization.id}`);
+            const res = await fetch(`/api/projects?organizationId=${currentOrganization.id}`, {
+                cache: 'no-store',
+                credentials: 'include',
+                headers: { Accept: 'application/json' }
+            });
             if (res.ok) {
-                const data = await res.json();
+                const data = await res.json().catch(() => null);
+                if (!data || !Array.isArray(data.projects)) {
+                    throw new Error('Invalid projects payload');
+                }
                 const projectsList = data.projects || [];
                 const adminStatus = data.isOrgAdmin || false;
 
@@ -97,17 +102,20 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
                 } else {
                     setSelectedProjectState(null);
                 }
-                setLoading(false);
                 return;
             }
             if ((res.status === 401 || res.status === 403) && retryCount < maxRetries) {
+                scheduledRetry = true;
                 setTimeout(() => setRetryCount((count) => count + 1), 600);
                 return;
             }
         } catch (error) {
             console.error('Failed to fetch projects:', error);
+        } finally {
+            if (!scheduledRetry) {
+                setLoading(false);
+            }
         }
-        setLoading(false);
     }, [currentOrganization, orgLoading, retryCount]);
 
     useEffect(() => {

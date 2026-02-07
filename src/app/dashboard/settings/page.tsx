@@ -5,10 +5,41 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import PlatformSettingsForm from './settings-form';
 import { Skeleton } from '@/components/ui/skeleton';
 
+interface PlatformSettingsState {
+    id?: string;
+    methodologyKnowledge?: string;
+    strategicPlan?: string;
+}
+
+interface GlobalConfigState {
+    openaiApiKey?: string;
+    anthropicApiKey?: string;
+    geminiApiKey?: string;
+    googleSerpApiKey?: string;
+    stripeSecretKey?: string;
+    stripeWebhookSecret?: string;
+    stripePriceStarter?: string;
+    stripePriceStarterYearly?: string;
+    stripePricePro?: string;
+    stripePriceProYearly?: string;
+    stripePriceBusiness?: string;
+    stripePriceBusinessYearly?: string;
+    stripePricePackSmall?: string;
+    stripePricePackMedium?: string;
+    stripePricePackLarge?: string;
+    smtpHost?: string;
+    smtpPort?: number | null;
+    smtpSecure?: boolean | null;
+    smtpUser?: string;
+    smtpPass?: string;
+    smtpFromEmail?: string;
+    smtpNotificationEmail?: string;
+}
+
 export default function PlatformSettingsPage() {
     const { currentOrganization, loading: orgLoading, isAdmin } = useOrganization();
-    const [settings, setSettings] = useState<any>(null);
-    const [globalConfig, setGlobalConfig] = useState<any>(null);
+    const [settings, setSettings] = useState<PlatformSettingsState | null>(null);
+    const [globalConfig, setGlobalConfig] = useState<GlobalConfigState | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -71,7 +102,6 @@ export default function PlatformSettingsPage() {
                         isAdmin={isAdmin}
                         currentKnowledge={settings?.methodologyKnowledge || ''}
                         currentStrategicPlan={settings?.strategicPlan || ''}
-                        settingsId={settings?.id}
                         platformOpenaiApiKey={globalConfig?.openaiApiKey || ''}
                         platformAnthropicApiKey={globalConfig?.anthropicApiKey || ''}
                         platformGeminiApiKey={globalConfig?.geminiApiKey}
@@ -82,6 +112,18 @@ export default function PlatformSettingsPage() {
                         stripePriceStarterYearly={globalConfig?.stripePriceStarterYearly}
                         stripePricePro={globalConfig?.stripePricePro}
                         stripePriceProYearly={globalConfig?.stripePriceProYearly}
+                        stripePriceBusiness={globalConfig?.stripePriceBusiness}
+                        stripePriceBusinessYearly={globalConfig?.stripePriceBusinessYearly}
+                        stripePricePackSmall={globalConfig?.stripePricePackSmall}
+                        stripePricePackMedium={globalConfig?.stripePricePackMedium}
+                        stripePricePackLarge={globalConfig?.stripePricePackLarge}
+                        smtpHost={globalConfig?.smtpHost}
+                        smtpPort={globalConfig?.smtpPort}
+                        smtpSecure={globalConfig?.smtpSecure}
+                        smtpUser={globalConfig?.smtpUser}
+                        smtpPass={globalConfig?.smtpPass}
+                        smtpFromEmail={globalConfig?.smtpFromEmail}
+                        smtpNotificationEmail={globalConfig?.smtpNotificationEmail}
                     />
                 </div>
             </div>

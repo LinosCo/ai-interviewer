@@ -24,6 +24,9 @@ export async function GET(
                         subscription: true,
                         visibilityConfigs: {
                             include: {
+                                projectShares: {
+                                    select: { projectId: true }
+                                },
                                 scans: {
                                     where: { status: 'completed' },
                                     orderBy: { completedAt: 'desc' },
@@ -64,7 +67,7 @@ export async function GET(
 
         // Separate linked and unlinked brands
         const linkedBrands = allBrands
-            .filter(b => b.projectId === projectId)
+            .filter(b => b.projectId === projectId || b.projectShares.some(s => s.projectId === projectId))
             .map(b => ({
                 id: b.id,
                 brandName: b.brandName,
@@ -74,7 +77,7 @@ export async function GET(
             }));
 
         const unlinkedBrands = allBrands
-            .filter(b => !b.projectId)
+            .filter(b => b.projectId !== projectId && !b.projectShares.some(s => s.projectId === projectId))
             .map(b => ({
                 id: b.id,
                 brandName: b.brandName,
@@ -154,17 +157,61 @@ export async function POST(
         }
 
         if (action === 'link') {
-            await prisma.visibilityConfig.update({
-                where: { id: brandId },
-                data: { projectId }
+            await prisma.$transaction(async (tx) => {
+                await tx.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
+                            projectId,
+                            configId: brandId
+                        }
+                    },
+                    update: {},
+                    create: {
+                        projectId,
+                        configId: brandId,
+                        createdBy: session.user.id
+                    }
+                });
+
+                // Keep backward compatibility: ensure a primary project exists.
+                if (!brand.projectId) {
+                    await tx.visibilityConfig.update({
+                        where: { id: brandId },
+                        data: { projectId }
+                    });
+                }
             });
 
             return NextResponse.json({ success: true, action: 'linked' });
 
         } else if (action === 'unlink') {
-            await prisma.visibilityConfig.update({
-                where: { id: brandId },
-                data: { projectId: null }
+            await prisma.$transaction(async (tx) => {
+                await tx.projectVisibilityConfig.deleteMany({
+                    where: {
+                        projectId,
+                        configId: brandId
+                    }
+                });
+
+                // If this project is the primary one, switch primary to another shared project if available.
+                const currentBrand = await tx.visibilityConfig.findUnique({
+                    where: { id: brandId },
+                    select: {
+                        projectId: true,
+                        projectShares: {
+                            where: { projectId: { not: projectId } },
+                            orderBy: { createdAt: 'asc' },
+                            select: { projectId: true }
+                        }
+                    }
+                });
+
+                if (currentBrand?.projectId === projectId) {
+                    await tx.visibilityConfig.update({
+                        where: { id: brandId },
+                        data: { projectId: currentBrand.projectShares[0]?.projectId || null }
+                    });
+                }
             });
 
             return NextResponse.json({ success: true, action: 'unlinked' });

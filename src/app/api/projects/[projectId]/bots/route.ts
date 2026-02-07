@@ -55,8 +55,17 @@ export async function GET(
 
             // 2. Fetch Trackers (VisibilityConfigs)
             const linkedTrackers = await prisma.visibilityConfig.findMany({
-                where: { projectId },
-                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
+                where: {
+                    organizationId: project.organizationId || undefined,
+                    OR: [
+                        { projectId },
+                        { projectShares: { some: { projectId } } }
+                    ]
+                },
+                include: {
+                    project: { select: { name: true, organization: { select: { name: true } } } },
+                    projectShares: { select: { projectId: true } }
+                },
                 orderBy: { updatedAt: 'desc' }
             });
 
@@ -88,9 +97,22 @@ export async function GET(
 
             const availableTrackers = await prisma.visibilityConfig.findMany({
                 where: {
-                    projectId: { in: allProjectIds, not: projectId }
+                    organizationId: { in: orgIds },
+                    NOT: {
+                        OR: [
+                            { projectId },
+                            { projectShares: { some: { projectId } } }
+                        ]
+                    },
+                    OR: [
+                        { projectId: { in: allProjectIds, not: projectId } },
+                        { projectShares: { some: { projectId: { in: allProjectIds, not: projectId } } } }
+                    ]
                 },
-                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
+                include: {
+                    project: { select: { name: true, organization: { select: { name: true } } } },
+                    projectShares: { select: { projectId: true } }
+                },
                 orderBy: { updatedAt: 'desc' }
             });
 
@@ -115,7 +137,7 @@ export async function GET(
                 name: t.brandName,
                 type: 'tracker',
                 botType: 'tracker',
-                projectId: t.projectId,
+                projectId: t.projectId || t.projectShares?.[0]?.projectId || null,
                 projectName: t.project?.name || null,
                 orgName: t.project?.organization?.name || null
             });
@@ -295,12 +317,36 @@ export async function POST(
             });
         } else {
             // For visibility configs, we also need to update organizationId
-            await prisma.visibilityConfig.update({
-                where: { id: botId },
-                data: {
-                    projectId: targetProjectId,
-                    ...(targetProject.organizationId && { organizationId: targetProject.organizationId })
-                }
+            await prisma.$transaction(async (tx) => {
+                await tx.visibilityConfig.update({
+                    where: { id: botId },
+                    data: {
+                        projectId: targetProjectId,
+                        ...(targetProject.organizationId && { organizationId: targetProject.organizationId })
+                    }
+                });
+
+                await tx.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
+                            projectId: targetProjectId,
+                            configId: botId
+                        }
+                    },
+                    update: {},
+                    create: {
+                        projectId: targetProjectId,
+                        configId: botId,
+                        createdBy: session.user.id
+                    }
+                });
+
+                await tx.projectVisibilityConfig.deleteMany({
+                    where: {
+                        projectId,
+                        configId: botId
+                    }
+                });
             });
         }
 

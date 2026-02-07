@@ -51,7 +51,17 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
 
     const interviews = project.bots.filter(b => (b as any).botType === 'interview' || !(b as any).botType);
     const chatbots = project.bots.filter(b => (b as any).botType === 'chatbot');
-    const trackers = project.visibilityConfigs;
+    const trackers = await prisma.visibilityConfig.findMany({
+        where: {
+            organizationId: project.organizationId || undefined,
+            OR: [
+                { projectId },
+                { projectShares: { some: { projectId } } }
+            ]
+        },
+        orderBy: { createdAt: 'desc' },
+        include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
+    });
 
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto">

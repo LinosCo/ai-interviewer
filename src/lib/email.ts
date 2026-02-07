@@ -1,7 +1,21 @@
 import { Resend } from 'resend';
+import net from 'node:net';
+import tls from 'node:tls';
+import { prisma } from '@/lib/prisma';
 
 // Lazy initialization to prevent build errors when API key is not set
 let resend: Resend | null = null;
+const DEFAULT_FROM_EMAIL = 'Business Tuner <businesstuner@voler.ai>';
+const DEFAULT_NOTIFICATION_EMAIL = 'businesstuner@voler.ai';
+
+function getAppBaseUrl() {
+    return (
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.AUTH_URL ||
+        process.env.NEXTAUTH_URL ||
+        'https://app.voler.ai'
+    );
+}
 
 function getResendClient() {
     if (!resend && process.env.RESEND_API_KEY) {
@@ -10,23 +24,138 @@ function getResendClient() {
     return resend;
 }
 
+function extractEmailAddress(raw: string) {
+    const match = raw.match(/<([^>]+)>/);
+    return (match ? match[1] : raw).trim();
+}
 
-export async function sendPasswordResetEmail(email: string, resetToken: string) {
-    const resendClient = getResendClient();
+function readSmtpResponse(socket: net.Socket | tls.TLSSocket): Promise<string> {
+    return new Promise((resolve, reject) => {
+        let response = '';
 
-    if (!resendClient) {
-        console.error('Resend API key not configured');
-        return { success: false, error: 'Email service not configured' };
+        const onData = (chunk: Buffer | string) => {
+            response += chunk.toString();
+            const lines = response.split('\r\n').filter(Boolean);
+            const lastLine = lines[lines.length - 1] || '';
+            if (/^\d{3} /.test(lastLine)) {
+                cleanup();
+                resolve(response);
+            }
+        };
+
+        const onError = (error: Error) => {
+            cleanup();
+            reject(error);
+        };
+
+        const onClose = () => {
+            cleanup();
+            reject(new Error('SMTP connection closed unexpectedly'));
+        };
+
+        const cleanup = () => {
+            socket.off('data', onData);
+            socket.off('error', onError);
+            socket.off('close', onClose);
+        };
+
+        socket.on('data', onData);
+        socket.on('error', onError);
+        socket.on('close', onClose);
+    });
+}
+
+async function sendSmtpCommand(
+    socket: net.Socket | tls.TLSSocket,
+    command: string,
+    expectedCodes: number[]
+) {
+    socket.write(`${command}\r\n`);
+    const response = await readSmtpResponse(socket);
+    const code = Number(response.slice(0, 3));
+    if (!expectedCodes.includes(code)) {
+        throw new Error(`SMTP command failed (${command}): ${response.trim()}`);
     }
+    return response;
+}
 
-    const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
+async function sendEmailViaSmtp(params: {
+    host: string;
+    port: number;
+    secure: boolean;
+    user: string;
+    pass: string;
+    from: string;
+    to: string;
+    subject: string;
+    html: string;
+}) {
+    const { host, port, secure, user, pass, from, to, subject, html } = params;
+
+    const socket = secure
+        ? tls.connect({ host, port, servername: host })
+        : net.connect({ host, port });
+
+    socket.setTimeout(20_000);
+    socket.setEncoding('utf8');
+
+    await new Promise<void>((resolve, reject) => {
+        socket.once('connect', () => resolve());
+        socket.once('error', reject);
+        socket.once('timeout', () => reject(new Error('SMTP connection timeout')));
+    });
 
     try {
-        const { data, error } = await resendClient.emails.send({
-            from: process.env.EMAIL_FROM || 'Business Tuner <hello@voler.ai>',
-            to: [email],
-            subject: 'Recupera la tua password - Business Tuner',
-            html: `
+        const greet = await readSmtpResponse(socket);
+        if (!greet.startsWith('220')) {
+            throw new Error(`SMTP greeting failed: ${greet.trim()}`);
+        }
+
+        await sendSmtpCommand(socket, `EHLO ${host}`, [250]);
+        await sendSmtpCommand(socket, 'AUTH LOGIN', [334]);
+        await sendSmtpCommand(socket, Buffer.from(user).toString('base64'), [334]);
+        await sendSmtpCommand(socket, Buffer.from(pass).toString('base64'), [235]);
+        await sendSmtpCommand(socket, `MAIL FROM:<${extractEmailAddress(from)}>`, [250]);
+        await sendSmtpCommand(socket, `RCPT TO:<${to}>`, [250, 251]);
+        await sendSmtpCommand(socket, 'DATA', [354]);
+
+        const headers = [
+            `From: ${from}`,
+            `To: ${to}`,
+            `Subject: ${subject}`,
+            'MIME-Version: 1.0',
+            'Content-Type: text/html; charset=UTF-8',
+            'Content-Transfer-Encoding: 8bit',
+            '',
+        ].join('\r\n');
+
+        const escapedBody = html.replace(/\r?\n\./g, '\n..');
+        socket.write(`${headers}${escapedBody}\r\n.\r\n`);
+        const dataResponse = await readSmtpResponse(socket);
+        const dataCode = Number(dataResponse.slice(0, 3));
+        if (dataCode !== 250) {
+            throw new Error(`SMTP DATA failed: ${dataResponse.trim()}`);
+        }
+
+        await sendSmtpCommand(socket, 'QUIT', [221]);
+        socket.end();
+
+        return { id: `smtp_${Date.now()}` };
+    } catch (error) {
+        socket.destroy();
+        throw error;
+    }
+}
+
+
+export async function sendPasswordResetEmail(email: string, resetToken: string) {
+    const appBaseUrl = getAppBaseUrl();
+    const resetUrl = `${appBaseUrl}/reset-password?token=${resetToken}`;
+
+    return sendEmail({
+        to: email,
+        subject: 'Recupera la tua password - Business Tuner',
+        html: `
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -76,37 +205,30 @@ export async function sendPasswordResetEmail(email: string, resetToken: string) 
                     <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
                         <p style="margin: 5px 0;">© 2025 Business Tuner. Tutti i diritti riservati.</p>
                         <p style="margin: 5px 0;">
-                            <a href="${process.env.NEXTAUTH_URL}/privacy" style="color: #9ca3af; text-decoration: none;">Privacy Policy</a> • 
-                            <a href="${process.env.NEXTAUTH_URL}/terms" style="color: #9ca3af; text-decoration: none;">Termini di Servizio</a>
+                            <a href="${appBaseUrl}/privacy" style="color: #9ca3af; text-decoration: none;">Privacy Policy</a> • 
+                            <a href="${appBaseUrl}/terms" style="color: #9ca3af; text-decoration: none;">Termini di Servizio</a>
                         </p>
                     </div>
                 </body>
                 </html>
-            `,
-        });
-
-        if (error) {
-            console.error('Error sending password reset email:', error);
-            return { success: false, error };
-        }
-
-        return { success: true, data };
-    } catch (error) {
-        console.error('Failed to send password reset email:', error);
-        return { success: false, error };
-    }
+            `
+    });
 }
 
 export async function sendLeadNotification(data: { name: string, surname: string, email: string, company: string, needs: string }) {
-    const resendClient = getResendClient();
-    if (!resendClient) return { success: false };
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: {
+            smtpFromEmail: true,
+            smtpNotificationEmail: true
+        }
+    }).catch(() => null);
 
-    try {
-        await resendClient.emails.send({
-            from: 'Business Tuner Leads <hello@voler.ai>',
-            to: ['hello@voler.ai'],
-            subject: `Nuovo Lead Business: ${data.company}`,
-            html: `
+    const result = await sendEmail({
+        from: globalConfig?.smtpFromEmail || process.env.EMAIL_FROM || DEFAULT_FROM_EMAIL,
+        to: globalConfig?.smtpNotificationEmail || process.env.NOTIFICATION_EMAIL || DEFAULT_NOTIFICATION_EMAIL,
+        subject: `Nuovo Lead Business: ${data.company}`,
+        html: `
                 <h2>Nuova richiesta Business Plan</h2>
                 <p><strong>Nome:</strong> ${data.name} ${data.surname}</p>
                 <p><strong>Email:</strong> ${data.email}</p>
@@ -114,30 +236,26 @@ export async function sendLeadNotification(data: { name: string, surname: string
                 <p><strong>Esigenze:</strong></p>
                 <p>${data.needs}</p>
             `
-        });
-        return { success: true };
-    } catch (error) {
-        console.error('Failed to send lead notification:', error);
-        return { success: false };
-    }
+    });
+    return { success: result.success };
 }
 
 export async function sendSystemNotification(subject: string, content: string) {
-    const resendClient = getResendClient();
-    if (!resendClient) return { success: false };
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: {
+            smtpFromEmail: true,
+            smtpNotificationEmail: true
+        }
+    }).catch(() => null);
 
-    try {
-        await resendClient.emails.send({
-            from: 'Business Tuner System <hello@voler.ai>',
-            to: ['hello@voler.ai'],
-            subject: `[Business Tuner System] ${subject}`,
-            html: `<div>${content}</div>`
-        });
-        return { success: true };
-    } catch (error) {
-        console.error('Failed to send system notification:', error);
-        return { success: false };
-    }
+    const result = await sendEmail({
+        from: globalConfig?.smtpFromEmail || process.env.EMAIL_FROM || DEFAULT_FROM_EMAIL,
+        to: globalConfig?.smtpNotificationEmail || process.env.NOTIFICATION_EMAIL || DEFAULT_NOTIFICATION_EMAIL,
+        subject: `[Business Tuner System] ${subject}`,
+        html: `<div>${content}</div>`
+    });
+    return { success: result.success };
 }
 
 /**
@@ -149,15 +267,65 @@ export async function sendEmail(params: {
     html: string;
     from?: string;
 }) {
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: {
+            smtpHost: true,
+            smtpPort: true,
+            smtpSecure: true,
+            smtpUser: true,
+            smtpPass: true,
+            smtpFromEmail: true,
+            resendApiKey: true
+        }
+    }).catch(() => null);
+
+    const from =
+        params.from ||
+        globalConfig?.smtpFromEmail ||
+        process.env.EMAIL_FROM ||
+        DEFAULT_FROM_EMAIL;
+
+    const smtpHost = globalConfig?.smtpHost || process.env.SMTP_HOST;
+    const smtpUser = globalConfig?.smtpUser || process.env.SMTP_USER;
+    const smtpPass = globalConfig?.smtpPass || process.env.SMTP_PASS;
+    const smtpPort = Number(globalConfig?.smtpPort || process.env.SMTP_PORT || 465);
+    const smtpSecure = typeof globalConfig?.smtpSecure === 'boolean'
+        ? globalConfig.smtpSecure
+        : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
+
+    if (smtpHost && smtpUser && smtpPass) {
+        try {
+            const data = await sendEmailViaSmtp({
+                host: smtpHost,
+                port: smtpPort,
+                secure: smtpSecure,
+                user: smtpUser,
+                pass: smtpPass,
+                from,
+                to: params.to,
+                subject: params.subject,
+                html: params.html
+            });
+            return { success: true, data };
+        } catch (error) {
+            console.error('SMTP email send failed:', error);
+            return { success: false, error };
+        }
+    }
+
+    if (!resend && globalConfig?.resendApiKey) {
+        resend = new Resend(globalConfig.resendApiKey);
+    }
     const resendClient = getResendClient();
     if (!resendClient) {
-        console.error('Resend API key not configured');
+        console.error('No email provider configured. Set SMTP_* or RESEND_API_KEY.');
         return { success: false, error: 'Email service not configured' };
     }
 
     try {
         const { data, error } = await resendClient.emails.send({
-            from: params.from || process.env.EMAIL_FROM || 'Business Tuner <hello@voler.ai>',
+            from,
             to: [params.to],
             subject: params.subject,
             html: params.html
@@ -179,7 +347,7 @@ export async function sendEmail(params: {
 // CREDIT NOTIFICATION EMAILS
 // ============================================
 
-const baseUrl = process.env.NEXTAUTH_URL || 'https://app.voler.ai';
+const baseUrl = getAppBaseUrl();
 
 const emailWrapper = (content: string) => `
 <!DOCTYPE html>
@@ -454,6 +622,56 @@ export async function sendPartnerTrialEndingEmail(params: {
     return sendEmail({
         to,
         subject: `⏰ Trial Partner: ${daysRemaining} giorni rimanenti - Business Tuner`,
+        html: emailWrapper(content)
+    });
+}
+
+/**
+ * Invia email di benvenuto dopo registrazione
+ */
+export async function sendWelcomeEmail(params: {
+    to: string;
+    userName?: string | null;
+}) {
+    const { to, userName } = params;
+    const greetingName = userName?.trim() || 'lì';
+
+    const content = `
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 60px; height: 60px; background: #DBEAFE; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                <span style="font-size: 28px;">🎉</span>
+            </div>
+            <h2 style="color: #1f2937; margin: 0; font-size: 22px;">Benvenuto in Business Tuner</h2>
+        </div>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Ciao ${greetingName},
+        </p>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Il tuo account è attivo. Puoi iniziare subito a creare interviste AI, chatbot e analisi di visibility.
+        </p>
+
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+            <p style="margin: 0 0 10px 0; color: #0F172A; font-size: 14px; font-weight: 600;">Passi consigliati:</p>
+            <ul style="color: #334155; font-size: 14px; margin: 0; padding-left: 20px;">
+                <li>Completa il setup iniziale del progetto</li>
+                <li>Crea il tuo primo bot/intervista</li>
+                <li>Invita il team in dashboard settings</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="${baseUrl}/dashboard"
+               style="background: #2563EB; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+                Vai alla dashboard
+            </a>
+        </div>
+    `;
+
+    return sendEmail({
+        to,
+        subject: '🎉 Benvenuto su Business Tuner',
         html: emailWrapper(content)
     });
 }

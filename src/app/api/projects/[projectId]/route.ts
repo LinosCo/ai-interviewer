@@ -185,6 +185,10 @@ export async function DELETE(
                 where: { projectId },
                 data: { projectId: null }
             }),
+            // Remove multi-project brand associations for this project
+            prisma.projectVisibilityConfig.deleteMany({
+                where: { projectId }
+            }),
             // Delete project access entries
             prisma.projectAccess.deleteMany({
                 where: { projectId }

@@ -16,9 +16,9 @@ export default function PricingPage() {
 
     const displayPlans = [
         PLANS[PlanType.STARTER],
-        PLANS[PlanType.PRO]
+        PLANS[PlanType.PRO],
+        PLANS[PlanType.BUSINESS]
     ];
-    const businessPlan = PLANS[PlanType.BUSINESS];
 
     const handleSubscribe = async (tier: string) => {
         setIsLoading(tier);
@@ -77,7 +77,7 @@ export default function PricingPage() {
             </div>
 
             {/* Plans Grid */}
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
                 {displayPlans.map((plan) => (
                     <div
                         key={plan.id}
@@ -136,40 +136,6 @@ export default function PricingPage() {
                         <p className="text-[10px] text-center mt-4 text-slate-400 font-medium">NESSUN COSTO ADDEBITATO PER 14 GIORNI</p>
                     </div>
                 ))}
-            </div>
-
-            {/* Business Section */}
-            <div className="max-w-5xl mx-auto mt-20">
-                <div className="relative rounded-3xl p-8 bg-slate-900 text-white border border-slate-800">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                        <div className="max-w-2xl">
-                            <Badge className="mb-4 bg-amber-50 text-amber-700 border-amber-100 px-3 py-1 font-bold text-[10px] uppercase tracking-widest">
-                                Business via Sales
-                            </Badge>
-                            <h3 className="text-3xl font-black mb-3">{businessPlan.name}</h3>
-                            <p className="text-slate-300 text-sm">
-                                Piano su misura con crediti, onboarding e integrazioni personalizzate. Il piano Business non è acquistabile self-serve.
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
-                                {businessPlan.featureList.slice(0, 6).map((feature, index) => (
-                                    <div key={index} className="flex items-start gap-2 text-sm text-slate-200">
-                                        <Check className="w-4 h-4 mt-0.5 text-amber-400" />
-                                        <span>{feature}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="flex flex-col gap-3 min-w-[220px]">
-                            <Link href="/sales">
-                                <Button className="w-full py-6 rounded-2xl font-black text-base bg-amber-600 hover:bg-amber-700">
-                                    Contatta Sales
-                                    <ArrowRight className="ml-2 w-5 h-5" />
-                                </Button>
-                            </Link>
-                            <p className="text-[11px] text-slate-400 text-center">Preventivo personalizzato in base a volumi e requisiti</p>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Credit Packs Section */}

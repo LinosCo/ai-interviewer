@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { CMSSuggestionType } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import {
     inferContentKind,
@@ -172,6 +173,27 @@ export async function POST(request: Request) {
             return NextResponse.json({ suggestionId: existing.id, alreadyExists: true });
         }
 
+        const sourceSignals = JSON.parse(JSON.stringify({
+            origin: recommendation?.dataSource ? 'ai_tip' : 'visibility_tip',
+            configId,
+            projectId: config.projectId,
+            tipKey,
+            tipType: recommendation.type,
+            dataSource: recommendation.dataSource,
+            relatedPrompts: recommendation.relatedPrompts || [],
+            strategyAlignment: recommendation.strategyAlignment || recommendation?.explainability?.strategicGoal || null,
+            evidencePoints: recommendation.evidencePoints || recommendation?.explainability?.evidence || [],
+            explainability: recommendation.explainability || null,
+            publishRouting,
+            mediaBrief: contentDraft.mediaBrief || null,
+            dataCapabilities: {
+                hasGoogleAnalytics: capabilities.hasGoogleAnalytics,
+                hasSearchConsole: capabilities.hasSearchConsole,
+                hasWordPress: capabilities.hasWordPress,
+                hasWooCommerce: capabilities.hasWooCommerce
+            }
+        })) as Prisma.InputJsonValue;
+
         const suggestion = await prisma.cMSSuggestion.create({
             data: {
                 connectionId: cmsConnection.id,
@@ -183,26 +205,7 @@ export async function POST(request: Request) {
                 metaDescription: contentDraft.metaDescription || null,
                 targetSection: contentDraft.targetSection || publishRouting.targetSection || null,
                 reasoning: recommendation.description || recommendation.impact || 'Suggerimento AI tip multi-canale',
-                sourceSignals: {
-                    origin: recommendation?.dataSource ? 'ai_tip' : 'visibility_tip',
-                    configId,
-                    projectId: config.projectId,
-                    tipKey,
-                    tipType: recommendation.type,
-                    dataSource: recommendation.dataSource,
-                    relatedPrompts: recommendation.relatedPrompts || [],
-                    strategyAlignment: recommendation.strategyAlignment || recommendation?.explainability?.strategicGoal || null,
-                    evidencePoints: recommendation.evidencePoints || recommendation?.explainability?.evidence || [],
-                    explainability: recommendation.explainability || null,
-                    publishRouting,
-                    mediaBrief: contentDraft.mediaBrief || null,
-                    dataCapabilities: {
-                        hasGoogleAnalytics: capabilities.hasGoogleAnalytics,
-                        hasSearchConsole: capabilities.hasSearchConsole,
-                        hasWordPress: capabilities.hasWordPress,
-                        hasWooCommerce: capabilities.hasWooCommerce
-                    }
-                },
+                sourceSignals,
                 priorityScore: priorityToScore(recommendation.priority),
                 status: 'PENDING'
             }

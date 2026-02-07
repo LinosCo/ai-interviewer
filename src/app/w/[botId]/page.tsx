@@ -105,7 +105,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                     botName={bot.name}
                     primaryColor={bot.primaryColor || '#7C3AED'}
                     welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
-                    privacyPolicyUrl={bot.privacyPolicyUrl}
+                    privacyPolicyUrl={bot.privacyPolicyUrl ?? undefined}
                     hostPageContext={hostPageContext}
                     enablePageContext={bot.enablePageContext !== false}
                 />
@@ -145,7 +145,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                 botName={bot.name}
                 primaryColor={bot.primaryColor || '#7C3AED'}
                 welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
-                privacyPolicyUrl={bot.privacyPolicyUrl}
+                privacyPolicyUrl={bot.privacyPolicyUrl ?? undefined}
                 hostPageContext={hostPageContext}
                 enablePageContext={bot.enablePageContext !== false}
             />

@@ -29,6 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         };
 
         const isLoading = loading || isProcessing;
+        const showLoadingIndicator = loading;
 
         // Base styles - improved for better text handling
         const baseStyles = "relative inline-flex items-center justify-center rounded-lg font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed active:scale-[0.98] whitespace-nowrap";
@@ -64,13 +65,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 onClick={handleClick}
                 {...props}
             >
-                {isLoading && (
+                {showLoadingIndicator && (
                     <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                 )}
-                {(!isLoading || !loadingText) && (
+                {(!showLoadingIndicator || !loadingText) && (
                     <span className="truncate">{children}</span>
                 )}
-                {isLoading && loadingText && (
+                {showLoadingIndicator && loadingText && (
                     <span className="truncate">{loadingText}</span>
                 )}
             </button>

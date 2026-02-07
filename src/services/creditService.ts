@@ -217,9 +217,7 @@ export const CreditService = {
         );
         const warningLevel = getWarningLevel(usagePercentage);
 
-        // Trigger notifications asynchronously (to organizational members who should receive them)
-        // TODO: Refactor notification service to handle organizations
-        /*
+        // Trigger notifications asynchronously for active org members with alerts enabled.
         if (warningLevel === 'danger' || warningLevel === 'critical' || warningLevel === 'exhausted') {
             getNotificationService().then(service => {
                 service.checkAndNotifyOrg(organizationId, usagePercentage).catch(err => {
@@ -227,7 +225,6 @@ export const CreditService = {
                 });
             });
         }
-        */
 
         return {
             success: true,
@@ -447,6 +444,13 @@ export const CreditService = {
             metadata: { type, stripePaymentId },
             balanceAfter: updatedOrg.packCreditsAvailable,
             executedById: purchasedBy
+        });
+
+        // Invia conferma acquisto agli utenti che ricevono alert.
+        getNotificationService().then(service => {
+            service.sendPurchaseConfirmationForOrg(organizationId, type, amount).catch(err => {
+                console.error('[Credits] Purchase confirmation email error:', err);
+            });
         });
     },
 

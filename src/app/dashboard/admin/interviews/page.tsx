@@ -6,10 +6,10 @@ import { AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { getInterviewQualityDashboardData } from '@/lib/interview/quality-dashboard';
 
 type PageProps = {
-    searchParams?: {
+    searchParams?: Promise<{
         windowHours?: string;
         refresh?: string;
-    };
+    }>;
 };
 
 function parseWindowHours(raw?: string): number {
@@ -49,8 +49,9 @@ export default async function AdminInterviewQualityPage({ searchParams }: PagePr
         return <div className="p-8">Access Denied</div>;
     }
 
-    const windowHours = parseWindowHours(searchParams?.windowHours);
-    const refreshAi = parseBooleanFlag(searchParams?.refresh);
+    const resolvedSearchParams = await searchParams;
+    const windowHours = parseWindowHours(resolvedSearchParams?.windowHours);
+    const refreshAi = parseBooleanFlag(resolvedSearchParams?.refresh);
     const data = await getInterviewQualityDashboardData({
         windowHours,
         maxTurns: 5000,

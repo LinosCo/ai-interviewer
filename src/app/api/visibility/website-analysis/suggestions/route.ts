@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { CMSSuggestionType } from '@prisma/client';
 import { createHash } from 'crypto';
+import {
+    inferContentKind,
+    normalizePublicationRouting,
+    resolvePublishingCapabilities
+} from '@/lib/cms/publishing';
 
 function slugify(value: string) {
     return value
@@ -14,8 +19,14 @@ function slugify(value: string) {
         .slice(0, 80);
 }
 
-function mapRecommendationType(recType: string, title?: string): CMSSuggestionType {
+function mapRecommendationType(recType: string, title?: string, contentKind?: string): CMSSuggestionType {
     const lowerTitle = (title || '').toLowerCase();
+    const lowerKind = (contentKind || '').toLowerCase();
+
+    if (lowerKind === 'faq_page') return 'CREATE_FAQ';
+    if (lowerKind === 'blog_post' || lowerKind === 'news_article' || lowerKind === 'social_post') return 'CREATE_BLOG_POST';
+    if (lowerKind === 'schema_patch' || lowerKind === 'seo_patch' || lowerKind === 'product_description') return 'MODIFY_CONTENT';
+
     if (recType === 'add_faq' || lowerTitle.includes('faq') || lowerTitle.includes('domanda')) {
         return 'CREATE_FAQ';
     }
@@ -35,6 +46,22 @@ function priorityToScore(priority: string) {
     if (priority === 'high') return 80;
     if (priority === 'medium') return 60;
     return 40;
+}
+
+function fallbackDraftFromRecommendation(recommendation: any) {
+    const title = String(recommendation?.title || '').trim();
+    const description = String(recommendation?.description || recommendation?.impact || '').trim();
+    if (!title || !description) return null;
+    return {
+        title,
+        slug: slugify(title),
+        body: description,
+        metaDescription: String(recommendation?.impact || '').trim().slice(0, 160),
+        targetSection: recommendation?.type === 'social_post' ? 'social' : 'pages',
+        mediaBrief: recommendation?.type === 'social_post'
+            ? 'Visual consigliato: immagine/video breve focalizzato sul beneficio principale con CTA chiara.'
+            : undefined
+    };
 }
 
 export async function POST(request: Request) {
@@ -95,13 +122,34 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'CMS integration not enabled for this project' }, { status: 400 });
         }
 
-        const contentDraft = draft || recommendation.contentDraft;
+        const contentDraft = draft || recommendation.contentDraft || fallbackDraftFromRecommendation(recommendation);
         if (!contentDraft?.title || !contentDraft?.body) {
             return NextResponse.json({ error: 'contentDraft.title and contentDraft.body are required' }, { status: 400 });
         }
 
+        const capabilities = await resolvePublishingCapabilities({
+            projectId: config.projectId,
+            hasCmsApi: Boolean(cmsConnection?.id),
+            hasGoogleAnalytics: Boolean(cmsConnection?.googleAnalyticsConnected),
+            hasSearchConsole: Boolean(cmsConnection?.searchConsoleConnected)
+        });
+
+        const inferredKind = inferContentKind({
+            suggestionType: mapRecommendationType(recommendation.type, contentDraft.title || recommendation.title),
+            tipType: recommendation.type,
+            targetSection: contentDraft.targetSection,
+            title: contentDraft.title || recommendation.title
+        });
+
+        const publishRouting = normalizePublicationRouting(
+            recommendation.implementation,
+            inferredKind,
+            capabilities,
+            contentDraft.targetSection
+        );
+
         const tipKey = createHash('md5')
-            .update(`${recommendation.title}-${recommendation.type}`)
+            .update(`${recommendation.title}-${recommendation.type}-${publishRouting.contentKind}`)
             .digest('hex')
             .substring(0, 16);
 
@@ -128,20 +176,32 @@ export async function POST(request: Request) {
             data: {
                 connectionId: cmsConnection.id,
                 createdBy: user?.id,
-                type: mapRecommendationType(recommendation.type, contentDraft.title || recommendation.title),
+                type: mapRecommendationType(recommendation.type, contentDraft.title || recommendation.title, publishRouting.contentKind),
                 title: contentDraft.title,
                 slug: contentDraft.slug || slugify(contentDraft.title),
                 body: contentDraft.body,
                 metaDescription: contentDraft.metaDescription || null,
-                targetSection: contentDraft.targetSection || null,
-                reasoning: recommendation.description || recommendation.impact || 'Suggerimento generato dal Brand Monitor',
+                targetSection: contentDraft.targetSection || publishRouting.targetSection || null,
+                reasoning: recommendation.description || recommendation.impact || 'Suggerimento AI tip multi-canale',
                 sourceSignals: {
-                    origin: 'visibility_tip',
+                    origin: recommendation?.dataSource ? 'ai_tip' : 'visibility_tip',
                     configId,
+                    projectId: config.projectId,
                     tipKey,
                     tipType: recommendation.type,
                     dataSource: recommendation.dataSource,
-                    relatedPrompts: recommendation.relatedPrompts || []
+                    relatedPrompts: recommendation.relatedPrompts || [],
+                    strategyAlignment: recommendation.strategyAlignment || recommendation?.explainability?.strategicGoal || null,
+                    evidencePoints: recommendation.evidencePoints || recommendation?.explainability?.evidence || [],
+                    explainability: recommendation.explainability || null,
+                    publishRouting,
+                    mediaBrief: contentDraft.mediaBrief || null,
+                    dataCapabilities: {
+                        hasGoogleAnalytics: capabilities.hasGoogleAnalytics,
+                        hasSearchConsole: capabilities.hasSearchConsole,
+                        hasWordPress: capabilities.hasWordPress,
+                        hasWooCommerce: capabilities.hasWooCommerce
+                    }
                 },
                 priorityScore: priorityToScore(recommendation.priority),
                 status: 'PENDING'

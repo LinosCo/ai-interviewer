@@ -18,10 +18,6 @@ export async function GET(request: Request) {
         const status = url.searchParams.get('status');
         const type = url.searchParams.get('type');
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
-
         // Verify user has access to this project
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
@@ -32,9 +28,9 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const project = await prisma.project.findFirst({
+        const projects = await prisma.project.findMany({
             where: {
-                id: projectId,
+                id: projectId || undefined,
                 organization: {
                     members: {
                         some: {
@@ -45,23 +41,40 @@ export async function GET(request: Request) {
             },
             include: {
                 cmsConnection: true,
-                newCmsConnection: true
-            } as any
+                newCmsConnection: true,
+                cmsShares: {
+                    include: {
+                        connection: true
+                    }
+                }
+            } as any,
+            orderBy: { updatedAt: 'desc' }
         });
 
-        if (!project) {
-            return NextResponse.json({ error: 'Project not found or access denied' }, { status: 404 });
+        const eligibleProjects = projects.filter((project: any) =>
+            Boolean(project.newCmsConnection || project.cmsConnection || project.cmsShares?.[0]?.connection)
+        );
+
+        if (eligibleProjects.length === 0) {
+            return NextResponse.json({
+                suggestions: [],
+                projectId: projectId || null,
+                message: 'CMS integration not enabled for this project'
+            });
         }
 
+        const project = eligibleProjects[0];
         const cmsConnection = (project as any).newCmsConnection || (project as any).cmsConnection;
+        const sharedConnection = (project as any).cmsShares?.[0]?.connection || null;
+        const activeConnection = cmsConnection || sharedConnection;
 
-        if (!cmsConnection) {
+        if (!activeConnection) {
             return NextResponse.json({ error: 'CMS integration not enabled for this project' }, { status: 400 });
         }
 
         // Build filter
         const where: any = {
-            connectionId: cmsConnection.id
+            connectionId: activeConnection.id
         };
 
         if (status) {
@@ -82,6 +95,7 @@ export async function GET(request: Request) {
         });
 
         return NextResponse.json({
+            projectId: project.id,
             suggestions: suggestions.map(s => ({
                 id: s.id,
                 type: s.type,

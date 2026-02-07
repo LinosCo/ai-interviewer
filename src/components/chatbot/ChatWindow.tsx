@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Paperclip, Image as ImageIcon, Loader2, Bot, User, Maximize2, Minimize2, Shield, ExternalLink } from 'lucide-react';
+import { Send, X, Loader2, Bot, User, Shield, ExternalLink } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -22,6 +22,59 @@ interface ChatWindowProps {
     companyName?: string; // For GDPR disclosure
     privacyPolicyUrl?: string;
     termsUrl?: string;
+    hostPageContext?: {
+        url?: string;
+        title?: string;
+        description?: string;
+        mainContent?: string;
+    } | null;
+    enablePageContext?: boolean;
+}
+
+const LEAKED_INSTRUCTION_PATTERN =
+    /Acknowledge what they said|Format your output in TWO parts|Part 1:|Part 2:|\[\[LEAD_QUESTION\]\]|IMPORTANT:/i;
+
+function sanitizeAssistantMessage(input: unknown): string {
+    if (typeof input !== 'string') return '';
+    const normalized = input.trim();
+    if (!normalized) return '';
+    if (LEAKED_INSTRUCTION_PATTERN.test(normalized)) return '';
+    return normalized;
+}
+
+function sanitizePageContextValue(value: unknown, maxLen: number): string {
+    if (typeof value !== 'string') return '';
+    const cleaned = value
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    if (cleaned.length <= maxLen) return cleaned;
+    return `${cleaned.slice(0, maxLen)}...`;
+}
+
+type ChatApiErrorPayload = {
+    error?: string;
+    message?: string;
+    code?: string;
+};
+
+function toUserFacingError(status: number, payload: unknown): string {
+    const data: ChatApiErrorPayload =
+        payload && typeof payload === 'object' ? (payload as ChatApiErrorPayload) : {};
+
+    if (status === 401 && data.error === 'API_KEY_MISSING') {
+        return 'Il servizio non è configurato correttamente. Riprova tra poco.';
+    }
+    if (status === 403 || status === 429 || data.code === 'LIMIT_REACHED') {
+        return 'Il servizio è momentaneamente non disponibile. Riprova tra qualche minuto.';
+    }
+
+    const fromBackend = typeof data.message === 'string' ? data.message : data.error;
+    if (typeof fromBackend === 'string' && fromBackend.trim()) {
+        return fromBackend.trim();
+    }
+
+    return 'Mi dispiace, si è verificato un errore. Riprova più tardi.';
 }
 
 // GDPR Consent Welcome Screen Component
@@ -201,7 +254,9 @@ export default function ChatWindow({
     botId,
     companyName = 'Business Tuner',
     privacyPolicyUrl = '/privacy',
-    termsUrl = '/terms'
+    termsUrl = '/terms',
+    hostPageContext = null,
+    enablePageContext = true
 }: ChatWindowProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -258,16 +313,29 @@ export default function ChatWindow({
                     localStorage.setItem('bt_sid', sessionId);
                 }
 
+                const fallbackDescription =
+                    document.querySelector('meta[name="description"], meta[property="og:description"]')?.getAttribute('content') || '';
+                const fallbackContext = {
+                    url: window.parent !== window && document.referrer ? document.referrer : window.location.href,
+                    title: document.title || '',
+                    description: fallbackDescription,
+                    mainContent: ''
+                };
+
+                const resolvedContext = {
+                    url: sanitizePageContextValue(hostPageContext?.url || fallbackContext.url, 700),
+                    title: sanitizePageContextValue(hostPageContext?.title || fallbackContext.title, 400),
+                    description: sanitizePageContextValue(hostPageContext?.description || fallbackContext.description, 800),
+                    mainContent: sanitizePageContextValue(hostPageContext?.mainContent || fallbackContext.mainContent, 3500)
+                };
+
                 const res = await fetch('/api/chatbot/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         botId,
                         sessionId,
-                        pageContext: {
-                            url: window.location.href,
-                            title: document.title
-                        },
+                        pageContext: enablePageContext ? resolvedContext : undefined,
                         gdprConsent: {
                             data: true,
                             marketing: marketingConsent,
@@ -281,12 +349,13 @@ export default function ChatWindow({
                 setConversationId(data.conversationId);
 
                 // Only set welcome message if we don't have messages yet
-                if (data.welcomeMessage && messages.length === 0) {
+                const initialGreeting = sanitizeAssistantMessage(data.welcomeMessage) || sanitizeAssistantMessage(welcomeMessage);
+                if (initialGreeting && messages.length === 0) {
                     setMessages([
                         {
                             id: 'welcome',
                             role: 'assistant',
-                            content: data.welcomeMessage,
+                            content: initialGreeting,
                             timestamp: new Date()
                         }
                     ]);
@@ -299,7 +368,7 @@ export default function ChatWindow({
         if (isOpen && hasConsented) {
             initChat();
         }
-    }, [isOpen, botId, conversationId, messages.length, hasConsented, marketingConsent]);
+    }, [isOpen, botId, conversationId, messages.length, hasConsented, marketingConsent, hostPageContext, enablePageContext, welcomeMessage]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -338,15 +407,23 @@ export default function ChatWindow({
                 })
             });
 
-            if (!res.ok) throw new Error('Failed to send message');
-
-            const data = await res.json();
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(toUserFacingError(res.status, data));
+            }
 
             // Add bot response(s)
             if (Array.isArray(data.responses) && data.responses.length > 0) {
+                const sanitized = data.responses
+                    .map((content: string) => sanitizeAssistantMessage(content))
+                    .filter(Boolean);
+                const safeResponses = sanitized.length > 0
+                    ? sanitized
+                    : ['Grazie, continuo subito ad aiutarti. Potresti riprovare con la tua richiesta?'];
+
                 setMessages(prev => [
                     ...prev,
-                    ...data.responses.map((content: string, idx: number) => ({
+                    ...safeResponses.map((content: string, idx: number) => ({
                         id: `${Date.now()}_${idx}`,
                         role: 'assistant' as const,
                         content,
@@ -354,12 +431,14 @@ export default function ChatWindow({
                     }))
                 ]);
             } else {
+                const content = sanitizeAssistantMessage(data?.response || data?.message)
+                    || 'Grazie, continuo subito ad aiutarti. Potresti riprovare con la tua richiesta?';
                 setMessages(prev => [
                     ...prev,
                     {
                         id: Date.now().toString(),
                         role: 'assistant',
-                        content: data.response || data.message, // handle both keys if API varies
+                        content,
                         timestamp: new Date()
                     }
                 ]);
@@ -368,12 +447,15 @@ export default function ChatWindow({
         } catch (err) {
             console.error(err);
             // Add error message
+            const errorMessage = err instanceof Error && err.message
+                ? err.message
+                : 'Mi dispiace, si è verificato un errore. Riprova più tardi.';
             setMessages(prev => [
                 ...prev,
                 {
                     id: Date.now().toString(),
                     role: 'assistant',
-                    content: 'Mi dispiace, si è verificato un errore. Riprova più tardi.',
+                    content: errorMessage,
                     timestamp: new Date()
                 }
             ]);
@@ -432,7 +514,7 @@ export default function ChatWindow({
 
                     {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scrollbar-thin scrollbar-thumb-gray-200">
-                        {messages.map((msg, idx) => (
+                        {messages.map((msg) => (
                             <motion.div
                                 key={msg.id}
                                 initial={{ opacity: 0, y: 10 }}

@@ -1,6 +1,14 @@
 import { prisma } from '@/lib/prisma';
 import { scrapeWebsiteWithSubpages, MultiPageScrapedContent, AdditionalUrl } from '@/lib/scraping';
 import { getSystemLLM } from './llm-providers';
+import {
+    defaultPublicationRouting,
+    inferContentKind,
+    normalizePublicationRouting,
+    resolvePublishingCapabilities,
+    type ContentKind,
+    type PublishCapabilities
+} from '@/lib/cms/publishing';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
@@ -12,6 +20,7 @@ interface PromptWithRef {
 
 // Strategic context from multiple data sources
 interface StrategicContext {
+    strategicPlan?: string;
     organizationVision?: string;
     organizationValueProp?: string;
     knowledgeGaps: Array<{ topic: string; priority: string; evidence: string }>;
@@ -35,6 +44,7 @@ interface StrategicContext {
         topSearchQueries?: Array<{ query: string; impressions: number; clicks: number; position: number }>;
         topSearchPages?: Array<{ page: string; impressions: number; clicks: number; position: number }>;
     };
+    capabilities?: PublishCapabilities;
 }
 
 // Zod schemas for structured LLM output
@@ -58,7 +68,9 @@ const RecommendationSchema = z.object({
         'improve_meta',
         'address_knowledge_gap',
         'leverage_interview_insight',
-        'competitive_positioning'
+        'competitive_positioning',
+        'social_post',
+        'product_content_optimization'
     ]),
     priority: z.enum(['high', 'medium', 'low']),
     title: z.string(),
@@ -66,12 +78,35 @@ const RecommendationSchema = z.object({
     impact: z.string(),
     relatedPrompts: z.array(z.string()).optional(),
     dataSource: z.string().optional(), // Which data source this recommendation came from
+    strategyAlignment: z.string().optional(),
+    evidencePoints: z.array(z.string()).optional(),
     contentDraft: z.object({
         title: z.string(),
         slug: z.string(),
         body: z.string(),
         metaDescription: z.string().optional(),
-        targetSection: z.string()
+        targetSection: z.string(),
+        mediaBrief: z.string().optional(),
+        targetEntityId: z.string().optional(),
+        targetEntitySlug: z.string().optional()
+    }).optional(),
+    implementation: z.object({
+        publishChannel: z.enum(['CMS_API', 'WORDPRESS_MCP', 'WOOCOMMERCE_MCP', 'MANUAL']).optional(),
+        contentKind: z.string().optional(),
+        contentMode: z.enum(['STATIC', 'DYNAMIC']).optional(),
+        wpPostType: z.enum(['page', 'post']).optional(),
+        targetSection: z.string().optional(),
+        targetEntityType: z.string().optional(),
+        targetEntityId: z.string().optional(),
+        targetEntitySlug: z.string().optional()
+    }).optional(),
+    explainability: z.object({
+        logic: z.string().optional(),
+        strategicGoal: z.string().optional(),
+        evidence: z.array(z.string()).optional(),
+        confidence: z.number().min(0).max(1).optional(),
+        dataFreshnessDays: z.number().int().min(0).optional(),
+        channelsEvaluated: z.array(z.string()).optional()
     }).optional()
 });
 
@@ -133,6 +168,67 @@ export class WebsiteAnalysisEngine {
         return union === 0 ? 0 : intersection / union;
     }
 
+    private static inferEvidencePoints(context: StrategicContext): string[] {
+        const evidence: string[] = [];
+
+        if (context.knowledgeGaps.length > 0) {
+            evidence.push(`${context.knowledgeGaps.length} knowledge gap chatbot aperti`);
+        }
+        if (context.chatbotFaqSuggestions.length > 0) {
+            evidence.push(`${context.chatbotFaqSuggestions.length} FAQ ricorrenti dal chatbot`);
+        }
+        if (context.interviewThemes.length > 0) {
+            evidence.push(`${context.interviewThemes.length} temi emersi da interviste`);
+        }
+        if (context.visibilityScanInsights.length > 0) {
+            const missing = context.visibilityScanInsights.filter(v => !v.brandMentioned).length;
+            evidence.push(`${missing} prompt AI senza menzione brand`);
+        }
+        if (context.websiteAnalytics?.topSearchQueries?.length) {
+            evidence.push(`${context.websiteAnalytics.topSearchQueries.length} query GSC analizzate`);
+        }
+        if (context.websiteAnalytics?.topPages?.length) {
+            const highBounce = context.websiteAnalytics.topPages.filter(p => (p.bounceRate || 0) > 0.7).length;
+            if (highBounce > 0) {
+                evidence.push(`${highBounce} pagine con bounce rate alto`);
+            }
+        }
+
+        return evidence.slice(0, 6);
+    }
+
+    private static detectContentOverlap(
+        rec: z.infer<typeof RecommendationSchema>,
+        content: MultiPageScrapedContent,
+        context: StrategicContext
+    ) {
+        if (!rec.contentDraft) {
+            return { hasOverlap: false, similarity: 0 };
+        }
+
+        const existingText = [
+            content.homepage.title,
+            content.homepage.description || '',
+            content.totalContent.substring(0, 24000),
+            ...(context.knowledgeSources || []).map(k => k.snippet)
+        ].join(' ');
+
+        const pageTitles = [
+            content.homepage.title,
+            ...content.subpages.map(p => p.title)
+        ]
+            .filter(Boolean)
+            .map(t => t.toLowerCase());
+
+        const draftTitle = (rec.contentDraft.title || '').toLowerCase();
+        const draftText = `${rec.contentDraft.title}\n${rec.contentDraft.body || ''}`;
+        const similarity = this.jaccardSimilarity(draftText, existingText);
+        const titleMatch = pageTitles.some(t => draftTitle && (t.includes(draftTitle) || draftTitle.includes(t)));
+        const hasOverlap = similarity >= 0.4 || titleMatch;
+
+        return { hasOverlap, similarity };
+    }
+
     private static postProcessRecommendations(
         recommendations: Array<z.infer<typeof RecommendationSchema>>,
         content: MultiPageScrapedContent,
@@ -140,35 +236,102 @@ export class WebsiteAnalysisEngine {
     ) {
         if (!recommendations.length) return recommendations;
 
-        const existingText = [
-            content.homepage.title,
-            content.homepage.description || '',
-            content.totalContent.substring(0, 15000),
-            ...(context.knowledgeSources || []).map(k => k.snippet)
-        ].join(' ');
-
-        const pageTitles = [
-            content.homepage.title,
-            ...content.subpages.map(p => p.title)
-        ].filter(Boolean).map(t => t.toLowerCase());
+        const evidencePoints = this.inferEvidencePoints(context);
+        const channelsEvaluated = [
+            'CMS_API',
+            context.capabilities?.hasWordPress ? 'WORDPRESS_MCP' : null,
+            context.capabilities?.hasWooCommerce ? 'WOOCOMMERCE_MCP' : null
+        ].filter(Boolean) as string[];
 
         return recommendations.map(rec => {
-            if (!rec.contentDraft) return rec;
+            const overlap = this.detectContentOverlap(rec, content, context);
+            let normalizedType = rec.type;
+            let normalizedDescription = rec.description;
 
-            const draftTitle = (rec.contentDraft.title || '').toLowerCase();
-            const draftText = `${rec.contentDraft.title}\n${rec.contentDraft.body || ''}`;
-            const similarity = this.jaccardSimilarity(draftText, existingText);
-            const titleMatch = pageTitles.some(t => draftTitle && (t.includes(draftTitle) || draftTitle.includes(t)));
-
-            if (similarity >= 0.45 || titleMatch) {
-                return {
-                    ...rec,
-                    type: 'modify_content',
-                    description: `${rec.description} Nota: contenuto simile già presente sul sito; proponi un aggiornamento/estensione invece di una nuova pagina.`
-                };
+            if (overlap.hasOverlap && rec.contentDraft && (rec.type === 'add_page' || rec.type === 'competitive_positioning')) {
+                normalizedType = 'modify_content';
+                normalizedDescription = `${rec.description} Nota: contenuto simile già presente sul sito; proponi un aggiornamento mirato invece di una nuova pagina.`;
             }
 
-            return rec;
+            const tipTypeForKind = normalizedType === 'social_post'
+                ? 'social_post'
+                : normalizedType === 'product_content_optimization'
+                    ? 'product_content_optimization'
+                    : normalizedType;
+
+            const inferredKind = inferContentKind({
+                suggestionType: tipTypeForKind === 'add_faq'
+                    ? 'CREATE_FAQ'
+                    : tipTypeForKind === 'modify_content'
+                        ? 'MODIFY_CONTENT'
+                        : tipTypeForKind === 'add_page'
+                            ? 'CREATE_PAGE'
+                            : tipTypeForKind === 'social_post'
+                                ? 'CREATE_BLOG_POST'
+                                : 'CREATE_PAGE',
+                tipType: tipTypeForKind,
+                targetSection: rec.contentDraft?.targetSection,
+                title: rec.title
+            });
+
+            const suggestedRouting = defaultPublicationRouting(
+                inferredKind,
+                context.capabilities || {
+                    hasCmsApi: true,
+                    hasWordPress: false,
+                    hasWooCommerce: false,
+                    hasGoogleAnalytics: false,
+                    hasSearchConsole: false
+                },
+                rec.contentDraft?.targetSection
+            );
+
+            const implementation = normalizePublicationRouting(
+                rec.implementation,
+                inferredKind,
+                context.capabilities || {
+                    hasCmsApi: true,
+                    hasWordPress: false,
+                    hasWooCommerce: false,
+                    hasGoogleAnalytics: false,
+                    hasSearchConsole: false
+                },
+                rec.contentDraft?.targetSection
+            );
+
+            const explainability = {
+                logic: rec.explainability?.logic || `Tip generato da incrocio segnali multi-canale (${channelsEvaluated.join(', ') || 'analisi interna'})`,
+                strategicGoal: rec.strategyAlignment || rec.explainability?.strategicGoal || context.organizationVision || context.organizationValueProp || context.strategicPlan || 'Migliorare visibilità e conversioni',
+                evidence: rec.evidencePoints?.length ? rec.evidencePoints : (rec.explainability?.evidence?.length ? rec.explainability.evidence : evidencePoints),
+                confidence: rec.explainability?.confidence ?? (overlap.hasOverlap ? 0.74 : 0.82),
+                dataFreshnessDays: rec.explainability?.dataFreshnessDays ?? 7,
+                channelsEvaluated
+            };
+
+            const contentDraft = rec.contentDraft
+                ? {
+                    ...rec.contentDraft,
+                    ...(inferredKind === 'SOCIAL_POST' || normalizedType === 'social_post'
+                        ? {
+                            targetSection: rec.contentDraft.targetSection || 'social',
+                            mediaBrief: rec.contentDraft.mediaBrief || 'Suggerisci un visual coerente con il messaggio: immagine o clip breve con focus su beneficio principale e CTA.'
+                        }
+                        : {})
+                }
+                : rec.contentDraft;
+
+            return {
+                ...rec,
+                type: normalizedType,
+                description: normalizedDescription,
+                contentDraft,
+                implementation: {
+                    ...suggestedRouting,
+                    ...implementation,
+                    contentKind: implementation.contentKind || suggestedRouting.contentKind || (inferredKind as ContentKind)
+                },
+                explainability
+            };
         });
     }
 
@@ -179,7 +342,15 @@ export class WebsiteAnalysisEngine {
         // Fetch organization data
         const organization = await prisma.organization.findUnique({
             where: { id: organizationId },
-            select: { strategicVision: true, valueProposition: true }
+            select: {
+                strategicVision: true,
+                valueProposition: true,
+                platformSettings: {
+                    select: {
+                        strategicPlan: true
+                    }
+                }
+            }
         });
 
         // Fetch project if linked
@@ -187,6 +358,17 @@ export class WebsiteAnalysisEngine {
             where: { id: configId },
             select: { projectId: true }
         });
+
+        let projectStrategy: { strategicVision: string | null; valueProposition: string | null } | null = null;
+        if (config?.projectId) {
+            projectStrategy = await prisma.project.findUnique({
+                where: { id: config.projectId },
+                select: {
+                    strategicVision: true,
+                    valueProposition: true
+                }
+            });
+        }
 
         // Get bots for this organization through projects
         const projects = await prisma.project.findMany({
@@ -283,6 +465,7 @@ export class WebsiteAnalysisEngine {
 
         // Fetch latest website analytics (GA/GSC) if CMS connection exists
         let websiteAnalytics: StrategicContext['websiteAnalytics'] | undefined;
+        let capabilities: PublishCapabilities | undefined;
         if (config?.projectId) {
             const project = await prisma.project.findUnique({
                 where: { id: config.projectId },
@@ -332,11 +515,27 @@ export class WebsiteAnalysisEngine {
                     };
                 }
             }
+
+            capabilities = await resolvePublishingCapabilities({
+                projectId: config.projectId,
+                hasCmsApi: Boolean(cmsConnection?.id),
+                hasGoogleAnalytics: Boolean(cmsConnection?.googleAnalyticsConnected),
+                hasSearchConsole: Boolean(cmsConnection?.searchConsoleConnected)
+            });
+        } else {
+            capabilities = {
+                hasCmsApi: false,
+                hasWordPress: false,
+                hasWooCommerce: false,
+                hasGoogleAnalytics: false,
+                hasSearchConsole: false
+            };
         }
 
         return {
-            organizationVision: organization?.strategicVision ?? undefined,
-            organizationValueProp: organization?.valueProposition ?? undefined,
+            strategicPlan: organization?.platformSettings?.strategicPlan ?? undefined,
+            organizationVision: projectStrategy?.strategicVision || organization?.strategicVision ?? undefined,
+            organizationValueProp: projectStrategy?.valueProposition || organization?.valueProposition ?? undefined,
             knowledgeGaps: knowledgeGaps.map(g => ({
                 topic: g.topic,
                 priority: g.priority,
@@ -360,7 +559,8 @@ export class WebsiteAnalysisEngine {
                 type: k.type ?? undefined,
                 snippet: (k.content || '').replace(/\s+/g, ' ').slice(0, 220)
             })),
-            websiteAnalytics
+            websiteAnalytics,
+            capabilities
         };
     }
 
@@ -554,8 +754,18 @@ ${strategicContext.organizationVision}` : ''}
 ${strategicContext.organizationValueProp ? `VALUE PROPOSITION DICHIARATA:
 ${strategicContext.organizationValueProp}` : ''}
 
+${strategicContext.strategicPlan ? `PIANO STRATEGICO COPILOT (da impostazioni):
+${strategicContext.strategicPlan}` : ''}
+
 === DATI MULTI-CANALE DELL'ORGANIZZAZIONE ===
 ${strategicContextSection}
+
+=== CAPABILITIES IMPLEMENTATIVE ATTIVE ===
+- CMS API: ${strategicContext.capabilities?.hasCmsApi ? 'attivo' : 'non attivo'}
+- WordPress MCP: ${strategicContext.capabilities?.hasWordPress ? 'attivo' : 'non attivo'}
+- WooCommerce MCP: ${strategicContext.capabilities?.hasWooCommerce ? 'attivo' : 'non attivo'}
+- Google Analytics: ${strategicContext.capabilities?.hasGoogleAnalytics ? 'attivo' : 'non attivo'}
+- Google Search Console: ${strategicContext.capabilities?.hasSearchConsole ? 'attivo' : 'non attivo'}
 
 === PROMPTS DA MONITORARE ===
 Questi sono i prompt per cui il brand vuole essere menzionato dagli LLM:
@@ -615,20 +825,26 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
    - Impatto: Quale metrica migliorerà e perché
    - dataSource: Da quale fonte dati deriva (es: "knowledge_gap", "interview_theme", "visibility_scan", "chatbot_faq")
    - relatedPrompts: Quali prompt beneficeranno di questa azione
+   - strategyAlignment: Spiega in una frase la coerenza con Vision/Value Proposition/Piano Strategico
+   - evidencePoints: 2-4 evidenze sintetiche con numeri (GA/GSC/chatbot/interviste/monitor)
 
    Tipi di raccomandazione disponibili:
    - address_knowledge_gap: Risponde a gap identificato dal chatbot
    - leverage_interview_insight: Sfrutta insight dalle interviste
    - competitive_positioning: Miglioramento posizionamento vs competitor
    - add_structured_data, improve_value_proposition, add_keyword_content, improve_clarity, add_page, modify_content, add_faq, improve_meta
+   - social_post: Bozza post social basata su insight (con descrizione visual)
+   - product_content_optimization: Ottimizzazione descrizioni prodotto (utile se WooCommerce attivo)
 
-   CONTENUTO OPERATIVO (solo per add_page, add_faq, modify_content, competitive_positioning):
+   CONTENUTO OPERATIVO (solo per add_page, add_faq, modify_content, competitive_positioning, social_post, product_content_optimization):
    - Aggiungi "contentDraft" con:
      • title (SEO-friendly)
      • slug (breve, con trattini)
      • body (Markdown con H2/H3, paragrafi brevi, liste, CTA)
      • metaDescription (<= 160 caratteri)
      • targetSection (faq, news, pages, blog, support o equivalente)
+     • mediaBrief (solo per social_post: descrizione del visual/video più adatto)
+     • targetEntityId/targetEntitySlug (solo product_content_optimization, se disponibile)
    - Il testo deve essere ottimizzato per LLM: esplicita brand, prodotto/servizio e termini chiave del prompt.
    - Non includere claim non verificati; se un dato non è nelle fonti, riformula come ipotesi o suggerisci verifica.`,
             temperature: 0.2

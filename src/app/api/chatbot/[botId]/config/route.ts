@@ -16,6 +16,8 @@ export async function GET(
                 botType: true,
                 primaryColor: true,
                 introMessage: true,
+                privacyPolicyUrl: true,
+                enablePageContext: true,
                 // Only include other PUBLIC fields needed for UI
             }
         });

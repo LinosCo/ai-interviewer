@@ -33,12 +33,27 @@ interface Recommendation {
     impact: string;
     relatedPrompts?: string[];
     dataSource?: string;
+    strategyAlignment?: string;
+    evidencePoints?: string[];
+    explainability?: {
+        logic?: string;
+        strategicGoal?: string;
+        evidence?: string[];
+        confidence?: number;
+        channelsEvaluated?: string[];
+    };
+    implementation?: {
+        publishChannel?: 'CMS_API' | 'WORDPRESS_MCP' | 'WOOCOMMERCE_MCP' | 'MANUAL';
+        contentKind?: string;
+        contentMode?: 'STATIC' | 'DYNAMIC';
+    };
     contentDraft?: {
         title: string;
         slug: string;
         body: string;
         metaDescription?: string;
         targetSection?: string;
+        mediaBrief?: string;
     };
 }
 
@@ -232,7 +247,9 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
             'add_page': FileText,
             'modify_content': FileText,
             'add_faq': FileText,
-            'improve_meta': Globe
+            'improve_meta': Globe,
+            'social_post': Sparkles,
+            'product_content_optimization': Target
         };
         const Icon = icons[type] || Lightbulb;
         return <Icon className="w-4 h-4" />;
@@ -288,7 +305,7 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
             }
 
             setDraftSuccessId(data.suggestionId);
-        } catch (error) {
+        } catch {
             setDraftError('Errore di rete durante la creazione della bozza');
         } finally {
             setDraftSaving(false);
@@ -435,6 +452,27 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                                 Fonte: {rec.dataSource}
                             </div>
                         )}
+                        {(rec.strategyAlignment || rec.evidencePoints?.length || rec.explainability?.logic) && (
+                            <div className="mt-2 p-2 bg-indigo-50 border border-indigo-100 rounded text-[10px] text-indigo-900 space-y-1">
+                                {rec.strategyAlignment && (
+                                    <div><strong>Allineamento:</strong> {rec.strategyAlignment}</div>
+                                )}
+                                {rec.explainability?.logic && (
+                                    <div><strong>Logica:</strong> {rec.explainability.logic}</div>
+                                )}
+                                {(rec.evidencePoints?.length || rec.explainability?.evidence?.length) && (
+                                    <div>
+                                        <strong>Evidenze:</strong>{' '}
+                                        {(rec.evidencePoints || rec.explainability?.evidence || []).slice(0, 3).join(' | ')}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {rec.implementation && (
+                            <div className="mt-1.5 text-[9px] text-slate-500">
+                                Routing: {rec.implementation.publishChannel || 'N/D'} · {rec.implementation.contentKind || 'N/D'}
+                            </div>
+                        )}
                         {rec.contentDraft && (
                             <div className="mt-2 p-2 bg-white border border-slate-200 rounded">
                                 <div className="text-[10px] font-semibold text-slate-700 mb-1">Bozza contenuto</div>
@@ -442,6 +480,11 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                                     {rec.contentDraft.body?.slice(0, 220)}
                                     {rec.contentDraft.body && rec.contentDraft.body.length > 220 ? '…' : ''}
                                 </div>
+                                {rec.contentDraft.mediaBrief && (
+                                    <div className="mt-1 text-[9px] text-slate-500">
+                                        Media brief: {rec.contentDraft.mediaBrief.slice(0, 140)}{rec.contentDraft.mediaBrief.length > 140 ? '…' : ''}
+                                    </div>
+                                )}
                                 <Button
                                     size="sm"
                                     variant="outline"

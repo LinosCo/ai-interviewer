@@ -19,6 +19,92 @@ export interface MultiPageScrapedContent {
     pagesScraped: number;
 }
 
+const NOISE_SELECTORS = [
+    'script',
+    'style',
+    'noscript',
+    'template',
+    'svg',
+    'canvas',
+    'iframe',
+    'nav',
+    'footer',
+    'header',
+    'aside',
+    'form',
+    'button',
+    '.ad',
+    '.ads',
+    '.cookie-banner',
+    '.cookies',
+    '.popup',
+    '.modal',
+    '.sidebar',
+    '.widget',
+    '.newsletter',
+    '[aria-hidden="true"]',
+    '[hidden]',
+    '[role="dialog"]'
+].join(', ');
+
+const SHORTCODE_PATTERNS = [
+    /\[\/?[\w:-]+(?:\s+[^\]]*)?\]/g, // WordPress and plugin shortcodes
+    /\{\{[\s\S]*?\}\}/g, // Handlebars / Mustache
+    /\{%\s*[\s\S]*?%\}/g, // Liquid templates
+    /<%[\s\S]*?%>/g, // EJS templates
+    /<\?php[\s\S]*?\?>/gi, // PHP blocks accidentally rendered
+    /<!--\s*wp:[\s\S]*?-->/g, // Gutenberg start comments
+    /<!--\s*\/wp:[\s\S]*?-->/g // Gutenberg end comments
+];
+
+const HTML_ENTITY_MAP: Record<string, string> = {
+    '&nbsp;': ' ',
+    '&amp;': '&',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&lt;': '<',
+    '&gt;': '>'
+};
+
+function decodeBasicHtmlEntities(input: string): string {
+    return input.replace(/&nbsp;|&amp;|&quot;|&#39;|&apos;|&lt;|&gt;/g, (entity) => HTML_ENTITY_MAP[entity] || entity);
+}
+
+function sanitizeExtractedText(raw: string, maxChars: number = 12_000): string {
+    if (!raw) return '';
+
+    let text = decodeBasicHtmlEntities(raw);
+    for (const pattern of SHORTCODE_PATTERNS) {
+        text = text.replace(pattern, ' ');
+    }
+
+    text = text
+        .replace(/https?:\/\/\S+/gi, ' ') // remove noisy URL-only fragments
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/[ \t]{2,}/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+    if (text.length > maxChars) {
+        text = `${text.slice(0, maxChars)}...`;
+    }
+
+    return text;
+}
+
+function extractPageText($: cheerio.CheerioAPI): string {
+    const rootCandidates = $('main, article, [role="main"], #content, .content, .main');
+    const root = rootCandidates.length > 0 ? rootCandidates.first().clone() : $('body').clone();
+
+    root.find(NOISE_SELECTORS).remove();
+    root.find('br').replaceWith('\n');
+    root.find('p, h1, h2, h3, h4, h5, h6, li, tr, section, article, div').append('\n');
+
+    return sanitizeExtractedText(root.text());
+}
+
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {
     try {
         const response = await fetch(url, {
@@ -33,32 +119,13 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
 
         const html = await response.text();
         const $ = cheerio.load(html);
-
-        // Remove script, style, and navigation elements to clean up text
-        $('script, style, nav, footer, header, aside, .ad, .cookie-banner, .popup, .modal, .sidebar, .widget, iframe').remove();
-
+        $('body').find(NOISE_SELECTORS).remove();
         const title = $('title').text().trim() || $('h1').first().text().trim() || url;
-        const description = $('meta[name="description"]').attr('content')?.trim();
-
-        // Extract main content
-        // Try to find main content container
-        let contentEl = $('main, article, #content, .content, .main').first();
-
-        // Fallback to body if no main container found
-        if (contentEl.length === 0) {
-            contentEl = $('body');
-        }
-
-        // Convert to clean text
-        // Replace block elements with newlines to preserve structure
-        $('br').replaceWith('\n');
-        $('p, h1, h2, h3, h4, h5, h6, li, tr').after('\n');
-
-        const content = contentEl.text()
-            .replace(/\[\/?[\w-]+.*?\]/g, '') // Remove WordPress-style shortcodes
-            .replace(/\s\s+/g, ' ') // Collapse multiple spaces
-            .replace(/\n\s*\n/g, '\n\n') // Collapse multiple newlines
-            .trim();
+        const rawDescription = $('meta[name="description"]').attr('content')
+            || $('meta[property="og:description"]').attr('content')
+            || '';
+        const description = sanitizeExtractedText(rawDescription, 600);
+        const content = extractPageText($);
 
         if (content.length < 50) {
             throw new Error("Content too short or couldn't extract meaningful text");
@@ -70,9 +137,10 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             description,
             url
         };
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown scraping error';
         console.error(`Scraping error for ${url}:`, error);
-        throw new Error(`Failed to scrape URL: ${error.message}`);
+        throw new Error(`Failed to scrape URL: ${message}`);
     }
 }
 

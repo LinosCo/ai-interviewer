@@ -63,24 +63,32 @@ export class CrossChannelSyncEngine {
         // 0. Fetch strategic context (project-level if available, otherwise org-level)
         let strategicVision: string | null = null;
         let valueProposition: string | null = null;
+        let strategicPlan: string | null = null;
+
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                strategicVision: true,
+                valueProposition: true,
+                platformSettings: {
+                    select: {
+                        strategicPlan: true
+                    }
+                }
+            }
+        });
+
+        strategicVision = org?.strategicVision || null;
+        valueProposition = org?.valueProposition || null;
+        strategicPlan = org?.platformSettings?.strategicPlan || null;
 
         if (projectId) {
             const project = await prisma.project.findUnique({
                 where: { id: projectId },
                 select: { strategicVision: true, valueProposition: true }
             });
-            strategicVision = project?.strategicVision || null;
-            valueProposition = project?.valueProposition || null;
-        }
-
-        // Fallback to org-level if project doesn't have strategy
-        if (!strategicVision && !valueProposition) {
-            const org = await prisma.organization.findUnique({
-                where: { id: organizationId },
-                select: { strategicVision: true, valueProposition: true }
-            });
-            strategicVision = org?.strategicVision || null;
-            valueProposition = org?.valueProposition || null;
+            strategicVision = project?.strategicVision || strategicVision;
+            valueProposition = project?.valueProposition || valueProposition;
         }
 
         // 1. Fetch visibility data (filter by project if provided)
@@ -288,7 +296,7 @@ export class CrossChannelSyncEngine {
         const { model } = await getSystemLLM();
 
         // Build a strong strategic context for the LLM
-        const hasStrategicContext = strategicVision || valueProposition;
+        const hasStrategicContext = strategicVision || valueProposition || strategicPlan;
         const strategicContextText = hasStrategicContext
             ? `
             🎯 VISIONE STRATEGICA del Brand:
@@ -297,11 +305,14 @@ export class CrossChannelSyncEngine {
             💎 VALUE PROPOSITION:
             "${valueProposition}"
 
+            🧭 PIANO STRATEGICO COPILOT:
+            "${strategicPlan}"
+
             ⚠️ IMPORTANTE: Ogni suggerimento DEVE essere direttamente collegato a questa visione.
             Se un suggerimento non supporta la visione strategica, NON includerlo.`
             : `
-            ⚠️ L'utente non ha ancora definito una visione strategica o una value proposition.
-            In questo caso genera SOLO 1-2 suggerimenti mirati a definire vision e value proposition, con domande concrete da fare agli stakeholder.
+            ⚠️ L'utente non ha ancora definito visione, value proposition e piano strategico.
+            In questo caso genera SOLO 1-2 suggerimenti mirati a definire questi elementi con domande concrete da fare agli stakeholder.
             Non generare altri suggerimenti operativi finché la strategia non è definita.`;
 
         const { object } = await generateObject({
@@ -456,12 +467,29 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
         };
 
         const savedInsights: any[] = [];
+        const visibilityPayload = {
+            visibilitySummary,
+            websiteAnalytics: websiteAnalytics || null,
+            serpSummary: serpSummary || null,
+            strategicContext: {
+                strategicVision,
+                valueProposition,
+                strategicPlan
+            },
+            activeChannels: [
+                visibilitySummary.length > 0 ? 'visibility' : null,
+                interviewSummary.length > 0 ? 'interviews' : null,
+                chatbotSummary.length > 0 ? 'chatbot' : null,
+                websiteAnalytics ? 'analytics' : null,
+                serpSummary ? 'serp' : null
+            ].filter(Boolean)
+        };
 
         // Save the summary report as a special record (single, updatable)
         const healthInsight = await upsertInsight("Health Report: Brand & Sito", {
             visibilityData: {
+                ...visibilityPayload,
                 report: object.healthReport,
-                serpSummary: serpSummary || null
             } as any,
             interviewData: interviewSummary as any,
             chatbotData: chatbotSummary as any,
@@ -510,7 +538,7 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             if (preparedActions.length === 0) continue;
 
             const insight = await upsertInsight(rawInsight.topicName, {
-                visibilityData: visibilitySummary as any,
+                visibilityData: visibilityPayload as any,
                 interviewData: interviewSummary as any,
                 chatbotData: chatbotSummary as any,
                 crossChannelScore: 100,

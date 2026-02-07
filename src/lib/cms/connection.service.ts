@@ -1,11 +1,20 @@
 import { prisma } from '@/lib/prisma';
-import { CMSConnectionStatus, WebhookDirection } from '@prisma/client';
+import { CMSConnectionStatus, CMSSuggestionType, WebhookDirection } from '@prisma/client';
+import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
+import { WORDPRESS_TOOLS } from '@/lib/integrations/mcp/wordpress.adapter';
+import { WOOCOMMERCE_TOOLS } from '@/lib/integrations/mcp/woocommerce.adapter';
+import {
+    defaultPublicationRouting,
+    inferContentKind,
+    normalizePublicationRouting,
+    resolvePublishingCapabilities,
+    type PublicationRouting
+} from './publishing';
 import {
     encrypt,
     decrypt,
     generateApiKey,
-    generateWebhookSecret,
-    createWebhookSignature
+    generateWebhookSecret
 } from './encryption';
 
 export interface CreateConnectionInput {
@@ -45,6 +54,11 @@ export interface PushSuggestionResult {
     cmsContentId?: string;
     previewUrl?: string;
     error?: string;
+}
+
+interface MCPLookupResult {
+    contentId?: string;
+    previewUrl?: string;
 }
 
 export class CMSConnectionService {
@@ -372,6 +386,247 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
         });
     }
 
+    private static normalizeSourceSignals(value: unknown): Record<string, unknown> {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return {};
+        }
+        return { ...(value as Record<string, unknown>) };
+    }
+
+    private static parseMcpResult(data: unknown): MCPLookupResult {
+        if (!data || typeof data !== 'object') return {};
+        const candidateObjects: Array<Record<string, unknown>> = [];
+        const maybeData = data as Record<string, unknown>;
+
+        const directContent = maybeData.content;
+        if (Array.isArray(directContent)) {
+            for (const item of directContent) {
+                if (!item || typeof item !== 'object') continue;
+                const typed = item as Record<string, unknown>;
+                if (typed.data && typeof typed.data === 'object') {
+                    if (Array.isArray(typed.data)) {
+                        for (const entry of typed.data) {
+                            if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+                                candidateObjects.push(entry as Record<string, unknown>);
+                            }
+                        }
+                    } else {
+                        candidateObjects.push(typed.data as Record<string, unknown>);
+                    }
+                }
+                if (typeof typed.text === 'string') {
+                    const text = typed.text.trim();
+                    if (text.startsWith('{') || text.startsWith('[')) {
+                        try {
+                            const parsed = JSON.parse(text);
+                            if (Array.isArray(parsed)) {
+                                for (const entry of parsed) {
+                                    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+                                        candidateObjects.push(entry as Record<string, unknown>);
+                                    }
+                                }
+                            } else if (parsed && typeof parsed === 'object') {
+                                candidateObjects.push(parsed as Record<string, unknown>);
+                            }
+                        } catch {
+                            // ignore malformed text payload
+                        }
+                    }
+                }
+            }
+        }
+
+        const extractString = (obj: Record<string, unknown>, keys: string[]): string | undefined => {
+            for (const key of keys) {
+                const value = obj[key];
+                if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+                if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+                if (Array.isArray(value)) {
+                    for (const entry of value) {
+                        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+                            const nestedArrayValue = extractString(entry as Record<string, unknown>, keys);
+                            if (nestedArrayValue) return nestedArrayValue;
+                        }
+                    }
+                }
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    const nested = value as Record<string, unknown>;
+                    const nestedValue = extractString(nested, keys);
+                    if (nestedValue) return nestedValue;
+                }
+            }
+            return undefined;
+        };
+
+        for (const obj of candidateObjects) {
+            const contentId = extractString(obj, ['id', 'postId', 'productId', 'contentId', 'ID']);
+            const previewUrl = extractString(obj, ['previewUrl', 'url', 'link', 'permalink']);
+            if (contentId || previewUrl) {
+                return { contentId, previewUrl };
+            }
+        }
+
+        return {};
+    }
+
+    private static buildCmsPayload(
+        suggestion: any,
+        routing: PublicationRouting,
+        sourceSignals: Record<string, unknown>
+    ) {
+        return {
+            btSuggestionId: suggestion.id,
+            type: suggestion.type,
+            title: suggestion.title,
+            slug: suggestion.slug,
+            body: suggestion.body,
+            metaDescription: suggestion.metaDescription,
+            targetSection: suggestion.targetSection,
+            reasoning: suggestion.reasoning,
+            priorityScore: suggestion.priorityScore,
+            publishRouting: routing,
+            mediaBrief: sourceSignals.mediaBrief || null,
+            strategyAlignment: sourceSignals.strategyAlignment || null,
+            explainability: sourceSignals.explainability || null
+        };
+    }
+
+    private static async pushToCmsApi(
+        suggestion: any,
+        routing: PublicationRouting,
+        sourceSignals: Record<string, unknown>
+    ): Promise<PushSuggestionResult> {
+        const payload = this.buildCmsPayload(suggestion, routing, sourceSignals);
+        const response = await fetch(`${suggestion.connection.cmsApiUrl}/suggestions`, {
+            method: 'POST',
+            headers: {
+                'X-BT-API-Key': decrypt(suggestion.connection.apiKey),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        });
+
+        await this.logWebhook(
+            suggestion.connectionId,
+            'OUTBOUND',
+            'suggestion.push.cms_api',
+            response.ok,
+            payload,
+            response.status,
+            undefined,
+            response.ok ? undefined : `HTTP ${response.status}`
+        );
+
+        if (!response.ok) {
+            return { success: false, error: `CMS returned ${response.status}` };
+        }
+
+        const data = await response.json().catch(() => ({}));
+        return {
+            success: true,
+            cmsContentId: typeof data?.contentId === 'string' ? data.contentId : undefined,
+            previewUrl: typeof data?.previewUrl === 'string' ? data.previewUrl : undefined
+        };
+    }
+
+    private static async pushToWordPress(
+        suggestion: any,
+        routing: PublicationRouting,
+        wordPressConnectionId: string
+    ): Promise<PushSuggestionResult> {
+        const kind = routing.contentKind;
+        const isPageKind = routing.wpPostType === 'page'
+            || kind === 'STATIC_PAGE'
+            || kind === 'FAQ_PAGE'
+            || kind === 'SCHEMA_PATCH'
+            || kind === 'SEO_PATCH';
+        const toolName = isPageKind ? WORDPRESS_TOOLS.CREATE_PAGE : WORDPRESS_TOOLS.CREATE_POST;
+
+        const args: Record<string, unknown> = {
+            title: suggestion.title,
+            content: suggestion.body,
+            status: 'draft'
+        };
+        if (suggestion.slug) args.slug = suggestion.slug;
+        if (suggestion.metaDescription) args.excerpt = suggestion.metaDescription;
+
+        const result = await MCPGatewayService.callTool(wordPressConnectionId, toolName, args);
+        if (!result.success || !result.data || result.data.isError) {
+            return { success: false, error: result.error || 'WordPress MCP call failed' };
+        }
+
+        const parsed = this.parseMcpResult(result.data);
+        return {
+            success: true,
+            cmsContentId: parsed.contentId,
+            previewUrl: parsed.previewUrl
+        };
+    }
+
+    private static async resolveWooProductId(
+        wooConnectionId: string,
+        routing: PublicationRouting
+    ): Promise<string | null> {
+        if (routing.targetEntityId) return routing.targetEntityId;
+        if (!routing.targetEntitySlug) return null;
+
+        const listResult = await MCPGatewayService.callTool(
+            wooConnectionId,
+            WOOCOMMERCE_TOOLS.LIST_PRODUCTS,
+            { search: routing.targetEntitySlug, per_page: 20 }
+        );
+
+        if (!listResult.success || !listResult.data || listResult.data.isError) {
+            return null;
+        }
+
+        const parsed = this.parseMcpResult(listResult.data);
+        return parsed.contentId || null;
+    }
+
+    private static async pushToWooCommerce(
+        suggestion: any,
+        routing: PublicationRouting,
+        wooConnectionId: string
+    ): Promise<PushSuggestionResult> {
+        if (routing.contentKind !== 'PRODUCT_DESCRIPTION') {
+            return { success: false, error: 'WooCommerce is available only for product content suggestions' };
+        }
+
+        const productId = await this.resolveWooProductId(wooConnectionId, routing);
+        if (!productId) {
+            return {
+                success: false,
+                error: 'Product target missing. Set targetEntityId or targetEntitySlug before pushing to WooCommerce.'
+            };
+        }
+
+        const args: Record<string, unknown> = {
+            id: productId,
+            description: suggestion.body
+        };
+        if (suggestion.metaDescription) args.short_description = suggestion.metaDescription;
+        if (suggestion.title) args.name = suggestion.title;
+        if (suggestion.slug) args.slug = suggestion.slug;
+
+        const result = await MCPGatewayService.callTool(
+            wooConnectionId,
+            WOOCOMMERCE_TOOLS.UPDATE_PRODUCT,
+            args
+        );
+
+        if (!result.success || !result.data || result.data.isError) {
+            return { success: false, error: result.error || 'WooCommerce MCP call failed' };
+        }
+
+        const parsed = this.parseMcpResult(result.data);
+        return {
+            success: true,
+            cmsContentId: parsed.contentId || productId,
+            previewUrl: parsed.previewUrl
+        };
+    }
+
     /**
      * Push a suggestion to the CMS as a draft.
      */
@@ -393,64 +648,109 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             return { success: false, error: `Suggestion already ${suggestion.status.toLowerCase()}` };
         }
 
-        const payload = {
-            btSuggestionId: suggestion.id,
-            type: suggestion.type,
-            title: suggestion.title,
-            slug: suggestion.slug,
-            body: suggestion.body,
-            metaDescription: suggestion.metaDescription,
-            targetSection: suggestion.targetSection,
-            reasoning: suggestion.reasoning,
-            priorityScore: suggestion.priorityScore
+        const sourceSignals = this.normalizeSourceSignals(suggestion.sourceSignals);
+        const projectIdFromSignals = typeof sourceSignals.projectId === 'string'
+            ? sourceSignals.projectId
+            : null;
+        const projectId = projectIdFromSignals || suggestion.connection.projectId || null;
+
+        const capabilities = await resolvePublishingCapabilities({
+            projectId,
+            hasCmsApi: Boolean(suggestion.connection?.id),
+            hasGoogleAnalytics: Boolean(suggestion.connection.googleAnalyticsConnected),
+            hasSearchConsole: Boolean(suggestion.connection.searchConsoleConnected)
+        });
+
+        const inferredKind = inferContentKind({
+            suggestionType: suggestion.type as CMSSuggestionType,
+            tipType: typeof sourceSignals.tipType === 'string' ? sourceSignals.tipType : undefined,
+            targetSection: suggestion.targetSection || undefined,
+            title: suggestion.title
+        });
+
+        const routing = normalizePublicationRouting(
+            sourceSignals.publishRouting,
+            inferredKind,
+            capabilities,
+            suggestion.targetSection || undefined
+        );
+        const fallbackRouting = defaultPublicationRouting(inferredKind, capabilities, suggestion.targetSection || undefined);
+        const effectiveRouting: PublicationRouting = {
+            ...fallbackRouting,
+            ...routing
         };
 
         try {
-            const response = await fetch(`${suggestion.connection.cmsApiUrl}/suggestions`, {
-                method: 'POST',
-                headers: {
-                    'X-BT-API-Key': decrypt(suggestion.connection.apiKey),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload)
-            });
+            let result: PushSuggestionResult;
 
-            // Log the outbound webhook
-            await this.logWebhook(
-                suggestion.connectionId,
-                'OUTBOUND',
-                'suggestion.push',
-                response.ok,
-                payload,
-                response.status,
-                undefined,
-                response.ok ? undefined : `HTTP ${response.status}`
-            );
+            if (effectiveRouting.publishChannel === 'MANUAL') {
+                result = {
+                    success: false,
+                    error: 'Suggestion is configured for manual handling only. Update routing before push.'
+                };
+            } else if (effectiveRouting.publishChannel === 'WORDPRESS_MCP') {
+                if (!capabilities.wordPressConnectionId) {
+                    result = { success: false, error: 'WordPress MCP connection not active for this project' };
+                } else {
+                    result = await this.pushToWordPress(
+                        suggestion,
+                        effectiveRouting,
+                        capabilities.wordPressConnectionId
+                    );
+                }
+            } else if (effectiveRouting.publishChannel === 'WOOCOMMERCE_MCP') {
+                if (!capabilities.wooCommerceConnectionId) {
+                    result = { success: false, error: 'WooCommerce MCP connection not active for this project' };
+                } else {
+                    result = await this.pushToWooCommerce(
+                        suggestion,
+                        effectiveRouting,
+                        capabilities.wooCommerceConnectionId
+                    );
+                }
+            } else {
+                if (suggestion.connection.status !== 'ACTIVE') {
+                    result = {
+                        success: false,
+                        error: 'CMS connection is not active. Please verify the connection first.'
+                    };
+                } else {
+                    result = await this.pushToCmsApi(suggestion, effectiveRouting, sourceSignals);
+                }
+            }
 
-            if (!response.ok) {
+            if (!result.success) {
                 await prisma.cMSSuggestion.update({
                     where: { id: suggestionId },
                     data: { status: 'FAILED' }
                 });
-                return { success: false, error: `CMS returned ${response.status}` };
+                return result;
             }
 
-            const data = await response.json();
+            const updatedSignals = {
+                ...sourceSignals,
+                publishRouting: effectiveRouting,
+                lastPush: {
+                    channel: effectiveRouting.publishChannel,
+                    pushedAt: new Date().toISOString()
+                }
+            };
 
             await prisma.cMSSuggestion.update({
                 where: { id: suggestionId },
                 data: {
                     status: 'PUSHED',
                     pushedAt: new Date(),
-                    cmsContentId: data.contentId,
-                    cmsPreviewUrl: data.previewUrl
+                    cmsContentId: result.cmsContentId || null,
+                    cmsPreviewUrl: result.previewUrl || null,
+                    sourceSignals: updatedSignals
                 }
             });
 
             return {
                 success: true,
-                cmsContentId: data.contentId,
-                previewUrl: data.previewUrl
+                cmsContentId: result.cmsContentId,
+                previewUrl: result.previewUrl
             };
 
         } catch (error: any) {
@@ -459,7 +759,10 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
                 'OUTBOUND',
                 'suggestion.push',
                 false,
-                payload,
+                {
+                    suggestionId,
+                    publishRouting: effectiveRouting
+                },
                 undefined,
                 undefined,
                 error.message

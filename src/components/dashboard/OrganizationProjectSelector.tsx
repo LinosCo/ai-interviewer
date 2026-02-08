@@ -35,7 +35,76 @@ export default function OrganizationProjectSelector() {
     const searchInputRef = useRef<HTMLInputElement>(null);
     const hasAutoRetriedRef = useRef(false);
 
-    // ...
+    // Filtered lists
+    const filteredOrganizations = organizations.filter(org =>
+        org.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const filteredProjects = [
+        ALL_PROJECTS_OPTION,
+        ...projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ];
+
+    // Reset search when closing dropdown
+    useEffect(() => {
+        if (!dropdownMode) {
+            setSearchQuery('');
+            setHighlightedIndex(0);
+        } else {
+            // Focus input when opening
+            setTimeout(() => {
+                searchInputRef.current?.focus();
+            }, 50);
+        }
+    }, [dropdownMode]);
+
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        setHighlightedIndex(0);
+    };
+
+    const handleOrgSelect = useCallback((org: Organization) => {
+        setCurrentOrganization(org);
+        setDropdownMode(null);
+    }, [setCurrentOrganization]);
+
+    const handleProjectSelect = useCallback((project: Project) => {
+        setSelectedProject(project);
+        setDropdownMode(null);
+    }, [setSelectedProject]);
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        const itemsCount = dropdownMode === 'org' ? filteredOrganizations.length : filteredProjects.length;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev + 1) % itemsCount);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev - 1 + itemsCount) % itemsCount);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (dropdownMode === 'org' && filteredOrganizations[highlightedIndex]) {
+                handleOrgSelect(filteredOrganizations[highlightedIndex]);
+            } else if (dropdownMode === 'project' && filteredProjects[highlightedIndex]) {
+                handleProjectSelect(filteredProjects[highlightedIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            setDropdownMode(null);
+        }
+    };
+
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setDropdownMode(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     if (orgError) {
         return (

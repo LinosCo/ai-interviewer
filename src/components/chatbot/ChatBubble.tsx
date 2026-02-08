@@ -54,7 +54,7 @@ export default function ChatBubble({
         : 'bottom-6 left-6';
 
     return (
-        <div className={`fixed ${positionClasses} z-[10000] flex flex-col items-end gap-4`}>
+        <div className={`fixed ${positionClasses} z-[9000] flex flex-col items-end gap-4`}>
             {/* Chat Window Container would go here - handled by parent or separate component */}
 
             {/* Welcome Message Tooltip */}

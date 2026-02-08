@@ -92,20 +92,45 @@ export class CrossChannelSyncEngine {
         }
 
         // 1. Fetch visibility data (filter by project if provided)
-        const visibilityConfig = await prisma.visibilityConfig.findFirst({
-            where: {
-                organizationId,
-                ...(projectId ? { projectId } : {})
-            },
-            include: {
-                scans: {
-                    where: { status: 'completed' },
-                    orderBy: { completedAt: 'desc' },
-                    take: 1,
-                    include: { responses: true }
+        let visibilityConfig: any = null;
+        try {
+            visibilityConfig = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(projectId ? {
+                        OR: [
+                            { projectId },
+                            { projectShares: { some: { projectId } } }
+                        ]
+                    } : {})
+                },
+                include: {
+                    scans: {
+                        where: { status: 'completed' },
+                        orderBy: { completedAt: 'desc' },
+                        take: 1,
+                        include: { responses: true }
+                    }
                 }
-            }
-        });
+            });
+        } catch (err: any) {
+            if (err?.code !== 'P2021') throw err;
+            // Fallback for missing ProjectVisibilityConfig table
+            visibilityConfig = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(projectId ? { projectId } : {})
+                },
+                include: {
+                    scans: {
+                        where: { status: 'completed' },
+                        orderBy: { completedAt: 'desc' },
+                        take: 1,
+                        include: { responses: true }
+                    }
+                }
+            });
+        }
 
         // 2-6 ... (skipping for BREVITY in replacement targetContent/content)
 
@@ -229,7 +254,7 @@ export class CrossChannelSyncEngine {
         };
 
         const visibilitySummary = limitArray(
-            visibilityConfig?.scans[0]?.responses?.map(r => ({
+            (visibilityConfig?.scans[0]?.responses as any[])?.map((r: any) => ({
                 platform: r.platform,
                 responseText: truncate(r.responseText || '', 220),
                 brandMentioned: r.brandMentioned,

@@ -108,7 +108,7 @@ export function ProjectBrandManager({ projectId, projectName }: ProjectBrandMana
     }
 
     const totalBrands = brands.length + unlinkedBrands.length;
-    const canAddMore = totalBrands < maxBrands;
+    const canAddMore = maxBrands === -1 || totalBrands < maxBrands;
 
     return (
         <Card>

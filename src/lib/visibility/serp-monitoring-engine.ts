@@ -722,18 +722,31 @@ Restituisci un array di analisi, una per ogni risultato nell'ordine dato.`,
      * Get recent SERP results for an organization
      */
     static async getRecentResults(organizationId: string, limit: number = 50, filters?: { projectId?: string | null; configId?: string | null }) {
-        const config = await prisma.visibilityConfig.findFirst({
-            where: {
-                organizationId,
-                ...(filters?.configId ? { id: filters.configId } : {}),
-                ...(filters?.projectId ? {
-                    OR: [
-                        { projectId: filters.projectId },
-                        { projectShares: { some: { projectId: filters.projectId } } }
-                    ]
-                } : {})
-            }
-        });
+        let config: any = null;
+        try {
+            config = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(filters?.configId ? { id: filters.configId } : {}),
+                    ...(filters?.projectId ? {
+                        OR: [
+                            { projectId: filters.projectId },
+                            { projectShares: { some: { projectId: filters.projectId } } }
+                        ]
+                    } : {})
+                }
+            });
+        } catch (err: any) {
+            if (err?.code !== 'P2021') throw err;
+            // Fallback for missing ProjectVisibilityConfig table
+            config = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(filters?.configId ? { id: filters.configId } : {}),
+                    ...(filters?.projectId ? { projectId: filters.projectId } : {})
+                }
+            });
+        }
 
         if (!config) return { results: [], scans: [] };
 

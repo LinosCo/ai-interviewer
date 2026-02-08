@@ -16,6 +16,7 @@ interface OrganizationContextType {
     currentOrganization: Organization | null;
     setCurrentOrganization: (org: Organization | null) => void;
     loading: boolean;
+    error?: string | null;
     refetchOrganizations: () => Promise<void>;
     isAdmin: boolean;
 }
@@ -33,6 +34,8 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
     const [retryCount, setRetryCount] = useState(0);
     const maxRetries = 3;
 
+    const [error, setError] = useState<string | null>(null);
+
     const fetchOrganizations = useCallback(async () => {
         if (status !== 'authenticated') {
             return;
@@ -44,6 +47,8 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
             if (organizations.length === 0 && retryCount === 0) {
                 setLoading(true);
             }
+            // Clear error on start of new fetch cycle (not retries)
+            if (retryCount === 0) setError(null);
 
             const res = await fetch(`/api/organizations?_ts=${Date.now()}`, {
                 cache: 'no-store',
@@ -57,6 +62,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                     throw new Error('Invalid organizations payload');
                 }
                 setOrganizations(data.organizations);
+                setError(null);
 
                 // Initialize selection logic
                 const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
@@ -82,18 +88,30 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                     setRetryCount(0);
                 }
             } else {
-                if ((res.status === 401 || res.status === 403 || res.status >= 500) && retryCount < maxRetries) {
-                    scheduledRetry = true;
-                    const delayMs = Math.min(5000, 500 * Math.pow(2, retryCount));
-                    setTimeout(() => setRetryCount((count) => count + 1), delayMs);
+                const errorData = await res.json().catch(() => ({}));
+                const errorMessage = errorData.error || `Server error: ${res.status}`;
+                console.error('Fetch organizations failed:', errorMessage);
+
+                if ((res.status === 401 || res.status === 403 || res.status >= 500)) {
+                    if (retryCount < maxRetries) {
+                        scheduledRetry = true;
+                        const delayMs = Math.min(5000, 500 * Math.pow(2, retryCount));
+                        setTimeout(() => setRetryCount((count) => count + 1), delayMs);
+                    } else {
+                        setError(errorMessage);
+                    }
+                } else {
+                    setError(errorMessage);
                 }
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to fetch organizations:', error);
             if (retryCount < maxRetries) {
                 scheduledRetry = true;
                 const delayMs = Math.min(5000, 500 * Math.pow(2, retryCount));
                 setTimeout(() => setRetryCount((count) => count + 1), delayMs);
+            } else {
+                setError(error.message || 'Connection failed');
             }
         } finally {
             if (!scheduledRetry) {
@@ -131,7 +149,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                     setCurrentOrganizationState(targetOrg);
                 }
                 setLoading(false);
-            } else if (organizations.length === 0) {
+            } else if (organizations.length === 0 && !error) { // Only fetch if no error
                 // Fetch if no data at all
                 fetchOrganizations();
             } else if (organizations.length > 0 && !currentOrganization) {
@@ -142,20 +160,19 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                 setLoading(false);
             }
         }
-    }, [status, retryCount, fetchOrganizations, initialData, organizations.length, currentOrganization]);
+    }, [status, retryCount, fetchOrganizations, initialData, organizations.length, currentOrganization, error]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);
         if (org) {
             localStorage.setItem(SELECTED_ORG_KEY, org.id);
             document.cookie = `${COOKIE_ORG_KEY}=${org.id}; path=/; max-age=31536000; SameSite=Lax`;
-            // Trigger a page reload or event to refresh other contexts (like projects)
-            // For now, let's keep it simple and assume components will react to currentOrganization change
         }
     };
 
     const refetchOrganizations = async () => {
         setRetryCount(0);
+        setError(null);
         setLoading(true);
         await fetchOrganizations();
     };
@@ -166,6 +183,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
             currentOrganization,
             setCurrentOrganization,
             loading,
+            error,
             refetchOrganizations,
             isAdmin: (session?.user as any)?.role === 'ADMIN'
         }}>

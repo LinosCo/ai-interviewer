@@ -38,31 +38,29 @@ export function DashboardSidebar({
     const toggleMenu = () => setIsOpen(!isOpen);
 
     // Navigation items configuration
-    const navigationItems = [
+    // Primary features (App core)
+    const primaryItems = [
         { href: '/dashboard/interviews', icon: Icons.MessageSquare, label: 'Interviste AI', visible: true },
         { href: '/dashboard/bots', icon: Icons.Bot, label: 'Chatbot AI', visible: hasChatbot },
         { href: '/dashboard/visibility', icon: Icons.Search, label: 'Brand Monitor', visible: hasVisibilityTracker },
         { href: '/dashboard/insights', icon: Icons.Layers, label: 'AI Tips', visible: hasAiTips },
-        { href: '/dashboard/cms', icon: Icons.Globe, label: 'Gestione Sito', visible: hasCMSIntegration, highlight: true },
-        { href: '/dashboard/templates', icon: Icons.LayoutTemplate, label: 'Template', visible: true },
+    ].filter(item => item.visible);
+
+    // Secondary features (Management & Tools)
+    const secondaryItems = [
         { href: '/dashboard/projects', icon: Icons.FolderKanban, label: 'Progetti', visible: canManageProjects },
-        { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
         { href: '/dashboard/settings/members', icon: Icons.Users, label: 'Team', visible: true },
+        { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
+        { href: '/dashboard/cms', icon: Icons.Globe, label: 'Gestione Sito', visible: hasCMSIntegration },
         ...(activeProjectId ? [
             {
                 href: `/dashboard/projects/${activeProjectId}/integrations`,
                 icon: Icons.Link,
-                label: 'Integrazioni',
+                label: 'Connessioni',
                 visible: true
             }
         ] : []),
-    ].filter(item => item.visible);
-
-    // System items for the pre-header
-    const systemItems = [
-        { href: '/dashboard/projects', icon: Icons.FolderKanban, label: 'Progetti', visible: canManageProjects },
-        { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
-        { href: '/dashboard/settings/members', icon: Icons.Users, label: 'Team', visible: true },
+        { href: '/dashboard/templates', icon: Icons.LayoutTemplate, label: 'Template', visible: true },
     ].filter(item => item.visible);
 
     const adminItems = [
@@ -122,10 +120,33 @@ export function DashboardSidebar({
                 {/* Organization & Project Selector (Fixed Header) */}
                 <div className="flex-shrink-0 space-y-4 mb-4">
                     <OrganizationProjectSelector />
+                </div>
 
-                    {/* System Navigation (Fixed Pre-header) */}
+                {/* Main Navigation (Scrollable) */}
+                <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 py-2 space-y-6">
+                    {/* Primary Features */}
                     <div className="space-y-0.5">
-                        {systemItems.map((item) => (
+                        <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            App
+                        </div>
+                        {primaryItems.map((item) => (
+                            <DashboardLink
+                                key={item.href}
+                                href={item.href}
+                                icon={<item.icon size={20} />}
+                                label={item.label}
+                                isActive={pathname?.startsWith(item.href)}
+                                onClick={() => setIsOpen(false)}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Secondary Features */}
+                    <div className="space-y-0.5">
+                        <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Gestione
+                        </div>
+                        {secondaryItems.map((item) => (
                             <DashboardLink
                                 key={item.href}
                                 href={item.href}
@@ -133,27 +154,7 @@ export function DashboardSidebar({
                                 label={item.label}
                                 isActive={pathname?.startsWith(item.href)}
                                 onClick={() => setIsOpen(false)}
-                                compact={true}
-                            />
-                        ))}
-                    </div>
-                </div>
-
-                {/* Main Navigation (Scrollable) */}
-                <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 py-2">
-                    <div className="space-y-0.5">
-                        <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                            App
-                        </div>
-                        {navigationItems.map((item) => (
-                            <DashboardLink
-                                key={item.href}
-                                href={item.href}
-                                icon={<item.icon size={20} />}
-                                label={item.label}
-                                isActive={pathname?.startsWith(item.href)}
-                                highlight={item.highlight}
-                                onClick={() => setIsOpen(false)}
+                                compact={true} // Slightly smaller for secondary items
                             />
                         ))}
                     </div>

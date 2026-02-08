@@ -38,29 +38,34 @@ export async function GET() {
 
         // Backfill membership rows for legacy cases where ownerId was updated
         // but membership was not created for the target organization.
-        const membershipOrgIds = new Set(user.memberships.map((m) => m.organizationId));
-        const missingOwnedOrgIds = Array.from(
-            new Set(
-                user.ownedProjects
-                    .map((p) => p.organizationId)
-                    .filter((orgId): orgId is string => Boolean(orgId))
-                    .filter((orgId) => !membershipOrgIds.has(orgId))
-            )
-        );
+        try {
+            const membershipOrgIds = new Set(user.memberships.map((m) => m.organizationId));
+            const missingOwnedOrgIds = Array.from(
+                new Set(
+                    user.ownedProjects
+                        .map((p) => p.organizationId)
+                        .filter((orgId): orgId is string => Boolean(orgId))
+                        .filter((orgId) => !membershipOrgIds.has(orgId))
+                )
+            );
 
-        if (missingOwnedOrgIds.length > 0) {
-            const now = new Date();
-            await prisma.membership.createMany({
-                data: missingOwnedOrgIds.map((organizationId) => ({
-                    userId: user.id,
-                    organizationId,
-                    role: 'MEMBER',
-                    status: 'ACTIVE',
-                    acceptedAt: now,
-                    joinedAt: now
-                })),
-                skipDuplicates: true
-            });
+            if (missingOwnedOrgIds.length > 0) {
+                const now = new Date();
+                await prisma.membership.createMany({
+                    data: missingOwnedOrgIds.map((organizationId) => ({
+                        userId: user.id,
+                        organizationId,
+                        role: 'MEMBER',
+                        status: 'ACTIVE',
+                        acceptedAt: now,
+                        joinedAt: now
+                    })),
+                    skipDuplicates: true
+                });
+            }
+        } catch (backfillError) {
+            console.error('Backfill memberships failed (non-critical):', backfillError);
+            // Continue execution, do not fail the request
         }
 
         const memberships = await prisma.membership.findMany({
@@ -84,28 +89,34 @@ export async function GET() {
 
         // Se l'utente non ha organizzazioni, creane una di default (Personale)
         if (organizations.length === 0) {
-            const { getOrCreateDefaultOrganization } = await import('@/lib/organizations');
-            const newOrg = await getOrCreateDefaultOrganization(user.id);
+            try {
+                const { getOrCreateDefaultOrganization } = await import('@/lib/organizations');
+                const newOrg = await getOrCreateDefaultOrganization(user.id);
 
-            // Migrazione progetti esistenti (se ce ne sono rimasti senza org)
-            await prisma.project.updateMany({
-                where: { ownerId: user.id, organizationId: null },
-                data: { organizationId: newOrg.id }
-            });
+                // Migrazione progetti esistenti (se ce ne sono rimasti senza org)
+                await prisma.project.updateMany({
+                    where: { ownerId: user.id, organizationId: null },
+                    data: { organizationId: newOrg.id }
+                });
 
-            organizations = [{
-                id: newOrg.id,
-                name: newOrg.name,
-                slug: newOrg.slug,
-                plan: newOrg.plan,
-                role: 'OWNER'
-            }];
+                organizations = [{
+                    id: newOrg.id,
+                    name: newOrg.name,
+                    slug: newOrg.slug,
+                    plan: newOrg.plan,
+                    role: 'OWNER'
+                }];
+            } catch (createError) {
+                console.error('Failed to create default organization:', createError);
+                // Return empty list instead of crashing, client will show empty state
+                // or we could return 500, but empty list allows the UI to render at least
+            }
         }
 
         return NextResponse.json({ organizations });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Fetch Organizations Error:', error);
-        return new Response('Internal Server Error', { status: 500 });
+        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
     }
 }

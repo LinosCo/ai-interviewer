@@ -150,7 +150,7 @@ export function CreditsWidget() {
                 </div>
             ) : (
                 <div className="flex justify-between text-[10px] text-stone-400 mt-1">
-                    <span>Resettano il {formatResetDate(credits.resetDate)}</span>
+                    <span>Reset il {formatResetDate(credits.resetDate)}</span>
                 </div>
             )}
         </div>

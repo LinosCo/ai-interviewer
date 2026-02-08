@@ -345,18 +345,26 @@ export async function POST(
                 data: { projectId: targetProjectId }
             });
         } else {
-            // For visibility configs, we also need to update organizationId
-            await prisma.$transaction(async (tx) => {
-                await tx.visibilityConfig.update({
-                    where: { id: botId },
-                    data: {
-                        projectId: targetProjectId,
-                        ...(targetProject.organizationId && { organizationId: targetProject.organizationId })
-                    }
-                });
+            // For visibility configs, we update organizationId and projectId
+            await prisma.visibilityConfig.update({
+                where: { id: botId },
+                data: {
+                    projectId: targetProjectId,
+                    ...(targetProject.organizationId && { organizationId: targetProject.organizationId })
+                }
+            });
 
+            // Handle ProjectVisibilityConfig associations (OUTSIDE transaction to avoid poisoning)
+            // 1. Check if table exists
+            const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+                SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
+            `;
+            const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+            if (projectVisibilityConfigExists) {
                 try {
-                    await tx.projectVisibilityConfig.upsert({
+                    // 2. Upsert target association
+                    await prisma.projectVisibilityConfig.upsert({
                         where: {
                             projectId_configId: {
                                 projectId: targetProjectId,
@@ -371,17 +379,17 @@ export async function POST(
                         }
                     });
 
-                    await tx.projectVisibilityConfig.deleteMany({
+                    // 3. Delete source association
+                    await prisma.projectVisibilityConfig.deleteMany({
                         where: {
                             projectId,
                             configId: botId
                         }
                     });
                 } catch (error: any) {
-                    // Backward compatibility: log and continue if table doesn't exist
-                    console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
+                    console.warn('Error during projectVisibilityConfig operations in bots transfer:', error?.code, error?.message);
                 }
-            });
+            }
         }
 
         return NextResponse.json({

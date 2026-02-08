@@ -32,11 +32,11 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 const SELECTED_PROJECT_KEY_PREFIX = 'bt_selected_project_id_';
 
-export function ProjectProvider({ children }: { children: ReactNode }) {
+export function ProjectProvider({ children, initialData }: { children: ReactNode, initialData?: Project[] }) {
     const { currentOrganization, loading: orgLoading } = useOrganization();
-    const [projects, setProjects] = useState<Project[]>([]);
+    const [projects, setProjects] = useState<Project[]>(initialData || []);
     const [selectedProject, setSelectedProjectState] = useState<Project | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!initialData);
     const [isOrgAdmin, setIsOrgAdmin] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const maxRetries = 2;

@@ -25,13 +25,13 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 const SELECTED_ORG_KEY = 'bt_selected_org_id';
 const COOKIE_ORG_KEY = 'bt_selected_org_id';
 
-export function OrganizationProvider({ children }: { children: ReactNode }) {
+export function OrganizationProvider({ children, initialData }: { children: ReactNode, initialData?: Organization[] }) {
     const { data: session, status } = useSession();
-    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [organizations, setOrganizations] = useState<Organization[]>(initialData || []);
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!initialData);
     const [retryCount, setRetryCount] = useState(0);
-    const maxRetries = 8;
+    const maxRetries = 3;
 
     const fetchOrganizations = useCallback(async () => {
         if (status !== 'authenticated') {
@@ -40,7 +40,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
         let scheduledRetry = false;
         try {
-            setLoading(true);
+            // Only set loading to true if we don't have any organizations yet
+            if (organizations.length === 0) {
+                setLoading(true);
+            }
+
             const res = await fetch(`/api/organizations?_ts=${Date.now()}`, {
                 cache: 'no-store',
                 credentials: 'include',

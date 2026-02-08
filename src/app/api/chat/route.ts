@@ -1634,6 +1634,13 @@ export async function POST(req: Request) {
             }
         }
 
+        // Log supervisor insight and next state transition for visibility
+        console.log(`📊 [SUPERVISOR] Insight: ${supervisorInsight?.status || 'N/A'}, NextSubGoal: ${supervisorInsight?.nextSubGoal || 'N/A'}`);
+        console.log(`🧭 [FLOW] Phase Transition: ${state.phase} -> ${nextState.phase}`);
+        if (state.topicIndex !== nextState.topicIndex) {
+            console.log(`🔄 [TOPIC] Pivot: Topic Index ${state.topicIndex} -> ${nextState.topicIndex}`);
+        }
+
         // ====================================================================
         // 4. BUILD PROMPT
         // ====================================================================
@@ -1656,7 +1663,7 @@ export async function POST(req: Request) {
         );
 
         console.log("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);
-        // console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 500) + "...");
+        console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 1000) + "...");
 
         // Inject intro message at start
         if (introMessage && canonicalMessages.length <= 1) {
@@ -1746,6 +1753,7 @@ hard_rules:
 
         console.timeEnd("LLM");
         let responseText = result.object.response;
+        console.log(`🧠 [LLM_REASONING]: ${result.object.meta_comment || 'N/A'}`);
         console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
         console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
 
@@ -2311,6 +2319,7 @@ Reply with the complete message (acknowledgment + question).`;
                 ...(clientMessageId ? { replyToClientMessageId: clientMessageId } : {}),
                 phase: nextState.phase,
                 supervisorStatus: supervisorInsight?.status ?? null,
+                reasoning: result?.object?.meta_comment ?? null,
                 topicLabel: targetTopic?.label || currentTopic.label,
                 topicId: targetTopic?.id || currentTopic.id,
                 quality: qualityTelemetry as unknown as Prisma.InputJsonValue,

@@ -150,7 +150,13 @@ export async function POST(request: Request) {
             }
         });
 
-        if (projectId) {
+        // Check if ProjectVisibilityConfig table exists to avoid transaction poisoning
+        const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+            SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
+        `;
+        const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+        if (projectId && projectVisibilityConfigExists) {
             try {
                 await prisma.projectVisibilityConfig.upsert({
                     where: {
@@ -167,8 +173,8 @@ export async function POST(request: Request) {
                     }
                 });
             } catch (error: any) {
-                // Backward compatibility: log and continue if table doesn't exist
-                console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
+                // Log and continue if table doesn't exist or other error
+                console.warn('ProjectVisibilityConfig table not available or error during upsert:', error?.code, error?.message);
             }
         }
 
@@ -365,7 +371,7 @@ export async function PATCH(request: Request) {
             }
         }
 
-        // Use a transaction to ensure atomic updates
+        // Use a transaction to ensure atomic updates for prompts and competitors
         const updatedConfig = await prisma.$transaction(async (tx) => {
             // 1. Update basic info
             const config = await tx.visibilityConfig.update({
@@ -382,28 +388,6 @@ export async function PATCH(request: Request) {
                     ...(projectId !== undefined && { projectId })
                 }
             });
-
-            if (projectId !== undefined && projectId) {
-                try {
-                    await tx.projectVisibilityConfig.upsert({
-                        where: {
-                            projectId_configId: {
-                                projectId,
-                                configId: config.id
-                            }
-                        },
-                        update: {},
-                        create: {
-                            projectId,
-                            configId: config.id,
-                            createdBy: user.id
-                        }
-                    });
-                } catch (error: any) {
-                    // Backward compatibility: log and continue if table doesn't exist
-                    console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
-                }
-            }
 
             // 2. Sync Prompts if provided
             if (prompts) {
@@ -450,6 +434,37 @@ export async function PATCH(request: Request) {
 
             return config;
         });
+
+        // 4. Project-Visibility association (OUTSIDE transaction to avoid poisoning)
+        if (projectId !== undefined && projectId) {
+            try {
+                // Check if ProjectVisibilityConfig table exists using a clean query outside the main transaction
+                const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+                    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
+                `;
+                const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+                if (projectVisibilityConfigExists) {
+                    await prisma.projectVisibilityConfig.upsert({
+                        where: {
+                            projectId_configId: {
+                                projectId,
+                                configId: updatedConfig.id
+                            }
+                        },
+                        update: {},
+                        create: {
+                            projectId,
+                            configId: updatedConfig.id,
+                            createdBy: user.id
+                        }
+                    });
+                }
+            } catch (error: any) {
+                // Log and continue - this operation is secondary and shouldn't block the main update
+                console.warn('ProjectVisibilityConfig table not available (post-transaction):', error?.code, error?.message);
+            }
+        }
 
         return NextResponse.json({
             success: true,

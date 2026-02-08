@@ -100,17 +100,30 @@ export async function POST(
             }
         }
 
-        const updatedConfig = await prisma.$transaction(async (tx) => {
+        // Check if ProjectVisibilityConfig table exists before starting transaction
+        // to avoid transaction poisoning if it doesn't exist.
+        const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'ProjectVisibilityConfig'
+            );
+        `;
+        const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+        // 1. Delete project associations (OUTSIDE transaction to avoid poisoning)
+        if (projectVisibilityConfigExists) {
             try {
-                await tx.projectVisibilityConfig.deleteMany({
+                await prisma.projectVisibilityConfig.deleteMany({
                     where: { configId: config.id }
                 });
             } catch (error: any) {
-                // Backward compatibility: log and continue if table doesn't exist or other errors occur
                 console.warn('Error deleting projectVisibilityConfig entries:', error?.code, error?.message);
-                // Don't throw - we want the transaction to continue
             }
+        }
 
+        // 2. Perform the transfer in a transaction
+        const updatedConfig = await prisma.$transaction(async (tx) => {
             return tx.visibilityConfig.update({
                 where: { id: config.id },
                 data: {

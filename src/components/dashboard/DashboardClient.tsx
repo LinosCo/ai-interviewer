@@ -25,7 +25,8 @@ import {
     Activity,
     Settings,
     Globe,
-    ExternalLink
+    ExternalLink,
+    Link as LinkIcon
 } from "lucide-react";
 import { useState } from 'react';
 import Link from 'next/link';
@@ -480,6 +481,26 @@ export default function DashboardClient({
                             <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
                         </div>
                     </Link>
+
+                    {!isAllProjects && selectedProject && (
+                        <Link
+                            href={`/dashboard/projects/${selectedProject.id}/integrations`}
+                            className="block platform-card rounded-xl p-4 hover:border-emerald-300 transition-colors group"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-100">
+                                        <LinkIcon className="w-4 h-4 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900 text-sm">Integrazioni</h3>
+                                        <p className="text-gray-500 text-xs">Gestisci connessioni WordPress, WooCommerce e Google</p>
+                                    </div>
+                                </div>
+                                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
+                            </div>
+                        </Link>
+                    )}
 
                     {/* CMS Connection Card(s) */}
                     {currentCmsConnection && (

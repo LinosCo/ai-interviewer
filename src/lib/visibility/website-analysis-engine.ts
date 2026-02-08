@@ -370,18 +370,15 @@ export class WebsiteAnalysisEngine {
             });
         }
 
-        // Get bots for this organization through projects
-        const projects = await prisma.project.findMany({
-            where: { organizationId },
-            select: { id: true }
-        });
-        const projectIds = projects.map(p => p.id);
-
-        const bots = projectIds.length > 0 ? await prisma.bot.findMany({
-            where: { projectId: { in: projectIds } },
-            select: { id: true }
-        }) : [];
-        const botIds = bots.map(b => b.id);
+        // Get bots ONLY for this specific project if linked
+        const botIds: string[] = [];
+        if (config?.projectId) {
+            const bots = await prisma.bot.findMany({
+                where: { projectId: config.projectId },
+                select: { id: true }
+            });
+            botIds.push(...bots.map(b => b.id));
+        }
 
         // Fetch knowledge gaps (what users ask that chatbot can't answer)
         const knowledgeGaps = botIds.length > 0 ? await prisma.knowledgeGap.findMany({
@@ -745,16 +742,16 @@ La tua analisi deve essere STRATEGICA, SPECIFICA e AZIONABILE - non generica.
 Hai accesso a dati multi-canale dell'organizzazione che ti permettono di fare raccomandazioni molto più mirate rispetto a una semplice analisi del sito.
 
 === BRAND ===
-Nome: ${brandName}
+Nome Brand: ${brandName}
 Competitor: ${competitors.join(', ') || 'Non specificati'}
 
-${strategicContext.organizationVision ? `VISIONE STRATEGICA DELL'ORGANIZZAZIONE:
+${strategicContext.organizationVision ? `VISIONE STRATEGICA (Specifica di Progetto/Brand):
 ${strategicContext.organizationVision}` : ''}
 
-${strategicContext.organizationValueProp ? `VALUE PROPOSITION DICHIARATA:
+${strategicContext.organizationValueProp ? `VALUE PROPOSITION (Specifica di Progetto/Brand):
 ${strategicContext.organizationValueProp}` : ''}
 
-${strategicContext.strategicPlan ? `PIANO STRATEGICO COPILOT (da impostazioni):
+${strategicContext.strategicPlan ? `PIANO STRATEGICO GLOBALE (da impostazioni piattaforma):
 ${strategicContext.strategicPlan}` : ''}
 
 === DATI MULTI-CANALE DELL'ORGANIZZAZIONE ===

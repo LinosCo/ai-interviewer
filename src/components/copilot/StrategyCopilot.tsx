@@ -129,7 +129,7 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
                         onClick={() => setIsOpen(true)}
-                        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-50"
+                        className="fixed bottom-6 right-24 w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-50"
                         title="Strategy Copilot"
                     >
                         <Sparkles className="w-6 h-6" />
@@ -144,7 +144,7 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        className="fixed bottom-6 right-6 w-[400px] h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-stone-200"
+                        className="fixed bottom-6 right-24 w-[400px] h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-stone-200"
                     >
                         {/* Header */}
                         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4">

@@ -10,7 +10,7 @@ const HERO_PHRASES = [
   'se il team è motivato?',
   'come parlano di te online?',
   'dove ottimizzare il budget?',
-  "se l&apos;assistenza funziona?",
+  "se l'assistenza funziona?",
   'come ti vede la filiera?',
   'perché i clienti comprano?',
   'cosa cercano i talenti?',
@@ -76,7 +76,7 @@ export function HeroSection() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -30, scale: 0.95 }}
                     transition={{ duration: 0.4, ease: 'easeOut' }}
-                    className="absolute inset-x-0 gradient-text"
+                    className="absolute inset-x-0 gradient-text font-display"
                   >
                     {HERO_PHRASES[currentPhraseIndex]}
                   </motion.span>

@@ -1,0 +1,146 @@
+import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+
+export const getProjectTranscriptsTool = {
+    description: 'Fetch interview transcripts and summaries for a specific project. Use this to analyze feedback from interviews.',
+    parameters: z.object({
+        projectId: z.string().describe('The ID of the project to fetch transcripts for'),
+        limit: z.number().optional().default(10).describe('Maximum number of transcripts to return'),
+    }),
+    execute: async ({ projectId, limit }: { projectId: string; limit?: number }) => {
+        try {
+            const conversations = await prisma.conversation.findMany({
+                where: {
+                    bot: {
+                        projectId,
+                        botType: 'interview'
+                    },
+                    status: 'COMPLETED',
+                },
+                orderBy: { completedAt: 'desc' },
+                take: limit,
+                include: {
+                    analysis: true,
+                    messages: {
+                        orderBy: { createdAt: 'asc' }
+                    }
+                }
+            });
+
+            if (conversations.length === 0) {
+                return { message: 'No completed interviews found for this project.' };
+            }
+
+            return {
+                interviews: conversations.map(c => ({
+                    id: c.id,
+                    candidateName: (c.candidateProfile as any)?.name || 'Anonimo',
+                    date: c.completedAt,
+                    sentiment: c.sentimentScore,
+                    topicCoverage: c.analysis?.topicCoverage,
+                    transcript: c.messages.map(m => `${m.role}: ${m.content}`).join('\n')
+                }))
+            };
+        } catch (error: any) {
+            console.error('[Copilot Tool] Error fetching transcripts:', error);
+            return { error: 'Failed to fetch transcripts', details: error.message };
+        }
+    }
+};
+
+export const getChatbotConversationsTool = {
+    description: 'Fetch recent chatbot conversation logs and analysis for a specific project. Use this to understand customer questions and issues.',
+    parameters: z.object({
+        projectId: z.string().describe('The ID of the project to fetch chatbot conversations for'),
+        limit: z.number().optional().default(10).describe('Maximum number of conversations to return'),
+    }),
+    execute: async ({ projectId, limit }: { projectId: string; limit?: number }) => {
+        try {
+            const conversations = await prisma.conversation.findMany({
+                where: {
+                    bot: {
+                        projectId,
+                        botType: 'chatbot'
+                    }
+                },
+                orderBy: { startedAt: 'desc' },
+                take: limit,
+                include: {
+                    analysis: true,
+                    messages: {
+                        orderBy: { createdAt: 'asc' },
+                        take: 20
+                    }
+                }
+            });
+
+            if (conversations.length === 0) {
+                return { message: 'No chatbot conversations found for this project.' };
+            }
+
+            return {
+                conversations: conversations.map(c => ({
+                    id: c.id,
+                    date: c.startedAt,
+                    sentiment: c.sentimentScore,
+                    messages: c.messages.map(m => ({
+                        role: m.role,
+                        content: m.content
+                    }))
+                }))
+            };
+        } catch (error: any) {
+            console.error('[Copilot Tool] Error fetching chatbot conversations:', error);
+            return { error: 'Failed to fetch chatbot conversations', details: error.message };
+        }
+    }
+};
+
+export const getProjectIntegrationsTool = {
+    description: 'Fetch the list of integrations and connections (WordPress, WooCommerce, CMS, Google) for a specific project. Use this to check if a project is connected to external platforms.',
+    parameters: z.object({
+        projectId: z.string().describe('The ID of the project to check integrations for'),
+    }),
+    execute: async ({ projectId }: { projectId: string }) => {
+        try {
+            const [mcpConnections, googleConnection, cmsConnection] = await Promise.all([
+                prisma.mCPConnection.findMany({
+                    where: {
+                        OR: [
+                            { projectId },
+                            { projectShares: { some: { projectId } } }
+                        ]
+                    },
+                    select: { type: true, status: true, name: true }
+                }),
+                prisma.googleConnection.findUnique({
+                    where: { projectId },
+                    select: { ga4Enabled: true, gscEnabled: true }
+                }),
+                prisma.cMSConnection.findUnique({
+                    where: { projectId },
+                    select: { status: true, name: true }
+                })
+            ]);
+
+            return {
+                projectId,
+                integrations: {
+                    mcp: mcpConnections,
+                    google: googleConnection ? {
+                        ga4: googleConnection.ga4Enabled ? 'ENABLED' : 'DISABLED',
+                        gsc: googleConnection.gscEnabled ? 'ENABLED' : 'DISABLED'
+                    } : 'NOT_CONFIGURED',
+                    cms: cmsConnection ? {
+                        status: cmsConnection.status,
+                        name: cmsConnection.name
+                    } : 'NOT_CONFIGURED'
+                },
+                setupUrl: `/dashboard/projects/${projectId}/integrations`
+            };
+        } catch (error: any) {
+            console.error('[Copilot Tool] Error fetching integrations:', error);
+            return { error: 'Failed to fetch integrations', details: error.message };
+        }
+    }
+};

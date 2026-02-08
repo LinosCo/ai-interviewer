@@ -168,7 +168,7 @@ export class CrossChannelSyncEngine {
         });
 
         // 5. Fetch SERP Monitoring Data (Google News/Search)
-        const serpSummary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId);
+        const serpSummary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId, projectId);
 
         // 5b. Fetch CMS/Website analytics if available
         let websiteAnalytics = null;
@@ -230,11 +230,11 @@ export class CrossChannelSyncEngine {
 
         const visibilitySummary = limitArray(
             visibilityConfig?.scans[0]?.responses?.map(r => ({
-            platform: r.platform,
-            responseText: truncate(r.responseText || '', 220),
-            brandMentioned: r.brandMentioned,
-            competitors: r.competitorPositions
-        })) || [],
+                platform: r.platform,
+                responseText: truncate(r.responseText || '', 220),
+                brandMentioned: r.brandMentioned,
+                competitors: r.competitorPositions
+            })) || [],
             6
         );
 

@@ -721,9 +721,18 @@ Restituisci un array di analisi, una per ogni risultato nell'ordine dato.`,
     /**
      * Get recent SERP results for an organization
      */
-    static async getRecentResults(organizationId: string, limit: number = 50) {
+    static async getRecentResults(organizationId: string, limit: number = 50, filters?: { projectId?: string | null; configId?: string | null }) {
         const config = await prisma.visibilityConfig.findFirst({
-            where: { organizationId }
+            where: {
+                organizationId,
+                ...(filters?.configId ? { id: filters.configId } : {}),
+                ...(filters?.projectId ? {
+                    OR: [
+                        { projectId: filters.projectId },
+                        { projectShares: { some: { projectId: filters.projectId } } }
+                    ]
+                } : {})
+            }
         });
 
         if (!config) return { results: [], scans: [] };
@@ -768,8 +777,8 @@ Restituisci un array di analisi, una per ogni risultato nell'ordine dato.`,
     /**
      * Get SERP data summary for cross-channel insights
      */
-    static async getSerpSummaryForInsights(organizationId: string) {
-        const { results, scans } = await this.getRecentResults(organizationId, 20);
+    static async getSerpSummaryForInsights(organizationId: string, projectId?: string | null) {
+        const { results, scans } = await this.getRecentResults(organizationId, 20, { projectId });
 
         if (results.length === 0) {
             return null;

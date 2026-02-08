@@ -34,8 +34,9 @@ export async function GET(request: Request) {
         // Get URL params
         const { searchParams } = new URL(request.url);
         const limit = parseInt(searchParams.get('limit') || '50');
+        const projectId = searchParams.get('projectId');
 
-        const data = await SerpMonitoringEngine.getRecentResults(organizationId, limit);
+        const data = await SerpMonitoringEngine.getRecentResults(organizationId, limit, { projectId });
 
         return NextResponse.json(data);
 
@@ -88,9 +89,25 @@ export async function POST(request: Request) {
             );
         }
 
-        // Get config
+        // Parse request body
+        const body = await request.json().catch(() => ({}));
+        const dateRange = body.dateRange || 'last_week';
+        const resultType = body.resultType || 'news';
+        const projectId = body.projectId;
+        const configId = body.configId;
+
+        // Get config - prioritized by configId, then projectId, then organizationId (fallback)
         const config = await prisma.visibilityConfig.findFirst({
-            where: { organizationId }
+            where: {
+                organizationId,
+                ...(configId ? { id: configId } : {}),
+                ...(projectId ? {
+                    OR: [
+                        { projectId: projectId },
+                        { projectShares: { some: { projectId: projectId } } }
+                    ]
+                } : {})
+            }
         });
 
         if (!config) {
@@ -99,11 +116,6 @@ export async function POST(request: Request) {
                 { status: 404 }
             );
         }
-
-        // Parse request body
-        const body = await request.json().catch(() => ({}));
-        const dateRange = body.dateRange || 'last_week';
-        const resultType = body.resultType || 'news';
 
         // Run scan
         const result = await SerpMonitoringEngine.runScan(config.id, dateRange, resultType);

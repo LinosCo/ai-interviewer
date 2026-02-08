@@ -319,7 +319,10 @@ export default async function VisibilityPage({
 
                 {/* Google SERP Monitoring Tab */}
                 <TabsContent value="serp">
-                    <SerpMonitoringSection />
+                    <SerpMonitoringSection
+                        projectId={projectIdFilter !== '__ALL__' ? (projectIdFilter || config.projectId) : undefined}
+                        configId={brandIdFilter || config.id}
+                    />
                 </TabsContent>
             </Tabs>
         </div>

@@ -105,56 +105,52 @@ export function CreditsWidget() {
     };
 
     return (
-        <div className="p-4 bg-stone-50 rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-                <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm font-medium text-stone-900">Crediti AI</span>
+        <div className="p-3 bg-stone-50 rounded-lg border border-stone-100">
+            <div className="flex justify-between items-center mb-1.5">
+                <div className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    <span className="text-xs font-bold text-stone-700">Crediti AI</span>
                 </div>
-                <span className="text-xs text-stone-500">
-                    {credits.formatted.totalAvailable}
+                <span className="text-[10px] font-medium text-stone-500 bg-white px-1.5 py-0.5 rounded border border-stone-100">
+                    {credits.formatted.monthlyRemaining}
                 </span>
             </div>
 
             {/* Progress bar */}
-            <div className="h-2 bg-stone-200 rounded-full overflow-hidden mb-2">
+            <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden mb-2">
                 <div
                     className={`h-full ${getBarColor()} transition-all duration-300`}
                     style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
             </div>
 
-            {/* Stats */}
-            <div className="flex justify-between text-xs text-stone-500 mb-2">
-                <span>{credits.formatted.monthlyUsed} usati</span>
-                <span className="flex items-center gap-1">
-                    <RefreshCcw className="w-3 h-3" />
-                    {formatResetDate(credits.resetDate)}
-                </span>
-            </div>
-
             {/* Pack credits indicator */}
             {credits.packAvailable > 0 && (
-                <div className="text-xs text-amber-600 mb-2">
-                    + {credits.formatted.packAvailable} pack
+                <div className="text-[10px] text-amber-600 mb-1 flex items-center gap-1">
+                    <div className="w-1 h-1 rounded-full bg-amber-500" />
+                    + {credits.formatted.packAvailable} pack extra
                 </div>
             )}
 
             {/* CTA for low credits */}
-            {percentage >= 85 && (
-                <div className="flex gap-2 mt-3">
+            {percentage >= 85 ? (
+                <div className="flex gap-1.5 mt-2">
                     <Link
                         href="/dashboard/billing?tab=packs"
-                        className="flex-1 text-center text-xs font-medium py-2 px-3 rounded-lg bg-white border border-stone-200 text-stone-700 hover:bg-stone-50 transition-all"
+                        className="flex-1 text-center text-[10px] font-bold py-1.5 px-2 rounded-md bg-white border border-stone-200 text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-all shine-effect"
                     >
-                        Acquista pack
+                        Ricarica
                     </Link>
                     <Link
                         href="/dashboard/billing/plans"
-                        className="flex-1 text-center text-xs font-medium py-2 px-3 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-all"
+                        className="flex-1 text-center text-[10px] font-bold py-1.5 px-2 rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-all shadow-sm"
                     >
                         Upgrade
                     </Link>
+                </div>
+            ) : (
+                <div className="flex justify-between text-[10px] text-stone-400 mt-1">
+                    <span>Resettano il {formatResetDate(credits.resetDate)}</span>
                 </div>
             )}
         </div>

@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { generateObject } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
@@ -12,6 +12,7 @@ import { PLANS, PlanType, isUnlimited } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
+import { getProjectTranscriptsTool, getChatbotConversationsTool, getProjectIntegrationsTool } from '@/lib/copilot/chat-tools';
 
 export const maxDuration = 60;
 
@@ -228,23 +229,70 @@ export async function POST(req: Request) {
         };
 
         // 8. Generate response (Anthropic primary, OpenAI fallback on network failures)
-        let modelUsed = 'claude-opus-4-5-20251101';
-        let result: Awaited<ReturnType<typeof runWithAnthropic>>;
 
-        if (anthropicApiKey) {
-            try {
-                result = await runWithAnthropic(anthropicApiKey, modelUsed);
-            } catch (anthropicError) {
-                const canFallback = !!openaiApiKey && isConnectionError(anthropicError);
-                if (!canFallback) throw anthropicError;
+        const tools = {
+            getProjectTranscripts: {
+                ...getProjectTranscriptsTool,
+                execute: (args: any) => getProjectTranscriptsTool.execute({ ...args, projectId })
+            },
+            getChatbotConversations: {
+                ...getChatbotConversationsTool,
+                execute: (args: any) => getChatbotConversationsTool.execute({ ...args, projectId })
+            },
+            getProjectIntegrations: {
+                ...getProjectIntegrationsTool,
+                execute: (args: any) => getProjectIntegrationsTool.execute({ ...args, projectId })
+            },
+        };
 
-                console.warn('[Copilot] Anthropic connection error, fallback to OpenAI:', anthropicError);
-                modelUsed = 'gpt-4o-mini';
-                result = await runWithOpenAI(openaiApiKey, modelUsed);
+        const runLLM = async (provider: 'anthropic' | 'openai', model: string) => {
+            const llm = provider === 'anthropic'
+                ? createAnthropic({ apiKey: anthropicApiKey })(model)
+                : createOpenAI({ apiKey: openaiApiKey })(model);
+
+            const toolSet = hasProjectAccess && projectId ? (tools as any) : undefined;
+
+            return generateText({
+                model: llm as any,
+                system: systemPrompt + "\n\nCRITICAL: Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
+                messages: inputMessages,
+                tools: toolSet,
+                ...(toolSet ? { maxSteps: 5 } : {}),
+                temperature: 0.3
+            });
+        };
+
+        let modelUsed = 'claude-3-7-sonnet-20250219'; // Use latest sonnet for better tool use
+        let result: any;
+
+        try {
+            if (anthropicApiKey) {
+                result = await runLLM('anthropic', modelUsed);
+            } else {
+                modelUsed = 'gpt-4o';
+                result = await runLLM('openai', modelUsed);
             }
-        } else {
-            modelUsed = 'gpt-4o-mini';
-            result = await runWithOpenAI(openaiApiKey, modelUsed);
+        } catch (error) {
+            if (isConnectionError(error) && openaiApiKey) {
+                console.warn('[Copilot] Fallback to OpenAI due to connection error');
+                modelUsed = 'gpt-4o';
+                result = await runLLM('openai', modelUsed);
+            } else {
+                throw error;
+            }
+        }
+
+        // Parse JSON from result.text
+        let finalObject = { response: result.text, usedKnowledgeBase: false, suggestedFollowUp: '' };
+        try {
+            // Find JSON block if it exists
+            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                finalObject = JSON.parse(jsonMatch[0]);
+            }
+        } catch (e) {
+            console.error('[Copilot] Failed to parse JSON from LLM response:', e);
+            finalObject = { response: result.text, usedKnowledgeBase: false, suggestedFollowUp: '' };
         }
 
         // 9. Track token usage with new credits system
@@ -295,9 +343,11 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({
-            response: result.object.response,
+            response: finalObject.response,
             hasProjectAccess,
-            suggestedFollowUp: result.object.suggestedFollowUp
+            usedKnowledgeBase: finalObject.usedKnowledgeBase,
+            suggestedFollowUp: finalObject.suggestedFollowUp,
+            toolsUsed: result.steps?.flatMap((s: any) => s.toolCalls?.map((tc: any) => tc.toolName)) || []
         });
 
     } catch (error: any) {
@@ -346,6 +396,8 @@ async function buildProjectContext(project: any) {
         conversationsCount: allConversations.length,
         topThemes,
         avgSentiment: Math.round(avgSentiment * 100) / 100,
-        period: 'ultimi 30 giorni'
+        period: 'ultimi 30 giorni',
+        strategicVision: project.strategicVision,
+        valueProposition: project.valueProposition
     };
 }

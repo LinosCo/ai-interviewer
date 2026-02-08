@@ -63,7 +63,7 @@ interface SerpData {
     scans: SerpScan[];
 }
 
-export function SerpMonitoringSection() {
+export function SerpMonitoringSection({ projectId, configId }: { projectId?: string | null; configId?: string | null }) {
     const [data, setData] = useState<SerpData | null>(null);
     const [loading, setLoading] = useState(true);
     const [scanning, setScanning] = useState(false);
@@ -75,7 +75,11 @@ export function SerpMonitoringSection() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/visibility/serp');
+            const params = new URLSearchParams();
+            if (projectId) params.set('projectId', projectId);
+            if (configId) params.set('configId', configId);
+
+            const response = await fetch(`/api/visibility/serp?${params.toString()}`);
             if (!response.ok) throw new Error('Failed to fetch');
             const json = await response.json();
             setData(json);
@@ -89,7 +93,7 @@ export function SerpMonitoringSection() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [projectId, configId]);
 
     const runScan = async () => {
         try {
@@ -97,7 +101,7 @@ export function SerpMonitoringSection() {
             const response = await fetch('/api/visibility/serp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ dateRange, resultType })
+                body: JSON.stringify({ dateRange, resultType, projectId, configId })
             });
 
             if (!response.ok) {
@@ -377,8 +381,8 @@ export function SerpMonitoringSection() {
                                                                         variant="outline"
                                                                         className={
                                                                             action.priority === 'high' ? 'bg-red-50 text-red-700' :
-                                                                            action.priority === 'medium' ? 'bg-amber-50 text-amber-700' :
-                                                                            'bg-gray-50 text-gray-700'
+                                                                                action.priority === 'medium' ? 'bg-amber-50 text-amber-700' :
+                                                                                    'bg-gray-50 text-gray-700'
                                                                         }
                                                                     >
                                                                         {action.type}

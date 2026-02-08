@@ -12,7 +12,8 @@ import {
     Calendar,
     ArrowRight,
     Zap,
-    Search
+    Search,
+    Link as LinkIcon
 } from "lucide-react";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
@@ -302,8 +303,27 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             </div>
                         </CardContent>
                     </Card>
-                </div>
-            </div>
-        </div>
+
+                    <Card className="border-slate-200">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+                                <LinkIcon className="w-4 h-4 text-emerald-500" />
+                                Integrazioni
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                                Connetti questo progetto a piattaforme esterne come <strong>WordPress</strong>, <strong>WooCommerce</strong> o <strong>Google Search Console</strong>.
+                            </p>
+                            <Link href={`/dashboard/projects/${projectId}/integrations`}>
+                                <Button variant="outline" className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] font-black uppercase tracking-widest h-10 rounded-xl">
+                                    Gestisci Connessioni
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                </div >
+            </div >
+        </div >
     );
 }

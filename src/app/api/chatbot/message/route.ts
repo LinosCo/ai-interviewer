@@ -222,6 +222,7 @@ export async function POST(req: Request) {
                 enoughConversationHistory &&
                 !greetingOnly
             ) {
+                console.log('[SmartLeadGen] Evaluating for conversation:', conversationId, 'Msg count:', totalUserMessages);
                 try {
                     const smartDecision = await generateObject({
                         model: openai('gpt-4o-mini'),
@@ -243,10 +244,14 @@ Return shouldAsk=true only when it is natural.`,
                         })).concat({ role: 'user', content: message })
                     });
 
+                    console.log('[SmartLeadGen] Decision:', smartDecision.object);
                     shouldCollect = explicitIntent || !!smartDecision.object.shouldAsk;
-                } catch {
+                } catch (e) {
+                    console.error('[SmartLeadGen] Error:', e);
                     shouldCollect = false;
                 }
+            } else {
+                console.log('[SmartLeadGen] Skipped. Conditions:', { isLeadCollectionEnabled, recentlyAsked, hasNextField: !!nextMissingField, enoughConversationHistory, greetingOnly });
             }
         }
 

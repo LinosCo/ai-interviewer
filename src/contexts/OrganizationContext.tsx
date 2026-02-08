@@ -90,7 +90,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
             } else {
                 const errorData = await res.json().catch(() => ({}));
                 const errorMessage = errorData.error || `Server error: ${res.status}`;
-                console.error('Fetch organizations failed:', errorMessage);
+                console.error(`Fetch organizations failed with status: ${res.status}`, errorData);
 
                 if ((res.status === 401 || res.status === 403 || res.status >= 500)) {
                     if (retryCount < maxRetries) {

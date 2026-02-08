@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
+    console.log('[API] GET /api/organizations called');
     try {
         const session = await auth();
         if (!session?.user?.id) {

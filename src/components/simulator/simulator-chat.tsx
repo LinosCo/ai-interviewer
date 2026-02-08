@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { colors, gradients, shadows } from '@/lib/design-system';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -157,12 +157,12 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
     const progress = Math.min((effectiveDuration / 60 / (config.maxDurationMins || 10)) * 100, 95);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative" style={{ background: 'linear-gradient(135deg, #FFFBEB 0%, #FFF 100%)' }}>
+        <div className="flex flex-col h-full bg-slate-50 relative" style={{ background: gradients.soft }}>
             {/* Progress bar */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100 z-10">
                 <motion.div
                     className="h-full bg-amber-500"
-                    style={{ background: 'linear-gradient(90deg, #FBBF24, #F59E0B)' }}
+                    style={{ background: gradients.brand }}
                     initial={{ width: '0%' }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.5 }}

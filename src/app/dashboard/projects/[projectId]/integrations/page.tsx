@@ -117,6 +117,13 @@ export default function IntegrationsPage() {
           if (projectData.project?.organization) {
             setCurrentOrgId(projectData.project.organization.id);
             setCurrentOrgName(projectData.project.organization.name);
+            // Source of truth for integrations plan is the Organization
+            setUserPlan(projectData.project.organization.plan || 'FREE');
+          } else if (projectData.organization) {
+            // Some API variations return organization directly
+            setCurrentOrgId(projectData.organization.id);
+            setCurrentOrgName(projectData.organization.name);
+            setUserPlan(projectData.organization.plan || 'FREE');
           }
         }
       } catch (err) {

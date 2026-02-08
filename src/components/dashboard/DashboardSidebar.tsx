@@ -52,14 +52,14 @@ export function DashboardSidebar({
         { href: '/dashboard/settings/members', icon: Icons.Users, label: 'Team', visible: true },
         { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
         { href: '/dashboard/cms', icon: Icons.Globe, label: 'Gestione Sito', visible: hasCMSIntegration },
-        ...(activeProjectId ? [
-            {
-                href: `/dashboard/projects/${activeProjectId}/integrations`,
-                icon: Icons.Link,
-                label: 'Connessioni',
-                visible: true
-            }
-        ] : []),
+        {
+            href: activeProjectId
+                ? `/dashboard/projects/${activeProjectId}/integrations`
+                : (initialProjects?.length > 0 ? `/dashboard/projects/${initialProjects[0].id}/integrations` : '/dashboard/projects'),
+            icon: Icons.Link,
+            label: 'Connessioni',
+            visible: true
+        },
         { href: '/dashboard/templates', icon: Icons.LayoutTemplate, label: 'Template', visible: true },
     ].filter(item => item.visible);
 

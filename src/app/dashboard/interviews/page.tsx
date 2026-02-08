@@ -17,7 +17,7 @@ export default async function InterviewsPage() {
                     <p className="text-gray-500 mt-1">Gestisci le tue interviste e visualizza le risposte</p>
                 </div>
                 <Link
-                    href="/onboarding"
+                    href="/dashboard/interviews/create"
                     className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
                 >
                     <Plus className="w-5 h-5" />

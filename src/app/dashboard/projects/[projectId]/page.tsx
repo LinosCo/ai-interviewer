@@ -120,7 +120,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                                 <MessageSquare className="w-5 h-5 text-amber-500" />
                                 Interviste AI
                             </h3>
-                            <Link href={`/onboarding?projectId=${projectId}`}>
+                            <Link href={`/dashboard/interviews/create?projectId=${projectId}`}>
                                 <Button variant="ghost" size="sm" className="text-amber-600 font-bold hover:bg-amber-50 rounded-lg">
                                     <Plus className="w-4 h-4 mr-1" /> Nuova
                                 </Button>
@@ -130,7 +130,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             <Card className="border-dashed bg-slate-50/50">
                                 <CardContent className="py-10 text-center">
                                     <p className="text-sm text-slate-500 mb-4">Nessuna intervista creata in questo progetto.</p>
-                                    <Link href={`/onboarding?projectId=${projectId}`}>
+                                    <Link href={`/dashboard/interviews/create?projectId=${projectId}`}>
                                         <Button size="sm" variant="outline" className="rounded-xl font-bold">Crea la prima intervista</Button>
                                     </Link>
                                 </CardContent>

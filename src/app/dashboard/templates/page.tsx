@@ -47,7 +47,7 @@ export default function DashboardTemplatesPage() {
                                 </ul>
                             </div>
 
-                            <Link href={`/onboarding?template=${template.id}`}>
+                            <Link href={`/dashboard/interviews/create?template=${template.id}`}>
                                 <button className="w-full bg-stone-900 text-white font-bold py-3.5 rounded-xl hover:bg-amber-500 transition-all flex items-center justify-center gap-2 text-sm shadow-sm hover:shadow-amber-500/20 active:scale-95">
                                     Crea da template <Icons.ArrowRight size={16} />
                                 </button>

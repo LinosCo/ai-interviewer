@@ -373,7 +373,7 @@ export default function DashboardClient({
                     {/* Create Interview */}
                     {canCreateInterview.allowed ? (
                         <Link
-                            href="/onboarding"
+                            href="/dashboard/interviews/create"
                             className="block bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5"
                         >
                             <div className="flex items-start justify-between">

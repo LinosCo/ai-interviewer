@@ -257,8 +257,9 @@ export async function POST(req: Request) {
                 system: systemPrompt + "\n\nCRITICAL: Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
                 messages: inputMessages,
                 tools: toolSet,
-                ...(toolSet ? { maxSteps: 5 } : {}),
-                temperature: 0.3
+                ...(toolSet ? { maxSteps: 3 } : {}), // Reduced steps to prevent long execution
+                temperature: 0.3,
+                abortSignal: AbortSignal.timeout(45000) // 45s Timeout to leave buffer for Vercel 60s limit
             });
         };
 
@@ -360,39 +361,72 @@ export async function POST(req: Request) {
 }
 
 // Helper to build project context
+// Helper to build project context (Optimized)
 async function buildProjectContext(project: any) {
-    const allConversations = project.bots.flatMap((b: any) => b.conversations);
+    // Top themes query - optimized to only fetch themes and analysis
+    const bots = await prisma.bot.findMany({
+        where: { projectId: project.id },
+        select: {
+            id: true,
+            conversations: {
+                where: {
+                    startedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+                },
+                select: {
+                    analysis: {
+                        select: { sentimentScore: true }
+                    },
+                    themeOccurrences: {
+                        select: {
+                            theme: { select: { name: true } }
+                        }
+                    }
+                },
+                take: 50 // Reduced from 100 to prevent OOM
+            }
+        }
+    });
+
+    const allConversations = bots.flatMap((b: any) => b.conversations);
 
     const themes = new Map<string, { count: number; sentimentSum: number }>();
+    let totalSentiment = 0;
+    let sentimentCount = 0;
+
     allConversations.forEach((c: any) => {
+        // Calculate sentiment
+        if (c.analysis?.sentimentScore != null) {
+            totalSentiment += c.analysis.sentimentScore;
+            sentimentCount++;
+        }
+
+        // Aggregate themes
         c.themeOccurrences?.forEach((to: any) => {
-            const existing = themes.get(to.theme.name) || { count: 0, sentimentSum: 0 };
-            themes.set(to.theme.name, {
-                count: existing.count + 1,
-                sentimentSum: existing.sentimentSum + (c.analysis?.sentimentScore || 0)
-            });
+            if (to.theme?.name) {
+                const existing = themes.get(to.theme.name) || { count: 0, sentimentSum: 0 };
+                themes.set(to.theme.name, {
+                    count: existing.count + 1,
+                    sentimentSum: existing.sentimentSum + (c.analysis?.sentimentScore || 0)
+                });
+            }
         });
     });
 
     const topThemes = Array.from(themes.entries())
         .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 10)
+        .slice(0, 5) // Top 5 is enough for context
         .map(([name, data]) => ({
             name,
             count: data.count,
-            sentiment: data.count > 0 ? data.sentimentSum / data.count : 0
+            sentiment: data.count > 0 ? Math.round((data.sentimentSum / data.count) * 100) / 100 : 0
         }));
 
-    const conversationsWithAnalysis = allConversations.filter((c: any) => c.analysis?.sentimentScore != null);
-    const avgSentiment = conversationsWithAnalysis.length > 0
-        ? conversationsWithAnalysis.reduce((acc: number, c: any) =>
-            acc + c.analysis.sentimentScore, 0) / conversationsWithAnalysis.length
-        : 0;
+    const avgSentiment = sentimentCount > 0 ? totalSentiment / sentimentCount : 0;
 
     return {
         projectId: project.id,
         projectName: project.name,
-        botsCount: project.bots.length,
+        botsCount: project.bots.length, // From previous query or passed prop
         conversationsCount: allConversations.length,
         topThemes,
         avgSentiment: Math.round(avgSentiment * 100) / 100,

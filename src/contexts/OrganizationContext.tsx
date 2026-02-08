@@ -40,8 +40,8 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
 
         let scheduledRetry = false;
         try {
-            // Only set loading to true if we don't have any organizations yet
-            if (organizations.length === 0) {
+            // Only set loading to true if we don't have any organizations yet AND it's not a retry
+            if (organizations.length === 0 && retryCount === 0) {
                 setLoading(true);
             }
 
@@ -50,6 +50,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                 credentials: 'include',
                 headers: { Accept: 'application/json' }
             });
+
             if (res.ok) {
                 const data = await res.json().catch(() => null);
                 if (!data || !Array.isArray(data.organizations)) {
@@ -57,44 +58,34 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                 }
                 setOrganizations(data.organizations);
 
-                // Ripristina organizzazione selezionata
+                // Initialize selection logic
                 const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
                     document.cookie.split('; ').find(row => row.startsWith(`${COOKIE_ORG_KEY}=`))?.split('=')[1];
 
+                let targetOrg = null;
+
                 if (savedOrgId) {
-                    const savedOrg = data.organizations.find((o: Organization) => o.id === savedOrgId);
-                    if (savedOrg) {
-                        setCurrentOrganizationState(savedOrg);
-                        // Assicurati che il cookie sia sincronizzato
-                        document.cookie = `${COOKIE_ORG_KEY}=${savedOrg.id}; path=/; max-age=31536000; SameSite=Lax`;
-                    } else if (data.organizations.length > 0) {
-                        setCurrentOrganizationState(data.organizations[0]);
-                        localStorage.setItem(SELECTED_ORG_KEY, data.organizations[0].id);
-                        document.cookie = `${COOKIE_ORG_KEY}=${data.organizations[0].id}; path=/; max-age=31536000; SameSite=Lax`;
-                    }
-                } else if (data.organizations.length > 0) {
-                    setCurrentOrganizationState(data.organizations[0]);
-                    localStorage.setItem(SELECTED_ORG_KEY, data.organizations[0].id);
-                    document.cookie = `${COOKIE_ORG_KEY}=${data.organizations[0].id}; path=/; max-age=31536000; SameSite=Lax`;
+                    targetOrg = data.organizations.find((o: Organization) => o.id === savedOrgId);
+                }
+
+                if (!targetOrg && data.organizations.length > 0) {
+                    targetOrg = data.organizations[0];
+                }
+
+                if (targetOrg) {
+                    setCurrentOrganizationState(targetOrg);
+                    localStorage.setItem(SELECTED_ORG_KEY, targetOrg.id);
+                    document.cookie = `${COOKIE_ORG_KEY}=${targetOrg.id}; path=/; max-age=31536000; SameSite=Lax`;
                 }
 
                 if (data.organizations.length > 0) {
                     setRetryCount(0);
-                } else {
-                    setCurrentOrganizationState(null);
-                    if (retryCount < maxRetries) {
-                        scheduledRetry = true;
-                        const delayMs = Math.min(5000, 600 * Math.pow(1.6, retryCount));
-                        setTimeout(() => setRetryCount((count) => count + 1), delayMs);
-                        return;
-                    }
                 }
             } else {
                 if ((res.status === 401 || res.status === 403 || res.status >= 500) && retryCount < maxRetries) {
                     scheduledRetry = true;
                     const delayMs = Math.min(5000, 500 * Math.pow(2, retryCount));
                     setTimeout(() => setRetryCount((count) => count + 1), delayMs);
-                    return;
                 }
             }
         } catch (error) {
@@ -103,20 +94,16 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                 scheduledRetry = true;
                 const delayMs = Math.min(5000, 500 * Math.pow(2, retryCount));
                 setTimeout(() => setRetryCount((count) => count + 1), delayMs);
-                return;
             }
         } finally {
             if (!scheduledRetry) {
                 setLoading(false);
             }
         }
-    }, [maxRetries, retryCount, status]);
+    }, [maxRetries, retryCount, status, organizations.length]);
 
     useEffect(() => {
-        if (status === 'loading') {
-            setLoading(true);
-            return;
-        }
+        if (status === 'loading') return;
 
         if (status === 'unauthenticated') {
             setLoading(false);
@@ -126,9 +113,36 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
         }
 
         if (status === 'authenticated') {
-            fetchOrganizations();
+            // If we have initial data, use it properly first
+            if (initialData && initialData.length > 0 && organizations.length === 0) {
+                setOrganizations(initialData);
+                // Initialize selection from initial data immediately
+                const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
+                    document.cookie.split('; ').find(row => row.startsWith(`${COOKIE_ORG_KEY}=`))?.split('=')[1];
+                let targetOrg = null;
+
+                if (savedOrgId) {
+                    targetOrg = initialData.find(o => o.id === savedOrgId);
+                }
+                if (!targetOrg) {
+                    targetOrg = initialData[0];
+                }
+                if (targetOrg) {
+                    setCurrentOrganizationState(targetOrg);
+                }
+                setLoading(false);
+            } else if (organizations.length === 0) {
+                // Fetch if no data at all
+                fetchOrganizations();
+            } else if (organizations.length > 0 && !currentOrganization) {
+                // Ensure selection if data exists but selection fell through
+                const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
+                const target = organizations.find(o => o.id === savedOrgId) || organizations[0];
+                if (target) setCurrentOrganizationState(target);
+                setLoading(false);
+            }
         }
-    }, [status, retryCount, fetchOrganizations]);
+    }, [status, retryCount, fetchOrganizations, initialData, organizations.length, currentOrganization]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);

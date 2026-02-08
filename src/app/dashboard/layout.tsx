@@ -127,11 +127,6 @@ export default async function DashboardLayout({
         }
     }
 
-    const signOutAction = async () => {
-        'use server';
-        await signOut({ redirectTo: "/" });
-    };
-
     return (
         <DashboardProviders initialOrganizations={initialOrganizations} initialProjects={initialProjects}>
             <div className="flex flex-col md:flex-row h-screen overflow-hidden font-sans" style={{ background: gradients.mesh }}>
@@ -165,3 +160,8 @@ export default async function DashboardLayout({
         </DashboardProviders>
     );
 }
+
+const signOutAction = async () => {
+    'use server';
+    await signOut({ redirectTo: "/" });
+};

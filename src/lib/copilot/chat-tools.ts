@@ -18,11 +18,18 @@ export const getProjectTranscriptsTool = {
                     status: 'COMPLETED',
                 },
                 orderBy: { completedAt: 'desc' },
-                take: limit,
-                include: {
-                    analysis: true,
+                take: limit && limit > 5 ? 5 : (limit || 5), // Hard limit to 5
+                select: {
+                    id: true,
+                    completedAt: true,
+                    candidateProfile: true, // Only fetch profile needed
+                    sentimentScore: true,
+                    analysis: {
+                        select: { topicCoverage: true, keyQuotes: true } // keyQuotes instead of summary
+                    },
                     messages: {
-                        orderBy: { createdAt: 'asc' }
+                        orderBy: { createdAt: 'asc' },
+                        where: { role: { not: 'system' } } // Exclude system prompts
                     }
                 }
             });
@@ -32,18 +39,20 @@ export const getProjectTranscriptsTool = {
             }
 
             return {
-                interviews: conversations.map(c => ({
+                interviews: conversations.map((c: any) => ({
                     id: c.id,
                     candidateName: (c.candidateProfile as any)?.name || 'Anonimo',
                     date: c.completedAt,
                     sentiment: c.sentimentScore,
                     topicCoverage: c.analysis?.topicCoverage,
-                    transcript: c.messages.map(m => `${m.role}: ${m.content}`).join('\n')
+                    keyQuotes: c.analysis?.keyQuotes,
+                    transcriptPreview: c.messages.map((m: any) => `${m.role}: ${m.content}`).join('\n').substring(0, 1500) + '...'
                 }))
             };
         } catch (error: any) {
             console.error('[Copilot Tool] Error fetching transcripts:', error);
-            return { error: 'Failed to fetch transcripts', details: error.message };
+            // Return structured error instead of throwing to keep chat alive
+            return { error: 'Failed to fetch transcripts', details: 'Si è verificato un errore nel recupero delle interviste.' };
         }
     }
 };
@@ -64,12 +73,15 @@ export const getChatbotConversationsTool = {
                     }
                 },
                 orderBy: { startedAt: 'desc' },
-                take: limit,
-                include: {
-                    analysis: true,
+                take: limit && limit > 5 ? 5 : (limit || 5),
+                select: {
+                    id: true,
+                    startedAt: true,
+                    sentimentScore: true,
                     messages: {
                         orderBy: { createdAt: 'asc' },
-                        take: 20
+                        take: 20,
+                        select: { role: true, content: true }
                     }
                 }
             });
@@ -79,11 +91,11 @@ export const getChatbotConversationsTool = {
             }
 
             return {
-                conversations: conversations.map(c => ({
+                conversations: conversations.map((c: any) => ({
                     id: c.id,
                     date: c.startedAt,
                     sentiment: c.sentimentScore,
-                    messages: c.messages.map(m => ({
+                    messages: c.messages.map((m: any) => ({
                         role: m.role,
                         content: m.content
                     }))
@@ -91,7 +103,7 @@ export const getChatbotConversationsTool = {
             };
         } catch (error: any) {
             console.error('[Copilot Tool] Error fetching chatbot conversations:', error);
-            return { error: 'Failed to fetch chatbot conversations', details: error.message };
+            return { error: 'Failed to fetch chatbot conversations', details: 'Si è verificato un errore nel recupero delle conversazioni.' };
         }
     }
 };

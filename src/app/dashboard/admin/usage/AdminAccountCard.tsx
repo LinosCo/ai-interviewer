@@ -67,7 +67,7 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
 
     const sub = account.subscription;
     const planConfig = PLANS[(sub?.tier || 'FREE') as PlanType] || PLANS[PlanType.FREE];
-    const creditsLimit = Number(account.monthlyCreditsLimit);
+    const creditsLimit = account.monthlyCreditsLimit;
     const copilotAndTipsCredits = account.creditUsageByTool.copilot + account.creditUsageByTool.ai_tips;
 
     const [editLimits, setEditLimits] = useState({
@@ -75,7 +75,7 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
         extraInterviews: sub?.extraInterviews || 0,
         extraChatbotSessions: sub?.extraChatbotSessions || 0,
         plan: sub?.tier || account.plan,
-        monthlyCreditsLimit: Number(account.monthlyCreditsLimit)
+        monthlyCreditsLimit: account.monthlyCreditsLimit
     });
 
     const handleSave = async () => {
@@ -185,14 +185,14 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                     <span className="font-semibold text-violet-900">Crediti Organizzazione</span>
                 </div>
                 <UsageBar
-                    used={Number(account.monthlyCreditsUsed)}
-                    limit={Number(account.monthlyCreditsLimit)}
+                    used={account.monthlyCreditsUsed}
+                    limit={account.monthlyCreditsLimit}
                     label="Crediti Mensili"
                     color="bg-violet-500"
                 />
-                {account.packCreditsAvailable > BigInt(0) && (
+                {account.packCreditsAvailable > 0 && (
                     <p className="text-xs text-violet-600 mt-2">
-                        + {formatNumber(Number(account.packCreditsAvailable))} crediti da pack
+                        + {formatNumber(account.packCreditsAvailable)} crediti da pack
                     </p>
                 )}
                 {account.creditsResetDate && (
@@ -391,7 +391,7 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                                         />
                                     ) : (
                                         <p className="text-lg font-semibold">
-                                            {account.monthlyCreditsLimit === BigInt(-1) ? '∞' : formatNumber(Number(account.monthlyCreditsLimit))}
+                                            {account.monthlyCreditsLimit === -1 ? '∞' : formatNumber(account.monthlyCreditsLimit)}
                                         </p>
                                     )}
                                 </div>

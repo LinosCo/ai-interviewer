@@ -306,7 +306,7 @@ ${topicLines}
     static buildTopicPrompt(
         currentTopic: TopicBlock | null,
         allTopics: TopicBlock[],
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string },
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string; transitionUserMessage?: string; transitionMode?: 'bridge' | 'clean_pivot'; transitionBridgeSnippet?: string },
         bot?: any // Added for language access and fields
     ): string {
         if (!currentTopic) {
@@ -549,6 +549,9 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
                 const nextTopicObj = allTopics.find(t => t.label === nextTopicLabel) || nextTopic;
                 const firstSubGoal = nextTopicObj?.subGoals?.[0] || nextTopicLabel;
                 const transitionFocus = supervisorInsight.nextSubGoal || firstSubGoal;
+                const transitionUserMessage = supervisorInsight.transitionUserMessage || '';
+                const transitionMode = supervisorInsight.transitionMode || 'clean_pivot';
+                const transitionBridgeSnippet = supervisorInsight.transitionBridgeSnippet || '';
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
 
@@ -558,18 +561,23 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > **IL TUO COMPITO**: Transiziona a "${nextTopicLabel}" e fai la PRIMA domanda.
 >
 > **STRUTTURA OBBLIGATORIA**:
-> 1. **FRASE DI LEGATURA** (OBBLIGATORIA, max 15 parole): Riconosci l'ultimo punto dell'utente con un riferimento SPECIFICO.
->    - Esempio: "Quello che dici su [dettaglio specifico dalla risposta] è un punto importante."
-> 2. **CONNESSIONE NATURALE** al nuovo topic (opzionale, 5-10 parole)
-> 3. **UNA DOMANDA** su "${nextTopicLabel}"
+> 1. **MICRO-TRANSIZIONE NATURALE** (max 12 parole)
+> 2. **UNA DOMANDA** su "${nextTopicLabel}"
 >
 > **FOCUS DOMANDA**: ${transitionFocus}
 > **VINCOLO**: La domanda deve essere chiaramente sul topic "${nextTopicLabel}".
+${transitionUserMessage ? `> **ULTIMO MESSAGGIO UTENTE (interpretalo semanticamente, NON citarlo parola per parola)**: "${transitionUserMessage}"` : ''}
+> **SE L'UTENTE È CONFUSO**: riformula la domanda in modo semplice prima di chiedere.
+${transitionMode === 'bridge'
+    ? `> **MODALITÀ BRIDGE**: collega il passaggio in modo naturale usando un riconoscimento breve del punto utente, senza citazione letterale.`
+    : '> **MODALITÀ CLEAN PIVOT**: fai un riconoscimento breve e neutro, poi passa al nuovo topic senza riusare dettagli non pertinenti.'}
 >
 > **DIVIETI**:
 > - ❌ NON dire "Ora passiamo a..." o "Cambiamo argomento..."
 > - ❌ NON chiedere permesso ("Possiamo parlare di...?")
 > - ❌ NON concludere o chiedere contatti
+> - ❌ NON fare echo/quote letterale della risposta utente
+> - ❌ Evita pattern forzati tipo: "Hai detto X: ..."
 > - ❌ NON iniziare direttamente con la domanda senza riconoscere la risposta precedente
 > - ✅ Fai fluire la conversazione naturalmente
 ` : `
@@ -578,18 +586,23 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > **YOUR TASK**: Transition to "${nextTopicLabel}" and ask the FIRST question about it.
 >
 > **MANDATORY STRUCTURE**:
-> 1. **BRIDGING PHRASE** (REQUIRED, max 15 words): Acknowledge the user's last point with a SPECIFIC reference.
->    - Example: "What you said about [specific detail from response] is an important point."
-> 2. **NATURAL CONNECTION** to the new topic (optional, 5-10 words)
-> 3. **ONE QUESTION** about "${nextTopicLabel}"
+> 1. **NATURAL MICRO-TRANSITION** (max 12 words)
+> 2. **ONE QUESTION** about "${nextTopicLabel}"
 >
 > **QUESTION FOCUS**: ${transitionFocus}
 > **CONSTRAINT**: The question must clearly be about "${nextTopicLabel}".
+${transitionUserMessage ? `> **LATEST USER MESSAGE (interpret semantically, DO NOT quote verbatim)**: "${transitionUserMessage}"` : ''}
+> **IF USER IS CONFUSED**: rephrase simply before asking.
+${transitionMode === 'bridge'
+    ? `> **BRIDGE MODE**: connect naturally with a short acknowledgment of the user point, without literal quoting.`
+    : '> **CLEAN PIVOT MODE**: use a short neutral acknowledgment, then pivot without reusing irrelevant user details.'}
 >
 > **PROHIBITIONS**:
 > - ❌ Do NOT say "Now let's move to..." or "Let's change topic..."
 > - ❌ Do NOT ask permission ("Can we talk about...?")
 > - ❌ Do NOT conclude or ask for contacts
+> - ❌ Do NOT echo/quote the user's response verbatim
+> - ❌ Avoid rigid patterns like: "You said X: ..."
 > - ❌ Do NOT start directly with the question without acknowledging the previous response
 > - ✅ Let the conversation flow naturally
 `;
@@ -603,10 +616,11 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 >
 > **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
 > 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Inizia riconoscendo quello che l'utente ha appena detto. Cita un elemento SPECIFICO della sua risposta.
->    - Esempio: "Quello che dici sulla comunicazione è interessante, soprattutto il punto su [dettaglio specifico]."
+>    - Mantienila breve e naturale, senza copiare parola per parola.
 > 2. **UNA DOMANDA** su "${target}"
 >
 > NON saltare la frase di legatura. NON iniziare direttamente con la domanda.
+> Evita formule rigide tipo "Hai detto X: ...".
 > DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "Abbiamo finito".
 ` : `
 > [!IMPORTANT] PHASE 1: SCANNING
@@ -614,10 +628,11 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 >
 > **MANDATORY MESSAGE STRUCTURE**:
 > 1. **BRIDGING PHRASE** (REQUIRED): Start by acknowledging what the user just said. Reference a SPECIFIC element from their response.
->    - Example: "What you mentioned about communication is interesting, especially the point about [specific detail]."
+>    - Keep it short and natural; do not copy verbatim.
 > 2. **ONE QUESTION** about "${target}"
 >
 > DO NOT skip the bridging phrase. DO NOT start directly with the question.
+> Avoid rigid templates like "You said X: ...".
 > DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "We are done".
 `;
                 primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode). Remember to start with an acknowledgment of the user's previous answer.";
@@ -634,7 +649,7 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 >
 > **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
 > 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Riconosci quello che l'utente ha appena detto con una frase specifica.
->    - Cita un dettaglio concreto dalla risposta dell'utente
+>    - Cita un dettaglio concreto senza riportarlo in forma di quote/copia-incolla
 >    - Esempi: "Quello che dici su [X] mi fa pensare...", "È interessante quello che hai detto su [Y]..."
 > 2. **UNA DOMANDA** di approfondimento
 >
@@ -656,7 +671,7 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 >
 > **MANDATORY MESSAGE STRUCTURE**:
 > 1. **BRIDGING PHRASE** (REQUIRED): Acknowledge what the user just said with a specific phrase.
->    - Reference a concrete detail from the user's response
+>    - Reference a concrete detail without quoting the user verbatim
 >    - Examples: "What you said about [X] makes me think...", "It's interesting what you mentioned about [Y]..."
 > 2. **ONE QUESTION** for deeper exploration
 >
@@ -909,7 +924,7 @@ Interview time / turns limit reached or topics completed.
         currentTopic: TopicBlock | null,
         methodologyContent: string,
         effectiveDurationSeconds: number,
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string } | string,
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string; transitionUserMessage?: string; transitionMode?: 'bridge' | 'clean_pivot'; transitionBridgeSnippet?: string } | string,
         interviewPlan?: any
     ): Promise<string> {
         const persona = this.buildPersonaPrompt(bot);

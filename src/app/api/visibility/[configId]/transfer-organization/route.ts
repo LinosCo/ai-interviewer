@@ -101,9 +101,14 @@ export async function POST(
         }
 
         const updatedConfig = await prisma.$transaction(async (tx) => {
-            await tx.projectVisibilityConfig.deleteMany({
-                where: { configId: config.id }
-            });
+            try {
+                await tx.projectVisibilityConfig.deleteMany({
+                    where: { configId: config.id }
+                });
+            } catch (error: any) {
+                // Backward compatibility for instances not yet migrated with ProjectVisibilityConfig.
+                if (error?.code !== 'P2021') throw error;
+            }
 
             return tx.visibilityConfig.update({
                 where: { id: config.id },

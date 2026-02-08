@@ -29,6 +29,14 @@ const CONFIG = {
     SAFETY_MAX_TOTAL_MESSAGES: 260,
 };
 
+function isLocalSimulationRequest(req: Request): boolean {
+    const simulateHeader = req.headers.get('x-chat-simulate');
+    if (simulateHeader !== '1') return false;
+    if (process.env.NODE_ENV === 'production') return false;
+    const host = (req.headers.get('host') || '').toLowerCase();
+    return /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -59,6 +67,7 @@ interface InterviewState {
     topicSubGoalHistory?: Record<string, string[]>; // Track used sub-goals per topic
     lastUserTopicId?: string | null;
     deepLastSubGoalByTopic?: Record<string, string>;
+    clarificationTurnsByTopic?: Record<string, number>;
 }
 
 interface QualityTelemetry {
@@ -389,11 +398,117 @@ function sanitizeUserSnippet(input: string, maxWords: number = 10): string {
     return withoutPunctuation.split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ');
 }
 
+function isClarificationSignal(input: string, language: string): boolean {
+    const text = String(input || '').trim().toLowerCase();
+    if (!text) return false;
+    const isItalian = (language || 'en').toLowerCase().startsWith('it');
+    const genericPattern = /^(boh|eh|mh|hmm|\?+|ok\??)$/i;
+    if (genericPattern.test(text)) return true;
+    const itPattern = /\b(non capisco|non ho capito|non mi è chiaro|puoi chiarire|puoi spiegare meglio)\b/i;
+    const enPattern = /\b(i don't understand|i do not understand|not clear|can you clarify|can you explain)\b/i;
+    return isItalian ? itPattern.test(text) : enPattern.test(text);
+}
+
+const GENERIC_TOPIC_ANCHORS_IT = new Set([
+    'tema', 'temi', 'aspetto', 'aspetti', 'punto', 'punti',
+    'progetto', 'progetti', 'iniziativa', 'iniziative', 'azienda', 'aziende',
+    'soluzione', 'soluzioni', 'impatto', 'valore', 'processo', 'processi',
+    'sistema', 'sistemi', 'approccio', 'uso'
+]);
+
+const GENERIC_TOPIC_ANCHORS_EN = new Set([
+    'topic', 'topics', 'aspect', 'aspects', 'point', 'points',
+    'project', 'projects', 'initiative', 'initiatives', 'company', 'companies',
+    'solution', 'solutions', 'impact', 'value', 'process', 'processes',
+    'system', 'systems', 'approach', 'usage', 'use'
+]);
+
+function getGenericTopicAnchors(language: string): Set<string> {
+    return (language || 'en').toLowerCase().startsWith('it')
+        ? GENERIC_TOPIC_ANCHORS_IT
+        : GENERIC_TOPIC_ANCHORS_EN;
+}
+
+function hasMeaningfulTopicOverlap(params: {
+    userMessage?: string;
+    nextTopic: any;
+    language: string;
+}): { hasSignal: boolean; overlaps: string[] } {
+    const userMessage = String(params.userMessage || '').trim();
+    if (!userMessage || !params.nextTopic) return { hasSignal: false, overlaps: [] };
+    if (isClarificationSignal(userMessage, params.language)) return { hasSignal: false, overlaps: [] };
+
+    const genericAnchors = getGenericTopicAnchors(params.language);
+    const userAnchors = buildMessageAnchors(userMessage, params.language).anchors
+        .map(a => a.toLowerCase())
+        .filter(a => !genericAnchors.has(a));
+    const topicAnchors = buildTopicAnchors(params.nextTopic, params.language).anchors
+        .map(a => a.toLowerCase())
+        .filter(a => !genericAnchors.has(a));
+
+    const overlapSet = new Set<string>();
+    for (const u of userAnchors) {
+        for (const t of topicAnchors) {
+            if (u === t) {
+                overlapSet.add(u);
+                continue;
+            }
+            if (u.length >= 8 && t.length >= 8) {
+                if (u.startsWith(t.slice(0, 8)) || t.startsWith(u.slice(0, 8))) {
+                    overlapSet.add(u.length <= t.length ? u : t);
+                }
+            }
+        }
+    }
+
+    if (overlapSet.size > 0) {
+        return { hasSignal: true, overlaps: Array.from(overlapSet) };
+    }
+
+    const labelTokens = String(params.nextTopic.label || '')
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .filter(token => token.length >= 4 && !genericAnchors.has(token));
+    const lowerUser = userMessage.toLowerCase();
+    const labelHits = labelTokens.filter(token => lowerUser.includes(token));
+    if (labelHits.length > 0) {
+        return { hasSignal: true, overlaps: labelHits };
+    }
+
+    return { hasSignal: false, overlaps: [] };
+}
+
+function isUsableBridgeSnippet(snippet: string, language: string): boolean {
+    const clean = String(snippet || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return false;
+    if (isClarificationSignal(clean, language)) return false;
+
+    const words = clean.split(/\s+/).filter(Boolean);
+    if (words.length < 3) return false;
+
+    const isItalian = (language || 'en').toLowerCase().startsWith('it');
+    const lowSignalPattern = isItalian
+        ? /\b(te l[’']?ho gi[aà] detto|non capisco|preferisco non dirlo|boh|ok|s[iì]|no)\b/i
+        : /\b(i already told you|i don.t understand|prefer not to say|ok|yes|no)\b/i;
+    return !lowSignalPattern.test(clean);
+}
+
+function stableTemplateIndex(seed: string, length: number): number {
+    if (length <= 1) return 0;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash) % length;
+}
+
 function buildDeterministicQualityQuestion(params: {
     phase: 'SCAN' | 'DEEP' | 'DEEP_OFFER';
     language: string;
     topicLabel: string;
     userResponse: string;
+    transitionMode?: 'bridge' | 'clean_pivot';
+    transitionBridgeSnippet?: string;
 }): string {
     const isItalian = (params.language || 'en').toLowerCase().startsWith('it');
     if (params.phase === 'DEEP_OFFER') {
@@ -403,20 +518,62 @@ function buildDeterministicQualityQuestion(params: {
     }
 
     const topic = (params.topicLabel || '').trim() || (isItalian ? 'questo tema' : 'this topic');
-    const snippet = sanitizeUserSnippet(params.userResponse);
-    const userWordCount = sanitizeUserSnippet(params.userResponse, 50).split(/\s+/).filter(Boolean).length;
-    const shortAnswer = userWordCount <= 4;
-    const safeSnippet = snippet || (isItalian ? 'quello che hai appena condiviso' : 'what you just shared');
-
-    if (isItalian) {
-        return shortAnswer
-            ? `Hai detto "${safeSnippet}": puoi farmi un esempio concreto di come questo aspetto incide su ${topic}?`
-            : `Hai menzionato "${safeSnippet}": qual e l'impatto piu significativo che ha su ${topic}?`;
+    if (isClarificationSignal(params.userResponse, params.language)) {
+        return isItalian
+            ? `Certo, la riformulo in modo semplice: rispetto a ${topic}, qual è l'aspetto più importante per te?`
+            : `Sure, let me rephrase simply: regarding ${topic}, what matters most to you?`;
     }
 
-    return shortAnswer
-        ? `You said "${safeSnippet}": can you share one concrete example of how this affects ${topic}?`
-        : `You mentioned "${safeSnippet}": what is the most significant impact this has on ${topic}?`;
+    if (params.transitionMode === 'bridge') {
+        const bridgeSnippetRaw = (params.transitionBridgeSnippet || sanitizeUserSnippet(params.userResponse, 7)).trim();
+        const bridgeSnippet = isUsableBridgeSnippet(bridgeSnippetRaw, params.language) ? bridgeSnippetRaw : '';
+        if (isItalian) {
+            return bridgeSnippet
+                ? `Interessante il punto su ${bridgeSnippet}. Riguardo a ${topic}, quale aspetto ti interessa di più?`
+                : `Interessante il tuo punto. Riguardo a ${topic}, qual è la tua prospettiva?`;
+        }
+        return bridgeSnippet
+            ? `Interesting point about ${bridgeSnippet}. Regarding ${topic}, which aspect matters most to you?`
+            : `Interesting point. Regarding ${topic}, what is your perspective?`;
+    }
+
+    if (params.transitionMode === 'clean_pivot') {
+        return isItalian
+            ? `Capisco. Riguardo a ${topic}, quale aspetto ritieni più rilevante?`
+            : `I see. Regarding ${topic}, which aspect do you consider most relevant?`;
+    }
+
+    const userWordCount = sanitizeUserSnippet(params.userResponse, 50).split(/\s+/).filter(Boolean).length;
+    const shortAnswer = userWordCount <= 4;
+    const seed = `${params.phase}|${topic}|${params.userResponse || ''}|${params.transitionMode || ''}`;
+
+    if (isItalian) {
+        const shortTemplates = [
+            `Capisco. Su ${topic}, puoi farmi un esempio concreto?`,
+            `Grazie, è utile. Su ${topic}, puoi raccontarmi un caso reale?`,
+            `Chiaro. Restando su ${topic}, quale esempio pratico ti viene in mente?`
+        ];
+        const longTemplates = [
+            `Rispetto a ${topic}, qual è per te l'impatto più significativo?`,
+            `Su ${topic}, qual è l'elemento che incide di più nella tua esperienza?`,
+            `Guardando a ${topic}, quale aspetto ritieni davvero decisivo?`
+        ];
+        const templates = shortAnswer ? shortTemplates : longTemplates;
+        return templates[stableTemplateIndex(seed, templates.length)];
+    }
+
+    const shortTemplates = [
+        `I see. On ${topic}, can you share one concrete example?`,
+        `Thanks, that helps. On ${topic}, can you describe a real case?`,
+        `Got it. Staying on ${topic}, what practical example comes to mind?`
+    ];
+    const longTemplates = [
+        `Regarding ${topic}, what is the most significant impact from your perspective?`,
+        `On ${topic}, what element has the strongest effect in your experience?`,
+        `Looking at ${topic}, which aspect feels most decisive to you?`
+    ];
+    const templates = shortAnswer ? shortTemplates : longTemplates;
+    return templates[stableTemplateIndex(seed, templates.length)];
 }
 
 // ============================================================================
@@ -426,7 +583,8 @@ async function completeInterview(
     conversationId: string,
     messages: any[],
     apiKey: string,
-    existingProfile: any
+    existingProfile: any,
+    options?: { simulationMode?: boolean }
 ): Promise<void> {
     // Run profile extraction and completion marking in PARALLEL
     // This saves time by not waiting for one before starting the other
@@ -441,8 +599,14 @@ async function completeInterview(
                 return null;
             }
         })(),
-        // Mark interview as completed (fast DB call)
-        ChatService.completeInterview(conversationId)
+        // Mark interview as completed.
+        // In local simulation mode, skip usage counters/credits side effects.
+        options?.simulationMode
+            ? prisma.conversation.update({
+                where: { id: conversationId },
+                data: { status: 'COMPLETED', completedAt: new Date() }
+            })
+            : ChatService.completeInterview(conversationId)
     ]);
 
     // Save extracted profile if available
@@ -462,6 +626,7 @@ async function completeInterview(
 export async function POST(req: Request) {
     const startTime = Date.now();
     try {
+        const simulationMode = isLocalSimulationRequest(req);
         const body = await req.json();
         const parsedBody = ChatRequestSchema.safeParse(body);
         if (!parsedBody.success) {
@@ -480,6 +645,9 @@ export async function POST(req: Request) {
             clientMessageId
         } = parsedBody.data;
         console.log(`\n🚀 [CHAT_API] Processing message for conversation: ${conversationId}`);
+        if (simulationMode) {
+            console.log('🧪 [CHAT_API] Local simulation mode enabled (credits and usage side effects disabled).');
+        }
 
         // ====================================================================
         // 1. LOAD DATA (with parallel operations for speed)
@@ -515,22 +683,24 @@ export async function POST(req: Request) {
             }
         }
 
-        const creditsCheck = await checkCreditsForAction(
-            'interview_question',
-            undefined,
-            (bot as any).project?.id,
-            (bot as any).project?.organization?.id
-        );
-        if (!creditsCheck.allowed) {
-            return Response.json(
-                {
-                    code: (creditsCheck as any).code || 'ACCESS_DENIED',
-                    error: creditsCheck.error,
-                    creditsNeeded: creditsCheck.creditsNeeded,
-                    creditsAvailable: creditsCheck.creditsAvailable
-                },
-                { status: creditsCheck.status || 403 }
+        if (!simulationMode) {
+            const creditsCheck = await checkCreditsForAction(
+                'interview_question',
+                undefined,
+                (bot as any).project?.id,
+                (bot as any).project?.organization?.id
             );
+            if (!creditsCheck.allowed) {
+                return Response.json(
+                    {
+                        code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                        error: creditsCheck.error,
+                        creditsNeeded: creditsCheck.creditsNeeded,
+                        creditsAvailable: creditsCheck.creditsAvailable
+                    },
+                    { status: creditsCheck.status || 403 }
+                );
+            }
         }
 
         // Run these operations in parallel - they don't depend on each other
@@ -614,7 +784,13 @@ export async function POST(req: Request) {
                 ? 'Per sicurezza concludo qui l’intervista. Grazie per il contributo: le informazioni raccolte sono già molto utili.'
                 : 'For safety, I will conclude the interview here. Thank you: the information collected is already very useful.';
 
-            await completeInterview(conversationId, canonicalMessages, openAIKey, conversation.candidateProfile || {});
+            await completeInterview(
+                conversationId,
+                canonicalMessages,
+                openAIKey,
+                conversation.candidateProfile || {},
+                { simulationMode }
+            );
             await prisma.message.create({
                 data: {
                     conversationId,
@@ -671,6 +847,7 @@ export async function POST(req: Request) {
             lastUserTopicId: rawMetadata.lastUserTopicId ?? null,
             deepLastSubGoalByTopic: rawMetadata.deepLastSubGoalByTopic ?? {},
             forceConsentQuestion: rawMetadata.forceConsentQuestion ?? false,
+            clarificationTurnsByTopic: rawMetadata.clarificationTurnsByTopic ?? {},
         };
 
         const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -725,6 +902,24 @@ export async function POST(req: Request) {
                 });
                 // Check if we should transition to next topic (use dynamic budget)
                 if (state.turnInTopic >= scanMaxTurns) {
+                    const shouldClarifyBeforeTransition =
+                        lastMessage?.role === 'user' &&
+                        isClarificationSignal(lastMessage.content, language) &&
+                        ((state.clarificationTurnsByTopic || {})[currentTopic.id] || 0) < 1;
+
+                    if (shouldClarifyBeforeTransition) {
+                        const usedSubGoals = (state.topicSubGoalHistory || {})[currentTopic.id] || [];
+                        const availableSubGoals = (currentTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
+                        const clarifySubGoal = availableSubGoals[0] || currentTopic.label;
+                        nextState.clarificationTurnsByTopic = {
+                            ...(state.clarificationTurnsByTopic || {}),
+                            [currentTopic.id]: ((state.clarificationTurnsByTopic || {})[currentTopic.id] || 0) + 1
+                        };
+                        nextState.turnInTopic = state.turnInTopic;
+                        supervisorInsight = { status: 'SCANNING', nextSubGoal: clarifySubGoal };
+                        console.log(`🧩 [SCAN] Clarification detected on "${currentTopic.label}". Adding one clarification turn before transition.`);
+                        // Keep current topic for one extra clarification question.
+                    } else {
                     // Move to next topic
                     if (state.topicIndex + 1 < numTopics) {
                         nextState.topicIndex = state.topicIndex + 1;
@@ -734,10 +929,33 @@ export async function POST(req: Request) {
                         console.log(`➡️ [SCAN] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
                         const nextTopic = botTopics[nextState.topicIndex];
                         const nextAvailableSubGoals = getRemainingSubGoals(nextTopic, state.topicSubGoalHistory);
+                        const transitionUserMessage = lastMessage?.role === 'user'
+                            ? String(lastMessage.content || '').slice(0, 300)
+                            : undefined;
+                        const transitionWordCount = transitionUserMessage
+                            ? transitionUserMessage.split(/\s+/).filter(Boolean).length
+                            : 0;
+                        const overlap = hasMeaningfulTopicOverlap({
+                            userMessage: transitionUserMessage,
+                            nextTopic,
+                            language
+                        });
+                        const userTouchesNextTopic = overlap.hasSignal;
+                        const transitionMode = (userTouchesNextTopic && transitionWordCount >= 5) ? 'bridge' : 'clean_pivot';
+                        const transitionSnippetCandidate = transitionUserMessage
+                            ? sanitizeUserSnippet(transitionUserMessage, 7)
+                            : '';
+                        const transitionBridgeSnippet = transitionMode === 'bridge' && isUsableBridgeSnippet(transitionSnippetCandidate, language)
+                            ? transitionSnippetCandidate
+                            : undefined;
+                        console.log(`🧭 [TRANSITION] mode=${transitionMode} userTouchesNextTopic=${userTouchesNextTopic} words=${transitionWordCount} overlaps=${overlap.overlaps.join('|') || '-'}`);
                         supervisorInsight = {
                             status: 'TRANSITION',
                             nextTopic: nextTopic.label,
-                            nextSubGoal: nextAvailableSubGoals[0] || nextTopic.label
+                            nextSubGoal: nextAvailableSubGoals[0] || nextTopic.label,
+                            transitionUserMessage,
+                            transitionMode,
+                            transitionBridgeSnippet
                         };
                     } else {
                         // End of SCAN: go directly to DEEP if there is still time.
@@ -764,6 +982,7 @@ export async function POST(req: Request) {
                             supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                             console.log(`🎁 [SCAN→DEEP_OFFER] SCAN complete with no time left. Asking continuation consent.`);
                         }
+                    }
                     }
                 } else {
                     // Continue SCAN on current topic
@@ -919,10 +1138,33 @@ export async function POST(req: Request) {
                         console.log(`➡️ [DEEP] Topic transition: ${deepCurrent.label} → ${deepTopics[nextState.topicIndex]?.label || botTopics[nextState.topicIndex]?.label}`);
                         const nextDeepTopic = deepTopics[nextState.topicIndex] || botTopics[nextState.topicIndex];
                         const nextAvailableSubGoals = nextDeepTopic ? getRemainingSubGoals(nextDeepTopic, nextState.topicSubGoalHistory || state.topicSubGoalHistory) : [];
+                        const transitionUserMessage = lastMessage?.role === 'user'
+                            ? String(lastMessage.content || '').slice(0, 300)
+                            : undefined;
+                        const transitionWordCount = transitionUserMessage
+                            ? transitionUserMessage.split(/\s+/).filter(Boolean).length
+                            : 0;
+                        const overlap = hasMeaningfulTopicOverlap({
+                            userMessage: transitionUserMessage,
+                            nextTopic: nextDeepTopic,
+                            language
+                        });
+                        const userTouchesNextTopic = overlap.hasSignal;
+                        const transitionMode = (userTouchesNextTopic && transitionWordCount >= 5) ? 'bridge' : 'clean_pivot';
+                        const transitionSnippetCandidate = transitionUserMessage
+                            ? sanitizeUserSnippet(transitionUserMessage, 7)
+                            : '';
+                        const transitionBridgeSnippet = transitionMode === 'bridge' && isUsableBridgeSnippet(transitionSnippetCandidate, language)
+                            ? transitionSnippetCandidate
+                            : undefined;
+                        console.log(`🧭 [TRANSITION] mode=${transitionMode} userTouchesNextTopic=${userTouchesNextTopic} words=${transitionWordCount} overlaps=${overlap.overlaps.join('|') || '-'}`);
                         supervisorInsight = {
                             status: 'TRANSITION',
                             nextTopic: nextDeepTopic?.label || botTopics[nextState.topicIndex]?.label,
-                            nextSubGoal: nextAvailableSubGoals[0] || nextDeepTopic?.label
+                            nextSubGoal: nextAvailableSubGoals[0] || nextDeepTopic?.label,
+                            transitionUserMessage,
+                            transitionMode,
+                            transitionBridgeSnippet
                         };
                     } else {
                         // End of DEEP - ALL topics done, move to DATA_COLLECTION
@@ -981,12 +1223,24 @@ export async function POST(req: Request) {
 
                 // Anti-loop protection
                 if (state.dataCollectionAttempts >= CONFIG.MAX_DATA_COLLECTION_ATTEMPTS) {
-                    await completeInterview(conversationId, canonicalMessages, openAIKey, conversation.candidateProfile || {});
+                    await completeInterview(
+                        conversationId,
+                        canonicalMessages,
+                        openAIKey,
+                        conversation.candidateProfile || {},
+                        { simulationMode }
+                    );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                 }
 
                 if (state.dataCollectionRefused) {
-                    await completeInterview(conversationId, canonicalMessages, openAIKey, conversation.candidateProfile || {});
+                    await completeInterview(
+                        conversationId,
+                        canonicalMessages,
+                        openAIKey,
+                        conversation.candidateProfile || {},
+                        { simulationMode }
+                    );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                     nextState.dataCollectionRefused = true;
                 }
@@ -1018,7 +1272,13 @@ export async function POST(req: Request) {
                         // Don't set supervisorInsight here - let it fall through to ask first field
                     } else if (intent === 'REFUSE') {
                         console.log(`📋 [DATA_COLLECTION] User refused consent.`);
-                        await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfile);
+                        await completeInterview(
+                            conversationId,
+                            canonicalMessages,
+                            openAIKey,
+                            currentProfile,
+                            { simulationMode }
+                        );
                         // Set status for AI to say goodbye
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         nextState.dataCollectionAttempts = CONFIG.MAX_DATA_COLLECTION_ATTEMPTS;
@@ -1051,7 +1311,13 @@ export async function POST(req: Request) {
 
                     if (lastMessage?.role === 'user' && refusalPattern.test(lastMessage.content)) {
                         console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
-                        await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfile);
+                        await completeInterview(
+                            conversationId,
+                            canonicalMessages,
+                            openAIKey,
+                            currentProfile,
+                            { simulationMode }
+                        );
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         nextState.dataCollectionRefused = true;
                         haltCollection = true;
@@ -1094,7 +1360,13 @@ export async function POST(req: Request) {
                         }
 
                         // Complete with what we have
-                        await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfile);
+                        await completeInterview(
+                            conversationId,
+                            canonicalMessages,
+                            openAIKey,
+                            currentProfile,
+                            { simulationMode }
+                        );
                         supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         haltCollection = true;
                     }
@@ -1435,7 +1707,7 @@ hard_rules:
         // Track token usage - NUOVO: usa userId (owner del progetto) per il sistema crediti
         const organizationId = (bot as any).project?.organization?.id;
         const projectOwnerId = (bot as any).project?.ownerId;
-        if (projectOwnerId && result.usage) {
+        if (!simulationMode && projectOwnerId && result.usage) {
             try {
                 await TokenTrackingService.logTokenUsage({
                     userId: projectOwnerId,
@@ -1718,6 +1990,7 @@ hard_rules:
             const phaseForQuality = nextState.phase as 'SCAN' | 'DEEP' | 'DEEP_OFFER';
             const isTopicPhaseForQuality = phaseForQuality === 'SCAN' || phaseForQuality === 'DEEP';
             const isDeepOfferPhaseForQuality = phaseForQuality === 'DEEP_OFFER';
+            const isTransitioningTopicQuestion = isTopicPhaseForQuality && supervisorInsight?.status === 'TRANSITION';
             const qualityTopicLabel = targetTopic?.label || currentTopic?.label || 'current topic';
             const userSnippet = String(lastMessage.content || '').trim().slice(0, 200);
             const userWordCount = userSnippet.split(/\s+/).filter(Boolean).length;
@@ -1732,7 +2005,9 @@ hard_rules:
                 (isTopicPhaseForQuality && !qualitativeResult.checks.referencesUserContext) ||
                 (isTopicPhaseForQuality && !qualitativeResult.checks.topicalAnchor) ||
                 (isTopicPhaseForQuality && !qualitativeResult.checks.nonRepetitive) ||
-                (isTopicPhaseForQuality && !qualitativeResult.checks.probingWhenUserIsBrief) ||
+                (isTopicPhaseForQuality && !isTransitioningTopicQuestion && !qualitativeResult.checks.probingWhenUserIsBrief) ||
+                (isTopicPhaseForQuality && !qualitativeResult.checks.coherentTransition) ||
+                (isTopicPhaseForQuality && !qualitativeResult.checks.handlesClarificationNaturally) ||
                 (isDeepOfferPhaseForQuality && !qualitativeResult.checks.deepOfferIntent)
             );
 
@@ -1755,6 +2030,13 @@ hard_rules:
 - Ask ONLY if the user has a bit more time to continue.
 - Ask exactly ONE yes/no question.
 - Do NOT ask topic questions, contacts, or goodbye.`
+                    : isTransitioningTopicQuestion
+                        ? `CRITICAL QUALITY FIX:
+- Keep transition natural and concise.
+- Start with a short acknowledgment of the previous reply (no literal quote).
+- Then pivot to "${qualityTopicLabel}" with one clear question.
+- If transition mode is clean_pivot, do not paraphrase user content in detail.
+- Ask exactly ONE question, no contacts, no closure.`
                     : `CRITICAL QUALITY FIX:
 - Start with a brief acknowledgment tied to this user message: "${userSnippet}".
 - Ask exactly ONE question about "${qualityTopicLabel}".
@@ -1790,7 +2072,13 @@ ${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up an
                         phase: phaseForQuality,
                         language,
                         topicLabel: qualityTopicLabel,
-                        userResponse: lastMessage.content
+                        userResponse: lastMessage.content,
+                        transitionMode: isTransitioningTopicQuestion
+                            ? (supervisorInsight?.transitionMode as 'bridge' | 'clean_pivot' | undefined)
+                            : undefined,
+                        transitionBridgeSnippet: isTransitioningTopicQuestion
+                            ? (supervisorInsight?.transitionBridgeSnippet as string | undefined)
+                            : undefined
                     });
                     qualityTelemetry.fallbackUsed = true;
                     console.log('⚠️ [SUPERVISOR] Applied deterministic quality fallback question.');
@@ -1864,9 +2152,12 @@ ${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up an
                 ...(clientMessageId ? { replyToClientMessageId: clientMessageId } : {}),
                 phase: nextState.phase,
                 supervisorStatus: supervisorInsight?.status ?? null,
+                topicLabel: targetTopic?.label || currentTopic.label,
+                topicId: targetTopic?.id || currentTopic.id,
                 quality: qualityTelemetry as unknown as Prisma.InputJsonValue,
                 flowFlags: flowTelemetry as unknown as Prisma.InputJsonValue,
                 responseLatencyMs: Date.now() - startTime,
+                simulationMode,
                 ...(isCompletion ? { isCompletion: true } : {})
             };
         };
@@ -1924,7 +2215,13 @@ ${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up an
                 }
             } else {
                 // Actually complete
-                await completeInterview(conversationId, canonicalMessages, openAIKey, currentProfileForCompletion || {});
+                await completeInterview(
+                    conversationId,
+                    canonicalMessages,
+                    openAIKey,
+                    currentProfileForCompletion || {},
+                    { simulationMode }
+                );
                 const finalResponseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
                 await prisma.message.create({
                     data: {

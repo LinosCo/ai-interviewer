@@ -89,12 +89,24 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
 
     // Notify parent window of resize
     useEffect(() => {
-        if (window.parent !== window) {
+        if (window.parent === window) return;
+
+        const notifyResize = () => {
             window.parent.postMessage({
                 type: 'bt-widget-resize',
-                isOpen: isOpen
+                isOpen
             }, '*');
-        }
+        };
+
+        // Send immediately and repeat briefly to avoid missed first handshake.
+        notifyResize();
+        const t1 = window.setTimeout(notifyResize, 120);
+        const t2 = window.setTimeout(notifyResize, 420);
+
+        return () => {
+            window.clearTimeout(t1);
+            window.clearTimeout(t2);
+        };
     }, [isOpen]);
 
     if (loading) return null;

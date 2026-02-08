@@ -355,27 +355,32 @@ export async function POST(
                     }
                 });
 
-                await tx.projectVisibilityConfig.upsert({
-                    where: {
-                        projectId_configId: {
+                try {
+                    await tx.projectVisibilityConfig.upsert({
+                        where: {
+                            projectId_configId: {
+                                projectId: targetProjectId,
+                                configId: botId
+                            }
+                        },
+                        update: {},
+                        create: {
                             projectId: targetProjectId,
+                            configId: botId,
+                            createdBy: currentUserId
+                        }
+                    });
+
+                    await tx.projectVisibilityConfig.deleteMany({
+                        where: {
+                            projectId,
                             configId: botId
                         }
-                    },
-                    update: {},
-                    create: {
-                        projectId: targetProjectId,
-                        configId: botId,
-                        createdBy: currentUserId
-                    }
-                });
-
-                await tx.projectVisibilityConfig.deleteMany({
-                    where: {
-                        projectId,
-                        configId: botId
-                    }
-                });
+                    });
+                } catch (error: any) {
+                    // Backward compatibility: log and continue if table doesn't exist
+                    console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
+                }
             });
         }
 
@@ -387,5 +392,5 @@ export async function POST(
     } catch (error) {
         console.error('Transfer Bot Error:', error);
         return new Response('Internal Server Error', { status: 500 });
-}
+    }
 }

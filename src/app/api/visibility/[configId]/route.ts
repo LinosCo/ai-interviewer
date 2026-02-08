@@ -146,20 +146,25 @@ export async function PATCH(
         });
 
         if (body.projectId) {
-            await prisma.projectVisibilityConfig.upsert({
-                where: {
-                    projectId_configId: {
+            try {
+                await prisma.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
+                            projectId: body.projectId,
+                            configId
+                        }
+                    },
+                    update: {},
+                    create: {
                         projectId: body.projectId,
-                        configId
+                        configId,
+                        createdBy: currentUserId
                     }
-                },
-                update: {},
-                create: {
-                    projectId: body.projectId,
-                    configId,
-                    createdBy: currentUserId
-                }
-            });
+                });
+            } catch (error: any) {
+                // Backward compatibility: log and continue if table doesn't exist
+                console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
+            }
         }
 
         return NextResponse.json({

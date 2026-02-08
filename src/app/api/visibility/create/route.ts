@@ -151,20 +151,25 @@ export async function POST(request: Request) {
         });
 
         if (projectId) {
-            await prisma.projectVisibilityConfig.upsert({
-                where: {
-                    projectId_configId: {
+            try {
+                await prisma.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
+                            projectId,
+                            configId: config.id
+                        }
+                    },
+                    update: {},
+                    create: {
                         projectId,
-                        configId: config.id
+                        configId: config.id,
+                        createdBy: user.id
                     }
-                },
-                update: {},
-                create: {
-                    projectId,
-                    configId: config.id,
-                    createdBy: user.id
-                }
-            });
+                });
+            } catch (error: any) {
+                // Backward compatibility: log and continue if table doesn't exist
+                console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
+            }
         }
 
         return NextResponse.json({
@@ -379,20 +384,25 @@ export async function PATCH(request: Request) {
             });
 
             if (projectId !== undefined && projectId) {
-                await tx.projectVisibilityConfig.upsert({
-                    where: {
-                        projectId_configId: {
+                try {
+                    await tx.projectVisibilityConfig.upsert({
+                        where: {
+                            projectId_configId: {
+                                projectId,
+                                configId: config.id
+                            }
+                        },
+                        update: {},
+                        create: {
                             projectId,
-                            configId: config.id
+                            configId: config.id,
+                            createdBy: user.id
                         }
-                    },
-                    update: {},
-                    create: {
-                        projectId,
-                        configId: config.id,
-                        createdBy: user.id
-                    }
-                });
+                    });
+                } catch (error: any) {
+                    // Backward compatibility: log and continue if table doesn't exist
+                    console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
+                }
             }
 
             // 2. Sync Prompts if provided

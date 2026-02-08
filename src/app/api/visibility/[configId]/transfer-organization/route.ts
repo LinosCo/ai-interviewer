@@ -106,8 +106,9 @@ export async function POST(
                     where: { configId: config.id }
                 });
             } catch (error: any) {
-                // Backward compatibility for instances not yet migrated with ProjectVisibilityConfig.
-                if (error?.code !== 'P2021') throw error;
+                // Backward compatibility: log and continue if table doesn't exist or other errors occur
+                console.warn('Error deleting projectVisibilityConfig entries:', error?.code, error?.message);
+                // Don't throw - we want the transaction to continue
             }
 
             return tx.visibilityConfig.update({

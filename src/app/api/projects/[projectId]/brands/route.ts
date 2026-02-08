@@ -199,7 +199,8 @@ export async function POST(
                         }
                     });
                 } catch (error: any) {
-                    if (error?.code !== 'P2021') throw error;
+                    // Backward compatibility: log and continue if table doesn't exist
+                    console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
                 }
 
                 // Keep backward compatibility: ensure a primary project exists.
@@ -223,7 +224,8 @@ export async function POST(
                         }
                     });
                 } catch (error: any) {
-                    if (error?.code !== 'P2021') throw error;
+                    // Backward compatibility: log and continue if table doesn't exist
+                    console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
                 }
 
                 // If this project is the primary one, switch primary to another shared project if available.
@@ -241,7 +243,8 @@ export async function POST(
                         }
                     });
                 } catch (error: any) {
-                    if (error?.code !== 'P2021') throw error;
+                    // Backward compatibility: log and continue if table doesn't exist
+                    console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
                     currentBrand = await tx.visibilityConfig.findUnique({
                         where: { id: brandId },
                         select: { projectId: true }

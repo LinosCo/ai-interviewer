@@ -8,9 +8,9 @@ export interface AccountData {
     id: string;
     name: string;
     plan: string;
-    monthlyCreditsLimit: bigint;
-    monthlyCreditsUsed: bigint;
-    packCreditsAvailable: bigint;
+    monthlyCreditsLimit: number;
+    monthlyCreditsUsed: number;
+    packCreditsAvailable: number;
     creditsResetDate: Date | null;
     owner: { id: string; name: string | null; email: string } | null;
     subscription: {
@@ -58,6 +58,18 @@ interface CreditUsageByTool {
     export: number;
     other: number;
     total: number;
+}
+
+function toSafeNumber(value: unknown): number {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'bigint') return Number(value);
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+    if (value == null) return 0;
+    const parsed = Number(value as any);
+    return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export default async function AdminUsagePage() {
@@ -162,12 +174,29 @@ export default async function AdminUsagePage() {
             id: org.id,
             name: org.name,
             plan: org.plan || 'FREE',
-            monthlyCreditsLimit: org.monthlyCreditsLimit,
-            monthlyCreditsUsed: org.monthlyCreditsUsed,
-            packCreditsAvailable: org.packCreditsAvailable,
+            monthlyCreditsLimit: Number(org.monthlyCreditsLimit),
+            monthlyCreditsUsed: Number(org.monthlyCreditsUsed),
+            packCreditsAvailable: Number(org.packCreditsAvailable),
             creditsResetDate: org.creditsResetDate,
             owner,
-            subscription: org.subscription,
+            subscription: org.subscription ? {
+                id: org.subscription.id,
+                tier: org.subscription.tier,
+                status: org.subscription.status,
+                tokensUsedThisMonth: toSafeNumber((org.subscription as any).tokensUsedThisMonth),
+                interviewsUsedThisMonth: toSafeNumber((org.subscription as any).interviewsUsedThisMonth),
+                chatbotSessionsUsedThisMonth: toSafeNumber((org.subscription as any).chatbotSessionsUsedThisMonth),
+                visibilityQueriesUsedThisMonth: toSafeNumber((org.subscription as any).visibilityQueriesUsedThisMonth),
+                interviewTokensUsed: toSafeNumber((org.subscription as any).interviewTokensUsed),
+                chatbotTokensUsed: toSafeNumber((org.subscription as any).chatbotTokensUsed),
+                visibilityTokensUsed: toSafeNumber((org.subscription as any).visibilityTokensUsed),
+                suggestionTokensUsed: toSafeNumber((org.subscription as any).suggestionTokensUsed),
+                systemTokensUsed: toSafeNumber((org.subscription as any).systemTokensUsed),
+                extraTokens: toSafeNumber((org.subscription as any).extraTokens),
+                extraInterviews: toSafeNumber((org.subscription as any).extraInterviews),
+                extraChatbotSessions: toSafeNumber((org.subscription as any).extraChatbotSessions),
+                currentPeriodEnd: org.subscription.currentPeriodEnd
+            } : null,
             projects: org.projects.map(p => ({
                 id: p.id,
                 name: p.name,

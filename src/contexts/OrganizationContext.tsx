@@ -31,7 +31,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [retryCount, setRetryCount] = useState(0);
-    const maxRetries = 6;
+    const maxRetries = 8;
 
     const fetchOrganizations = useCallback(async () => {
         if (status !== 'authenticated') {
@@ -78,6 +78,12 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
                     setRetryCount(0);
                 } else {
                     setCurrentOrganizationState(null);
+                    if (retryCount < maxRetries) {
+                        scheduledRetry = true;
+                        const delayMs = Math.min(5000, 600 * Math.pow(1.6, retryCount));
+                        setTimeout(() => setRetryCount((count) => count + 1), delayMs);
+                        return;
+                    }
                 }
             } else {
                 if ((res.status === 401 || res.status === 403 || res.status >= 500) && retryCount < maxRetries) {

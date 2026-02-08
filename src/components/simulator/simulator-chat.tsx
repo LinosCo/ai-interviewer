@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { colors, gradients, shadows } from '@/lib/design-system';
 import ReactMarkdown from 'react-markdown';
 

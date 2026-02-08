@@ -173,27 +173,36 @@ ${flowExplanation}
    - Do NOT advertise products, services, or external platforms.
    - Do NOT include emails, links, or calls to action (CTA).
    - Do NOT mention rewards, prizes, or promotions.
-2. **ACKNOWLEDGMENT/BRIDGING (CRITICAL - MUST DO)**:
-   - **EVERY response MUST start with a brief acknowledgment** of what the user just said.
+2. **ACKNOWLEDGMENT/BRIDGING & FOLLOW-UP (CRITICAL)**:
+   - In **SCAN/DEEP**, ALWAYS start with a brief acknowledgment of what the user just said.
    - This creates conversational flow and shows you're listening.
    - The acknowledgment should:
      a) Reference SPECIFIC content from the user's last message (not generic phrases)
      b) Be brief (1-2 sentences max, 10-20 words)
      c) Use varied language - don't always say "Interessante!" or "Capisco"
+
+   - **FOLLOW-UP WHEN IT DESERVES (CRITICAL)**:
+     When the user shares something interesting, unexpected, or emotionally significant:
+     - Ask a follow-up question on THAT point before moving on
+     - Show genuine curiosity: "Mi incuriosisce quello che dici su X - come ci sei arrivato?"
+     - Dig deeper: "Quando dici che è stato difficile, cosa intendi esattamente?"
+     - Ask for examples: "Puoi farmi un esempio concreto di quando è successo?"
+
    - **EXAMPLES (Italian)**:
-     ✅ "È un punto di vista che non avevo considerato, quello sulla gestione del tempo."
-     ✅ "Quindi la comunicazione con il team è stata la sfida principale, capisco."
-     ✅ "Il fatto che tu abbia menzionato la formazione è molto rilevante."
-     ✅ "Questa esperienza con i clienti difficili sembra essere stata formativa."
+     ✅ "È un punto di vista che non avevo considerato, quello sulla gestione del tempo. Cosa ti ha portato a vederla così?"
+     ✅ "Quindi la comunicazione con il team è stata la sfida principale - mi racconti un episodio specifico?"
+     ✅ "Il fatto che tu abbia menzionato la formazione è molto rilevante. In che modo ha fatto la differenza?"
+     ✅ "Questa esperienza con i clienti difficili sembra essere stata formativa. Cosa hai imparato da quella situazione?"
    - **EXAMPLES (English)**:
-     ✅ "That's a perspective I hadn't considered, especially regarding time management."
-     ✅ "So communication with the team was the main challenge - that makes sense."
-     ✅ "The training aspect you mentioned is particularly relevant."
+     ✅ "That's a perspective I hadn't considered. What led you to see it that way?"
+     ✅ "So communication with the team was the main challenge - can you give me a specific example?"
+     ✅ "The training aspect you mentioned is particularly relevant. How did it make a difference?"
    - **BAD EXAMPLES (avoid)**:
      ❌ "Interessante!" (too generic, doesn't reference content)
      ❌ "Capisco." (minimal effort, not engaging)
      ❌ "Grazie per aver condiviso." (too formal, robotic)
      ❌ Starting directly with the next question (no bridge)
+     ❌ Ignoring an interesting point to rush to the next topic
 3. **ONE QUESTION RULE (CRITICAL - ABSOLUTE)**:
    - Ask EXACTLY ONE question per message. NO EXCEPTIONS.
    - Your message must contain ONLY ONE question mark (?).
@@ -306,7 +315,7 @@ ${topicLines}
     static buildTopicPrompt(
         currentTopic: TopicBlock | null,
         allTopics: TopicBlock[],
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string; transitionUserMessage?: string; transitionMode?: 'bridge' | 'clean_pivot'; transitionBridgeSnippet?: string },
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string; transitionUserMessage?: string; transitionMode?: 'bridge' | 'clean_pivot'; transitionBridgeSnippet?: string; engagingSnippet?: string },
         bot?: any // Added for language access and fields
     ): string {
         if (!currentTopic) {
@@ -367,7 +376,7 @@ You may propose a short optional deep-dive.
             if (supervisorInsight.status === 'START_DEEP') {
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
-                const focusTopic = supervisorInsight.focusPoint || allTopics[0]?.label || 'the first topic';
+                const focusTopic = supervisorInsight.focusPoint || currentTopic.label || allTopics[0]?.label || 'the first topic';
 
                 const startDeepPrompt = isItalian ? `
 ## FASE: INIZIO APPROFONDIMENTO (DEEP)
@@ -561,12 +570,15 @@ ${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified t
 > **IL TUO COMPITO**: Transiziona a "${nextTopicLabel}" e fai la PRIMA domanda.
 >
 > **STRUTTURA OBBLIGATORIA**:
-> 1. **MICRO-TRANSIZIONE NATURALE** (max 12 parole)
-> 2. **UNA DOMANDA** su "${nextTopicLabel}"
+> 1. **FRASE DI LEGATURA** (OBBLIGATORIA, max 15 parole): riconosci l'ultimo punto dell'utente con un riferimento SPECIFICO.
+>    - Esempio: "Quello che dici su [dettaglio specifico] è un punto importante."
+> 2. **CONNESSIONE NATURALE** al nuovo topic (opzionale, 5-10 parole)
+> 3. **UNA DOMANDA** su "${nextTopicLabel}"
 >
 > **FOCUS DOMANDA**: ${transitionFocus}
 > **VINCOLO**: La domanda deve essere chiaramente sul topic "${nextTopicLabel}".
 ${transitionUserMessage ? `> **ULTIMO MESSAGGIO UTENTE (interpretalo semanticamente, NON citarlo parola per parola)**: "${transitionUserMessage}"` : ''}
+${transitionBridgeSnippet ? `> **DETTAGLIO UTENTE DA VALORIZZARE NELLA LEGATURA**: "${transitionBridgeSnippet}"` : ''}
 > **SE L'UTENTE È CONFUSO**: riformula la domanda in modo semplice prima di chiedere.
 ${transitionMode === 'bridge'
     ? `> **MODALITÀ BRIDGE**: collega il passaggio in modo naturale usando un riconoscimento breve del punto utente, senza citazione letterale.`
@@ -576,8 +588,8 @@ ${transitionMode === 'bridge'
 > - ❌ NON dire "Ora passiamo a..." o "Cambiamo argomento..."
 > - ❌ NON chiedere permesso ("Possiamo parlare di...?")
 > - ❌ NON concludere o chiedere contatti
-> - ❌ NON fare echo/quote letterale della risposta utente
-> - ❌ Evita pattern forzati tipo: "Hai detto X: ..."
+> - ❌ NON fare citazioni letterali lunghe o copia-incolla della risposta utente
+> - ❌ Evita pattern rigidi e ripetitivi ("Hai detto X..." sempre uguale)
 > - ❌ NON iniziare direttamente con la domanda senza riconoscere la risposta precedente
 > - ✅ Fai fluire la conversazione naturalmente
 ` : `
@@ -586,12 +598,15 @@ ${transitionMode === 'bridge'
 > **YOUR TASK**: Transition to "${nextTopicLabel}" and ask the FIRST question about it.
 >
 > **MANDATORY STRUCTURE**:
-> 1. **NATURAL MICRO-TRANSITION** (max 12 words)
-> 2. **ONE QUESTION** about "${nextTopicLabel}"
+> 1. **BRIDGING PHRASE** (REQUIRED, max 15 words): acknowledge the user's last point with a SPECIFIC reference.
+>    - Example: "What you said about [specific detail] is an important point."
+> 2. **NATURAL CONNECTION** to the new topic (optional, 5-10 words)
+> 3. **ONE QUESTION** about "${nextTopicLabel}"
 >
 > **QUESTION FOCUS**: ${transitionFocus}
 > **CONSTRAINT**: The question must clearly be about "${nextTopicLabel}".
 ${transitionUserMessage ? `> **LATEST USER MESSAGE (interpret semantically, DO NOT quote verbatim)**: "${transitionUserMessage}"` : ''}
+${transitionBridgeSnippet ? `> **USER DETAIL TO LEVERAGE IN BRIDGING**: "${transitionBridgeSnippet}"` : ''}
 > **IF USER IS CONFUSED**: rephrase simply before asking.
 ${transitionMode === 'bridge'
     ? `> **BRIDGE MODE**: connect naturally with a short acknowledgment of the user point, without literal quoting.`
@@ -601,8 +616,8 @@ ${transitionMode === 'bridge'
 > - ❌ Do NOT say "Now let's move to..." or "Let's change topic..."
 > - ❌ Do NOT ask permission ("Can we talk about...?")
 > - ❌ Do NOT conclude or ask for contacts
-> - ❌ Do NOT echo/quote the user's response verbatim
-> - ❌ Avoid rigid patterns like: "You said X: ..."
+> - ❌ Do NOT use long literal quotes or copy-paste user wording
+> - ❌ Avoid rigid repetitive patterns like always starting with "You said X..."
 > - ❌ Do NOT start directly with the question without acknowledging the previous response
 > - ✅ Let the conversation flow naturally
 `;
@@ -616,11 +631,14 @@ ${transitionMode === 'bridge'
 >
 > **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
 > 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Inizia riconoscendo quello che l'utente ha appena detto. Cita un elemento SPECIFICO della sua risposta.
->    - Mantienila breve e naturale, senza copiare parola per parola.
+>    - Mantienila breve e naturale (10-20 parole).
+>    - Esempio: "Quello che dici sulla [X] è interessante, soprattutto il punto su [Y]."
 > 2. **UNA DOMANDA** su "${target}"
+>    - Se l'utente ha detto qualcosa di interessante, approfondisci QUELLO prima di passare oltre.
+>    - Esempio: "Mi incuriosisce quando dici [dettaglio] - puoi dirmi di più?"
 >
+> **ENGAGEMENT**: Se la risposta dell'utente merita approfondimento, APPROFONDISCI. Non correre al prossimo punto.
 > NON saltare la frase di legatura. NON iniziare direttamente con la domanda.
-> Evita formule rigide tipo "Hai detto X: ...".
 > DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "Abbiamo finito".
 ` : `
 > [!IMPORTANT] PHASE 1: SCANNING
@@ -628,16 +646,20 @@ ${transitionMode === 'bridge'
 >
 > **MANDATORY MESSAGE STRUCTURE**:
 > 1. **BRIDGING PHRASE** (REQUIRED): Start by acknowledging what the user just said. Reference a SPECIFIC element from their response.
->    - Keep it short and natural; do not copy verbatim.
+>    - Keep it short and natural (10-20 words).
+>    - Example: "What you said about [X] is interesting, especially the point about [Y]."
 > 2. **ONE QUESTION** about "${target}"
+>    - If the user said something interesting, dig deeper into THAT before moving on.
+>    - Example: "I'm curious about when you mentioned [detail] - can you tell me more?"
 >
+> **ENGAGEMENT**: If the user's answer deserves follow-up, FOLLOW UP. Don't rush to the next point.
 > DO NOT skip the bridging phrase. DO NOT start directly with the question.
-> Avoid rigid templates like "You said X: ...".
 > DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "We are done".
 `;
-                primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode). Remember to start with an acknowledgment of the user's previous answer.";
+                primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode). Remember to start with an acknowledgment of the user's previous answer. If their answer is interesting, probe deeper.";
             } else if (supervisorInsight.status === 'DEEPENING') {
                 const focus = supervisorInsight.focusPoint || "their last point";
+                const engagingSnippet = (supervisorInsight as any).engagingSnippet || '';
                 const subGoalsList = currentTopic.subGoals?.join(', ') || 'various aspects';
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
@@ -645,50 +667,56 @@ ${transitionMode === 'bridge'
 > [!IMPORTANT] FASE 2: DEEPENING - Topic: "${currentTopic.label}"
 > Sei nella fase di APPROFONDIMENTO del topic "${currentTopic.label}".
 > Focus suggerito: "${focus}".
+${engagingSnippet ? `> **L'UTENTE HA MOSTRATO INTERESSE quando ha detto**: "${engagingSnippet}"\n> Usa questo come punto di partenza per approfondire.` : ''}
 > Sub-goal disponibili: ${subGoalsList}
 >
 > **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
-> 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Riconosci quello che l'utente ha appena detto con una frase specifica.
->    - Cita un dettaglio concreto senza riportarlo in forma di quote/copia-incolla
->    - Esempi: "Quello che dici su [X] mi fa pensare...", "È interessante quello che hai detto su [Y]..."
-> 2. **UNA DOMANDA** di approfondimento
+> 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Riconosci quello che l'utente ha appena detto.
+>    - Mostra genuino interesse: "Mi colpisce quello che dici su [X]..."
+>    - Fai sentire l'utente ascoltato: "Capisco cosa intendi quando parli di [Y]..."
+> 2. **UNA DOMANDA** di approfondimento SPECIFICA
+>    - Chiedi il "perché" o il "come": "Come ci sei arrivato a questa conclusione?"
+>    - Chiedi esempi concreti: "Puoi farmi un esempio di quando è successo?"
+>    - Esplora le implicazioni: "Cosa ha significato questo per te?"
 >
-> **IL TUO OBIETTIVO** (scegli UNO):
-> 1. **Chiarire una risposta interessante**: "Hai menzionato X prima, puoi dirmi di più...?"
-> 2. **Esplorare un sub-goal mancante**: Se un sub-goal non è stato discusso, affrontalo ora
-> 3. **Variare l'angolazione**: Chiedi esempi concreti, implicazioni pratiche
+> **ENGAGEMENT È LA PRIORITÀ**:
+> - Segui il filo dell'utente, non la tua agenda
+> - Se dice qualcosa di emotivamente significativo, riconoscilo
+> - Fai domande che mostrano che hai DAVVERO ascoltato
 >
-> **DIVIETI**:
-> - ❌ Domande generiche ("C'è altro?", "Dimmi di più", "Altri pensieri?")
-> - ❌ Ripetere domande già fatte in SCAN
-> - ❌ Cambiare topic da solo - aspetta TRANSITION del SUPERVISOR
+> **EVITA**:
+> - ❌ Domande generiche ("C'è altro?", "Dimmi di più")
+> - ❌ Ignorare punti interessanti per passare oltre
 > - ❌ Concludere o chiedere contatti
 ` : `
 > [!IMPORTANT] PHASE 2: DEEPENING - Topic: "${currentTopic.label}"
 > You are in DEEP DIVE phase exploring topic "${currentTopic.label}" more thoroughly.
 > Suggested focus for this turn: "${focus}".
+${engagingSnippet ? `> **THE USER SHOWED INTEREST when they said**: "${engagingSnippet}"\n> Use this as a starting point to dig deeper.` : ''}
 > Available sub-goals for this topic: ${subGoalsList}
 >
 > **MANDATORY MESSAGE STRUCTURE**:
-> 1. **BRIDGING PHRASE** (REQUIRED): Acknowledge what the user just said with a specific phrase.
->    - Reference a concrete detail without quoting the user verbatim
->    - Examples: "What you said about [X] makes me think...", "It's interesting what you mentioned about [Y]..."
-> 2. **ONE QUESTION** for deeper exploration
+> 1. **BRIDGING PHRASE** (REQUIRED): Acknowledge what the user just said.
+>    - Show genuine interest: "What you said about [X] really stands out..."
+>    - Make them feel heard: "I understand what you mean about [Y]..."
+> 2. **ONE SPECIFIC follow-up QUESTION**
+>    - Ask "why" or "how": "How did you come to that conclusion?"
+>    - Ask for concrete examples: "Can you give me an example of when that happened?"
+>    - Explore implications: "What did that mean for you?"
 >
-> **YOUR OBJECTIVE** (pick ONE):
-> 1. **Clarify an interesting SCAN response**: "You mentioned X earlier, can you tell me more about...?"
-> 2. **Explore a missing sub-goal**: If a sub-goal hasn't been discussed yet, ask about it now
-> 3. **Vary the angle**: Ask for concrete examples, practical implications, or a different perspective
+> **ENGAGEMENT IS THE PRIORITY**:
+> - Follow the user's thread, not your agenda
+> - If they share something emotionally significant, acknowledge it
+> - Ask questions that show you've REALLY listened
 >
-> **PROHIBITIONS**:
-> - ❌ Generic questions ("Is there anything else?", "Tell me more", "Any other thoughts?")
-> - ❌ Repeat questions already asked in SCAN
-> - ❌ Transition to another topic yourself - wait for SUPERVISOR's TRANSITION
-> - ❌ Conclude or ask for contacts
+> **AVOID**:
+> - ❌ Generic questions ("Is there anything else?", "Tell me more")
+> - ❌ Ignoring interesting points to move on
+> - ❌ Concluding or asking for contacts
 >
 > **FLOW**: The SUPERVISOR manages topic transitions. Keep probing "${currentTopic.label}" until you receive a TRANSITION instruction.
 `;
-                primaryInstruction = `Probe deeply into "${currentTopic.label}". Start with a bridging phrase that acknowledges the user's response, then ask your question.`;
+                primaryInstruction = `Probe deeply into "${currentTopic.label}". Show genuine curiosity. Start with a bridging phrase that acknowledges the user's response, then ask a specific follow-up question.`;
             }
         }
 
@@ -924,7 +952,7 @@ Interview time / turns limit reached or topics completed.
         currentTopic: TopicBlock | null,
         methodologyContent: string,
         effectiveDurationSeconds: number,
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string; transitionUserMessage?: string; transitionMode?: 'bridge' | 'clean_pivot'; transitionBridgeSnippet?: string } | string,
+        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string; transitionUserMessage?: string; transitionMode?: 'bridge' | 'clean_pivot'; transitionBridgeSnippet?: string; engagingSnippet?: string } | string,
         interviewPlan?: any
     ): Promise<string> {
         const persona = this.buildPersonaPrompt(bot);

@@ -112,6 +112,7 @@ export default function InsightHubPage() {
     const [expandedWebsiteRec, setExpandedWebsiteRec] = useState<number | null>(null);
     const [showArchived, setShowArchived] = useState(false);
     const [updatingInsightId, setUpdatingInsightId] = useState<string | null>(null);
+    const [topSources, setTopSources] = useState<any[]>([]);
 
     // Get the project ID for API calls (null if "All Projects" is selected)
     const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
@@ -205,6 +206,29 @@ export default function InsightHubPage() {
         }
     };
 
+    const fetchTopSources = async () => {
+        try {
+            // Get the visibility config for the project/org
+            const configUrl = projectId
+                ? `/api/visibility/create?projectId=${projectId}${organizationId ? `&organizationId=${organizationId}` : ''}`
+                : `/api/visibility/create${organizationId ? `?organizationId=${organizationId}` : ''}`;
+            const configRes = await fetch(configUrl);
+            if (configRes.ok) {
+                const configData = await configRes.json();
+                if (configData.config?.id) {
+                    // Fetch top sources for this config
+                    const sourcesRes = await fetch(`/api/visibility/top-sources?configId=${configData.config.id}`);
+                    if (sourcesRes.ok) {
+                        const sourcesData = await sourcesRes.json();
+                        setTopSources(sourcesData.sources || []);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Error fetching top sources:', err);
+        }
+    };
+
     const runWebsiteAnalysis = async (configId: string) => {
         setWebsiteAnalysisLoading(true);
         try {
@@ -245,9 +269,11 @@ export default function InsightHubPage() {
         setLoading(true);
         setHealthReport(null);
         setWebsiteAnalysis(null);
+        setTopSources([]);
         fetchInsights();
         fetchStrategy();
         fetchWebsiteAnalysis();
+        fetchTopSources();
     }, [projectId, organizationId]);
 
     const handleSync = async () => {
@@ -521,6 +547,66 @@ export default function InsightHubPage() {
                 </div>
             )}
 
+            {/* Top Industry Sources Section */}
+            {topSources && topSources.length > 0 && (
+                <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50/30 to-white">
+                    <CardHeader className="pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-indigo-100 rounded-xl">
+                                <Globe className="w-5 h-5 text-indigo-600" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg font-bold">Fonti Più Rilevanti per il Settore</CardTitle>
+                                <CardDescription className="text-xs">
+                                    Siti e fonti citati più frequentemente dagli LLM per le tue query monitorate
+                                </CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {topSources.map((source: any, idx: number) => (
+                                <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-indigo-100 hover:border-indigo-200 transition-colors group">
+                                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                                        <div className="text-2xl font-black text-indigo-600 shrink-0">#{idx + 1}</div>
+                                        <div className="min-w-0 flex-1">
+                                            <a
+                                                href={source.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="font-semibold text-sm hover:underline hover:text-indigo-600 truncate block transition-colors"
+                                            >
+                                                {source.domain}
+                                            </a>
+                                            <div className="flex gap-2 mt-1.5 flex-wrap">
+                                                {source.platforms.map((p: string) => (
+                                                    <Badge key={p} variant="outline" className="text-[9px] border-indigo-200 text-indigo-700 bg-indigo-50">
+                                                        {p}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                            {source.prompts && source.prompts.length > 0 && (
+                                                <div className="mt-2 text-[10px] text-slate-500 truncate">
+                                                    Query: {source.prompts[0]}
+                                                    {source.prompts.length > 1 && ` +${source.prompts.length - 1}`}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-right shrink-0 ml-4">
+                                        <div className="text-lg font-bold text-slate-900">{source.count}</div>
+                                        <div className="text-[10px] text-slate-500">citazioni</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-4 text-[10px] text-slate-400 text-center pt-3 border-t">
+                            Basato sulle ultime {topSources.length > 0 ? '50' : '0'} scansioni completate
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Website LLM Optimization Section - from Brand Monitor */}
             {websiteAnalysis?.websiteUrl && (
                 <Card className="border-purple-200 bg-gradient-to-br from-purple-50/30 to-white">
@@ -555,11 +641,10 @@ export default function InsightHubPage() {
                             <>
                                 {/* Scores */}
                                 <div className="grid grid-cols-5 gap-3">
-                                    <div className={`p-3 rounded-xl text-center border ${
-                                        websiteAnalysis.overallScore >= 80 ? 'bg-green-50 border-green-200 text-green-700' :
-                                        websiteAnalysis.overallScore >= 60 ? 'bg-amber-50 border-amber-200 text-amber-700' :
-                                        'bg-red-50 border-red-200 text-red-700'
-                                    }`}>
+                                    <div className={`p-3 rounded-xl text-center border ${websiteAnalysis.overallScore >= 80 ? 'bg-green-50 border-green-200 text-green-700' :
+                                            websiteAnalysis.overallScore >= 60 ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                                'bg-red-50 border-red-200 text-red-700'
+                                        }`}>
                                         <div className="text-2xl font-black">{websiteAnalysis.overallScore}</div>
                                         <div className="text-[10px] font-bold uppercase">Score Totale</div>
                                     </div>
@@ -634,24 +719,22 @@ export default function InsightHubPage() {
                                                         onClick={() => setExpandedWebsiteRec(expandedWebsiteRec === idx ? null : idx)}
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0">
-                                                            <div className={`p-1.5 rounded-lg shrink-0 ${
-                                                                rec.type === 'add_structured_data' ? 'bg-blue-100' :
-                                                                rec.type === 'improve_value_proposition' ? 'bg-purple-100' :
-                                                                rec.type === 'add_keyword_content' ? 'bg-green-100' :
-                                                                'bg-amber-100'
-                                                            }`}>
+                                                            <div className={`p-1.5 rounded-lg shrink-0 ${rec.type === 'add_structured_data' ? 'bg-blue-100' :
+                                                                    rec.type === 'improve_value_proposition' ? 'bg-purple-100' :
+                                                                        rec.type === 'add_keyword_content' ? 'bg-green-100' :
+                                                                            'bg-amber-100'
+                                                                }`}>
                                                                 {rec.type === 'add_structured_data' ? <Code className="w-4 h-4 text-blue-600" /> :
-                                                                 rec.type === 'improve_value_proposition' ? <Target className="w-4 h-4 text-purple-600" /> :
-                                                                 rec.type === 'add_keyword_content' ? <FileText className="w-4 h-4 text-green-600" /> :
-                                                                 <Sparkles className="w-4 h-4 text-amber-600" />}
+                                                                    rec.type === 'improve_value_proposition' ? <Target className="w-4 h-4 text-purple-600" /> :
+                                                                        rec.type === 'add_keyword_content' ? <FileText className="w-4 h-4 text-green-600" /> :
+                                                                            <Sparkles className="w-4 h-4 text-amber-600" />}
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <div className="font-semibold text-sm text-slate-800 truncate">{rec.title}</div>
-                                                                <Badge variant="outline" className={`text-[9px] mt-0.5 ${
-                                                                    rec.priority === 'high' ? 'border-red-200 bg-red-50 text-red-700' :
-                                                                    rec.priority === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-700' :
-                                                                    'border-blue-200 bg-blue-50 text-blue-700'
-                                                                }`}>
+                                                                <Badge variant="outline" className={`text-[9px] mt-0.5 ${rec.priority === 'high' ? 'border-red-200 bg-red-50 text-red-700' :
+                                                                        rec.priority === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-700' :
+                                                                            'border-blue-200 bg-blue-50 text-blue-700'
+                                                                    }`}>
                                                                     {rec.priority === 'high' ? 'Alta Priorità' : rec.priority === 'medium' ? 'Media' : 'Bassa'}
                                                                 </Badge>
                                                             </div>

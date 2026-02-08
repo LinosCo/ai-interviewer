@@ -44,8 +44,8 @@ const PIVOT_EN = /\b(regarding|about|switching to|moving to|as for|when it comes
 const PROBE_IT = /\b(puoi|potresti|mi racconti|in che modo|cosa intendi|farmi un esempio)\b/i;
 const PROBE_EN = /\b(could you|can you|tell me more|what do you mean|share an example|in what way)\b/i;
 
-const DEEP_OFFER_IT = /\b(continuare|proseguire|approfondire|qualche altra domanda|hai ancora tempo|ti va di)\b/i;
-const DEEP_OFFER_EN = /\b(continue|deeper|few more questions|a bit more time|would you like to continue)\b/i;
+const DEEP_OFFER_IT = /\b(ti va di continuare|vuoi continuare|hai(?:\s+ancora)?\s+(?:qualche|un paio di)?\s*minut[oi]|hai tempo per continuare|proseguire con(?:\s+qualche)?\s+domanda)\b/i;
+const DEEP_OFFER_EN = /\b(would you like to continue|do you want to continue|do you have (?:a few|a couple of)?\s*more minutes|can we continue with (?:a few )?deeper questions)\b/i;
 const CONFUSION_IT = /\b(non capisco|non ho capito|non mi è chiaro|puoi chiarire|puoi spiegare meglio)\b/i;
 const CONFUSION_EN = /\b(i don't understand|i do not understand|not clear|can you clarify|can you explain)\b/i;
 const ECHO_BRIDGE_IT = /\b(hai detto|hai menzionato)\b/i;

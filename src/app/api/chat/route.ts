@@ -236,6 +236,44 @@ function normalizeCandidateFieldIds(rawFields: any[]): string[] {
     return Array.from(new Set(normalized));
 }
 
+function responseMentionsCandidateField(responseText: string, fieldId: string): boolean {
+    const text = String(responseText || '').toLowerCase();
+    if (!text || !fieldId) return false;
+    if (text.includes(fieldId.toLowerCase())) return true;
+
+    if (fieldId === 'name' || fieldId === 'fullName') {
+        return /\b(nome|cognome|name)\b/i.test(text);
+    }
+    if (fieldId === 'email') {
+        return /\b(email|mail)\b/i.test(text);
+    }
+    if (fieldId === 'phone') {
+        return /\b(telefono|phone|numero)\b/i.test(text);
+    }
+    if (fieldId === 'company') {
+        return /\b(azienda|company|organizzazione)\b/i.test(text);
+    }
+    if (fieldId === 'role') {
+        return /\b(ruolo|role|posizione)\b/i.test(text);
+    }
+    if (fieldId === 'linkedin') {
+        return /\b(linkedin|profilo|profile)\b/i.test(text);
+    }
+    if (fieldId === 'portfolio') {
+        return /\b(portfolio|sito web|website|url)\b/i.test(text);
+    }
+    if (fieldId === 'location') {
+        return /\b(citt[àa]|city|location|localit[àa])\b/i.test(text);
+    }
+    if (fieldId === 'budget') {
+        return /\b(budget)\b/i.test(text);
+    }
+    if (fieldId === 'availability') {
+        return /\b(disponibilit[àa]|availability)\b/i.test(text);
+    }
+    return false;
+}
+
 function extractDeterministicFieldValue(fieldName: string, userMessage: string): string | null {
     const text = userMessage.trim();
     if (!text) return null;
@@ -361,20 +399,35 @@ async function generateQuestionOnly(params: {
     model: any;
     language: string;
     topicLabel: string;
+    topicCue?: string | null;
     subGoal?: string | null;
     lastUserMessage?: string | null;
+    requireAcknowledgment?: boolean;
+    transitionMode?: 'bridge' | 'clean_pivot';
 }) {
-    const { model, language, topicLabel, subGoal, lastUserMessage } = params;
+    const { model, language, topicLabel, topicCue, subGoal, lastUserMessage, requireAcknowledgment, transitionMode } = params;
     const questionSchema = z.object({
         question: z.string().describe("A single interview question ending with a question mark.")
     });
 
+    const structureInstruction = requireAcknowledgment
+        ? `Output structure: (1) one short acknowledgment sentence; (2) one specific question.`
+        : `Output structure: one concise question.`;
+    const transitionInstruction = transitionMode === 'bridge'
+        ? `Transition mode: bridge naturally from the user's point to "${topicLabel}" without literal quotes.`
+        : transitionMode === 'clean_pivot'
+            ? `Transition mode: clean pivot. Use a neutral acknowledgment and do not paraphrase irrelevant user details.`
+            : null;
+
     const prompt = [
         `Language: ${language}`,
-        `Topic: ${topicLabel}`,
+        `Topic title (internal): ${topicLabel}`,
+        topicCue ? `Natural topic cue for user-facing wording: ${topicCue}` : null,
         subGoal ? `Sub-goal: ${subGoal}` : null,
         lastUserMessage ? `User last message: "${lastUserMessage}"` : null,
-        `Task: Ask exactly ONE concise interview question about the topic. Do NOT close the interview. Do NOT ask for contact data. End with a question mark.`
+        structureInstruction,
+        transitionInstruction,
+        `Task: Ask exactly ONE concise interview question about the topic. Do NOT close the interview. Do NOT ask for contact data. Avoid literal quote of user's words. Do NOT repeat the topic title verbatim; use natural phrasing. End with a single question mark.`
     ].filter(Boolean).join('\n');
 
     const result = await generateObject({
@@ -384,11 +437,88 @@ async function generateQuestionOnly(params: {
         temperature: 0.2
     });
 
-    let question = (result.object.question || '').trim();
-    if (!question.endsWith('?')) {
-        question = `${question.replace(/[.!?…]+$/g, '').trim()}?`;
+    let question = normalizeSingleQuestion(String(result.object.question || '').trim());
+    if (topicCue) {
+        question = replaceLiteralTopicTitle(question, topicLabel, topicCue);
     }
     return question;
+}
+
+async function generateDeepOfferOnly(params: {
+    model: any;
+    language: string;
+}) {
+    const schema = z.object({
+        question: z.string().describe('A single yes/no continuation question ending with a question mark.')
+    });
+
+    const prompt = [
+        `Language: ${params.language}`,
+        `Task: Ask exactly ONE yes/no question to understand if the user wants to continue with a few deeper questions.`,
+        `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
+        `Keep it natural and concise. End with exactly one question mark.`
+    ].join('\n');
+
+    const result = await generateObject({
+        model: params.model,
+        schema,
+        prompt,
+        temperature: 0.2
+    });
+
+    return normalizeSingleQuestion(String(result.object.question || '').trim());
+}
+
+async function generateConsentQuestionOnly(params: {
+    model: any;
+    language: string;
+}) {
+    const schema = z.object({
+        question: z.string().describe('A single yes/no consent question ending with a question mark.')
+    });
+
+    const prompt = [
+        `Language: ${params.language}`,
+        `Task: Ask exactly ONE yes/no question asking permission to collect contact details for follow-up.`,
+        `Do NOT ask for any specific field yet. Do NOT ask topic questions. Do NOT close the interview.`,
+        `Keep it natural and concise. End with exactly one question mark.`
+    ].join('\n');
+
+    const result = await generateObject({
+        model: params.model,
+        schema,
+        prompt,
+        temperature: 0.2
+    });
+
+    return normalizeSingleQuestion(String(result.object.question || '').trim());
+}
+
+async function generateFieldQuestionOnly(params: {
+    model: any;
+    language: string;
+    fieldLabel: string;
+}) {
+    const schema = z.object({
+        question: z.string().describe('A single field collection question ending with a question mark.')
+    });
+
+    const prompt = [
+        `Language: ${params.language}`,
+        `Target field to collect now: ${params.fieldLabel}`,
+        `Task: Ask exactly ONE concise question to collect this field only.`,
+        `Do NOT ask for other fields. Do NOT ask topic questions. Do NOT close the interview.`,
+        `Keep it natural and concise. End with exactly one question mark.`
+    ].join('\n');
+
+    const result = await generateObject({
+        model: params.model,
+        schema,
+        prompt,
+        temperature: 0.2
+    });
+
+    return normalizeSingleQuestion(String(result.object.question || '').trim());
 }
 
 function sanitizeUserSnippet(input: string, maxWords: number = 10): string {
@@ -396,6 +526,32 @@ function sanitizeUserSnippet(input: string, maxWords: number = 10): string {
     if (!compact) return '';
     const withoutPunctuation = compact.replace(/[?!.,;:()[\]{}"“”'’`]/g, '').trim();
     return withoutPunctuation.split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ');
+}
+
+function escapeRegexLiteral(input: string): string {
+    return String(input || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function replaceLiteralTopicTitle(text: string, topicLabel: string, replacement: string): string {
+    const source = String(text || '').trim();
+    const label = String(topicLabel || '').trim();
+    const repl = String(replacement || '').trim();
+    if (!source || !label || !repl) return source;
+    const re = new RegExp(escapeRegexLiteral(label), 'gi');
+    return source.replace(re, repl);
+}
+
+function normalizeSingleQuestion(question: string): string {
+    let normalized = String(question || '').trim();
+    const questionMarkCount = (normalized.match(/\?/g) || []).length;
+    if (questionMarkCount > 1) {
+        const firstQuestionIdx = normalized.indexOf('?');
+        normalized = normalized.slice(0, firstQuestionIdx + 1).trim();
+    }
+    if (!normalized.endsWith('?')) {
+        normalized = `${normalized.replace(/[.!?…]+$/g, '').trim()}?`;
+    }
+    return normalized;
 }
 
 function isClarificationSignal(input: string, language: string): boolean {
@@ -407,6 +563,35 @@ function isClarificationSignal(input: string, language: string): boolean {
     const itPattern = /\b(non capisco|non ho capito|non mi è chiaro|puoi chiarire|puoi spiegare meglio)\b/i;
     const enPattern = /\b(i don't understand|i do not understand|not clear|can you clarify|can you explain)\b/i;
     return isItalian ? itPattern.test(text) : enPattern.test(text);
+}
+
+function buildNaturalTopicCue(topicLabel: string, language: string): string {
+    const label = String(topicLabel || '').trim();
+    if (!label) return (language || 'en').toLowerCase().startsWith('it') ? 'questo tema' : 'this topic';
+    const lower = label.toLowerCase();
+    const isItalian = (language || 'en').toLowerCase().startsWith('it');
+
+    if (isItalian) {
+        if (lower.includes('tedx') && lower.includes('aspettative')) return 'aspettative per il TEDx';
+        if (lower.includes('tedx')) return 'TEDx';
+        if (lower.includes('percezion') && (lower.includes('ai') || lower.includes('intelligenza artificiale'))) {
+            return "percezione dell'AI";
+        }
+        if (lower.includes('iniziative') && lower.includes('ai')) return "iniziative AI in azienda";
+        if (lower.includes('intelligenza artificiale') || /\bai\b/i.test(label)) return "uso dell'AI";
+        const anchors = buildMessageAnchors(label, language).anchors;
+        if (anchors.length > 0) return anchors[0];
+        return 'questo tema';
+    }
+
+    if (lower.includes('tedx')) return 'TEDx';
+    if (lower.includes('perception') && lower.includes('ai')) return 'AI perception';
+    if (lower.includes('initiative') && lower.includes('ai')) return 'AI initiatives in the company';
+    if (lower.includes('expectation') && lower.includes('tedx')) return 'TEDx expectations';
+    if (lower.includes('artificial intelligence') || /\bai\b/i.test(label)) return 'AI adoption';
+    const anchors = buildMessageAnchors(label, language).anchors;
+    if (anchors.length > 0) return `this aspect about ${anchors[0]}`;
+    return 'this topic';
 }
 
 const GENERIC_TOPIC_ANCHORS_IT = new Set([
@@ -491,89 +676,6 @@ function isUsableBridgeSnippet(snippet: string, language: string): boolean {
         ? /\b(te l[’']?ho gi[aà] detto|non capisco|preferisco non dirlo|boh|ok|s[iì]|no)\b/i
         : /\b(i already told you|i don.t understand|prefer not to say|ok|yes|no)\b/i;
     return !lowSignalPattern.test(clean);
-}
-
-function stableTemplateIndex(seed: string, length: number): number {
-    if (length <= 1) return 0;
-    let hash = 0;
-    for (let i = 0; i < seed.length; i++) {
-        hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
-    }
-    return Math.abs(hash) % length;
-}
-
-function buildDeterministicQualityQuestion(params: {
-    phase: 'SCAN' | 'DEEP' | 'DEEP_OFFER';
-    language: string;
-    topicLabel: string;
-    userResponse: string;
-    transitionMode?: 'bridge' | 'clean_pivot';
-    transitionBridgeSnippet?: string;
-}): string {
-    const isItalian = (params.language || 'en').toLowerCase().startsWith('it');
-    if (params.phase === 'DEEP_OFFER') {
-        return isItalian
-            ? 'Ti va di continuare con qualche domanda piu approfondita?'
-            : 'Would you like to continue with a few deeper questions?';
-    }
-
-    const topic = (params.topicLabel || '').trim() || (isItalian ? 'questo tema' : 'this topic');
-    if (isClarificationSignal(params.userResponse, params.language)) {
-        return isItalian
-            ? `Certo, la riformulo in modo semplice: rispetto a ${topic}, qual è l'aspetto più importante per te?`
-            : `Sure, let me rephrase simply: regarding ${topic}, what matters most to you?`;
-    }
-
-    if (params.transitionMode === 'bridge') {
-        const bridgeSnippetRaw = (params.transitionBridgeSnippet || sanitizeUserSnippet(params.userResponse, 7)).trim();
-        const bridgeSnippet = isUsableBridgeSnippet(bridgeSnippetRaw, params.language) ? bridgeSnippetRaw : '';
-        if (isItalian) {
-            return bridgeSnippet
-                ? `Interessante il punto su ${bridgeSnippet}. Riguardo a ${topic}, quale aspetto ti interessa di più?`
-                : `Interessante il tuo punto. Riguardo a ${topic}, qual è la tua prospettiva?`;
-        }
-        return bridgeSnippet
-            ? `Interesting point about ${bridgeSnippet}. Regarding ${topic}, which aspect matters most to you?`
-            : `Interesting point. Regarding ${topic}, what is your perspective?`;
-    }
-
-    if (params.transitionMode === 'clean_pivot') {
-        return isItalian
-            ? `Capisco. Riguardo a ${topic}, quale aspetto ritieni più rilevante?`
-            : `I see. Regarding ${topic}, which aspect do you consider most relevant?`;
-    }
-
-    const userWordCount = sanitizeUserSnippet(params.userResponse, 50).split(/\s+/).filter(Boolean).length;
-    const shortAnswer = userWordCount <= 4;
-    const seed = `${params.phase}|${topic}|${params.userResponse || ''}|${params.transitionMode || ''}`;
-
-    if (isItalian) {
-        const shortTemplates = [
-            `Capisco. Su ${topic}, puoi farmi un esempio concreto?`,
-            `Grazie, è utile. Su ${topic}, puoi raccontarmi un caso reale?`,
-            `Chiaro. Restando su ${topic}, quale esempio pratico ti viene in mente?`
-        ];
-        const longTemplates = [
-            `Rispetto a ${topic}, qual è per te l'impatto più significativo?`,
-            `Su ${topic}, qual è l'elemento che incide di più nella tua esperienza?`,
-            `Guardando a ${topic}, quale aspetto ritieni davvero decisivo?`
-        ];
-        const templates = shortAnswer ? shortTemplates : longTemplates;
-        return templates[stableTemplateIndex(seed, templates.length)];
-    }
-
-    const shortTemplates = [
-        `I see. On ${topic}, can you share one concrete example?`,
-        `Thanks, that helps. On ${topic}, can you describe a real case?`,
-        `Got it. Staying on ${topic}, what practical example comes to mind?`
-    ];
-    const longTemplates = [
-        `Regarding ${topic}, what is the most significant impact from your perspective?`,
-        `On ${topic}, what element has the strongest effect in your experience?`,
-        `Looking at ${topic}, which aspect feels most decisive to you?`
-    ];
-    const templates = shortAnswer ? shortTemplates : longTemplates;
-    return templates[stableTemplateIndex(seed, templates.length)];
 }
 
 // ============================================================================
@@ -920,69 +1022,69 @@ export async function POST(req: Request) {
                         console.log(`🧩 [SCAN] Clarification detected on "${currentTopic.label}". Adding one clarification turn before transition.`);
                         // Keep current topic for one extra clarification question.
                     } else {
-                    // Move to next topic
-                    if (state.topicIndex + 1 < numTopics) {
-                        nextState.topicIndex = state.topicIndex + 1;
-                        nextState.turnInTopic = 0;
-                        nextTopicId = botTopics[nextState.topicIndex].id;
-
-                        console.log(`➡️ [SCAN] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
-                        const nextTopic = botTopics[nextState.topicIndex];
-                        const nextAvailableSubGoals = getRemainingSubGoals(nextTopic, state.topicSubGoalHistory);
-                        const transitionUserMessage = lastMessage?.role === 'user'
-                            ? String(lastMessage.content || '').slice(0, 300)
-                            : undefined;
-                        const transitionWordCount = transitionUserMessage
-                            ? transitionUserMessage.split(/\s+/).filter(Boolean).length
-                            : 0;
-                        const overlap = hasMeaningfulTopicOverlap({
-                            userMessage: transitionUserMessage,
-                            nextTopic,
-                            language
-                        });
-                        const userTouchesNextTopic = overlap.hasSignal;
-                        const transitionMode = (userTouchesNextTopic && transitionWordCount >= 5) ? 'bridge' : 'clean_pivot';
-                        const transitionSnippetCandidate = transitionUserMessage
-                            ? sanitizeUserSnippet(transitionUserMessage, 7)
-                            : '';
-                        const transitionBridgeSnippet = transitionMode === 'bridge' && isUsableBridgeSnippet(transitionSnippetCandidate, language)
-                            ? transitionSnippetCandidate
-                            : undefined;
-                        console.log(`🧭 [TRANSITION] mode=${transitionMode} userTouchesNextTopic=${userTouchesNextTopic} words=${transitionWordCount} overlaps=${overlap.overlaps.join('|') || '-'}`);
-                        supervisorInsight = {
-                            status: 'TRANSITION',
-                            nextTopic: nextTopic.label,
-                            nextSubGoal: nextAvailableSubGoals[0] || nextTopic.label,
-                            transitionUserMessage,
-                            transitionMode,
-                            transitionBridgeSnippet
-                        };
-                    } else {
-                        // End of SCAN: go directly to DEEP if there is still time.
-                        // Ask DEEP_OFFER only when hard time is already over.
-                        const maxDurationSec = maxDurationMins * 60;
-                        const remainingSec = maxDurationSec - effectiveSec;
-                        console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
-
-                        if (remainingSec > 0) {
-                            nextState.phase = 'DEEP';
-                            nextState.deepAccepted = null;
-                            nextState.topicIndex = 0;
+                        // Move to next topic
+                        if (state.topicIndex + 1 < numTopics) {
+                            nextState.topicIndex = state.topicIndex + 1;
                             nextState.turnInTopic = 0;
-                            const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
-                            nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                            nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
-                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                            supervisorInsight = { status: 'START_DEEP' };
-                            console.log(`✅ [SCAN→DEEP] SCAN complete with time left (${remainingSec}s). Starting DEEP.`);
+                            nextTopicId = botTopics[nextState.topicIndex].id;
+
+                            console.log(`➡️ [SCAN] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
+                            const nextTopic = botTopics[nextState.topicIndex];
+                            const nextAvailableSubGoals = getRemainingSubGoals(nextTopic, state.topicSubGoalHistory);
+                            const transitionUserMessage = lastMessage?.role === 'user'
+                                ? String(lastMessage.content || '').slice(0, 300)
+                                : undefined;
+                            const transitionWordCount = transitionUserMessage
+                                ? transitionUserMessage.split(/\s+/).filter(Boolean).length
+                                : 0;
+                            const overlap = hasMeaningfulTopicOverlap({
+                                userMessage: transitionUserMessage,
+                                nextTopic,
+                                language
+                            });
+                            const userTouchesNextTopic = overlap.hasSignal;
+                            const transitionMode = (userTouchesNextTopic && transitionWordCount >= 5) ? 'bridge' : 'clean_pivot';
+                            const transitionSnippetCandidate = transitionUserMessage
+                                ? sanitizeUserSnippet(transitionUserMessage, 7)
+                                : '';
+                            const transitionBridgeSnippet = transitionMode === 'bridge' && isUsableBridgeSnippet(transitionSnippetCandidate, language)
+                                ? transitionSnippetCandidate
+                                : undefined;
+                            console.log(`🧭 [TRANSITION] mode=${transitionMode} userTouchesNextTopic=${userTouchesNextTopic} words=${transitionWordCount} overlaps=${overlap.overlaps.join('|') || '-'}`);
+                            supervisorInsight = {
+                                status: 'TRANSITION',
+                                nextTopic: nextTopic.label,
+                                nextSubGoal: nextAvailableSubGoals[0] || nextTopic.label,
+                                transitionUserMessage,
+                                transitionMode,
+                                transitionBridgeSnippet
+                            };
                         } else {
-                            nextState.phase = 'DEEP_OFFER';
-                            nextState.deepAccepted = null;
-                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                            console.log(`🎁 [SCAN→DEEP_OFFER] SCAN complete with no time left. Asking continuation consent.`);
+                            // End of SCAN: go directly to DEEP if there is still time.
+                            // Ask DEEP_OFFER only when hard time is already over.
+                            const maxDurationSec = maxDurationMins * 60;
+                            const remainingSec = maxDurationSec - effectiveSec;
+                            console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
+
+                            if (remainingSec > 0) {
+                                nextState.phase = 'DEEP';
+                                nextState.deepAccepted = null;
+                                nextState.topicIndex = 0;
+                                nextState.turnInTopic = 0;
+                                const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
+                                nextState.deepTopicOrder = deepPlan.deepTopicOrder;
+                                nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
+                                const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
+                                nextTopicId = deepTopics[0]?.id || botTopics[0].id;
+                                supervisorInsight = { status: 'START_DEEP' };
+                                console.log(`✅ [SCAN→DEEP] SCAN complete with time left (${remainingSec}s). Starting DEEP.`);
+                            } else {
+                                nextState.phase = 'DEEP_OFFER';
+                                nextState.deepAccepted = false;
+                                supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                                console.log(`🎁 [SCAN→DEEP_OFFER] SCAN complete with no time left. Asking continuation consent.`);
+                            }
                         }
-                    }
                     }
                 } else {
                     // Continue SCAN on current topic
@@ -1051,14 +1153,14 @@ export async function POST(req: Request) {
             // --------------------------------------------------------------------
             else if (state.phase === 'DEEP_OFFER') {
                 console.log(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted}`);
+                const hasUserReply = lastMessage?.role === 'user' && String(lastMessage.content || '').trim().length > 0;
+                const waitingForAnswer = state.deepAccepted === false || state.deepAccepted === null;
 
-                if (state.deepAccepted === null) {
-                    // First time - bot will ask the offer question
-                    console.log(`🎁 [DEEP_OFFER] First time, asking offer question`);
+                if (!hasUserReply || !waitingForAnswer) {
+                    console.log(`🎁 [DEEP_OFFER] Asking continuation offer.`);
                     supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                    nextState.deepAccepted = false; // Mark that we're waiting for response
-                } else if (state.deepAccepted === false) {
-                    // We asked, now check user's response
+                    nextState.deepAccepted = false;
+                } else {
                     console.log(`🎁 [DEEP_OFFER] Checking user response`);
                     const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
                     console.log(`🎁 [DEEP_OFFER] Intent detected: ${intent}`);
@@ -1090,6 +1192,7 @@ export async function POST(req: Request) {
                         // NEUTRAL - re-ask
                         console.log(`🎁 [DEEP_OFFER] Neutral response, re-asking`);
                         supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                        nextState.deepAccepted = false;
                     }
                 }
             }
@@ -1121,7 +1224,7 @@ export async function POST(req: Request) {
                 const remainingSec = maxDurationSec - effectiveSec;
                 if (remainingSec <= 0 && state.deepAccepted !== true) {
                     nextState.phase = 'DEEP_OFFER';
-                    nextState.deepAccepted = null;
+                    nextState.deepAccepted = false;
                     supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                     console.log(`🎁 [DEEP→DEEP_OFFER] Time over during DEEP. Offering extra time.`);
                 }
@@ -1194,10 +1297,16 @@ export async function POST(req: Request) {
                         .filter((sg: string) => !usedSubGoals.includes(sg))
                         .filter((sg: string) => (lastDeepGoal ? sg !== lastDeepGoal : true));
 
+                    // Get engaging snippet from SCAN phase for this topic
+                    const matchingTopic = (nextState.interestingTopics || state.interestingTopics || []).find(
+                        (it: InterestingTopic) => it.topicId === deepCurrent.id
+                    );
+                    const engagingSnippet = matchingTopic?.bestSnippet || '';
+
                     if (availableSubGoals.length === 0) {
                         const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
                         const focusPoint = fallbackSnippet ? `Approfondisci: "${fallbackSnippet}"` : `Approfondisci: "${deepCurrent.label}"`;
-                        supervisorInsight = { status: 'DEEPENING', focusPoint };
+                        supervisorInsight = { status: 'DEEPENING', focusPoint, engagingSnippet };
                     } else {
                         const focusPoint = availableSubGoals[0];
                         nextState.topicSubGoalHistory = {
@@ -1208,7 +1317,7 @@ export async function POST(req: Request) {
                             ...(state.deepLastSubGoalByTopic || {}),
                             [deepCurrent.id]: focusPoint
                         };
-                        supervisorInsight = { status: 'DEEPENING', focusPoint };
+                        supervisorInsight = { status: 'DEEPENING', focusPoint, engagingSnippet };
                     }
 
                     console.log(`🔍 [DEEP] Continuing topic "${deepCurrent.label}", turn ${nextState.turnInTopic}/${turnsLimit}`);
@@ -1253,271 +1362,271 @@ export async function POST(req: Request) {
                     console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFieldIds.join(', ')}`);
                     console.log(`📋 [DATA_COLLECTION] Current profile keys: ${Object.keys(currentProfile).join(', ') || 'none'}`);
 
-                // STEP 1: Handle consent flow
-                if (state.consentGiven === null) {
-                    // First time in DATA_COLLECTION - ask for consent
-                    console.log(`📋 [DATA_COLLECTION] Asking for consent (first time)`);
-                    supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                    nextState.consentGiven = false; // Mark that we're waiting for response
-                    nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
-                } else if (state.consentGiven === false) {
-                    // We asked for consent, now check user's response
-                    console.log(`📋 [DATA_COLLECTION] Checking consent response`);
-                    const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'consent');
-                    console.log(`📋 [DATA_COLLECTION] Intent detected: ${intent}`);
-
-                    if (intent === 'ACCEPT') {
-                        nextState.consentGiven = true;
-                        console.log(`📋 [DATA_COLLECTION] User accepted, will ask first field`);
-                        // Don't set supervisorInsight here - let it fall through to ask first field
-                    } else if (intent === 'REFUSE') {
-                        console.log(`📋 [DATA_COLLECTION] User refused consent.`);
-                        await completeInterview(
-                            conversationId,
-                            canonicalMessages,
-                            openAIKey,
-                            currentProfile,
-                            { simulationMode }
-                        );
-                        // Set status for AI to say goodbye
-                        supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                        nextState.dataCollectionAttempts = CONFIG.MAX_DATA_COLLECTION_ATTEMPTS;
-                        nextState.consentGiven = false;
-                        nextState.lastAskedField = null;
-                        nextState.dataCollectionRefused = true;
-                    } else {
-                        // NEUTRAL - re-ask consent
-                        console.log(`📋 [DATA_COLLECTION] Neutral response, re-asking consent`);
+                    // STEP 1: Handle consent flow
+                    if (state.consentGiven === null) {
+                        // First time in DATA_COLLECTION - ask for consent
+                        console.log(`📋 [DATA_COLLECTION] Asking for consent (first time)`);
                         supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                        nextState.consentGiven = false; // Mark that we're waiting for response
                         nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                    } else if (state.consentGiven === false) {
+                        // We asked for consent, now check user's response
+                        console.log(`📋 [DATA_COLLECTION] Checking consent response`);
+                        const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'consent');
+                        console.log(`📋 [DATA_COLLECTION] Intent detected: ${intent}`);
+
+                        if (intent === 'ACCEPT') {
+                            nextState.consentGiven = true;
+                            console.log(`📋 [DATA_COLLECTION] User accepted, will ask first field`);
+                            // Don't set supervisorInsight here - let it fall through to ask first field
+                        } else if (intent === 'REFUSE') {
+                            console.log(`📋 [DATA_COLLECTION] User refused consent.`);
+                            await completeInterview(
+                                conversationId,
+                                canonicalMessages,
+                                openAIKey,
+                                currentProfile,
+                                { simulationMode }
+                            );
+                            // Set status for AI to say goodbye
+                            supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                            nextState.dataCollectionAttempts = CONFIG.MAX_DATA_COLLECTION_ATTEMPTS;
+                            nextState.consentGiven = false;
+                            nextState.lastAskedField = null;
+                            nextState.dataCollectionRefused = true;
+                        } else {
+                            // NEUTRAL - re-ask consent
+                            console.log(`📋 [DATA_COLLECTION] Neutral response, re-asking consent`);
+                            supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                            nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                        }
                     }
-                }
 
                     // STEP 2: If consent given (now or before), handle field collection
                     if (nextState.consentGiven === true || state.consentGiven === true) {
                         console.log(`📋 [DATA_COLLECTION] Consent given, processing fields`);
                         let haltCollection = false;
 
-                    // CHECK: Did user change their mind mid-collection? ("basta", "non voglio", "stop")
-                    const REFUSAL_MID_COLLECTION_IT = /\b(basta|non voglio|stop|preferisco fermarmi|non continuare|lascia stare)\b/i;
-                    const REFUSAL_MID_COLLECTION_EN = /\b(stop|enough|i don't want|let's stop|never mind|forget it)\b/i;
-                    const refusalPattern = language === 'it' ? REFUSAL_MID_COLLECTION_IT : REFUSAL_MID_COLLECTION_EN;
+                        // CHECK: Did user change their mind mid-collection? ("basta", "non voglio", "stop")
+                        const REFUSAL_MID_COLLECTION_IT = /\b(basta|non voglio|stop|preferisco fermarmi|non continuare|lascia stare)\b/i;
+                        const REFUSAL_MID_COLLECTION_EN = /\b(stop|enough|i don't want|let's stop|never mind|forget it)\b/i;
+                        const refusalPattern = language === 'it' ? REFUSAL_MID_COLLECTION_IT : REFUSAL_MID_COLLECTION_EN;
 
-                    // CHECK: Is user frustrated/complaining about repeated questions?
-                    const FRUSTRATION_IT = /\b(già (detto|chiesto)|te l'ho (già|appena)|incantato|bloccato|ripeti|sempre la stessa|loop)\b/i;
-                    const FRUSTRATION_EN = /\b(already (told|said|asked)|just (told|said)|stuck|loop|same question|repeating)\b/i;
-                    const frustrationPattern = language === 'it' ? FRUSTRATION_IT : FRUSTRATION_EN;
-                    const userFrustrated = lastMessage?.role === 'user' && frustrationPattern.test(lastMessage.content);
+                        // CHECK: Is user frustrated/complaining about repeated questions?
+                        const FRUSTRATION_IT = /\b(già (detto|chiesto)|te l'ho (già|appena)|incantato|bloccato|ripeti|sempre la stessa|loop)\b/i;
+                        const FRUSTRATION_EN = /\b(already (told|said|asked)|just (told|said)|stuck|loop|same question|repeating)\b/i;
+                        const frustrationPattern = language === 'it' ? FRUSTRATION_IT : FRUSTRATION_EN;
+                        const userFrustrated = lastMessage?.role === 'user' && frustrationPattern.test(lastMessage.content);
 
-                    if (lastMessage?.role === 'user' && refusalPattern.test(lastMessage.content)) {
-                        console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
-                        await completeInterview(
-                            conversationId,
-                            canonicalMessages,
-                            openAIKey,
-                            currentProfile,
-                            { simulationMode }
-                        );
-                        supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                        nextState.dataCollectionRefused = true;
-                        haltCollection = true;
-                    }
+                        if (lastMessage?.role === 'user' && refusalPattern.test(lastMessage.content)) {
+                            console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
+                            await completeInterview(
+                                conversationId,
+                                canonicalMessages,
+                                openAIKey,
+                                currentProfile,
+                                { simulationMode }
+                            );
+                            supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                            nextState.dataCollectionRefused = true;
+                            haltCollection = true;
+                        }
 
-                    // If user is frustrated about repeated questions, try to extract info from conversation history
-                    // and complete the interview with what we have
-                    if (userFrustrated) {
-                        console.log(`⚠️ [DATA_COLLECTION] User frustrated - attempting to extract from history and complete`);
+                        // If user is frustrated about repeated questions, try to extract info from conversation history
+                        // and complete the interview with what we have
+                        if (userFrustrated) {
+                            console.log(`⚠️ [DATA_COLLECTION] User frustrated - attempting to extract from history and complete`);
 
-                        // Determine which name field is configured (name or fullName)
-                        const configuredNameField = candidateFieldIds.find((fieldName: string) =>
-                            fieldName === 'name' || fieldName === 'fullName'
-                        );
-                        const nameFieldKey = configuredNameField || 'fullName';
+                            // Determine which name field is configured (name or fullName)
+                            const configuredNameField = candidateFieldIds.find((fieldName: string) =>
+                                fieldName === 'name' || fieldName === 'fullName'
+                            );
+                            const nameFieldKey = configuredNameField || 'fullName';
 
-                        // Try to find the name in previous messages if we don't have it
-                        if (!currentProfile[nameFieldKey]) {
-                            // Look for a short reply (1-3 words) after a "name" question
-                            for (let i = canonicalMessages.length - 1; i >= 0; i--) {
-                                const msg = canonicalMessages[i];
-                                if (msg.role === 'user') {
-                                    const content = msg.content.trim();
-                                    const words = content.split(/\s+/);
-                                    // Short response that looks like a name
-                                    if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content)) {
-                                        const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
-                                        if (cleanedName.length > 1) {
-                                            currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
-                                            console.log(`✅ [DATA_COLLECTION] Recovered name from history for "${nameFieldKey}"`);
-                                            await prisma.conversation.update({
-                                                where: { id: conversationId },
-                                                data: { candidateProfile: currentProfile }
-                                            });
-                                            break;
+                            // Try to find the name in previous messages if we don't have it
+                            if (!currentProfile[nameFieldKey]) {
+                                // Look for a short reply (1-3 words) after a "name" question
+                                for (let i = canonicalMessages.length - 1; i >= 0; i--) {
+                                    const msg = canonicalMessages[i];
+                                    if (msg.role === 'user') {
+                                        const content = msg.content.trim();
+                                        const words = content.split(/\s+/);
+                                        // Short response that looks like a name
+                                        if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content)) {
+                                            const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
+                                            if (cleanedName.length > 1) {
+                                                currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
+                                                console.log(`✅ [DATA_COLLECTION] Recovered name from history for "${nameFieldKey}"`);
+                                                await prisma.conversation.update({
+                                                    where: { id: conversationId },
+                                                    data: { candidateProfile: currentProfile }
+                                                });
+                                                break;
+                                            }
                                         }
                                     }
                                 }
                             }
+
+                            // Complete with what we have
+                            await completeInterview(
+                                conversationId,
+                                canonicalMessages,
+                                openAIKey,
+                                currentProfile,
+                                { simulationMode }
+                            );
+                            supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                            haltCollection = true;
                         }
 
-                        // Complete with what we have
-                        await completeInterview(
-                            conversationId,
-                            canonicalMessages,
-                            openAIKey,
-                            currentProfile,
-                            { simulationMode }
-                        );
-                        supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                        haltCollection = true;
-                    }
+                        if (!haltCollection) {
+                            // CHECK: Did user say they don't have this field? ("non ho email", "I don't have")
+                            const SKIP_FIELD_IT = /\b(non ho|non ce l'ho|non posso|preferisco non)\b/i;
+                            const SKIP_FIELD_EN = /\b(i don't have|don't have|can't provide|prefer not to)\b/i;
+                            const skipPattern = language === 'it' ? SKIP_FIELD_IT : SKIP_FIELD_EN;
+                            const userWantsToSkip = lastMessage?.role === 'user' && skipPattern.test(lastMessage.content);
 
-                    if (!haltCollection) {
-                        // CHECK: Did user say they don't have this field? ("non ho email", "I don't have")
-                        const SKIP_FIELD_IT = /\b(non ho|non ce l'ho|non posso|preferisco non)\b/i;
-                        const SKIP_FIELD_EN = /\b(i don't have|don't have|can't provide|prefer not to)\b/i;
-                        const skipPattern = language === 'it' ? SKIP_FIELD_IT : SKIP_FIELD_EN;
-                        const userWantsToSkip = lastMessage?.role === 'user' && skipPattern.test(lastMessage.content);
+                            // Targeted extraction strategy:
+                            // 1) prioritize the field we just asked,
+                            // 2) opportunistically capture deterministic structured fields (email/phone/url),
+                            // 3) avoid broad multi-field LLM extraction to reduce false positives.
+                            if (lastMessage?.role === 'user' && !userWantsToSkip) {
+                                const missingFieldIds = candidateFieldIds.filter((fieldName: string) =>
+                                    !currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__'
+                                );
+                                const lastAsked = state.lastAskedField;
+                                const prioritizedField = (lastAsked && missingFieldIds.includes(lastAsked))
+                                    ? lastAsked
+                                    : (missingFieldIds[0] || null);
 
-                        // Targeted extraction strategy:
-                        // 1) prioritize the field we just asked,
-                        // 2) opportunistically capture deterministic structured fields (email/phone/url),
-                        // 3) avoid broad multi-field LLM extraction to reduce false positives.
-                        if (lastMessage?.role === 'user' && !userWantsToSkip) {
-                            const missingFieldIds = candidateFieldIds.filter((fieldName: string) =>
-                                !currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__'
-                            );
-                            const lastAsked = state.lastAskedField;
-                            const prioritizedField = (lastAsked && missingFieldIds.includes(lastAsked))
-                                ? lastAsked
-                                : (missingFieldIds[0] || null);
+                                console.log(`📋 [DATA_COLLECTION] Missing fields: ${missingFieldIds.join(', ') || 'none'}`);
+                                console.log(`📋 [DATA_COLLECTION] Prioritized field: ${prioritizedField || 'none'}`);
 
-                            console.log(`📋 [DATA_COLLECTION] Missing fields: ${missingFieldIds.join(', ') || 'none'}`);
-                            console.log(`📋 [DATA_COLLECTION] Prioritized field: ${prioritizedField || 'none'}`);
+                                const userReply = lastMessage.content.trim();
+                                const wordCount = userReply.split(/\s+/).length;
+                                let profileChanged = false;
 
-                            const userReply = lastMessage.content.trim();
-                            const wordCount = userReply.split(/\s+/).length;
-                            let profileChanged = false;
-
-                            // Opportunistic deterministic extraction for structured fields present in free text.
-                            const opportunisticFields = missingFieldIds.filter((fieldName: string) =>
-                                ['email', 'phone', 'linkedin', 'portfolio'].includes(fieldName) && fieldName !== prioritizedField
-                            );
-                            for (const fieldName of opportunisticFields) {
-                                const deterministicValue = extractDeterministicFieldValue(fieldName, lastMessage.content);
-                                if (deterministicValue) {
-                                    currentProfile = { ...currentProfile, [fieldName]: deterministicValue };
-                                    profileChanged = true;
-                                    console.log(`✅ [DATA_COLLECTION] Opportunistic deterministic capture for "${fieldName}"`);
-                                }
-                            }
-
-                            if (prioritizedField) {
-                                // Direct capture for NAME (1-3 words, no special chars)
-                                const isNameField = prioritizedField === 'fullName' || prioritizedField === 'name';
-                                const nameFieldKey = prioritizedField === 'name' ? 'name' : 'fullName';
-                                if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey]) {
-                                    const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
-                                    if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
-                                        currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
-                                        profileChanged = true;
-                                        console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}"`);
-                                    }
-                                }
-
-                                // Direct capture for COMPANY (1-5 words, reasonable length)
-                                if (prioritizedField === 'company' && wordCount <= 5 && !currentProfile.company) {
-                                    const cleanedCompany = userReply.replace(/[.!?,;:]/g, '').trim();
-                                    if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
-                                        !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
-                                        currentProfile = { ...currentProfile, company: cleanedCompany };
-                                        profileChanged = true;
-                                        console.log(`✅ [DATA_COLLECTION] Direct company capture`);
-                                    }
-                                }
-
-                                // Direct capture for ROLE (1-4 words)
-                                if (prioritizedField === 'role' && wordCount <= 4 && !currentProfile.role) {
-                                    const cleanedRole = userReply.replace(/[.!?,;:]/g, '').trim();
-                                    if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
-                                        !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
-                                        currentProfile = { ...currentProfile, role: cleanedRole };
-                                        profileChanged = true;
-                                        console.log(`✅ [DATA_COLLECTION] Direct role capture`);
-                                    }
-                                }
-
-                                if (!currentProfile[prioritizedField]) {
-                                    const deterministicValue = extractDeterministicFieldValue(prioritizedField, lastMessage.content);
+                                // Opportunistic deterministic extraction for structured fields present in free text.
+                                const opportunisticFields = missingFieldIds.filter((fieldName: string) =>
+                                    ['email', 'phone', 'linkedin', 'portfolio'].includes(fieldName) && fieldName !== prioritizedField
+                                );
+                                for (const fieldName of opportunisticFields) {
+                                    const deterministicValue = extractDeterministicFieldValue(fieldName, lastMessage.content);
                                     if (deterministicValue) {
-                                        currentProfile = { ...currentProfile, [prioritizedField]: deterministicValue };
+                                        currentProfile = { ...currentProfile, [fieldName]: deterministicValue };
                                         profileChanged = true;
-                                        console.log(`✅ [DATA_COLLECTION] Deterministic extraction for "${prioritizedField}"`);
+                                        console.log(`✅ [DATA_COLLECTION] Opportunistic deterministic capture for "${fieldName}"`);
                                     }
                                 }
 
-                                if (!currentProfile[prioritizedField]) {
-                                    const extraction = await extractFieldFromMessage(
-                                        prioritizedField,
-                                        lastMessage.content,
-                                        openAIKey,
-                                        language
-                                    );
-                                    console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}"`);
-                                    if (extraction.value && extraction.confidence !== 'none') {
-                                        currentProfile = { ...currentProfile, [prioritizedField]: extraction.value };
-                                        profileChanged = true;
-                                        console.log(`✅ [DATA_COLLECTION] LLM extraction for "${prioritizedField}"`);
-                                    } else {
-                                        console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}" (confidence=${extraction.confidence})`);
+                                if (prioritizedField) {
+                                    // Direct capture for NAME (1-3 words, no special chars)
+                                    const isNameField = prioritizedField === 'fullName' || prioritizedField === 'name';
+                                    const nameFieldKey = prioritizedField === 'name' ? 'name' : 'fullName';
+                                    if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey]) {
+                                        const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
+                                        if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
+                                            currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
+                                            profileChanged = true;
+                                            console.log(`✅ [DATA_COLLECTION] Direct name capture for "${nameFieldKey}"`);
+                                        }
+                                    }
+
+                                    // Direct capture for COMPANY (1-5 words, reasonable length)
+                                    if (prioritizedField === 'company' && wordCount <= 5 && !currentProfile.company) {
+                                        const cleanedCompany = userReply.replace(/[.!?,;:]/g, '').trim();
+                                        if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
+                                            !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
+                                            currentProfile = { ...currentProfile, company: cleanedCompany };
+                                            profileChanged = true;
+                                            console.log(`✅ [DATA_COLLECTION] Direct company capture`);
+                                        }
+                                    }
+
+                                    // Direct capture for ROLE (1-4 words)
+                                    if (prioritizedField === 'role' && wordCount <= 4 && !currentProfile.role) {
+                                        const cleanedRole = userReply.replace(/[.!?,;:]/g, '').trim();
+                                        if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
+                                            !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
+                                            currentProfile = { ...currentProfile, role: cleanedRole };
+                                            profileChanged = true;
+                                            console.log(`✅ [DATA_COLLECTION] Direct role capture`);
+                                        }
+                                    }
+
+                                    if (!currentProfile[prioritizedField]) {
+                                        const deterministicValue = extractDeterministicFieldValue(prioritizedField, lastMessage.content);
+                                        if (deterministicValue) {
+                                            currentProfile = { ...currentProfile, [prioritizedField]: deterministicValue };
+                                            profileChanged = true;
+                                            console.log(`✅ [DATA_COLLECTION] Deterministic extraction for "${prioritizedField}"`);
+                                        }
+                                    }
+
+                                    if (!currentProfile[prioritizedField]) {
+                                        const extraction = await extractFieldFromMessage(
+                                            prioritizedField,
+                                            lastMessage.content,
+                                            openAIKey,
+                                            language
+                                        );
+                                        console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}"`);
+                                        if (extraction.value && extraction.confidence !== 'none') {
+                                            currentProfile = { ...currentProfile, [prioritizedField]: extraction.value };
+                                            profileChanged = true;
+                                            console.log(`✅ [DATA_COLLECTION] LLM extraction for "${prioritizedField}"`);
+                                        } else {
+                                            console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}" (confidence=${extraction.confidence})`);
+                                        }
                                     }
                                 }
-                            }
 
-                            // Save only when profile changed in this turn.
-                            if (profileChanged) {
+                                // Save only when profile changed in this turn.
+                                if (profileChanged) {
+                                    await prisma.conversation.update({
+                                        where: { id: conversationId },
+                                        data: { candidateProfile: currentProfile }
+                                    });
+                                    console.log(`✅ [DATA_COLLECTION] Saved profile`);
+                                }
+                            } else if (userWantsToSkip && state.lastAskedField) {
+                                // User wants to skip this field - mark it as skipped so we don't ask again
+                                console.log(`📋 [DATA_COLLECTION] User wants to skip "${state.lastAskedField}"`);
+                                currentProfile = { ...currentProfile, [state.lastAskedField]: '__SKIPPED__' };
                                 await prisma.conversation.update({
                                     where: { id: conversationId },
                                     data: { candidateProfile: currentProfile }
                                 });
-                                console.log(`✅ [DATA_COLLECTION] Saved profile`);
                             }
-                        } else if (userWantsToSkip && state.lastAskedField) {
-                            // User wants to skip this field - mark it as skipped so we don't ask again
-                            console.log(`📋 [DATA_COLLECTION] User wants to skip "${state.lastAskedField}"`);
-                            currentProfile = { ...currentProfile, [state.lastAskedField]: '__SKIPPED__' };
-                            await prisma.conversation.update({
-                                where: { id: conversationId },
-                                data: { candidateProfile: currentProfile }
-                            });
-                        }
 
-                        // Find next missing field (skip fields marked as __SKIPPED__ or asked too many times)
-                        const MAX_FIELD_ATTEMPTS = 3; // Skip field if asked more than 3 times
-                        const nextField = getNextMissingCandidateField(
-                            candidateFieldIds,
-                            currentProfile,
-                            state.fieldAttemptCounts,
-                            MAX_FIELD_ATTEMPTS
-                        );
-                        console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected/skipped'}`);
+                            // Find next missing field (skip fields marked as __SKIPPED__ or asked too many times)
+                            const MAX_FIELD_ATTEMPTS = 3; // Skip field if asked more than 3 times
+                            const nextField = getNextMissingCandidateField(
+                                candidateFieldIds,
+                                currentProfile,
+                                state.fieldAttemptCounts,
+                                MAX_FIELD_ATTEMPTS
+                            );
+                            console.log(`📋 [DATA_COLLECTION] Next field to ask: ${nextField || 'NONE - all collected/skipped'}`);
 
-                        if (!nextField) {
-                            // All fields collected or skipped!
-                            console.log(`✅ [DATA_COLLECTION] All fields collected/skipped, letting AI say final goodbye`);
-                            supervisorInsight = { status: 'FINAL_GOODBYE' };
-                            nextState.lastAskedField = null;
-                        } else {
-                            // Set up to ask next field - track attempt count
-                            nextState.lastAskedField = nextField;
-                            nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
-                            nextState.consentGiven = true;
-                            nextState.fieldAttemptCounts = {
-                                ...state.fieldAttemptCounts,
-                                [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
-                            };
-                            supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
+                            if (!nextField) {
+                                // All fields collected or skipped!
+                                console.log(`✅ [DATA_COLLECTION] All fields collected/skipped, letting AI say final goodbye`);
+                                supervisorInsight = { status: 'FINAL_GOODBYE' };
+                                nextState.lastAskedField = null;
+                            } else {
+                                // Set up to ask next field - track attempt count
+                                nextState.lastAskedField = nextField;
+                                nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                                nextState.consentGiven = true;
+                                nextState.fieldAttemptCounts = {
+                                    ...state.fieldAttemptCounts,
+                                    [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
+                                };
+                                supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
+                            }
                         }
-                    }
                     }
                 } else {
                     nextState.dataCollectionAttempts = CONFIG.MAX_DATA_COLLECTION_ATTEMPTS;
@@ -1813,99 +1922,94 @@ hard_rules:
                     responseText = `${responseText.trim()} INTERVIEW_COMPLETED`.trim();
                 }
             } else {
-            const candidateFields = (bot.candidateDataFields as any[]) || [];
-            const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
+                const candidateFields = (bot.candidateDataFields as any[]) || [];
+                const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
 
-            // CRITICAL: Re-read profile from DB to get updated values after extraction
-            // The `conversation.candidateProfile` is stale (from start of request)
-            const freshConversation = await prisma.conversation.findUnique({
-                where: { id: conversationId },
-                select: { candidateProfile: true }
-            });
-            const currentProfile = (freshConversation?.candidateProfile as any) || {};
+                // CRITICAL: Re-read profile from DB to get updated values after extraction
+                // The `conversation.candidateProfile` is stale (from start of request)
+                const freshConversation = await prisma.conversation.findUnique({
+                    where: { id: conversationId },
+                    select: { candidateProfile: true }
+                });
+                const currentProfile = (freshConversation?.candidateProfile as any) || {};
 
-            // Find first missing field (must match logic in data collection phase)
-            // Consider: already collected, explicitly skipped, or asked too many times
-            const MAX_FIELD_ATTEMPTS_SUPERVISOR = 3;
-            const missingField = getNextMissingCandidateField(
-                candidateFieldIds,
-                currentProfile,
-                nextState.fieldAttemptCounts,
-                MAX_FIELD_ATTEMPTS_SUPERVISOR
-            );
+                // Find first missing field (must match logic in data collection phase)
+                // Consider: already collected, explicitly skipped, or asked too many times
+                const MAX_FIELD_ATTEMPTS_SUPERVISOR = 3;
+                const missingField = getNextMissingCandidateField(
+                    candidateFieldIds,
+                    currentProfile,
+                    nextState.fieldAttemptCounts,
+                    MAX_FIELD_ATTEMPTS_SUPERVISOR
+                );
 
-            // CONSENT PHASE: bot should ask for permission
-            const forceConsent = nextState.forceConsentQuestion === true;
-            if ((forceConsent || nextState.consentGiven === false) && !nextState.dataCollectionRefused) {
-                const openai = createOpenAI({ apiKey: openAIKey });
-                const consentSchema = z.object({ isConsent: z.boolean() });
-                let isConsent = false;
-                try {
-                    const consentCheck = await generateObject({
-                        model: openai('gpt-4o-mini'),
-                        schema: consentSchema,
-                        prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
-                        temperature: 0
-                    });
-                    isConsent = consentCheck.object.isConsent;
-                } catch (e) {
-                    console.error('Consent validation failed:', e);
-                }
-
-                if (!isConsent || forceConsent) {
-                    console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for consent to collect contact details. One question only. Do not ask any topic question.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
-                    responseText = retry.object.response?.trim() || responseText;
-
+                // CONSENT PHASE: bot should ask for permission
+                const forceConsent = nextState.forceConsentQuestion === true;
+                if ((forceConsent || nextState.consentGiven === false) && !nextState.dataCollectionRefused) {
+                    const openai = createOpenAI({ apiKey: openAIKey });
+                    const consentSchema = z.object({ isConsent: z.boolean() });
+                    let isConsent = false;
                     try {
-                        const consentCheck2 = await generateObject({
+                        const consentCheck = await generateObject({
                             model: openai('gpt-4o-mini'),
                             schema: consentSchema,
                             prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
                             temperature: 0
                         });
-                        if (!consentCheck2.object.isConsent) {
-                            const enforcedSystem2 = `You must ask a single yes/no question asking permission to collect contact details.`;
-                            const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
-                            responseText = retry2.object.response?.trim() || responseText;
-                        }
+                        isConsent = consentCheck.object.isConsent;
                     } catch (e) {
-                        console.error('Consent validation retry failed:', e);
+                        console.error('Consent validation failed:', e);
+                    }
+
+                    if (!isConsent || forceConsent) {
+                        console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
+                        const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for consent to collect contact details. One question only. Do not ask any topic question.`;
+                        const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                        responseText = retry.object.response?.trim() || responseText;
+
+                        try {
+                            const consentCheck2 = await generateObject({
+                                model: openai('gpt-4o-mini'),
+                                schema: consentSchema,
+                                prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
+                                temperature: 0
+                            });
+                            if (!consentCheck2.object.isConsent) {
+                                const enforcedSystem2 = `You must ask a single yes/no question asking permission to collect contact details.`;
+                                const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
+                                responseText = retry2.object.response?.trim() || responseText;
+                            }
+                        } catch (e) {
+                            console.error('Consent validation retry failed:', e);
+                        }
+                    }
+                    if (forceConsent) {
+                        nextState.forceConsentQuestion = false;
                     }
                 }
-                if (forceConsent) {
-                    nextState.forceConsentQuestion = false;
-                }
-            }
-            // FIELD COLLECTION PHASE: bot should ask for specific field
-            else if (nextState.consentGiven === true && missingField) {
-                // Only override if the response doesn't already ask for this field
-                const fieldMentioned = responseText.toLowerCase().includes(missingField.toLowerCase()) ||
-                    ((missingField === 'name' || missingField === 'fullName') && /\b(nome|cognome|name)\b/i.test(responseText)) ||
-                    (missingField === 'email' && /\b(email|mail)\b/i.test(responseText)) ||
-                    (missingField === 'phone' && /\b(telefono|phone|numero)\b/i.test(responseText)) ||
-                    (missingField === 'company' && /\b(azienda|company|organizzazione)\b/i.test(responseText)) ||
-                    (missingField === 'role' && /\b(ruolo|role|posizione)\b/i.test(responseText));
+                // FIELD COLLECTION PHASE: bot should ask for specific field
+                else if (nextState.consentGiven === true && missingField) {
+                    // Only override if the response doesn't already ask for this field
+                    const fieldMentioned = responseMentionsCandidateField(responseText, missingField);
 
-                if (!fieldMentioned || hasNoQuestion) {
-                    console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". OVERRIDING with field question.`);
-                    const fieldLabel = getFieldLabel(missingField, language);
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for ${fieldLabel}. One question only.`;
+                    if (!fieldMentioned || hasNoQuestion) {
+                        console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". OVERRIDING with field question.`);
+                        const fieldLabel = getFieldLabel(missingField, language);
+                        const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for ${fieldLabel}. One question only.`;
+                        const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                        responseText = retry.object.response?.trim() || responseText;
+                    }
+                }
+                // ALL FIELDS COLLECTED but bot didn't complete
+                else if (!missingField && !responseText.includes('INTERVIEW_COMPLETED')) {
+                    console.log(`✅ [SUPERVISOR] All fields collected, adding completion tag.`);
+                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Thank the user, close the interview, and append \"INTERVIEW_COMPLETED\". Do not ask any questions.`;
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
+                    if (!/INTERVIEW_COMPLETED/i.test(responseText)) {
+                        responseText = `${responseText.trim()} INTERVIEW_COMPLETED`.trim();
+                    }
                 }
-            }
-            // ALL FIELDS COLLECTED but bot didn't complete
-            else if (!missingField && !responseText.includes('INTERVIEW_COMPLETED')) {
-                console.log(`✅ [SUPERVISOR] All fields collected, adding completion tag.`);
-                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Thank the user, close the interview, and append \"INTERVIEW_COMPLETED\". Do not ask any questions.`;
-                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-                responseText = retry.object.response?.trim() || responseText;
-                if (!/INTERVIEW_COMPLETED/i.test(responseText)) {
-                    responseText = `${responseText.trim()} INTERVIEW_COMPLETED`.trim();
-                }
-            }
             }
         }
         // Other phases - Handle bot trying to close during SCAN/DEEP
@@ -1919,7 +2023,7 @@ hard_rules:
             if (shouldOfferExtraTime) {
                 console.log(`⚠️ [SUPERVISOR] Closure attempt while time is over. Switching to DEEP_OFFER.`);
                 nextState.phase = 'DEEP_OFFER';
-                nextState.deepAccepted = null;
+                nextState.deepAccepted = false;
                 supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                 try {
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask (lightly) if the user has a bit more time to continue with a few extra/deeper questions. One question only.`;
@@ -1929,39 +2033,38 @@ hard_rules:
                     console.error('Deep offer regeneration after closure failed:', e);
                 }
             } else {
-            nextState.closureAttempts = (state.closureAttempts || 0) + 1;
-            console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Forcing topic question. Attempt #${nextState.closureAttempts}`);
+                nextState.closureAttempts = (state.closureAttempts || 0) + 1;
+                console.log(`⚠️ [SUPERVISOR] Bot tried to close during ${nextState.phase} phase. Forcing topic question. Attempt #${nextState.closureAttempts}`);
 
-            const enforceTopic = targetTopic?.label || currentTopic.label;
-            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing. The response MUST end with a question mark.`;            
-            const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-            responseText = retry.object.response?.trim() || responseText;
-            console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
+                const enforceTopic = targetTopic?.label || currentTopic.label;
+                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing. The response MUST end with a question mark.`;
+                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                responseText = retry.object.response?.trim() || responseText;
+                console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
 
-            // If the override still isn't a proper question, retry with stricter constraints
-            const stillBad = !responseText.includes('?') || goodbyePattern.test(responseText);
-            if (stillBad) {
-                console.log("🧭 [SUPERVISOR] Override still invalid, retrying with stricter constraints.");
-                const enforcedSystem2 = `You must ask exactly ONE question about "${enforceTopic}". Do NOT include any closing, thanks, or future contact. End with "?".`;
-                const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.2 });
-                responseText = retry2.object.response?.trim() || responseText;
-                console.log("🧭 [SUPERVISOR] Override response #2:", responseText.slice(0, 300));
-                const stillBadAfterRetry = !responseText.includes('?') || goodbyePattern.test(responseText);
-                if (stillBadAfterRetry) {
-                    console.log("🧭 [SUPERVISOR] Override still invalid after retry #2. Forcing question-only generation.");
+                // If the override still isn't a proper question, use fallback question-only generation (MAX 1 retry)
+                const stillBad = !responseText.includes('?') || goodbyePattern.test(responseText);
+                if (stillBad) {
+                    console.log("🧭 [SUPERVISOR] Override still invalid, using fallback question-only generation.");
                     try {
                         responseText = await generateQuestionOnly({
                             model,
                             language,
                             topicLabel: enforceTopic,
-                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null
+                            topicCue: buildNaturalTopicCue(enforceTopic, language),
+                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
+                            requireAcknowledgment: true
                         });
                         console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
                     } catch (e) {
                         console.error("Question-only generation failed:", e);
+                        // Final fallback: simple question
+                        const fallbackQuestion = language === 'it'
+                            ? `Puoi dirmi di più su ${enforceTopic}?`
+                            : `Can you tell me more about ${enforceTopic}?`;
+                        responseText = fallbackQuestion;
                     }
                 }
-            }
             }
         }
         // Reset closure attempts when bot generates a valid question (not trying to close)
@@ -1976,42 +2079,21 @@ hard_rules:
             responseText = retry.object.response?.trim() || responseText;
         }
 
-        // Qualitative guardrail: keep questions context-aware and probing,
-        // especially after very short user answers.
+        // ====================================================================
+        // QUALITATIVE TELEMETRY (logging only, not blocking)
+        // ====================================================================
         const qualityGatePhases = new Set(['SCAN', 'DEEP', 'DEEP_OFFER']);
         qualityTelemetry.eligible = qualityGatePhases.has(nextState.phase);
-        const shouldRunQualitativeGate =
-            qualityGatePhases.has(nextState.phase) &&
-            lastMessage?.role === 'user' &&
-            !/INTERVIEW_COMPLETED/i.test(responseText);
 
-        if (shouldRunQualitativeGate) {
+        if (qualityGatePhases.has(nextState.phase) && lastMessage?.role === 'user' && !/INTERVIEW_COMPLETED/i.test(responseText)) {
             qualityTelemetry.evaluated = true;
             const phaseForQuality = nextState.phase as 'SCAN' | 'DEEP' | 'DEEP_OFFER';
-            const isTopicPhaseForQuality = phaseForQuality === 'SCAN' || phaseForQuality === 'DEEP';
-            const isDeepOfferPhaseForQuality = phaseForQuality === 'DEEP_OFFER';
-            const isTransitioningTopicQuestion = isTopicPhaseForQuality && supervisorInsight?.status === 'TRANSITION';
             const qualityTopicLabel = targetTopic?.label || currentTopic?.label || 'current topic';
-            const userSnippet = String(lastMessage.content || '').trim().slice(0, 200);
-            const userWordCount = userSnippet.split(/\s+/).filter(Boolean).length;
             const lastAssistantBeforeCurrent = [...canonicalMessages]
                 .reverse()
                 .find(m => m.role === 'assistant')?.content || null;
 
-            const mustFixForQuality = (qualitativeResult: ReturnType<typeof evaluateInterviewQuestionQuality>): boolean => (
-                !qualitativeResult.checks.oneQuestion ||
-                !qualitativeResult.checks.avoidsClosure ||
-                !qualitativeResult.checks.avoidsPrematureContact ||
-                (isTopicPhaseForQuality && !qualitativeResult.checks.referencesUserContext) ||
-                (isTopicPhaseForQuality && !qualitativeResult.checks.topicalAnchor) ||
-                (isTopicPhaseForQuality && !qualitativeResult.checks.nonRepetitive) ||
-                (isTopicPhaseForQuality && !isTransitioningTopicQuestion && !qualitativeResult.checks.probingWhenUserIsBrief) ||
-                (isTopicPhaseForQuality && !qualitativeResult.checks.coherentTransition) ||
-                (isTopicPhaseForQuality && !qualitativeResult.checks.handlesClarificationNaturally) ||
-                (isDeepOfferPhaseForQuality && !qualitativeResult.checks.deepOfferIntent)
-            );
-
-            let qualitative = evaluateInterviewQuestionQuality({
+            const qualitative = evaluateInterviewQuestionQuality({
                 phase: phaseForQuality,
                 topicLabel: qualityTopicLabel,
                 userResponse: lastMessage.content,
@@ -2020,116 +2102,99 @@ hard_rules:
                 language
             });
 
-            const requiresFix = mustFixForQuality(qualitative);
-            qualityTelemetry.gateTriggered = requiresFix;
-
-            if (requiresFix) {
-                qualityTelemetry.regenerated = true;
-                const qualityInstruction = isDeepOfferPhaseForQuality
-                    ? `CRITICAL QUALITY FIX:
-- Ask ONLY if the user has a bit more time to continue.
-- Ask exactly ONE yes/no question.
-- Do NOT ask topic questions, contacts, or goodbye.`
-                    : isTransitioningTopicQuestion
-                        ? `CRITICAL QUALITY FIX:
-- Keep transition natural and concise.
-- Start with a short acknowledgment of the previous reply (no literal quote).
-- Then pivot to "${qualityTopicLabel}" with one clear question.
-- If transition mode is clean_pivot, do not paraphrase user content in detail.
-- Ask exactly ONE question, no contacts, no closure.`
-                    : `CRITICAL QUALITY FIX:
-- Start with a brief acknowledgment tied to this user message: "${userSnippet}".
-- Ask exactly ONE question about "${qualityTopicLabel}".
-- Keep it specific and contextual, avoid generic phrasing.
-- Avoid repeating the previous assistant question wording.
-- Do NOT ask for contacts. Do NOT close the interview.
-${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up and request one concrete example.' : ''}`;
-
-                try {
-                    const retry = await generateObject({
-                        model,
-                        schema,
-                        messages: messagesForAI,
-                        system: `${systemPrompt}\n\n${qualityInstruction}`,
-                        temperature: 0.25
-                    });
-                    responseText = retry.object.response?.trim() || responseText;
-                } catch (e) {
-                    console.error('Qualitative regeneration failed:', e);
-                }
-
-                qualitative = evaluateInterviewQuestionQuality({
-                    phase: phaseForQuality,
-                    topicLabel: qualityTopicLabel,
-                    userResponse: lastMessage.content,
-                    assistantResponse: responseText,
-                    previousAssistantResponse: lastAssistantBeforeCurrent,
-                    language
-                });
-
-                if (mustFixForQuality(qualitative)) {
-                    responseText = buildDeterministicQualityQuestion({
-                        phase: phaseForQuality,
-                        language,
-                        topicLabel: qualityTopicLabel,
-                        userResponse: lastMessage.content,
-                        transitionMode: isTransitioningTopicQuestion
-                            ? (supervisorInsight?.transitionMode as 'bridge' | 'clean_pivot' | undefined)
-                            : undefined,
-                        transitionBridgeSnippet: isTransitioningTopicQuestion
-                            ? (supervisorInsight?.transitionBridgeSnippet as string | undefined)
-                            : undefined
-                    });
-                    qualityTelemetry.fallbackUsed = true;
-                    console.log('⚠️ [SUPERVISOR] Applied deterministic quality fallback question.');
-                    qualitative = evaluateInterviewQuestionQuality({
-                        phase: phaseForQuality,
-                        topicLabel: qualityTopicLabel,
-                        userResponse: lastMessage.content,
-                        assistantResponse: responseText,
-                        previousAssistantResponse: lastAssistantBeforeCurrent,
-                        language
-                    });
-                }
-            }
-
             qualityTelemetry.score = qualitative.score;
             qualityTelemetry.passed = qualitative.passed;
             qualityTelemetry.issues = qualitative.issues.slice(0, 8);
+
+            // Log quality issues for monitoring, but don't block
+            if (!qualitative.passed) {
+                console.log(`📊 [QUALITY] Score: ${qualitative.score}%, Issues: ${qualitative.issues.join(', ')}`);
+            }
         }
 
-        // Final fail-safe: never send closure/completion text during active topic phases.
+        // ====================================================================
+        // FINAL SAFETY NET: Only intervene for critical issues
+        // Strategy: ADDITIVE fix (keep original + add question) instead of full regeneration
+        // ====================================================================
         if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
             const hasGoodbyeNow = goodbyePattern.test(responseText);
             const hasNoQuestionNow = !responseText.includes('?');
             const hasCompletionNow = /INTERVIEW_COMPLETED/i.test(responseText);
             const hasPrematureContactNow = contactRequestPattern.test(responseText);
 
-            if (hasGoodbyeNow || hasNoQuestionNow || hasCompletionNow || hasPrematureContactNow) {
+            // Only intervene for the 3 critical cases
+            const needsIntervention = hasGoodbyeNow || hasNoQuestionNow || hasCompletionNow || hasPrematureContactNow;
+
+            if (needsIntervention) {
                 flowTelemetry.topicClosureIntercepted = true;
                 const enforceTopic = targetTopic?.label || currentTopic.label;
-                console.log(`🛡️ [FINAL_GUARD] Blocking invalid ${nextState.phase} response. Forcing question-only fallback.`);
+                const userContext = lastMessage?.role === 'user' ? lastMessage.content.slice(0, 150) : '';
+
+                console.log(`🛡️ [SAFETY_NET] Issue detected in ${nextState.phase}: goodbye=${hasGoodbyeNow}, noQuestion=${hasNoQuestionNow}, completion=${hasCompletionNow}, contact=${hasPrematureContactNow}`);
+
+                // ADDITIVE APPROACH: Ask LLM to add a follow-up question to the existing response
+                const additivePrompt = language === 'it'
+                    ? `La tua risposta è buona ma manca la domanda.
+Mantieni il riconoscimento della risposta dell'utente e AGGIUNGI una domanda naturale di follow-up su "${enforceTopic}".
+${userContext ? `Contesto utente: "${userContext}"` : ''}
+Rispondi con il messaggio completo (riconoscimento + domanda).`
+                    : `Your response is good but missing the question.
+Keep your acknowledgment of the user's response and ADD a natural follow-up question about "${enforceTopic}".
+${userContext ? `User context: "${userContext}"` : ''}
+Reply with the complete message (acknowledgment + question).`;
+
                 try {
-                    responseText = await generateQuestionOnly({
-                        model,
-                        language,
-                        topicLabel: enforceTopic,
-                        lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null
-                    });
+                    // Clean the response first
+                    let cleanedResponse = responseText
+                        .replace(/INTERVIEW_COMPLETED/gi, '')
+                        .replace(goodbyePattern, '')
+                        .replace(contactRequestPattern, '')
+                        .trim();
+
+                    // If there's still meaningful content, try to add a question to it
+                    if (cleanedResponse.length > 20 && !hasNoQuestionNow) {
+                        // Response has content and a question, just clean it
+                        responseText = cleanedResponse;
+                    } else {
+                        // Need to generate/add a question
+                        const additiveRetry = await generateObject({
+                            model,
+                            schema,
+                            messages: [
+                                ...messagesForAI.slice(0, -1),
+                                { role: 'user' as const, content: lastMessage?.content || '' }
+                            ],
+                            system: `${systemPrompt}\n\n${additivePrompt}`,
+                            temperature: 0.4  // Slightly higher for more natural responses
+                        });
+                        responseText = additiveRetry.object.response?.trim() || responseText;
+                    }
+
+                    // Final check: if still no question, append a simple one
+                    if (!responseText.includes('?')) {
+                        const simpleFollowUp = language === 'it'
+                            ? ` Puoi dirmi di più su questo aspetto?`
+                            : ` Can you tell me more about this?`;
+                        responseText = responseText.replace(/[.!]+$/, '') + simpleFollowUp;
+                    }
+
+                    // Clean any remaining closure markers
+                    responseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
+
                 } catch (e) {
-                    console.error('Final guard question-only generation failed:', e);
-                    responseText = buildDeterministicQualityQuestion({
-                        phase: nextState.phase as 'SCAN' | 'DEEP',
-                        language,
-                        topicLabel: enforceTopic,
-                        userResponse: lastMessage?.role === 'user' ? lastMessage.content : ''
-                    });
+                    console.error('Additive fix failed:', e);
+                    // Fallback: just append a question
+                    const fallbackQuestion = language === 'it'
+                        ? ` Puoi approfondire questo punto?`
+                        : ` Can you elaborate on this?`;
+                    responseText = responseText
+                        .replace(/INTERVIEW_COMPLETED/gi, '')
+                        .replace(/[.!]+$/, '') + fallbackQuestion;
                 }
-                responseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
             }
         }
 
-        // Final fail-safe for DEEP_OFFER: must remain a continuation yes/no question.
+        // DEEP_OFFER safety: must be a continuation question
         if (nextState.phase === 'DEEP_OFFER') {
             const invalidDeepOffer =
                 !responseText.includes('?') ||
@@ -2137,13 +2202,107 @@ ${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up an
                 /INTERVIEW_COMPLETED/i.test(responseText);
             if (invalidDeepOffer) {
                 flowTelemetry.deepOfferClosureIntercepted = true;
-                console.log(`🛡️ [FINAL_GUARD] Blocking invalid DEEP_OFFER response. Using deterministic offer question.`);
-                responseText = buildDeterministicQualityQuestion({
-                    phase: 'DEEP_OFFER',
-                    language,
-                    topicLabel: targetTopic?.label || currentTopic.label,
-                    userResponse: lastMessage?.role === 'user' ? lastMessage.content : ''
-                });
+                console.log(`🛡️ [SAFETY_NET] Invalid DEEP_OFFER response, fixing...`);
+
+                // Simple additive fix for DEEP_OFFER
+                const offerQuestion = language === 'it'
+                    ? `Ti ringrazio per le risposte finora. Hai qualche minuto in più per approfondire alcuni punti?`
+                    : `Thank you for your answers so far. Do you have a few more minutes to explore some points in depth?`;
+
+                // Try to keep acknowledgment if present, otherwise use default
+                const cleanedResponse = responseText
+                    .replace(/INTERVIEW_COMPLETED/gi, '')
+                    .replace(goodbyePattern, '')
+                    .trim();
+
+                if (cleanedResponse.length > 10 && !cleanedResponse.includes('?')) {
+                    responseText = cleanedResponse.replace(/[.!]+$/, '') + ` ${language === 'it' ? 'Hai qualche minuto in più?' : 'Do you have a few more minutes?'}`;
+                } else {
+                    responseText = offerQuestion;
+                }
+            }
+        }
+
+        // Final fail-safe for DATA_COLLECTION:
+        // keep phase-consistent behavior even when previous regenerations drift.
+        if (nextState.phase === 'DATA_COLLECTION' && !nextState.dataCollectionRefused && supervisorInsight?.status !== 'COMPLETE_WITHOUT_DATA') {
+            const candidateFields = (bot.candidateDataFields as any[]) || [];
+            const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
+            const freshConvForDataGuard = await prisma.conversation.findUnique({
+                where: { id: conversationId },
+                select: { candidateProfile: true }
+            });
+            const currentProfileForDataGuard = (freshConvForDataGuard?.candidateProfile as any) || {};
+            const missingFieldForDataGuard = getNextMissingCandidateField(
+                candidateFieldIds,
+                currentProfileForDataGuard,
+                nextState.fieldAttemptCounts,
+                3
+            );
+
+            const needsConsentQuestion = nextState.forceConsentQuestion === true || nextState.consentGiven === false;
+            const hasQuestionNow = responseText.includes('?');
+            const hasCompletionTagNow = /INTERVIEW_COMPLETED/i.test(responseText);
+            const hasGoodbyeNow = goodbyePattern.test(responseText);
+
+            if (needsConsentQuestion) {
+                const consentCuePattern = language === 'it'
+                    ? /\b(posso|permesso|consenso|contatt|restare in contatto)\b/i
+                    : /\b(may i|permission|consent|contact|stay in touch)\b/i;
+                const invalidConsentResponse =
+                    !hasQuestionNow ||
+                    hasCompletionTagNow ||
+                    hasGoodbyeNow ||
+                    !consentCuePattern.test(responseText);
+                if (invalidConsentResponse) {
+                    console.log('🛡️ [FINAL_GUARD] DATA_COLLECTION consent response invalid. Forcing consent question.');
+                    try {
+                        responseText = await generateConsentQuestionOnly({ model, language });
+                    } catch (e) {
+                        console.error('Consent question fallback failed:', e);
+                        responseText = normalizeSingleQuestion(String(responseText || '').replace(/INTERVIEW_COMPLETED/gi, '').trim());
+                    }
+                }
+                nextState.forceConsentQuestion = false;
+            } else if (nextState.consentGiven === true && missingFieldForDataGuard) {
+                const fieldMentioned = responseMentionsCandidateField(responseText, missingFieldForDataGuard);
+                const invalidFieldResponse =
+                    !hasQuestionNow ||
+                    hasCompletionTagNow ||
+                    hasGoodbyeNow ||
+                    !fieldMentioned;
+                if (invalidFieldResponse) {
+                    console.log(`🛡️ [FINAL_GUARD] DATA_COLLECTION field response invalid for "${missingFieldForDataGuard}". Forcing field question.`);
+                    const fieldLabel = getFieldLabel(missingFieldForDataGuard, language);
+                    try {
+                        responseText = await generateFieldQuestionOnly({
+                            model,
+                            language,
+                            fieldLabel
+                        });
+                    } catch (e) {
+                        console.error('Field question fallback failed:', e);
+                        responseText = normalizeSingleQuestion(String(responseText || '').replace(/INTERVIEW_COMPLETED/gi, '').trim());
+                    }
+                }
+            } else if (nextState.consentGiven === true && !missingFieldForDataGuard && !hasCompletionTagNow) {
+                console.log('🛡️ [FINAL_GUARD] DATA_COLLECTION complete but missing completion tag. Forcing final goodbye.');
+                try {
+                    const retry = await generateObject({
+                        model,
+                        schema,
+                        messages: messagesForAI,
+                        system: `${systemPrompt}\n\nCRITICAL: Thank the user, close the interview, and append "INTERVIEW_COMPLETED". Do NOT ask any questions.`,
+                        temperature: 0.2
+                    });
+                    responseText = retry.object.response?.trim() || responseText;
+                } catch (e) {
+                    console.error('Final goodbye fallback failed:', e);
+                }
+                if (!/INTERVIEW_COMPLETED/i.test(responseText)) {
+                    const noQuestionTail = String(responseText || '').replace(/[?]+$/g, '').trim();
+                    responseText = `${noQuestionTail} INTERVIEW_COMPLETED`.trim();
+                }
             }
         }
 
@@ -2163,7 +2322,7 @@ ${userWordCount <= 4 ? '- User answer was very short: ask a probing follow-up an
         };
 
         // Check for completion tag - only valid if we're actually done
-            if (/INTERVIEW_COMPLETED/i.test(responseText)) {
+        if (/INTERVIEW_COMPLETED/i.test(responseText)) {
             // Verify we're actually done - MUST re-read from DB for fresh data
             const candidateFields = (bot.candidateDataFields as any[]) || [];
             const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);

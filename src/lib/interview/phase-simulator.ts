@@ -45,7 +45,7 @@ export function onScanCompleted(state: PhaseSimulatorState): PhaseTransitionResu
         state: {
             ...state,
             phase: 'DEEP_OFFER',
-            deepAccepted: null
+            deepAccepted: false
         },
         action: 'ASK_DEEP_OFFER'
     };
@@ -92,7 +92,7 @@ export function onTopicPhaseClosureAttempt(state: PhaseSimulatorState): PhaseTra
             state: {
                 ...state,
                 phase: 'DEEP_OFFER',
-                deepAccepted: null
+                deepAccepted: false
             },
             action: 'ASK_DEEP_OFFER'
         };

@@ -33,7 +33,7 @@ describe('phase-simulator integration-like sequences', () => {
         const scanDone = onScanCompleted(baseState({ phase: 'SCAN', remainingSec: 0 }));
         expect(scanDone.action).toBe('ASK_DEEP_OFFER');
         expect(scanDone.state.phase).toBe('DEEP_OFFER');
-        expect(scanDone.state.deepAccepted).toBeNull();
+        expect(scanDone.state.deepAccepted).toBe(false);
     });
 
     it('moves directly from DEEP completion to DATA_COLLECTION consent', () => {

@@ -45,7 +45,7 @@ export function MarketingNav({ session }: MarketingNavProps) {
                             </Link>
                         )}
                         <Link
-                            href={session ? "/dashboard" : "/onboarding/preview"}
+                            href={session ? "/dashboard" : "/preview"}
                             className="text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:shadow-lg hover:-translate-y-0.5"
                             style={{ background: gradients.primary, boxShadow: shadows.amber }}
                         >
@@ -83,7 +83,7 @@ export function MarketingNav({ session }: MarketingNavProps) {
                                 {session ? "Dashboard" : "Accedi"}
                             </Link>
                             <Link
-                                href={session ? "/dashboard" : "/onboarding/preview"}
+                                href={session ? "/dashboard" : "/preview"}
                                 onClick={() => setIsOpen(false)}
                                 className="text-white text-center px-5 py-3 rounded-xl text-sm font-semibold shadow-lg"
                                 style={{ background: gradients.primary }}

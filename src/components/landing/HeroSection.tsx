@@ -101,7 +101,7 @@ export function HeroSection() {
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
-                href="/onboarding/preview"
+                href="/preview"
                 className="bg-[hsl(var(--foreground))] text-[hsl(var(--background))] hover:opacity-90 text-lg px-10 py-4 font-semibold shadow-lg hover:scale-105 transition-transform rounded-xl inline-flex items-center justify-center gap-2"
               >
                 <Play className="w-5 h-5" />

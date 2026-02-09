@@ -33,8 +33,8 @@ export function LandingHeader({ session }: LandingHeaderProps) {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled
-          ? 'py-3 glass border-b border-[hsl(var(--border)/0.5)]'
-          : 'py-5 bg-transparent'
+        ? 'py-3 glass border-b border-[hsl(var(--border)/0.5)]'
+        : 'py-5 bg-transparent'
         }`}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
@@ -77,7 +77,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
             </Link>
           )}
           <Link
-            href={session ? '/dashboard' : '/onboarding/preview'}
+            href={session ? '/dashboard' : '/preview'}
             className="gradient-bg shadow-glow font-medium text-white px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
           >
             {session ? 'Vai alla console' : 'Prova Gratis'}
@@ -123,7 +123,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
                   {session ? 'Dashboard' : 'Accedi'}
                 </Link>
                 <Link
-                  href={session ? '/dashboard' : '/onboarding/preview'}
+                  href={session ? '/dashboard' : '/preview'}
                   className="gradient-bg shadow-glow text-white font-medium py-3 rounded-xl text-center"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >

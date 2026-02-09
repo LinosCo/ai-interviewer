@@ -51,7 +51,7 @@ export function Footer() {
                             <li><Link href="/#features" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Features</Link></li>
                             <li><Link href="/#use-cases" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Casi d&apos;uso</Link></li>
                             <li><Link href="/#pricing" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Prezzi</Link></li>
-                            <li><Link href="/onboarding/preview" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Simulatore</Link></li>
+                            <li><Link href="/preview" style={{ color: colors.muted, textDecoration: 'none', transition: 'color 0.2s' }}>Simulatore</Link></li>
                         </ul>
                     </div>
 

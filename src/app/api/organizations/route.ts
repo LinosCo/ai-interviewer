@@ -77,7 +77,10 @@ export async function GET() {
                         id: true,
                         name: true,
                         slug: true,
-                        plan: true
+                        plan: true,
+                        monthlyCreditsLimit: true,
+                        monthlyCreditsUsed: true,
+                        packCreditsAvailable: true
                     }
                 }
             }
@@ -101,12 +104,9 @@ export async function GET() {
                 });
 
                 organizations = [{
-                    id: newOrg.id,
-                    name: newOrg.name,
-                    slug: newOrg.slug,
-                    plan: newOrg.plan,
+                    ...newOrg,
                     role: 'OWNER'
-                }];
+                } as any];
             } catch (createError) {
                 console.error('Failed to create default organization:', createError);
                 // Return empty list instead of crashing, client will show empty state
@@ -114,7 +114,15 @@ export async function GET() {
             }
         }
 
-        return NextResponse.json({ organizations });
+        const sanitizedOrganizations = organizations.map(org => ({
+            ...org,
+            monthlyCreditsLimit: org.monthlyCreditsLimit?.toString(),
+            monthlyCreditsUsed: org.monthlyCreditsUsed?.toString(),
+            packCreditsAvailable: org.packCreditsAvailable?.toString(),
+            role: org.role
+        }));
+
+        return NextResponse.json({ organizations: sanitizedOrganizations });
 
     } catch (error: any) {
         console.error('Fetch Organizations Error:', error);

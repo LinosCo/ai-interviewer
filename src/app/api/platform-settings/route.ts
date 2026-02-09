@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
             smtpUser,
             smtpPass,
             smtpFromEmail,
-            smtpNotificationEmail
+            smtpNotificationEmail,
+            publicDemoBotId
         } = body;
 
         const currentUser = await prisma.user.findUnique({
@@ -189,6 +190,10 @@ export async function POST(req: NextRequest) {
             if (smtpNotificationEmail !== undefined) {
                 const value = smtpNotificationEmail || null;
                 assignIfAvailable('smtpNotificationEmail', 'smtpNotificationEmail', value);
+            }
+            if (publicDemoBotId !== undefined) {
+                const value = publicDemoBotId || null;
+                assignIfAvailable('publicDemoBotId', 'publicDemoBotId', value);
             }
 
             await prisma.globalConfig.upsert({

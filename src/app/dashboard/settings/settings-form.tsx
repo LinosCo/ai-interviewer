@@ -34,6 +34,13 @@ interface PlatformSettingsFormProps {
     smtpPass?: string;
     smtpFromEmail?: string;
     smtpNotificationEmail?: string;
+    publicDemoBotId?: string;
+}
+
+interface AdminBot {
+    id: string;
+    name: string;
+    slug: string;
 }
 
 export default function PlatformSettingsForm({
@@ -62,7 +69,8 @@ export default function PlatformSettingsForm({
     smtpUser = '',
     smtpPass = '',
     smtpFromEmail = '',
-    smtpNotificationEmail = ''
+    smtpNotificationEmail = '',
+    publicDemoBotId = ''
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
     const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
@@ -97,6 +105,29 @@ export default function PlatformSettingsForm({
     const [smtpPassValue, setSmtpPassValue] = useState(smtpPass);
     const [smtpFromEmailValue, setSmtpFromEmailValue] = useState(smtpFromEmail);
     const [smtpNotificationEmailValue, setSmtpNotificationEmailValue] = useState(smtpNotificationEmail);
+    const [demoBotId, setDemoBotId] = useState(publicDemoBotId);
+    const [availableBots, setAvailableBots] = useState<AdminBot[]>([]);
+    const [isLoadingBots, setIsLoadingBots] = useState(false);
+
+    useEffect(() => {
+        if (isAdmin) {
+            const fetchBots = async () => {
+                setIsLoadingBots(true);
+                try {
+                    const res = await fetch('/api/admin/bots');
+                    if (res.ok) {
+                        const data = await res.json();
+                        setAvailableBots(data);
+                    }
+                } catch (error) {
+                    console.error('Error fetching admin bots:', error);
+                } finally {
+                    setIsLoadingBots(false);
+                }
+            };
+            fetchBots();
+        }
+    }, [isAdmin]);
 
     const isDirty = (
         (openaiKey && openaiKey !== platformOpenaiApiKey) ||
@@ -121,6 +152,7 @@ export default function PlatformSettingsForm({
         smtpPassValue !== smtpPass ||
         smtpFromEmailValue !== smtpFromEmail ||
         smtpNotificationEmailValue !== smtpNotificationEmail ||
+        demoBotId !== publicDemoBotId ||
         knowledge !== currentKnowledge ||
         strategicPlan !== currentStrategicPlan
     );
@@ -161,7 +193,8 @@ export default function PlatformSettingsForm({
                     smtpUser: smtpUserValue,
                     smtpPass: smtpPassValue || undefined,
                     smtpFromEmail: smtpFromEmailValue,
-                    smtpNotificationEmail: smtpNotificationEmailValue
+                    smtpNotificationEmail: smtpNotificationEmailValue,
+                    publicDemoBotId: demoBotId || undefined
                 })
             });
 
@@ -600,21 +633,49 @@ export default function PlatformSettingsForm({
                                     </label>
                                 </div>
                             </div>
+                            <div className="pt-6 border-t border-gray-100">
+                                <h3 className="text-md font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                    Configurazione Landing Page
+                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-black uppercase tracking-wider">Demo Simulator</span>
+                                </h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Seleziona Bot per la Demo Pubblica
+                                        </label>
+                                        <select
+                                            value={demoBotId || ''}
+                                            onChange={(e) => setDemoBotId(e.target.value)}
+                                            className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-white focus:ring-2 focus:ring-amber-500 outline-none"
+                                            disabled={isLoadingBots}
+                                        >
+                                            <option value="">-- Nessun bot selezionato (Usa default statico) --</option>
+                                            {availableBots.map((bot) => (
+                                                <option key={bot.id} value={bot.id}>
+                                                    {bot.name} ({bot.slug})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Il bot selezionato verrà utilizzato nella pagina `/preview`. Tutte le simulazioni verranno salvate come interviste reali per raccogliere lead e trascrizioni.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
             )}
 
-            {/* Save Buttons */}
-            <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-                <button
-                    onClick={handleSave}
-                    disabled={isSaving || !isDirty}
-                    className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20 active:scale-[0.98] transition-all"
-                >
-                    {isSaving ? 'Salvataggio...' : 'Salva tutte le impostazioni'}
-                </button>
-            </div>
-        </div>
-    );
+                    {/* Save Buttons */}
+                    <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving || !isDirty}
+                            className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20 active:scale-[0.98] transition-all"
+                        >
+                            {isSaving ? 'Salvataggio...' : 'Salva tutte le impostazioni'}
+                        </button>
+                    </div>
+                </div>
+            );
 }

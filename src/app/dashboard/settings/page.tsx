@@ -34,6 +34,7 @@ interface GlobalConfigState {
     smtpPass?: string;
     smtpFromEmail?: string;
     smtpNotificationEmail?: string;
+    publicDemoBotId?: string;
 }
 
 export default function PlatformSettingsPage() {
@@ -124,6 +125,7 @@ export default function PlatformSettingsPage() {
                         smtpPass={globalConfig?.smtpPass}
                         smtpFromEmail={globalConfig?.smtpFromEmail}
                         smtpNotificationEmail={globalConfig?.smtpNotificationEmail}
+                        publicDemoBotId={globalConfig?.publicDemoBotId}
                     />
                 </div>
             </div>

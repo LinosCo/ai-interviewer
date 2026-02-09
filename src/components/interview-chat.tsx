@@ -62,6 +62,7 @@ interface InterviewChatProps {
     warmupContextPrompt?: string | null;
     warmupFollowup?: boolean;
     skipWelcome?: boolean;
+    isEmbedded?: boolean;
 }
 
 const TRANSLATIONS: Record<string, any> = {
@@ -139,7 +140,8 @@ export default function InterviewChat({
     warmupIcebreaker,
     warmupContextPrompt,
     warmupFollowup = true,
-    skipWelcome = false
+    skipWelcome = false,
+    isEmbedded = false
 }: InterviewChatProps) {
     const router = useRouter();
     const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
@@ -646,7 +648,7 @@ export default function InterviewChat({
 
             {/* Progress bar */}
             {showProgressBar && (
-                <div className="fixed top-0 left-0 right-0 z-30 backdrop-blur-sm pt-20 md:pt-16 pb-2">
+                <div className={`${isEmbedded ? 'absolute' : 'fixed'} top-0 left-0 right-0 z-30 backdrop-blur-sm ${isEmbedded ? 'pt-8' : 'pt-20 md:pt-16'} pb-2`}>
                     <div className="max-w-7xl mx-auto px-4 md:px-12">
                         {progressBarStyle === 'semantic' && topics.length > 0 ? (
                             <SemanticProgressBar
@@ -673,7 +675,7 @@ export default function InterviewChat({
             )}
 
             {/* Header - Moved to top for mobile, custom position for larger screens */}
-            <header className="fixed top-2 left-0 right-0 z-50 px-3 py-2 md:p-4 flex items-start justify-between pointer-events-none transition-all duration-300">
+            <header className={`${isEmbedded ? 'absolute' : 'fixed'} top-2 left-0 right-0 z-50 px-3 py-2 md:p-4 flex items-start justify-between pointer-events-none transition-all duration-300`}>
                 <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md border border-stone-200/50 p-2 pl-3 pr-4 rounded-full shadow-lg pointer-events-auto transition-all hover:shadow-xl hover:scale-105">
                     {logoUrl ? (
                         <div className="h-8 w-8 rounded-full overflow-hidden border border-stone-100 flex-shrink-0 bg-stone-50">
@@ -720,7 +722,7 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col items-center justify-center px-4 pt-32 md:pt-40 pb-48 md:pb-56 w-full max-w-4xl mx-auto relative z-10">
+            <div className={`flex-1 flex flex-col items-center justify-center px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} ${isEmbedded ? 'pb-24' : 'pb-48 md:pb-56'} w-full max-w-4xl mx-auto relative z-10`}>
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
                 {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && (
@@ -747,7 +749,7 @@ export default function InterviewChat({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-40 flex items-center justify-center"
+                        className={`${isEmbedded ? 'absolute' : 'fixed'} inset-0 z-40 flex items-center justify-center`}
                     >
                         {/* Subtle backdrop */}
                         <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
@@ -885,7 +887,7 @@ export default function InterviewChat({
             </div>
 
             {/* Input Area or Completion Screen */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 p-3 md:p-6 pb-4 md:pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-8 md:pt-12">
+            <div className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${isEmbedded ? 'pt-4' : 'pt-8 md:pt-12'}`}>
                 <div className="max-w-3xl mx-auto w-full relative">
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">

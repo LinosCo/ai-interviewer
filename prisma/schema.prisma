@@ -146,6 +146,7 @@ model GlobalConfig {
   smtpFromEmail             String?
   smtpNotificationEmail     String?
   resendApiKey              String?
+  publicDemoBotId           String?
 }
 
 model Organization {

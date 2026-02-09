@@ -25,7 +25,8 @@ const GLOBAL_CONFIG_FIELDS = [
     'smtpUser',
     'smtpPass',
     'smtpFromEmail',
-    'smtpNotificationEmail'
+    'smtpNotificationEmail',
+    'publicDemoBotId'
 ] as const;
 
 async function getGlobalConfigCompat() {

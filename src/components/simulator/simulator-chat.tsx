@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { colors, gradients, shadows } from '@/lib/design-system';
+import { Icons } from '@/components/ui/business-tuner/Icons';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -158,46 +159,46 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
     const progress = Math.min((effectiveDuration / 60 / (config.maxDurationMins || 10)) * 100, 95);
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative" style={{ background: gradients.soft }}>
+        <div className="flex flex-col h-full bg-slate-50 relative" style={{ background: gradients.mesh }}>
             {/* Progress bar */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gray-100 z-10">
                 <motion.div
                     className="h-full bg-amber-500"
-                    style={{ background: gradients.brand }}
+                    style={{ background: 'linear-gradient(90deg, #E85D3B 0%, #F5A623 100%)' }}
                     initial={{ width: '0%' }}
                     animate={{ width: `${progress}%` }}
                     transition={{ duration: 0.5 }}
                 />
             </div>
 
-            {/* Header */}
+            {/* Header - Aligned with InterviewChat */}
             <div className="p-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex justify-between items-center shadow-sm z-10 relative">
                 <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0" style={{ background: 'linear-gradient(135deg, #E85D3B 0%, #F5A623 100%)' }}>
+                        <Icons.Chat size={20} />
+                    </div>
                     <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-gray-900">{config.name || 'Anteprima Intervista'}</h3>
-                            <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium text-xs">
-                                Modalità Simulatore
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">
-                                Topic {currentTopicIndex + 1}/{config.topics.length}
-                            </span>
-                            <span>{Math.floor(effectiveDuration / 60)} min</span>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-[10px] text-gray-400 uppercase tracking-widest leading-none mb-0.5" style={{ fontSize: '0.6rem' }}>Sessione Live Demo</span>
+                            <span className="font-bold text-sm text-gray-900 tracking-tight">{config.name || 'Anteprima Intervista'}</span>
                         </div>
                     </div>
                 </div>
-                {onClose && (
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    <div className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full font-bold text-[11px] shadow-sm border border-amber-100/50">
+                        Topic {currentTopicIndex + 1}/{config.topics.length}
+                    </div>
+                    {onClose && (
+                        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Chat Area - CENTERED LAYOUT matching InterviewChat */}
             <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
-                <div className="max-w-3xl w-full pb-32"> {/* pb-32 for input area space */}
+                <div className="max-w-3xl w-full pb-32">
                     <AnimatePresence mode="wait">
                         {currentQuestion && (
                             <motion.div
@@ -208,38 +209,41 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                 transition={{ duration: 0.4 }}
                                 className="space-y-6 mt-8"
                             >
-                                {/* Question number */}
-                                <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
+                                {/* Question number indicator */}
+                                <div className="flex items-center gap-2 text-[11px] text-stone-400 font-bold uppercase tracking-wider">
                                     <span>Domanda {totalQuestions}</span>
-                                    <span>→</span>
+                                    <span>•</span>
+                                    <span className="text-amber-500/80">Simulator</span>
                                 </div>
 
-                                {/* Previous Answer from User (if exists) */}
+                                {/* Previous Answer Context */}
                                 {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && (
                                     <motion.div
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="mb-8 p-6 rounded-2xl bg-white/60 backdrop-blur-sm border border-orange-100 shadow-sm"
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="ml-auto max-w-[85%] mb-8"
                                     >
-                                        <div className="text-xs text-amber-600 font-bold mb-2 uppercase tracking-wide">La tua risposta</div>
-                                        <div className="text-gray-700 text-lg leading-relaxed font-serif">
-                                            "{messages[messages.length - 2].content}"
+                                        <div className="bg-white/40 backdrop-blur-md border border-white/60 p-4 rounded-2xl rounded-tr-sm shadow-sm text-right">
+                                            <div className="text-[10px] font-black mb-1 uppercase tracking-widest text-amber-600">La tua risposta</div>
+                                            <div className="text-gray-700 font-medium leading-relaxed">
+                                                "{messages[messages.length - 2].content}"
+                                            </div>
                                         </div>
                                     </motion.div>
                                 )}
 
-                                {/* Current Question */}
+                                {/* Current Question Bubble */}
                                 <div className="prose prose-lg max-w-none">
                                     <ReactMarkdown
                                         components={{
                                             p: ({ children }) => {
                                                 const length = String(children).length;
-                                                let textSizeClass = 'text-lg md:text-xl';
-                                                if (length > 300) textSizeClass = 'text-base md:text-lg';
-                                                else if (length > 200) textSizeClass = 'text-lg md:text-xl';
+                                                let textSizeClass = 'text-xl md:text-2xl';
+                                                if (length > 300) textSizeClass = 'text-lg md:text-xl';
+                                                else if (length > 200) textSizeClass = 'text-xl md:text-2xl';
 
                                                 return (
-                                                    <p className={`${textSizeClass} font-medium text-gray-900 leading-relaxed mb-4 tracking-tight`}>
+                                                    <p className={`${textSizeClass} font-bold text-gray-900 leading-tight mb-4 tracking-tight`}>
                                                         {children}
                                                     </p>
                                                 );
@@ -253,18 +257,18 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                         )}
 
                         {/* Loading State */}
-                        {isLoading && !currentQuestion && (
+                        {isLoading && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 className="flex flex-col items-center gap-4 mt-12"
                             >
                                 <div className="flex space-x-2">
-                                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                    <div className="w-3 h-3 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                    <div className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                    <div className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                    <div className="w-2.5 h-2.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                 </div>
-                                <p className="text-gray-400 text-sm font-medium">L&apos;IA sta pensando...</p>
+                                <p className="text-gray-400 text-[11px] font-bold uppercase tracking-widest">L&apos;IA sta elaborando...</p>
                             </motion.div>
                         )}
                     </AnimatePresence>
@@ -275,7 +279,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
             {/* Input Area - FIXED BOTTOM */}
             <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-12 z-20">
                 <div className="max-w-3xl mx-auto relative">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-amber-300 to-orange-400 rounded-[20px] blur opacity-20 transition-opacity duration-500" />
+                    <div className="absolute -inset-1 bg-gradient-to-r from-amber-300 to-orange-400 rounded-[20px] blur opacity-15 transition-opacity duration-500" />
                     <form onSubmit={handleSubmit} className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden transition-all ring-1 ring-black/5 focus-within:ring-amber-500/50">
                         <textarea
                             ref={inputRef}
@@ -300,7 +304,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                             type="submit"
                             disabled={!input.trim() || isLoading}
                             className="absolute right-3 bottom-3 w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-md"
-                            style={{ background: 'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)' }}
+                            style={{ background: 'linear-gradient(135deg, #E85D3B 0%, #F5A623 100%)' }}
                         >
                             {isLoading ? (
                                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -311,22 +315,9 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                             )}
                         </button>
                     </form>
-                    <div className="mt-3 flex items-center justify-between text-xs text-gray-400 font-medium px-2">
+                    <div className="mt-3 flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-widest px-2">
                         <span>Premi <strong>Invio</strong> per inviare</span>
                         <span>Domanda {totalQuestions}</span>
-                    </div>
-
-                    {/* Footer - Business Tuner Branding */}
-                    <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
-                        <span>Powered by</span>
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-4 h-4 rounded-md bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                                <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" />
-                                </svg>
-                            </div>
-                            <span className="font-semibold text-gray-600">Business Tuner</span>
-                        </div>
                     </div>
                 </div>
             </div>

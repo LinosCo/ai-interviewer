@@ -31,7 +31,7 @@ export function DashboardSidebar({
     const [isOpen, setIsOpen] = useState(false);
     const [adminExpanded, setAdminExpanded] = useState(false);
     const pathname = usePathname();
-    const { selectedProject, isAllProjectsSelected } = useProject();
+    const { projects, selectedProject, isAllProjectsSelected } = useProject();
 
     const activeProjectId = !isAllProjectsSelected && selectedProject?.id ? selectedProject.id : null;
 
@@ -55,7 +55,7 @@ export function DashboardSidebar({
         {
             href: activeProjectId
                 ? `/dashboard/projects/${activeProjectId}/integrations`
-                : (initialProjects?.length > 0 ? `/dashboard/projects/${initialProjects[0].id}/integrations` : '/dashboard/projects'),
+                : (projects?.length > 0 ? `/dashboard/projects/${projects[0].id}/integrations` : '/dashboard/projects'),
             icon: Icons.Link,
             label: 'Connessioni',
             visible: true

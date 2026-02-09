@@ -78,7 +78,7 @@ export default function PublicPreviewPage() {
                         <div className="flex-1 p-0 flex flex-col">
                             <SimulatorChat
                                 config={DEFAULT_DEMO_CONFIG as any}
-                                onSimulationEnd={() => { }}
+                                onClose={() => { }}
                             />
                         </div>
                     </div>

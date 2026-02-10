@@ -175,12 +175,14 @@ export async function POST(req: Request) {
             }
 
             // Chatbot specific fields
+            const hasLeadFields = Array.isArray(botConfig.candidateDataFields) && botConfig.candidateDataFields.length > 0;
             botData = {
                 ...botData,
                 tone: botConfig.tone,
                 enablePageContext: true,
                 leadCaptureStrategy: botConfig.leadCaptureStrategy || 'after_3_msgs',
                 candidateDataFields: botConfig.candidateDataFields,
+                collectCandidateData: hasLeadFields, // Auto-enable when lead fields are configured
                 introMessage: botConfig.welcomeMessage,
                 bubblePosition: botConfig.bubblePosition || 'bottom-right',
                 knowledgeSources: {

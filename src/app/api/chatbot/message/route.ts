@@ -166,7 +166,10 @@ export async function POST(req: Request) {
         const leadCapture = normalizeLeadCapture(metadata.leadCapture);
         const declinedFields = new Set(leadCapture.declinedFields);
 
-        const isLeadCollectionEnabled = Boolean(bot.collectCandidateData) && candidateFields.length > 0;
+        // Legacy fix: if candidateDataFields exists but collectCandidateData is false, auto-enable
+        // This handles bots created before the fix was deployed
+        const shouldEnableLeadCollection = candidateFields.length > 0 && !bot.collectCandidateData;
+        const isLeadCollectionEnabled = (Boolean(bot.collectCandidateData) || shouldEnableLeadCollection) && candidateFields.length > 0;
         let nextMissingField = isLeadCollectionEnabled
             ? getNextMissingField(candidateFields, candidateProfile, declinedFields)
             : null;

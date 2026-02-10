@@ -10,7 +10,7 @@ import ChatWindow from '@/components/chatbot/ChatWindow';
 import ProjectSelector from '@/components/dashboard/ProjectSelector';
 import {
     Bot, Zap, Save, MessageSquare, Shield,
-    Palette, BookOpen, RefreshCw, Send, Eye, Check, User, Mail, Phone, Building, Briefcase, MapPin, X
+    Palette, BookOpen, RefreshCw, Send, Eye, Check, User, Mail, Phone, Building, Briefcase, MapPin, X, Plus, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -59,6 +59,23 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
     });
     const [isSaving, setIsSaving] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(true); // Toggle for mobile maybe
+    const [newBoundary, setNewBoundary] = useState('');
+
+    const handleAddBoundary = () => {
+        if (!newBoundary.trim()) return;
+        setConfig({
+            ...config,
+            boundaries: [...config.boundaries, newBoundary.trim()]
+        });
+        setNewBoundary('');
+    };
+
+    const handleRemoveBoundary = (index: number) => {
+        setConfig({
+            ...config,
+            boundaries: config.boundaries.filter((_: string, i: number) => i !== index)
+        });
+    };
 
     // Toggle global widget visibility when in Test tab
     useEffect(() => {
@@ -258,6 +275,65 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
 
                                 {activeTab === 'behavior' && (
                                     <div className="grid gap-10">
+                                        {/* Boundaries / Limits Section */}
+                                        <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm space-y-8">
+                                            <div className="space-y-2">
+                                                <h3 className="text-lg font-black text-gray-900">Limiti e Obiettivi</h3>
+                                                <p className="text-sm text-gray-500 font-medium">Definisci cosa il chatbot NON deve fare per garantire risposte appropriate.</p>
+                                            </div>
+
+                                            {/* Current Boundaries List */}
+                                            <div className="space-y-4">
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Limiti Attivi</label>
+                                                <div className="space-y-3">
+                                                    {config.boundaries.length === 0 ? (
+                                                        <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm text-gray-500 italic">
+                                                            Nessun limite configurato. Aggiungi limiti per controllare il comportamento del bot.
+                                                        </div>
+                                                    ) : (
+                                                        config.boundaries.map((boundary: string, idx: number) => (
+                                                            <div
+                                                                key={idx}
+                                                                className="flex items-start justify-between p-4 bg-red-50/50 border border-red-100 rounded-2xl group"
+                                                            >
+                                                                <div className="flex items-start gap-3">
+                                                                    <Shield className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                                                    <p className="text-sm text-gray-800 font-medium">{boundary}</p>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => handleRemoveBoundary(idx)}
+                                                                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-100 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
+                                                                    title="Rimuovi limite"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+
+                                                {/* Add New Boundary */}
+                                                <div className="flex gap-3 mt-4">
+                                                    <input
+                                                        type="text"
+                                                        value={newBoundary}
+                                                        onChange={(e) => setNewBoundary(e.target.value)}
+                                                        className="flex-1 rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-blue-500 h-12 font-medium px-4 outline-none"
+                                                        placeholder="Es: Non discutere di politica o religione"
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleAddBoundary()}
+                                                    />
+                                                    <button
+                                                        onClick={handleAddBoundary}
+                                                        disabled={!newBoundary.trim()}
+                                                        className="px-5 h-12 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                                    >
+                                                        <Plus className="w-4 h-4" />
+                                                        Aggiungi
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm space-y-8">
                                             <div className="space-y-2">
                                                 <h3 className="text-lg font-black text-gray-900">Comportamento</h3>

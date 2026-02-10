@@ -18,7 +18,7 @@ type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
 
 interface IntegrationCardProps {
   id: string;
-  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'GOOGLE' | 'CMS_VOLER';
+  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'GOOGLE' | 'CMS_VOLER' | 'N8N';
   name: string;
   status: ConnectionStatus;
   description?: string;
@@ -93,6 +93,10 @@ const TYPE_CONFIG: Record<string, {
   CMS_VOLER: {
     icon: '🚀',
     gradient: 'from-amber-500 to-orange-600',
+  },
+  N8N: {
+    icon: '⚡',
+    gradient: 'from-green-500 to-teal-600',
   },
 };
 

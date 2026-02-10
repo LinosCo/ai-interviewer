@@ -66,6 +66,7 @@ export async function GET(
             where: { id: projectId },
             include: {
                 bots: { select: { id: true, name: true, botType: true } },
+                organization: { select: { id: true, name: true, slug: true, plan: true } },
                 _count: {
                     select: { accessList: true, bots: true }
                 }

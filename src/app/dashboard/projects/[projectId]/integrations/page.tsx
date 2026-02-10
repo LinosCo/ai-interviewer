@@ -36,6 +36,16 @@ interface CMSConnection {
   lastSyncError?: string | null;
 }
 
+interface N8NConnection {
+  id: string;
+  name: string;
+  webhookUrl: string;
+  status: 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
+  lastTriggerAt?: string | null;
+  lastError?: string | null;
+  triggerOnTips: boolean;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -59,6 +69,7 @@ export default function IntegrationsPage() {
   const [mcpConnections, setMcpConnections] = useState<MCPConnection[]>([]);
   const [googleConnection, setGoogleConnection] = useState<GoogleConnection | null>(null);
   const [cmsConnection, setCmsConnection] = useState<CMSConnection | null>(null);
+  const [n8nConnection, setN8nConnection] = useState<N8NConnection | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
@@ -68,10 +79,11 @@ export default function IntegrationsPage() {
   // Fetch all integrations data
   const fetchData = useCallback(async () => {
     try {
-      const [mcpRes, googleRes, cmsRes, userRes, projectsRes] = await Promise.all([
+      const [mcpRes, googleRes, cmsRes, n8nRes, userRes, projectsRes] = await Promise.all([
         fetch(`/api/integrations/mcp/connections?projectId=${projectId}`),
         fetch(`/api/integrations/google/connections?projectId=${projectId}`),
         fetch(`/api/cms/connection?projectId=${projectId}`),
+        fetch(`/api/integrations/n8n/connections?projectId=${projectId}`),
         fetch('/api/user/me'),
         fetch('/api/projects/list-all'),
       ]);
@@ -97,6 +109,11 @@ export default function IntegrationsPage() {
             lastSyncError: data.connection.lastSyncError,
           });
         }
+      }
+
+      if (n8nRes.ok) {
+        const data = await n8nRes.json();
+        setN8nConnection(data.connection || null);
       }
 
       if (userRes.ok) {
@@ -247,6 +264,28 @@ export default function IntegrationsPage() {
     router.push(`/dashboard/projects/${projectId}/integrations/connect/cms`);
   };
 
+  const handleTestN8N = async (id: string) => {
+    const res = await fetch(`/api/integrations/n8n/connections/${id}/test`, {
+      method: 'POST',
+    });
+    if (res.ok) {
+      await fetchData();
+    }
+  };
+
+  const handleDeleteN8N = async (id: string) => {
+    const res = await fetch(`/api/integrations/n8n/connections/${id}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      await fetchData();
+    }
+  };
+
+  const handleConfigureN8N = () => {
+    router.push(`/dashboard/projects/${projectId}/integrations/connect/n8n`);
+  };
+
   if (loading) {
     return (
       <div className="p-8">
@@ -269,6 +308,7 @@ export default function IntegrationsPage() {
         mcpConnections={mcpConnections}
         googleConnection={googleConnection}
         cmsConnection={cmsConnection}
+        n8nConnection={n8nConnection}
         userPlan={userPlan}
         onTestMCP={handleTestMCP}
         onDeleteMCP={handleDeleteMCP}
@@ -280,6 +320,9 @@ export default function IntegrationsPage() {
         onDeleteCMS={handleDeleteCMS}
         onOpenCMSDashboard={handleOpenCMSDashboard}
         onConfigureCMS={handleConfigureCMS}
+        onTestN8N={handleTestN8N}
+        onDeleteN8N={handleDeleteN8N}
+        onConfigureN8N={handleConfigureN8N}
         projects={projects}
         organizations={organizations}
         currentProjectId={projectId}

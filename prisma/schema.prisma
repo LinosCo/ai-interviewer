@@ -310,6 +310,7 @@ model Project {
   creditTransactions   CreditTransaction[]
   crossChannelInsights CrossChannelInsight[]
   googleConnection     GoogleConnection?
+  n8nConnection        N8NConnection?
   itemTransfers        ItemTransferInvite[]       @relation("ProjectItemTransfers")
   mcpConnections       MCPConnection[]
   firstAttributions    PartnerClientAttribution[] @relation("FirstAttributionProject")
@@ -1369,6 +1370,23 @@ model GoogleAnalyticsData {
 
   @@unique([googleConnectionId, date])
   @@index([googleConnectionId, date])
+}
+
+model N8NConnection {
+  id             String           @id @default(cuid())
+  projectId      String           @unique
+  name           String           @default("n8n Automation")
+  webhookUrl     String
+  status         ConnectionStatus @default(PENDING)
+  lastTriggerAt  DateTime?
+  lastError      String?
+  triggerOnTips  Boolean          @default(true) // Auto-trigger when AI tips are generated
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  createdBy      String
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model IntegrationLog {

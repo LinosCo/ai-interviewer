@@ -16,7 +16,7 @@ export async function GET() {
             where: { id: globalConfig.publicDemoBotId },
             include: {
                 topics: {
-                    orderBy: { order: 'asc' }
+                    orderBy: { orderIndex: 'asc' }
                 }
             }
         });

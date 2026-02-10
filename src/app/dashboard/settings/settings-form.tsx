@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { showToast } from '@/components/toast';
 
@@ -664,18 +664,19 @@ export default function PlatformSettingsForm({
                             </div>
                         </div>
                     </div>
+                </div>
             )}
 
-                    {/* Save Buttons */}
-                    <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-                        <button
-                            onClick={handleSave}
-                            disabled={isSaving || !isDirty}
-                            className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20 active:scale-[0.98] transition-all"
-                        >
-                            {isSaving ? 'Salvataggio...' : 'Salva tutte le impostazioni'}
-                        </button>
-                    </div>
-                </div>
-            );
+            {/* Save Buttons */}
+            <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+                <button
+                    onClick={handleSave}
+                    disabled={isSaving || !isDirty}
+                    className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-600/20 active:scale-[0.98] transition-all"
+                >
+                    {isSaving ? 'Salvataggio...' : 'Salva tutte le impostazioni'}
+                </button>
+            </div>
+        </div>
+    );
 }

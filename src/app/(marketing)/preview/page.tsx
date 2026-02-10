@@ -152,7 +152,6 @@ export default function PublicPreviewPage() {
                             ) : (
                                 <SimulatorChat
                                     config={config}
-                                    botId={botId}
                                     onClose={() => { }}
                                 />
                             )}

@@ -200,7 +200,8 @@ function buildDeepPlan(
     botTopics: any[],
     plan: InterviewPlan,
     history: Record<string, string[]> | undefined,
-    interestingTopics: InterestingTopic[] | undefined
+    interestingTopics: InterestingTopic[] | undefined,
+    remainingSec?: number
 ) {
     const topicsWithRemaining = botTopics.filter(t => getRemainingSubGoals(t, history).length > 0);
     if (topicsWithRemaining.length > 0) {
@@ -208,11 +209,23 @@ function buildDeepPlan(
             topicsWithRemaining.some(t => t.id === id)
         );
         const deepTurnsByTopic: Record<string, number> = {};
+
+        // Adaptive: distribute available time proportionally to remaining sub-goals
+        const availableTurns = remainingSec
+            ? Math.max(ordered.length, Math.floor(remainingSec / 45))
+            : ordered.length * (plan.deep.maxTurnsPerTopic || 2);
+        const totalRemaining = ordered.reduce((sum, id) => {
+            const topic = botTopics.find(t => t.id === id);
+            return sum + (topic ? getRemainingSubGoals(topic, history).length : 0);
+        }, 0);
+
         for (const topicId of ordered) {
             const topic = botTopics.find(t => t.id === topicId);
             if (!topic) continue;
             const remaining = getRemainingSubGoals(topic, history).length;
-            const maxTurns = Math.min(getDeepPlanTurns(plan, topicId), remaining);
+            // Proportional allocation: each topic gets turns based on its share of remaining sub-goals
+            const proportion = totalRemaining > 0 ? remaining / totalRemaining : 1 / ordered.length;
+            const maxTurns = Math.max(1, Math.min(remaining, Math.round(availableTurns * proportion)));
             deepTurnsByTopic[topicId] = Math.max(1, maxTurns);
         }
         return { deepTopicOrder: ordered, deepTurnsByTopic };
@@ -567,31 +580,16 @@ function isClarificationSignal(input: string, language: string): boolean {
 
 function buildNaturalTopicCue(topicLabel: string, language: string): string {
     const label = String(topicLabel || '').trim();
-    if (!label) return (language || 'en').toLowerCase().startsWith('it') ? 'questo tema' : 'this topic';
-    const lower = label.toLowerCase();
     const isItalian = (language || 'en').toLowerCase().startsWith('it');
+    if (!label) return isItalian ? 'questo tema' : 'this topic';
 
-    if (isItalian) {
-        if (lower.includes('tedx') && lower.includes('aspettative')) return 'aspettative per il TEDx';
-        if (lower.includes('tedx')) return 'TEDx';
-        if (lower.includes('percezion') && (lower.includes('ai') || lower.includes('intelligenza artificiale'))) {
-            return "percezione dell'AI";
-        }
-        if (lower.includes('iniziative') && lower.includes('ai')) return "iniziative AI in azienda";
-        if (lower.includes('intelligenza artificiale') || /\bai\b/i.test(label)) return "uso dell'AI";
-        const anchors = buildMessageAnchors(label, language).anchors;
-        if (anchors.length > 0) return anchors[0];
-        return 'questo tema';
-    }
-
-    if (lower.includes('tedx')) return 'TEDx';
-    if (lower.includes('perception') && lower.includes('ai')) return 'AI perception';
-    if (lower.includes('initiative') && lower.includes('ai')) return 'AI initiatives in the company';
-    if (lower.includes('expectation') && lower.includes('tedx')) return 'TEDx expectations';
-    if (lower.includes('artificial intelligence') || /\bai\b/i.test(label)) return 'AI adoption';
+    // Extract meaningful keywords from topic label dynamically
     const anchors = buildMessageAnchors(label, language).anchors;
-    if (anchors.length > 0) return `this aspect about ${anchors[0]}`;
-    return 'this topic';
+    if (anchors.length === 0) return isItalian ? 'questo tema' : 'this topic';
+
+    // Use the most meaningful anchor (longest, most specific)
+    const bestAnchor = anchors.sort((a, b) => b.length - a.length)[0];
+    return isItalian ? bestAnchor : `this aspect about ${bestAnchor}`;
 }
 
 const GENERIC_TOPIC_ANCHORS_IT = new Set([
@@ -1071,12 +1069,15 @@ export async function POST(req: Request) {
                                 nextState.deepAccepted = null;
                                 nextState.topicIndex = 0;
                                 nextState.turnInTopic = 0;
-                                const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
+                                const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSec);
                                 nextState.deepTopicOrder = deepPlan.deepTopicOrder;
                                 nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                                 const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
                                 nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                                supervisorInsight = { status: 'START_DEEP' };
+                                const bestSnippet = (state.interestingTopics || []).find(
+                                    (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
+                                )?.bestSnippet || '';
+                                supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
                                 console.log(`✅ [SCAN→DEEP] SCAN complete with time left (${remainingSec}s). Starting DEEP.`);
                             } else {
                                 nextState.phase = 'DEEP_OFFER';
@@ -1141,7 +1142,8 @@ export async function POST(req: Request) {
                     } else {
                         // Sub-goals exhausted: deepen on user's last detail
                         const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
-                        nextSubGoal = fallbackSnippet ? `Approfondisci: "${fallbackSnippet}"` : `Approfondisci: "${currentTopic.label}"`;
+                        const deepenVerb = language === 'it' ? 'Approfondisci' : 'Explore further';
+                        nextSubGoal = fallbackSnippet ? `${deepenVerb}: "${fallbackSnippet}"` : `${deepenVerb}: "${currentTopic.label}"`;
                     }
 
                     supervisorInsight = { status: 'SCANNING', nextSubGoal };
@@ -1170,12 +1172,17 @@ export async function POST(req: Request) {
                         nextState.phase = 'DEEP';
                         nextState.topicIndex = 0;
                         nextState.turnInTopic = 0;
-                        const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
+                        const maxDurationSec = maxDurationMins * 60;
+                        const remainingSecForDeep = maxDurationSec - effectiveSec;
+                        const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForDeep);
                         nextState.deepTopicOrder = deepPlan.deepTopicOrder;
                         nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                         const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
                         nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                        supervisorInsight = { status: 'START_DEEP' };
+                        const bestSnippet = (state.interestingTopics || []).find(
+                            (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
+                        )?.bestSnippet || '';
+                        supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
                         console.log("✅ [DEEP_OFFER] User accepted quick DEEP");
                     } else if (intent === 'REFUSE') {
                         console.log("❌ [DEEP_OFFER] User declined");
@@ -1189,10 +1196,33 @@ export async function POST(req: Request) {
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         }
                     } else {
-                        // NEUTRAL - re-ask
-                        console.log(`🎁 [DEEP_OFFER] Neutral response, re-asking`);
-                        supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                        nextState.deepAccepted = false;
+                        // NEUTRAL - track attempts and eventually treat as accept
+                        const deepOfferNeutralAttempts = (state as any).deepOfferNeutralAttempts ?? 0;
+
+                        if (deepOfferNeutralAttempts >= 2) {
+                            // After 2 neutral attempts, treat as accept
+                            console.log(`🎁 [DEEP_OFFER] 2+ neutral responses, treating as accept`);
+                            nextState.deepAccepted = true;
+                            nextState.phase = 'DEEP';
+                            nextState.topicIndex = 0;
+                            nextState.turnInTopic = 0;
+                            const maxDurationSec = maxDurationMins * 60;
+                            const remainingSecForDeep = maxDurationSec - effectiveSec;
+                            const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForDeep);
+                            nextState.deepTopicOrder = deepPlan.deepTopicOrder;
+                            nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
+                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
+                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
+                            const bestSnippet = (state.interestingTopics || []).find(
+                                (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
+                            )?.bestSnippet || '';
+                            supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
+                        } else {
+                            console.log(`🎁 [DEEP_OFFER] Neutral response (attempt ${deepOfferNeutralAttempts + 1}), re-asking`);
+                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                            nextState.deepAccepted = false;
+                            (nextState as any).deepOfferNeutralAttempts = deepOfferNeutralAttempts + 1;
+                        }
                     }
                 }
             }
@@ -1202,7 +1232,9 @@ export async function POST(req: Request) {
             // --------------------------------------------------------------------
             else if (state.phase === 'DEEP') {
                 if (!state.deepTurnsByTopic || Object.keys(state.deepTurnsByTopic).length === 0) {
-                    const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics);
+                    const maxDurationSecForPlan = maxDurationMins * 60;
+                    const remainingSecForPlan = maxDurationSecForPlan - effectiveSec;
+                    const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForPlan);
                     nextState.deepTopicOrder = deepPlan.deepTopicOrder;
                     nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                 }
@@ -1305,7 +1337,8 @@ export async function POST(req: Request) {
 
                     if (availableSubGoals.length === 0) {
                         const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
-                        const focusPoint = fallbackSnippet ? `Approfondisci: "${fallbackSnippet}"` : `Approfondisci: "${deepCurrent.label}"`;
+                        const deepenVerb = language === 'it' ? 'Approfondisci' : 'Explore further';
+                        const focusPoint = fallbackSnippet ? `${deepenVerb}: "${fallbackSnippet}"` : `${deepenVerb}: "${deepCurrent.label}"`;
                         supervisorInsight = { status: 'DEEPENING', focusPoint, engagingSnippet };
                     } else {
                         const focusPoint = availableSubGoals[0];
@@ -1717,9 +1750,9 @@ hard_rules:
 
         let messagesForAI = canonicalMessages.map((m: any) => ({ role: m.role, content: m.content }));
         if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' || supervisorInsight?.status === 'DEEP_OFFER_ASK') {
-            messagesForAI = lastMessage?.role === 'user'
-                ? [{ role: 'user', content: lastMessage.content }]
-                : [];
+            // Keep last few messages for context so the LLM can reference the conversation
+            const recentMessages = canonicalMessages.slice(-4).map((m: any) => ({ role: m.role, content: m.content }));
+            messagesForAI = recentMessages;
         }
 
         console.log("⏳ [CHAT] Generating response...");

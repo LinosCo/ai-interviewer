@@ -74,11 +74,12 @@ target_audience: "${bot.targetAudience}"
 tone: "${bot.tone || 'Friendly, professional, and empathetic'}"
 language: "${bot.language || 'en'}"
 
-## YOUR IDENTITY & PARTICIPANT RELATIONSHIP
-- **IMPORTANT**: The person you are talking to is the **PARTICIPANT**, not the creator of the event/project.
-- DO NOT say "Your event", "Your project", or "How can I help you build this".
-- Instead use: "The event you attended", "Your experience at the event", "Your opinion as a participant".
-- You are representing "${bot.name}" to gather their honest feedback.
+## YOUR IDENTITY & RELATIONSHIP WITH THE INTERVIEWEE
+- You are "${bot.name}", conducting qualitative research.
+- The person you are talking to is the **INTERVIEWEE** — someone sharing their experience and opinions.
+- DO NOT assume their role (participant, creator, customer, employee) unless the research goal explicitly states it.
+- DO NOT say "Your event", "Your project" unless the interview topics specifically cover events/projects the user owns.
+- Focus on gathering their honest perspective on the topics configured for this interview.
 
 ## KNOWLEDGE BASE
 Use this context to inform your questions, but DO NOT lecture the user.
@@ -377,10 +378,17 @@ You may propose a short optional deep-dive.
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
                 const focusTopic = supervisorInsight.focusPoint || currentTopic.label || allTopics[0]?.label || 'the first topic';
+                const engagingSnippet = (supervisorInsight as any).engagingSnippet || '';
+
+                const snippetHint = engagingSnippet
+                    ? (isItalian
+                        ? `L'utente ha mostrato particolare interesse quando ha detto: "${engagingSnippet}". Usa questo come aggancio.\n`
+                        : `The user showed particular interest when they said: "${engagingSnippet}". Use this as a hook.\n`)
+                    : '';
 
                 const startDeepPrompt = isItalian ? `
 ## FASE: INIZIO APPROFONDIMENTO (DEEP)
-Abbiamo completato la panoramica generale di tutti i temi.
+${snippetHint}Abbiamo completato la panoramica generale di tutti i temi.
 Ora approfondiamo alcuni punti interessanti, partendo da: "${focusTopic}".
 
 **ISTRUZIONI**:
@@ -389,7 +397,7 @@ Ora approfondiamo alcuni punti interessanti, partendo da: "${focusTopic}".
 3. Cita un dettaglio specifico che l'utente ha menzionato prima su questo tema.
 ` : `
 ## PHASE: START DEEP DIVE
-We have completed the general overview of all topics.
+${snippetHint}We have completed the general overview of all topics.
 Now we dive deeper into interesting points, starting with: "${focusTopic}".
 
 **INSTRUCTIONS**:
@@ -734,21 +742,9 @@ ${engagingSnippet ? `> **THE USER SHOWED INTEREST when they said**: "${engagingS
             // ACTIVE PHASE (SCAN / DEEP / TRANSITION)
             // STRICTLY FORBID CLOSURE AND CONTACT REQUESTS
             supervisorSupremacyInstruction = `
-> [!CRITICAL] SUPERVISOR SUPREMACY: INTERVIEW IS ACTIVE - PHASE ${supervisorInsight?.status || 'UNKNOWN'}
-> The Interview Supervisor has indicated that the conversation MUST CONTINUE.
->
-> **ABSOLUTE PROHIBITIONS (VIOLATING THESE = FAILURE):**
-> 1. **NO GOODBYE**: Do NOT say "A presto", "Buona giornata", "Goodbye", "See you", "Grazie per il tempo"
-> 2. **NO CONTACT REQUESTS**: Do NOT ask for email, phone, name, contacts, or ANY personal data
->    - ❌ "Posso chiederti i contatti?"
->    - ❌ "Prima di concludere, la tua email?"
->    - ❌ "Qual è il tuo nome/email/telefono?"
-> 3. **NO WRAP-UP**: Do NOT say "Abbiamo finito", "Siamo alla fine", "Prima di salutarci"
->
-> **YOUR ONLY JOB**: Ask questions about the CURRENT TOPIC. Nothing else.
-> Contact collection happens LATER, in a different phase. NOT NOW.
->
-> If the user said "prego" or "thank you", acknowledge briefly and IMMEDIATELY ask the next topic question.
+> [!CRITICAL] ACTIVE INTERVIEW — CONTINUE QUESTIONING
+> Your only job now: ask questions about the current topic.
+> Do NOT say goodbye, ask for contacts, or wrap up. Those happen in a later phase.
 `;
         } else {
             // COMPLETION PHASE

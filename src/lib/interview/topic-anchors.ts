@@ -34,11 +34,14 @@ export function buildTopicAnchors(topic: TopicBlock | null, language: string) {
   const anchors: string[] = [];
   for (const token of tokens) {
     const lower = token.toLowerCase();
-    if (lower === 'ai' || lower === 'tedx') {
-      anchors.push(lower);
+    // Keep short but meaningful tokens (acronyms, brand names)
+    if (lower.length < 4) {
+      // Allow 2-3 char tokens only if they look like acronyms (all caps in original)
+      if (token.length >= 2 && token === token.toUpperCase() && /^[A-Z]+$/.test(token)) {
+        anchors.push(lower);
+      }
       continue;
     }
-    if (lower.length < 4) continue;
     if (stopwords.has(lower)) continue;
     anchors.push(lower);
   }

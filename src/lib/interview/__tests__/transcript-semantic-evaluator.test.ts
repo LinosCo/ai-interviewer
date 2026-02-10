@@ -17,8 +17,8 @@ describe('transcript-semantic-evaluator', () => {
                 {
                     role: 'assistant',
                     phase: 'SCAN',
-                    topicLabel: 'Aspettative per il TEDx',
-                    content: 'Hai detto "ognuno propone una soluzione e poi il presidente decide": qual e l impatto su Aspettative per il TEDx?'
+                    topicLabel: 'Feedback sul Prodotto',
+                    content: 'Hai detto "ognuno propone una soluzione e poi il presidente decide": qual e l impatto su Feedback sul Prodotto?'
                 }
             ]
         });
@@ -43,8 +43,8 @@ describe('transcript-semantic-evaluator', () => {
                 {
                     role: 'assistant',
                     phase: 'SCAN',
-                    topicLabel: 'Aspettative per il TEDx',
-                    content: 'Interessante il tuo punto. Riguardo alle aspettative per il TEDx, quali temi ritieni più utili?'
+                    topicLabel: 'Feedback sul Prodotto',
+                    content: 'Interessante il tuo punto. Riguardo al prodotto, quali aspetti ritieni più utili?'
                 }
             ]
         });
@@ -61,8 +61,8 @@ describe('transcript-semantic-evaluator', () => {
                 {
                     role: 'assistant',
                     phase: 'SCAN',
-                    topicLabel: 'Aspettative per il TEDx',
-                    content: 'Hai detto "non capisco la domanda": puoi farmi un esempio concreto su Aspettative per il TEDx?'
+                    topicLabel: 'Feedback sul Prodotto',
+                    content: 'Hai detto "non capisco la domanda": puoi farmi un esempio concreto su Feedback sul Prodotto?'
                 }
             ]
         });

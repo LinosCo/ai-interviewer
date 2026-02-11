@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { decryptIfNeeded } from '@/lib/encryption';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
@@ -478,13 +479,23 @@ async function generateInterviewQualityAiReview(params: {
     topFailingBots: InterviewQualityBotSummary[];
 }): Promise<InterviewQualityAiReview> {
     const modelName = 'gpt-4o-mini';
-    const apiKey = process.env.OPENAI_API_KEY;
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: { openaiApiKey: true }
+    });
+    let globalOpenAiKey: string | null = null;
+    try {
+        globalOpenAiKey = decryptIfNeeded(globalConfig?.openaiApiKey);
+    } catch (error) {
+        console.error('Unable to decrypt global OpenAI API key for interview quality dashboard:', error);
+    }
+    const apiKey = globalOpenAiKey || process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
         return {
             generated: false,
             model: modelName,
-            summary: 'OPENAI_API_KEY non configurata: report AI non disponibile.',
+            summary: 'OpenAI API key non configurata nelle impostazioni globali: report AI non disponibile.',
             priorities: [],
             risks: []
         };

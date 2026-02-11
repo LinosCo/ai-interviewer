@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 /**
  * GET /api/cms/connection?projectId=xxx
  * Get the CMS connection status for a specific project.
+ * If projectId is omitted, resolves the first eligible project in the user's organizations.
  */
 export async function GET(request: Request) {
     try {
@@ -15,9 +16,6 @@ export async function GET(request: Request) {
 
         const url = new URL(request.url);
         const projectId = url.searchParams.get('projectId');
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
 
         // Verify user exists
         const user = await prisma.user.findUnique({
@@ -29,10 +27,10 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Find project and any CMS connection (direct or shared) that the user can access
-        const project = await prisma.project.findFirst({
+        // Find projects and any CMS connection (direct or shared) that the user can access
+        const projects = await prisma.project.findMany({
             where: {
-                id: projectId,
+                ...(projectId ? { id: projectId } : {}),
                 organization: {
                     members: {
                         some: {
@@ -52,26 +50,55 @@ export async function GET(request: Request) {
             }
         });
 
-        if (!project) {
+        if (!projects.length) {
             return NextResponse.json({
                 enabled: false,
                 message: 'Project not found or access denied'
             });
         }
 
-        const sharedConnection = project.cmsShares.find(s => s.connection.status !== 'DISABLED')?.connection || null;
-        const cmsConnection = project.newCmsConnection || project.cmsConnection || sharedConnection;
+        type ProjectWithConnections = (typeof projects)[number];
+        type ResolvedConnection = NonNullable<
+            ProjectWithConnections['newCmsConnection']
+            | ProjectWithConnections['cmsConnection']
+            | ProjectWithConnections['cmsShares'][number]['connection']
+        >;
 
-        if (!cmsConnection) {
+        const resolveConnection = (project: ProjectWithConnections): ResolvedConnection | null => {
+            const directConnection = project.newCmsConnection || project.cmsConnection;
+            if (directConnection && directConnection.status !== 'DISABLED') {
+                return directConnection;
+            }
+            return project.cmsShares.find((share) => share.connection.status !== 'DISABLED')?.connection || null;
+        };
+
+        const eligibleProjects = projects
+            .map(project => ({
+                project,
+                connection: resolveConnection(project)
+            }))
+            .filter(
+                (entry): entry is { project: ProjectWithConnections; connection: ResolvedConnection } => Boolean(entry.connection)
+            );
+
+        if (!eligibleProjects.length) {
             return NextResponse.json({
                 enabled: false,
                 message: 'CMS integration is not enabled for this project'
             });
         }
 
+        const preferredProjectId = process.env.BUSINESS_TUNER_SELF_PROJECT_ID;
+        const selected = eligibleProjects.find(entry => entry.project.id === preferredProjectId)
+            || eligibleProjects.find(entry => entry.project.name.trim().toLowerCase() === 'business tuner')
+            || eligibleProjects[0];
+        const cmsConnection = selected.connection;
+        const project = selected.project;
+
         return NextResponse.json({
             enabled: true,
             projectId: project.id,
+            projectName: project.name,
             connection: {
                 id: cmsConnection.id,
                 name: cmsConnection.name,
@@ -85,7 +112,7 @@ export async function GET(request: Request) {
             }
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error getting CMS connection:', error);
         return NextResponse.json(
             { error: 'Failed to get CMS connection' },

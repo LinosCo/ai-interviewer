@@ -54,6 +54,7 @@ export interface PushSuggestionResult {
     success: boolean;
     cmsContentId?: string;
     previewUrl?: string;
+    markPublished?: boolean;
     error?: string;
 }
 
@@ -63,6 +64,17 @@ interface MCPLookupResult {
 }
 
 export class CMSConnectionService {
+    private static readonly INTERNAL_LANDING_CMS_API_URLS = new Set([
+        'internal://landing',
+        'internal://business-tuner-landing',
+        'internal:landing'
+    ]);
+
+    private static isInternalLandingConnection(connection: { cmsApiUrl?: string | null }): boolean {
+        const url = String(connection.cmsApiUrl || '').trim().toLowerCase();
+        return this.INTERNAL_LANDING_CMS_API_URLS.has(url);
+    }
+
     /**
      * Create a new CMS connection for an organization.
      * Returns the credentials that should be shown only once.
@@ -148,6 +160,30 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
         const startTime = Date.now();
 
         try {
+            if (this.isInternalLandingConnection(connection)) {
+                await prisma.cMSConnection.update({
+                    where: { id: connectionId },
+                    data: {
+                        status: 'ACTIVE',
+                        lastPingAt: new Date(),
+                        lastSyncError: null,
+                        capabilities: ['internal-landing'],
+                        cmsVersion: 'internal'
+                    }
+                });
+
+                return {
+                    success: true,
+                    status: 'ok',
+                    message: 'Connessione interna landing attiva',
+                    details: {
+                        cmsVersion: 'internal',
+                        capabilities: ['internal-landing'],
+                        responseTime: Date.now() - startTime
+                    }
+                };
+            }
+
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -530,6 +566,37 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
         };
     }
 
+    private static async pushToInternalLanding(
+        suggestion: any,
+        routing: PublicationRouting,
+        sourceSignals: Record<string, unknown>
+    ): Promise<PushSuggestionResult> {
+        const baseCandidate = typeof suggestion.connection?.cmsPublicUrl === 'string'
+            ? suggestion.connection.cmsPublicUrl.trim()
+            : '';
+        const fallbackBase = process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai';
+        const baseUrl = (baseCandidate.startsWith('http') ? baseCandidate : fallbackBase).replace(/\/+$/, '');
+        const slug = suggestion.slug || suggestion.id;
+        const section = String(suggestion.targetSection || routing.targetSection || '').toLowerCase();
+        const previewPath = section.includes('news') ? `/#news-${slug}` : '/#news';
+
+        await this.logWebhook(
+            suggestion.connectionId,
+            'OUTBOUND',
+            'suggestion.push.internal_landing',
+            true,
+            this.buildCmsPayload(suggestion, routing, sourceSignals),
+            200
+        );
+
+        return {
+            success: true,
+            cmsContentId: suggestion.id,
+            previewUrl: `${baseUrl}${previewPath}`,
+            markPublished: true
+        };
+    }
+
     private static async pushToWordPress(
         suggestion: any,
         routing: PublicationRouting,
@@ -710,13 +777,21 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
                     );
                 }
             } else {
-                if (suggestion.connection.status !== 'ACTIVE') {
-                    result = {
-                        success: false,
-                        error: 'CMS connection is not active. Please verify the connection first.'
-                    };
+                if (this.isInternalLandingConnection(suggestion.connection)) {
+                    result = await this.pushToInternalLanding(
+                        suggestion,
+                        effectiveRouting,
+                        sourceSignals
+                    );
                 } else {
-                    result = await this.pushToCmsApi(suggestion, effectiveRouting, sourceSignals);
+                    if (suggestion.connection.status !== 'ACTIVE') {
+                        result = {
+                            success: false,
+                            error: 'CMS connection is not active. Please verify the connection first.'
+                        };
+                    } else {
+                        result = await this.pushToCmsApi(suggestion, effectiveRouting, sourceSignals);
+                    }
                 }
             }
 
@@ -737,11 +812,13 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
                 }
             })) as Prisma.InputJsonValue;
 
+            const now = new Date();
             await prisma.cMSSuggestion.update({
                 where: { id: suggestionId },
                 data: {
-                    status: 'PUSHED',
-                    pushedAt: new Date(),
+                    status: result.markPublished ? 'PUBLISHED' : 'PUSHED',
+                    pushedAt: now,
+                    publishedAt: result.markPublished ? now : null,
                     cmsContentId: result.cmsContentId || null,
                     cmsPreviewUrl: result.previewUrl || null,
                     sourceSignals: updatedSignals

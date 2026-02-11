@@ -53,12 +53,26 @@ function fallbackDraftFromRecommendation(recommendation: any) {
     const title = String(recommendation?.title || '').trim();
     const description = String(recommendation?.description || recommendation?.impact || '').trim();
     if (!title || !description) return null;
+    const lowerTitle = title.toLowerCase();
+    const lowerType = String(recommendation?.type || '').toLowerCase();
+
+    let targetSection = 'pages';
+    if (lowerType === 'social_post' || lowerTitle.includes('linkedin') || lowerTitle.includes('social')) {
+        targetSection = 'social';
+    } else if (lowerType === 'add_faq' || lowerTitle.includes('faq') || lowerTitle.includes('domanda')) {
+        targetSection = 'faq';
+    } else if (lowerTitle.includes('news') || lowerTitle.includes('aggiornamento')) {
+        targetSection = 'news';
+    } else if (lowerTitle.includes('blog') || lowerTitle.includes('articolo')) {
+        targetSection = 'blog';
+    }
+
     return {
         title,
         slug: slugify(title),
         body: description,
         metaDescription: String(recommendation?.impact || '').trim().slice(0, 160),
-        targetSection: recommendation?.type === 'social_post' ? 'social' : 'pages',
+        targetSection,
         mediaBrief: recommendation?.type === 'social_post'
             ? 'Visual consigliato: immagine/video breve focalizzato sul beneficio principale con CTA chiara.'
             : undefined

@@ -6,6 +6,7 @@ import {
   ProblemSection,
   FeaturesSection,
   AITipsSection,
+  NewsSection,
   HowItWorks,
   WhySection,
   UseCasesSection,
@@ -60,8 +61,12 @@ export default function LandingPage() {
         <div className="h-24 section-fade-to-transparent" />
         <AITipsSection />
 
-        {/* Transition: AITips (transparent) → HowItWorks (white) */}
+        {/* Transition: AITips (transparent) → News (white) */}
         <div className="h-24 section-fade-from-transparent" />
+        <NewsSection />
+
+        {/* Transition: News (white) → HowItWorks (white) */}
+        <div className="h-16 bg-white" />
         <HowItWorks />
 
         {/* Transition: HowItWorks (white) → Why (transparent) */}

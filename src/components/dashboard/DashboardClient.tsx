@@ -344,19 +344,25 @@ export default function DashboardClient({
                     </h2>
 
                     {/* CMS Dashboard Quick Access */}
-                    {currentCmsConnection && currentCmsConnection.status === 'ACTIVE' && (
-                        <button
-                            onClick={handleOpenCmsDashboard}
-                            disabled={isOpeningCms}
-                            className="w-full text-left block bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-wait"
+                    {currentCmsConnection && (
+                        <div className="block bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5 relative group cursor-pointer"
+                            onClick={() => {
+                                if (currentCmsConnection.status === 'ACTIVE') {
+                                    handleOpenCmsDashboard();
+                                } else {
+                                    handleTransfer(currentCmsConnection.id);
+                                }
+                            }}
                         >
                             <div className="flex items-start justify-between">
                                 <div>
                                     <h3 className="text-xl font-semibold mb-2">
-                                        {isOpeningCms ? 'Apertura...' : currentCmsConnection.name || 'Gestisci Sito Web'}
+                                        {isOpeningCms ? 'Apertura...' : currentCmsConnection.name || 'Sito Web Collegato'}
                                     </h3>
                                     <p className="text-emerald-100 text-sm">
-                                        Accedi alla dashboard CMS per gestire contenuti e pagine.
+                                        {currentCmsConnection.status === 'ACTIVE'
+                                            ? 'Accedi alla dashboard CMS per gestire contenuti.'
+                                            : 'Configura o gestisci la connessione CMS.'}
                                     </p>
                                 </div>
                                 <div className="p-2 bg-white/20 rounded-lg">
@@ -367,9 +373,43 @@ export default function DashboardClient({
                                     )}
                                 </div>
                             </div>
-                        </button>
+                            <div className="mt-4 flex gap-2 overflow-hidden h-0 group-hover:h-auto transition-all opacity-0 group-hover:opacity-100">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleTransfer(currentCmsConnection.id);
+                                    }}
+                                    className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-xs font-medium backdrop-blur-sm"
+                                >
+                                    Impostazioni
+                                </button>
+                                {currentCmsConnection.status === 'ACTIVE' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenCmsDashboard();
+                                        }}
+                                        className="px-3 py-1.5 bg-white text-emerald-600 hover:bg-emerald-50 rounded text-xs font-medium shadow-sm"
+                                    >
+                                        Apri CMS
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     )}
-
+                    {/* Show all CMS connections when "All Projects" is selected */}
+                    {isAllProjects && allCmsConnections.map((conn: any) => (
+                        <CMSConnectionCard
+                            key={conn.id}
+                            connection={{
+                                ...conn,
+                                status: conn.status || 'ACTIVE'
+                            }}
+                            canManage={true}
+                            onTransfer={handleTransfer}
+                            onDelete={handleDeleteConnection}
+                        />
+                    ))}
                     {/* Create Interview */}
                     {canCreateInterview.allowed ? (
                         <Link
@@ -446,6 +486,24 @@ export default function DashboardClient({
                         </div>
                     )}
 
+                    {/* Brand Monitor (Renamed & Styled) */}
+                    <Link
+                        href="/dashboard/visibility/brands"
+                        className="block bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5"
+                    >
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h3 className="text-xl font-semibold mb-2">Brand Monitor</h3>
+                                <p className="text-purple-100 text-sm">
+                                    Monitora la visibilità del tuo brand negli LLM e motori di ricerca.
+                                </p>
+                            </div>
+                            <div className="p-2 bg-white/20 rounded-lg">
+                                <Eye className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </Link>
+
                     <Link
                         href="/dashboard/templates"
                         className="block platform-card rounded-xl p-4 hover:border-gray-300 transition-colors group"
@@ -458,24 +516,6 @@ export default function DashboardClient({
                                 <div>
                                     <h3 className="font-semibold text-gray-900 text-sm">Esplora template</h3>
                                     <p className="text-gray-500 text-xs">Modelli pronti all'uso per ogni settore</p>
-                                </div>
-                            </div>
-                            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                    </Link>
-
-                    <Link
-                        href="/dashboard/visibility/brands"
-                        className="block platform-card rounded-xl p-4 hover:border-purple-300 transition-colors group"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100">
-                                    <Eye className="w-4 h-4 text-purple-600" />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-900 text-sm">Brand Monitor</h3>
-                                    <p className="text-gray-500 text-xs">Monitora la visibilità del tuo brand</p>
                                 </div>
                             </div>
                             <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
@@ -501,34 +541,6 @@ export default function DashboardClient({
                             </div>
                         </Link>
                     )}
-
-                    {/* CMS Connection Card(s) */}
-                    {currentCmsConnection && (
-                        <CMSConnectionCard
-                            connection={{
-                                ...currentCmsConnection,
-                                projectName: selectedProject?.name || '',
-                                projectId: selectedProject?.id || '',
-                                status: currentCmsConnection.status || 'ACTIVE'
-                            }}
-                            canManage={true}
-                            onTransfer={handleTransfer}
-                            onDelete={handleDeleteConnection}
-                        />
-                    )}
-                    {/* Show all CMS connections when "All Projects" is selected */}
-                    {isAllProjects && allCmsConnections.map((conn: any) => (
-                        <CMSConnectionCard
-                            key={conn.id}
-                            connection={{
-                                ...conn,
-                                status: conn.status || 'ACTIVE'
-                            }}
-                            canManage={true}
-                            onTransfer={handleTransfer}
-                            onDelete={handleDeleteConnection}
-                        />
-                    ))}
                 </div>
 
                 {/* Recent Activity List */}

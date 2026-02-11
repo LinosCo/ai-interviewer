@@ -181,11 +181,21 @@ export default function InterviewChat({
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
     const [isTyping, setIsTyping] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
+    const [showCompletionActions, setShowCompletionActions] = useState(false);
     const inFlightRequestRef = useRef(false);
 
     useEffect(() => {
         messagesRef.current = messages;
     }, [messages]);
+
+    useEffect(() => {
+        if (!isCompleted) {
+            setShowCompletionActions(false);
+            return;
+        }
+        const timer = setTimeout(() => setShowCompletionActions(true), 2200);
+        return () => clearTimeout(timer);
+    }, [isCompleted]);
 
     // Active Timer
     useEffect(() => {
@@ -846,8 +856,8 @@ export default function InterviewChat({
 
                                                     return (
                                                         <p className={`
-                                                            ${isShort ? 'text-xl md:text-2xl font-semibold text-gray-900' : ''} 
-                                                            ${!isShort && !isLong ? 'text-lg md:text-xl font-medium text-gray-800' : ''}
+                                                            ${isShort ? 'text-lg md:text-xl font-semibold text-gray-900' : ''} 
+                                                            ${!isShort && !isLong ? 'text-base md:text-lg font-medium text-gray-800' : ''}
                                                             ${isLong ? 'text-base md:text-lg text-gray-700' : ''}
                                                             leading-relaxed mb-6
                                                         `} style={{ textShadow: 'none' }}>
@@ -902,13 +912,14 @@ export default function InterviewChat({
                                     ? 'Grazie per il tuo prezioso contributo.'
                                     : 'Thank you for your valuable contribution.'}
                             </p>
-                            {rewardConfig?.enabled && rewardConfig.displayText && (
+                            {showCompletionActions && rewardConfig?.enabled && rewardConfig.displayText && (
                                 <div className="bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg mb-6 flex items-center justify-center gap-2">
                                     <Icons.Gift size={18} />
                                     <span className="font-medium">{rewardConfig.displayText}</span>
                                 </div>
                             )}
                             {rewardConfig?.enabled ? (
+                                showCompletionActions ? (
                                 rewardConfig.type === 'redirect' && rewardConfig.payload ? (
                                     <button
                                         onClick={() => window.open(rewardConfig.payload, '_blank')}
@@ -925,6 +936,13 @@ export default function InterviewChat({
                                     >
                                         {language?.toLowerCase().startsWith('it') ? 'Richiedi il tuo premio' : 'Claim your reward'}
                                     </button>
+                                )
+                                ) : (
+                                    <p className="text-sm text-gray-500">
+                                        {language?.toLowerCase().startsWith('it')
+                                            ? 'Sto preparando la tua ricompensa...'
+                                            : 'Preparing your reward...'}
+                                    </p>
                                 )
                             ) : (
                                 <button

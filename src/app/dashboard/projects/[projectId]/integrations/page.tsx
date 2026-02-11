@@ -118,7 +118,7 @@ export default function IntegrationsPage() {
 
       if (userRes.ok) {
         const data = await userRes.json();
-        setUserPlan(data.plan || 'FREE');
+        setUserPlan((data.plan || 'FREE').toUpperCase() as UserPlan);
       }
 
       if (projectsRes.ok) {
@@ -135,12 +135,12 @@ export default function IntegrationsPage() {
             setCurrentOrgId(projectData.project.organization.id);
             setCurrentOrgName(projectData.project.organization.name);
             // Source of truth for integrations plan is the Organization
-            setUserPlan(projectData.project.organization.plan || 'FREE');
+            setUserPlan((projectData.project.organization.plan || 'FREE').toUpperCase() as UserPlan);
           } else if (projectData.organization) {
             // Some API variations return organization directly
             setCurrentOrgId(projectData.organization.id);
             setCurrentOrgName(projectData.organization.name);
-            setUserPlan(projectData.organization.plan || 'FREE');
+            setUserPlan((projectData.organization.plan || 'FREE').toUpperCase() as UserPlan);
           }
         }
       } catch (err) {

@@ -142,7 +142,7 @@ export default function CreateVisibilityWizardPage() {
             }
         };
         loadConfig();
-    }, [projectIdParam]);
+    }, [searchParams, projectIdParam]);
 
     const handleNext = () => {
         if (currentStep < STEPS.length) {

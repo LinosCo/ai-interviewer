@@ -492,7 +492,8 @@ async function generateConsentQuestionOnly(params: {
 
     const prompt = [
         `Language: ${params.language}`,
-        `Task: Ask exactly ONE yes/no question asking permission to collect contact details for follow-up.`,
+        `Task: Write a natural transition into data collection and ask exactly ONE yes/no question asking permission to collect contact details for follow-up.`,
+        `Structure: (1) one short linking sentence acknowledging content interview closure; (2) one yes/no consent question.`,
         `Do NOT ask for any specific field yet. Do NOT ask topic questions. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].join('\n');
@@ -2004,7 +2005,7 @@ hard_rules:
 
                     if (!isConsent || forceConsent) {
                         console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
-                        const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for consent to collect contact details. One question only. Do not ask any topic question.`;
+                        const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Start with one short linking sentence acknowledging the content interview is complete, then ask ONLY one yes/no consent question to collect contact details. Do not ask topic questions.`;
                         const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                         responseText = retry.object.response?.trim() || responseText;
 
@@ -2016,7 +2017,7 @@ hard_rules:
                                 temperature: 0
                             });
                             if (!consentCheck2.object.isConsent) {
-                                const enforcedSystem2 = `You must ask a single yes/no question asking permission to collect contact details.`;
+                                const enforcedSystem2 = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
                                 const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
                                 responseText = retry2.object.response?.trim() || responseText;
                             }
@@ -2121,7 +2122,7 @@ hard_rules:
         }
 
         // ====================================================================
-        // QUALITATIVE TELEMETRY (logging only, not blocking)
+        // QUALITATIVE GUARDRAILS (naturalness-first, light-touch corrections)
         // ====================================================================
         const qualityGatePhases = new Set(['SCAN', 'DEEP', 'DEEP_OFFER']);
         qualityTelemetry.eligible = qualityGatePhases.has(nextState.phase);
@@ -2151,6 +2152,72 @@ hard_rules:
             if (!qualitative.passed) {
                 console.log(`📊 [QUALITY] Score: ${qualitative.score}%, Issues: ${qualitative.issues.join(', ')}`);
             }
+
+            // Soft correction only for the two high-impact issues requested by product:
+            // - double question / malformed question count
+            // - repetitive question compared to previous assistant turn
+            const needsQuestionCountFix = !qualitative.checks.oneQuestion;
+            const needsRepetitionFix = !qualitative.checks.nonRepetitive;
+            const isTopicQuestionPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
+
+            if (isTopicQuestionPhase && (needsQuestionCountFix || needsRepetitionFix)) {
+                qualityTelemetry.gateTriggered = true;
+                const enforceTopic = targetTopic?.label || currentTopic.label;
+                const previousAssistant = String(lastAssistantBeforeCurrent || '').slice(0, 180);
+                const userContext = String(lastMessage.content || '').slice(0, 180);
+                const correctionPrompt = language === 'it'
+                    ? `Rigenera in modo naturale.
+Vincoli:
+1) Mantieni una breve frase di legame con l'ultimo messaggio utente.
+2) Fai ESATTAMENTE una sola domanda.
+3) Evita ripetizioni rispetto alla domanda precedente.
+4) Rimani sul topic "${enforceTopic}".
+5) Non chiudere e non chiedere contatti.
+Ultimo messaggio utente: "${userContext}"
+Domanda precedente assistente (da non ripetere): "${previousAssistant}"`
+                    : `Regenerate naturally.
+Constraints:
+1) Keep a short bridging sentence with the user's latest message.
+2) Ask EXACTLY one question.
+3) Avoid repeating the previous assistant question.
+4) Stay on topic "${enforceTopic}".
+5) Do not close and do not ask for contacts.
+Latest user message: "${userContext}"
+Previous assistant question (do not repeat): "${previousAssistant}"`;
+
+                try {
+                    const retry = await generateObject({
+                        model,
+                        schema,
+                        messages: messagesForAI,
+                        system: `${systemPrompt}\n\n${correctionPrompt}`,
+                        temperature: 0.35
+                    });
+                    responseText = retry.object.response?.trim() || responseText;
+                    if ((responseText.match(/\?/g) || []).length !== 1) {
+                        responseText = normalizeSingleQuestion(responseText);
+                    }
+                    qualityTelemetry.regenerated = true;
+                    didRegenerate = true;
+                } catch (e) {
+                    console.error('Qualitative soft correction failed:', e);
+                    qualityTelemetry.fallbackUsed = true;
+                    try {
+                        responseText = await generateQuestionOnly({
+                            model,
+                            language,
+                            topicLabel: enforceTopic,
+                            topicCue: buildNaturalTopicCue(enforceTopic, language),
+                            subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
+                            lastUserMessage: lastMessage?.content || null,
+                            requireAcknowledgment: true,
+                            transitionMode: supervisorInsight?.transitionMode
+                        });
+                    } catch (innerError) {
+                        console.error('Qualitative fallback question generation failed:', innerError);
+                    }
+                }
+            }
         }
 
         // ====================================================================
@@ -2160,33 +2227,39 @@ hard_rules:
         if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
             const hasGoodbyeNow = goodbyePattern.test(responseText);
             const hasNoQuestionNow = !responseText.includes('?');
+            const hasMultipleQuestionsNow = (responseText.match(/\?/g) || []).length > 1;
             const hasCompletionNow = /INTERVIEW_COMPLETED/i.test(responseText);
             const hasPrematureContactNow = contactRequestPattern.test(responseText);
 
-            // Only intervene for the 3 critical cases
-            const needsIntervention = hasGoodbyeNow || hasNoQuestionNow || hasCompletionNow || hasPrematureContactNow;
+            // Only intervene for critical conversational integrity issues
+            const needsIntervention =
+                hasGoodbyeNow ||
+                hasNoQuestionNow ||
+                hasMultipleQuestionsNow ||
+                hasCompletionNow ||
+                hasPrematureContactNow;
 
             if (needsIntervention) {
                 flowTelemetry.topicClosureIntercepted = true;
                 const enforceTopic = targetTopic?.label || currentTopic.label;
                 const userContext = lastMessage?.role === 'user' ? lastMessage.content.slice(0, 150) : '';
 
-                console.log(`🛡️ [SAFETY_NET] Issue detected in ${nextState.phase}: goodbye=${hasGoodbyeNow}, noQuestion=${hasNoQuestionNow}, completion=${hasCompletionNow}, contact=${hasPrematureContactNow}`);
+                console.log(`🛡️ [SAFETY_NET] Issue detected in ${nextState.phase}: goodbye=${hasGoodbyeNow}, noQuestion=${hasNoQuestionNow}, multiQuestion=${hasMultipleQuestionsNow}, completion=${hasCompletionNow}, contact=${hasPrematureContactNow}`);
 
                 // ADDITIVE APPROACH: Ask LLM to add a follow-up question to the existing response
                 const additivePrompt = language === 'it'
-                    ? `La tua risposta è buona ma manca la domanda.
-Mantieni il riconoscimento della risposta dell'utente e AGGIUNGI una domanda naturale di follow-up su "${enforceTopic}".
+                    ? `La tua risposta è buona ma ${hasMultipleQuestionsNow ? 'contiene più di una domanda' : 'manca la domanda'}.
+Mantieni il riconoscimento della risposta dell'utente e usa una sola domanda naturale di follow-up su "${enforceTopic}".
 ${userContext ? `Contesto utente: "${userContext}"` : ''}
 Rispondi con il messaggio completo (riconoscimento + domanda).`
-                    : `Your response is good but missing the question.
-Keep your acknowledgment of the user's response and ADD a natural follow-up question about "${enforceTopic}".
+                    : `Your response is good but ${hasMultipleQuestionsNow ? 'contains more than one question' : 'is missing the question'}.
+Keep your acknowledgment of the user's response and use one natural follow-up question about "${enforceTopic}".
 ${userContext ? `User context: "${userContext}"` : ''}
 Reply with the complete message (acknowledgment + question).`;
 
                 try {
                     // Clean the response first
-                    let cleanedResponse = responseText
+                    const cleanedResponse = responseText
                         .replace(/INTERVIEW_COMPLETED/gi, '')
                         .replace(goodbyePattern, '')
                         .replace(contactRequestPattern, '')
@@ -2394,7 +2467,7 @@ Reply with the complete message (acknowledgment + question).`;
                 flowTelemetry.completionBlockedForConsent = true;
                 // Guardrail: never allow completion before an explicit contact-consent step.
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED before consent resolution. OVERRIDING with consent question.`);
-                const enforcedSystem = `You must ask a single yes/no question asking permission to collect contact details.`;
+                const enforcedSystem = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
                 try {
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;

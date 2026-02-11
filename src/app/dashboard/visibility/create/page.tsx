@@ -63,6 +63,15 @@ interface VisibilityConfigApiResponse {
     };
 }
 
+interface UserSettingsResponse {
+    memberships?: Array<{
+        organization?: {
+            projects?: Array<{ id: string; name: string }>;
+            subscription?: { tier?: string | null };
+        } | null;
+    }>;
+}
+
 const STEPS = [
     { id: 1, title: 'Brand Info', description: 'Descrivi il tuo brand' },
     { id: 2, title: 'Prompts', description: 'Genera e affina i prompt' },
@@ -144,7 +153,12 @@ export default function CreateVisibilityWizardPage() {
                                 enabled: p.enabled,
                                 aiOverviewEnabled: p.aiOverviewEnabled ?? true,
                                 aiOverviewVariant: p.aiOverviewVariant || null,
-                                aiOverviewLastFound: p.aiOverviewLastFound || null,
+                                aiOverviewLastFound: (() => {
+                                    if (!p.aiOverviewLastFound) return null;
+                                    return p.aiOverviewLastFound instanceof Date
+                                        ? p.aiOverviewLastFound
+                                        : new Date(p.aiOverviewLastFound);
+                                })(),
                                 referenceUrl: p.referenceUrl || undefined
                             })) || [],
                             competitors: data.config.competitors?.map((c) => ({
@@ -160,12 +174,12 @@ export default function CreateVisibilityWizardPage() {
                 // Load Limits and Projects
                 const limitRes = await fetch('/api/user/settings');
                 if (limitRes.ok) {
-                    const limitData = await limitRes.json();
+                    const limitData: UserSettingsResponse = await limitRes.json();
 
                     // Extract projects
                     const org = limitData.memberships?.[0]?.organization;
                     const orgProjects = org?.projects || [];
-                    setProjects(orgProjects.map((p: any) => ({ id: p.id, name: p.name })));
+                    setProjects(orgProjects.map((p) => ({ id: p.id, name: p.name })));
 
                     const tier = org?.subscription?.tier || 'FREE';
 
@@ -221,9 +235,10 @@ export default function CreateVisibilityWizardPage() {
 
             // Redirect to the monitoring page for this specific brand
             router.push(`/dashboard/visibility?brandId=${savedConfigId}`);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Save error:', error);
-            alert(error.message || 'Errore nel salvataggio. Riprova.');
+            const errorMessage = error instanceof Error ? error.message : 'Errore nel salvataggio. Riprova.';
+            alert(errorMessage);
         } finally {
             setLoading(false);
         }

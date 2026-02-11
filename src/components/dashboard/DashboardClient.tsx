@@ -348,7 +348,7 @@ export default function DashboardClient({
                             onClick={() => {
                                 if (currentCmsConnection.status === 'ACTIVE') {
                                     handleOpenCmsDashboard();
-                                } else {
+                                } else if (selectedProject?.id) {
                                     handleOpenIntegrations(selectedProject.id);
                                 }
                             }}
@@ -376,7 +376,9 @@ export default function DashboardClient({
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleOpenIntegrations(selectedProject.id);
+                                        if (selectedProject?.id) {
+                                            handleOpenIntegrations(selectedProject.id);
+                                        }
                                     }}
                                     className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-xs font-medium backdrop-blur-sm"
                                 >

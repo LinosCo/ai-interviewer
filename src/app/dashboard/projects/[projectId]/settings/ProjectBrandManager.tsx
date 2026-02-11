@@ -168,7 +168,7 @@ export function ProjectBrandManager({ projectId, projectName }: ProjectBrandMana
                                                 <BarChart3 className="w-4 h-4" />
                                             </Button>
                                         </Link>
-                                        <Link href={`/dashboard/visibility/create?configId=${brand.id}`}>
+                                        <Link href={`/dashboard/visibility/create?configId=${brand.id}&projectId=${projectId}`}>
                                             <Button variant="ghost" size="sm">
                                                 <Settings className="w-4 h-4" />
                                             </Button>

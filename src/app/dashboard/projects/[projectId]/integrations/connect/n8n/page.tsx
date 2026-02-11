@@ -4,6 +4,33 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Zap, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 
+interface N8NConnection {
+  id: string;
+  name: string;
+  webhookUrl: string;
+  status: 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
+  lastTriggerAt?: string | null;
+  lastError?: string | null;
+  triggerOnTips: boolean;
+}
+
+interface N8NConnectionResponse {
+  connection?: N8NConnection | null;
+  error?: string;
+  unavailableReason?: string;
+  success?: boolean;
+}
+
+async function readJsonSafely<T>(response: Response): Promise<T | null> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) return null;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function ConnectN8NPage() {
   const params = useParams();
   const router = useRouter();
@@ -16,20 +43,33 @@ export default function ConnectN8NPage() {
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [existingConnection, setExistingConnection] = useState<any>(null);
+  const [existingConnection, setExistingConnection] = useState<N8NConnection | null>(null);
 
   useEffect(() => {
-    // Check for existing connection
-    fetch(`/api/integrations/n8n/connections?projectId=${projectId}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.connection) {
+    const loadExistingConnection = async () => {
+      try {
+        const res = await fetch(`/api/integrations/n8n/connections?projectId=${projectId}`);
+        const data = await readJsonSafely<N8NConnectionResponse>(res);
+        if (!res.ok) {
+          setError(data?.error || 'Impossibile caricare la configurazione n8n');
+          return;
+        }
+        if (data?.unavailableReason) {
+          setError('n8n non è disponibile su questo database finché non vengono applicate le migration.');
+          return;
+        }
+        if (data?.connection) {
           setExistingConnection(data.connection);
           setWebhookUrl(data.connection.webhookUrl);
           setName(data.connection.name);
           setTriggerOnTips(data.connection.triggerOnTips);
         }
-      });
+      } catch {
+        setError('Impossibile caricare la configurazione n8n');
+      }
+    };
+
+    loadExistingConnection();
   }, [projectId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,16 +89,19 @@ export default function ConnectN8NPage() {
         }),
       });
 
+      const data = await readJsonSafely<N8NConnectionResponse>(res);
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text);
+        throw new Error(data?.error || 'Errore durante il salvataggio');
       }
 
-      const data = await res.json();
+      if (!data?.connection) {
+        throw new Error('Risposta non valida dal server n8n');
+      }
+
       setExistingConnection(data.connection);
       setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || 'Errore durante il salvataggio');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Errore durante il salvataggio');
     } finally {
       setLoading(false);
     }
@@ -75,19 +118,28 @@ export default function ConnectN8NPage() {
         method: 'POST',
       });
 
-      const data = await res.json();
+      const data = await readJsonSafely<N8NConnectionResponse>(res);
+
+      if (!res.ok) {
+        setError(data?.error || 'Test fallito');
+        return;
+      }
+      if (!data) {
+        setError('Risposta non valida durante il test');
+        return;
+      }
 
       if (data.success) {
         setSuccess(true);
         // Refresh connection status
         const refreshRes = await fetch(`/api/integrations/n8n/connections?projectId=${projectId}`);
-        const refreshData = await refreshRes.json();
-        setExistingConnection(refreshData.connection);
+        const refreshData = await readJsonSafely<N8NConnectionResponse>(refreshRes);
+        setExistingConnection(refreshData?.connection || null);
       } else {
         setError(data.error || 'Test fallito');
       }
-    } catch (err: any) {
-      setError(err.message || 'Errore durante il test');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Errore durante il test');
     } finally {
       setTesting(false);
     }

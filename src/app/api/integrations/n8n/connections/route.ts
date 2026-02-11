@@ -10,18 +10,24 @@ const createConnectionSchema = z.object({
   triggerOnTips: z.boolean().optional().default(true),
 });
 
+function isMissingN8NConnectionTable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const prismaError = error as { code?: string; meta?: { table?: string } };
+  return prismaError.code === 'P2021' && String(prismaError.meta?.table || '').includes('N8NConnection');
+}
+
 export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return new Response('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get('projectId');
 
     if (!projectId) {
-      return new Response('projectId is required', { status: 400 });
+      return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
     }
 
     // Check access
@@ -35,7 +41,7 @@ export async function GET(req: Request) {
     });
 
     if (!access) {
-      return new Response('Access denied', { status: 403 });
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const connection = await prisma.n8NConnection.findUnique({
@@ -44,8 +50,14 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ connection });
   } catch (error) {
+    if (isMissingN8NConnectionTable(error)) {
+      return NextResponse.json({
+        connection: null,
+        unavailableReason: 'N8NConnection table missing. Run database migrations to enable n8n integration.',
+      });
+    }
     console.error('Get N8N Connection Error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -53,7 +65,7 @@ export async function POST(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return new Response('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await req.json();
@@ -70,7 +82,7 @@ export async function POST(req: Request) {
     });
 
     if (!access) {
-      return new Response('Access denied', { status: 403 });
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Check plan
@@ -81,7 +93,7 @@ export async function POST(req: Request) {
 
     const plan = project?.organization?.plan || 'FREE';
     if (!['BUSINESS', 'PARTNER'].includes(plan)) {
-      return new Response('Upgrade to BUSINESS required', { status: 403 });
+      return NextResponse.json({ error: 'Upgrade to BUSINESS required' }, { status: 403 });
     }
 
     // Create or update connection
@@ -106,9 +118,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ connection });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return new Response(error.issues[0].message, { status: 400 });
+      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
+    }
+    if (isMissingN8NConnectionTable(error)) {
+      return NextResponse.json(
+        { error: 'N8N integration unavailable: missing N8NConnection table. Run database migrations.' },
+        { status: 503 }
+      );
     }
     console.error('Create N8N Connection Error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

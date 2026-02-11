@@ -2,11 +2,28 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Link2, Check, AlertCircle, Globe } from 'lucide-react';
+import { ArrowLeft, Link2, AlertCircle, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { showToast } from '@/components/toast';
+
+interface ExistingConnection {
+    id: string;
+    name: string;
+    endpoint: string;
+}
+
+interface MCPConnectionSummary {
+    id: string;
+    type: 'WORDPRESS' | 'WOOCOMMERCE';
+    name: string;
+    endpoint: string;
+}
+
+interface MCPConnectionsResponse {
+    connections?: MCPConnectionSummary[];
+}
 
 export default function ConnectWordPressPage() {
     const params = useParams();
@@ -21,36 +38,92 @@ export default function ConnectWordPressPage() {
         applicationPassword: '',
     });
     const [error, setError] = useState<string | null>(null);
+    const [existingConnection, setExistingConnection] = useState<ExistingConnection | null>(null);
+
+    useEffect(() => {
+        const loadExistingConnection = async () => {
+            try {
+                const res = await fetch(`/api/integrations/mcp/connections?projectId=${projectId}`);
+                if (!res.ok) return;
+
+                const data = await res.json() as MCPConnectionsResponse;
+                const existing = data.connections?.find((c) => c.type === 'WORDPRESS');
+                if (!existing) return;
+
+                setExistingConnection({
+                    id: existing.id,
+                    name: existing.name,
+                    endpoint: existing.endpoint,
+                });
+
+                setFormData(prev => ({
+                    ...prev,
+                    name: existing.name || prev.name,
+                    baseUrl: existing.endpoint || prev.baseUrl,
+                }));
+            } catch (err) {
+                console.error('Error loading existing WordPress connection:', err);
+            }
+        };
+
+        loadExistingConnection();
+    }, [projectId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
+        const username = formData.username.trim();
+        const applicationPassword = formData.applicationPassword.trim();
+        const hasPartialCredentials = Boolean(username) !== Boolean(applicationPassword);
+        if (hasPartialCredentials) {
+            setError('Per aggiornare le credenziali devi compilare sia username che Application Password.');
+            setLoading(false);
+            return;
+        }
+
         try {
-            const res = await fetch(`/api/integrations/mcp/connections`, {
-                method: 'POST',
+            const payload: Record<string, unknown> = {
+                name: formData.name,
+                endpoint: formData.baseUrl,
+            };
+
+            if (!existingConnection) {
+                payload.projectId = projectId;
+                payload.type = 'WORDPRESS';
+            }
+
+            if (username && applicationPassword) {
+                payload.credentials = {
+                    username,
+                    applicationPassword,
+                };
+            }
+
+            const url = existingConnection
+                ? `/api/integrations/mcp/connections/${existingConnection.id}`
+                : '/api/integrations/mcp/connections';
+            const method = existingConnection ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    projectId,
-                    type: 'WORDPRESS',
-                    name: formData.name,
-                    endpoint: formData.baseUrl,
-                    credentials: {
-                        username: formData.username,
-                        applicationPassword: formData.applicationPassword,
-                    }
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (res.ok) {
-                showToast('Connessione WordPress creata con successo');
+                showToast(
+                    existingConnection
+                        ? 'Connessione WordPress aggiornata con successo'
+                        : 'Connessione WordPress creata con successo'
+                );
                 router.push(`/dashboard/projects/${projectId}/integrations`);
             } else {
-                const data = await res.json();
-                setError(data.error || 'Errore durante la creazione della connessione');
+                const data = await res.json().catch(() => null) as { error?: string } | null;
+                setError(data?.error || 'Errore durante il salvataggio della connessione');
             }
-        } catch (err) {
+        } catch {
             setError('Errore di rete');
         } finally {
             setLoading(false);
@@ -104,14 +177,14 @@ export default function ConnectWordPressPage() {
                     <Label htmlFor="baseUrl">URL Sito WordPress</Label>
                     <Input
                         id="baseUrl"
-                        placeholder="https://tuosito.it"
+                        placeholder="https://tuosito.it oppure endpoint MCP completo"
                         type="url"
                         value={formData.baseUrl}
                         onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
                         required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                        Assicurati di includere https://
+                        Se inserisci solo il dominio, verrà usato automaticamente <code>/wp-json/mcp/v1</code>.
                     </p>
                 </div>
 
@@ -123,7 +196,7 @@ export default function ConnectWordPressPage() {
                             placeholder="admin"
                             value={formData.username}
                             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                            required
+                            required={!existingConnection}
                         />
                     </div>
                     <div className="space-y-2">
@@ -134,10 +207,16 @@ export default function ConnectWordPressPage() {
                             placeholder="xxxx xxxx xxxx xxxx"
                             value={formData.applicationPassword}
                             onChange={(e) => setFormData({ ...formData, applicationPassword: e.target.value })}
-                            required
+                            required={!existingConnection}
                         />
                     </div>
                 </div>
+
+                {existingConnection && (
+                    <p className="text-xs text-gray-500 -mt-2">
+                        Lascia username e password vuoti per mantenere le credenziali già salvate.
+                    </p>
+                )}
 
                 <div className="pt-4">
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
@@ -147,8 +226,8 @@ export default function ConnectWordPressPage() {
                         </h4>
                         <p className="text-xs text-amber-800 leading-relaxed">
                             1. Vai nel tuo pannello WordPress {'>'} Utenti {'>'} Profilo.<br />
-                            2. Scorri fino alla sezione "Password applicative".<br />
-                            3. Inserisci un nome (es. "Business Tuner") e clicca su "Aggiungi nuova".<br />
+                            2. Scorri fino alla sezione &quot;Password applicative&quot;.<br />
+                            3. Inserisci un nome (es. &quot;Business Tuner&quot;) e clicca su &quot;Aggiungi nuova&quot;.<br />
                             4. Copia il codice generato e incollalo qui sopra.
                         </p>
                     </div>
@@ -162,7 +241,7 @@ export default function ConnectWordPressPage() {
                         ) : (
                             <>
                                 <Link2 className="w-4 h-4 mr-2" />
-                                Connetti WordPress
+                                {existingConnection ? 'Aggiorna WordPress' : 'Connetti WordPress'}
                             </>
                         )}
                     </Button>

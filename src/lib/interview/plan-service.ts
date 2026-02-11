@@ -3,6 +3,7 @@ import type { Bot, TopicBlock } from '@prisma/client';
 import type { InterviewPlan, InterviewPlanOverrides, PlanTopic } from './plan-types';
 
 const SECONDS_PER_TURN = 45;
+const PLAN_LOGIC_VERSION = 'scan-min2-extension-gate-v1';
 
 function buildTopicsSignature(topics: TopicBlock[]) {
   return topics
@@ -17,10 +18,10 @@ export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[]): Intervie
 
   const scanTopics: PlanTopic[] = topics.map(t => {
     const topicMaxTurns = Number(t.maxTurns || timeBasedMax);
-    const minTurns = 1;
+    const minTurns = 2;
     const computedMax = perTopicTimeSec < 60
-      ? 1
-      : Math.max(1, Math.min(topicMaxTurns, timeBasedMax));
+      ? 2
+      : Math.max(2, Math.min(topicMaxTurns, timeBasedMax));
     const maxTurns = Math.max(minTurns, computedMax);
 
     return {
@@ -37,6 +38,7 @@ export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[]): Intervie
     version: 1,
     meta: {
       generatedAt: new Date().toISOString(),
+      planLogicVersion: PLAN_LOGIC_VERSION,
       maxDurationMins: bot.maxDurationMins || 10,
       totalTimeSec,
       perTopicTimeSec,
@@ -178,7 +180,12 @@ export async function getOrCreateInterviewPlan(bot: Bot & { topics: TopicBlock[]
   const existingBase = existing.basePlan as InterviewPlan;
   const overrides = existing.overrides as InterviewPlanOverrides | null;
 
-  if (!existingBase?.meta?.topicsSignature || existingBase.meta.topicsSignature !== basePlan.meta.topicsSignature || existingBase.meta.maxDurationMins !== basePlan.meta.maxDurationMins) {
+  if (
+    !existingBase?.meta?.topicsSignature ||
+    existingBase.meta.topicsSignature !== basePlan.meta.topicsSignature ||
+    existingBase.meta.maxDurationMins !== basePlan.meta.maxDurationMins ||
+    existingBase.meta.planLogicVersion !== basePlan.meta.planLogicVersion
+  ) {
     const merged = mergeInterviewPlan(basePlan, overrides);
     await prisma.interviewPlan.update({
       where: { botId: bot.id },

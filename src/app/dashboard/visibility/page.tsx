@@ -223,7 +223,7 @@ export default async function VisibilityPage({
                         </Link>
                     )}
                     <VisibilityProjectFilter currentProjectId={projectIdFilter || config.projectId || undefined} />
-                    <Link href={`/dashboard/visibility/create?configId=${config.id}`}>
+                    <Link href={`/dashboard/visibility/create?configId=${config.id}${config.projectId ? `&projectId=${config.projectId}` : ''}`}>
                         <Button variant="outline" size="sm" className="gap-2">
                             <Settings className="h-4 w-4" />
                             Impostazioni

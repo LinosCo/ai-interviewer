@@ -2,11 +2,28 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Link2, Check, AlertCircle, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Link2, AlertCircle, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { showToast } from '@/components/toast';
+
+interface ExistingConnection {
+    id: string;
+    name: string;
+    endpoint: string;
+}
+
+interface MCPConnectionSummary {
+    id: string;
+    type: 'WORDPRESS' | 'WOOCOMMERCE';
+    name: string;
+    endpoint: string;
+}
+
+interface MCPConnectionsResponse {
+    connections?: MCPConnectionSummary[];
+}
 
 export default function ConnectWooCommercePage() {
     const params = useParams();
@@ -21,36 +38,92 @@ export default function ConnectWooCommercePage() {
         consumerSecret: '',
     });
     const [error, setError] = useState<string | null>(null);
+    const [existingConnection, setExistingConnection] = useState<ExistingConnection | null>(null);
+
+    useEffect(() => {
+        const loadExistingConnection = async () => {
+            try {
+                const res = await fetch(`/api/integrations/mcp/connections?projectId=${projectId}`);
+                if (!res.ok) return;
+
+                const data = await res.json() as MCPConnectionsResponse;
+                const existing = data.connections?.find((c) => c.type === 'WOOCOMMERCE');
+                if (!existing) return;
+
+                setExistingConnection({
+                    id: existing.id,
+                    name: existing.name,
+                    endpoint: existing.endpoint,
+                });
+
+                setFormData(prev => ({
+                    ...prev,
+                    name: existing.name || prev.name,
+                    baseUrl: existing.endpoint || prev.baseUrl,
+                }));
+            } catch (err) {
+                console.error('Error loading existing WooCommerce connection:', err);
+            }
+        };
+
+        loadExistingConnection();
+    }, [projectId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
+        const consumerKey = formData.consumerKey.trim();
+        const consumerSecret = formData.consumerSecret.trim();
+        const hasPartialCredentials = Boolean(consumerKey) !== Boolean(consumerSecret);
+        if (hasPartialCredentials) {
+            setError('Per aggiornare le credenziali devi compilare sia Consumer Key che Consumer Secret.');
+            setLoading(false);
+            return;
+        }
+
         try {
-            const res = await fetch(`/api/integrations/mcp/connections`, {
-                method: 'POST',
+            const payload: Record<string, unknown> = {
+                name: formData.name,
+                endpoint: formData.baseUrl,
+            };
+
+            if (!existingConnection) {
+                payload.projectId = projectId;
+                payload.type = 'WOOCOMMERCE';
+            }
+
+            if (consumerKey && consumerSecret) {
+                payload.credentials = {
+                    consumerKey,
+                    consumerSecret,
+                };
+            }
+
+            const url = existingConnection
+                ? `/api/integrations/mcp/connections/${existingConnection.id}`
+                : '/api/integrations/mcp/connections';
+            const method = existingConnection ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    projectId,
-                    type: 'WOOCOMMERCE',
-                    name: formData.name,
-                    endpoint: formData.baseUrl,
-                    credentials: {
-                        consumerKey: formData.consumerKey,
-                        consumerSecret: formData.consumerSecret,
-                    }
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (res.ok) {
-                showToast('Connessione WooCommerce creata con successo');
+                showToast(
+                    existingConnection
+                        ? 'Connessione WooCommerce aggiornata con successo'
+                        : 'Connessione WooCommerce creata con successo'
+                );
                 router.push(`/dashboard/projects/${projectId}/integrations`);
             } else {
-                const data = await res.json();
-                setError(data.error || 'Errore durante la creazione della connessione');
+                const data = await res.json().catch(() => null) as { error?: string } | null;
+                setError(data?.error || 'Errore durante il salvataggio della connessione');
             }
-        } catch (err) {
+        } catch {
             setError('Errore di rete');
         } finally {
             setLoading(false);
@@ -104,14 +177,14 @@ export default function ConnectWooCommercePage() {
                     <Label htmlFor="baseUrl">URL Store WooCommerce</Label>
                     <Input
                         id="baseUrl"
-                        placeholder="https://tuostore.it"
+                        placeholder="https://tuostore.it oppure endpoint MCP completo"
                         type="url"
                         value={formData.baseUrl}
                         onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
                         required
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                        Assicurati di includere https://
+                        Se inserisci solo il dominio, verrà usato automaticamente <code>/wp-json/mcp/v1</code>.
                     </p>
                 </div>
 
@@ -123,7 +196,7 @@ export default function ConnectWooCommercePage() {
                             placeholder="ck_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                             value={formData.consumerKey}
                             onChange={(e) => setFormData({ ...formData, consumerKey: e.target.value })}
-                            required
+                            required={!existingConnection}
                         />
                     </div>
                     <div className="space-y-2">
@@ -134,10 +207,16 @@ export default function ConnectWooCommercePage() {
                             placeholder="cs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                             value={formData.consumerSecret}
                             onChange={(e) => setFormData({ ...formData, consumerSecret: e.target.value })}
-                            required
+                            required={!existingConnection}
                         />
                     </div>
                 </div>
+
+                {existingConnection && (
+                    <p className="text-xs text-gray-500 -mt-2">
+                        Lascia le API key vuote per mantenere le credenziali già salvate.
+                    </p>
+                )}
 
                 <div className="pt-4">
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
@@ -147,8 +226,8 @@ export default function ConnectWooCommercePage() {
                         </h4>
                         <p className="text-xs text-amber-800 leading-relaxed">
                             1. Vai nel tuo pannello WordPress {'>'} WooCommerce {'>'} Impostazioni.<br />
-                            2. Clicca sulla scheda "Avanzate" e poi su "REST API".<br />
-                            3. Clicca su "Aggiungi chiave". Inserisci una descrizione e imposta i permessi su "Lettura/Scrittura".<br />
+                            2. Clicca sulla scheda &quot;Avanzate&quot; e poi su &quot;REST API&quot;.<br />
+                            3. Clicca su &quot;Aggiungi chiave&quot;. Inserisci una descrizione e imposta i permessi su &quot;Lettura/Scrittura&quot;.<br />
                             4. Copia la Consumer Key e la Consumer Secret generate.
                         </p>
                     </div>
@@ -162,7 +241,7 @@ export default function ConnectWooCommercePage() {
                         ) : (
                             <>
                                 <Link2 className="w-4 h-4 mr-2" />
-                                Connetti WooCommerce
+                                {existingConnection ? 'Aggiorna WooCommerce' : 'Connetti WooCommerce'}
                             </>
                         )}
                     </Button>

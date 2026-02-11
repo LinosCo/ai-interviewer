@@ -34,7 +34,13 @@ export default async function DashboardPage() {
                                         orderBy: { updatedAt: 'desc' }
                                     },
                                     cmsConnection: true,
-                                    newCmsConnection: true
+                                    newCmsConnection: true,
+                                    cmsShares: {
+                                        include: {
+                                            connection: true
+                                        },
+                                        orderBy: { createdAt: 'asc' }
+                                    }
                                 }
                             }
                         }
@@ -81,11 +87,14 @@ export default async function DashboardPage() {
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
         .slice(0, 5);
 
-    const projectsWithCms = organization.projects.map(p => ({
-        id: p.id,
-        name: p.name,
-        cmsConnection: p.newCmsConnection || p.cmsConnection
-    }));
+    const projectsWithCms = organization.projects.map(p => {
+        const sharedCms = p.cmsShares?.find(s => s.connection.status !== 'DISABLED')?.connection || null;
+        return {
+            id: p.id,
+            name: p.name,
+            cmsConnection: p.newCmsConnection || p.cmsConnection || sharedCms
+        };
+    });
 
     // Serialize BigInts in usage stats
     const serializedUsage = JSON.parse(JSON.stringify(usage, (key, value) =>

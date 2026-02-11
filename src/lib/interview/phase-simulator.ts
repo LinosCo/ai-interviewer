@@ -30,24 +30,13 @@ export interface PhaseTransitionResult {
 }
 
 export function onScanCompleted(state: PhaseSimulatorState): PhaseTransitionResult {
-    if (state.remainingSec > 0) {
-        return {
-            state: {
-                ...state,
-                phase: 'DEEP',
-                deepAccepted: null
-            },
-            action: 'START_DEEP'
-        };
-    }
-
     return {
         state: {
             ...state,
-            phase: 'DEEP_OFFER',
-            deepAccepted: false
+            phase: 'DEEP',
+            deepAccepted: state.deepAccepted === true ? true : null
         },
-        action: 'ASK_DEEP_OFFER'
+        action: 'START_DEEP'
     };
 }
 

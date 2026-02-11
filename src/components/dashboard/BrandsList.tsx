@@ -285,6 +285,9 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                     {brands.map((brand) => {
                         const latestScan = brand.scans[0];
                         const score = latestScan?.score || 0;
+                        const editHref = isAllProjectsSelected
+                            ? `/dashboard/visibility/create?configId=${brand.id}${brand.project?.id ? `&projectId=${brand.project.id}` : ''}`
+                            : `/dashboard/visibility/create?configId=${brand.id}${selectedProject?.id ? `&projectId=${selectedProject.id}` : ''}`;
 
                         return (
                             <Card key={brand.id} className="hover:shadow-lg transition-all group overflow-hidden">
@@ -367,7 +370,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/dashboard/visibility/create?configId=${brand.id}`} className="flex items-center gap-2">
+                                                        <Link href={editHref} className="flex items-center gap-2">
                                                             <Settings className="w-4 h-4" />
                                                             Modifica
                                                         </Link>

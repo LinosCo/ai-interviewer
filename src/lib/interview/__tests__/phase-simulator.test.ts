@@ -29,11 +29,10 @@ describe('phase-simulator integration-like sequences', () => {
         expect(scanDone.state.deepAccepted).toBeNull();
     });
 
-    it('asks DEEP_OFFER when SCAN is completed with no remaining time', () => {
+    it('starts DEEP even when SCAN completes with no remaining time (time gate is handled during active phases)', () => {
         const scanDone = onScanCompleted(baseState({ phase: 'SCAN', remainingSec: 0 }));
-        expect(scanDone.action).toBe('ASK_DEEP_OFFER');
-        expect(scanDone.state.phase).toBe('DEEP_OFFER');
-        expect(scanDone.state.deepAccepted).toBe(false);
+        expect(scanDone.action).toBe('START_DEEP');
+        expect(scanDone.state.phase).toBe('DEEP');
     });
 
     it('moves directly from DEEP completion to DATA_COLLECTION consent', () => {
@@ -53,6 +52,12 @@ describe('phase-simulator integration-like sequences', () => {
         const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'DEEP', remainingSec: 0 }));
         expect(closure.action).toBe('ASK_DEEP_OFFER');
         expect(closure.state.phase).toBe('DEEP_OFFER');
+    });
+
+    it('does not switch to DEEP_OFFER when closure attempt happens in SCAN with no remaining time', () => {
+        const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'SCAN', remainingSec: 0 }));
+        expect(closure.action).toBe('ASK_TOPIC_QUESTION');
+        expect(closure.state.phase).toBe('SCAN');
     });
 
     it('blocks INTERVIEW_COMPLETED before contact consent', () => {

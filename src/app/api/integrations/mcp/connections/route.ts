@@ -7,6 +7,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { encrypt } from '@/lib/integrations/encryption';
+import { normalizeMcpEndpoint } from '@/lib/integrations/mcp/endpoint';
 import { NextResponse } from 'next/server';
 
 // GET - List MCP connections for a project
@@ -125,13 +126,15 @@ export async function POST(request: Request) {
   // Encrypt credentials
   const encryptedCredentials = encrypt(JSON.stringify(credentials));
 
+  const normalizedEndpoint = normalizeMcpEndpoint(type, endpoint);
+
   // Create connection
   const connection = await prisma.mCPConnection.create({
     data: {
       projectId,
       type,
       name,
-      endpoint,
+      endpoint: normalizedEndpoint,
       credentials: encryptedCredentials,
       status: 'PENDING',
       createdBy: session.user.email,

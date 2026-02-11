@@ -15,6 +15,9 @@ export async function GET(request: Request) {
 
         const url = new URL(request.url);
         const projectId = url.searchParams.get('projectId');
+        if (!projectId) {
+            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
+        }
 
         // Verify user exists
         const user = await prisma.user.findUnique({
@@ -26,38 +29,38 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Find projects with CMS connections that the user has access to
-        const projects = await prisma.project.findMany({
+        // Find project and any CMS connection (direct or shared) that the user can access
+        const project = await prisma.project.findFirst({
             where: {
-                id: projectId || undefined,
+                id: projectId,
                 organization: {
                     members: {
                         some: {
                             userId: user.id
                         }
                     }
-                },
-                OR: [
-                    { cmsConnection: { isNot: null } },
-                    { newCmsConnection: { isNot: null } }
-                ] as any
+                }
             },
             include: {
                 cmsConnection: true,
-                newCmsConnection: true
-            } as any
+                newCmsConnection: true,
+                cmsShares: {
+                    include: {
+                        connection: true
+                    }
+                }
+            }
         });
 
-        if (projects.length === 0) {
+        if (!project) {
             return NextResponse.json({
                 enabled: false,
-                message: 'CMS integration is not enabled for this project'
+                message: 'Project not found or access denied'
             });
         }
 
-        const project = projects[0];
-        const cmsConnection = (project as any).newCmsConnection || (project as any).cmsConnection;
-        const foundProjectId = project.id;
+        const sharedConnection = project.cmsShares.find(s => s.connection.status !== 'DISABLED')?.connection || null;
+        const cmsConnection = project.newCmsConnection || project.cmsConnection || sharedConnection;
 
         if (!cmsConnection) {
             return NextResponse.json({
@@ -68,7 +71,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             enabled: true,
-            projectId: foundProjectId,
+            projectId: project.id,
             connection: {
                 id: cmsConnection.id,
                 name: cmsConnection.name,

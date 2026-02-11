@@ -16,11 +16,12 @@ interface CMSConnectionCardProps {
         projectName: string;
     };
     canManage: boolean;
+    onSettings?: (projectId: string) => void;
     onTransfer?: (connectionId: string) => void;
     onDelete?: (connectionId: string) => void;
 }
 
-export default function CMSConnectionCard({ connection, canManage, onTransfer, onDelete }: CMSConnectionCardProps) {
+export default function CMSConnectionCard({ connection, canManage, onSettings, onTransfer, onDelete }: CMSConnectionCardProps) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [isOpeningDashboard, setIsOpeningDashboard] = useState(false);
 
@@ -126,20 +127,28 @@ export default function CMSConnectionCard({ connection, canManage, onTransfer, o
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.location.href = `/dashboard/cms/${connection.id}/settings`}
+                            onClick={() => {
+                                if (onSettings) {
+                                    onSettings(connection.projectId);
+                                } else {
+                                    window.location.href = `/dashboard/projects/${connection.projectId}/integrations`;
+                                }
+                            }}
                         >
                             <Settings className="w-3.5 h-3.5" />
                             Impostazioni
                         </Button>
 
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onTransfer?.(connection.id)}
-                        >
-                            <ArrowRightLeft className="w-3.5 h-3.5" />
-                            Trasferisci
-                        </Button>
+                        {onTransfer && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onTransfer(connection.id)}
+                            >
+                                <ArrowRightLeft className="w-3.5 h-3.5" />
+                                Trasferisci
+                            </Button>
+                        )}
 
                         <Button
                             size="sm"

@@ -230,13 +230,16 @@ export async function GET(request: Request) {
         const config = await prisma.visibilityConfig.findFirst({
             where: {
                 organizationId,
-                ...(configId ? { id: configId } : {}),
-                ...(projectId ? {
-                    OR: [
-                        { projectId },
-                        { projectShares: { some: { projectId } } }
-                    ]
-                } : {})
+                ...(configId
+                    ? { id: configId }
+                    : projectId
+                        ? {
+                            OR: [
+                                { projectId },
+                                { projectShares: { some: { projectId } } }
+                            ]
+                        }
+                        : {})
             },
             include: {
                 prompts: {

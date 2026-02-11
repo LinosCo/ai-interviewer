@@ -68,6 +68,10 @@ interface InterviewState {
     lastUserTopicId?: string | null;
     deepLastSubGoalByTopic?: Record<string, string>;
     clarificationTurnsByTopic?: Record<string, number>;
+    extensionReturnPhase?: 'SCAN' | 'DEEP' | null;
+    extensionReturnTopicIndex?: number | null;
+    extensionReturnTurnInTopic?: number | null;
+    extensionOfferAttempts?: number;
 }
 
 interface QualityTelemetry {
@@ -380,7 +384,7 @@ async function checkUserIntent(
 
     const contextPrompts = {
         consent: `The system asked for contact details. Did the user agree?`,
-        deep_offer: `The system offered to continue with deeper questions. Did the user accept?`,
+        deep_offer: `The system asked whether the user wants to EXTEND the interview by a few minutes to continue. Did the user accept?`,
         stop_confirmation: `The system noticed the user might be tired or wants to stop, and asked for confirmation to conclude. Did the user confirm they want to STOP?`
     };
 
@@ -393,7 +397,7 @@ async function checkUserIntent(
         const classificationHints = context === 'consent'
             ? `ACCEPT = user agrees to share contact details; REFUSE = user declines; NEUTRAL = unrelated`
             : context === 'deep_offer'
-                ? `ACCEPT = user agrees to continue with extra/deeper questions; REFUSE = user declines; NEUTRAL = unrelated`
+                ? `ACCEPT = user explicitly agrees to extend/continue; REFUSE = user declines extension; NEUTRAL = unrelated or just answers content`
                 : `ACCEPT = user confirms they want to stop; REFUSE = user wants to continue; NEUTRAL = unclear`;
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
@@ -467,7 +471,7 @@ async function generateDeepOfferOnly(params: {
 
     const prompt = [
         `Language: ${params.language}`,
-        `Task: Ask exactly ONE yes/no question to understand if the user wants to continue with a few deeper questions.`,
+        `Task: Ask exactly ONE yes/no question to understand if the user wants to extend the interview by a few minutes and continue.`,
         `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].join('\n');
@@ -480,6 +484,15 @@ async function generateDeepOfferOnly(params: {
     });
 
     return normalizeSingleQuestion(String(result.object.question || '').trim());
+}
+
+function isExtensionOfferQuestion(message: string, language: string): boolean {
+    const text = String(message || '').trim().toLowerCase();
+    if (!text || !text.includes('?')) return false;
+    const isItalian = (language || 'en').toLowerCase().startsWith('it');
+    const itPattern = /\b(ti va di continuare|vuoi continuare|qualche minuto in più|hai ancora qualche minuto|estendere(?:\s+l')?\s*intervista|proseguire)\b/i;
+    const enPattern = /\b(would you like to continue|do you want to continue|few more minutes|extend the interview|continue for a few more minutes)\b/i;
+    return isItalian ? itPattern.test(text) : enPattern.test(text);
 }
 
 async function generateConsentQuestionOnly(params: {
@@ -949,6 +962,10 @@ export async function POST(req: Request) {
             deepLastSubGoalByTopic: rawMetadata.deepLastSubGoalByTopic ?? {},
             forceConsentQuestion: rawMetadata.forceConsentQuestion ?? false,
             clarificationTurnsByTopic: rawMetadata.clarificationTurnsByTopic ?? {},
+            extensionReturnPhase: rawMetadata.extensionReturnPhase ?? null,
+            extensionReturnTopicIndex: rawMetadata.extensionReturnTopicIndex ?? null,
+            extensionReturnTurnInTopic: rawMetadata.extensionReturnTurnInTopic ?? null,
+            extensionOfferAttempts: rawMetadata.extensionOfferAttempts ?? 0,
         };
 
         const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -991,9 +1008,6 @@ export async function POST(req: Request) {
         // --------------------------------------------------------------------
         if (supervisorInsight.status !== 'COMPLETE_WITHOUT_DATA' && supervisorInsight.status !== 'DATA_COLLECTION_CONSENT') {
 
-            // NOTE: Time-based early exit removed. We always complete SCAN across all topics.
-
-            // Only process SCAN if time isn't up and we're in SCAN phase
             if (state.phase === 'SCAN') {
                 const scanMaxTurns = getScanPlanTurns(interviewPlan, currentTopic.id);
                 const scanPlanTopic = interviewPlan.scan.topics.find(t => t.topicId === currentTopic.id);
@@ -1059,33 +1073,26 @@ export async function POST(req: Request) {
                                 transitionBridgeSnippet
                             };
                         } else {
-                            // End of SCAN: go directly to DEEP if there is still time.
-                            // Ask DEEP_OFFER only when hard time is already over.
+                            // End of SCAN: always move to DEEP.
+                            // Time gate is handled only in DEEP (extension offer there).
                             const maxDurationSec = maxDurationMins * 60;
                             const remainingSec = maxDurationSec - effectiveSec;
                             console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
 
-                            if (remainingSec > 0) {
-                                nextState.phase = 'DEEP';
-                                nextState.deepAccepted = null;
-                                nextState.topicIndex = 0;
-                                nextState.turnInTopic = 0;
-                                const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSec);
-                                nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                                nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                                const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
-                                nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                                const bestSnippet = (state.interestingTopics || []).find(
-                                    (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
-                                )?.bestSnippet || '';
-                                supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
-                                console.log(`✅ [SCAN→DEEP] SCAN complete with time left (${remainingSec}s). Starting DEEP.`);
-                            } else {
-                                nextState.phase = 'DEEP_OFFER';
-                                nextState.deepAccepted = false;
-                                supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                                console.log(`🎁 [SCAN→DEEP_OFFER] SCAN complete with no time left. Asking continuation consent.`);
-                            }
+                            nextState.phase = 'DEEP';
+                            nextState.deepAccepted = state.deepAccepted === true ? true : null;
+                            nextState.topicIndex = 0;
+                            nextState.turnInTopic = 0;
+                            const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSec);
+                            nextState.deepTopicOrder = deepPlan.deepTopicOrder;
+                            nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
+                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
+                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
+                            const bestSnippet = (state.interestingTopics || []).find(
+                                (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
+                            )?.bestSnippet || '';
+                            supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
+                            console.log(`✅ [SCAN→DEEP] SCAN complete. Starting DEEP.`);
                         }
                     }
                 } else {
@@ -1155,38 +1162,80 @@ export async function POST(req: Request) {
             // PHASE: DEEP_OFFER
             // --------------------------------------------------------------------
             else if (state.phase === 'DEEP_OFFER') {
-                console.log(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted}`);
+                console.log(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted} returnPhase=${state.extensionReturnPhase || 'DEEP'} attempts=${state.extensionOfferAttempts || 0}`);
                 const hasUserReply = lastMessage?.role === 'user' && String(lastMessage.content || '').trim().length > 0;
                 const waitingForAnswer = state.deepAccepted === false || state.deepAccepted === null;
+                const lastAssistantMessage = [...canonicalMessages]
+                    .reverse()
+                    .find((m: any) => m.role === 'assistant')?.content || '';
+                const previousWasOffer = isExtensionOfferQuestion(lastAssistantMessage, language);
 
-                if (!hasUserReply || !waitingForAnswer) {
-                    console.log(`🎁 [DEEP_OFFER] Asking continuation offer.`);
+                if (!hasUserReply || !waitingForAnswer || !previousWasOffer) {
+                    if (hasUserReply && waitingForAnswer && !previousWasOffer) {
+                        console.log(`⚠️ [DEEP_OFFER] Previous assistant message was not a valid extension offer. Re-asking offer.`);
+                    } else {
+                        console.log(`🎁 [DEEP_OFFER] Asking extension offer.`);
+                    }
                     supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                     nextState.deepAccepted = false;
+                    nextState.extensionOfferAttempts = state.extensionOfferAttempts ?? 0;
                 } else {
                     console.log(`🎁 [DEEP_OFFER] Checking user response`);
                     const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
                     console.log(`🎁 [DEEP_OFFER] Intent detected: ${intent}`);
 
                     if (intent === 'ACCEPT') {
+                        const returnPhase = state.extensionReturnPhase || 'DEEP';
                         nextState.deepAccepted = true;
-                        nextState.phase = 'DEEP';
-                        nextState.topicIndex = 0;
-                        nextState.turnInTopic = 0;
-                        const maxDurationSec = maxDurationMins * 60;
-                        const remainingSecForDeep = maxDurationSec - effectiveSec;
-                        const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForDeep);
-                        nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                        nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                        const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
-                        nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                        const bestSnippet = (state.interestingTopics || []).find(
-                            (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
-                        )?.bestSnippet || '';
-                        supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
-                        console.log("✅ [DEEP_OFFER] User accepted quick DEEP");
+                        nextState.extensionOfferAttempts = 0;
+                        nextState.extensionReturnPhase = null;
+                        nextState.extensionReturnTopicIndex = null;
+                        nextState.extensionReturnTurnInTopic = null;
+
+                        if (returnPhase === 'SCAN') {
+                            nextState.phase = 'SCAN';
+                            nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
+                            nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
+                            const resumeTopic = botTopics[nextState.topicIndex] || botTopics[0];
+                            nextTopicId = resumeTopic?.id || botTopics[0].id;
+                            const usedSubGoals = (state.topicSubGoalHistory || {})[resumeTopic.id] || [];
+                            const availableSubGoals = (resumeTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
+                            supervisorInsight = { status: 'SCANNING', nextSubGoal: availableSubGoals[0] || resumeTopic.label };
+                            console.log(`✅ [DEEP_OFFER] User accepted extension. Resuming SCAN at topicIndex=${nextState.topicIndex}, turn=${nextState.turnInTopic}`);
+                        } else {
+                            nextState.phase = 'DEEP';
+                            nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
+                            nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
+
+                            const maxDurationSec = maxDurationMins * 60;
+                            const remainingSecForDeep = maxDurationSec - effectiveSec;
+                            const hasDeepPlan = Boolean(state.deepTurnsByTopic && Object.keys(state.deepTurnsByTopic).length > 0);
+                            if (!hasDeepPlan) {
+                                const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForDeep);
+                                nextState.deepTopicOrder = deepPlan.deepTopicOrder;
+                                nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
+                            }
+
+                            const deepOrder = (nextState.deepTopicOrder && nextState.deepTopicOrder.length > 0)
+                                ? nextState.deepTopicOrder
+                                : (state.deepTopicOrder || []);
+                            const deepTopics = getDeepTopics(botTopics, deepOrder);
+                            const deepCurrent = deepTopics[nextState.topicIndex] || botTopics[nextState.topicIndex] || botTopics[0];
+                            nextTopicId = deepCurrent?.id || botTopics[0].id;
+                            const usedSubGoals = (state.topicSubGoalHistory || {})[deepCurrent.id] || [];
+                            const availableSubGoals = (deepCurrent.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
+                            const engagingSnippet = (state.interestingTopics || []).find(
+                                (it: InterestingTopic) => it.topicId === deepCurrent.id
+                            )?.bestSnippet || '';
+                            supervisorInsight = { status: 'DEEPENING', focusPoint: availableSubGoals[0] || deepCurrent.label, engagingSnippet };
+                            console.log(`✅ [DEEP_OFFER] User accepted extension. Resuming DEEP at topicIndex=${nextState.topicIndex}, turn=${nextState.turnInTopic}`);
+                        }
                     } else if (intent === 'REFUSE') {
-                        console.log("❌ [DEEP_OFFER] User declined");
+                        console.log("❌ [DEEP_OFFER] User declined extension");
+                        nextState.extensionOfferAttempts = 0;
+                        nextState.extensionReturnPhase = null;
+                        nextState.extensionReturnTopicIndex = null;
+                        nextState.extensionReturnTurnInTopic = null;
                         if (shouldCollectData) {
                             nextState.phase = 'DATA_COLLECTION';
                             supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
@@ -1197,32 +1246,29 @@ export async function POST(req: Request) {
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                         }
                     } else {
-                        // NEUTRAL - track attempts and eventually treat as accept
-                        const deepOfferNeutralAttempts = (state as any).deepOfferNeutralAttempts ?? 0;
+                        const extensionAttempts = (state.extensionOfferAttempts ?? (state as any).deepOfferNeutralAttempts ?? 0);
 
-                        if (deepOfferNeutralAttempts >= 2) {
-                            // After 2 neutral attempts, treat as accept
-                            console.log(`🎁 [DEEP_OFFER] 2+ neutral responses, treating as accept`);
-                            nextState.deepAccepted = true;
-                            nextState.phase = 'DEEP';
-                            nextState.topicIndex = 0;
-                            nextState.turnInTopic = 0;
-                            const maxDurationSec = maxDurationMins * 60;
-                            const remainingSecForDeep = maxDurationSec - effectiveSec;
-                            const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForDeep);
-                            nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                            nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
-                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                            const bestSnippet = (state.interestingTopics || []).find(
-                                (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
-                            )?.bestSnippet || '';
-                            supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
+                        if (extensionAttempts >= 2) {
+                            // No explicit consent after multiple attempts: default to no extension.
+                            console.log(`🎁 [DEEP_OFFER] Neutral responses reached limit. Defaulting to no extension.`);
+                            nextState.extensionOfferAttempts = 0;
+                            nextState.extensionReturnPhase = null;
+                            nextState.extensionReturnTopicIndex = null;
+                            nextState.extensionReturnTurnInTopic = null;
+                            if (shouldCollectData) {
+                                nextState.phase = 'DATA_COLLECTION';
+                                supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                                nextState.consentGiven = false;
+                                nextState.forceConsentQuestion = true;
+                            } else {
+                                nextState.phase = 'DATA_COLLECTION';
+                                supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                            }
                         } else {
-                            console.log(`🎁 [DEEP_OFFER] Neutral response (attempt ${deepOfferNeutralAttempts + 1}), re-asking`);
+                            console.log(`🎁 [DEEP_OFFER] Neutral response (attempt ${extensionAttempts + 1}), re-asking extension offer`);
                             supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                             nextState.deepAccepted = false;
-                            (nextState as any).deepOfferNeutralAttempts = deepOfferNeutralAttempts + 1;
+                            nextState.extensionOfferAttempts = extensionAttempts + 1;
                         }
                     }
                 }
@@ -1258,8 +1304,12 @@ export async function POST(req: Request) {
                 if (remainingSec <= 0 && state.deepAccepted !== true) {
                     nextState.phase = 'DEEP_OFFER';
                     nextState.deepAccepted = false;
+                    nextState.extensionReturnPhase = 'DEEP';
+                    nextState.extensionReturnTopicIndex = state.topicIndex;
+                    nextState.extensionReturnTurnInTopic = state.turnInTopic;
+                    nextState.extensionOfferAttempts = 0;
                     supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                    console.log(`🎁 [DEEP→DEEP_OFFER] Time over during DEEP. Offering extra time.`);
+                    console.log(`🎁 [DEEP→DEEP_OFFER] Time limit reached during DEEP. Asking extension consent.`);
                 }
 
                 if (nextState.phase === 'DEEP_OFFER') {
@@ -1792,7 +1842,7 @@ hard_rules:
         console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
 
         // ====================================================================
-        // 5.4 TRANSITION / DEEP_OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
+        // 5.4 TRANSITION / EXTENSION OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
         // ====================================================================
         let didRegenerate = false;
         const qualityTelemetry: QualityTelemetry = {
@@ -1820,12 +1870,12 @@ hard_rules:
                 const offerCheck = await generateObject({
                     model: openai('gpt-4o-mini'),
                     schema: offerSchema,
-                    prompt: `Determine if the assistant is explicitly asking (lightly) whether the user has a bit more time to continue with a few extra/deeper questions, and is waiting for a yes/no.\nAssistant message: "${responseText}"\nReturn { isOffer: true/false }.`,
+                    prompt: `Determine if the assistant is explicitly asking (lightly) whether the user wants to extend the interview by a few minutes and continue, and is waiting for a yes/no.\nAssistant message: "${responseText}"\nReturn { isOffer: true/false }.`,
                     temperature: 0
                 });
                 if (!offerCheck.object.isOffer) {
                     console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY ask (lightly) if the user has a bit more time to continue with a few extra/deeper questions, and wait for yes/no. Do NOT ask any topic question.`;
+                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY ask (lightly) if the user wants to extend the interview by a few minutes to continue, and wait for yes/no. Do NOT ask any topic question.`;
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                     didRegenerate = true;
@@ -2063,16 +2113,21 @@ hard_rules:
             const shouldOfferExtraTime = nextState.phase === 'DEEP' && remainingSec <= 0 && state.deepAccepted !== true;
 
             if (shouldOfferExtraTime) {
-                console.log(`⚠️ [SUPERVISOR] Closure attempt while time is over. Switching to DEEP_OFFER.`);
+                console.log(`⚠️ [SUPERVISOR] Closure attempt while time is over. Switching to extension offer.`);
+                const returnPhase: 'SCAN' | 'DEEP' = state.phase === 'SCAN' ? 'SCAN' : 'DEEP';
                 nextState.phase = 'DEEP_OFFER';
                 nextState.deepAccepted = false;
+                nextState.extensionReturnPhase = returnPhase;
+                nextState.extensionReturnTopicIndex = state.topicIndex;
+                nextState.extensionReturnTurnInTopic = state.turnInTopic;
+                nextState.extensionOfferAttempts = 0;
                 supervisorInsight = { status: 'DEEP_OFFER_ASK' };
                 try {
-                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask (lightly) if the user has a bit more time to continue with a few extra/deeper questions. One question only.`;
+                    const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask (lightly) if the user wants to extend the interview by a few minutes to continue. One question only.`;
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
-                    console.error('Deep offer regeneration after closure failed:', e);
+                    console.error('Extension offer regeneration after closure failed:', e);
                 }
             } else {
                 nextState.closureAttempts = (state.closureAttempts || 0) + 1;
@@ -2116,7 +2171,7 @@ hard_rules:
         else if (shouldBlockDeepOfferClosure) {
             flowTelemetry.deepOfferClosureIntercepted = true;
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. OVERRIDING with offer question.`);
-            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Offer the choice to continue with deeper questions. One question only. Do not ask any topic question.`;
+            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Offer the choice to extend the interview by a few minutes and continue. One question only. Do not ask any topic question.`;
             const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
             responseText = retry.object.response?.trim() || responseText;
         }
@@ -2308,7 +2363,7 @@ Reply with the complete message (acknowledgment + question).`;
             }
         }
 
-        // DEEP_OFFER safety: must be a continuation question
+        // DEEP_OFFER safety: must be an extension-consent question
         if (nextState.phase === 'DEEP_OFFER') {
             const invalidDeepOffer =
                 !responseText.includes('?') ||
@@ -2319,9 +2374,14 @@ Reply with the complete message (acknowledgment + question).`;
                 console.log(`🛡️ [SAFETY_NET] Invalid DEEP_OFFER response, fixing...`);
 
                 // Simple additive fix for DEEP_OFFER
-                const offerQuestion = language === 'it'
-                    ? `Ti ringrazio per le risposte finora. Hai qualche minuto in più per approfondire alcuni punti?`
-                    : `Thank you for your answers so far. Do you have a few more minutes to explore some points in depth?`;
+                let offerQuestion = language === 'it'
+                    ? `Ti ringrazio per le risposte finora. Ti va di estendere l'intervista di qualche minuto per continuare?`
+                    : `Thanks for your answers so far. Would you like to extend the interview by a few minutes to continue?`;
+                try {
+                    offerQuestion = await generateDeepOfferOnly({ model, language });
+                } catch (e) {
+                    console.error('DEEP_OFFER fallback generation failed, using static fallback:', e);
+                }
 
                 // Try to keep acknowledgment if present, otherwise use default
                 const cleanedResponse = responseText
@@ -2330,7 +2390,7 @@ Reply with the complete message (acknowledgment + question).`;
                     .trim();
 
                 if (cleanedResponse.length > 10 && !cleanedResponse.includes('?')) {
-                    responseText = cleanedResponse.replace(/[.!]+$/, '') + ` ${language === 'it' ? 'Hai qualche minuto in più?' : 'Do you have a few more minutes?'}`;
+                    responseText = cleanedResponse.replace(/[.!]+$/, '') + ` ${language === 'it' ? `Ti va di estendere l'intervista di qualche minuto?` : `Would you like to extend the interview by a few minutes?`}`;
                 } else {
                     responseText = offerQuestion;
                 }

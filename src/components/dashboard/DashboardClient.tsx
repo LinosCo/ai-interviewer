@@ -92,9 +92,8 @@ export default function DashboardClient({
         }))
         : [];
 
-    // Handle CMS transfer navigation
-    const handleTransfer = (connectionId: string) => {
-        router.push(`/dashboard/cms/${connectionId}/settings`);
+    const handleOpenIntegrations = (projectId: string) => {
+        router.push(`/dashboard/projects/${projectId}/integrations`);
     };
 
     const handleDeleteConnection = async (connectionId: string) => {
@@ -350,7 +349,7 @@ export default function DashboardClient({
                                 if (currentCmsConnection.status === 'ACTIVE') {
                                     handleOpenCmsDashboard();
                                 } else {
-                                    handleTransfer(currentCmsConnection.id);
+                                    handleOpenIntegrations(selectedProject.id);
                                 }
                             }}
                         >
@@ -377,7 +376,7 @@ export default function DashboardClient({
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleTransfer(currentCmsConnection.id);
+                                        handleOpenIntegrations(selectedProject.id);
                                     }}
                                     className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-xs font-medium backdrop-blur-sm"
                                 >
@@ -406,7 +405,7 @@ export default function DashboardClient({
                                 status: conn.status || 'ACTIVE'
                             }}
                             canManage={true}
-                            onTransfer={handleTransfer}
+                            onSettings={handleOpenIntegrations}
                             onDelete={handleDeleteConnection}
                         />
                     ))}

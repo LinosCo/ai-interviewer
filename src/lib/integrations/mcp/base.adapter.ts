@@ -73,14 +73,74 @@ export abstract class BaseMCPAdapter {
       this.sessionId = newSessionId;
     }
 
+    const contentType = response.headers.get('content-type') || '';
+    const rawBody = await response.text();
+
     if (!response.ok) {
-      throw new Error(`MCP request failed: ${response.status} ${response.statusText}`);
+      let errorMessage = `${response.status} ${response.statusText}`;
+      if (rawBody.trim()) {
+        try {
+          const parsed: unknown = JSON.parse(rawBody);
+          if (parsed && typeof parsed === 'object') {
+            const parsedObj = parsed as {
+              error?: { message?: string } | string;
+              message?: string;
+            };
+            const maybeMessage =
+              typeof parsedObj.error === 'string'
+                ? parsedObj.error
+                : parsedObj.error?.message || parsedObj.message;
+            if (typeof maybeMessage === 'string') {
+              errorMessage = maybeMessage;
+            } else {
+              errorMessage = rawBody.slice(0, 200);
+            }
+          } else {
+            errorMessage = rawBody.slice(0, 200);
+          }
+        } catch {
+          errorMessage = rawBody.slice(0, 200);
+        }
+      }
+      throw new Error(`MCP request failed (${response.status}): ${errorMessage}`);
     }
 
-    const data = await response.json();
+    if (!rawBody.trim()) {
+      if (request.method.startsWith('notifications/')) {
+        return {} as T;
+      }
+      throw new Error('MCP response body is empty');
+    }
+
+    let parsedData: unknown;
+    try {
+      parsedData = JSON.parse(rawBody);
+    } catch {
+      const bodyPreview = rawBody.replace(/\s+/g, ' ').trim().slice(0, 140);
+      const looksLikeHtml = /^<!doctype html>|^<html/i.test(rawBody.trim());
+      if (looksLikeHtml) {
+        throw new Error(
+          'L\'endpoint MCP ha risposto con HTML invece di JSON. Verifica di usare l\'URL endpoint MCP completo (non solo la root del sito).'
+        );
+      }
+      const typeLabel = contentType || 'content-type sconosciuto';
+      throw new Error(
+        `Risposta MCP non valida (${typeLabel}): ${bodyPreview || 'body vuoto'}`
+      );
+    }
+
+    if (!parsedData || typeof parsedData !== 'object') {
+      throw new Error('MCP response payload is not an object');
+    }
+
+    const data = parsedData as {
+      error?: { message?: string } | string;
+      result?: T;
+    };
 
     if (data.error) {
-      throw new Error(data.error.message || 'MCP error');
+      const errorMessage = typeof data.error === 'string' ? data.error : data.error.message;
+      throw new Error(errorMessage || 'MCP error');
     }
 
     return data.result as T;

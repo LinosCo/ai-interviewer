@@ -337,38 +337,38 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
         if (supervisorInsight) {
 
             // ========== DEEP_OFFER_ASK ==========
-            // Offer user to continue with deeper questions (no hardcoded time phrasing)
+            // Offer user to extend interview and continue (no hardcoded time phrasing)
             if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
 
                 const offerPrompt = isItalian ? `
-## FASE: OFFERTA APPROFONDIMENTO
-Puoi proporre un breve approfondimento opzionale.
+## FASE: OFFERTA ESTENSIONE
+Puoi proporre una breve estensione opzionale dell'intervista.
 
 **ISTRUZIONI**:
 1. Ringrazia brevemente l'utente per le risposte finora.
-2. Chiedi in modo leggero se ha qualche minuto in più per continuare con alcune domande extra di approfondimento.
+2. Chiedi in modo leggero se vuole estendere l'intervista di qualche minuto per continuare.
 3. Attendi la risposta dell'utente.
 
 **DIVIETI**:
 - NON chiedere dati di contatto ora
 - NON fare altre domande sui topic
-- SOLO offri la scelta di continuare o meno
+- SOLO offri la scelta di estendere/continuare o meno
 - NON concludere l'intervista
 ` : `
-## PHASE: DEEP DIVE OFFER
-You may propose a short optional deep-dive.
+## PHASE: EXTENSION OFFER
+You may propose a short optional extension of the interview.
 
 **INSTRUCTIONS**:
 1. Briefly thank the user for their answers so far.
-2. Ask lightly if they have a few extra minutes to continue with a few extra deep-dive questions.
+2. Ask lightly if they want to extend the interview by a few minutes to continue.
 3. Wait for user's response.
 
 **PROHIBITIONS**:
 - DO NOT ask for contact details now
 - DO NOT ask other topic questions
-- ONLY offer the choice to continue or not
+- ONLY offer the choice to extend/continue or not
 - DO NOT conclude the interview
 `;
                 return offerPrompt.trim();

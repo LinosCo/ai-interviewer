@@ -60,6 +60,59 @@ interface Organization {
 
 type UserPlan = 'FREE' | 'STARTER' | 'PRO' | 'BUSINESS' | 'PARTNER';
 
+interface MCPConnectionsResponse {
+  connections?: MCPConnection[];
+}
+
+interface GoogleConnectionResponse {
+  connection?: GoogleConnection | null;
+}
+
+interface CMSConnectionResponse {
+  connection?: CMSConnection | null;
+}
+
+interface N8NConnectionResponse {
+  connection?: N8NConnection | null;
+}
+
+interface UserMeResponse {
+  plan?: string;
+}
+
+interface ProjectsListResponse {
+  projects?: Project[];
+}
+
+interface ProjectResponse {
+  project?: {
+    organization?: {
+      id: string;
+      name: string;
+      plan?: string;
+    };
+  };
+  organization?: {
+    id: string;
+    name: string;
+    plan?: string;
+  };
+}
+
+interface OrganizationsResponse {
+  organizations?: Organization[];
+}
+
+async function readJsonSafely<T>(response: Response): Promise<T | null> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) return null;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export default function IntegrationsPage() {
   const params = useParams();
   const router = useRouter();
@@ -88,55 +141,58 @@ export default function IntegrationsPage() {
         fetch('/api/projects/list-all'),
       ]);
 
+      const [mcpData, googleData, cmsData, n8nData, userData, projectsData] = await Promise.all([
+        readJsonSafely<MCPConnectionsResponse>(mcpRes),
+        readJsonSafely<GoogleConnectionResponse>(googleRes),
+        readJsonSafely<CMSConnectionResponse>(cmsRes),
+        readJsonSafely<N8NConnectionResponse>(n8nRes),
+        readJsonSafely<UserMeResponse>(userRes),
+        readJsonSafely<ProjectsListResponse>(projectsRes),
+      ]);
+
       if (mcpRes.ok) {
-        const data = await mcpRes.json();
-        setMcpConnections(data.connections || []);
+        setMcpConnections(mcpData?.connections || []);
       }
 
       if (googleRes.ok) {
-        const data = await googleRes.json();
-        setGoogleConnection(data.connection || null);
+        setGoogleConnection(googleData?.connection || null);
       }
 
       if (cmsRes.ok) {
-        const data = await cmsRes.json();
-        if (data.connection) {
+        if (cmsData?.connection) {
           setCmsConnection({
-            id: data.connection.id,
-            name: data.connection.name,
-            status: data.connection.status,
-            lastSyncAt: data.connection.lastSyncAt,
-            lastSyncError: data.connection.lastSyncError,
+            id: cmsData.connection.id,
+            name: cmsData.connection.name,
+            status: cmsData.connection.status,
+            lastSyncAt: cmsData.connection.lastSyncAt,
+            lastSyncError: cmsData.connection.lastSyncError,
           });
         }
       }
 
       if (n8nRes.ok) {
-        const data = await n8nRes.json();
-        setN8nConnection(data.connection || null);
+        setN8nConnection(n8nData?.connection || null);
       }
 
       if (userRes.ok) {
-        const data = await userRes.json();
-        setUserPlan((data.plan || 'FREE').toUpperCase() as UserPlan);
+        setUserPlan((userData?.plan || 'FREE').toUpperCase() as UserPlan);
       }
 
       if (projectsRes.ok) {
-        const data = await projectsRes.json();
-        setProjects(data.projects || []);
+        setProjects(projectsData?.projects || []);
       }
 
       // Fetch current project organization info
       try {
         const projectRes = await fetch(`/api/projects/${projectId}`);
         if (projectRes.ok) {
-          const projectData = await projectRes.json();
-          if (projectData.project?.organization) {
+          const projectData = await readJsonSafely<ProjectResponse>(projectRes);
+          if (projectData?.project?.organization) {
             setCurrentOrgId(projectData.project.organization.id);
             setCurrentOrgName(projectData.project.organization.name);
             // Source of truth for integrations plan is the Organization
             setUserPlan((projectData.project.organization.plan || 'FREE').toUpperCase() as UserPlan);
-          } else if (projectData.organization) {
+          } else if (projectData?.organization) {
             // Some API variations return organization directly
             setCurrentOrgId(projectData.organization.id);
             setCurrentOrgName(projectData.organization.name);
@@ -151,8 +207,8 @@ export default function IntegrationsPage() {
       try {
         const orgsRes = await fetch('/api/organizations');
         if (orgsRes.ok) {
-          const orgsData = await orgsRes.json();
-          setOrganizations(orgsData.organizations || []);
+          const orgsData = await readJsonSafely<OrganizationsResponse>(orgsRes);
+          setOrganizations(orgsData?.organizations || []);
         }
       } catch (err) {
         console.error('Error fetching organizations:', err);

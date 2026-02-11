@@ -2,6 +2,12 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+function isMissingN8NConnectionTable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const prismaError = error as { code?: string; meta?: { table?: string } };
+  return prismaError.code === 'P2021' && String(prismaError.meta?.table || '').includes('N8NConnection');
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -9,7 +15,7 @@ export async function POST(
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return new Response('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
@@ -20,7 +26,7 @@ export async function POST(
     });
 
     if (!connection) {
-      return new Response('Connection not found', { status: 404 });
+      return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
     }
 
     // Check access
@@ -34,7 +40,7 @@ export async function POST(
     });
 
     if (!access) {
-      return new Response('Access denied', { status: 403 });
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     // Update status to TESTING
@@ -92,22 +98,31 @@ export async function POST(
           error: `Webhook returned ${response.status}`,
         });
       }
-    } catch (fetchError: any) {
+    } catch (fetchError: unknown) {
+      const fetchErrorMessage = fetchError instanceof Error
+        ? fetchError.message
+        : 'Failed to connect to webhook';
       await prisma.n8NConnection.update({
         where: { id },
         data: {
           status: 'ERROR',
-          lastError: fetchError.message || 'Failed to connect to webhook',
+          lastError: fetchErrorMessage,
         },
       });
 
       return NextResponse.json({
         success: false,
-        error: fetchError.message || 'Failed to connect to webhook',
+        error: fetchErrorMessage,
       });
     }
   } catch (error) {
+    if (isMissingN8NConnectionTable(error)) {
+      return NextResponse.json(
+        { error: 'N8N integration unavailable: missing N8NConnection table. Run database migrations.' },
+        { status: 503 }
+      );
+    }
     console.error('Test N8N Connection Error:', error);
-    return new Response('Internal Server Error', { status: 500 });
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

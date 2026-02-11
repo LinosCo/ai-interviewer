@@ -44,8 +44,8 @@ const PIVOT_EN = /\b(regarding|about|switching to|moving to|as for|when it comes
 const PROBE_IT = /\b(puoi|potresti|mi racconti|in che modo|cosa intendi|farmi un esempio)\b/i;
 const PROBE_EN = /\b(could you|can you|tell me more|what do you mean|share an example|in what way)\b/i;
 
-const DEEP_OFFER_IT = /\b(ti va di continuare|vuoi continuare|hai(?:\s+ancora)?\s+(?:qualche|un paio di)?\s*minut[oi]|hai tempo per continuare|proseguire con(?:\s+qualche)?\s+domanda)\b/i;
-const DEEP_OFFER_EN = /\b(would you like to continue|do you want to continue|do you have (?:a few|a couple of)?\s*more minutes|can we continue with (?:a few )?deeper questions)\b/i;
+const DEEP_OFFER_IT = /\b(ti va di continuare|vuoi continuare|hai(?:\s+ancora)?\s+(?:qualche|un paio di)?\s*minut[oi]|hai tempo per continuare|proseguire con(?:\s+qualche)?\s+domanda|estendere(?:\s+l')?\s*intervista)\b/i;
+const DEEP_OFFER_EN = /\b(would you like to continue|do you want to continue|do you have (?:a few|a couple of)?\s*more minutes|can we continue with (?:a few )?deeper questions|extend the interview)\b/i;
 const CONFUSION_IT = /\b(non capisco|non ho capito|non mi è chiaro|puoi chiarire|puoi spiegare meglio)\b/i;
 const CONFUSION_EN = /\b(i don't understand|i do not understand|not clear|can you clarify|can you explain)\b/i;
 const ECHO_BRIDGE_IT = /\b(hai detto|hai menzionato)\b/i;
@@ -150,7 +150,7 @@ export function evaluateInterviewQuestionQuality(input: QualitativeEvalInput): Q
     if (!checks.topicalAnchor) issues.push('La domanda sembra fuori topic rispetto al tema corrente.');
     if (!checks.nonRepetitive) issues.push('La domanda è troppo simile a quella precedente.');
     if (!checks.probingWhenUserIsBrief) issues.push('Con risposta breve dell’utente, manca probing qualitativo.');
-    if (!checks.deepOfferIntent) issues.push('In DEEP_OFFER non sta davvero chiedendo se proseguire.');
+    if (!checks.deepOfferIntent) issues.push('In EXTENSION_OFFER non sta davvero chiedendo se proseguire.');
     if (!checks.coherentTransition) issues.push('Transizione poco coerente: riusa la risposta utente senza connessione al topic corrente.');
     if (!checks.handlesClarificationNaturally) issues.push('Gestione poco naturale della richiesta di chiarimento: evita echo letterale.');
 

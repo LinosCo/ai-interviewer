@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { getInterviewQualityDashboardData } from '@/lib/interview/quality-dashboard';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function parsePositiveInt(value: string | null, fallback: number): number {
     const parsed = Number(value);
     if (!Number.isFinite(parsed) || parsed <= 0) return fallback;

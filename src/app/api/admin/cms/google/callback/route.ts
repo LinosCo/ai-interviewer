@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { googleAnalyticsService } from '@/lib/cms/google-analytics.service';
 import { redirect } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/admin/cms/google/callback
  * OAuth callback handler for Google authorization.

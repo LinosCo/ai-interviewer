@@ -8,6 +8,7 @@ import { decrypt } from '../encryption';
 import { calculateCredits } from '../credits';
 import { WordPressAdapter, type WordPressCredentials } from './wordpress.adapter';
 import { WooCommerceAdapter, type WooCommerceCredentials } from './woocommerce.adapter';
+import { getMcpEndpointCandidates, normalizeMcpEndpoint } from './endpoint';
 import type { BaseMCPAdapter, MCPServerInfo, MCPTool, MCPCallResult } from './base.adapter';
 import type { MCPConnection, MCPConnectionType } from '@prisma/client';
 
@@ -35,18 +36,19 @@ class MCPGatewayServiceClass {
   /**
    * Create an adapter for a given connection
    */
-  private createAdapter(connection: MCPConnection): BaseMCPAdapter {
+  private createAdapter(connection: MCPConnection, endpointOverride?: string): BaseMCPAdapter {
+    const endpoint = normalizeMcpEndpoint(connection.type, endpointOverride || connection.endpoint);
     const credentials = JSON.parse(decrypt(connection.credentials));
 
     switch (connection.type) {
       case 'WORDPRESS':
         return new WordPressAdapter(
-          connection.endpoint,
+          endpoint,
           credentials as WordPressCredentials
         );
       case 'WOOCOMMERCE':
         return new WooCommerceAdapter(
-          connection.endpoint,
+          endpoint,
           credentials as WooCommerceCredentials
         );
       default:
@@ -66,16 +68,34 @@ class MCPGatewayServiceClass {
       return { success: false, message: 'Connection not found' };
     }
 
-    const adapter = this.createAdapter(connection);
+    const endpointCandidates = getMcpEndpointCandidates(connection.type, connection.endpoint);
+    let serverInfo: MCPServerInfo | undefined;
+    let usedEndpoint = connection.endpoint;
+    let lastErrorMessage = 'Unknown error';
 
-    try {
-      const serverInfo = await adapter.initialize();
-      await adapter.close();
+    for (const candidateEndpoint of endpointCandidates) {
+      const adapter = this.createAdapter(connection, candidateEndpoint);
+      try {
+        serverInfo = await adapter.initialize();
+        await adapter.close();
+        usedEndpoint = candidateEndpoint;
+        break;
+      } catch (error) {
+        lastErrorMessage = error instanceof Error ? error.message : 'Unknown error';
+        try {
+          await adapter.close();
+        } catch {
+          // Ignore adapter close errors
+        }
+      }
+    }
 
+    if (serverInfo) {
       // Update connection status
       await prisma.mCPConnection.update({
         where: { id: connectionId },
         data: {
+          endpoint: usedEndpoint,
           status: 'ACTIVE',
           lastPingAt: new Date(),
           lastError: null,
@@ -89,23 +109,21 @@ class MCPGatewayServiceClass {
         message: 'Connection successful',
         serverInfo,
       };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Update connection status
-      await prisma.mCPConnection.update({
-        where: { id: connectionId },
-        data: {
-          status: 'ERROR',
-          lastError: errorMessage,
-        },
-      });
-
-      return {
-        success: false,
-        message: errorMessage,
-      };
     }
+
+    // Update connection status
+    await prisma.mCPConnection.update({
+      where: { id: connectionId },
+      data: {
+        status: 'ERROR',
+        lastError: lastErrorMessage,
+      },
+    });
+
+    return {
+      success: false,
+      message: lastErrorMessage,
+    };
   }
 
   /**

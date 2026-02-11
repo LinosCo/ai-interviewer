@@ -4,8 +4,11 @@ import { NextResponse } from 'next/server';
 
 function isMissingN8NConnectionTable(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
-  const prismaError = error as { code?: string; meta?: { table?: string } };
-  return prismaError.code === 'P2021' && String(prismaError.meta?.table || '').includes('N8NConnection');
+  const prismaError = error as { code?: string; meta?: { table?: string }; message?: string };
+  if (prismaError.code !== 'P2021') return false;
+  const tableRef = String(prismaError.meta?.table || '').toLowerCase();
+  const messageRef = String(prismaError.message || '').toLowerCase();
+  return tableRef.includes('n8nconnection') || messageRef.includes('n8nconnection');
 }
 
 export async function GET(

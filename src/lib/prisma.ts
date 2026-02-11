@@ -2,6 +2,23 @@ import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+function normalizePgConnectionString(rawConnectionString: string): string {
+  try {
+    const url = new URL(rawConnectionString);
+    const sslMode = (url.searchParams.get('sslmode') || '').toLowerCase();
+    const hasLibpqCompat = url.searchParams.has('uselibpqcompat');
+
+    // Avoid pg warning and keep current secure behavior with upcoming pg v9 changes.
+    if (!hasLibpqCompat && ['prefer', 'require', 'verify-ca'].includes(sslMode)) {
+      url.searchParams.set('uselibpqcompat', 'true');
+    }
+
+    return url.toString();
+  } catch {
+    return rawConnectionString;
+  }
+}
+
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
@@ -16,7 +33,8 @@ function createPrismaClient(): PrismaClient {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaPg } = require('@prisma/adapter-pg');
 
-  const pool = new Pool({ connectionString });
+  const normalizedConnectionString = normalizePgConnectionString(connectionString);
+  const pool = new Pool({ connectionString: normalizedConnectionString });
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({ adapter });

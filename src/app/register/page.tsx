@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, Suspense, useState, useEffect } from 'react';
+import { useActionState, Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { registerUser } from './actions';
 import Link from 'next/link';
@@ -14,19 +14,10 @@ function RegisterForm() {
     const searchParams = useSearchParams();
     const plan = searchParams.get('plan');
     const [errorMessage, dispatch, isPending] = useActionState(registerUser, undefined);
-    const [isNavigating, setIsNavigating] = useState(false);
+    const [hasSubmitted, setHasSubmitted] = useState(false);
 
     // Combined loading state
-    const isLoading = isPending || isNavigating;
-
-    // When action completes successfully, keep loading state until navigation
-    useEffect(() => {
-        if (!isPending && errorMessage === null && !isNavigating) {
-            // Registration successful, redirect will happen from server action
-            // Keep showing loading state
-            setIsNavigating(true);
-        }
-    }, [errorMessage, isPending, isNavigating]);
+    const isLoading = isPending || (hasSubmitted && errorMessage === null);
 
     return (
         <div style={{
@@ -60,7 +51,7 @@ function RegisterForm() {
                 </div>
 
                 <Card variant="glass" padding="2.5rem">
-                    <form action={dispatch}>
+                    <form action={dispatch} onSubmit={() => setHasSubmitted(true)}>
                         <input type="hidden" name="plan" value={plan || ''} />
                         <input type="hidden" name="billing" value={searchParams.get('billing') || 'monthly'} />
 

@@ -34,6 +34,11 @@ export default function OrganizationProjectSelector() {
     const containerRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const hasAutoRetriedRef = useRef(false);
+    const closeDropdown = useCallback(() => {
+        setDropdownMode(null);
+        setSearchQuery('');
+        setHighlightedIndex(0);
+    }, []);
 
     // Filtered lists
     const filteredOrganizations = organizations.filter(org =>
@@ -45,12 +50,9 @@ export default function OrganizationProjectSelector() {
         ...projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     ];
 
-    // Reset search when closing dropdown
+    // Focus input when opening dropdown
     useEffect(() => {
-        if (!dropdownMode) {
-            setSearchQuery('');
-            setHighlightedIndex(0);
-        } else {
+        if (dropdownMode) {
             // Focus input when opening
             setTimeout(() => {
                 searchInputRef.current?.focus();
@@ -65,13 +67,13 @@ export default function OrganizationProjectSelector() {
 
     const handleOrgSelect = useCallback((org: Organization) => {
         setCurrentOrganization(org);
-        setDropdownMode(null);
-    }, [setCurrentOrganization]);
+        closeDropdown();
+    }, [setCurrentOrganization, closeDropdown]);
 
     const handleProjectSelect = useCallback((project: Project) => {
         setSelectedProject(project);
-        setDropdownMode(null);
-    }, [setSelectedProject]);
+        closeDropdown();
+    }, [setSelectedProject, closeDropdown]);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
         const itemsCount = dropdownMode === 'org' ? filteredOrganizations.length : filteredProjects.length;
@@ -90,7 +92,7 @@ export default function OrganizationProjectSelector() {
                 handleProjectSelect(filteredProjects[highlightedIndex]);
             }
         } else if (e.key === 'Escape') {
-            setDropdownMode(null);
+            closeDropdown();
         }
     };
 
@@ -98,13 +100,13 @@ export default function OrganizationProjectSelector() {
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setDropdownMode(null);
+                closeDropdown();
             }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [closeDropdown]);
 
     if (orgError) {
         return (
@@ -150,9 +152,13 @@ export default function OrganizationProjectSelector() {
             <div className="relative">
                 <button
                     onClick={() => {
-                        setDropdownMode(dropdownMode === 'org' ? null : 'org');
-                        setSearchQuery('');
-                        setHighlightedIndex(0);
+                        if (dropdownMode === 'org') {
+                            closeDropdown();
+                        } else {
+                            setDropdownMode('org');
+                            setSearchQuery('');
+                            setHighlightedIndex(0);
+                        }
                     }}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-all ${dropdownMode === 'org'
                         ? 'bg-amber-50 border-amber-200 ring-2 ring-amber-100'

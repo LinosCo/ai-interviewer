@@ -341,15 +341,28 @@ Goal: Thank the user, provide closure, and if applicable, the reward claim link.
             if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
                 const lang = bot?.language || 'en';
                 const isItalian = lang === 'it';
+                const extensionPreview = Array.isArray((supervisorInsight as any).extensionPreview)
+                    ? ((supervisorInsight as any).extensionPreview as string[]).map(v => String(v || '').trim()).filter(Boolean).slice(0, 2)
+                    : [];
+                const previewHintIt = extensionPreview.length > 0
+                    ? `Gli spunti principali sono: ${extensionPreview.join(' | ')}.`
+                    : `Accenna a uno o due spunti concreti ancora da approfondire.`;
+                const previewHintEn = extensionPreview.length > 0
+                    ? `Main remaining angles: ${extensionPreview.join(' | ')}.`
+                    : `Briefly mention one or two concrete remaining angles to deepen.`;
 
                 const offerPrompt = isItalian ? `
 ## FASE: OFFERTA ESTENSIONE
 Puoi proporre una breve estensione opzionale dell'intervista.
 
 **ISTRUZIONI**:
-1. Ringrazia brevemente l'utente per le risposte finora.
-2. Chiedi in modo leggero se vuole estendere l'intervista di qualche minuto per continuare.
-3. Attendi la risposta dell'utente.
+1. Dichiara in modo naturale che il tempo previsto per l'intervista è terminato.
+2. Indica che ci sono ancora alcuni approfondimenti utili da fare. ${previewHintIt}
+3. Chiedi in modo leggero se ha disponibilità per qualche ulteriore domanda di approfondimento.
+4. Attendi la risposta dell'utente.
+
+**REGOLA CRITICA**:
+- Il messaggio deve contenere ESATTAMENTE un punto interrogativo.
 
 **DIVIETI**:
 - NON chiedere dati di contatto ora
@@ -361,9 +374,13 @@ Puoi proporre una breve estensione opzionale dell'intervista.
 You may propose a short optional extension of the interview.
 
 **INSTRUCTIONS**:
-1. Briefly thank the user for their answers so far.
-2. Ask lightly if they want to extend the interview by a few minutes to continue.
-3. Wait for user's response.
+1. Naturally state that the planned interview time has ended.
+2. Mention there are still useful points to deepen. ${previewHintEn}
+3. Ask lightly if they are available for a few more deep-dive questions.
+4. Wait for the user's response.
+
+**CRITICAL RULE**:
+- The message must contain EXACTLY one question mark.
 
 **PROHIBITIONS**:
 - DO NOT ask for contact details now

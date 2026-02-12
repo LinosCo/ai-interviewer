@@ -13,31 +13,21 @@ import { Card } from '@/components/ui/business-tuner/Card';
 export default function LoginPage() {
     const router = useRouter();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
-    const [isNavigating, setIsNavigating] = useState(false);
     const [hasSubmitted, setHasSubmitted] = useState(false);
 
     // Combined loading state: pending action OR navigating to dashboard
-    const isLoading = isPending || isNavigating;
+    const isLoading = isPending || (hasSubmitted && errorMessage === null);
 
     useEffect(() => {
-        if (errorMessage) {
-            setIsNavigating(false);
-            setHasSubmitted(false);
-            return;
-        }
-
         if (!isPending && errorMessage === null && hasSubmitted) {
             // Login successful, start navigation and refresh session
-            setIsNavigating(true);
             router.refresh();
             router.replace('/dashboard');
-            // Note: isNavigating stays true - page will unmount during navigation
         }
     }, [errorMessage, isPending, router, hasSubmitted]);
 
     const handleSubmit = () => {
         setHasSubmitted(true);
-        setIsNavigating(true);
     };
 
     return (

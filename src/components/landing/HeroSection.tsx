@@ -21,17 +21,8 @@ const HERO_PHRASES = [
   'come migliorare il servizio?',
 ];
 
-export function HeroSection() {
-  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentPhraseIndex((prev) => (prev + 1) % HERO_PHRASES.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const TrustBadges = () => (
+function TrustBadgesView() {
+  return (
     <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-[hsl(var(--muted-foreground))] text-sm">
       <span className="flex items-center gap-2">
         <svg className="w-4 h-4 text-[hsl(var(--coral))]" fill="currentColor" viewBox="0 0 20 20">
@@ -53,6 +44,17 @@ export function HeroSection() {
       </span>
     </div>
   );
+}
+
+export function HeroSection() {
+  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentPhraseIndex((prev) => (prev + 1) % HERO_PHRASES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <>
@@ -137,7 +139,7 @@ export function HeroSection() {
               transition={{ delay: 0.6 }}
               className="hidden md:block mt-16"
             >
-              <TrustBadges />
+              <TrustBadgesView />
             </motion.div>
           </motion.div>
         </div>
@@ -150,7 +152,7 @@ export function HeroSection() {
         transition={{ delay: 0.6 }}
         className="md:hidden py-8 px-6"
       >
-        <TrustBadges />
+        <TrustBadgesView />
       </motion.div>
     </>
   );

@@ -276,6 +276,7 @@ export default function InterviewChat({
     const resizeRafRef = useRef<number | null>(null);
     const lastTextareaHeightRef = useRef<number | null>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const INPUT_MAX_HEIGHT_PX = 280;
 
     // Auto-resize textarea function (deferred to next frame to avoid blocking input)
     const autoResizeTextarea = () => {
@@ -287,7 +288,7 @@ export default function InterviewChat({
             const el = inputRef.current;
             if (!el) return;
             el.style.height = 'auto';
-            const nextHeight = Math.min(el.scrollHeight, 150);
+            const nextHeight = Math.min(el.scrollHeight, INPUT_MAX_HEIGHT_PX);
             if (lastTextareaHeightRef.current !== nextHeight) {
                 el.style.height = `${nextHeight}px`;
                 lastTextareaHeightRef.current = nextHeight;
@@ -982,8 +983,8 @@ export default function InterviewChat({
                                     autoComplete="off"
                                     autoCorrect="on"
                                     spellCheck="true"
-                                    className="w-full resize-none border-none bg-transparent px-4 md:px-6 py-4 md:py-5 pr-16 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:ring-0 focus:outline-none overflow-hidden"
-                                    style={{ minHeight: '56px', maxHeight: '150px' }}
+                                    className="w-full resize-none border-none bg-transparent px-4 md:px-6 py-4 md:py-5 pr-16 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:ring-0 focus:outline-none overflow-y-auto"
+                                    style={{ minHeight: '56px', maxHeight: `${INPUT_MAX_HEIGHT_PX}px` }}
                                 />
 
                                 <div className="pb-2 md:pb-3 pr-2 md:pr-3 flex items-end">

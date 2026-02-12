@@ -4,7 +4,7 @@ import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
-import { LLMService } from '@/services/llmService';
+import { LLMService, type InterviewRuntimeModels } from '@/services/llmService';
 import { TopicManager } from '@/lib/llm/topic-manager';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import { prisma } from '@/lib/prisma';
@@ -385,6 +385,64 @@ function selectDeepFocusPoint(params: {
     return bestSubGoal;
 }
 
+function buildExtensionPreviewHints(params: {
+    botTopics: any[];
+    deepOrder?: string[];
+    history?: Record<string, string[]>;
+    interestingTopics?: InterestingTopic[];
+    interviewObjective?: string;
+    language: string;
+    startIndex?: number;
+    maxItems?: number;
+}): string[] {
+    const {
+        botTopics,
+        deepOrder,
+        history,
+        interestingTopics,
+        interviewObjective,
+        language,
+        startIndex = 0,
+        maxItems = 2
+    } = params;
+
+    const deepTopics = getDeepTopics(botTopics, deepOrder);
+    const baseTopics = deepTopics.length > 0 ? deepTopics : botTopics;
+    if (!baseTopics.length) return [];
+
+    const safeStart = Math.max(0, Math.min(startIndex, Math.max(0, baseTopics.length - 1)));
+    const rotatedTopics = [
+        ...baseTopics.slice(safeStart),
+        ...baseTopics.slice(0, safeStart)
+    ];
+
+    const preview: string[] = [];
+    for (const topic of rotatedTopics) {
+        const availableSubGoals = getRemainingSubGoals(topic, history);
+        if (availableSubGoals.length === 0) continue;
+
+        const engagingSnippet = (interestingTopics || []).find(
+            (it: InterestingTopic) => it.topicId === topic.id
+        )?.bestSnippet || '';
+
+        const focusPoint = selectDeepFocusPoint({
+            topic,
+            availableSubGoals,
+            engagingSnippet,
+            interviewObjective,
+            lastUserMessage: '',
+            language
+        });
+
+        const compactFocus = sanitizeUserSnippet(focusPoint, 10) || focusPoint;
+        preview.push(`${topic.label}: ${compactFocus}`);
+        if (preview.length >= maxItems) break;
+    }
+
+    if (preview.length > 0) return preview;
+    return rotatedTopics.slice(0, maxItems).map(t => t.label).filter(Boolean);
+}
+
 function normalizeCandidateFieldIds(rawFields: any[]): string[] {
     if (!Array.isArray(rawFields)) return [];
     const normalized = rawFields
@@ -597,6 +655,48 @@ async function checkUserIntent(
     }
 }
 
+// ============================================================================
+// HELPER: Detect explicit user intent to conclude the interview now
+// ============================================================================
+async function detectExplicitClosureIntent(
+    userMessage: string,
+    apiKey: string,
+    language: string
+): Promise<{ wantsToConclude: boolean; confidence: 'high' | 'medium' | 'low'; reason: string }> {
+    const text = String(userMessage || '').trim();
+    if (!text) {
+        return { wantsToConclude: false, confidence: 'low', reason: 'empty_message' };
+    }
+
+    const openai = createOpenAI({ apiKey });
+    const schema = z.object({
+        wantsToConclude: z.boolean().describe('True only when the user explicitly wants to stop/conclude now.'),
+        confidence: z.enum(['high', 'medium', 'low']),
+        reason: z.string()
+    });
+
+    try {
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: [
+                `Classify interviewee intent from a single message.`,
+                `Language: ${language}`,
+                `User message: "${text}"`,
+                ``,
+                `Return wantsToConclude=true ONLY if the user is explicitly asking to stop/end/conclude now, or clearly refusing to continue now.`,
+                `Return false for normal topic answers, generic frustration without explicit stop request, uncertainty, or unrelated content.`,
+                `Be strict: avoid false positives.`
+            ].join('\n'),
+            temperature: 0
+        });
+        return result.object;
+    } catch (e) {
+        console.error('Explicit closure intent detection failed:', e);
+        return { wantsToConclude: false, confidence: 'low', reason: 'detection_error' };
+    }
+}
+
 async function generateQuestionOnly(params: {
     model: any;
     language: string;
@@ -604,10 +704,23 @@ async function generateQuestionOnly(params: {
     topicCue?: string | null;
     subGoal?: string | null;
     lastUserMessage?: string | null;
+    previousAssistantQuestion?: string | null;
+    semanticBridgeHint?: string | null;
     requireAcknowledgment?: boolean;
     transitionMode?: 'bridge' | 'clean_pivot';
 }) {
-    const { model, language, topicLabel, topicCue, subGoal, lastUserMessage, requireAcknowledgment, transitionMode } = params;
+    const {
+        model,
+        language,
+        topicLabel,
+        topicCue,
+        subGoal,
+        lastUserMessage,
+        previousAssistantQuestion,
+        semanticBridgeHint,
+        requireAcknowledgment,
+        transitionMode
+    } = params;
     const questionSchema = z.object({
         question: z.string().describe("A single interview question ending with a question mark.")
     });
@@ -627,6 +740,8 @@ async function generateQuestionOnly(params: {
         topicCue ? `Natural topic cue for user-facing wording: ${topicCue}` : null,
         subGoal ? `Sub-goal: ${subGoal}` : null,
         lastUserMessage ? `User last message: "${lastUserMessage}"` : null,
+        previousAssistantQuestion ? `Previous assistant question to avoid repeating: "${previousAssistantQuestion}"` : null,
+        semanticBridgeHint ? `Bridge hint: ${semanticBridgeHint}` : null,
         structureInstruction,
         transitionInstruction,
         `Task: Ask exactly ONE concise interview question about the topic. Do NOT close the interview. Do NOT ask for contact data. Avoid literal quote of user's words. Do NOT repeat the topic title verbatim; use natural phrasing. End with a single question mark.`
@@ -649,14 +764,25 @@ async function generateQuestionOnly(params: {
 async function generateDeepOfferOnly(params: {
     model: any;
     language: string;
+    extensionPreview?: string[];
 }) {
     const schema = z.object({
-        question: z.string().describe('A single yes/no continuation question ending with a question mark.')
+        message: z.string().describe('A short message that ends with one yes/no extension question.')
     });
+
+    const previewHints = (params.extensionPreview || [])
+        .map(h => String(h || '').trim())
+        .filter(Boolean)
+        .slice(0, 2);
 
     const prompt = [
         `Language: ${params.language}`,
-        `Task: Ask exactly ONE yes/no question to understand if the user wants to extend the interview by a few minutes and continue.`,
+        `Task: Write a short extension message with this structure:`,
+        `1) Say that the planned interview time has ended.`,
+        previewHints.length > 0
+            ? `2) Mention that you can still deepen these themes: ${previewHints.join(' | ')}.`
+            : `2) Mention one or two concrete themes you could still deepen.`,
+        `3) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
         `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].join('\n');
@@ -668,15 +794,16 @@ async function generateDeepOfferOnly(params: {
         temperature: 0.2
     });
 
-    return normalizeSingleQuestion(String(result.object.question || '').trim());
+    return normalizeSingleQuestion(String(result.object.message || '').trim());
 }
 
 async function enforceDeepOfferQuestion(params: {
     model: any;
     language: string;
     currentText?: string | null;
+    extensionPreview?: string[];
 }) {
-    const { model, language, currentText } = params;
+    const { model, language, currentText, extensionPreview } = params;
     const cleanedCurrent = normalizeSingleQuestion(
         String(currentText || '')
             .replace(/INTERVIEW_COMPLETED/gi, '')
@@ -688,7 +815,7 @@ async function enforceDeepOfferQuestion(params: {
     }
 
     try {
-        const generated = await generateDeepOfferOnly({ model, language });
+        const generated = await generateDeepOfferOnly({ model, language, extensionPreview });
         if (isExtensionOfferQuestion(generated, language)) {
             return generated;
         }
@@ -696,17 +823,22 @@ async function enforceDeepOfferQuestion(params: {
         console.error('enforceDeepOfferQuestion generation failed:', e);
     }
 
+    const hintText = (extensionPreview || []).slice(0, 2).join('; ');
     return language === 'it'
-        ? `Ti va di estendere l'intervista di qualche minuto per continuare?`
-        : `Would you like to extend the interview by a few minutes to continue?`;
+        ? (hintText
+            ? `Il tempo previsto per l'intervista sarebbe finito. Se vuoi, possiamo ancora approfondire ${hintText}: hai disponibilità per qualche ulteriore domanda?`
+            : `Il tempo previsto per l'intervista sarebbe finito. Hai disponibilità per qualche ulteriore domanda di approfondimento?`)
+        : (hintText
+            ? `The planned interview time has ended. If you want, we can still deepen ${hintText}: are you available for a few more follow-up questions?`
+            : `The planned interview time has ended. Are you available for a few more deep-dive questions?`);
 }
 
 function isExtensionOfferQuestion(message: string, language: string): boolean {
     const text = String(message || '').trim().toLowerCase();
     if (!text || !text.includes('?')) return false;
     const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    const itPattern = /\b(ti va di continuare|vuoi continuare|qualche minuto in più|hai ancora qualche minuto|estendere(?:\s+l')?\s*intervista|proseguire)\b/i;
-    const enPattern = /\b(would you like to continue|do you want to continue|few more minutes|extend the interview|continue for a few more minutes)\b/i;
+    const itPattern = /\b(ti va di continuare|vuoi continuare|qualche minuto in più|hai ancora qualche minuto|hai disponibilità|estendere(?:\s+l')?\s*intervista|proseguire|ulteriore(?:i)? domanda(?:e)? di approfondimento)\b/i;
+    const enPattern = /\b(would you like to continue|do you want to continue|few more minutes|are you available|extend the interview|continue for a few more minutes|follow-up questions|deep-dive questions)\b/i;
     return isItalian ? itPattern.test(text) : enPattern.test(text);
 }
 
@@ -768,6 +900,113 @@ function sanitizeUserSnippet(input: string, maxWords: number = 10): string {
     if (!compact) return '';
     const withoutPunctuation = compact.replace(/[?!.,;:()[\]{}"“”'’`]/g, '').trim();
     return withoutPunctuation.split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ');
+}
+
+function extractLastAssistantQuestion(input?: string | null): string {
+    const text = String(input || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!text || !text.includes('?')) return '';
+
+    const pieces = text
+        .split('?')
+        .map(chunk => chunk.trim())
+        .filter(Boolean);
+    if (pieces.length === 0) return '';
+    return `${pieces[pieces.length - 1]}?`;
+}
+
+function getUserResponseDepth(input?: string | null): 'brief' | 'balanced' | 'rich' {
+    const words = String(input || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length;
+    if (words <= 10) return 'brief';
+    if (words >= 35) return 'rich';
+    return 'balanced';
+}
+
+function buildUserBridgeHint(input: string, language: string): string {
+    const signal = sanitizeUserSnippet(input, 14);
+    if (!signal) return '';
+    return language === 'it'
+        ? `Apri collegandoti semanticamente al punto utente su "${signal}" senza citazione letterale.`
+        : `Open by semantically linking to the user point about "${signal}" without literal quoting.`;
+}
+
+function buildRuntimeSemanticContextPrompt(params: {
+    language: string;
+    phase: Phase;
+    targetTopicLabel: string;
+    supervisorInsight?: any;
+    lastUserMessage?: string | null;
+    previousAssistantMessage?: string | null;
+}): string {
+    const lastUserMessage = String(params.lastUserMessage || '').trim();
+    if (!lastUserMessage) return '';
+
+    const language = params.language || 'en';
+    const userSignal = sanitizeUserSnippet(lastUserMessage, 18);
+    const previousQuestion = extractLastAssistantQuestion(params.previousAssistantMessage);
+    const responseDepth = getUserResponseDepth(lastUserMessage);
+    const transitionMode = params.supervisorInsight?.transitionMode as 'bridge' | 'clean_pivot' | undefined;
+    const phase = params.phase;
+
+    const depthHintIt: Record<'brief' | 'balanced' | 'rich', string> = {
+        brief: 'Risposta breve: usa una domanda semplice e concreta, con un solo focus.',
+        balanced: 'Risposta equilibrata: approfondisci un dettaglio specifico emerso ora.',
+        rich: 'Risposta ricca: seleziona un solo elemento ad alto valore e approfondiscilo.'
+    };
+    const depthHintEn: Record<'brief' | 'balanced' | 'rich', string> = {
+        brief: 'Short answer: use one simple, concrete follow-up with a single focus.',
+        balanced: 'Balanced answer: deepen one specific detail that just emerged.',
+        rich: 'Rich answer: pick one high-value element and probe that only.'
+    };
+
+    const transitionHintIt = transitionMode === 'bridge'
+        ? 'Transizione: usa un ponte naturale dal punto utente al nuovo focus.'
+        : transitionMode === 'clean_pivot'
+            ? 'Transizione: pivot pulito con aggancio neutro, senza forzare dettagli non pertinenti.'
+            : 'Transizione: mantieni continuità naturale col turno precedente.';
+    const transitionHintEn = transitionMode === 'bridge'
+        ? 'Transition: use a natural bridge from the user point into the new focus.'
+        : transitionMode === 'clean_pivot'
+            ? 'Transition: use a clean pivot with a neutral bridge, no forced irrelevant details.'
+            : 'Transition: keep natural continuity from the previous turn.';
+
+    if ((language || '').toLowerCase().startsWith('it')) {
+        return `
+## RUNTIME SEMANTIC CONTEXT
+- Fase attiva: ${phase}
+- Topic target: "${params.targetTopicLabel}"
+- Segnale utente da valorizzare (parafrasi, non citazione): "${userSignal || 'N/A'}"
+- Ultima domanda assistente da NON ripetere: "${previousQuestion || 'N/A'}"
+- Profondità risposta utente: ${responseDepth}
+
+Istruzioni di coerenza:
+1. Inizia con una frase breve che riconosce il segnale utente.
+2. Mantieni la nuova domanda semanticamente diversa dalla precedente.
+3. ${depthHintIt[responseDepth]}
+4. ${transitionHintIt}
+5. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
+`.trim();
+    }
+
+    return `
+## RUNTIME SEMANTIC CONTEXT
+- Active phase: ${phase}
+- Target topic: "${params.targetTopicLabel}"
+- User signal to leverage (paraphrase, no literal quote): "${userSignal || 'N/A'}"
+- Previous assistant question to avoid repeating: "${previousQuestion || 'N/A'}"
+- User response depth: ${responseDepth}
+
+Coherence instructions:
+1. Open with one short sentence acknowledging the user signal.
+2. Keep the new question semantically distinct from the previous one.
+3. ${depthHintEn[responseDepth]}
+4. ${transitionHintEn}
+5. Avoid rigid templates ("now let's move to") and premature closure cues.
+`.trim();
 }
 
 function escapeRegexLiteral(input: string): string {
@@ -1076,14 +1315,14 @@ export async function POST(req: Request) {
             return ChatService.saveUserMessage(conversationId, lastIncomingMessage.content);
         })();
 
-        const [savedUserMessage, , openAIKey, prefetchedModel] = await Promise.all([
+        const [savedUserMessage, , openAIKey, runtimeModels] = await Promise.all([
             saveUserMessagePromise,
             // Update progress
             ChatService.updateProgress(conversationId, safeEffectiveDuration),
             // Get API key
             LLMService.getApiKey(bot, 'openai').then(key => key || process.env.OPENAI_API_KEY || ''),
-            // Pre-fetch model (this also warms up the connection)
-            LLMService.getModel(bot)
+            // Pre-fetch routed models (primary + critical paths)
+            LLMService.getInterviewRuntimeModels(bot)
         ]);
         console.log(`⏱️ [TIMING] Parallel ops: ${Date.now() - parallelStart}ms`);
 
@@ -1100,6 +1339,9 @@ export async function POST(req: Request) {
         }
 
         const lastMessage = canonicalMessages[canonicalMessages.length - 1];
+        const previousAssistantMessage = [...canonicalMessages]
+            .reverse()
+            .find(message => message.role === 'assistant')?.content || null;
 
         const assistantTurnsSoFar = canonicalMessages.reduce(
             (count, message) => (message.role === 'assistant' ? count + 1 : count),
@@ -1214,15 +1456,67 @@ export async function POST(req: Request) {
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: any = { status: 'SCANNING' };
+        const buildDeepOfferInsight = (sourceState: InterviewState) => {
+            const extensionPreview = buildExtensionPreviewHints({
+                botTopics,
+                deepOrder: sourceState.deepTopicOrder,
+                history: sourceState.topicSubGoalHistory,
+                interestingTopics: sourceState.interestingTopics,
+                interviewObjective,
+                language,
+                startIndex: sourceState.topicIndex,
+                maxItems: 2
+            });
+            return extensionPreview.length > 0
+                ? { status: 'DEEP_OFFER_ASK', extensionPreview }
+                : { status: 'DEEP_OFFER_ASK' };
+        };
 
         if (lastMessage?.role === 'user') {
             nextState.lastUserTopicId = currentTopic.id;
         }
 
+        let forceEarlyClosureFromUser = false;
+        if (lastMessage?.role === 'user' && state.phase !== 'DATA_COLLECTION') {
+            const closureIntent = await detectExplicitClosureIntent(
+                lastMessage.content,
+                openAIKey,
+                language
+            );
+            if (closureIntent.wantsToConclude && closureIntent.confidence !== 'low') {
+                forceEarlyClosureFromUser = true;
+                console.log(`🛑 [SUPERVISOR] Explicit user intent to conclude detected. reason="${closureIntent.reason}" confidence=${closureIntent.confidence}`);
+
+                // Reset extension state to avoid offer loops and move straight to closure path.
+                nextState.deepAccepted = false;
+                nextState.extensionOfferAttempts = 0;
+                nextState.extensionReturnPhase = null;
+                nextState.extensionReturnTopicIndex = null;
+                nextState.extensionReturnTurnInTopic = null;
+                nextState.closureAttempts = 0;
+
+                if (shouldCollectData) {
+                    nextState.phase = 'DATA_COLLECTION';
+                    nextState.consentGiven = false;
+                    nextState.forceConsentQuestion = true;
+                    supervisorInsight = {
+                        status: 'DATA_COLLECTION_CONSENT',
+                        stopReason: closureIntent.reason
+                    };
+                } else {
+                    nextState.phase = 'DATA_COLLECTION';
+                    supervisorInsight = {
+                        status: 'COMPLETE_WITHOUT_DATA',
+                        stopReason: closureIntent.reason
+                    };
+                }
+            }
+        }
+
         // --------------------------------------------------------------------
         // PHASE: MACHINE
         // --------------------------------------------------------------------
-        if (supervisorInsight.status !== 'COMPLETE_WITHOUT_DATA' && supervisorInsight.status !== 'DATA_COLLECTION_CONSENT') {
+        if (!forceEarlyClosureFromUser && supervisorInsight.status !== 'COMPLETE_WITHOUT_DATA' && supervisorInsight.status !== 'DATA_COLLECTION_CONSENT') {
 
             if (state.phase === 'SCAN') {
                 const scanMaxTurns = getScanPlanTurns(interviewPlan, currentTopic.id);
@@ -1422,14 +1716,14 @@ export async function POST(req: Request) {
                                 console.log(`🎁 [DEEP_OFFER] Invalid-offer loop detected. Defaulting to no extension.`);
                                 moveToDataCollection();
                             } else {
-                                supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                                supervisorInsight = buildDeepOfferInsight(state);
                                 nextState.deepAccepted = false;
                                 nextState.extensionOfferAttempts = extensionAttempts;
                             }
                         }
                     } else {
                         console.log(`🎁 [DEEP_OFFER] Asking extension offer.`);
-                        supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                        supervisorInsight = buildDeepOfferInsight(state);
                         nextState.deepAccepted = false;
                         nextState.extensionOfferAttempts = state.extensionOfferAttempts ?? 0;
                     }
@@ -1512,7 +1806,7 @@ export async function POST(req: Request) {
                             moveToDataCollection();
                         } else {
                             console.log(`🎁 [DEEP_OFFER] Neutral response (attempt ${extensionAttempts + 1}), re-asking extension offer`);
-                            supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                            supervisorInsight = buildDeepOfferInsight(state);
                             nextState.deepAccepted = false;
                             nextState.extensionOfferAttempts = extensionAttempts + 1;
                         }
@@ -1562,7 +1856,7 @@ export async function POST(req: Request) {
                     nextState.extensionReturnTopicIndex = state.topicIndex;
                     nextState.extensionReturnTurnInTopic = state.turnInTopic;
                     nextState.extensionOfferAttempts = 0;
-                    supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                    supervisorInsight = buildDeepOfferInsight(state);
                     console.log(`🎁 [DEEP→DEEP_OFFER] Time limit reached during DEEP. Asking extension consent.`);
                 }
 
@@ -1763,10 +2057,12 @@ export async function POST(req: Request) {
                         console.log(`📋 [DATA_COLLECTION] Consent given, processing fields`);
                         let haltCollection = false;
 
-                        // CHECK: Did user change their mind mid-collection? ("basta", "non voglio", "stop")
-                        const REFUSAL_MID_COLLECTION_IT = /\b(basta|non voglio|stop|preferisco fermarmi|non continuare|lascia stare)\b/i;
-                        const REFUSAL_MID_COLLECTION_EN = /\b(stop|enough|i don't want|let's stop|never mind|forget it)\b/i;
-                        const refusalPattern = language === 'it' ? REFUSAL_MID_COLLECTION_IT : REFUSAL_MID_COLLECTION_EN;
+                        // CHECK (semantic): Did user change their mind mid-collection?
+                        const midCollectionClosureIntent = lastMessage?.role === 'user'
+                            ? await detectExplicitClosureIntent(lastMessage.content, openAIKey, language)
+                            : { wantsToConclude: false, confidence: 'low' as const, reason: 'no_user_message' };
+                        const userWantsToStopMidCollection =
+                            midCollectionClosureIntent.wantsToConclude && midCollectionClosureIntent.confidence !== 'low';
 
                         // CHECK: Is user frustrated/complaining about repeated questions?
                         const FRUSTRATION_IT = /\b(già (detto|chiesto)|te l'ho (già|appena)|incantato|bloccato|ripeti|sempre la stessa|loop)\b/i;
@@ -1774,8 +2070,8 @@ export async function POST(req: Request) {
                         const frustrationPattern = language === 'it' ? FRUSTRATION_IT : FRUSTRATION_EN;
                         const userFrustrated = lastMessage?.role === 'user' && frustrationPattern.test(lastMessage.content);
 
-                        if (lastMessage?.role === 'user' && refusalPattern.test(lastMessage.content)) {
-                            console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection`);
+                        if (userWantsToStopMidCollection) {
+                            console.log(`📋 [DATA_COLLECTION] User wants to stop mid-collection (semantic). reason="${midCollectionClosureIntent.reason}" confidence=${midCollectionClosureIntent.confidence}`);
                             await completeInterview(
                                 conversationId,
                                 canonicalMessages,
@@ -2001,7 +2297,12 @@ export async function POST(req: Request) {
         // 4. BUILD PROMPT
         // ====================================================================
         const methodology = LLMService.getMethodology();
-        const model = prefetchedModel; // Use pre-fetched model from parallel init
+        const modelRegistry: InterviewRuntimeModels = runtimeModels;
+        const model = modelRegistry.primary;
+        const criticalModel = modelRegistry.critical;
+        const qualityModel = modelRegistry.quality;
+        const dataCollectionModel = modelRegistry.dataCollection;
+        console.log("🧠 [MODEL_ROUTING]", modelRegistry.names);
         const nextActiveTopics = nextState.phase === 'DEEP'
             ? getDeepTopics(botTopics, nextState.deepTopicOrder || state.deepTopicOrder)
             : botTopics;
@@ -2058,6 +2359,20 @@ hard_rules:
 `;
         }
 
+        if (lastMessage?.role === 'user') {
+            const runtimeSemanticContext = buildRuntimeSemanticContextPrompt({
+                language,
+                phase: nextState.phase,
+                targetTopicLabel: targetTopic?.label || currentTopic.label,
+                supervisorInsight,
+                lastUserMessage: lastMessage.content,
+                previousAssistantMessage
+            });
+            if (runtimeSemanticContext) {
+                systemPrompt += `\n\n${runtimeSemanticContext}`;
+            }
+        }
+
         const shouldEndWithQuestion = !['COMPLETE_WITHOUT_DATA', 'FINAL_GOODBYE'].includes(supervisorInsight?.status);
         if (shouldEndWithQuestion) {
             systemPrompt += `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
@@ -2073,10 +2388,16 @@ hard_rules:
 
         let messagesForAI = canonicalMessages.map((m: any) => ({ role: m.role, content: m.content }));
         if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' || supervisorInsight?.status === 'DEEP_OFFER_ASK') {
-            // Keep last few messages for context so the LLM can reference the conversation
-            const recentMessages = canonicalMessages.slice(-4).map((m: any) => ({ role: m.role, content: m.content }));
+            // Keep recent messages for context so the LLM can preserve continuity in sensitive transitions.
+            const recentMessages = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
             messagesForAI = recentMessages;
         }
+
+        const modelForMainResponse = nextState.phase === 'DATA_COLLECTION'
+            ? dataCollectionModel
+            : nextState.phase === 'DEEP_OFFER'
+                ? criticalModel
+                : model;
 
         console.log("⏳ [CHAT] Generating response...");
         console.time("LLM");
@@ -2084,7 +2405,7 @@ hard_rules:
         let result: any;
         try {
             result = await Promise.race([
-                generateObject({ model, schema, messages: messagesForAI, system: systemPrompt, temperature: 0.7 }),
+                generateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: systemPrompt, temperature: 0.7 }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 45000))
             ]);
         } catch (error: any) {
@@ -2134,13 +2455,20 @@ hard_rules:
             completionBlockedForConsent: false,
             completionBlockedForMissingField: false
         };
+        const deepOfferPreviewHints: string[] = Array.isArray((supervisorInsight as any)?.extensionPreview)
+            ? ((supervisorInsight as any).extensionPreview as string[]).map(v => String(v || '').trim()).filter(Boolean).slice(0, 2)
+            : [];
+        const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
+        const userBridgeHint = lastMessage?.role === 'user'
+            ? buildUserBridgeHint(lastMessage.content, language)
+            : '';
 
         if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
             if (!isExtensionOfferQuestion(responseText, language)) {
                 console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
                 try {
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY ask (lightly) if the user wants to extend the interview by a few minutes to continue, and wait for yes/no. Do NOT ask any topic question.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                     didRegenerate = true;
                 } catch (e) {
@@ -2150,7 +2478,12 @@ hard_rules:
 
             // Hard enforcement: never leave DEEP_OFFER with a topic question.
             if (!isExtensionOfferQuestion(responseText, language)) {
-                responseText = await enforceDeepOfferQuestion({ model, language, currentText: responseText });
+                responseText = await enforceDeepOfferQuestion({
+                    model: criticalModel,
+                    language,
+                    currentText: responseText,
+                    extensionPreview: deepOfferPreviewHints
+                });
                 didRegenerate = true;
             }
         }
@@ -2169,7 +2502,7 @@ hard_rules:
                 console.log(`⚠️ [SUPERVISOR] Possible topic drift from "${targetTopic.label}". Regenerating with anchors.`);
                 const anchorList = anchorData.anchors.slice(0, 5).join(', ');
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your question must stay on topic "${targetTopic.label}". Include at least ONE of these anchor terms: ${anchorList}. Ask exactly one question.`;
-                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
                 didRegenerate = true;
             }
@@ -2187,7 +2520,7 @@ hard_rules:
                     inputTokens: result.usage.inputTokens || 0,
                     outputTokens: result.usage.outputTokens || 0,
                     category: 'INTERVIEW',
-                    model: model.modelId || 'gpt-4o',
+                    model: modelForMainResponse.modelId || 'gpt-4o',
                     operation: 'interview-response',
                     resourceType: 'interview',
                     resourceId: bot.id
@@ -2263,7 +2596,7 @@ hard_rules:
             console.log(`⚠️ [SUPERVISOR] Promo/CTA detected during active phase. Regenerating.`);
             const enforceTopic = targetTopic?.label || currentTopic.label;
             const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Remove any promo/CTA. Ask exactly ONE question about "${enforceTopic}".`;
-            const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+            const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
             responseText = retry.object.response?.trim() || responseText;
         }
 
@@ -2275,7 +2608,7 @@ hard_rules:
                 console.log(`⚠️ [SUPERVISOR] Forcing final closure after data collection refusal/completion.`);
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Conclude the interview now. Thank the user, and if a reward is configured, provide it. Do NOT ask any questions. Append "INTERVIEW_COMPLETED".`;
                 try {
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Final closure regeneration failed:', e);
@@ -2326,7 +2659,7 @@ hard_rules:
                     if (!isConsent || forceConsent) {
                         console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
                         const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Start with one short linking sentence acknowledging the content interview is complete, then ask ONLY one yes/no consent question to collect contact details. Do not ask topic questions.`;
-                        const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                        const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                         responseText = retry.object.response?.trim() || responseText;
 
                         try {
@@ -2338,7 +2671,7 @@ hard_rules:
                             });
                             if (!consentCheck2.object.isConsent) {
                                 const enforcedSystem2 = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
-                                const retry2 = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
+                                const retry2 = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
                                 responseText = retry2.object.response?.trim() || responseText;
                             }
                         } catch (e) {
@@ -2358,7 +2691,7 @@ hard_rules:
                         console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". OVERRIDING with field question.`);
                         const fieldLabel = getFieldLabel(missingField, language);
                         const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for ${fieldLabel}. One question only.`;
-                        const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                        const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                         responseText = retry.object.response?.trim() || responseText;
                     }
                 }
@@ -2366,7 +2699,7 @@ hard_rules:
                 else if (!missingField && !responseText.includes('INTERVIEW_COMPLETED')) {
                     console.log(`✅ [SUPERVISOR] All fields collected, adding completion tag.`);
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Thank the user, close the interview, and append \"INTERVIEW_COMPLETED\". Do not ask any questions.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                     if (!/INTERVIEW_COMPLETED/i.test(responseText)) {
                         responseText = `${responseText.trim()} INTERVIEW_COMPLETED`.trim();
@@ -2391,10 +2724,10 @@ hard_rules:
                 nextState.extensionReturnTopicIndex = state.topicIndex;
                 nextState.extensionReturnTurnInTopic = state.turnInTopic;
                 nextState.extensionOfferAttempts = 0;
-                supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                supervisorInsight = buildDeepOfferInsight(nextState);
                 try {
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask (lightly) if the user wants to extend the interview by a few minutes to continue. One question only.`;
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Extension offer regeneration after closure failed:', e);
@@ -2405,7 +2738,7 @@ hard_rules:
 
                 const enforceTopic = targetTopic?.label || currentTopic.label;
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing. The response MUST end with a question mark.`;
-                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
                 console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
 
@@ -2415,11 +2748,13 @@ hard_rules:
                     console.log("🧭 [SUPERVISOR] Override still invalid, using fallback question-only generation.");
                     try {
                         responseText = await generateQuestionOnly({
-                            model,
+                            model: qualityModel,
                             language,
                             topicLabel: enforceTopic,
                             topicCue: buildNaturalTopicCue(enforceTopic, language),
                             lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
+                            previousAssistantQuestion,
+                            semanticBridgeHint: userBridgeHint,
                             requireAcknowledgment: true
                         });
                         console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
@@ -2443,13 +2778,18 @@ hard_rules:
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. OVERRIDING with offer question.`);
             try {
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Offer the choice to extend the interview by a few minutes and continue. One question only. Do not ask any topic question.`;
-                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
             } catch (e) {
                 console.error('Deep offer closure regeneration failed:', e);
             }
             if (!isExtensionOfferQuestion(responseText, language)) {
-                responseText = await enforceDeepOfferQuestion({ model, language, currentText: responseText });
+                responseText = await enforceDeepOfferQuestion({
+                    model: criticalModel,
+                    language,
+                    currentText: responseText,
+                    extensionPreview: deepOfferPreviewHints
+                });
             }
         }
 
@@ -2463,9 +2803,7 @@ hard_rules:
             qualityTelemetry.evaluated = true;
             const phaseForQuality = nextState.phase as 'SCAN' | 'DEEP' | 'DEEP_OFFER';
             const qualityTopicLabel = targetTopic?.label || currentTopic?.label || 'current topic';
-            const lastAssistantBeforeCurrent = [...canonicalMessages]
-                .reverse()
-                .find(m => m.role === 'assistant')?.content || null;
+            const lastAssistantBeforeCurrent = previousAssistantMessage;
 
             const qualitative = evaluateInterviewQuestionQuality({
                 phase: phaseForQuality,
@@ -2519,7 +2857,7 @@ Previous assistant question (do not repeat): "${previousAssistant}"`;
 
                 try {
                     const retry = await generateObject({
-                        model,
+                        model: qualityModel,
                         schema,
                         messages: messagesForAI,
                         system: `${systemPrompt}\n\n${correctionPrompt}`,
@@ -2536,12 +2874,14 @@ Previous assistant question (do not repeat): "${previousAssistant}"`;
                     qualityTelemetry.fallbackUsed = true;
                     try {
                         responseText = await generateQuestionOnly({
-                            model,
+                            model: qualityModel,
                             language,
                             topicLabel: enforceTopic,
                             topicCue: buildNaturalTopicCue(enforceTopic, language),
                             subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
                             lastUserMessage: lastMessage?.content || null,
+                            previousAssistantQuestion,
+                            semanticBridgeHint: userBridgeHint,
                             requireAcknowledgment: true,
                             transitionMode: supervisorInsight?.transitionMode
                         });
@@ -2604,7 +2944,7 @@ Reply with the complete message (acknowledgment + question).`;
                     } else {
                         // Need to generate/add a question
                         const additiveRetry = await generateObject({
-                            model,
+                            model: qualityModel,
                             schema,
                             messages: [
                                 ...messagesForAI.slice(0, -1),
@@ -2649,7 +2989,12 @@ Reply with the complete message (acknowledgment + question).`;
             if (invalidDeepOffer) {
                 flowTelemetry.deepOfferClosureIntercepted = true;
                 console.log(`🛡️ [SAFETY_NET] Invalid DEEP_OFFER response, fixing...`);
-                responseText = await enforceDeepOfferQuestion({ model, language, currentText: responseText });
+                responseText = await enforceDeepOfferQuestion({
+                    model: criticalModel,
+                    language,
+                    currentText: responseText,
+                    extensionPreview: deepOfferPreviewHints
+                });
             }
         }
 
@@ -2687,7 +3032,7 @@ Reply with the complete message (acknowledgment + question).`;
                 if (invalidConsentResponse) {
                     console.log('🛡️ [FINAL_GUARD] DATA_COLLECTION consent response invalid. Forcing consent question.');
                     try {
-                        responseText = await generateConsentQuestionOnly({ model, language });
+                        responseText = await generateConsentQuestionOnly({ model: dataCollectionModel, language });
                     } catch (e) {
                         console.error('Consent question fallback failed:', e);
                         responseText = normalizeSingleQuestion(String(responseText || '').replace(/INTERVIEW_COMPLETED/gi, '').trim());
@@ -2706,7 +3051,7 @@ Reply with the complete message (acknowledgment + question).`;
                     const fieldLabel = getFieldLabel(missingFieldForDataGuard, language);
                     try {
                         responseText = await generateFieldQuestionOnly({
-                            model,
+                            model: dataCollectionModel,
                             language,
                             fieldLabel
                         });
@@ -2719,7 +3064,7 @@ Reply with the complete message (acknowledgment + question).`;
                 console.log('🛡️ [FINAL_GUARD] DATA_COLLECTION complete but missing completion tag. Forcing final goodbye.');
                 try {
                     const retry = await generateObject({
-                        model,
+                        model: dataCollectionModel,
                         schema,
                         messages: messagesForAI,
                         system: `${systemPrompt}\n\nCRITICAL: Thank the user, close the interview, and append "INTERVIEW_COMPLETED". Do NOT ask any questions.`,
@@ -2785,7 +3130,7 @@ Reply with the complete message (acknowledgment + question).`;
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED before consent resolution. OVERRIDING with consent question.`);
                 const enforcedSystem = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
                 try {
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Consent regeneration after completion failed:', e);
@@ -2798,7 +3143,7 @@ Reply with the complete message (acknowledgment + question).`;
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but "${missingFieldForCompletion}" is still missing. OVERRIDING with field question.`);
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT conclude. Ask ONLY for ${fieldLabel}. One question only.`;
                 try {
-                    const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Field regeneration after premature completion failed:', e);

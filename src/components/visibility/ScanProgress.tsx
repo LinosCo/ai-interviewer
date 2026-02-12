@@ -27,8 +27,13 @@ export function ScanProgress({ isOpen, onComplete }: { isOpen: boolean, onComple
             }, 3000);
 
             return () => clearInterval(interval);
-        } else {
-            setCurrentStep(0);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            const timeout = setTimeout(() => setCurrentStep(0), 0);
+            return () => clearTimeout(timeout);
         }
     }, [isOpen]);
 

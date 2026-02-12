@@ -17,6 +17,9 @@ import { getFieldLabel, getNextMissingCandidateField } from '@/lib/interview/flo
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
 import { evaluateInterviewQuestionQuality } from '@/lib/interview/qualitative-evaluator';
+import { buildAdditiveQuestionPrompt, buildQualityCorrectionPrompt } from '@/lib/interview/quality-pipeline';
+import { extractDeterministicFieldValue, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
+import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
 
 export const maxDuration = 60;
 
@@ -40,8 +43,6 @@ function isLocalSimulationRequest(req: Request): boolean {
 // ============================================================================
 // TYPES
 // ============================================================================
-type Phase = 'SCAN' | 'DEEP_OFFER' | 'DEEP' | 'DATA_COLLECTION';
-
 interface InterestingTopic {
     topicId: string;
     topicLabel: string;
@@ -443,75 +444,6 @@ function buildExtensionPreviewHints(params: {
     return rotatedTopics.slice(0, maxItems).map(t => t.label).filter(Boolean);
 }
 
-function normalizeCandidateFieldIds(rawFields: any[]): string[] {
-    if (!Array.isArray(rawFields)) return [];
-    const normalized = rawFields
-        .map((f: any) => (typeof f === 'string' ? f : (f?.id || f?.field || '')))
-        .map((f: string) => String(f || '').trim())
-        .filter(Boolean);
-    return Array.from(new Set(normalized));
-}
-
-function responseMentionsCandidateField(responseText: string, fieldId: string): boolean {
-    const text = String(responseText || '').toLowerCase();
-    if (!text || !fieldId) return false;
-    if (text.includes(fieldId.toLowerCase())) return true;
-
-    if (fieldId === 'name' || fieldId === 'fullName') {
-        return /\b(nome|cognome|name)\b/i.test(text);
-    }
-    if (fieldId === 'email') {
-        return /\b(email|mail)\b/i.test(text);
-    }
-    if (fieldId === 'phone') {
-        return /\b(telefono|phone|numero)\b/i.test(text);
-    }
-    if (fieldId === 'company') {
-        return /\b(azienda|company|organizzazione)\b/i.test(text);
-    }
-    if (fieldId === 'role') {
-        return /\b(ruolo|role|posizione)\b/i.test(text);
-    }
-    if (fieldId === 'linkedin') {
-        return /\b(linkedin|profilo|profile)\b/i.test(text);
-    }
-    if (fieldId === 'portfolio') {
-        return /\b(portfolio|sito web|website|url)\b/i.test(text);
-    }
-    if (fieldId === 'location') {
-        return /\b(citt[àa]|city|location|localit[àa])\b/i.test(text);
-    }
-    if (fieldId === 'budget') {
-        return /\b(budget)\b/i.test(text);
-    }
-    if (fieldId === 'availability') {
-        return /\b(disponibilit[àa]|availability)\b/i.test(text);
-    }
-    return false;
-}
-
-function extractDeterministicFieldValue(fieldName: string, userMessage: string): string | null {
-    const text = userMessage.trim();
-    if (!text) return null;
-
-    if (fieldName === 'email') {
-        const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-        return emailMatch ? emailMatch[0] : null;
-    }
-
-    if (fieldName === 'phone') {
-        const phoneMatch = text.match(/\+?[0-9][0-9\s().-]{6,}[0-9]/);
-        return phoneMatch ? phoneMatch[0].replace(/\s+/g, ' ').trim() : null;
-    }
-
-    if (fieldName === 'linkedin' || fieldName === 'portfolio') {
-        const urlMatch = text.match(/https?:\/\/[^\s]+/i);
-        return urlMatch ? urlMatch[0] : null;
-    }
-
-    return null;
-}
-
 // ============================================================================
 // HELPER: Extract field from user message
 // ============================================================================
@@ -742,6 +674,8 @@ async function generateQuestionOnly(params: {
         lastUserMessage ? `User last message: "${lastUserMessage}"` : null,
         previousAssistantQuestion ? `Previous assistant question to avoid repeating: "${previousAssistantQuestion}"` : null,
         semanticBridgeHint ? `Bridge hint: ${semanticBridgeHint}` : null,
+        `Acknowledgment quality: reference one concrete detail from the user's message (fact, constraint, example, or cause/effect).`,
+        `Avoid stock openers like "molto interessante", "e un punto importante", "grazie per aver condiviso", "very interesting", "that's an important point", "thanks for sharing".`,
         structureInstruction,
         transitionInstruction,
         `Task: Ask exactly ONE concise interview question about the topic. Do NOT close the interview. Do NOT ask for contact data. Avoid literal quote of user's words. Do NOT repeat the topic title verbatim; use natural phrasing. End with a single question mark.`
@@ -773,16 +707,18 @@ async function generateDeepOfferOnly(params: {
     const previewHints = (params.extensionPreview || [])
         .map(h => String(h || '').trim())
         .filter(Boolean)
-        .slice(0, 2);
+        .slice(0, 1);
+    const starterTheme = previewHints[0] || '';
 
     const prompt = [
         `Language: ${params.language}`,
         `Task: Write a short extension message with this structure:`,
-        `1) Say that the planned interview time has ended.`,
-        previewHints.length > 0
-            ? `2) Mention that you can still deepen these themes: ${previewHints.join(' | ')}.`
-            : `2) Mention one or two concrete themes you could still deepen.`,
-        `3) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
+        `1) Start with a short thank-you for the user's availability and answers so far.`,
+        `2) Say naturally that the planned interview time is over (or would be over).`,
+        starterTheme
+            ? `3) Propose to continue and say you can start from THIS single theme: "${starterTheme}" (do not list multiple themes).`
+            : `3) Propose to continue and say one concrete single theme you can start from.`,
+        `4) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
         `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
     ].join('\n');
@@ -823,14 +759,14 @@ async function enforceDeepOfferQuestion(params: {
         console.error('enforceDeepOfferQuestion generation failed:', e);
     }
 
-    const hintText = (extensionPreview || []).slice(0, 2).join('; ');
+    const hintText = (extensionPreview || []).map(v => String(v || '').trim()).filter(Boolean)[0] || '';
     return language === 'it'
         ? (hintText
-            ? `Il tempo previsto per l'intervista sarebbe finito. Se vuoi, possiamo ancora approfondire ${hintText}: hai disponibilità per qualche ulteriore domanda?`
-            : `Il tempo previsto per l'intervista sarebbe finito. Hai disponibilità per qualche ulteriore domanda di approfondimento?`)
+            ? `Grazie per la disponibilita e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo proseguire iniziando da "${hintText}". Hai disponibilita per qualche ulteriore domanda di approfondimento?`
+            : `Grazie per la disponibilita e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo proseguire con un ultimo approfondimento mirato. Hai disponibilita per qualche ulteriore domanda di approfondimento?`)
         : (hintText
-            ? `The planned interview time has ended. If you want, we can still deepen ${hintText}: are you available for a few more follow-up questions?`
-            : `The planned interview time has ended. Are you available for a few more deep-dive questions?`);
+            ? `Thank you for your availability and for the insights shared so far. The planned interview time would now be over: if you want, we can continue starting from "${hintText}". Are you available for a few more deep-dive questions?`
+            : `Thank you for your availability and for the insights shared so far. The planned interview time would now be over: if you want, we can continue with one focused deep-dive. Are you available for a few more deep-dive questions?`);
 }
 
 function isExtensionOfferQuestion(message: string, language: string): boolean {
@@ -938,7 +874,7 @@ function buildRuntimeSemanticContextPrompt(params: {
     language: string;
     phase: Phase;
     targetTopicLabel: string;
-    supervisorInsight?: any;
+    supervisorInsight?: SupervisorInsight;
     lastUserMessage?: string | null;
     previousAssistantMessage?: string | null;
 }): string {
@@ -949,7 +885,7 @@ function buildRuntimeSemanticContextPrompt(params: {
     const userSignal = sanitizeUserSnippet(lastUserMessage, 18);
     const previousQuestion = extractLastAssistantQuestion(params.previousAssistantMessage);
     const responseDepth = getUserResponseDepth(lastUserMessage);
-    const transitionMode = params.supervisorInsight?.transitionMode as 'bridge' | 'clean_pivot' | undefined;
+    const transitionMode: TransitionMode | undefined = params.supervisorInsight?.transitionMode;
     const phase = params.phase;
 
     const depthHintIt: Record<'brief' | 'balanced' | 'rich', string> = {
@@ -989,6 +925,7 @@ Istruzioni di coerenza:
 3. ${depthHintIt[responseDepth]}
 4. ${transitionHintIt}
 5. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
+6. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
 `.trim();
     }
 
@@ -1006,6 +943,7 @@ Coherence instructions:
 3. ${depthHintEn[responseDepth]}
 4. ${transitionHintEn}
 5. Avoid rigid templates ("now let's move to") and premature closure cues.
+6. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
 `.trim();
 }
 
@@ -1455,7 +1393,7 @@ export async function POST(req: Request) {
         const nextState = { ...state };
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
-        let supervisorInsight: any = { status: 'SCANNING' };
+        let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
         const buildDeepOfferInsight = (sourceState: InterviewState) => {
             const extensionPreview = buildExtensionPreviewHints({
                 botTopics,
@@ -1467,9 +1405,7 @@ export async function POST(req: Request) {
                 startIndex: sourceState.topicIndex,
                 maxItems: 2
             });
-            return extensionPreview.length > 0
-                ? { status: 'DEEP_OFFER_ASK', extensionPreview }
-                : { status: 'DEEP_OFFER_ASK' };
+            return createDeepOfferInsight(extensionPreview);
         };
 
         if (lastMessage?.role === 'user') {
@@ -1681,136 +1617,48 @@ export async function POST(req: Request) {
             // --------------------------------------------------------------------
             else if (state.phase === 'DEEP_OFFER') {
                 console.log(`🎁 [DEEP_OFFER] State: deepAccepted=${state.deepAccepted} returnPhase=${state.extensionReturnPhase || 'DEEP'} attempts=${state.extensionOfferAttempts || 0}`);
-                const hasUserReply = lastMessage?.role === 'user' && String(lastMessage.content || '').trim().length > 0;
-                const waitingForAnswer = state.deepAccepted === false || state.deepAccepted === null;
-                const lastAssistantMessage = [...canonicalMessages]
-                    .reverse()
-                    .find((m: any) => m.role === 'assistant')?.content || '';
-                const previousWasOffer = isExtensionOfferQuestion(lastAssistantMessage, language);
-                const moveToDataCollection = () => {
-                    nextState.extensionOfferAttempts = 0;
-                    nextState.extensionReturnPhase = null;
-                    nextState.extensionReturnTopicIndex = null;
-                    nextState.extensionReturnTurnInTopic = null;
-                    if (shouldCollectData) {
-                        nextState.phase = 'DATA_COLLECTION';
-                        supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                        nextState.consentGiven = false;
-                        nextState.forceConsentQuestion = true;
-                    } else {
-                        nextState.phase = 'DATA_COLLECTION';
-                        supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                    }
-                };
-
-                if (!hasUserReply || !waitingForAnswer || !previousWasOffer) {
-                    if (hasUserReply && waitingForAnswer && !previousWasOffer) {
-                        console.log(`⚠️ [DEEP_OFFER] Previous assistant message was not a valid extension offer. Re-asking offer.`);
-                        const fallbackIntent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
-                        if (fallbackIntent === 'REFUSE') {
-                            console.log("❌ [DEEP_OFFER] User declined extension (detected without prior valid offer)");
-                            moveToDataCollection();
-                        } else {
-                            const extensionAttempts = (state.extensionOfferAttempts ?? 0) + 1;
-                            if (extensionAttempts >= 2) {
-                                console.log(`🎁 [DEEP_OFFER] Invalid-offer loop detected. Defaulting to no extension.`);
-                                moveToDataCollection();
-                            } else {
-                                supervisorInsight = buildDeepOfferInsight(state);
-                                nextState.deepAccepted = false;
-                                nextState.extensionOfferAttempts = extensionAttempts;
-                            }
-                        }
-                    } else {
-                        console.log(`🎁 [DEEP_OFFER] Asking extension offer.`);
-                        supervisorInsight = buildDeepOfferInsight(state);
-                        nextState.deepAccepted = false;
-                        nextState.extensionOfferAttempts = state.extensionOfferAttempts ?? 0;
-                    }
-                } else {
-                    console.log(`🎁 [DEEP_OFFER] Checking user response`);
-                    const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
-                    console.log(`🎁 [DEEP_OFFER] Intent detected: ${intent}`);
-
-                    if (intent === 'ACCEPT') {
-                        const returnPhase = state.extensionReturnPhase || 'DEEP';
-                        nextState.deepAccepted = true;
-                        nextState.extensionOfferAttempts = 0;
-                        nextState.extensionReturnPhase = null;
-                        nextState.extensionReturnTopicIndex = null;
-                        nextState.extensionReturnTurnInTopic = null;
-
-                        if (returnPhase === 'SCAN') {
-                            nextState.phase = 'SCAN';
-                            nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
-                            nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
-                            const resumeTopic = botTopics[nextState.topicIndex] || botTopics[0];
-                            nextTopicId = resumeTopic?.id || botTopics[0].id;
-                            const usedSubGoals = (state.topicSubGoalHistory || {})[resumeTopic.id] || [];
-                            const availableSubGoals = (resumeTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
-                            supervisorInsight = { status: 'SCANNING', nextSubGoal: availableSubGoals[0] || resumeTopic.label };
-                            console.log(`✅ [DEEP_OFFER] User accepted extension. Resuming SCAN at topicIndex=${nextState.topicIndex}, turn=${nextState.turnInTopic}`);
-                        } else {
-                            nextState.phase = 'DEEP';
-                            nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
-                            nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
-
-                            const maxDurationSec = maxDurationMins * 60;
-                            const remainingSecForDeep = maxDurationSec - effectiveSec;
-                            const hasDeepPlan = Boolean(state.deepTurnsByTopic && Object.keys(state.deepTurnsByTopic).length > 0);
-                            if (!hasDeepPlan) {
-                                const deepPlan = buildDeepPlan(
-                                    botTopics,
-                                    interviewPlan,
-                                    state.topicSubGoalHistory,
-                                    state.interestingTopics,
-                                    remainingSecForDeep,
-                                    interviewObjective,
-                                    language
-                                );
-                                nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                                nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                            }
-
-                            const deepOrder = (nextState.deepTopicOrder && nextState.deepTopicOrder.length > 0)
-                                ? nextState.deepTopicOrder
-                                : (state.deepTopicOrder || []);
-                            const deepTopics = getDeepTopics(botTopics, deepOrder);
-                            const deepCurrent = deepTopics[nextState.topicIndex] || botTopics[nextState.topicIndex] || botTopics[0];
-                            nextTopicId = deepCurrent?.id || botTopics[0].id;
-                            const usedSubGoals = (state.topicSubGoalHistory || {})[deepCurrent.id] || [];
-                            const availableSubGoals = (deepCurrent.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
-                            const engagingSnippet = (state.interestingTopics || []).find(
-                                (it: InterestingTopic) => it.topicId === deepCurrent.id
-                            )?.bestSnippet || '';
-                            const focusPoint = selectDeepFocusPoint({
-                                topic: deepCurrent,
+                const deepOfferResult = await runDeepOfferPhase({
+                    state: state as InterviewStateLike,
+                    nextState: nextState as InterviewStateLike,
+                    botTopics,
+                    canonicalMessages,
+                    lastUserMessage: lastMessage?.role === 'user' ? (lastMessage.content || '') : '',
+                    shouldCollectData,
+                    maxDurationMins,
+                    effectiveSec,
+                    deps: {
+                        checkUserIntent: async (userMessage: string, context: 'deep_offer') =>
+                            checkUserIntent(userMessage, openAIKey, language, context),
+                        isExtensionOfferQuestion: (message: string) => isExtensionOfferQuestion(message, language),
+                        buildDeepOfferInsight: (sourceState: InterviewStateLike) =>
+                            buildDeepOfferInsight(sourceState as InterviewState),
+                        buildDeepPlan: (remainingSec: number) =>
+                            buildDeepPlan(
+                                botTopics,
+                                interviewPlan,
+                                state.topicSubGoalHistory,
+                                state.interestingTopics,
+                                remainingSec,
+                                interviewObjective,
+                                language
+                            ),
+                        getDeepTopics: (deepOrder?: string[]) => getDeepTopics(botTopics, deepOrder),
+                        getRemainingSubGoals: (topic: any, history?: Record<string, string[]>) => getRemainingSubGoals(topic, history),
+                        selectDeepFocusPoint: ({ topic, availableSubGoals, engagingSnippet, lastUserMessage }) =>
+                            selectDeepFocusPoint({
+                                topic,
                                 availableSubGoals,
                                 engagingSnippet,
                                 interviewObjective,
-                                lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
+                                lastUserMessage,
                                 language
-                            });
-                            supervisorInsight = { status: 'DEEPENING', focusPoint: focusPoint || deepCurrent.label, engagingSnippet };
-                            console.log(`✅ [DEEP_OFFER] User accepted extension. Resuming DEEP at topicIndex=${nextState.topicIndex}, turn=${nextState.turnInTopic}`);
-                        }
-                    } else if (intent === 'REFUSE') {
-                        console.log("❌ [DEEP_OFFER] User declined extension");
-                        moveToDataCollection();
-                    } else {
-                        const extensionAttempts = (state.extensionOfferAttempts ?? (state as any).deepOfferNeutralAttempts ?? 0);
-
-                        if (extensionAttempts >= 2) {
-                            // No explicit consent after multiple attempts: default to no extension.
-                            console.log(`🎁 [DEEP_OFFER] Neutral responses reached limit. Defaulting to no extension.`);
-                            moveToDataCollection();
-                        } else {
-                            console.log(`🎁 [DEEP_OFFER] Neutral response (attempt ${extensionAttempts + 1}), re-asking extension offer`);
-                            supervisorInsight = buildDeepOfferInsight(state);
-                            nextState.deepAccepted = false;
-                            nextState.extensionOfferAttempts = extensionAttempts + 1;
-                        }
+                            })
                     }
+                });
+                Object.assign(nextState, deepOfferResult.nextState);
+                supervisorInsight = deepOfferResult.supervisorInsight;
+                if (deepOfferResult.nextTopicId) {
+                    nextTopicId = deepOfferResult.nextTopicId;
                 }
             }
 
@@ -2455,8 +2303,8 @@ hard_rules:
             completionBlockedForConsent: false,
             completionBlockedForMissingField: false
         };
-        const deepOfferPreviewHints: string[] = Array.isArray((supervisorInsight as any)?.extensionPreview)
-            ? ((supervisorInsight as any).extensionPreview as string[]).map(v => String(v || '').trim()).filter(Boolean).slice(0, 2)
+        const deepOfferPreviewHints: string[] = Array.isArray(supervisorInsight.extensionPreview)
+            ? supervisorInsight.extensionPreview.map(v => String(v || '').trim()).filter(Boolean).slice(0, 1)
             : [];
         const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
         const userBridgeHint = lastMessage?.role === 'user'
@@ -2835,25 +2683,12 @@ hard_rules:
                 const enforceTopic = targetTopic?.label || currentTopic.label;
                 const previousAssistant = String(lastAssistantBeforeCurrent || '').slice(0, 180);
                 const userContext = String(lastMessage.content || '').slice(0, 180);
-                const correctionPrompt = language === 'it'
-                    ? `Rigenera in modo naturale.
-Vincoli:
-1) Mantieni una breve frase di legame con l'ultimo messaggio utente.
-2) Fai ESATTAMENTE una sola domanda.
-3) Evita ripetizioni rispetto alla domanda precedente.
-4) Rimani sul topic "${enforceTopic}".
-5) Non chiudere e non chiedere contatti.
-Ultimo messaggio utente: "${userContext}"
-Domanda precedente assistente (da non ripetere): "${previousAssistant}"`
-                    : `Regenerate naturally.
-Constraints:
-1) Keep a short bridging sentence with the user's latest message.
-2) Ask EXACTLY one question.
-3) Avoid repeating the previous assistant question.
-4) Stay on topic "${enforceTopic}".
-5) Do not close and do not ask for contacts.
-Latest user message: "${userContext}"
-Previous assistant question (do not repeat): "${previousAssistant}"`;
+                const correctionPrompt = buildQualityCorrectionPrompt({
+                    language,
+                    enforceTopic,
+                    userContext,
+                    previousAssistant
+                });
 
                 try {
                     const retry = await generateObject({
@@ -2919,15 +2754,12 @@ Previous assistant question (do not repeat): "${previousAssistant}"`;
                 console.log(`🛡️ [SAFETY_NET] Issue detected in ${nextState.phase}: goodbye=${hasGoodbyeNow}, noQuestion=${hasNoQuestionNow}, multiQuestion=${hasMultipleQuestionsNow}, completion=${hasCompletionNow}, contact=${hasPrematureContactNow}`);
 
                 // ADDITIVE APPROACH: Ask LLM to add a follow-up question to the existing response
-                const additivePrompt = language === 'it'
-                    ? `La tua risposta è buona ma ${hasMultipleQuestionsNow ? 'contiene più di una domanda' : 'manca la domanda'}.
-Mantieni il riconoscimento della risposta dell'utente e usa una sola domanda naturale di follow-up su "${enforceTopic}".
-${userContext ? `Contesto utente: "${userContext}"` : ''}
-Rispondi con il messaggio completo (riconoscimento + domanda).`
-                    : `Your response is good but ${hasMultipleQuestionsNow ? 'contains more than one question' : 'is missing the question'}.
-Keep your acknowledgment of the user's response and use one natural follow-up question about "${enforceTopic}".
-${userContext ? `User context: "${userContext}"` : ''}
-Reply with the complete message (acknowledgment + question).`;
+                const additivePrompt = buildAdditiveQuestionPrompt({
+                    language,
+                    hasMultipleQuestionsNow,
+                    enforceTopic,
+                    userContext
+                });
 
                 try {
                     // Clean the response first

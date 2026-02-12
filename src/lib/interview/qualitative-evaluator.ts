@@ -40,6 +40,8 @@ const BRIDGE_IT = /\b(hai menzionato|da quello che hai detto|quindi|mi sembra ch
 const BRIDGE_EN = /\b(you mentioned|from what you said|so you|if i understood|it sounds like)\b/i;
 const PIVOT_IT = /\b(riguardo|in merito|passando|spostandoci|invece|sul tema)\b/i;
 const PIVOT_EN = /\b(regarding|about|switching to|moving to|as for|when it comes to)\b/i;
+const GENERIC_ACK_IT = /^\s*(molto interessante|interessante|e un punto importante|è un punto importante|grazie per aver condiviso|capisco|chiaro|ottimo|bene|perfetto)([\s,!.:;-]|$)/i;
+const GENERIC_ACK_EN = /^\s*(very interesting|interesting|that s an important point|that's an important point|thanks for sharing|i understand|got it|great point|perfect)([\s,!.:;-]|$)/i;
 
 const PROBE_IT = /\b(puoi|potresti|mi racconti|in che modo|cosa intendi|farmi un esempio)\b/i;
 const PROBE_EN = /\b(could you|can you|tell me more|what do you mean|share an example|in what way)\b/i;
@@ -88,6 +90,7 @@ export function evaluateInterviewQuestionQuality(input: QualitativeEvalInput): Q
     const bridgePattern = isItalian ? BRIDGE_IT : BRIDGE_EN;
     const pivotPattern = isItalian ? PIVOT_IT : PIVOT_EN;
     const probePattern = isItalian ? PROBE_IT : PROBE_EN;
+    const genericAckPattern = isItalian ? GENERIC_ACK_IT : GENERIC_ACK_EN;
     const deepOfferPattern = isItalian ? DEEP_OFFER_IT : DEEP_OFFER_EN;
     const confusionPattern = isItalian ? CONFUSION_IT : CONFUSION_EN;
     const echoBridgePattern = isItalian ? ECHO_BRIDGE_IT : ECHO_BRIDGE_EN;
@@ -110,11 +113,14 @@ export function evaluateInterviewQuestionQuality(input: QualitativeEvalInput): Q
     const userOverlapRatio = userRoots.length > 0 ? userOverlapCount / userRoots.length : 0;
     const hasUserAnchorMention = userRoots.length > 0 && responseMentionsAnchors(input.assistantResponse, userRoots);
     const hasBridgeCue = bridgePattern.test(input.assistantResponse);
-    const referencesUserContext =
-        !isTopicPhase ||
-        userRoots.length === 0 ||
-        hasUserAnchorMention ||
-        (userWordCount <= 3 && hasBridgeCue);
+    const hasGenericAcknowledgmentLead = genericAckPattern.test(input.assistantResponse);
+    const userAssistantSimilarity = jaccardSimilarity(input.userResponse || '', input.assistantResponse || '');
+    const hasSemanticCarryOver = hasUserAnchorMention || userOverlapRatio >= 0.2 || userAssistantSimilarity >= 0.08;
+    const referencesUserContext = !isTopicPhase
+        ? true
+        : userWordCount <= 3
+            ? (hasBridgeCue && !hasGenericAcknowledgmentLead)
+            : (hasSemanticCarryOver && !hasGenericAcknowledgmentLead);
 
     const previous = input.previousAssistantResponse || '';
     const nonRepetitive = !isTopicPhase || (previous ? jaccardSimilarity(previous, input.assistantResponse) < 0.68 : true);
@@ -147,6 +153,7 @@ export function evaluateInterviewQuestionQuality(input: QualitativeEvalInput): Q
     if (!checks.avoidsClosure) issues.push('Ha usato una formula di chiusura in una fase non di chiusura.');
     if (!checks.avoidsPrematureContact) issues.push('Ha chiesto contatti in una fase dove non dovrebbe.');
     if (!checks.referencesUserContext) issues.push('Non si aggancia chiaramente alla risposta dell’utente.');
+    if (hasGenericAcknowledgmentLead && isTopicPhase) issues.push('Apertura troppo generica/ripetitiva: entra nel merito del contenuto utente.');
     if (!checks.topicalAnchor) issues.push('La domanda sembra fuori topic rispetto al tema corrente.');
     if (!checks.nonRepetitive) issues.push('La domanda è troppo simile a quella precedente.');
     if (!checks.probingWhenUserIsBrief) issues.push('Con risposta breve dell’utente, manca probing qualitativo.');

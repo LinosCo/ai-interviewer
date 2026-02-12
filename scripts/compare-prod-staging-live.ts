@@ -240,7 +240,7 @@ function round(n: number, d = 3): number {
   return Math.round(n * p) / p;
 }
 
-function createPrisma(databaseUrl: string): { prisma: PrismaClient; pool: Pool } {
+function createPrisma(databaseUrl: string): { prisma: PrismaClient; pool: any } {
   const pool = new Pool({ connectionString: databaseUrl });
   const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
   return { prisma, pool };

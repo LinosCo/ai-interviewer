@@ -599,9 +599,6 @@ export function hasFeatureAccess(
  */
 export function formatMonthlyCredits(credits: number): string {
     if (credits === -1) return 'Illimitati';
-    if (credits >= 1_000_000) {
-        return `${(credits / 1_000_000).toFixed(0)}M`;
-    }
     if (credits >= 1_000) {
         return `${(credits / 1_000).toFixed(0)}K`;
     }

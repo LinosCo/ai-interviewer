@@ -22,7 +22,7 @@ export interface LandingPlan {
 export interface LandingCreditPack {
     id: string;
     name: string;
-    credits: string;         // Formatted string "2M"
+    credits: string;         // Formatted string "2K"
     price: number;
     pricePerThousand: number;
     popular?: boolean;

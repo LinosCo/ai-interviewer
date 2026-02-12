@@ -305,8 +305,8 @@ export default function DashboardClient({
                     </div>
                     <div>
                         <div className="flex items-end justify-between mb-2">
-                            <p className="text-2xl font-bold text-gray-900">{(usage?.tokens.used || 0) > 1000 ? `${Math.round(usage!.tokens.used / 1000)}k` : usage?.tokens.used || 0}</p>
-                            <p className="text-xs text-gray-500">di {(usage?.tokens.limit || 0) >= 1000000 ? `${(usage!.tokens.limit / 1000000).toFixed(1)}M` : `${Math.round((usage?.tokens.limit || 0) / 1000)}k`}</p>
+                            <p className="text-2xl font-bold text-gray-900">{(usage?.tokens.used || 0) >= 1000 ? `${Math.round(usage!.tokens.used / 1000)}K` : usage?.tokens.used || 0}</p>
+                            <p className="text-xs text-gray-500">di {(usage?.tokens.limit || 0) >= 1000 ? `${Math.round((usage?.tokens.limit || 0) / 1000)}K` : usage?.tokens.limit || 0}</p>
                         </div>
                         <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
                             <div

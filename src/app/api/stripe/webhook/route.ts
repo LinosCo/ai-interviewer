@@ -8,10 +8,27 @@ import { getStripeClient } from '@/lib/stripe';
 import { CreditService } from '@/services/creditService';
 import { PLANS } from '@/config/plans';
 
+async function resolveStripeWebhookSecret(): Promise<string | null> {
+    if (process.env.STRIPE_WEBHOOK_SECRET) {
+        return process.env.STRIPE_WEBHOOK_SECRET;
+    }
+
+    try {
+        const globalConfig = await prisma.globalConfig.findUnique({
+            where: { id: 'default' },
+            select: { stripeWebhookSecret: true }
+        });
+        return globalConfig?.stripeWebhookSecret || null;
+    } catch (error) {
+        console.warn('[stripe/webhook] Failed to load webhook secret from GlobalConfig:', error);
+        return null;
+    }
+}
+
 export async function POST(req: NextRequest) {
     const body = await req.text();
     const signature = (await headers()).get('stripe-signature');
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret = await resolveStripeWebhookSecret();
 
     if (!signature || !webhookSecret) {
         return NextResponse.json({ error: 'Missing Stripe webhook configuration' }, { status: 400 });

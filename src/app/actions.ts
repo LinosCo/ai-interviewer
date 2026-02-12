@@ -891,7 +891,9 @@ export async function updateSettingsAction(organizationId: string, formData: For
             }
 
             await prisma.$executeRawUnsafe(
-                `INSERT INTO "GlobalConfig" ("id") VALUES ('default') ON CONFLICT ("id") DO NOTHING`
+                available.has('updatedAt')
+                    ? `INSERT INTO "GlobalConfig" ("id", "updatedAt") VALUES ('default', NOW()) ON CONFLICT ("id") DO NOTHING`
+                    : `INSERT INTO "GlobalConfig" ("id") VALUES ('default') ON CONFLICT ("id") DO NOTHING`
             );
 
             const setClause = assignments

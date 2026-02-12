@@ -159,10 +159,7 @@ export async function GET() {
                 price: pack.price,
                 priceFormatted: `€${pack.price}`,
                 pricePerThousand: pack.pricePerThousand,
-                pricePerThousandFormatted: `€${pack.pricePerThousand.toFixed(2)}`,
-                // Backward compatibility for existing clients expecting old fields.
-                pricePerMillion: pack.pricePerThousand * 1000,
-                pricePerMillionFormatted: `€${(pack.pricePerThousand * 1000).toFixed(2)}`
+                pricePerThousandFormatted: `€${pack.pricePerThousand.toFixed(2)}`
             }))
         });
     } catch (error) {

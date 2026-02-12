@@ -30,7 +30,6 @@ function UsageBar({ used, limit, extra = 0, label, color }: {
     const isNearLimit = percentage >= 80;
 
     const formatNumber = (n: number) => {
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
         if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
         return n.toString();
     };
@@ -103,7 +102,6 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
     };
 
     const formatNumber = (n: number) => {
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
         if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
         return n.toString();
     };

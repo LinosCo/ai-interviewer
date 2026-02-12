@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { Suspense, useActionState, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticate } from './actions';
 import Link from 'next/link';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/business-tuner/Button';
 import { Input } from '@/components/ui/business-tuner/Input';
 import { Card } from '@/components/ui/business-tuner/Card';
 
-export default function LoginPage() {
+function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
@@ -139,5 +139,13 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: gradients.mesh }}>Caricamento...</div>}>
+            <LoginForm />
+        </Suspense>
     );
 }

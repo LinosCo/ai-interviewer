@@ -154,6 +154,53 @@ function computeEngagementScore(text: string, language: string): number {
     return Math.max(0, Math.min(1, score));
 }
 
+const ITALIAN_STOPWORDS = new Set([
+    'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una',
+    'di', 'a', 'da', 'in', 'con', 'su', 'per', 'tra', 'fra',
+    'e', 'o', 'ma', 'se', 'che', 'non', 'piu', 'più',
+    'del', 'dello', 'della', 'dei', 'degli', 'delle',
+    'al', 'allo', 'alla', 'ai', 'agli', 'alle',
+    'nel', 'nello', 'nella', 'nei', 'negli', 'nelle'
+]);
+const ENGLISH_STOPWORDS = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then',
+    'of', 'to', 'in', 'on', 'at', 'for', 'with', 'from', 'by', 'as',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'this', 'that', 'these', 'those', 'it', 'its', 'their', 'them'
+]);
+
+function tokenizeForScoring(text: string, language: string): Set<string> {
+    const source = String(text || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    const stopwords = language === 'it' ? ITALIAN_STOPWORDS : ENGLISH_STOPWORDS;
+    const tokens = source.filter(t => t.length >= 3 && !stopwords.has(t));
+    return new Set(tokens);
+}
+
+function lexicalOverlapScore(aText: string, bText: string, language: string): number {
+    const a = tokenizeForScoring(aText, language);
+    const b = tokenizeForScoring(bText, language);
+    if (!a.size || !b.size) return 0;
+
+    let intersection = 0;
+    for (const token of a) {
+        if (b.has(token)) intersection++;
+    }
+    return intersection / Math.max(1, Math.min(a.size, b.size));
+}
+
+function buildTopicSemanticText(topic: any): string {
+    const subGoals = Array.isArray(topic?.subGoals) ? topic.subGoals.join(' ') : '';
+    return `${topic?.label || ''} ${subGoals}`.trim();
+}
+
 function getDeepTopics(botTopics: any[], deepOrder?: string[]) {
     if (!deepOrder || deepOrder.length === 0) return botTopics;
     return deepOrder
@@ -164,14 +211,36 @@ function getDeepTopics(botTopics: any[], deepOrder?: string[]) {
 function buildDeepTopicOrder(
     botTopics: any[],
     interestingTopics: InterestingTopic[] | undefined,
-    history?: Record<string, string[]>
+    history?: Record<string, string[]>,
+    interviewObjective?: string,
+    language: string = 'en'
 ): string[] {
     const scored = botTopics.map((t, idx) => {
         const match = (interestingTopics || []).find(it => it.topicId === t.id);
         const remainingSubGoals = getRemainingSubGoals(t, history).length;
+        const totalSubGoals = Math.max(1, Array.isArray(t?.subGoals) ? t.subGoals.length : 1);
+        const uncoveredRatio = Math.max(0, Math.min(1, remainingSubGoals / totalSubGoals));
+        const topicText = buildTopicSemanticText(t);
+        const snippetText = match?.bestSnippet || '';
+        const interestScore = match?.engagementScore ?? 0;
+        const snippetAlignment = snippetText
+            ? lexicalOverlapScore(topicText, snippetText, language)
+            : 0;
+        const objectiveAlignment = interviewObjective
+            ? lexicalOverlapScore(topicText, interviewObjective, language)
+            : 0;
+        // Naturalness-first weighting:
+        // 1) what remains uncovered, 2) what sounded interesting, 3) what aligns with interview objective.
+        const priorityScore = (
+            uncoveredRatio * 0.4 +
+            interestScore * 0.25 +
+            snippetAlignment * 0.15 +
+            objectiveAlignment * 0.2
+        );
+
         return {
             id: t.id,
-            score: match?.engagementScore ?? 0,
+            score: priorityScore,
             remainingSubGoals,
             idx
         };
@@ -205,43 +274,115 @@ function buildDeepPlan(
     plan: InterviewPlan,
     history: Record<string, string[]> | undefined,
     interestingTopics: InterestingTopic[] | undefined,
-    remainingSec?: number
+    remainingSec?: number,
+    interviewObjective?: string,
+    language: string = 'en'
 ) {
     const topicsWithRemaining = botTopics.filter(t => getRemainingSubGoals(t, history).length > 0);
     if (topicsWithRemaining.length > 0) {
-        const ordered = buildDeepTopicOrder(botTopics, interestingTopics, history).filter(id =>
+        const ordered = buildDeepTopicOrder(
+            botTopics,
+            interestingTopics,
+            history,
+            interviewObjective,
+            language
+        ).filter(id =>
             topicsWithRemaining.some(t => t.id === id)
         );
         const deepTurnsByTopic: Record<string, number> = {};
 
-        // Adaptive: distribute available time proportionally to remaining sub-goals
-        const availableTurns = remainingSec
-            ? Math.max(ordered.length, Math.floor(remainingSec / 45))
+        // Naturalness-first allocation:
+        // - guarantee at least 1 turn per remaining topic
+        // - then add extra turns in priority order, capped by uncovered sub-goals and plan max.
+        const availableTurnsRaw = typeof remainingSec === 'number'
+            ? Math.floor(Math.max(0, remainingSec) / 45)
             : ordered.length * (plan.deep.maxTurnsPerTopic || 2);
-        const totalRemaining = ordered.reduce((sum, id) => {
-            const topic = botTopics.find(t => t.id === id);
-            return sum + (topic ? getRemainingSubGoals(topic, history).length : 0);
-        }, 0);
+        const availableTurns = Math.max(ordered.length, availableTurnsRaw);
 
+        for (const topicId of ordered) {
+            deepTurnsByTopic[topicId] = 1;
+        }
+
+        const maxTurnsByTopic: Record<string, number> = {};
         for (const topicId of ordered) {
             const topic = botTopics.find(t => t.id === topicId);
             if (!topic) continue;
-            const remaining = getRemainingSubGoals(topic, history).length;
-            // Proportional allocation: each topic gets turns based on its share of remaining sub-goals
-            const proportion = totalRemaining > 0 ? remaining / totalRemaining : 1 / ordered.length;
-            const maxTurns = Math.max(1, Math.min(remaining, Math.round(availableTurns * proportion)));
-            deepTurnsByTopic[topicId] = Math.max(1, maxTurns);
+            const remainingSubGoals = getRemainingSubGoals(topic, history).length;
+            const planMax = getDeepPlanTurns(plan, topicId);
+            maxTurnsByTopic[topicId] = Math.max(1, Math.min(planMax, remainingSubGoals));
+        }
+
+        let remainingBudget = Math.max(0, availableTurns - ordered.length);
+        while (remainingBudget > 0) {
+            let allocatedInRound = false;
+            for (const topicId of ordered) {
+                if (remainingBudget <= 0) break;
+                const current = deepTurnsByTopic[topicId] || 1;
+                const maxForTopic = maxTurnsByTopic[topicId] || 1;
+                if (current < maxForTopic) {
+                    deepTurnsByTopic[topicId] = current + 1;
+                    remainingBudget -= 1;
+                    allocatedInRound = true;
+                }
+            }
+            if (!allocatedInRound) break;
         }
         return { deepTopicOrder: ordered, deepTurnsByTopic };
     }
 
     const fallbackCount = Math.max(1, plan.deep.fallbackTurns || 2);
-    const ordered = buildDeepTopicOrder(botTopics, interestingTopics, history).slice(0, fallbackCount);
+    const ordered = buildDeepTopicOrder(
+        botTopics,
+        interestingTopics,
+        history,
+        interviewObjective,
+        language
+    ).slice(0, fallbackCount);
     const deepTurnsByTopic: Record<string, number> = {};
     ordered.forEach(id => {
         deepTurnsByTopic[id] = 1;
     });
     return { deepTopicOrder: ordered, deepTurnsByTopic };
+}
+
+function selectDeepFocusPoint(params: {
+    topic: any;
+    availableSubGoals: string[];
+    engagingSnippet?: string;
+    interviewObjective?: string;
+    lastUserMessage?: string;
+    language: string;
+}): string {
+    const { topic, availableSubGoals, engagingSnippet, interviewObjective, lastUserMessage, language } = params;
+    if (!availableSubGoals || availableSubGoals.length === 0) {
+        return topic?.label || '';
+    }
+
+    const contextText = [engagingSnippet || '', lastUserMessage || '']
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+    const objectiveText = String(interviewObjective || '').trim();
+
+    let bestSubGoal = availableSubGoals[0];
+    let bestScore = -1;
+
+    for (const subGoal of availableSubGoals) {
+        const objectiveScore = objectiveText
+            ? lexicalOverlapScore(subGoal, objectiveText, language)
+            : 0;
+        const contextScore = contextText
+            ? lexicalOverlapScore(subGoal, contextText, language)
+            : 0;
+        const score = objectiveScore * 0.6 + contextScore * 0.4;
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestSubGoal = subGoal;
+        }
+    }
+
+    return bestSubGoal;
 }
 
 function normalizeCandidateFieldIds(rawFields: any[]): string[] {
@@ -380,6 +521,50 @@ async function checkUserIntent(
     language: string,
     context: 'consent' | 'deep_offer' | 'stop_confirmation'
 ): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> {
+    const normalized = String(userMessage || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[!?.,;:()\[\]"]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    // Fast-path deterministic intent for extension consent to avoid accidental accepts
+    // on unrelated content replies.
+    if (context === 'deep_offer') {
+        const refuseSet = new Set([
+            'no',
+            'no grazie',
+            'direi di no',
+            'anche no',
+            'non ora',
+            'meglio di no',
+            'preferisco di no',
+            'stop',
+            'basta'
+        ]);
+        const acceptSet = new Set([
+            'si',
+            'sì',
+            'yes',
+            'ok',
+            'va bene',
+            'certo',
+            'volontieri',
+            'continuiamo',
+            'proseguiamo',
+            'andiamo avanti'
+        ]);
+
+        if (refuseSet.has(normalized)) return 'REFUSE';
+        if (acceptSet.has(normalized)) return 'ACCEPT';
+
+        const refusePattern = /\b(non voglio continuare|non continuare|abbiamo gia parlato troppo|chiudiamo qui|fermiamoci|preferisco chiudere)\b/i;
+        if (refusePattern.test(normalized)) return 'REFUSE';
+
+        const acceptPattern = /\b(voglio continuare|possiamo continuare|continuiamo|proseguiamo|andiamo avanti|estendiamo)\b/i;
+        if (acceptPattern.test(normalized)) return 'ACCEPT';
+    }
+
     const openai = createOpenAI({ apiKey });
 
     const contextPrompts = {
@@ -484,6 +669,36 @@ async function generateDeepOfferOnly(params: {
     });
 
     return normalizeSingleQuestion(String(result.object.question || '').trim());
+}
+
+async function enforceDeepOfferQuestion(params: {
+    model: any;
+    language: string;
+    currentText?: string | null;
+}) {
+    const { model, language, currentText } = params;
+    const cleanedCurrent = normalizeSingleQuestion(
+        String(currentText || '')
+            .replace(/INTERVIEW_COMPLETED/gi, '')
+            .trim()
+    );
+
+    if (isExtensionOfferQuestion(cleanedCurrent, language)) {
+        return cleanedCurrent;
+    }
+
+    try {
+        const generated = await generateDeepOfferOnly({ model, language });
+        if (isExtensionOfferQuestion(generated, language)) {
+            return generated;
+        }
+    } catch (e) {
+        console.error('enforceDeepOfferQuestion generation failed:', e);
+    }
+
+    return language === 'it'
+        ? `Ti va di estendere l'intervista di qualche minuto per continuare?`
+        : `Would you like to extend the interview by a few minutes to continue?`;
 }
 
 function isExtensionOfferQuestion(message: string, language: string): boolean {
@@ -771,6 +986,7 @@ export async function POST(req: Request) {
         console.log(`⏱️ [TIMING] Data load: ${Date.now() - loadStart}ms`);
         const bot = conversation.bot;
         const language = bot.language || 'en';
+        const interviewObjective = String((bot as any).researchGoal || '').trim();
         const shouldCollectData = (bot as any).collectCandidateData;
         const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
 
@@ -1083,7 +1299,15 @@ export async function POST(req: Request) {
                             nextState.deepAccepted = state.deepAccepted === true ? true : null;
                             nextState.topicIndex = 0;
                             nextState.turnInTopic = 0;
-                            const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSec);
+                            const deepPlan = buildDeepPlan(
+                                botTopics,
+                                interviewPlan,
+                                state.topicSubGoalHistory,
+                                state.interestingTopics,
+                                remainingSec,
+                                interviewObjective,
+                                language
+                            );
                             nextState.deepTopicOrder = deepPlan.deepTopicOrder;
                             nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                             const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
@@ -1169,16 +1393,46 @@ export async function POST(req: Request) {
                     .reverse()
                     .find((m: any) => m.role === 'assistant')?.content || '';
                 const previousWasOffer = isExtensionOfferQuestion(lastAssistantMessage, language);
+                const moveToDataCollection = () => {
+                    nextState.extensionOfferAttempts = 0;
+                    nextState.extensionReturnPhase = null;
+                    nextState.extensionReturnTopicIndex = null;
+                    nextState.extensionReturnTurnInTopic = null;
+                    if (shouldCollectData) {
+                        nextState.phase = 'DATA_COLLECTION';
+                        supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+                        nextState.consentGiven = false;
+                        nextState.forceConsentQuestion = true;
+                    } else {
+                        nextState.phase = 'DATA_COLLECTION';
+                        supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
+                    }
+                };
 
                 if (!hasUserReply || !waitingForAnswer || !previousWasOffer) {
                     if (hasUserReply && waitingForAnswer && !previousWasOffer) {
                         console.log(`⚠️ [DEEP_OFFER] Previous assistant message was not a valid extension offer. Re-asking offer.`);
+                        const fallbackIntent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
+                        if (fallbackIntent === 'REFUSE') {
+                            console.log("❌ [DEEP_OFFER] User declined extension (detected without prior valid offer)");
+                            moveToDataCollection();
+                        } else {
+                            const extensionAttempts = (state.extensionOfferAttempts ?? 0) + 1;
+                            if (extensionAttempts >= 2) {
+                                console.log(`🎁 [DEEP_OFFER] Invalid-offer loop detected. Defaulting to no extension.`);
+                                moveToDataCollection();
+                            } else {
+                                supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                                nextState.deepAccepted = false;
+                                nextState.extensionOfferAttempts = extensionAttempts;
+                            }
+                        }
                     } else {
                         console.log(`🎁 [DEEP_OFFER] Asking extension offer.`);
+                        supervisorInsight = { status: 'DEEP_OFFER_ASK' };
+                        nextState.deepAccepted = false;
+                        nextState.extensionOfferAttempts = state.extensionOfferAttempts ?? 0;
                     }
-                    supervisorInsight = { status: 'DEEP_OFFER_ASK' };
-                    nextState.deepAccepted = false;
-                    nextState.extensionOfferAttempts = state.extensionOfferAttempts ?? 0;
                 } else {
                     console.log(`🎁 [DEEP_OFFER] Checking user response`);
                     const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'deep_offer');
@@ -1211,7 +1465,15 @@ export async function POST(req: Request) {
                             const remainingSecForDeep = maxDurationSec - effectiveSec;
                             const hasDeepPlan = Boolean(state.deepTurnsByTopic && Object.keys(state.deepTurnsByTopic).length > 0);
                             if (!hasDeepPlan) {
-                                const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForDeep);
+                                const deepPlan = buildDeepPlan(
+                                    botTopics,
+                                    interviewPlan,
+                                    state.topicSubGoalHistory,
+                                    state.interestingTopics,
+                                    remainingSecForDeep,
+                                    interviewObjective,
+                                    language
+                                );
                                 nextState.deepTopicOrder = deepPlan.deepTopicOrder;
                                 nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                             }
@@ -1227,43 +1489,27 @@ export async function POST(req: Request) {
                             const engagingSnippet = (state.interestingTopics || []).find(
                                 (it: InterestingTopic) => it.topicId === deepCurrent.id
                             )?.bestSnippet || '';
-                            supervisorInsight = { status: 'DEEPENING', focusPoint: availableSubGoals[0] || deepCurrent.label, engagingSnippet };
+                            const focusPoint = selectDeepFocusPoint({
+                                topic: deepCurrent,
+                                availableSubGoals,
+                                engagingSnippet,
+                                interviewObjective,
+                                lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
+                                language
+                            });
+                            supervisorInsight = { status: 'DEEPENING', focusPoint: focusPoint || deepCurrent.label, engagingSnippet };
                             console.log(`✅ [DEEP_OFFER] User accepted extension. Resuming DEEP at topicIndex=${nextState.topicIndex}, turn=${nextState.turnInTopic}`);
                         }
                     } else if (intent === 'REFUSE') {
                         console.log("❌ [DEEP_OFFER] User declined extension");
-                        nextState.extensionOfferAttempts = 0;
-                        nextState.extensionReturnPhase = null;
-                        nextState.extensionReturnTopicIndex = null;
-                        nextState.extensionReturnTurnInTopic = null;
-                        if (shouldCollectData) {
-                            nextState.phase = 'DATA_COLLECTION';
-                            supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                            nextState.consentGiven = false;
-                            nextState.forceConsentQuestion = true;
-                        } else {
-                            nextState.phase = 'DATA_COLLECTION';
-                            supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                        }
+                        moveToDataCollection();
                     } else {
                         const extensionAttempts = (state.extensionOfferAttempts ?? (state as any).deepOfferNeutralAttempts ?? 0);
 
                         if (extensionAttempts >= 2) {
                             // No explicit consent after multiple attempts: default to no extension.
                             console.log(`🎁 [DEEP_OFFER] Neutral responses reached limit. Defaulting to no extension.`);
-                            nextState.extensionOfferAttempts = 0;
-                            nextState.extensionReturnPhase = null;
-                            nextState.extensionReturnTopicIndex = null;
-                            nextState.extensionReturnTurnInTopic = null;
-                            if (shouldCollectData) {
-                                nextState.phase = 'DATA_COLLECTION';
-                                supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                                nextState.consentGiven = false;
-                                nextState.forceConsentQuestion = true;
-                            } else {
-                                nextState.phase = 'DATA_COLLECTION';
-                                supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                            }
+                            moveToDataCollection();
                         } else {
                             console.log(`🎁 [DEEP_OFFER] Neutral response (attempt ${extensionAttempts + 1}), re-asking extension offer`);
                             supervisorInsight = { status: 'DEEP_OFFER_ASK' };
@@ -1281,7 +1527,15 @@ export async function POST(req: Request) {
                 if (!state.deepTurnsByTopic || Object.keys(state.deepTurnsByTopic).length === 0) {
                     const maxDurationSecForPlan = maxDurationMins * 60;
                     const remainingSecForPlan = maxDurationSecForPlan - effectiveSec;
-                    const deepPlan = buildDeepPlan(botTopics, interviewPlan, state.topicSubGoalHistory, state.interestingTopics, remainingSecForPlan);
+                    const deepPlan = buildDeepPlan(
+                        botTopics,
+                        interviewPlan,
+                        state.topicSubGoalHistory,
+                        state.interestingTopics,
+                        remainingSecForPlan,
+                        interviewObjective,
+                        language
+                    );
                     nextState.deepTopicOrder = deepPlan.deepTopicOrder;
                     nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                 }
@@ -1324,6 +1578,17 @@ export async function POST(req: Request) {
                         console.log(`➡️ [DEEP] Topic transition: ${deepCurrent.label} → ${deepTopics[nextState.topicIndex]?.label || botTopics[nextState.topicIndex]?.label}`);
                         const nextDeepTopic = deepTopics[nextState.topicIndex] || botTopics[nextState.topicIndex];
                         const nextAvailableSubGoals = nextDeepTopic ? getRemainingSubGoals(nextDeepTopic, nextState.topicSubGoalHistory || state.topicSubGoalHistory) : [];
+                        const nextEngagingSnippet = (nextState.interestingTopics || state.interestingTopics || []).find(
+                            (it: InterestingTopic) => it.topicId === nextDeepTopic?.id
+                        )?.bestSnippet || '';
+                        const nextFocusPoint = nextDeepTopic ? selectDeepFocusPoint({
+                            topic: nextDeepTopic,
+                            availableSubGoals: nextAvailableSubGoals,
+                            engagingSnippet: nextEngagingSnippet,
+                            interviewObjective,
+                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
+                            language
+                        }) : '';
                         const transitionUserMessage = lastMessage?.role === 'user'
                             ? String(lastMessage.content || '').slice(0, 300)
                             : undefined;
@@ -1347,7 +1612,7 @@ export async function POST(req: Request) {
                         supervisorInsight = {
                             status: 'TRANSITION',
                             nextTopic: nextDeepTopic?.label || botTopics[nextState.topicIndex]?.label,
-                            nextSubGoal: nextAvailableSubGoals[0] || nextDeepTopic?.label,
+                            nextSubGoal: nextFocusPoint || nextDeepTopic?.label,
                             transitionUserMessage,
                             transitionMode,
                             transitionBridgeSnippet
@@ -1392,7 +1657,14 @@ export async function POST(req: Request) {
                         const focusPoint = fallbackSnippet ? `${deepenVerb}: "${fallbackSnippet}"` : `${deepenVerb}: "${deepCurrent.label}"`;
                         supervisorInsight = { status: 'DEEPENING', focusPoint, engagingSnippet };
                     } else {
-                        const focusPoint = availableSubGoals[0];
+                        const focusPoint = selectDeepFocusPoint({
+                            topic: deepCurrent,
+                            availableSubGoals,
+                            engagingSnippet,
+                            interviewObjective,
+                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
+                            language
+                        });
                         nextState.topicSubGoalHistory = {
                             ...(state.topicSubGoalHistory || {}),
                             [deepCurrent.id]: [...usedSubGoals, focusPoint]
@@ -1864,24 +2136,22 @@ hard_rules:
         };
 
         if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
-            const openai = createOpenAI({ apiKey: openAIKey });
-            const offerSchema = z.object({ isOffer: z.boolean() });
-            try {
-                const offerCheck = await generateObject({
-                    model: openai('gpt-4o-mini'),
-                    schema: offerSchema,
-                    prompt: `Determine if the assistant is explicitly asking (lightly) whether the user wants to extend the interview by a few minutes and continue, and is waiting for a yes/no.\nAssistant message: "${responseText}"\nReturn { isOffer: true/false }.`,
-                    temperature: 0
-                });
-                if (!offerCheck.object.isOffer) {
-                    console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
+            if (!isExtensionOfferQuestion(responseText, language)) {
+                console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
+                try {
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY ask (lightly) if the user wants to extend the interview by a few minutes to continue, and wait for yes/no. Do NOT ask any topic question.`;
                     const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                     didRegenerate = true;
+                } catch (e) {
+                    console.error('Deep offer regeneration failed:', e);
                 }
-            } catch (e) {
-                console.error('Deep offer validation failed:', e);
+            }
+
+            // Hard enforcement: never leave DEEP_OFFER with a topic question.
+            if (!isExtensionOfferQuestion(responseText, language)) {
+                responseText = await enforceDeepOfferQuestion({ model, language, currentText: responseText });
+                didRegenerate = true;
             }
         }
 
@@ -2171,9 +2441,16 @@ hard_rules:
         else if (shouldBlockDeepOfferClosure) {
             flowTelemetry.deepOfferClosureIntercepted = true;
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. OVERRIDING with offer question.`);
-            const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Offer the choice to extend the interview by a few minutes and continue. One question only. Do not ask any topic question.`;
-            const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
-            responseText = retry.object.response?.trim() || responseText;
+            try {
+                const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Offer the choice to extend the interview by a few minutes and continue. One question only. Do not ask any topic question.`;
+                const retry = await generateObject({ model, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                responseText = retry.object.response?.trim() || responseText;
+            } catch (e) {
+                console.error('Deep offer closure regeneration failed:', e);
+            }
+            if (!isExtensionOfferQuestion(responseText, language)) {
+                responseText = await enforceDeepOfferQuestion({ model, language, currentText: responseText });
+            }
         }
 
         // ====================================================================
@@ -2366,34 +2643,13 @@ Reply with the complete message (acknowledgment + question).`;
         // DEEP_OFFER safety: must be an extension-consent question
         if (nextState.phase === 'DEEP_OFFER') {
             const invalidDeepOffer =
-                !responseText.includes('?') ||
+                !isExtensionOfferQuestion(responseText, language) ||
                 goodbyePattern.test(responseText) ||
                 /INTERVIEW_COMPLETED/i.test(responseText);
             if (invalidDeepOffer) {
                 flowTelemetry.deepOfferClosureIntercepted = true;
                 console.log(`🛡️ [SAFETY_NET] Invalid DEEP_OFFER response, fixing...`);
-
-                // Simple additive fix for DEEP_OFFER
-                let offerQuestion = language === 'it'
-                    ? `Ti ringrazio per le risposte finora. Ti va di estendere l'intervista di qualche minuto per continuare?`
-                    : `Thanks for your answers so far. Would you like to extend the interview by a few minutes to continue?`;
-                try {
-                    offerQuestion = await generateDeepOfferOnly({ model, language });
-                } catch (e) {
-                    console.error('DEEP_OFFER fallback generation failed, using static fallback:', e);
-                }
-
-                // Try to keep acknowledgment if present, otherwise use default
-                const cleanedResponse = responseText
-                    .replace(/INTERVIEW_COMPLETED/gi, '')
-                    .replace(goodbyePattern, '')
-                    .trim();
-
-                if (cleanedResponse.length > 10 && !cleanedResponse.includes('?')) {
-                    responseText = cleanedResponse.replace(/[.!]+$/, '') + ` ${language === 'it' ? `Ti va di estendere l'intervista di qualche minuto?` : `Would you like to extend the interview by a few minutes?`}`;
-                } else {
-                    responseText = offerQuestion;
-                }
+                responseText = await enforceDeepOfferQuestion({ model, language, currentText: responseText });
             }
         }
 

@@ -65,6 +65,25 @@ interface InterviewChatProps {
     isEmbedded?: boolean;
 }
 
+function toUserFacingInterviewError(status: number, payload: unknown, language?: string): string {
+    const isItalian = (language || 'it').toLowerCase().startsWith('it');
+    const fallback = isItalian
+        ? 'Intervista temporaneamente non disponibile. Riprova tra poco.'
+        : 'Interview temporarily unavailable. Please try again shortly.';
+
+    if (!payload || typeof payload !== 'object') return fallback;
+    const data = payload as Record<string, unknown>;
+    const code = typeof data.code === 'string' ? data.code : '';
+
+    if (code === 'ACCESS_DENIED' || status === 401 || status === 403) {
+        return isItalian
+            ? 'Intervista non disponibile per limiti di accesso o crediti. Riprova più tardi.'
+            : 'Interview unavailable due to access or credit limits. Please try again later.';
+    }
+
+    return fallback;
+}
+
 const TRANSLATIONS: Record<string, any> = {
     it: {
         duration: 'Durata',
@@ -394,8 +413,13 @@ export default function InterviewChat({
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || 'Failed to get response');
+                let payload: unknown = null;
+                try {
+                    payload = await response.json();
+                } catch {
+                    payload = null;
+                }
+                throw new Error(toUserFacingInterviewError(response.status, payload, language));
             }
 
             const data = await response.json();

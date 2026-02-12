@@ -146,7 +146,39 @@ export async function checkCreditsForAction(
 ) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { allowed: false, error: 'Unauthorized', status: 401 };
+        // Public interview links must work for anonymous users.
+        // In that case we can charge credits directly to the interview owner's organization.
+        if (!forcedOrganizationId) {
+            return { allowed: false, error: 'Unauthorized', status: 401 };
+        }
+
+        const check = await TokenTrackingService.checkCanUseResource({
+            organizationId: forcedOrganizationId,
+            action,
+            customAmount
+        });
+
+        if (!check.allowed) {
+            const isCreditsExhausted = check.reason === 'Crediti insufficienti';
+            return {
+                allowed: false,
+                error: check.reason || 'Crediti insufficienti',
+                status: isCreditsExhausted ? 429 : 403,
+                code: isCreditsExhausted ? 'CREDITS_EXHAUSTED' : 'ACCESS_DENIED',
+                userId: undefined,
+                organizationId: forcedOrganizationId,
+                creditsNeeded: check.creditsNeeded,
+                creditsAvailable: check.creditsAvailable
+            };
+        }
+
+        return {
+            allowed: true,
+            userId: undefined,
+            organizationId: forcedOrganizationId,
+            creditsNeeded: check.creditsNeeded,
+            creditsAvailable: check.creditsAvailable
+        };
     }
 
     const currentUserId = session.user.id;

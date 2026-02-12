@@ -1292,14 +1292,21 @@ export async function POST(req: Request) {
                 (bot as any).project?.organization?.id
             );
             if (!creditsCheck.allowed) {
+                const userFacingError = (language || 'en').toLowerCase().startsWith('it')
+                    ? 'Intervista temporaneamente non disponibile per limiti di accesso o crediti. Riprova tra poco oppure contatta il team.'
+                    : 'Interview temporarily unavailable due to access or credit limits. Please try again shortly or contact the team.';
                 return Response.json(
                     {
+                        text: userFacingError,
+                        currentTopicId: conversation.currentTopicId,
+                        isCompleted: false,
+                        degraded: true,
                         code: (creditsCheck as any).code || 'ACCESS_DENIED',
                         error: creditsCheck.error,
                         creditsNeeded: creditsCheck.creditsNeeded,
                         creditsAvailable: creditsCheck.creditsAvailable
                     },
-                    { status: creditsCheck.status || 403 }
+                    { status: 200 }
                 );
             }
         }

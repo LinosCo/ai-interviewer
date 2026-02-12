@@ -121,20 +121,37 @@ async function getStripeConfig() {
     return null;
 }
 
-export async function getStripeClient(): Promise<Stripe> {
+/**
+ * Returns the Stripe client, or null if Stripe is not configured.
+ * Use this when Stripe being unconfigured is acceptable (e.g. loading pages).
+ */
+export async function getStripeClientSafe(): Promise<Stripe | null> {
     if (_stripe) return _stripe;
 
     const config = await getStripeConfig();
     if (!config || !config.secretKey) {
-        throw new Error("Stripe is not configured. Please set env vars or configure in dashboard.");
+        console.warn('[Stripe] Not configured – set STRIPE_SECRET_KEY in env or via Admin dashboard.');
+        return null;
     }
 
     _stripe = new Stripe(config.secretKey, {
         typescript: true,
-        apiVersion: '2025-12-15.clover', // Updated to a stable version used in other files
+        apiVersion: '2025-12-15.clover',
     });
 
     return _stripe;
+}
+
+/**
+ * Returns the Stripe client or throws if not configured.
+ * Use in API routes that strictly require Stripe (checkout, webhook, etc.).
+ */
+export async function getStripeClient(): Promise<Stripe> {
+    const client = await getStripeClientSafe();
+    if (!client) {
+        throw new Error('Stripe is not configured. Please set env vars or configure in dashboard.');
+    }
+    return client;
 }
 
 export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {

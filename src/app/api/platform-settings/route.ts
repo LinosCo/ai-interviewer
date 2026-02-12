@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { Prisma } from '@prisma/client';
 
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 export async function POST(req: NextRequest) {
     try {
         const session = await auth();
@@ -97,138 +99,145 @@ export async function POST(req: NextRequest) {
             `).catch(() => []);
             const available = new Set(availableColumns.map((c) => c.column_name));
 
-            const updateData: Prisma.GlobalConfigUpdateInput = {};
-            const createData: Prisma.GlobalConfigCreateInput = {
-                id: 'default'
-            };
-            const assignIfAvailable = (column: string, key: keyof Prisma.GlobalConfigUpdateInput, value: unknown) => {
+            const compatValues: Record<string, unknown> = {};
+            const assignIfAvailable = (column: string, value: unknown) => {
                 if (!available.has(column)) return;
-                (updateData as any)[key] = value;
-                (createData as any)[key] = value;
+                compatValues[column] = value;
             };
 
             if (platformOpenaiApiKey !== undefined) {
                 const value = platformOpenaiApiKey || null;
-                assignIfAvailable('openaiApiKey', 'openaiApiKey', value);
+                assignIfAvailable('openaiApiKey', value);
             }
             if (platformAnthropicApiKey !== undefined) {
                 const value = platformAnthropicApiKey || null;
-                assignIfAvailable('anthropicApiKey', 'anthropicApiKey', value);
+                assignIfAvailable('anthropicApiKey', value);
             }
             if (platformGeminiApiKey !== undefined) {
                 const value = platformGeminiApiKey || null;
-                assignIfAvailable('geminiApiKey', 'geminiApiKey', value);
+                assignIfAvailable('geminiApiKey', value);
             }
             if (googleSerpApiKey !== undefined) {
                 const value = googleSerpApiKey || null;
-                assignIfAvailable('googleSerpApiKey', 'googleSerpApiKey', value);
+                assignIfAvailable('googleSerpApiKey', value);
             }
             if (stripeSecretKey !== undefined) {
                 const value = stripeSecretKey || null;
-                assignIfAvailable('stripeSecretKey', 'stripeSecretKey', value);
+                assignIfAvailable('stripeSecretKey', value);
             }
             if (stripeWebhookSecret !== undefined) {
                 const value = stripeWebhookSecret || null;
-                assignIfAvailable('stripeWebhookSecret', 'stripeWebhookSecret', value);
+                assignIfAvailable('stripeWebhookSecret', value);
             }
             if (stripePriceStarter !== undefined) {
                 const value = stripePriceStarter || null;
-                assignIfAvailable('stripePriceStarter', 'stripePriceStarter', value);
+                assignIfAvailable('stripePriceStarter', value);
             }
             if (stripePriceStarterYearly !== undefined) {
                 const value = stripePriceStarterYearly || null;
-                assignIfAvailable('stripePriceStarterYearly', 'stripePriceStarterYearly', value);
+                assignIfAvailable('stripePriceStarterYearly', value);
             }
             if (stripePricePro !== undefined) {
                 const value = stripePricePro || null;
-                assignIfAvailable('stripePricePro', 'stripePricePro', value);
+                assignIfAvailable('stripePricePro', value);
             }
             if (stripePriceProYearly !== undefined) {
                 const value = stripePriceProYearly || null;
-                assignIfAvailable('stripePriceProYearly', 'stripePriceProYearly', value);
+                assignIfAvailable('stripePriceProYearly', value);
             }
             if (stripePriceBusiness !== undefined) {
                 const value = stripePriceBusiness || null;
-                assignIfAvailable('stripePriceBusiness', 'stripePriceBusiness', value);
+                assignIfAvailable('stripePriceBusiness', value);
             }
             if (stripePriceBusinessYearly !== undefined) {
                 const value = stripePriceBusinessYearly || null;
-                assignIfAvailable('stripePriceBusinessYearly', 'stripePriceBusinessYearly', value);
+                assignIfAvailable('stripePriceBusinessYearly', value);
             }
             if (stripePricePackSmall !== undefined) {
                 const value = stripePricePackSmall || null;
-                assignIfAvailable('stripePricePackSmall', 'stripePricePackSmall', value);
+                assignIfAvailable('stripePricePackSmall', value);
             }
             if (stripePricePackMedium !== undefined) {
                 const value = stripePricePackMedium || null;
-                assignIfAvailable('stripePricePackMedium', 'stripePricePackMedium', value);
+                assignIfAvailable('stripePricePackMedium', value);
             }
             if (stripePricePackLarge !== undefined) {
                 const value = stripePricePackLarge || null;
-                assignIfAvailable('stripePricePackLarge', 'stripePricePackLarge', value);
+                assignIfAvailable('stripePricePackLarge', value);
             }
             if (stripePricePartner !== undefined) {
                 const value = stripePricePartner || null;
-                assignIfAvailable('stripePricePartner', 'stripePricePartner', value);
+                assignIfAvailable('stripePricePartner', value);
             }
             if (stripePricePartnerYearly !== undefined) {
                 const value = stripePricePartnerYearly || null;
-                assignIfAvailable('stripePricePartnerYearly', 'stripePricePartnerYearly', value);
+                assignIfAvailable('stripePricePartnerYearly', value);
             }
             if (stripePriceEnterprise !== undefined) {
                 const value = stripePriceEnterprise || null;
-                assignIfAvailable('stripePriceEnterprise', 'stripePriceEnterprise', value);
+                assignIfAvailable('stripePriceEnterprise', value);
             }
             if (stripePriceEnterpriseYearly !== undefined) {
                 const value = stripePriceEnterpriseYearly || null;
-                assignIfAvailable('stripePriceEnterpriseYearly', 'stripePriceEnterpriseYearly', value);
+                assignIfAvailable('stripePriceEnterpriseYearly', value);
             }
             if (smtpHost !== undefined) {
                 const value = smtpHost || null;
-                assignIfAvailable('smtpHost', 'smtpHost', value);
+                assignIfAvailable('smtpHost', value);
             }
             if (smtpPort !== undefined) {
                 const value = smtpPort ? Number(smtpPort) : null;
-                assignIfAvailable('smtpPort', 'smtpPort', value);
+                assignIfAvailable('smtpPort', value);
             }
             if (smtpSecure !== undefined) {
                 const value = Boolean(smtpSecure);
-                assignIfAvailable('smtpSecure', 'smtpSecure', value);
+                assignIfAvailable('smtpSecure', value);
             }
             if (smtpUser !== undefined) {
                 const value = smtpUser || null;
-                assignIfAvailable('smtpUser', 'smtpUser', value);
+                assignIfAvailable('smtpUser', value);
             }
             if (smtpPass !== undefined) {
                 const value = smtpPass || null;
-                assignIfAvailable('smtpPass', 'smtpPass', value);
+                assignIfAvailable('smtpPass', value);
             }
             if (smtpFromEmail !== undefined) {
                 const value = smtpFromEmail || null;
-                assignIfAvailable('smtpFromEmail', 'smtpFromEmail', value);
+                assignIfAvailable('smtpFromEmail', value);
             }
             if (smtpNotificationEmail !== undefined) {
                 const value = smtpNotificationEmail || null;
-                assignIfAvailable('smtpNotificationEmail', 'smtpNotificationEmail', value);
+                assignIfAvailable('smtpNotificationEmail', value);
             }
             if (publicDemoBotId !== undefined) {
                 const value = publicDemoBotId || null;
-                assignIfAvailable('publicDemoBotId', 'publicDemoBotId', value);
+                assignIfAvailable('publicDemoBotId', value);
             }
 
-            try {
-                await prisma.globalConfig.upsert({
-                    where: { id: 'default' },
-                    update: updateData,
-                    create: createData
-                });
-            } catch (globalConfigError: any) {
-                if (globalConfigError?.code === 'P2022') {
-                    // Schema drift guard: don't block organization settings save if GlobalConfig is partially out-of-sync.
-                    console.warn('[platform-settings] GlobalConfig upsert skipped due to schema mismatch (P2022).');
-                } else {
-                    throw globalConfigError;
+            if (available.has('updatedAt')) {
+                compatValues.updatedAt = new Date();
+            }
+
+            const assignments = Object.entries(compatValues);
+            if (assignments.length > 0) {
+                for (const [column] of assignments) {
+                    if (!SAFE_SQL_IDENTIFIER.test(column)) {
+                        throw new Error(`[platform-settings] Unsafe GlobalConfig column name: ${column}`);
+                    }
                 }
+
+                await prisma.$executeRawUnsafe(
+                    `INSERT INTO "GlobalConfig" ("id") VALUES ('default') ON CONFLICT ("id") DO NOTHING`
+                );
+
+                const setClause = assignments
+                    .map(([column], index) => `"${column}" = $${index + 1}`)
+                    .join(', ');
+
+                await prisma.$executeRawUnsafe(
+                    `UPDATE "GlobalConfig" SET ${setClause} WHERE "id" = 'default'`,
+                    ...assignments.map(([, value]) => value)
+                );
             }
         }
 

@@ -172,25 +172,20 @@ export async function POST(request: Request) {
         const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
 
         if (projectId && projectVisibilityConfigExists) {
-            try {
-                await prisma.projectVisibilityConfig.upsert({
-                    where: {
-                        projectId_configId: {
-                            projectId,
-                            configId: config.id
-                        }
-                    },
-                    update: {},
-                    create: {
+            await prisma.projectVisibilityConfig.upsert({
+                where: {
+                    projectId_configId: {
                         projectId,
-                        configId: config.id,
-                        createdBy: user.id
+                        configId: config.id
                     }
-                });
-            } catch (error: any) {
-                // Log and continue if table doesn't exist or other error
-                console.warn('ProjectVisibilityConfig table not available or error during upsert:', error?.code, error?.message);
-            }
+                },
+                update: {},
+                create: {
+                    projectId,
+                    configId: config.id,
+                    createdBy: user.id
+                }
+            });
         }
 
         return NextResponse.json({
@@ -434,32 +429,27 @@ export async function PATCH(request: Request) {
 
         // 4. Project-Visibility association (OUTSIDE transaction to avoid poisoning)
         if (projectId !== undefined && projectId) {
-            try {
-                // Check if ProjectVisibilityConfig table exists using a clean query outside the main transaction
-                const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
-                    SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
-                `;
-                const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+            // Check if ProjectVisibilityConfig table exists using a clean query outside the main transaction
+            const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+                SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
+            `;
+            const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
 
-                if (projectVisibilityConfigExists) {
-                    await prisma.projectVisibilityConfig.upsert({
-                        where: {
-                            projectId_configId: {
-                                projectId,
-                                configId: updatedConfig.id
-                            }
-                        },
-                        update: {},
-                        create: {
+            if (projectVisibilityConfigExists) {
+                await prisma.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
                             projectId,
-                            configId: updatedConfig.id,
-                            createdBy: user.id
+                            configId: updatedConfig.id
                         }
-                    });
-                }
-            } catch (error: any) {
-                // Log and continue - this operation is secondary and shouldn't block the main update
-                console.warn('ProjectVisibilityConfig table not available (post-transaction):', error?.code, error?.message);
+                    },
+                    update: {},
+                    create: {
+                        projectId,
+                        configId: updatedConfig.id,
+                        createdBy: user.id
+                    }
+                });
             }
         }
 

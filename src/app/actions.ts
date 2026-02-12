@@ -17,6 +17,8 @@ import { transferBotToProject } from './actions/project-tools';
 import { regenerateInterviewPlan } from '@/lib/interview/plan-service';
 import { checkTrialResourceLimit } from '@/lib/trial-limits';
 
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
     // 1. Bot-specific key always wins (decrypt if needed)
     if (botSpecificKey) return decryptIfNeeded(botSpecificKey);
@@ -861,26 +863,45 @@ export async function updateSettingsAction(organizationId: string, formData: For
 
     // If Admin, update Global Config with encrypted keys
     if (currentUser.role === 'ADMIN') {
-        try {
-            await prisma.globalConfig.upsert({
-                where: { id: "default" },
-                update: {
-                    openaiApiKey: encryptIfNeeded(openaiKey),
-                    anthropicApiKey: encryptIfNeeded(anthropicKey),
-                },
-                create: {
-                    id: "default",
-                    openaiApiKey: encryptIfNeeded(openaiKey),
-                    anthropicApiKey: encryptIfNeeded(anthropicKey),
+        const availableColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'GlobalConfig'
+        `).catch(() => []);
+        const available = new Set(availableColumns.map((c) => c.column_name));
+
+        const compatValues: Record<string, unknown> = {};
+        if (available.has('openaiApiKey')) {
+            compatValues.openaiApiKey = encryptIfNeeded(openaiKey);
+        }
+        if (available.has('anthropicApiKey')) {
+            compatValues.anthropicApiKey = encryptIfNeeded(anthropicKey);
+        }
+        if (available.has('updatedAt')) {
+            compatValues.updatedAt = new Date();
+        }
+
+        const assignments = Object.entries(compatValues);
+        if (assignments.length > 0) {
+            for (const [column] of assignments) {
+                if (!SAFE_SQL_IDENTIFIER.test(column)) {
+                    throw new Error(`[updateSettingsAction] Unsafe GlobalConfig column name: ${column}`);
                 }
-            });
-        } catch (globalConfigError: any) {
-            if (globalConfigError?.code === 'P2022') {
-                // Don't block platform settings save when production DB is missing one or more GlobalConfig columns.
-                console.warn('[updateSettingsAction] GlobalConfig upsert skipped due to schema mismatch (P2022).');
-            } else {
-                throw globalConfigError;
             }
+
+            await prisma.$executeRawUnsafe(
+                `INSERT INTO "GlobalConfig" ("id") VALUES ('default') ON CONFLICT ("id") DO NOTHING`
+            );
+
+            const setClause = assignments
+                .map(([column], index) => `"${column}" = $${index + 1}`)
+                .join(', ');
+
+            await prisma.$executeRawUnsafe(
+                `UPDATE "GlobalConfig" SET ${setClause} WHERE "id" = 'default'`,
+                ...assignments.map(([, value]) => value)
+            );
         }
     }
 

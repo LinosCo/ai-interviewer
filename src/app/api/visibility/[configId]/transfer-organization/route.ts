@@ -113,13 +113,9 @@ export async function POST(
 
         // 1. Delete project associations (OUTSIDE transaction to avoid poisoning)
         if (projectVisibilityConfigExists) {
-            try {
-                await prisma.projectVisibilityConfig.deleteMany({
-                    where: { configId: config.id }
-                });
-            } catch (error: any) {
-                console.warn('Error deleting projectVisibilityConfig entries:', error?.code, error?.message);
-            }
+            await prisma.projectVisibilityConfig.deleteMany({
+                where: { configId: config.id }
+            });
         }
 
         // 2. Perform the transfer in a transaction

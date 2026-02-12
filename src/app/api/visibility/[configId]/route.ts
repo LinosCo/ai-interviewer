@@ -15,7 +15,6 @@ export async function GET(
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        const currentUserId = session.user.id;
 
         const { configId } = await params;
 
@@ -146,25 +145,20 @@ export async function PATCH(
         });
 
         if (body.projectId) {
-            try {
-                await prisma.projectVisibilityConfig.upsert({
-                    where: {
-                        projectId_configId: {
-                            projectId: body.projectId,
-                            configId
-                        }
-                    },
-                    update: {},
-                    create: {
+            await prisma.projectVisibilityConfig.upsert({
+                where: {
+                    projectId_configId: {
                         projectId: body.projectId,
-                        configId,
-                        createdBy: currentUserId
+                        configId
                     }
-                });
-            } catch (error: any) {
-                // Backward compatibility: log and continue if table doesn't exist
-                console.warn('ProjectVisibilityConfig table not available:', error?.code, error?.message);
-            }
+                },
+                update: {},
+                create: {
+                    projectId: body.projectId,
+                    configId,
+                    createdBy: currentUserId
+                }
+            });
         }
 
         return NextResponse.json({

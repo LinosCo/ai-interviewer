@@ -17,7 +17,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Missing Stripe webhook configuration' }, { status: 400 });
     }
 
-    const stripe = await getStripeClient();
+    let stripe;
+    try {
+        stripe = await getStripeClient();
+    } catch {
+        console.error('Stripe not configured for webhook processing');
+        return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
+    }
     let event: Stripe.Event;
 
     try {

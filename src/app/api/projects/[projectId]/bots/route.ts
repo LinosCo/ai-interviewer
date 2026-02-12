@@ -362,33 +362,29 @@ export async function POST(
             const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
 
             if (projectVisibilityConfigExists) {
-                try {
-                    // 2. Upsert target association
-                    await prisma.projectVisibilityConfig.upsert({
-                        where: {
-                            projectId_configId: {
-                                projectId: targetProjectId,
-                                configId: botId
-                            }
-                        },
-                        update: {},
-                        create: {
+                // 2. Upsert target association
+                await prisma.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
                             projectId: targetProjectId,
-                            configId: botId,
-                            createdBy: currentUserId
-                        }
-                    });
-
-                    // 3. Delete source association
-                    await prisma.projectVisibilityConfig.deleteMany({
-                        where: {
-                            projectId,
                             configId: botId
                         }
-                    });
-                } catch (error: any) {
-                    console.warn('Error during projectVisibilityConfig operations in bots transfer:', error?.code, error?.message);
-                }
+                    },
+                    update: {},
+                    create: {
+                        projectId: targetProjectId,
+                        configId: botId,
+                        createdBy: currentUserId
+                    }
+                });
+
+                // 3. Delete source association
+                await prisma.projectVisibilityConfig.deleteMany({
+                    where: {
+                        projectId,
+                        configId: botId
+                    }
+                });
             }
         }
 

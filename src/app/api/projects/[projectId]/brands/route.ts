@@ -190,36 +190,28 @@ export async function POST(
         if (action === 'link') {
             // 1. Project-Visibility association (OUTSIDE transaction to avoid poisoning)
             if (projectVisibilityConfigExists) {
-                try {
-                    await prisma.projectVisibilityConfig.upsert({
-                        where: {
-                            projectId_configId: {
-                                projectId,
-                                configId: brandId
-                            }
-                        },
-                        update: {},
-                        create: {
+                await prisma.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
                             projectId,
-                            configId: brandId,
-                            createdBy: userId
+                            configId: brandId
                         }
-                    });
-                } catch (error: any) {
-                    console.warn('Error during projectVisibilityConfig upsert:', error?.code, error?.message);
-                }
+                    },
+                    update: {},
+                    create: {
+                        projectId,
+                        configId: brandId,
+                        createdBy: userId
+                    }
+                });
             }
 
             // 2. Keep backward compatibility: ensure a primary project exists.
             if (!brand.projectId) {
-                try {
-                    await prisma.visibilityConfig.update({
-                        where: { id: brandId },
-                        data: { projectId }
-                    });
-                } catch (error: any) {
-                    console.error('Error updating primary projectId:', error);
-                }
+                await prisma.visibilityConfig.update({
+                    where: { id: brandId },
+                    data: { projectId }
+                });
             }
 
             return NextResponse.json({ success: true, action: 'linked' });
@@ -227,40 +219,28 @@ export async function POST(
         } else if (action === 'unlink') {
             // 1. Delete project association (OUTSIDE transaction to avoid poisoning)
             if (projectVisibilityConfigExists) {
-                try {
-                    await prisma.projectVisibilityConfig.deleteMany({
-                        where: {
-                            projectId,
-                            configId: brandId
-                        }
-                    });
-                } catch (error: any) {
-                    console.warn('Error during projectVisibilityConfig delete:', error?.code, error?.message);
-                }
+                await prisma.projectVisibilityConfig.deleteMany({
+                    where: {
+                        projectId,
+                        configId: brandId
+                    }
+                });
             }
 
             // 2. If this project is the primary one, switch primary to another shared project if available.
             let currentBrand: { projectId: string | null; projectShares?: Array<{ projectId: string }> } | null = null;
             if (projectVisibilityConfigExists) {
-                try {
-                    currentBrand = await prisma.visibilityConfig.findUnique({
-                        where: { id: brandId },
-                        select: {
-                            projectId: true,
-                            projectShares: {
-                                where: { projectId: { not: projectId } },
-                                orderBy: { createdAt: 'asc' },
-                                select: { projectId: true }
-                            }
+                currentBrand = await prisma.visibilityConfig.findUnique({
+                    where: { id: brandId },
+                    select: {
+                        projectId: true,
+                        projectShares: {
+                            where: { projectId: { not: projectId } },
+                            orderBy: { createdAt: 'asc' },
+                            select: { projectId: true }
                         }
-                    });
-                } catch (error: any) {
-                    console.warn('Error checking project shares:', error?.code, error?.message);
-                    currentBrand = await prisma.visibilityConfig.findUnique({
-                        where: { id: brandId },
-                        select: { projectId: true }
-                    });
-                }
+                    }
+                });
             } else {
                 currentBrand = await prisma.visibilityConfig.findUnique({
                     where: { id: brandId },
@@ -269,14 +249,10 @@ export async function POST(
             }
 
             if (currentBrand?.projectId === projectId) {
-                try {
-                    await prisma.visibilityConfig.update({
-                        where: { id: brandId },
-                        data: { projectId: currentBrand.projectShares?.[0]?.projectId || null }
-                    });
-                } catch (error: any) {
-                    console.error('Error switching primary projectId:', error);
-                }
+                await prisma.visibilityConfig.update({
+                    where: { id: brandId },
+                    data: { projectId: currentBrand.projectShares?.[0]?.projectId || null }
+                });
             }
 
             return NextResponse.json({ success: true, action: 'unlinked' });

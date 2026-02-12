@@ -23,17 +23,29 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
     trustHost: true,
     debug: process.env.NODE_ENV === 'development',
     logger: {
-        error(code, metadata) {
+        error(error) {
             // Invalid credentials are a normal user-flow outcome, not an operational error.
-            if (code === 'CredentialsSignin') return;
-            console.error(`[auth][error] ${code}`, metadata || '');
+            const errorType = typeof error === 'object' && error && 'type' in error
+                ? String((error as { type?: string }).type || '')
+                : '';
+            const errorName = typeof error === 'object' && error && 'name' in error
+                ? String((error as { name?: string }).name || '')
+                : '';
+            const errorMessage = typeof error === 'object' && error && 'message' in error
+                ? String((error as { message?: string }).message || '')
+                : String(error || '');
+
+            if (errorType === 'CredentialsSignin' || errorName === 'CredentialsSignin' || errorMessage.includes('CredentialsSignin')) {
+                return;
+            }
+            console.error('[auth][error]', error);
         },
-        warn(code) {
-            console.warn(`[auth][warn] ${code}`);
+        warn(message) {
+            console.warn('[auth][warn]', message);
         },
-        debug(code, metadata) {
+        debug(message) {
             if (process.env.NODE_ENV === 'development') {
-                console.debug(`[auth][debug] ${code}`, metadata || '');
+                console.debug('[auth][debug]', message);
             }
         },
     },

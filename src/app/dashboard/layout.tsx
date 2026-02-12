@@ -8,6 +8,7 @@ import { CreditsAlertBanner } from '@/components/dashboard/CreditsAlertBanner';
 import { CreditsExhaustedModal } from '@/components/dashboard/CreditsExhaustedModal';
 import { PLANS, PlanType } from '@/config/plans';
 import { cookies } from 'next/headers';
+import { getOrCreateDefaultOrganization } from '@/lib/organizations';
 
 export default async function DashboardLayout({
     children,
@@ -28,6 +29,9 @@ export default async function DashboardLayout({
     let initialProjects: any[] = [];
 
     if (session?.user?.id) {
+        // Hard guard for first-login races: ensure at least one organization exists.
+        await getOrCreateDefaultOrganization(session.user.id);
+
         // Read active organization from cookies
         const cookieStore = await cookies();
         const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;

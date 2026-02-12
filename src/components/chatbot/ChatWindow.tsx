@@ -593,7 +593,7 @@ export default function ChatWindow({
 
                             {/* Input Area */}
                             <div className="p-3 border-t bg-white">
-                                <div className="flex gap-2 items-end bg-gray-100 p-2 rounded-xl border border-transparent focus-within:border-gray-300 focus-within:bg-white transition-all">
+                                <div className="flex gap-2 items-end bg-gray-100 p-2 pr-16 sm:pr-2 rounded-xl border border-transparent focus-within:border-gray-300 focus-within:bg-white transition-all">
                                     <input
                                         type="text"
                                         value={inputValue}
@@ -606,7 +606,7 @@ export default function ChatWindow({
                                     <button
                                         onClick={handleSend}
                                         disabled={!inputValue.trim() || isLoading}
-                                        className={`p-2 rounded-lg transition-all ${inputValue.trim()
+                                        className={`mr-10 sm:mr-0 p-2 rounded-lg transition-all ${inputValue.trim()
                                             ? 'bg-gray-900 text-white shadow-md hover:bg-gray-800'
                                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                             }`}

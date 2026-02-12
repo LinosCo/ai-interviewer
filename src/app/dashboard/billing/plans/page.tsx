@@ -5,6 +5,8 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 
+const SALES_EMAIL = 'info@businesstuner.it';
+
 export default async function PlansPage({
     searchParams
 }: {
@@ -42,6 +44,7 @@ export default async function PlansPage({
     // Build plans array with current plan info
     const plans = PURCHASABLE_PLANS.map(planType => ({
         ...PLANS[planType],
+        requiresSalesContact: planType === PlanType.BUSINESS,
         isCurrent: currentPlan === planType
     }));
 
@@ -124,15 +127,29 @@ export default async function PlansPage({
                             <p className="text-sm text-stone-500 mb-4">{plan.description}</p>
 
                             <div className="mb-4 flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-stone-900">
-                                    €{billingPeriod === 'yearly' ? plan.yearlyMonthlyEquivalent : plan.monthlyPrice}
-                                </span>
-                                <span className="text-stone-400 text-sm">/mese</span>
+                                {plan.requiresSalesContact ? (
+                                    <>
+                                        <span className="text-4xl font-black text-stone-900">Su richiesta</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-4xl font-black text-stone-900">
+                                            €{billingPeriod === 'yearly' ? plan.yearlyMonthlyEquivalent : plan.monthlyPrice}
+                                        </span>
+                                        <span className="text-stone-400 text-sm">/mese</span>
+                                    </>
+                                )}
                             </div>
 
-                            {billingPeriod === 'yearly' && plan.yearlyMonthlyEquivalent < plan.monthlyPrice && (
+                            {!plan.requiresSalesContact && billingPeriod === 'yearly' && plan.yearlyMonthlyEquivalent < plan.monthlyPrice && (
                                 <div className="mb-4 text-sm text-green-600 font-medium bg-green-50 rounded-lg px-3 py-2">
                                     Fatturato annualmente: €{plan.yearlyPrice}/anno
+                                </div>
+                            )}
+
+                            {plan.requiresSalesContact && (
+                                <div className="mb-4 text-sm text-amber-700 font-medium bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                                    Piano Business attivabile tramite contatto commerciale.
                                 </div>
                             )}
 
@@ -163,16 +180,24 @@ export default async function PlansPage({
                                 <button disabled className="w-full bg-stone-100 text-stone-400 font-bold py-4 rounded-2xl cursor-not-allowed">
                                     Piano attuale
                                 </button>
+                            ) : plan.requiresSalesContact ? (
+                                <a
+                                    href={`mailto:${SALES_EMAIL}?subject=Richiesta%20Piano%20Business`}
+                                    className="w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 bg-stone-900 text-white hover:bg-stone-800"
+                                >
+                                    Richiedi info via email <Icons.ArrowRight size={18} />
+                                </a>
                             ) : (
-                                <Link href={`/api/stripe/checkout?tier=${plan.id}&billing=${billingPeriod}`} className="w-full">
-                                    <button className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${
+                                <a
+                                    href={`/api/stripe/checkout?tier=${plan.id}&billing=${billingPeriod}`}
+                                    className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${
                                         isPopular
                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20'
                                             : 'bg-stone-900 text-white hover:bg-stone-800'
-                                    }`}>
-                                        Seleziona piano <Icons.ArrowRight size={18} />
-                                    </button>
-                                </Link>
+                                    }`}
+                                >
+                                    Seleziona piano <Icons.ArrowRight size={18} />
+                                </a>
                             )}
                         </div>
                     );

@@ -17,7 +17,16 @@ export function useProjectData<T>({ endpoint, queryParams }: UseProjectDataOptio
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (projectLoading || !selectedProject) {
+        if (projectLoading) {
+            return;
+        }
+
+        // Prevent infinite loading when no project is selected yet
+        // (e.g. first render/race during org bootstrap).
+        if (!selectedProject) {
+            setLoading(false);
+            setData(null);
+            setError(null);
             return;
         }
 

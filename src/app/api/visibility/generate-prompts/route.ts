@@ -45,7 +45,15 @@ export async function POST(request: Request) {
                 plan: true,
                 role: true,
                 memberships: {
-                    select: { organizationId: true, status: true }
+                    select: {
+                        organizationId: true,
+                        status: true,
+                        organization: {
+                            select: {
+                                plan: true
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -61,9 +69,11 @@ export async function POST(request: Request) {
         ) || user.memberships.find(m => m.status === 'ACTIVE');
         const organizationId = activeMembership?.organizationId;
 
-        // Use user's plan (admin has unlimited access)
+        // Use active organization plan as source of truth.
+        // User plan can differ (e.g. default FREE) and would wrongly block features.
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
-        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+        const effectivePlan = (activeMembership?.organization?.plan as PlanType) || (user.plan as PlanType) || PlanType.FREE;
+        const plan = PLANS[effectivePlan] || PLANS[PlanType.FREE];
         // Admin bypasses, 10 prompts if visibility enabled
         const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 10 : 0);
 

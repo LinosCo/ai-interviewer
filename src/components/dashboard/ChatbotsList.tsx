@@ -23,7 +23,11 @@ interface ChatBot {
     project?: { id: string; name: string } | null;
 }
 
-export function ChatbotsList() {
+interface ChatbotsListProps {
+    hasChatbot?: boolean;
+}
+
+export function ChatbotsList({ hasChatbot = true }: ChatbotsListProps) {
     const { selectedProject, isAllProjectsSelected } = useProject();
     const { data: bots, loading, error } = useProjectData<ChatBot[]>({
         endpoint: 'bots',
@@ -63,14 +67,28 @@ export function ChatbotsList() {
             <div className="platform-card rounded-xl p-12 text-center">
                 <Bot className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun chatbot in questo progetto</h3>
-                <p className="text-gray-500 mb-6">Crea il tuo primo assistente AI da integrare nel tuo sito</p>
-                <Link
-                    href="/dashboard/bots/create-chatbot"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                >
-                    <Plus className="w-5 h-5" />
-                    Crea Chatbot
-                </Link>
+                {hasChatbot ? (
+                    <>
+                        <p className="text-gray-500 mb-6">Crea il tuo primo assistente AI da integrare nel tuo sito</p>
+                        <Link
+                            href="/dashboard/bots/create-chatbot"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                        >
+                            <Plus className="w-5 h-5" />
+                            Crea Chatbot
+                        </Link>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-amber-700 mb-6">Azione bloccata dal piano attuale: i chatbot non sono inclusi.</p>
+                        <Link
+                            href="/dashboard/billing/plans"
+                            className="inline-flex items-center gap-2 px-6 py-3 border border-amber-300 text-amber-700 rounded-lg font-medium hover:bg-amber-50 transition-colors"
+                        >
+                            Upgrade per sbloccare
+                        </Link>
+                    </>
+                )}
             </div>
         );
     }

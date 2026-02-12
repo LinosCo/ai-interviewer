@@ -55,6 +55,9 @@ export async function registerUser(prevState: string | undefined, formData: Form
                         create: {
                             userId: user.id,
                             role: 'OWNER',
+                            status: 'ACTIVE',
+                            acceptedAt: new Date(),
+                            joinedAt: new Date()
                         },
                     },
                     subscription: {

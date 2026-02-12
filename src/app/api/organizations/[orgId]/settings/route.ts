@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { Prisma } from '@prisma/client';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const GLOBAL_CONFIG_FIELDS = [
     'openaiApiKey',
@@ -57,6 +59,16 @@ async function getGlobalConfigCompat() {
     }
 }
 
+function getDefaultMethodologyKnowledge(): string {
+    try {
+        const filePath = path.join(process.cwd(), 'knowledge', 'interview-methodology.md');
+        return fs.readFileSync(filePath, 'utf-8');
+    } catch (error) {
+        console.error('Error loading default methodology knowledge:', error);
+        return '';
+    }
+}
+
 export async function GET(
     req: Request,
     { params }: { params: Promise<{ orgId: string }> }
@@ -87,6 +99,19 @@ export async function GET(
             where: { organizationId: orgId }
         });
 
+        const defaultMethodology = getDefaultMethodologyKnowledge();
+        const settingsWithDefaults = settings
+            ? {
+                ...settings,
+                methodologyKnowledge: settings.methodologyKnowledge?.trim()
+                    ? settings.methodologyKnowledge
+                    : defaultMethodology
+            }
+            : {
+                methodologyKnowledge: defaultMethodology,
+                strategicPlan: null
+            };
+
         // If admin, also return global config
         let globalConfig = null;
         if ((session.user as any).role === 'ADMIN') {
@@ -94,7 +119,7 @@ export async function GET(
         }
 
         return NextResponse.json({
-            settings,
+            settings: settingsWithDefaults,
             globalConfig
         });
     } catch (error) {

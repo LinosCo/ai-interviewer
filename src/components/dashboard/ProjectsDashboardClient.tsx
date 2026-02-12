@@ -20,6 +20,7 @@ import Link from 'next/link';
 export default function ProjectsDashboardClient() {
     const { projects, loading: projectsLoading } = useProject();
     const { currentOrganization, loading: orgLoading } = useOrganization();
+    const isProjectCreationLocked = currentOrganization?.plan === 'TRIAL' || currentOrganization?.plan === 'FREE';
 
     const loading = projectsLoading || orgLoading;
 
@@ -54,13 +55,26 @@ export default function ProjectsDashboardClient() {
                     <p className="text-muted-foreground font-medium">
                         Gestisci i tuoi spazi di lavoro, chatbot e monitoraggio brand.
                     </p>
+                    {isProjectCreationLocked && (
+                        <p className="text-sm text-amber-700 mt-2">
+                            Nel piano di prova non e possibile creare nuovi progetti. Passa a un piano a pagamento per sbloccare la funzione.
+                        </p>
+                    )}
                 </div>
-                <Link href={`/dashboard/projects/new?orgId=${currentOrganization.id}`}>
-                    <Button className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-lg shadow-amber-200 px-6">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Nuovo Progetto
-                    </Button>
-                </Link>
+                {isProjectCreationLocked ? (
+                    <Link href="/dashboard/billing/plans">
+                        <Button variant="outline" className="rounded-xl px-6 border-amber-200 text-amber-700 hover:bg-amber-50">
+                            Passa a un piano a pagamento
+                        </Button>
+                    </Link>
+                ) : (
+                    <Link href={`/dashboard/projects/new?orgId=${currentOrganization.id}`}>
+                        <Button className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-lg shadow-amber-200 px-6">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Nuovo Progetto
+                        </Button>
+                    </Link>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -74,9 +88,17 @@ export default function ProjectsDashboardClient() {
                             <p className="text-sm text-slate-500 max-w-sm mt-2">
                                 Crea il tuo primo progetto per iniziare a configurare chatbot e interviste in questo team.
                             </p>
-                            <Link href={`/dashboard/projects/new?orgId=${currentOrganization.id}`} className="mt-6">
-                                <Button variant="outline" className="rounded-xl font-bold">Inizia Ora</Button>
-                            </Link>
+                            {isProjectCreationLocked ? (
+                                <Link href="/dashboard/billing/plans" className="mt-6">
+                                    <Button variant="outline" className="rounded-xl font-bold border-amber-200 text-amber-700 hover:bg-amber-50">
+                                        Sblocca con upgrade
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <Link href={`/dashboard/projects/new?orgId=${currentOrganization.id}`} className="mt-6">
+                                    <Button variant="outline" className="rounded-xl font-bold">Inizia Ora</Button>
+                                </Link>
+                            )}
                         </CardContent>
                     </Card>
                 ) : (

@@ -9,9 +9,34 @@ export default function NewProjectPage() {
     const { organizations, currentOrganization } = useOrganization();
     const searchParams = useSearchParams();
     const orgIdFromUrl = searchParams.get('orgId');
+    const selectedOrg = organizations.find((org) => org.id === (orgIdFromUrl || currentOrganization?.id)) || currentOrganization || organizations[0];
+    const isProjectCreationLocked = selectedOrg?.plan === 'TRIAL' || selectedOrg?.plan === 'FREE';
 
     // Use orgId from URL, or currentOrg from context, or first org available
     const initialOrgId = orgIdFromUrl || currentOrganization?.id || organizations[0]?.id;
+
+    if (isProjectCreationLocked) {
+        return (
+            <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-3 bg-amber-50 rounded-2xl">
+                        <LayoutGrid className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Nuovo Progetto non disponibile</h1>
+                </div>
+                <p className="text-sm text-gray-600 mb-6">
+                    Nel piano di prova non e possibile creare nuovi progetti. Per continuare, passa a un piano a pagamento.
+                </p>
+                <a
+                    href="/dashboard/billing/plans"
+                    className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white py-3 px-5 rounded-2xl font-bold transition-all shadow-lg shadow-amber-200"
+                >
+                    <Plus className="w-5 h-5" />
+                    Vedi piani disponibili
+                </a>
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50">

@@ -22,58 +22,85 @@ interface PriceConfig {
 }
 
 async function getStripeConfig() {
+    const envPrices = {
+        STARTER: process.env.STRIPE_PRICE_STARTER,
+        STARTER_YEARLY: process.env.STRIPE_PRICE_STARTER_YEARLY,
+        PRO: process.env.STRIPE_PRICE_PRO,
+        PRO_YEARLY: process.env.STRIPE_PRICE_PRO_YEARLY,
+        BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
+        BUSINESS_YEARLY: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
+        PACK_SMALL: process.env.STRIPE_PRICE_PACK_SMALL,
+        PACK_MEDIUM: process.env.STRIPE_PRICE_PACK_MEDIUM,
+        PACK_LARGE: process.env.STRIPE_PRICE_PACK_LARGE
+    };
+
     // 1. Env vars take precedence
     if (process.env.STRIPE_SECRET_KEY) {
         return {
             secretKey: process.env.STRIPE_SECRET_KEY,
-            prices: {
-                STARTER: process.env.STRIPE_PRICE_STARTER,
-                STARTER_YEARLY: process.env.STRIPE_PRICE_STARTER_YEARLY,
-                PRO: process.env.STRIPE_PRICE_PRO,
-                PRO_YEARLY: process.env.STRIPE_PRICE_PRO_YEARLY,
-                BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
-                BUSINESS_YEARLY: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
-                PACK_SMALL: process.env.STRIPE_PRICE_PACK_SMALL,
-                PACK_MEDIUM: process.env.STRIPE_PRICE_PACK_MEDIUM,
-                PACK_LARGE: process.env.STRIPE_PRICE_PACK_LARGE
-            }
+            prices: envPrices
         };
     }
 
     // 2. DB fallback
+    let secretKeyFromDb: string | null = null;
+
     try {
-        const config = await prisma.globalConfig.findUnique({
+        // Keep this query minimal to avoid hard-failing when some optional
+        // pricing columns are missing in partially migrated environments.
+        const secretConfig = await prisma.globalConfig.findUnique({
             where: { id: 'default' },
             select: {
-                stripeSecretKey: true,
-                stripePriceStarter: true,
-                stripePriceStarterYearly: true,
-                stripePricePro: true,
-                stripePriceProYearly: true,
-                stripePriceBusiness: true,
-                stripePricePackSmall: true,
-                stripePricePackMedium: true,
-                stripePricePackLarge: true
+                stripeSecretKey: true
             }
         });
-        if (config?.stripeSecretKey) {
-            return {
-                secretKey: config.stripeSecretKey,
-                prices: {
-                    STARTER: config.stripePriceStarter,
-                    STARTER_YEARLY: config.stripePriceStarterYearly,
-                    PRO: config.stripePricePro,
-                    PRO_YEARLY: config.stripePriceProYearly,
-                    BUSINESS: config.stripePriceBusiness,
-                    BUSINESS_YEARLY: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
-                    PACK_SMALL: config.stripePricePackSmall,
-                    PACK_MEDIUM: config.stripePricePackMedium,
-                    PACK_LARGE: config.stripePricePackLarge
-                }
-            };
-        }
+        secretKeyFromDb = secretConfig?.stripeSecretKey || null;
     } catch (e) {
-        console.warn("Failed to fetch global config for Stripe", e);
+        console.warn("Failed to fetch Stripe secret key from global config", e);
+    }
+
+    if (secretKeyFromDb) {
+        let dbPrices: Partial<Record<string, string | null>> = {};
+
+        try {
+            const priceConfig = await prisma.globalConfig.findUnique({
+                where: { id: 'default' },
+                select: {
+                    stripePriceStarter: true,
+                    stripePriceStarterYearly: true,
+                    stripePricePro: true,
+                    stripePriceProYearly: true,
+                    stripePriceBusiness: true,
+                    stripePricePackSmall: true,
+                    stripePricePackMedium: true,
+                    stripePricePackLarge: true
+                }
+            });
+
+            if (priceConfig) {
+                dbPrices = {
+                    STARTER: priceConfig.stripePriceStarter,
+                    STARTER_YEARLY: priceConfig.stripePriceStarterYearly,
+                    PRO: priceConfig.stripePricePro,
+                    PRO_YEARLY: priceConfig.stripePriceProYearly,
+                    BUSINESS: priceConfig.stripePriceBusiness,
+                    PACK_SMALL: priceConfig.stripePricePackSmall,
+                    PACK_MEDIUM: priceConfig.stripePricePackMedium,
+                    PACK_LARGE: priceConfig.stripePricePackLarge
+                };
+            }
+        } catch (e) {
+            // Non-fatal: keep Stripe enabled using secret key + env/default prices.
+            console.warn("Failed to fetch Stripe prices from global config", e);
+        }
+
+        return {
+            secretKey: secretKeyFromDb,
+            prices: {
+                ...envPrices,
+                ...dbPrices
+            }
+        };
     }
 
     return null;

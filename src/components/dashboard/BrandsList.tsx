@@ -245,12 +245,18 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                             </Button>
                         </Link>
                     ) : (
-                        <Link href="/dashboard/billing/plans">
-                            <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
-                                <Zap className="w-4 h-4" />
-                                Upgrade per Brand Monitor
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" className="gap-2 border-gray-200 text-gray-400 cursor-not-allowed" disabled>
+                                <Plus className="w-4 h-4" />
+                                Nuovo Brand
                             </Button>
-                        </Link>
+                            <Link href="/dashboard/billing/plans">
+                                <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
+                                    <Zap className="w-4 h-4" />
+                                    Upgrade
+                                </Button>
+                            </Link>
+                        </div>
                     )}
                 </div>
             </div>
@@ -267,17 +273,29 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                             }
                         </h3>
                         <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                            Configura il monitoraggio della visibilità per scoprire come i principali LLM parlano del tuo brand.
+                            {canAddMore
+                                ? 'Configura il monitoraggio della visibilità per scoprire come i principali LLM parlano del tuo brand.'
+                                : 'Azione bloccata dal piano attuale: il monitoraggio visibilità non è incluso.'
+                            }
                         </p>
-                        <Link href={selectedProject && !isAllProjectsSelected
-                            ? `/dashboard/visibility/create?projectId=${selectedProject.id}`
-                            : "/dashboard/visibility/create"
-                        }>
-                            <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
-                                <Plus className="w-4 h-4" />
-                                Configura il primo brand
-                            </Button>
-                        </Link>
+                        {canAddMore ? (
+                            <Link href={selectedProject && !isAllProjectsSelected
+                                ? `/dashboard/visibility/create?projectId=${selectedProject.id}`
+                                : "/dashboard/visibility/create"
+                            }>
+                                <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
+                                    <Plus className="w-4 h-4" />
+                                    Configura il primo brand
+                                </Button>
+                            </Link>
+                        ) : (
+                            <Link href="/dashboard/billing/plans">
+                                <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
+                                    <Zap className="w-4 h-4" />
+                                    Upgrade per sbloccare
+                                </Button>
+                            </Link>
+                        )}
                     </CardContent>
                 </Card>
             ) : (

@@ -4,10 +4,14 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { canCreateChatbot, canPublishBot, getUsageStats } from '@/lib/usage';
 import DashboardClient from '@/components/dashboard/DashboardClient';
+import { getOrCreateDefaultOrganization } from '@/lib/organizations';
 
 export default async function DashboardPage() {
     const session = await auth();
     if (!session?.user?.id) redirect('/login');
+
+    // Hard guard for first-login races: ensure at least one organization exists.
+    await getOrCreateDefaultOrganization(session.user.id);
 
     // Read active organization from cookies
     const cookieStore = await cookies();

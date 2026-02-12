@@ -3,8 +3,17 @@ export function buildQualityCorrectionPrompt(params: {
   enforceTopic: string;
   userContext: string;
   previousAssistant: string;
+  clarifyPreviousQuestion?: boolean;
+  scopeBoundaryRequired?: boolean;
 }): string {
-  const { language, enforceTopic, userContext, previousAssistant } = params;
+  const {
+    language,
+    enforceTopic,
+    userContext,
+    previousAssistant,
+    clarifyPreviousQuestion = false,
+    scopeBoundaryRequired = false
+  } = params;
   if ((language || '').toLowerCase().startsWith('it')) {
     return `Rigenera in modo naturale.
 Vincoli:
@@ -14,6 +23,8 @@ Vincoli:
 4) Rimani sul topic "${enforceTopic}".
 5) Non chiudere e non chiedere contatti.
 6) Evita formule generiche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): agganciati a un dettaglio concreto del messaggio utente.
+${clarifyPreviousQuestion ? `7) L'utente chiede chiarimento: rispondi prima chiarendo in modo diretto cosa intendevi, poi fai una sola domanda coerente.` : ''}
+${scopeBoundaryRequired ? `8) L'utente ha posto una domanda fuori scopo: esplicita gentilmente il perimetro dell'intervista e poi reindirizza al topic con una sola domanda.` : ''}
 Ultimo messaggio utente: "${userContext}"
 Domanda precedente assistente (da non ripetere): "${previousAssistant}"`;
   }
@@ -26,6 +37,8 @@ Constraints:
 4) Stay on topic "${enforceTopic}".
 5) Do not close and do not ask for contacts.
 6) Avoid generic openers ("very interesting", "that's an important point", "thanks for sharing"): ground your bridge in one concrete user detail.
+${clarifyPreviousQuestion ? `7) The user asked for clarification: first clarify directly what you meant, then ask one coherent follow-up question.` : ''}
+${scopeBoundaryRequired ? `8) The user asked an out-of-scope question: politely state the interview scope, then redirect to the topic with one focused question.` : ''}
 Latest user message: "${userContext}"
 Previous assistant question (do not repeat): "${previousAssistant}"`;
 }

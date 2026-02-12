@@ -436,7 +436,7 @@ function buildExtensionPreviewHints(params: {
         });
 
         const compactFocus = sanitizeUserSnippet(focusPoint, 10) || focusPoint;
-        preview.push(`${topic.label}: ${compactFocus}`);
+        preview.push(compactFocus || topic.label);
         if (preview.length >= maxItems) break;
     }
 
@@ -521,6 +521,8 @@ async function checkUserIntent(
     // Fast-path deterministic intent for extension consent to avoid accidental accepts
     // on unrelated content replies.
     if (context === 'deep_offer') {
+        if (isClarificationSignal(userMessage, language)) return 'NEUTRAL';
+
         const refuseSet = new Set([
             'no',
             'no grazie',
@@ -716,8 +718,8 @@ async function generateDeepOfferOnly(params: {
         `1) Start with a short thank-you for the user's availability and answers so far.`,
         `2) Say naturally that the planned interview time is over (or would be over).`,
         starterTheme
-            ? `3) Propose to continue and say you can start from THIS single theme: "${starterTheme}" (do not list multiple themes).`
-            : `3) Propose to continue and say one concrete single theme you can start from.`,
+            ? `3) Propose to continue and mention one indirect starting point connected to what the user shared, for example around: ${starterTheme}. Use no quotes, labels, or list formatting.`
+            : `3) Propose to continue and mention one concrete single starting point connected to what the user shared, using indirect wording.`,
         `4) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
         `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
@@ -762,11 +764,11 @@ async function enforceDeepOfferQuestion(params: {
     const hintText = (extensionPreview || []).map(v => String(v || '').trim()).filter(Boolean)[0] || '';
     return language === 'it'
         ? (hintText
-            ? `Grazie per la disponibilita e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo proseguire iniziando da "${hintText}". Hai disponibilita per qualche ulteriore domanda di approfondimento?`
-            : `Grazie per la disponibilita e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo proseguire con un ultimo approfondimento mirato. Hai disponibilita per qualche ulteriore domanda di approfondimento?`)
+            ? `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu, partendo da uno dei punti emersi, ad esempio ${hintText}. Ti va di proseguire ancora per qualche minuto?`
+            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti piu utili emersi. Ti va di proseguire ancora per qualche minuto?`)
         : (hintText
-            ? `Thank you for your availability and for the insights shared so far. The planned interview time would now be over: if you want, we can continue starting from "${hintText}". Are you available for a few more deep-dive questions?`
-            : `Thank you for your availability and for the insights shared so far. The planned interview time would now be over: if you want, we can continue with one focused deep-dive. Are you available for a few more deep-dive questions?`);
+            ? `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions, starting from one point that emerged, for example ${hintText}. Would you like to continue for a few more minutes?`
+            : `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions on one useful point that emerged. Would you like to continue for a few more minutes?`);
 }
 
 function isExtensionOfferQuestion(message: string, language: string): boolean {
@@ -887,6 +889,7 @@ function buildRuntimeSemanticContextPrompt(params: {
     const responseDepth = getUserResponseDepth(lastUserMessage);
     const transitionMode: TransitionMode | undefined = params.supervisorInsight?.transitionMode;
     const phase = params.phase;
+    const clarificationRequested = isClarificationSignal(lastUserMessage, language);
 
     const depthHintIt: Record<'brief' | 'balanced' | 'rich', string> = {
         brief: 'Risposta breve: usa una domanda semplice e concreta, con un solo focus.',
@@ -926,6 +929,9 @@ Istruzioni di coerenza:
 4. ${transitionHintIt}
 5. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
 6. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
+${clarificationRequested
+                ? '7. L\'utente sta chiedendo un chiarimento/disambiguazione: chiarisci prima in modo diretto la domanda precedente e poi fai una sola domanda di follow-up coerente.'
+                : ''}
 `.trim();
     }
 
@@ -944,6 +950,9 @@ Coherence instructions:
 4. ${transitionHintEn}
 5. Avoid rigid templates ("now let's move to") and premature closure cues.
 6. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
+${clarificationRequested
+            ? '7. The user is asking for clarification/disambiguation: first clarify your previous question directly, then ask one coherent follow-up question.'
+            : ''}
 `.trim();
 }
 
@@ -979,9 +988,94 @@ function isClarificationSignal(input: string, language: string): boolean {
     const isItalian = (language || 'en').toLowerCase().startsWith('it');
     const genericPattern = /^(boh|eh|mh|hmm|\?+|ok\??)$/i;
     if (genericPattern.test(text)) return true;
-    const itPattern = /\b(non capisco|non ho capito|non mi è chiaro|puoi chiarire|puoi spiegare meglio)\b/i;
-    const enPattern = /\b(i don't understand|i do not understand|not clear|can you clarify|can you explain)\b/i;
-    return isItalian ? itPattern.test(text) : enPattern.test(text);
+    const words = text.split(/\s+/).filter(Boolean);
+    const shortEitherOrQuestion = text.includes('?') && words.length <= 12 && (/\bo\b/.test(text) || /\bor\b/.test(text));
+    const itPattern = /\b(non capisco|non ho capito|non mi [eè] chiaro|puoi chiarire|puoi spiegare meglio|cosa intendi|intendi dire|ti riferisci|in che senso|parli di|quale dei due)\b/i;
+    const enPattern = /\b(i don't understand|i do not understand|not clear|can you clarify|can you explain|what do you mean|do you mean|are you referring to|which one)\b/i;
+    if (isItalian ? itPattern.test(text) : enPattern.test(text)) return true;
+    return shortEitherOrQuestion;
+}
+
+type UserTurnSignal = 'none' | 'clarification' | 'off_topic_question';
+
+function isLikelyUserQuestion(input: string, language: string): boolean {
+    const text = String(input || '').trim().toLowerCase();
+    if (!text) return false;
+    if (text.includes('?')) return true;
+    const isItalian = (language || 'en').toLowerCase().startsWith('it');
+    const itQuestionStarters = /^(come|cosa|perch[eé]|quando|dove|chi|quale|quali|quanto|in che modo|mi spieghi|puoi spiegare)/i;
+    const enQuestionStarters = /^(how|what|why|when|where|who|which|can you|could you|would you|please explain)/i;
+    return isItalian ? itQuestionStarters.test(text) : enQuestionStarters.test(text);
+}
+
+function hasAnyAnchorOverlap(source: string[], target: string[]): boolean {
+    if (!source.length || !target.length) return false;
+    const targetSet = new Set(target);
+    return source.some((root) => targetSet.has(root));
+}
+
+function detectUserTurnSignal(params: {
+    userMessage?: string | null;
+    language: string;
+    phase: Phase;
+    currentTopic: any;
+    targetTopic: any;
+    interviewObjective?: string;
+}): UserTurnSignal {
+    const userMessage = String(params.userMessage || '').trim();
+    if (!userMessage) return 'none';
+    if (params.phase !== 'SCAN' && params.phase !== 'DEEP') return 'none';
+
+    if (isClarificationSignal(userMessage, params.language)) {
+        return 'clarification';
+    }
+
+    if (!isLikelyUserQuestion(userMessage, params.language)) {
+        return 'none';
+    }
+
+    const language = params.language || 'en';
+    const isItalian = language.toLowerCase().startsWith('it');
+    const userAnchorRoots = buildMessageAnchors(userMessage, language).anchorRoots;
+    const currentAnchorRoots = buildTopicAnchors(params.currentTopic, language).anchorRoots;
+    const targetAnchorRoots = buildTopicAnchors(params.targetTopic, language).anchorRoots;
+    const objectiveAnchorRoots = buildMessageAnchors(String(params.interviewObjective || ''), language).anchorRoots;
+
+    const overlapsTopic =
+        hasAnyAnchorOverlap(userAnchorRoots, currentAnchorRoots) ||
+        hasAnyAnchorOverlap(userAnchorRoots, targetAnchorRoots) ||
+        hasAnyAnchorOverlap(userAnchorRoots, objectiveAnchorRoots);
+
+    if (overlapsTopic) return 'none';
+
+    const explicitOffTopicPattern = isItalian
+        ? /\b(che ore|che tempo|meteo|oroscopo|barzelletta|storia divertente|chi sei|come stai|quanti anni hai|dove vivi|che modello usi|chatgpt|openai|calcio|sport|borsa|bitcoin|criptovalute|ricetta)\b/i
+        : /\b(what time|weather|horoscope|joke|funny story|who are you|how are you|how old are you|where do you live|what model do you use|chatgpt|openai|football|soccer|sports|stock market|bitcoin|crypto|recipe)\b/i;
+    if (explicitOffTopicPattern.test(userMessage)) return 'off_topic_question';
+
+    const metaQuestionPattern = isItalian
+        ? /\b(tu|ti|te|sei|puoi)\b/i
+        : /\b(you|your|are you|can you)\b/i;
+    const words = userMessage.split(/\s+/).filter(Boolean).length;
+    if (words <= 10 && metaQuestionPattern.test(userMessage)) return 'off_topic_question';
+
+    return 'none';
+}
+
+function isClarificationHandledResponse(response: string, language: string): boolean {
+    const text = String(response || '');
+    const isItalian = (language || 'en').toLowerCase().startsWith('it');
+    const itPattern = /\b(per chiarire|intendo|mi riferivo|in altre parole|pi[uù] chiaramente|cio[eè]|parlavo di)\b/i;
+    const enPattern = /\b(to clarify|i meant|i was referring to|in other words|more clearly|that is|i was talking about)\b/i;
+    return (isItalian ? itPattern.test(text) : enPattern.test(text)) && text.includes('?');
+}
+
+function isScopeBoundaryHandledResponse(response: string, language: string): boolean {
+    const text = String(response || '');
+    const isItalian = (language || 'en').toLowerCase().startsWith('it');
+    const itPattern = /\b(fuori(?:\s+dallo)?\s+scopo|esula dallo scopo|nell'ambito di questa intervista|restiamo su|torniamo a|per questa intervista)\b/i;
+    const enPattern = /\b(out of scope|outside the scope|for this interview|let's stay on|let's get back to|within this interview)\b/i;
+    return (isItalian ? itPattern.test(text) : enPattern.test(text)) && text.includes('?');
 }
 
 function buildNaturalTopicCue(topicLabel: string, language: string): string {
@@ -1697,19 +1791,55 @@ export async function POST(req: Request) {
                 // If time is over during DEEP, offer extra time before continuing
                 const maxDurationSec = maxDurationMins * 60;
                 const remainingSec = maxDurationSec - effectiveSec;
+                let usedClarificationTurnInDeep = false;
                 if (remainingSec <= 0 && state.deepAccepted !== true) {
-                    nextState.phase = 'DEEP_OFFER';
-                    nextState.deepAccepted = false;
-                    nextState.extensionReturnPhase = 'DEEP';
-                    nextState.extensionReturnTopicIndex = state.topicIndex;
-                    nextState.extensionReturnTurnInTopic = state.turnInTopic;
-                    nextState.extensionOfferAttempts = 0;
-                    supervisorInsight = buildDeepOfferInsight(state);
-                    console.log(`🎁 [DEEP→DEEP_OFFER] Time limit reached during DEEP. Asking extension consent.`);
+                    const shouldClarifyBeforeOffer =
+                        lastMessage?.role === 'user' &&
+                        isClarificationSignal(lastMessage.content, language) &&
+                        ((state.clarificationTurnsByTopic || {})[deepCurrent.id] || 0) < 1;
+
+                    if (shouldClarifyBeforeOffer) {
+                        usedClarificationTurnInDeep = true;
+                        nextState.turnInTopic = state.turnInTopic;
+                        nextState.clarificationTurnsByTopic = {
+                            ...(state.clarificationTurnsByTopic || {}),
+                            [deepCurrent.id]: ((state.clarificationTurnsByTopic || {})[deepCurrent.id] || 0) + 1
+                        };
+                        const usedSubGoals = (state.topicSubGoalHistory || {})[deepCurrent.id] || [];
+                        const lastDeepGoal = (state.deepLastSubGoalByTopic || {})[deepCurrent.id];
+                        const availableSubGoals = (deepCurrent.subGoals || [])
+                            .filter((sg: string) => !usedSubGoals.includes(sg))
+                            .filter((sg: string) => (lastDeepGoal ? sg !== lastDeepGoal : true));
+                        const matchingTopic = (nextState.interestingTopics || state.interestingTopics || []).find(
+                            (it: InterestingTopic) => it.topicId === deepCurrent.id
+                        );
+                        const engagingSnippet = matchingTopic?.bestSnippet || '';
+                        const focusPoint = selectDeepFocusPoint({
+                            topic: deepCurrent,
+                            availableSubGoals: availableSubGoals.length > 0 ? availableSubGoals : (deepCurrent.subGoals || [deepCurrent.label]),
+                            engagingSnippet,
+                            interviewObjective,
+                            lastUserMessage: lastMessage.content,
+                            language
+                        });
+                        supervisorInsight = { status: 'DEEPENING', focusPoint: focusPoint || deepCurrent.label, engagingSnippet };
+                        console.log(`🧩 [DEEP] Clarification detected on "${deepCurrent.label}" at time boundary. Adding one clarification turn before extension offer.`);
+                    } else {
+                        nextState.phase = 'DEEP_OFFER';
+                        nextState.deepAccepted = false;
+                        nextState.extensionReturnPhase = 'DEEP';
+                        nextState.extensionReturnTopicIndex = state.topicIndex;
+                        nextState.extensionReturnTurnInTopic = state.turnInTopic;
+                        nextState.extensionOfferAttempts = 0;
+                        supervisorInsight = buildDeepOfferInsight(state);
+                        console.log(`🎁 [DEEP→DEEP_OFFER] Time limit reached during DEEP. Asking extension consent.`);
+                    }
                 }
 
                 if (nextState.phase === 'DEEP_OFFER') {
                     // Skip DEEP progression until user responds to offer
+                } else if (usedClarificationTurnInDeep) {
+                    // Keep current DEEP topic/turn for one clarification response.
                 } else if (state.turnInTopic >= turnsLimit) {
                     // Move to next topic
                     if (state.topicIndex + 1 < deepTotal) {
@@ -2155,6 +2285,16 @@ export async function POST(req: Request) {
             ? getDeepTopics(botTopics, nextState.deepTopicOrder || state.deepTopicOrder)
             : botTopics;
         const targetTopic = nextActiveTopics[nextState.topicIndex] || currentTopic;
+        const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
+            ? detectUserTurnSignal({
+                userMessage: lastMessage.content,
+                language,
+                phase: nextState.phase,
+                currentTopic,
+                targetTopic,
+                interviewObjective
+            })
+            : 'none';
 
 
         systemPrompt = await PromptBuilder.build(
@@ -2219,6 +2359,16 @@ hard_rules:
             if (runtimeSemanticContext) {
                 systemPrompt += `\n\n${runtimeSemanticContext}`;
             }
+        }
+
+        if (userTurnSignal === 'clarification') {
+            systemPrompt += language === 'it'
+                ? `\n\n## CLARIFICATION GUARD (OBBLIGATORIO)\nL'utente sta chiedendo un chiarimento: NON ignorarlo.\n1) Rispondi gentilmente chiarendo in modo diretto la domanda precedente, senza formule vaghe.\n2) Se l'utente mette due opzioni (es. "X o Y"), specifica chiaramente quale intendevi.\n3) Dopo il chiarimento, fai UNA sola domanda di follow-up coerente con il topic corrente.`
+                : `\n\n## CLARIFICATION GUARD (MANDATORY)\nThe user is asking for clarification: do NOT ignore it.\n1) Reply kindly by directly clarifying your previous question.\n2) If the user offers two options (e.g. "X or Y"), state clearly which one you meant.\n3) After clarifying, ask ONE coherent follow-up question on the current topic.`;
+        } else if (userTurnSignal === 'off_topic_question') {
+            systemPrompt += language === 'it'
+                ? `\n\n## SCOPE GUARD (OBBLIGATORIO)\nL'utente ha fatto una domanda fuori dallo scopo dell'intervista.\n1) Rispondi con una frase gentile che spieghi che la domanda esula dallo scopo di questa intervista.\n2) Riporta subito il focus al topic corrente con UNA sola domanda mirata.\n3) Non sviluppare il tema fuori scopo in dettaglio.`
+                : `\n\n## SCOPE GUARD (MANDATORY)\nThe user asked a question outside the interview scope.\n1) Reply with one polite sentence stating that the question is outside the scope of this interview.\n2) Immediately redirect to the current topic with ONE focused question.\n3) Do not expand on the off-topic question.`;
         }
 
         const shouldEndWithQuestion = !['COMPLETE_WITHOUT_DATA', 'FINAL_GOODBYE'].includes(supervisorInsight?.status);
@@ -2332,6 +2482,30 @@ hard_rules:
                     currentText: responseText,
                     extensionPreview: deepOfferPreviewHints
                 });
+                didRegenerate = true;
+            }
+        }
+
+        // Clarification/scope enforcement on topic phases:
+        // if the user asked a clarification or an off-topic question,
+        // ensure the assistant acknowledges it explicitly before continuing.
+        if (!didRegenerate && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
+            if (userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language)) {
+                console.log(`⚠️ [SUPERVISOR] Clarification requested but not handled clearly. Regenerating.`);
+                const enforcedSystem = language === 'it'
+                    ? `${systemPrompt}\n\nCRITICAL: Rispondi prima al chiarimento in modo diretto e gentile (specifica esattamente cosa intendevi), poi fai UNA sola domanda coerente col topic corrente.`
+                    : `${systemPrompt}\n\nCRITICAL: First answer the clarification directly and kindly (state exactly what you meant), then ask ONE coherent follow-up question on the current topic.`;
+                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.25 });
+                responseText = retry.object.response?.trim() || responseText;
+                didRegenerate = true;
+            } else if (userTurnSignal === 'off_topic_question' && !isScopeBoundaryHandledResponse(responseText, language)) {
+                console.log(`⚠️ [SUPERVISOR] Off-topic user question not bounded. Regenerating with scope boundary.`);
+                const enforceTopic = targetTopic?.label || currentTopic.label;
+                const enforcedSystem = language === 'it'
+                    ? `${systemPrompt}\n\nCRITICAL: Spiega gentilmente in una frase che la domanda dell'utente è fuori scopo per questa intervista, poi riporta il focus su "${enforceTopic}" con UNA sola domanda.`
+                    : `${systemPrompt}\n\nCRITICAL: In one polite sentence, explain the user's question is out of scope for this interview, then redirect to "${enforceTopic}" with ONE focused question.`;
+                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.25 });
+                responseText = retry.object.response?.trim() || responseText;
                 didRegenerate = true;
             }
         }
@@ -2672,13 +2846,28 @@ hard_rules:
             }
 
             // Soft correction only for the two high-impact issues requested by product:
-            // - double question / malformed question count
-            // - repetitive question compared to previous assistant turn
+            // - malformed or repetitive question
+            // - weak semantic linkage / clarification handling (strictly gated)
             const needsQuestionCountFix = !qualitative.checks.oneQuestion;
             const needsRepetitionFix = !qualitative.checks.nonRepetitive;
+            const userWordCountForQuality = String(lastMessage.content || '').trim().split(/\s+/).filter(Boolean).length;
+            const clarificationRequestedForQuality = isClarificationSignal(lastMessage.content, language);
+            const needsSemanticLinkFix = !qualitative.checks.referencesUserContext && userWordCountForQuality >= 4;
+            const needsTransitionCoherenceFix = !qualitative.checks.coherentTransition && userWordCountForQuality >= 5;
+            const needsClarificationFix = clarificationRequestedForQuality && !qualitative.checks.handlesClarificationNaturally;
+            const needsClarificationDirectFix = userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language);
+            const needsScopeBoundaryFix = userTurnSignal === 'off_topic_question' && !isScopeBoundaryHandledResponse(responseText, language);
             const isTopicQuestionPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
 
-            if (isTopicQuestionPhase && (needsQuestionCountFix || needsRepetitionFix)) {
+            if (isTopicQuestionPhase && (
+                needsQuestionCountFix ||
+                needsRepetitionFix ||
+                needsSemanticLinkFix ||
+                needsTransitionCoherenceFix ||
+                needsClarificationFix ||
+                needsClarificationDirectFix ||
+                needsScopeBoundaryFix
+            )) {
                 qualityTelemetry.gateTriggered = true;
                 const enforceTopic = targetTopic?.label || currentTopic.label;
                 const previousAssistant = String(lastAssistantBeforeCurrent || '').slice(0, 180);
@@ -2687,7 +2876,9 @@ hard_rules:
                     language,
                     enforceTopic,
                     userContext,
-                    previousAssistant
+                    previousAssistant,
+                    clarifyPreviousQuestion: clarificationRequestedForQuality || userTurnSignal === 'clarification',
+                    scopeBoundaryRequired: userTurnSignal === 'off_topic_question'
                 });
 
                 try {

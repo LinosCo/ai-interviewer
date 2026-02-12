@@ -341,6 +341,11 @@ async function resolvePlanAndCycleFromPriceId(priceId?: string | null): Promise<
             stripePricePro: true,
             stripePriceProYearly: true,
             stripePriceBusiness: true,
+            stripePriceBusinessYearly: true,
+            stripePricePartner: true,
+            stripePricePartnerYearly: true,
+            stripePriceEnterprise: true,
+            stripePriceEnterpriseYearly: true,
         }
     }).catch(() => null);
 
@@ -351,16 +356,16 @@ async function resolvePlanAndCycleFromPriceId(priceId?: string | null): Promise<
             (planType === PlanType.STARTER ? globalConfig?.stripePriceStarter : null) ||
             (planType === PlanType.PRO ? globalConfig?.stripePricePro : null) ||
             (planType === PlanType.BUSINESS ? globalConfig?.stripePriceBusiness : null) ||
-            (planType === PlanType.PARTNER ? (globalConfig as any)?.stripePricePartner : null) ||
-            (planType === PlanType.ENTERPRISE ? (globalConfig as any)?.stripePriceEnterprise : null) ||
+            (planType === PlanType.PARTNER ? globalConfig?.stripePricePartner : null) ||
+            (planType === PlanType.ENTERPRISE ? globalConfig?.stripePriceEnterprise : null) ||
             plan.stripePriceIdMonthly;
 
         const yearlyId =
             (planType === PlanType.STARTER ? globalConfig?.stripePriceStarterYearly : null) ||
             (planType === PlanType.PRO ? globalConfig?.stripePriceProYearly : null) ||
             (planType === PlanType.BUSINESS ? globalConfig?.stripePriceBusinessYearly : null) ||
-            (planType === PlanType.PARTNER ? (globalConfig as any)?.stripePricePartnerYearly : null) ||
-            (planType === PlanType.ENTERPRISE ? (globalConfig as any)?.stripePriceEnterpriseYearly : null) ||
+            (planType === PlanType.PARTNER ? globalConfig?.stripePricePartnerYearly : null) ||
+            (planType === PlanType.ENTERPRISE ? globalConfig?.stripePriceEnterpriseYearly : null) ||
             plan.stripePriceIdYearly;
 
         if (monthlyId && monthlyId === priceId) {

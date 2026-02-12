@@ -754,7 +754,11 @@ ${engagingSnippet ? `> **THE USER SHOWED INTEREST when they said**: "${engagingS
         // And we must force the data ask if the supervisor says "completion"
 
         let supervisorSupremacyInstruction = "";
-        const isCompletion = supervisorInsight && (typeof supervisorInsight === 'string' ? false : supervisorInsight.status === 'COMPLETION');
+        const isCompletion = Boolean(
+            supervisorInsight &&
+            typeof supervisorInsight !== 'string' &&
+            (supervisorInsight.status === 'FINAL_GOODBYE' || supervisorInsight.status === 'COMPLETE_WITHOUT_DATA')
+        );
         // Logic for Data Collection (Pre-check) - ensure we don't miss it
         const collectingData = bot.collectCandidateData;
 

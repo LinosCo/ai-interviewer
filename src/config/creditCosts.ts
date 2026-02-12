@@ -3,34 +3,39 @@
  * Questi valori devono essere calibrati in base ai costi LLM effettivi
  */
 
+import { LLMModel, MODEL_PRICING } from './llmModels';
+
 export const CREDIT_COSTS = {
     // Interview AI
-    interview_question: 8_000,        // singola domanda/risposta
-    interview_complete: 12_000,       // intervista media completa
-    interview_analysis: 15_000,       // analisi post-intervista
+    interview_question: 8,        // singola domanda/risposta
+    interview_complete: 12,       // intervista media completa
+    interview_analysis: 15,       // analisi post-intervista
 
     // Chatbot
-    chatbot_session_message: 3_000,   // singolo messaggio
-    chatbot_session_complete: 8_000,  // sessione media completa
+    chatbot_session_message: 3,   // singolo messaggio
+    chatbot_session_complete: 8,  // sessione media completa
 
     // Visibility Tracker
-    visibility_query: 6_000,          // singola query AI
-    visibility_report: 20_000,        // report completo
+    visibility_query: 6,          // singola query AI
+    visibility_report: 20,        // report completo
 
     // AI Tips
-    ai_tip_generation: 15_000,        // generazione singolo tip
+    ai_tip_generation: 15,        // generazione singolo tip
 
     // Copilot Strategico
-    copilot_message: 20_000,          // singola interazione
-    copilot_analysis: 35_000,         // analisi approfondita
+    copilot_message: 20,          // singola interazione
+    copilot_analysis: 35,         // analisi approfondita
 
     // Export
-    export_pdf_simple: 5_000,         // export senza AI
-    export_pdf_analysis: 30_000,      // export con analisi AI
-    export_csv: 1_000                 // export dati raw
+    export_pdf_simple: 5,         // export senza AI
+    export_pdf_analysis: 30,      // export con analisi AI
+    export_csv: 1                 // export dati raw
 } as const;
 
 export type CreditAction = keyof typeof CREDIT_COSTS;
+type PricingModelKey = keyof typeof MODEL_PRICING;
+
+export const TOKEN_TO_CREDIT_RATE = 0.0005;
 
 /**
  * Mappa azione -> tool per tracking
@@ -56,6 +61,49 @@ export const ACTION_TO_TOOL: Record<CreditAction, string> = {
  */
 export function getCreditCost(action: CreditAction): number {
     return CREDIT_COSTS[action];
+}
+
+function resolvePricingModel(modelName: string): PricingModelKey | null {
+    const normalized = String(modelName || '').toLowerCase().trim();
+    if (!normalized) return null;
+
+    const aliases: Array<{ prefix: string; model: PricingModelKey }> = [
+        { prefix: 'gpt-4o-mini', model: LLMModel.GPT4O_MINI },
+        { prefix: 'claude-3-5-haiku', model: LLMModel.CLAUDE_HAIKU },
+        { prefix: 'claude-sonnet-4', model: LLMModel.CLAUDE_SONNET },
+        { prefix: 'gemini-2.0-flash', model: LLMModel.GEMINI_FLASH },
+        { prefix: 'gemini-1.5-flash-8b', model: LLMModel.GEMINI_FLASH_LITE }
+    ];
+
+    for (const alias of aliases) {
+        if (normalized.startsWith(alias.prefix)) {
+            return alias.model;
+        }
+    }
+
+    return null;
+}
+
+export function getModelCreditMultiplier(modelName: string): number {
+    const normalized = String(modelName || '').toLowerCase().trim();
+    const pricingModel = resolvePricingModel(normalized);
+    const baseline = MODEL_PRICING[LLMModel.GPT4O_MINI];
+    const baselineCost = baseline.input + baseline.output;
+
+    if (pricingModel) {
+        const modelPricing = MODEL_PRICING[pricingModel];
+        const modelCost = modelPricing.input + modelPricing.output;
+        return Math.max(1, Math.min(8, modelCost / baselineCost));
+    }
+
+    if (normalized.includes('gpt-4o-mini') || normalized.includes('haiku') || normalized.includes('flash-8b')) {
+        return 1;
+    }
+    if (normalized.includes('gpt-4o') || normalized.includes('sonnet') || normalized.includes('o1') || normalized.includes('o3')) {
+        return 3;
+    }
+
+    return 1.5;
 }
 
 /**

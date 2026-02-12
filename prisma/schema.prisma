@@ -21,7 +21,7 @@ model User {
   customApiKeys           Json?
   creditsResetDate        DateTime?
   isPartner               Boolean                    @default(false)
-  monthlyCreditsLimit     BigInt                     @default(500000)
+  monthlyCreditsLimit     BigInt                     @default(500)
   monthlyCreditsUsed      BigInt                     @default(0)
   packCreditsAvailable    BigInt                     @default(0)
   partnerActiveClients    Int                        @default(0)
@@ -174,7 +174,7 @@ model Organization {
   currentPeriodStart     DateTime?
   extraMemberSlots       Int                    @default(0)
   maxMembers             Int                    @default(1)
-  monthlyCreditsLimit    BigInt                 @default(500000)
+  monthlyCreditsLimit    BigInt                 @default(500)
   monthlyCreditsUsed     BigInt                 @default(0)
   packCreditsAvailable   BigInt                 @default(0)
   stripeCustomerId       String?                @unique

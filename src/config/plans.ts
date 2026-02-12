@@ -101,7 +101,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.FREE,
         name: 'Free',
         description: 'Per sempre gratuito',
-        monthlyCredits: 500_000,
+        monthlyCredits: 500,
         monthlyPrice: 0,
         yearlyPrice: 0,
         yearlyMonthlyEquivalent: 0,
@@ -121,7 +121,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: 1
         },
         limits: {
-            monthlyTokenBudget: 500_000,
+            monthlyTokenBudget: 500,
             maxInterviewsPerMonth: -1,
             maxChatbots: 0,
             maxChatbotSessionsPerMonth: 0,
@@ -140,7 +140,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: false
         },
         featureList: [
-            '500K crediti/mese',
+            '500 crediti/mese',
             'Interview AI base',
             '1 progetto',
             'Analytics base',
@@ -152,7 +152,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.TRIAL,
         name: 'Trial',
         description: 'Prova gratuita 14 giorni',
-        monthlyCredits: 2_000_000,
+        monthlyCredits: 2_000,
         monthlyPrice: 0,
         yearlyPrice: 0,
         yearlyMonthlyEquivalent: 0,
@@ -172,7 +172,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 2_000_000,
+            monthlyTokenBudget: 2_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -191,7 +191,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: false
         },
         featureList: [
-            '2M crediti per 14 giorni',
+            '2K crediti per 14 giorni',
             'Tutte le funzionalità PRO',
             'Progetti illimitati',
             'Prova gratuita completa'
@@ -202,7 +202,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.STARTER,
         name: 'Starter',
         description: 'Per iniziare',
-        monthlyCredits: 6_000_000,
+        monthlyCredits: 6_000,
         monthlyPrice: 69,
         yearlyPrice: 588,
         yearlyMonthlyEquivalent: 49,
@@ -224,7 +224,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 6_000_000,
+            monthlyTokenBudget: 6_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -243,7 +243,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: false
         },
         featureList: [
-            '6M crediti/mese',
+            '6K crediti/mese',
             'Interview AI completo',
             'Chatbot illimitati',
             'Progetti illimitati',
@@ -256,7 +256,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.PRO,
         name: 'Pro',
         description: 'Per professionisti',
-        monthlyCredits: 20_000_000,
+        monthlyCredits: 20_000,
         monthlyPrice: 199,
         yearlyPrice: 1788,
         yearlyMonthlyEquivalent: 149,
@@ -279,7 +279,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 20_000_000,
+            monthlyTokenBudget: 20_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -298,7 +298,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: true
         },
         featureList: [
-            '20M crediti/mese',
+            '20K crediti/mese',
             'Interview AI completo',
             'Chatbot illimitati',
             'Brand Monitor',
@@ -314,7 +314,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.BUSINESS,
         name: 'Business',
         description: 'Per aziende',
-        monthlyCredits: 50_000_000,
+        monthlyCredits: 50_000,
         monthlyPrice: 399,
         yearlyPrice: 3588,
         yearlyMonthlyEquivalent: 299,
@@ -336,7 +336,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 50_000_000,
+            monthlyTokenBudget: 50_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -355,7 +355,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: true
         },
         featureList: [
-            '50M crediti/mese',
+            '50K crediti/mese',
             'Tutte le funzionalità PRO',
             'White Label',
             'API Access',
@@ -371,7 +371,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.PARTNER,
         name: 'Partner',
         description: 'Per agenzie e consulenti',
-        monthlyCredits: 10_000_000,
+        monthlyCredits: 10_000,
         monthlyPrice: 29, // €0 con 3+ clienti attivi
         yearlyPrice: 348,
         yearlyMonthlyEquivalent: 29,
@@ -393,7 +393,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             customLogoReports: true
         },
         limits: {
-            monthlyTokenBudget: 10_000_000,
+            monthlyTokenBudget: 10_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -412,7 +412,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: true
         },
         featureList: [
-            '10M crediti/mese',
+            '10K crediti/mese',
             'Tutte le funzionalità PRO',
             'Trasferimento progetti',
             'Dashboard multi-cliente',

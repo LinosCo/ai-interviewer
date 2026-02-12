@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType } from '@/config/plans';
 import { TokenCategory } from '@prisma/client';
 import { CreditService } from './creditService';
-import { CreditAction, getCreditCost } from '@/config/creditCosts';
+import { CreditAction, getCreditCost, getModelCreditMultiplier, TOKEN_TO_CREDIT_RATE } from '@/config/creditCosts';
 
 /**
  * TokenTrackingService
@@ -115,8 +115,10 @@ export class TokenTrackingService {
 
         // 2. Calcola crediti da consumare
         const baseCost = getCreditCost(action);
-        const tokenBasedCost = Math.ceil(totalTokens * 0.5); // 0.5 crediti per token
-        const creditsToConsume = Math.max(baseCost, tokenBasedCost);
+        const modelMultiplier = getModelCreditMultiplier(model);
+        const modelAdjustedBaseCost = Math.max(1, Math.ceil(baseCost * modelMultiplier));
+        const tokenBasedCost = Math.max(1, Math.ceil(totalTokens * TOKEN_TO_CREDIT_RATE * modelMultiplier));
+        const creditsToConsume = Math.max(modelAdjustedBaseCost, tokenBasedCost);
 
         // 3. Consuma i crediti dall'organizzazione
         const creditResult = await CreditService.consumeCredits(organizationId, action, {
@@ -231,11 +233,11 @@ export class TokenTrackingService {
             organization.customLimits !== null &&
             (organization.customLimits as Record<string, unknown>).monthlyCreditsLimitCustom === true;
 
-        // Auto-heal stale prelaunch data: paid/business orgs left with old 500k default.
+        // Auto-heal stale prelaunch data: paid/business orgs left with old free-tier default.
         if (
             !hasCustomMonthlyLimit &&
-            defaultPlanLimit > 500_000 &&
-            organization.monthlyCreditsLimit === BigInt(500_000)
+            defaultPlanLimit > 500 &&
+            organization.monthlyCreditsLimit === BigInt(500)
         ) {
             await prisma.organization.update({
                 where: { id: organizationId },

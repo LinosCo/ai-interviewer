@@ -24,7 +24,7 @@ export interface LandingCreditPack {
     name: string;
     credits: string;         // Formatted string "2M"
     price: number;
-    pricePerMillion: number;
+    pricePerThousand: number;
     popular?: boolean;
 }
 
@@ -54,7 +54,7 @@ export const LANDING_PLANS: LandingPlan[] = [
         yearlyPrice: 0,
         showPrice: true,
         features: [
-            '500K crediti/mese',
+            '500 crediti/mese',
             '1 progetto',
             'Interviste AI',
             'Analytics base',
@@ -71,7 +71,7 @@ export const LANDING_PLANS: LandingPlan[] = [
         yearlyPrice: 49,
         showPrice: true,
         features: [
-            '6M crediti/mese',
+            '6K crediti/mese',
             'Insterviste AI con branding personalizzabile',
             'Chatbot AI con lead generation',
             'Progetti illimitati',
@@ -89,7 +89,7 @@ export const LANDING_PLANS: LandingPlan[] = [
         yearlyPrice: 149,
         showPrice: true,
         features: [
-            '20M crediti/mese',
+            '20K crediti/mese',
             'Brand Monitor',
             'AI Tips',
             'Copilot Strategico',
@@ -128,24 +128,24 @@ export const LANDING_CREDIT_PACKS: LandingCreditPack[] = [
     {
         id: 'small',
         name: 'Pack Small',
-        credits: '2M',
+        credits: '2K',
         price: 15,
-        pricePerMillion: 7.50,
+        pricePerThousand: 7.50,
     },
     {
         id: 'medium',
         name: 'Pack Medium',
-        credits: '6M',
+        credits: '6K',
         price: 39,
-        pricePerMillion: 6.50,
+        pricePerThousand: 6.50,
         popular: true,
     },
     {
         id: 'large',
         name: 'Pack Large',
-        credits: '15M',
+        credits: '15K',
         price: 89,
-        pricePerMillion: 5.93,
+        pricePerThousand: 5.93,
     },
 ];
 
@@ -160,7 +160,7 @@ export const PARTNER_PLAN: PartnerPlan = {
     whiteLabelThreshold: 10,
     trialDays: 60,
     features: [
-        '10M crediti/mese',
+        '10K crediti/mese',
         'Tutte le funzionalità PRO',
         'Dashboard multi-cliente',
         'Trasferimento progetti',

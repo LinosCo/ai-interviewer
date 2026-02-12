@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType, formatMonthlyCredits } from '@/config/plans';
-import { CREDIT_PACKS } from '@/config/creditPacks';
+import { CREDIT_PACKS, formatCredits } from '@/config/creditPacks';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import BillingClient from './billing-client';
 import { UsageDashboard } from '@/components/dashboard/UsageDashboard';
@@ -208,13 +208,13 @@ export default async function BillingPage() {
                                     <div>
                                         <p className="font-bold text-stone-900">{pack.name}</p>
                                         <p className="text-xs text-stone-500">
-                                            {(pack.credits / 1_000_000).toFixed(0)}M crediti
+                                            {formatCredits(pack.credits)} crediti
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <p className="font-bold text-amber-600">€{pack.price}</p>
                                         <p className="text-[10px] text-stone-400">
-                                            €{pack.pricePerMillion.toFixed(2)}/M
+                                            €{pack.pricePerThousand.toFixed(2)}/1K
                                         </p>
                                     </div>
                                 </div>

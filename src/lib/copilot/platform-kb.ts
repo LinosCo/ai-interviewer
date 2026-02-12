@@ -849,26 +849,26 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
 
 **Starter**:
 - 69€/mese oppure 588€/anno (49€/mese equivalente)
-- 6M crediti/mese
+- 6K crediti/mese
 - Interviste e chatbot base
 - Analytics base
 
 **Pro**:
 - 199€/mese oppure 1788€/anno (149€/mese equivalente)
-- 20M crediti/mese
+- 20K crediti/mese
 - Brand Monitor (1 brand)
 - Strategy Copilot con analisi dati
 - Cross-channel insights
 
 **Business**:
 - 399€/mese oppure 3588€/anno (299€/mese equivalente)
-- 50M crediti/mese
+- 50K crediti/mese
 - Brand Monitor (3 brand)
 - White label, API, dominio custom
 - Supporto prioritario
 
 **Trial** (14 giorni gratuiti):
-- 2M crediti
+- 2K crediti
 - Accesso a tutte le funzionalita Pro
 
 Puoi scegliere fatturazione mensile o annuale direttamente in checkout.`,
@@ -907,25 +907,25 @@ Ogni operazione AI consuma crediti in base alla complessita:
 
 | Operazione | Crediti |
 |------------|---------|
-| Messaggio intervista | ~5.000 |
-| Messaggio chatbot | ~3.000 |
-| Analisi sentiment | ~8.000 |
-| Estrazione temi | ~10.000 |
-| Copilot message | 20.000 |
-| Copilot analysis | 35.000 |
-| Brand scan (per LLM) | ~15.000 |
+| Messaggio intervista | ~5 |
+| Messaggio chatbot | ~3 |
+| Analisi sentiment | ~8 |
+| Estrazione temi | ~10 |
+| Copilot message | 20 |
+| Copilot analysis | 35 |
+| Brand scan (per LLM) | ~15 |
 
 **Budget mensili per piano:**
-- FREE: 500K crediti
-- STARTER: 6M crediti
-- PRO: 20M crediti
-- BUSINESS: 50M crediti
+- FREE: 500 crediti
+- STARTER: 6K crediti
+- PRO: 20K crediti
+- BUSINESS: 50K crediti
 - ADMIN: Illimitati
 
 **Credit Pack extra (one-time):**
-- Small: 2M
-- Medium: 6M
-- Large: 15M
+- Small: 2K
+- Medium: 6K
+- Large: 15K
 
 I pack non scadono e si acquistano da Billing.
 

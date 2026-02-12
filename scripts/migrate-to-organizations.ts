@@ -47,7 +47,7 @@ async function migrate() {
                             // @ts-ignore - Fields were commented out but we use them here before final deprecation
                             plan: (user as any).plan || PlanType.FREE,
                             // @ts-ignore
-                            monthlyCreditsLimit: (user as any).monthlyCreditsLimit || BigInt(500000),
+                            monthlyCreditsLimit: (user as any).monthlyCreditsLimit || BigInt(500),
                             // @ts-ignore
                             monthlyCreditsUsed: (user as any).monthlyCreditsUsed || BigInt(0),
                             // @ts-ignore

@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getCreditPack, CREDIT_PACKS } from '@/config/creditPacks';
+import { getCreditPack, CREDIT_PACKS, formatCredits } from '@/config/creditPacks';
 import { getStripeClient, getStripePriceIdForPack } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 
@@ -155,11 +155,14 @@ export async function GET() {
                 id: pack.id,
                 name: pack.name,
                 credits: pack.credits,
-                creditsFormatted: `${(pack.credits / 1_000_000).toFixed(0)}M`,
+                creditsFormatted: formatCredits(pack.credits),
                 price: pack.price,
                 priceFormatted: `€${pack.price}`,
-                pricePerMillion: pack.pricePerMillion,
-                pricePerMillionFormatted: `€${pack.pricePerMillion.toFixed(2)}`
+                pricePerThousand: pack.pricePerThousand,
+                pricePerThousandFormatted: `€${pack.pricePerThousand.toFixed(2)}`,
+                // Backward compatibility for existing clients expecting old fields.
+                pricePerMillion: pack.pricePerThousand * 1000,
+                pricePerMillionFormatted: `€${(pack.pricePerThousand * 1000).toFixed(2)}`
             }))
         });
     } catch (error) {

@@ -17,12 +17,12 @@ const prisma = new PrismaClient();
 
 // Mapping piano -> crediti mensili (da plans.ts)
 const PLAN_CREDITS: Record<string, bigint> = {
-    FREE: BigInt(500_000),
-    TRIAL: BigInt(2_000_000),
-    STARTER: BigInt(6_000_000),
-    PRO: BigInt(20_000_000),
-    BUSINESS: BigInt(50_000_000),
-    PARTNER: BigInt(10_000_000),
+    FREE: BigInt(500),
+    TRIAL: BigInt(2_000),
+    STARTER: BigInt(6_000),
+    PRO: BigInt(20_000),
+    BUSINESS: BigInt(50_000),
+    PARTNER: BigInt(10_000),
     ADMIN: BigInt(-1), // Illimitato
 };
 

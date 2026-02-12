@@ -105,8 +105,8 @@ export const CreditService = {
 
         if (
             !hasCustomMonthlyLimit &&
-            defaultPlanLimit > 500_000 &&
-            org.monthlyCreditsLimit === BigInt(500_000)
+            defaultPlanLimit > 500 &&
+            org.monthlyCreditsLimit === BigInt(500)
         ) {
             await prisma.organization.update({
                 where: { id: organizationId },
@@ -261,8 +261,8 @@ export const CreditService = {
 
         if (
             !hasCustomMonthlyLimit &&
-            defaultPlanLimit > 500_000 &&
-            org.monthlyCreditsLimit === BigInt(500_000)
+            defaultPlanLimit > 500 &&
+            org.monthlyCreditsLimit === BigInt(500)
         ) {
             await prisma.organization.update({
                 where: { id: organizationId },
@@ -307,8 +307,8 @@ export const CreditService = {
 
         if (
             !hasCustomMonthlyLimit &&
-            defaultPlanLimit > 500_000 &&
-            org.monthlyCreditsLimit === BigInt(500_000)
+            defaultPlanLimit > 500 &&
+            org.monthlyCreditsLimit === BigInt(500)
         ) {
             await prisma.organization.update({
                 where: { id: organizationId },

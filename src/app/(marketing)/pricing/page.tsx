@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { PLANS, PlanType } from '@/config/plans';
+import { formatMonthlyCredits, PLANS, PlanType } from '@/config/plans';
 import { LANDING_CREDIT_PACKS } from '@/config/landingPricing';
 import { Check, Zap, ArrowRight, ShieldCheck, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -120,7 +120,7 @@ export default function PricingPage() {
                             <div className="pt-4 border-t border-slate-50">
                                 <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
                                     <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                                    {plan.monthlyCredits === -1 ? 'Crediti Illimitati' : `${(plan.monthlyCredits / 1000000).toFixed(0)}M Crediti/mese`}
+                                    {plan.monthlyCredits === -1 ? 'Crediti Illimitati' : `${formatMonthlyCredits(plan.monthlyCredits)} crediti/mese`}
                                 </div>
                             </div>
                         </div>
@@ -154,7 +154,7 @@ export default function PricingPage() {
                             </div>
                             <h3 className="font-bold text-slate-900 mb-1">{pack.name}</h3>
                             <p className="text-xs text-slate-500 font-medium mb-1">{pack.credits} crediti</p>
-                            <p className="text-xs text-slate-500 font-medium mb-6 flex-1">€{pack.pricePerMillion.toFixed(2)} per milione di crediti</p>
+                            <p className="text-xs text-slate-500 font-medium mb-6 flex-1">€{pack.pricePerThousand.toFixed(2)} per 1K crediti</p>
                             <Link href={`/register?plan=starter&focus=pack-${pack.id}`}>
                                 <Button variant="outline" size="sm" className="w-full rounded-xl border-slate-200 font-bold bg-white">
                                     Acquista Ora

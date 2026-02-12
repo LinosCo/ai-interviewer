@@ -9,7 +9,7 @@ export interface CreditPack {
     name: string;
     credits: number;
     price: number;           // EUR
-    pricePerMillion: number; // EUR per milione di crediti
+    pricePerThousand: number; // EUR per mille crediti
     stripePriceId?: string;
 }
 
@@ -17,25 +17,25 @@ export const CREDIT_PACKS: CreditPack[] = [
     {
         id: 'small',
         name: 'Pack Small',
-        credits: 2_000_000,
+        credits: 2_000,
         price: 15,
-        pricePerMillion: 7.50,
+        pricePerThousand: 7.50,
         stripePriceId: process.env.STRIPE_PRICE_PACK_SMALL
     },
     {
         id: 'medium',
         name: 'Pack Medium',
-        credits: 6_000_000,
+        credits: 6_000,
         price: 39,
-        pricePerMillion: 6.50,
+        pricePerThousand: 6.50,
         stripePriceId: process.env.STRIPE_PRICE_PACK_MEDIUM
     },
     {
         id: 'large',
         name: 'Pack Large',
-        credits: 15_000_000,
+        credits: 15_000,
         price: 89,
-        pricePerMillion: 5.93,
+        pricePerThousand: 5.93,
         stripePriceId: process.env.STRIPE_PRICE_PACK_LARGE
     }
 ];

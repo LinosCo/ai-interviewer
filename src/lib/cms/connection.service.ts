@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
 import { WORDPRESS_TOOLS } from '@/lib/integrations/mcp/wordpress.adapter';
 import { WOOCOMMERCE_TOOLS } from '@/lib/integrations/mcp/woocommerce.adapter';
+import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 import {
     defaultPublicationRouting,
     inferContentKind,
@@ -91,6 +92,10 @@ export class CMSConnectionService {
         if (!project) throw new Error('Project not found');
         if (project.cmsConnection) throw new Error('Project already has a CMS connection');
         if (!project.organizationId) throw new Error('Project must belong to an organization');
+        const integrationCheck = await checkIntegrationCreationAllowed(project.organizationId);
+        if (!integrationCheck.allowed) {
+            throw new Error(integrationCheck.reason || 'Integration creation unavailable on trial');
+        }
 
         // Generate credentials
         const apiKey = generateApiKey('bt_live_');
@@ -1035,6 +1040,13 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
 
         if (!project) {
             return { success: false, error: 'Project not found' };
+        }
+
+        if (project.organizationId) {
+            const integrationCheck = await checkIntegrationCreationAllowed(project.organizationId);
+            if (!integrationCheck.allowed) {
+                return { success: false, error: integrationCheck.reason || 'Integration creation unavailable on trial' };
+            }
         }
 
         // Verify user has permission in the connection's organization

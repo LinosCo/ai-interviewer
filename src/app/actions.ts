@@ -15,6 +15,7 @@ import path from 'path';
 import { User, Prisma } from '@prisma/client';
 import { transferBotToProject } from './actions/project-tools';
 import { regenerateInterviewPlan } from '@/lib/interview/plan-service';
+import { checkTrialResourceLimit } from '@/lib/trial-limits';
 
 async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
     // 1. Bot-specific key always wins (decrypt if needed)
@@ -66,6 +67,24 @@ export async function createBotAction(projectId: string, formData: FormData) {
 
     if (!name) throw new Error("Name required");
 
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { organizationId: true }
+    });
+
+    if (!project) throw new Error("Project not found");
+
+    if (project.organizationId) {
+        const trialLimitCheck = await checkTrialResourceLimit({
+            organizationId: project.organizationId,
+            resource: 'interview'
+        });
+
+        if (!trialLimitCheck.allowed) {
+            throw new Error(trialLimitCheck.reason || 'Trial limit reached');
+        }
+    }
+
     let topicsToCreate = [
         { orderIndex: 0, label: "Introduction", description: "Welcome the user and explain the context." },
         { orderIndex: 1, label: "Main Questions", description: "Core research questions." }
@@ -92,6 +111,7 @@ export async function createBotAction(projectId: string, formData: FormData) {
             description,
             researchGoal: researchGoal || null,
             targetAudience: targetAudience || null,
+            botType: 'interview',
             slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().split('-')[0],
             topics: {
                 create: topicsToCreate
@@ -841,18 +861,27 @@ export async function updateSettingsAction(organizationId: string, formData: For
 
     // If Admin, update Global Config with encrypted keys
     if (currentUser.role === 'ADMIN') {
-        await prisma.globalConfig.upsert({
-            where: { id: "default" },
-            update: {
-                openaiApiKey: encryptIfNeeded(openaiKey),
-                anthropicApiKey: encryptIfNeeded(anthropicKey),
-            },
-            create: {
-                id: "default",
-                openaiApiKey: encryptIfNeeded(openaiKey),
-                anthropicApiKey: encryptIfNeeded(anthropicKey),
+        try {
+            await prisma.globalConfig.upsert({
+                where: { id: "default" },
+                update: {
+                    openaiApiKey: encryptIfNeeded(openaiKey),
+                    anthropicApiKey: encryptIfNeeded(anthropicKey),
+                },
+                create: {
+                    id: "default",
+                    openaiApiKey: encryptIfNeeded(openaiKey),
+                    anthropicApiKey: encryptIfNeeded(anthropicKey),
+                }
+            });
+        } catch (globalConfigError: any) {
+            if (globalConfigError?.code === 'P2022') {
+                // Don't block platform settings save when production DB is missing one or more GlobalConfig columns.
+                console.warn('[updateSettingsAction] GlobalConfig upsert skipped due to schema mismatch (P2022).');
+            } else {
+                throw globalConfigError;
             }
-        });
+        }
     }
 
     // Always update User Platform Settings linked to user (for methodology etc, but maybe remove API keys from user?)

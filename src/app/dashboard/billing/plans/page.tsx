@@ -44,7 +44,7 @@ export default async function PlansPage({
     // Build plans array with current plan info
     const plans = PURCHASABLE_PLANS.map(planType => ({
         ...PLANS[planType],
-        requiresSalesContact: planType === PlanType.BUSINESS,
+        requiresSalesContact: planType === PlanType.BUSINESS || planType === PlanType.ENTERPRISE,
         isCurrent: currentPlan === planType
     }));
 
@@ -113,9 +113,8 @@ export default async function PlansPage({
                     return (
                         <div
                             key={plan.id}
-                            className={`bg-white/80 backdrop-blur-md rounded-[32px] p-8 border ${
-                                isPopular ? 'border-amber-400 shadow-xl' : 'border-white/50 shadow-sm'
-                            } flex flex-col relative`}
+                            className={`bg-white/80 backdrop-blur-md rounded-[32px] p-8 border ${isPopular ? 'border-amber-400 shadow-xl' : 'border-white/50 shadow-sm'
+                                } flex flex-col relative`}
                         >
                             {isPopular && (
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">
@@ -190,11 +189,10 @@ export default async function PlansPage({
                             ) : (
                                 <a
                                     href={`/api/stripe/checkout?tier=${plan.id}&billing=${billingPeriod}`}
-                                    className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${
-                                        isPopular
+                                    className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${isPopular
                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20'
                                             : 'bg-stone-900 text-white hover:bg-stone-800'
-                                    }`}
+                                        }`}
                                 >
                                     Seleziona piano <Icons.ArrowRight size={18} />
                                 </a>
@@ -251,9 +249,8 @@ export default async function PlansPage({
                                                         <span className="text-stone-300">—</span>
                                                     )
                                                 ) : (
-                                                    <span className={`text-sm font-medium ${
-                                                        feature.key === 'credits' ? 'text-amber-600 font-bold' : 'text-stone-600'
-                                                    }`}>
+                                                    <span className={`text-sm font-medium ${feature.key === 'credits' ? 'text-amber-600 font-bold' : 'text-stone-600'
+                                                        }`}>
                                                         {value}
                                                     </span>
                                                 )}

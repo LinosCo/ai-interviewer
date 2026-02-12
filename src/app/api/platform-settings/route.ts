@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
             stripePricePackSmall,
             stripePricePackMedium,
             stripePricePackLarge,
+            stripePricePartner,
+            stripePricePartnerYearly,
+            stripePriceEnterprise,
+            stripePriceEnterpriseYearly,
             smtpHost,
             smtpPort,
             smtpSecure,
@@ -163,6 +167,22 @@ export async function POST(req: NextRequest) {
                 const value = stripePricePackLarge || null;
                 assignIfAvailable('stripePricePackLarge', 'stripePricePackLarge', value);
             }
+            if (stripePricePartner !== undefined) {
+                const value = stripePricePartner || null;
+                assignIfAvailable('stripePricePartner', 'stripePricePartner', value);
+            }
+            if (stripePricePartnerYearly !== undefined) {
+                const value = stripePricePartnerYearly || null;
+                assignIfAvailable('stripePricePartnerYearly', 'stripePricePartnerYearly', value);
+            }
+            if (stripePriceEnterprise !== undefined) {
+                const value = stripePriceEnterprise || null;
+                assignIfAvailable('stripePriceEnterprise', 'stripePriceEnterprise', value);
+            }
+            if (stripePriceEnterpriseYearly !== undefined) {
+                const value = stripePriceEnterpriseYearly || null;
+                assignIfAvailable('stripePriceEnterpriseYearly', 'stripePriceEnterpriseYearly', value);
+            }
             if (smtpHost !== undefined) {
                 const value = smtpHost || null;
                 assignIfAvailable('smtpHost', 'smtpHost', value);
@@ -196,11 +216,20 @@ export async function POST(req: NextRequest) {
                 assignIfAvailable('publicDemoBotId', 'publicDemoBotId', value);
             }
 
-            await prisma.globalConfig.upsert({
-                where: { id: 'default' },
-                update: updateData,
-                create: createData
-            });
+            try {
+                await prisma.globalConfig.upsert({
+                    where: { id: 'default' },
+                    update: updateData,
+                    create: createData
+                });
+            } catch (globalConfigError: any) {
+                if (globalConfigError?.code === 'P2022') {
+                    // Schema drift guard: don't block organization settings save if GlobalConfig is partially out-of-sync.
+                    console.warn('[platform-settings] GlobalConfig upsert skipped due to schema mismatch (P2022).');
+                } else {
+                    throw globalConfigError;
+                }
+            }
         }
 
         return NextResponse.json(settings);

@@ -109,6 +109,75 @@ function hasBuyingIntent(input: string): boolean {
     return /(prezzo|pricing|costo|preventivo|demo|trial|prova|abbonamento|piano|contratto|offerta|integrazion|implementazione|timeline|budget|acquisto)/.test(text);
 }
 
+const OFF_TOPIC_PATTERN = /\b(pizzeria|ristorante|pizza|meteo|oroscopo|barzelletta|barzellett|calcio|partita|bitcoin|crypto|borsa|azioni|ricetta|cucina|film|serie tv|vacanza|viaggio)\b/i;
+const SCOPE_STOPWORDS = new Set([
+    'the', 'and', 'for', 'with', 'this', 'that', 'from', 'your', 'you', 'are', 'about', 'into',
+    'per', 'con', 'che', 'della', 'delle', 'degli', 'dello', 'dall', 'dallai', 'dei', 'del', 'nel',
+    'nella', 'nelle', 'agli', 'allo', 'alla', 'alle', 'uno', 'una', 'sono', 'come', 'quale', 'quali',
+    'cosa', 'fare', 'puoi', 'solo', 'tema', 'temi', 'obiettivo', 'ai', 'llm', 'business'
+]);
+
+function normalizeScopeTokens(input: string): string[] {
+    return input
+        .toLowerCase()
+        .replace(/[^a-z0-9àèéìòù\s]/gi, ' ')
+        .split(/\s+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 4 && !SCOPE_STOPWORDS.has(t));
+}
+
+function buildScopeLexicon(bot: any): Set<string> {
+    const parts: string[] = [];
+    if (typeof bot?.researchGoal === 'string') parts.push(bot.researchGoal);
+    if (Array.isArray(bot?.topics)) {
+        for (const topic of bot.topics) {
+            if (!topic || typeof topic !== 'object') continue;
+            if (typeof topic.label === 'string') parts.push(topic.label);
+            if (typeof topic.description === 'string') parts.push(topic.description);
+            if (Array.isArray(topic.subGoals)) {
+                parts.push(topic.subGoals.filter((s: unknown): s is string => typeof s === 'string').join(' '));
+            }
+        }
+    }
+    if (Array.isArray(bot?.knowledgeSources)) {
+        for (const source of bot.knowledgeSources) {
+            if (source && typeof source.title === 'string') parts.push(source.title);
+        }
+    }
+
+    const lexicon = new Set<string>();
+    for (const part of parts) {
+        for (const token of normalizeScopeTokens(part)) lexicon.add(token);
+    }
+    return lexicon;
+}
+
+function topicLabels(bot: any): string[] {
+    if (!Array.isArray(bot?.topics)) return [];
+    return bot.topics
+        .map((topic: any) => (typeof topic?.label === 'string' ? topic.label.trim() : ''))
+        .filter((label: string) => label.length > 0)
+        .slice(0, 2);
+}
+
+function buildOutOfScopeReply(bot: any): string {
+    const topics = topicLabels(bot);
+    if (topics.length >= 2) {
+        return `Posso aiutarti solo sui temi di questa chat (${topics[0]} e ${topics[1]}). Se vuoi, partiamo da ${topics[0]}: quale aspetto ti interessa di più?`;
+    }
+    if (topics.length === 1) {
+        return `Posso aiutarti solo sui temi di questa chat, in particolare su ${topics[0]}. Se vuoi, partiamo da lì: cosa ti interessa approfondire?`;
+    }
+    return 'Posso aiutarti solo sui temi previsti da questa chat. Se vuoi, dimmi cosa ti interessa rispetto al servizio o all’obiettivo configurato.';
+}
+
+function isClearlyOutOfScope(message: string, scopeLexicon: Set<string>): boolean {
+    if (!OFF_TOPIC_PATTERN.test(message)) return false;
+    const msgTokens = normalizeScopeTokens(message);
+    const overlap = msgTokens.some((token) => scopeLexicon.has(token));
+    return !overlap;
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -175,6 +244,7 @@ export async function POST(req: Request) {
             : null;
 
         const systemPromptBase = buildChatbotPrompt(bot, session);
+        const scopeLexicon = buildScopeLexicon(bot);
 
         // Retrieve Global Config for API Key fallback
         const globalConfig = await prisma.globalConfig.findUnique({
@@ -412,7 +482,13 @@ NON-NEGOTIABLE RULES
             }
         }
 
-        const result = await generateObject({
+        if (isClearlyOutOfScope(message, scopeLexicon)) {
+            finalResponse = buildOutOfScopeReply(bot);
+        }
+
+        const result = finalResponse
+            ? null
+            : await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
             system: systemPrompt,
@@ -422,7 +498,9 @@ NON-NEGOTIABLE RULES
             })).concat({ role: 'user', content: message }),
         });
 
-        finalResponse = (result.object.response || '').trim();
+        if (!finalResponse) {
+            finalResponse = (result?.object.response || '').trim();
+        }
         if (!finalResponse || looksLikePromptLeak(finalResponse)) {
             finalResponse = fallbackLeadResponse(nextMissingField && shouldCollect ? nextMissingField : null);
         }
@@ -455,10 +533,10 @@ NON-NEGOTIABLE RULES
         });
 
         // Track response tokens - NUOVO: usa userId (owner del progetto) per sistema crediti
-        const responseTokens = result.usage?.totalTokens || 0;
+        const responseTokens = result?.usage?.totalTokens || 0;
         const orgId = bot.project?.organizationId;
         const ownerId = bot.project?.ownerId;
-        if (ownerId && result.usage) {
+        if (ownerId && result?.usage) {
             try {
                 await TokenTrackingService.logTokenUsage({
                     userId: ownerId,

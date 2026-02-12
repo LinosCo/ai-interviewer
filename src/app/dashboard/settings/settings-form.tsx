@@ -24,6 +24,10 @@ interface PlatformSettingsFormProps {
     stripePriceProYearly?: string;
     stripePriceBusiness?: string;
     stripePriceBusinessYearly?: string;
+    stripePricePartner?: string;
+    stripePricePartnerYearly?: string;
+    stripePriceEnterprise?: string;
+    stripePriceEnterpriseYearly?: string;
     stripePricePackSmall?: string;
     stripePricePackMedium?: string;
     stripePricePackLarge?: string;
@@ -60,6 +64,10 @@ export default function PlatformSettingsForm({
     stripePriceProYearly = '',
     stripePriceBusiness = '',
     stripePriceBusinessYearly = '',
+    stripePricePartner = '',
+    stripePricePartnerYearly = '',
+    stripePriceEnterprise = '',
+    stripePriceEnterpriseYearly = '',
     stripePricePackSmall = '',
     stripePricePackMedium = '',
     stripePricePackLarge = '',
@@ -91,6 +99,10 @@ export default function PlatformSettingsForm({
     const [sPriceProYearly, setSPriceProYearly] = useState(stripePriceProYearly);
     const [sPriceBusiness, setSPriceBusiness] = useState(stripePriceBusiness);
     const [sPriceBusinessYearly, setSPriceBusinessYearly] = useState(stripePriceBusinessYearly);
+    const [sPricePartner, setSPricePartner] = useState(stripePricePartner);
+    const [sPricePartnerYearly, setSPricePartnerYearly] = useState(stripePricePartnerYearly);
+    const [sPriceEnterprise, setSPriceEnterprise] = useState(stripePriceEnterprise);
+    const [sPriceEnterpriseYearly, setSPriceEnterpriseYearly] = useState(stripePriceEnterpriseYearly);
     const [sPricePackSmall, setSPricePackSmall] = useState(stripePricePackSmall);
     const [sPricePackMedium, setSPricePackMedium] = useState(stripePricePackMedium);
     const [sPricePackLarge, setSPricePackLarge] = useState(stripePricePackLarge);
@@ -142,6 +154,10 @@ export default function PlatformSettingsForm({
         sPriceProYearly !== stripePriceProYearly ||
         sPriceBusiness !== stripePriceBusiness ||
         sPriceBusinessYearly !== stripePriceBusinessYearly ||
+        sPricePartner !== stripePricePartner ||
+        sPricePartnerYearly !== stripePricePartnerYearly ||
+        sPriceEnterprise !== stripePriceEnterprise ||
+        sPriceEnterpriseYearly !== stripePriceEnterpriseYearly ||
         sPricePackSmall !== stripePricePackSmall ||
         sPricePackMedium !== stripePricePackMedium ||
         sPricePackLarge !== stripePricePackLarge ||
@@ -184,6 +200,10 @@ export default function PlatformSettingsForm({
                     stripePriceProYearly: sPriceProYearly,
                     stripePriceBusiness: sPriceBusiness,
                     stripePriceBusinessYearly: sPriceBusinessYearly,
+                    stripePricePartner: sPricePartner,
+                    stripePricePartnerYearly: sPricePartnerYearly,
+                    stripePriceEnterprise: sPriceEnterprise,
+                    stripePriceEnterpriseYearly: sPriceEnterpriseYearly,
                     stripePricePackSmall: sPricePackSmall,
                     stripePricePackMedium: sPricePackMedium,
                     stripePricePackLarge: sPricePackLarge,
@@ -510,6 +530,54 @@ export default function PlatformSettingsForm({
                                     type="text"
                                     value={sPriceBusinessYearly}
                                     onChange={(e) => setSPriceBusinessYearly(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Partner Price ID (Monthly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPricePartner}
+                                    onChange={(e) => setSPricePartner(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Partner Price ID (Yearly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPricePartnerYearly}
+                                    onChange={(e) => setSPricePartnerYearly(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Enterprise Price ID (Monthly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceEnterprise}
+                                    onChange={(e) => setSPriceEnterprise(e.target.value)}
+                                    placeholder="price_..."
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Enterprise Price ID (Yearly)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={sPriceEnterpriseYearly}
+                                    onChange={(e) => setSPriceEnterpriseYearly(e.target.value)}
                                     placeholder="price_..."
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
                                 />

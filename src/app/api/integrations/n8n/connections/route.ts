@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 
 const createConnectionSchema = z.object({
   projectId: z.string(),
@@ -91,8 +92,23 @@ export async function POST(req: Request) {
     // Check plan
     const project = await prisma.project.findUnique({
       where: { id: data.projectId },
-      include: { organization: { select: { plan: true } } },
+      select: {
+        organizationId: true,
+        organization: {
+          select: { plan: true }
+        }
+      },
     });
+
+    if (project?.organizationId) {
+      const integrationCheck = await checkIntegrationCreationAllowed(project.organizationId);
+      if (!integrationCheck.allowed) {
+        return NextResponse.json(
+          { error: integrationCheck.reason || 'Integration creation unavailable on trial' },
+          { status: 403 }
+        );
+      }
+    }
 
     const plan = project?.organization?.plan || 'FREE';
     if (!['BUSINESS', 'PARTNER'].includes(plan)) {

@@ -31,7 +31,11 @@ async function getStripeConfig() {
         BUSINESS_YEARLY: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
         PACK_SMALL: process.env.STRIPE_PRICE_PACK_SMALL,
         PACK_MEDIUM: process.env.STRIPE_PRICE_PACK_MEDIUM,
-        PACK_LARGE: process.env.STRIPE_PRICE_PACK_LARGE
+        PACK_LARGE: process.env.STRIPE_PRICE_PACK_LARGE,
+        PARTNER: process.env.STRIPE_PRICE_PARTNER,
+        PARTNER_YEARLY: process.env.STRIPE_PRICE_PARTNER_YEARLY,
+        ENTERPRISE: process.env.STRIPE_PRICE_ENTERPRISE,
+        ENTERPRISE_YEARLY: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY
     };
 
     // 1. Env vars take precedence
@@ -71,6 +75,11 @@ async function getStripeConfig() {
                     stripePricePro: true,
                     stripePriceProYearly: true,
                     stripePriceBusiness: true,
+                    stripePriceBusinessYearly: true,
+                    stripePricePartner: true,
+                    stripePricePartnerYearly: true,
+                    stripePriceEnterprise: true,
+                    stripePriceEnterpriseYearly: true,
                     stripePricePackSmall: true,
                     stripePricePackMedium: true,
                     stripePricePackLarge: true
@@ -78,15 +87,21 @@ async function getStripeConfig() {
             });
 
             if (priceConfig) {
+                const pc = priceConfig as any;
                 dbPrices = {
-                    STARTER: priceConfig.stripePriceStarter,
-                    STARTER_YEARLY: priceConfig.stripePriceStarterYearly,
-                    PRO: priceConfig.stripePricePro,
-                    PRO_YEARLY: priceConfig.stripePriceProYearly,
-                    BUSINESS: priceConfig.stripePriceBusiness,
-                    PACK_SMALL: priceConfig.stripePricePackSmall,
-                    PACK_MEDIUM: priceConfig.stripePricePackMedium,
-                    PACK_LARGE: priceConfig.stripePricePackLarge
+                    STARTER: pc.stripePriceStarter,
+                    STARTER_YEARLY: pc.stripePriceStarterYearly,
+                    PRO: pc.stripePricePro,
+                    PRO_YEARLY: pc.stripePriceProYearly,
+                    BUSINESS: pc.stripePriceBusiness,
+                    BUSINESS_YEARLY: pc.stripePriceBusinessYearly,
+                    PARTNER: pc.stripePricePartner,
+                    PARTNER_YEARLY: pc.stripePricePartnerYearly,
+                    ENTERPRISE: pc.stripePriceEnterprise,
+                    ENTERPRISE_YEARLY: pc.stripePriceEnterpriseYearly,
+                    PACK_SMALL: pc.stripePricePackSmall,
+                    PACK_MEDIUM: pc.stripePricePackMedium,
+                    PACK_LARGE: pc.stripePricePackLarge
                 };
             }
         } catch (e) {

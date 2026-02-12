@@ -7,6 +7,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { encrypt } from '@/lib/integrations/encryption';
+import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 import { NextResponse } from 'next/server';
 
 // GET - Get Google connection for a project
@@ -119,6 +120,16 @@ export async function POST(request: Request) {
 
   if (!project) {
     return NextResponse.json({ error: 'Project not found or access denied' }, { status: 404 });
+  }
+
+  if (project.organizationId) {
+    const integrationCheck = await checkIntegrationCreationAllowed(project.organizationId);
+    if (!integrationCheck.allowed) {
+      return NextResponse.json(
+        { error: integrationCheck.reason || 'Integration creation unavailable on trial' },
+        { status: 403 }
+      );
+    }
   }
 
   // Check if connection already exists

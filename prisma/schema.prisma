@@ -146,6 +146,10 @@ model GlobalConfig {
   smtpNotificationEmail     String?
   resendApiKey              String?
   publicDemoBotId           String?
+  stripePricePartner        String?
+  stripePricePartnerYearly  String?
+  stripePriceEnterprise     String?
+  stripePriceEnterpriseYearly String?
 }
 
 model Organization {
@@ -1531,6 +1535,7 @@ enum PlanType {
   BUSINESS
   FREE
   PARTNER
+  ENTERPRISE
   ADMIN
 }
 
@@ -1541,6 +1546,7 @@ enum UserPlanType {
   PRO
   BUSINESS
   PARTNER
+  ENTERPRISE
   ADMIN
 }
 

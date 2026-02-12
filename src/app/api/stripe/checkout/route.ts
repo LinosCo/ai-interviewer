@@ -17,6 +17,8 @@ function planTierToSubscriptionTier(plan: PlanType): SubscriptionTier {
     if (plan === PlanType.STARTER) return SubscriptionTier.STARTER;
     if (plan === PlanType.PRO) return SubscriptionTier.PRO;
     if (plan === PlanType.BUSINESS) return SubscriptionTier.BUSINESS;
+    if (plan === PlanType.PARTNER) return SubscriptionTier.PARTNER;
+    if (plan === PlanType.ENTERPRISE) return SubscriptionTier.ENTERPRISE;
     return SubscriptionTier.FREE;
 }
 
@@ -133,7 +135,7 @@ async function createCheckoutSession(
         const planConfig = PLANS[normalizedTier];
         const existingCustomLimits =
             typeof membership?.organization?.customLimits === 'object' &&
-            membership.organization.customLimits !== null
+                membership.organization.customLimits !== null
                 ? (membership.organization.customLimits as Record<string, unknown>)
                 : {};
         const hasCustomMonthlyLimit = existingCustomLimits.monthlyCreditsLimitCustom === true;

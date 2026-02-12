@@ -28,13 +28,25 @@ const COOKIE_ORG_KEY = 'bt_selected_org_id';
 
 export function OrganizationProvider({ children, initialData }: { children: ReactNode, initialData?: Organization[] }) {
     const { data: session, status } = useSession();
+    const hasInitialOrganizations = Array.isArray(initialData) && initialData.length > 0;
     const [organizations, setOrganizations] = useState<Organization[]>(initialData || []);
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
-    const [loading, setLoading] = useState(!initialData);
+    const [loading, setLoading] = useState(!hasInitialOrganizations);
     const [retryCount, setRetryCount] = useState(0);
     const maxRetries = 3;
 
     const [error, setError] = useState<string | null>(null);
+
+    const resolvePreferredOrganization = useCallback((list: Organization[]): Organization | null => {
+        if (!Array.isArray(list) || list.length === 0) return null;
+        const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
+            document.cookie.split('; ').find(row => row.startsWith(`${COOKIE_ORG_KEY}=`))?.split('=')[1];
+        if (savedOrgId) {
+            const found = list.find((o) => o.id === savedOrgId);
+            if (found) return found;
+        }
+        return list[0] || null;
+    }, []);
 
     const fetchOrganizations = useCallback(async () => {
         if (status !== 'authenticated') {
@@ -65,18 +77,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                 setError(null);
 
                 // Initialize selection logic
-                const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
-                    document.cookie.split('; ').find(row => row.startsWith(`${COOKIE_ORG_KEY}=`))?.split('=')[1];
-
-                let targetOrg = null;
-
-                if (savedOrgId) {
-                    targetOrg = data.organizations.find((o: Organization) => o.id === savedOrgId);
-                }
-
-                if (!targetOrg && data.organizations.length > 0) {
-                    targetOrg = data.organizations[0];
-                }
+                const targetOrg = resolvePreferredOrganization(data.organizations);
 
                 if (targetOrg) {
                     setCurrentOrganizationState(targetOrg);
@@ -118,7 +119,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                 setLoading(false);
             }
         }
-    }, [maxRetries, retryCount, status, organizations.length]);
+    }, [maxRetries, retryCount, status, organizations.length, resolvePreferredOrganization]);
 
     useEffect(() => {
         if (status === 'loading') return;
@@ -131,36 +132,27 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
         }
 
         if (status === 'authenticated') {
-            // If we have initial data, use it properly first
-            if (initialData && initialData.length > 0 && organizations.length === 0) {
+            // Initialize from server-provided organizations
+            if (hasInitialOrganizations && organizations.length === 0) {
                 setOrganizations(initialData);
-                // Initialize selection from initial data immediately
-                const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
-                    document.cookie.split('; ').find(row => row.startsWith(`${COOKIE_ORG_KEY}=`))?.split('=')[1];
-                let targetOrg = null;
-
-                if (savedOrgId) {
-                    targetOrg = initialData.find(o => o.id === savedOrgId);
-                }
-                if (!targetOrg) {
-                    targetOrg = initialData[0];
-                }
+                const targetOrg = resolvePreferredOrganization(initialData);
                 if (targetOrg) {
                     setCurrentOrganizationState(targetOrg);
+                    localStorage.setItem(SELECTED_ORG_KEY, targetOrg.id);
+                    document.cookie = `${COOKIE_ORG_KEY}=${targetOrg.id}; path=/; max-age=31536000; SameSite=Lax`;
                 }
                 setLoading(false);
-            } else if (organizations.length === 0 && !error) { // Only fetch if no error
+            } else if (organizations.length === 0 && !error) { // Only fetch if no data at all
                 // Fetch if no data at all
                 fetchOrganizations();
             } else if (organizations.length > 0 && !currentOrganization) {
                 // Ensure selection if data exists but selection fell through
-                const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY);
-                const target = organizations.find(o => o.id === savedOrgId) || organizations[0];
+                const target = resolvePreferredOrganization(organizations);
                 if (target) setCurrentOrganizationState(target);
                 setLoading(false);
             }
         }
-    }, [status, retryCount, fetchOrganizations, initialData, organizations.length, currentOrganization, error]);
+    }, [status, retryCount, fetchOrganizations, initialData, organizations, organizations.length, currentOrganization, error, hasInitialOrganizations, resolvePreferredOrganization]);
 
     const setCurrentOrganization = (org: Organization | null) => {
         setCurrentOrganizationState(org);

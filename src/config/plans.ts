@@ -15,6 +15,7 @@ export enum PlanType {
     PRO = 'PRO',
     BUSINESS = 'BUSINESS',
     PARTNER = 'PARTNER',
+    ENTERPRISE = 'ENTERPRISE',
     ADMIN = 'ADMIN'
 }
 
@@ -375,6 +376,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         monthlyPrice: 29, // €0 con 3+ clienti attivi
         yearlyPrice: 348,
         yearlyMonthlyEquivalent: 29,
+        stripePriceIdMonthly: process.env.STRIPE_PRICE_PARTNER,
+        stripePriceIdYearly: process.env.STRIPE_PRICE_PARTNER_YEARLY,
         features: {
             interviewAI: 'full',
             chatbot: true,
@@ -419,6 +422,60 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             'Report con logo personalizzato',
             '€0/mese con 3+ clienti',
             'White Label con 10+ clienti'
+        ]
+    },
+
+    [PlanType.ENTERPRISE]: {
+        id: PlanType.ENTERPRISE,
+        name: 'Enterprise',
+        description: 'Per grandi organizzazioni',
+        monthlyCredits: -1, // Custom -1 per mostrare illimitato o gestire via custom limits
+        monthlyPrice: 999,
+        yearlyPrice: 9990,
+        yearlyMonthlyEquivalent: 832.5,
+        stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE,
+        stripePriceIdYearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY,
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: true,
+            aiTips: true,
+            copilotStrategico: true,
+            whiteLabel: true,
+            apiAccess: true,
+            cmsIntegrations: true,
+            exportPdf: 'clean',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: true,
+            maxProjects: -1,
+            multiClientDashboard: true,
+            customLogoReports: true
+        },
+        limits: {
+            monthlyTokenBudget: -1,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: -1,
+            maxAiSuggestionsPerMonth: -1,
+            visibilityEnabled: true,
+            aiTipsEnabled: true,
+            whiteLabelEnabled: true,
+            apiAccessEnabled: true,
+            canTransferProjects: true,
+            customLogo: true,
+            customColor: true,
+            themeExtraction: true,
+            knowledgeBase: true,
+            conditionalLogic: true
+        },
+        featureList: [
+            'Crediti illimitati',
+            'White Label completo',
+            'API Access & Custom Integration',
+            'Supporto dedicato',
+            'SLA garantiti'
         ]
     },
 
@@ -567,7 +624,9 @@ export const PLAN_ORDER: PlanType[] = [
 export const PURCHASABLE_PLANS: PlanType[] = [
     PlanType.STARTER,
     PlanType.PRO,
-    PlanType.BUSINESS
+    PlanType.BUSINESS,
+    PlanType.PARTNER,
+    PlanType.ENTERPRISE
 ];
 
 // ============================================

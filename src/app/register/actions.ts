@@ -2,16 +2,17 @@
 
 import { prisma } from '@/lib/prisma';
 import { hash } from 'bcryptjs';
-import { signIn } from '@/auth';
 import { redirect } from 'next/navigation';
-import { sendSystemNotification, sendWelcomeEmail } from '@/lib/email';
+import crypto from 'crypto';
+import { PlanType, PLANS } from '@/config/plans';
+import { sendAccountVerificationEmail, sendSystemNotification } from '@/lib/email';
 
 export async function registerUser(prevState: string | undefined, formData: FormData) {
-    const email = formData.get('email') as string;
+    const email = (formData.get('email') as string)?.toLowerCase().trim();
     const password = formData.get('password') as string;
-    const name = formData.get('name') as string;
-    const companyName = formData.get('companyName') as string;
-    const vatId = formData.get('vatId') as string;
+    const name = (formData.get('name') as string)?.trim();
+    const companyName = (formData.get('companyName') as string)?.trim();
+    const vatId = (formData.get('vatId') as string)?.trim();
     const plan = formData.get('plan') as string;
     const billing = formData.get('billing') as string;
 
@@ -29,6 +30,9 @@ export async function registerUser(prevState: string | undefined, formData: Form
         }
 
         const hashedPassword = await hash(password, 10);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ore
+        const partnerTrialCredits = PLANS[PlanType.PARTNER].monthlyCredits;
 
         // Create user, organization and membership in a transaction
         await prisma.$transaction(async (tx) => {
@@ -50,6 +54,7 @@ export async function registerUser(prevState: string | undefined, formData: Form
                     name: companyName,
                     vatId: vatId || null,
                     plan: 'PRO', // Start as PRO for trial
+                    monthlyCreditsLimit: BigInt(partnerTrialCredits),
                     slug: `org-${Math.random().toString(36).substring(2, 10)}`,
                     members: {
                         create: {
@@ -62,9 +67,10 @@ export async function registerUser(prevState: string | undefined, formData: Form
                     },
                     subscription: {
                         create: {
-                            tier: 'PRO',
+                            tier: 'TRIAL',
                             status: 'TRIALING',
                             currentPeriodEnd: trialEnd,
+                            trialEndsAt: trialEnd,
                         }
                     },
                     projects: {
@@ -83,21 +89,20 @@ export async function registerUser(prevState: string | undefined, formData: Form
                 },
             });
 
+            await tx.verificationToken.deleteMany({
+                where: { identifier: email }
+            });
+
+            await tx.verificationToken.create({
+                data: {
+                    identifier: email,
+                    token: verificationToken,
+                    expires: verificationExpires
+                }
+            });
+
             return { user, org };
         });
-
-        // Auto-login after registration
-        try {
-            await signIn('credentials', {
-                email,
-                password,
-                redirect: false,
-            });
-        } catch (signInError) {
-            console.error('SignIn error during registration:', signInError);
-            // We don't return here because the user is created, 
-            // the redirect below will handle the rest or they can login manually.
-        }
 
         await sendSystemNotification(
             'Nuova Registrazione Utente',
@@ -106,9 +111,17 @@ export async function registerUser(prevState: string | undefined, formData: Form
              <p>Piano selezionato: ${plan || 'FREE'}</p>`
         );
 
-        await sendWelcomeEmail({
+        // Keep paid-plan intent for post-verification login.
+        const normalizedPlan = plan?.toUpperCase();
+        const checkoutPath = normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)
+            ? `/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`
+            : undefined;
+
+        await sendAccountVerificationEmail({
             to: email,
-            userName: name
+            userName: name,
+            token: verificationToken,
+            nextPath: checkoutPath
         });
 
     } catch (error) {
@@ -116,11 +129,10 @@ export async function registerUser(prevState: string | undefined, formData: Form
         return 'Registration failed.';
     }
 
-    // Redirect logic for paid plans
     const normalizedPlan = plan?.toUpperCase();
-    if (normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)) {
-        redirect(`/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`);
-    } else {
-        redirect('/dashboard');
-    }
+    const nextPath = normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)
+        ? `/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`
+        : '';
+
+    redirect(`/login?verification=sent${nextPath ? `&next=${encodeURIComponent(nextPath)}` : ''}`);
 }

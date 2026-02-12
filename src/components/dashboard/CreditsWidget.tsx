@@ -38,9 +38,14 @@ export function CreditsWidget() {
     const [error, setError] = useState<string | null>(null);
 
     const fetchCredits = useCallback(async () => {
-        if (!currentOrganization) return;
+        if (!currentOrganization) {
+            setLoading(false);
+            setCredits(null);
+            return;
+        }
         try {
             setLoading(true);
+            setError(null);
             const res = await fetch(`/api/credits?organizationId=${currentOrganization.id}`);
             if (!res.ok) throw new Error('Errore nel caricamento');
             const data = await res.json();

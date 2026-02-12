@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { PLANS, PlanType } from '@/config/plans';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
+import { checkTrialResourceLimit } from '@/lib/trial-limits';
 
 export async function POST(request: Request) {
     try {
@@ -57,6 +58,20 @@ export async function POST(request: Request) {
                 { error: 'Visibility tracking non disponibile nel tuo piano' },
                 { status: 403 }
             );
+        }
+
+        if (!isAdmin) {
+            const trialLimitCheck = await checkTrialResourceLimit({
+                organizationId: finalOrganizationId,
+                resource: 'brand'
+            });
+
+            if (!trialLimitCheck.allowed) {
+                return NextResponse.json(
+                    { error: trialLimitCheck.reason || 'Trial limit reached' },
+                    { status: 403 }
+                );
+            }
         }
 
         // Check brand limit (unlimited if visibility enabled)

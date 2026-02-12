@@ -10,7 +10,7 @@ async function getUser(email: string) {
     try {
         const user = await prisma.user.findUnique({ where: { email } });
         return user;
-    } catch (error) {
+    } catch {
         throw new Error('Failed to fetch user.');
     }
 }
@@ -57,15 +57,15 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                     .safeParse(credentials);
 
                 if (parsedCredentials.success) {
-                    const { email, password } = parsedCredentials.data;
+                    const email = parsedCredentials.data.email.toLowerCase().trim();
+                    const { password } = parsedCredentials.data;
                     const user = await getUser(email);
                     if (!user) return null;
+                    if (!user.emailVerified) return null;
 
                     const passwordsMatch = await bcrypt.compare(password, user.password || '');
                     if (passwordsMatch) return user;
 
-                    // For now, allow login if user exists and we skip password check or check against a hardcoded hash?
-                    // No, I must update Schema to add password.
                 }
                 return null;
             },

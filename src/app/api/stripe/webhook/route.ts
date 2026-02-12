@@ -316,6 +316,8 @@ function mapTierToPlanType(tier: string): PlanType {
     if (t === 'STARTER') return PlanType.STARTER;
     if (t === 'PRO') return PlanType.PRO;
     if (t === 'BUSINESS') return PlanType.BUSINESS;
+    if (t === 'PARTNER') return PlanType.PARTNER;
+    if (t === 'ENTERPRISE') return PlanType.ENTERPRISE;
     return PlanType.TRIAL;
 }
 
@@ -342,19 +344,23 @@ async function resolvePlanAndCycleFromPriceId(priceId?: string | null): Promise<
         }
     }).catch(() => null);
 
-    const plansToCheck = [PlanType.STARTER, PlanType.PRO, PlanType.BUSINESS];
+    const plansToCheck = [PlanType.STARTER, PlanType.PRO, PlanType.BUSINESS, PlanType.PARTNER, PlanType.ENTERPRISE];
     for (const planType of plansToCheck) {
         const plan = PLANS[planType];
         const monthlyId =
             (planType === PlanType.STARTER ? globalConfig?.stripePriceStarter : null) ||
             (planType === PlanType.PRO ? globalConfig?.stripePricePro : null) ||
             (planType === PlanType.BUSINESS ? globalConfig?.stripePriceBusiness : null) ||
+            (planType === PlanType.PARTNER ? (globalConfig as any)?.stripePricePartner : null) ||
+            (planType === PlanType.ENTERPRISE ? (globalConfig as any)?.stripePriceEnterprise : null) ||
             plan.stripePriceIdMonthly;
 
         const yearlyId =
             (planType === PlanType.STARTER ? globalConfig?.stripePriceStarterYearly : null) ||
             (planType === PlanType.PRO ? globalConfig?.stripePriceProYearly : null) ||
-            (planType === PlanType.BUSINESS ? process.env.STRIPE_PRICE_BUSINESS_YEARLY : null) ||
+            (planType === PlanType.BUSINESS ? globalConfig?.stripePriceBusinessYearly : null) ||
+            (planType === PlanType.PARTNER ? (globalConfig as any)?.stripePricePartnerYearly : null) ||
+            (planType === PlanType.ENTERPRISE ? (globalConfig as any)?.stripePriceEnterpriseYearly : null) ||
             plan.stripePriceIdYearly;
 
         if (monthlyId && monthlyId === priceId) {
@@ -409,6 +415,7 @@ function mapTierToSubscriptionTier(tier: string | PlanType): SubscriptionTier {
     if (t === 'STARTER') return SubscriptionTier.STARTER;
     if (t === 'PRO') return SubscriptionTier.PRO;
     if (t === 'BUSINESS') return SubscriptionTier.BUSINESS;
+    if (t === 'PARTNER') return SubscriptionTier.PARTNER;
     if (t === 'ENTERPRISE') return SubscriptionTier.ENTERPRISE;
     return SubscriptionTier.FREE;
 }

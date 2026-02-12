@@ -22,6 +22,21 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
     basePath: '/api/auth',
     trustHost: true,
     debug: process.env.NODE_ENV === 'development',
+    logger: {
+        error(code, metadata) {
+            // Invalid credentials are a normal user-flow outcome, not an operational error.
+            if (code === 'CredentialsSignin') return;
+            console.error(`[auth][error] ${code}`, metadata || '');
+        },
+        warn(code) {
+            console.warn(`[auth][warn] ${code}`);
+        },
+        debug(code, metadata) {
+            if (process.env.NODE_ENV === 'development') {
+                console.debug(`[auth][debug] ${code}`, metadata || '');
+            }
+        },
+    },
     providers: [
         Credentials({
             async authorize(credentials) {

@@ -1,6 +1,6 @@
 
 import { ChatService } from '@/services/chat-service';
-import { generateObject } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { PromptBuilder } from '@/lib/llm/prompt-builder';
@@ -18,7 +18,7 @@ import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
 import { evaluateInterviewQuestionQuality } from '@/lib/interview/qualitative-evaluator';
 import { buildAdditiveQuestionPrompt, buildQualityCorrectionPrompt } from '@/lib/interview/quality-pipeline';
-import { extractDeterministicFieldValue, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
+import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
 import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
 
 export const maxDuration = 60;
@@ -1987,6 +1987,7 @@ export async function POST(req: Request) {
                     const candidateFields = (bot.candidateDataFields as any[]) || [];
                     const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
                     let currentProfile = (conversation.candidateProfile as any) || {};
+                    let justAcceptedConsentThisTurn = false;
                     console.log(`📋 [DATA_COLLECTION] Fields to collect: ${candidateFieldIds.join(', ')}`);
                     console.log(`📋 [DATA_COLLECTION] Current profile keys: ${Object.keys(currentProfile).join(', ') || 'none'}`);
 
@@ -2005,6 +2006,7 @@ export async function POST(req: Request) {
 
                         if (intent === 'ACCEPT') {
                             nextState.consentGiven = true;
+                            justAcceptedConsentThisTurn = true;
                             console.log(`📋 [DATA_COLLECTION] User accepted, will ask first field`);
                             // Don't set supervisorInsight here - let it fall through to ask first field
                         } else if (intent === 'REFUSE') {
@@ -2033,7 +2035,31 @@ export async function POST(req: Request) {
                     // STEP 2: If consent given (now or before), handle field collection
                     if (nextState.consentGiven === true || state.consentGiven === true) {
                         console.log(`📋 [DATA_COLLECTION] Consent given, processing fields`);
-                        let haltCollection = false;
+                        if (justAcceptedConsentThisTurn) {
+                            const nextFieldAfterConsent = getNextMissingCandidateField(
+                                candidateFieldIds,
+                                currentProfile,
+                                state.fieldAttemptCounts,
+                                3
+                            );
+                            if (nextFieldAfterConsent) {
+                                nextState.lastAskedField = nextFieldAfterConsent;
+                                nextState.dataCollectionAttempts = state.dataCollectionAttempts + 1;
+                                nextState.consentGiven = true;
+                                nextState.fieldAttemptCounts = {
+                                    ...state.fieldAttemptCounts,
+                                    [nextFieldAfterConsent]: (state.fieldAttemptCounts[nextFieldAfterConsent] || 0) + 1
+                                };
+                                supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextFieldAfterConsent };
+                                console.log(`📋 [DATA_COLLECTION] Consent accepted this turn. Skipping extraction and asking first field "${nextFieldAfterConsent}".`);
+                            } else {
+                                supervisorInsight = { status: 'FINAL_GOODBYE' };
+                                nextState.lastAskedField = null;
+                                console.log(`📋 [DATA_COLLECTION] Consent accepted but no missing fields. Closing data collection.`);
+                            }
+                            // Critical: do not process the consent message as field content.
+                        } else {
+                            let haltCollection = false;
 
                         // CHECK (semantic): Did user change their mind mid-collection?
                         const midCollectionClosureIntent = lastMessage?.role === 'user'
@@ -2082,7 +2108,7 @@ export async function POST(req: Request) {
                                         const content = msg.content.trim();
                                         const words = content.split(/\s+/);
                                         // Short response that looks like a name
-                                        if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content)) {
+                                        if (words.length <= 3 && content.length < 30 && !/[@\d]/.test(content) && !isLikelyNonValueAck(content)) {
                                             const cleanedName = content.replace(/[.!?,;:]/g, '').trim();
                                             if (cleanedName.length > 1) {
                                                 currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
@@ -2110,7 +2136,7 @@ export async function POST(req: Request) {
                             haltCollection = true;
                         }
 
-                        if (!haltCollection) {
+                            if (!haltCollection) {
                             // CHECK: Did user say they don't have this field? ("non ho email", "I don't have")
                             const SKIP_FIELD_IT = /\b(non ho|non ce l'ho|non posso|preferisco non)\b/i;
                             const SKIP_FIELD_EN = /\b(i don't have|don't have|can't provide|prefer not to)\b/i;
@@ -2121,7 +2147,7 @@ export async function POST(req: Request) {
                             // 1) prioritize the field we just asked,
                             // 2) opportunistically capture deterministic structured fields (email/phone/url),
                             // 3) avoid broad multi-field LLM extraction to reduce false positives.
-                            if (lastMessage?.role === 'user' && !userWantsToSkip) {
+                            if (lastMessage?.role === 'user' && !userWantsToSkip && !justAcceptedConsentThisTurn) {
                                 const missingFieldIds = candidateFieldIds.filter((fieldName: string) =>
                                     !currentProfile[fieldName] && currentProfile[fieldName] !== '__SKIPPED__'
                                 );
@@ -2154,7 +2180,7 @@ export async function POST(req: Request) {
                                     // Direct capture for NAME (1-3 words, no special chars)
                                     const isNameField = prioritizedField === 'fullName' || prioritizedField === 'name';
                                     const nameFieldKey = prioritizedField === 'name' ? 'name' : 'fullName';
-                                    if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey]) {
+                                    if (isNameField && wordCount <= 3 && !currentProfile[nameFieldKey] && !isLikelyNonValueAck(userReply)) {
                                         const cleanedName = userReply.replace(/[.!?,;:]/g, '').trim();
                                         if (cleanedName.length > 0 && cleanedName.length < 50 && !/[@\d]/.test(cleanedName)) {
                                             currentProfile = { ...currentProfile, [nameFieldKey]: cleanedName };
@@ -2164,7 +2190,7 @@ export async function POST(req: Request) {
                                     }
 
                                     // Direct capture for COMPANY (1-5 words, reasonable length)
-                                    if (prioritizedField === 'company' && wordCount <= 5 && !currentProfile.company) {
+                                    if (prioritizedField === 'company' && wordCount <= 5 && !currentProfile.company && !isLikelyNonValueAck(userReply)) {
                                         const cleanedCompany = userReply.replace(/[.!?,;:]/g, '').trim();
                                         if (cleanedCompany.length > 1 && cleanedCompany.length < 100 &&
                                             !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedCompany)) {
@@ -2175,7 +2201,7 @@ export async function POST(req: Request) {
                                     }
 
                                     // Direct capture for ROLE (1-4 words)
-                                    if (prioritizedField === 'role' && wordCount <= 4 && !currentProfile.role) {
+                                    if (prioritizedField === 'role' && wordCount <= 4 && !currentProfile.role && !isLikelyNonValueAck(userReply)) {
                                         const cleanedRole = userReply.replace(/[.!?,;:]/g, '').trim();
                                         if (cleanedRole.length > 1 && cleanedRole.length < 50 &&
                                             !/^(no|non|basta|stop|te l'ho|l'ho già|già detto)/i.test(cleanedRole)) {
@@ -2220,6 +2246,8 @@ export async function POST(req: Request) {
                                     });
                                     console.log(`✅ [DATA_COLLECTION] Saved profile`);
                                 }
+                            } else if (justAcceptedConsentThisTurn) {
+                                console.log(`📋 [DATA_COLLECTION] Consent just accepted: skip extraction this turn and ask first missing field.`);
                             } else if (userWantsToSkip && state.lastAskedField) {
                                 // User wants to skip this field - mark it as skipped so we don't ask again
                                 console.log(`📋 [DATA_COLLECTION] User wants to skip "${state.lastAskedField}"`);
@@ -2255,6 +2283,7 @@ export async function POST(req: Request) {
                                     [nextField]: (state.fieldAttemptCounts[nextField] || 0) + 1
                                 };
                                 supervisorInsight = { status: 'DATA_COLLECTION', nextSubGoal: nextField };
+                            }
                             }
                         }
                     }
@@ -2423,7 +2452,42 @@ hard_rules:
                 });
                 return Response.json({ text: fallback, currentTopicId: nextTopicId, isCompleted: false });
             }
+            const errorName = String(error?.name || '');
+            const errorMessage = String(error?.message || '');
+            const isObjectValidationFailure =
+                errorName.includes('AI_NoObjectGeneratedError') ||
+                errorMessage.includes('No object generated') ||
+                errorMessage.includes('did not match schema');
+            if (isObjectValidationFailure) {
+                console.error('⚠️ [LLM] Object schema validation failed. Retrying with fallback strategy.', {
+                    name: errorName,
+                    message: errorMessage
+                });
+                try {
+                    const minimalSchema = z.object({
+                        response: z.string()
+                    });
+                    const retry = await generateObject({
+                        model: modelForMainResponse,
+                        schema: minimalSchema,
+                        messages: messagesForAI,
+                        system: `${systemPrompt}\n\nCRITICAL: Return ONLY a JSON object with one key: {"response":"..."} and no other keys.`,
+                        temperature: 0.6
+                    });
+                    result = { object: { response: String(retry.object.response || '').trim(), meta_comment: 'minimal_schema_fallback' } };
+                } catch (innerError: any) {
+                    console.error('⚠️ [LLM] Minimal-schema retry failed. Falling back to generateText.', innerError);
+                    const textFallback = await generateText({
+                        model: modelForMainResponse,
+                        messages: messagesForAI,
+                        system: `${systemPrompt}\n\nCRITICAL: Return plain text only. Do not output JSON.`,
+                        temperature: 0.6
+                    });
+                    result = { object: { response: String(textFallback.text || '').trim(), meta_comment: 'generate_text_fallback' } };
+                }
+            } else {
             throw error;
+            }
         }
 
         console.timeEnd("LLM");
@@ -2534,22 +2598,18 @@ hard_rules:
         const organizationId = (bot as any).project?.organization?.id;
         const projectOwnerId = (bot as any).project?.ownerId;
         if (!simulationMode && projectOwnerId && result.usage) {
-            try {
-                await TokenTrackingService.logTokenUsage({
-                    userId: projectOwnerId,
-                    organizationId,
-                    projectId: (bot as any).project?.id,
-                    inputTokens: result.usage.inputTokens || 0,
-                    outputTokens: result.usage.outputTokens || 0,
-                    category: 'INTERVIEW',
-                    model: modelForMainResponse.modelId || 'gpt-4o',
-                    operation: 'interview-response',
-                    resourceType: 'interview',
-                    resourceId: bot.id
-                });
-            } catch (err) {
-                console.error('Token tracking failed:', err);
-            }
+            TokenTrackingService.logTokenUsage({
+                userId: projectOwnerId,
+                organizationId,
+                projectId: (bot as any).project?.id,
+                inputTokens: result.usage.inputTokens || 0,
+                outputTokens: result.usage.outputTokens || 0,
+                category: 'INTERVIEW',
+                model: modelForMainResponse.modelId || 'gpt-4o',
+                operation: 'interview-response',
+                resourceType: 'interview',
+                resourceId: bot.id
+            }).catch((err) => console.error('Token tracking failed:', err));
         }
 
         // ====================================================================
@@ -2853,7 +2913,10 @@ hard_rules:
             const userWordCountForQuality = String(lastMessage.content || '').trim().split(/\s+/).filter(Boolean).length;
             const clarificationRequestedForQuality = isClarificationSignal(lastMessage.content, language);
             const needsSemanticLinkFix = !qualitative.checks.referencesUserContext && userWordCountForQuality >= 4;
-            const needsTransitionCoherenceFix = !qualitative.checks.coherentTransition && userWordCountForQuality >= 5;
+            const needsTransitionCoherenceFix =
+                !qualitative.checks.coherentTransition &&
+                userWordCountForQuality >= 8 &&
+                qualitative.score < 80;
             const needsClarificationFix = clarificationRequestedForQuality && !qualitative.checks.handlesClarificationNaturally;
             const needsClarificationDirectFix = userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language);
             const needsScopeBoundaryFix = userTurnSignal === 'off_topic_question' && !isScopeBoundaryHandledResponse(responseText, language);
@@ -3244,6 +3307,16 @@ hard_rules:
 
     } catch (error: any) {
         console.error("Chat API Error:", error);
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        const safeFallback = "Mi dispiace, c'è stato un problema temporaneo. Possiamo riprendere da dove eravamo?";
+        return Response.json(
+            {
+                text: safeFallback,
+                currentTopicId: null,
+                isCompleted: false,
+                degraded: true,
+                error: String(error?.message || 'unknown_error')
+            },
+            { status: 200 }
+        );
     }
 }

@@ -66,3 +66,25 @@ export function extractDeterministicFieldValue(fieldName: string, userMessage: s
 
   return null;
 }
+
+export function isLikelyNonValueAck(userMessage: string): boolean {
+  const text = String(userMessage || '').trim().toLowerCase();
+  if (!text) return true;
+
+  const normalized = text
+    .replace(/[.!?,;:()[\]"'`]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Common confirmations/acknowledgments that must never be stored as profile values.
+  const ackPattern = /^(ok|okay|okey|va bene|va benissimo|bene|perfetto|d accordo|accordo|s[iì]|yes|yep|yeah|sure|certo|volontieri|allora va bene|direi di si|ci sta)$/i;
+  if (ackPattern.test(normalized)) return true;
+
+  // Very short generic confirmations with no identifying signal.
+  const tokens = normalized.split(' ').filter(Boolean);
+  if (tokens.length <= 3 && /^(si|sì|yes|ok|va|bene|certo|perfetto|sure|yep|yeah)+(\s+(si|sì|yes|ok|va|bene|certo|perfetto|sure|yep|yeah))*$/i.test(normalized)) {
+    return true;
+  }
+
+  return false;
+}

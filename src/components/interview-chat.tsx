@@ -289,10 +289,8 @@ export default function InterviewChat({
             if (!el) return;
             el.style.height = 'auto';
             const nextHeight = Math.min(el.scrollHeight, INPUT_MAX_HEIGHT_PX);
-            if (lastTextareaHeightRef.current !== nextHeight) {
-                el.style.height = `${nextHeight}px`;
-                lastTextareaHeightRef.current = nextHeight;
-            }
+            el.style.height = `${nextHeight}px`;
+            lastTextareaHeightRef.current = nextHeight;
         });
     };
 
@@ -967,6 +965,7 @@ export default function InterviewChat({
                                     value={input}
                                     onChange={(e) => {
                                         setInput(e.target.value);
+                                        autoResizeTextarea();
                                     }}
                                     onKeyDown={handleKeyDown}
                                     onFocus={() => {

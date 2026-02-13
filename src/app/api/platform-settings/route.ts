@@ -129,6 +129,50 @@ export async function POST(req: NextRequest) {
 
         // If allowed, update Global Config API Keys and Stripe Config
         if (canManageGlobalConfig) {
+            // Self-healing schema check
+            try {
+                const requiredColumns = [
+                    { name: 'stripePricePartner', type: 'TEXT' },
+                    { name: 'stripePricePartnerYearly', type: 'TEXT' },
+                    { name: 'stripePriceEnterprise', type: 'TEXT' },
+                    { name: 'stripePriceEnterpriseYearly', type: 'TEXT' },
+                    { name: 'stripePriceBusinessYearly', type: 'TEXT' },
+                    { name: 'smtpHost', type: 'TEXT' },
+                    { name: 'smtpPort', type: 'INTEGER' },
+                    { name: 'smtpSecure', type: 'BOOLEAN' },
+                    { name: 'smtpUser', type: 'TEXT' },
+                    { name: 'smtpPass', type: 'TEXT' },
+                    { name: 'smtpFromEmail', type: 'TEXT' },
+                    { name: 'smtpNotificationEmail', type: 'TEXT' },
+                    { name: 'publicDemoBotId', type: 'TEXT' }
+                ];
+
+                const existingColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_schema = 'public' 
+                    AND LOWER(table_name) = LOWER('GlobalConfig')
+                `);
+
+                const existingSet = new Set(existingColumns.map(c => c.column_name));
+                const missing = requiredColumns.filter(c => !existingSet.has(c.name));
+
+                if (missing.length > 0) {
+                    console.log('[platform-settings] Found missing columns, attempting to patch schema:', missing.map(c => c.name));
+                    for (const col of missing) {
+                        try {
+                            await prisma.$executeRawUnsafe(`ALTER TABLE "GlobalConfig" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}`);
+                            console.log(`[platform-settings] Added column: ${col.name}`);
+                        } catch (alterError) {
+                            console.error(`[platform-settings] Failed to add column ${col.name}:`, alterError);
+                        }
+                    }
+                }
+            } catch (schemaCheckError) {
+                console.error('[platform-settings] Schema check failed:', schemaCheckError);
+                // Continue execution, maybe it works anyway
+            }
+
             const globalConfigUpdate: Prisma.GlobalConfigUpdateInput = {};
 
             if (platformOpenaiApiKey !== undefined) globalConfigUpdate.openaiApiKey = platformOpenaiApiKey;

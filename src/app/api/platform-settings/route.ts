@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
         if (!membership && currentUser?.role !== 'ADMIN') {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
+        const canManageGlobalConfig = currentUser?.role === 'ADMIN';
 
         // Update organization's methodology and strategic plan
         const settings = await prisma.platformSettings.upsert({
@@ -89,8 +90,45 @@ export async function POST(req: NextRequest) {
             data: { platformSettingsId: settings.id }
         });
 
-        // If Admin, update Global Config API Keys and Stripe Config
-        if (currentUser?.role === 'ADMIN') {
+        const hasGlobalConfigPayload = [
+            platformOpenaiApiKey,
+            platformAnthropicApiKey,
+            platformGeminiApiKey,
+            googleSerpApiKey,
+            stripeSecretKey,
+            stripeWebhookSecret,
+            stripePriceStarter,
+            stripePriceStarterYearly,
+            stripePricePro,
+            stripePriceProYearly,
+            stripePriceBusiness,
+            stripePriceBusinessYearly,
+            stripePricePackSmall,
+            stripePricePackMedium,
+            stripePricePackLarge,
+            stripePricePartner,
+            stripePricePartnerYearly,
+            stripePriceEnterprise,
+            stripePriceEnterpriseYearly,
+            smtpHost,
+            smtpPort,
+            smtpSecure,
+            smtpUser,
+            smtpPass,
+            smtpFromEmail,
+            smtpNotificationEmail,
+            publicDemoBotId
+        ].some((value) => value !== undefined);
+
+        if (hasGlobalConfigPayload && !canManageGlobalConfig) {
+            return NextResponse.json(
+                { error: 'Access denied for global configuration' },
+                { status: 403 }
+            );
+        }
+
+        // If allowed, update Global Config API Keys and Stripe Config
+        if (canManageGlobalConfig) {
             const availableColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
                 SELECT column_name
                 FROM information_schema.columns

@@ -114,7 +114,7 @@ export async function GET(
             where: { id: session.user.id },
             select: { role: true }
         });
-        const isAdmin = currentUser?.role === 'ADMIN';
+        const isPlatformAdmin = currentUser?.role === 'ADMIN';
 
         // Verify membership
         const membership = await prisma.membership.findUnique({
@@ -126,9 +126,10 @@ export async function GET(
             }
         });
 
-        if (!membership && !isAdmin) {
+        if (!membership && !isPlatformAdmin) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
+        const canViewGlobalConfig = isPlatformAdmin;
 
         // Fetch organization settings
         const settings = await prisma.platformSettings.findUnique({
@@ -150,7 +151,7 @@ export async function GET(
 
         // If admin, also return global config
         let globalConfig = null;
-        if (isAdmin) {
+        if (canViewGlobalConfig) {
             globalConfig = await getGlobalConfigCompat();
         }
 

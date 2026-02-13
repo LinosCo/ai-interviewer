@@ -203,15 +203,45 @@ export async function POST(req: Request) {
 
             // Chatbot specific fields
             const hasLeadFields = Array.isArray(botConfig.candidateDataFields) && botConfig.candidateDataFields.length > 0;
+            const chatbotTopics = Array.isArray(botConfig.topics)
+                ? botConfig.topics
+                    .map((topic: unknown, index: number) => {
+                        const label = typeof topic === 'string'
+                            ? topic.trim()
+                            : (typeof topic === 'object' && topic !== null && typeof (topic as any).label === 'string'
+                                ? String((topic as any).label).trim()
+                                : '');
+                        if (!label) return null;
+                        return {
+                            orderIndex: index,
+                            label,
+                            description: typeof topic === 'object' && topic !== null && typeof (topic as any).description === 'string'
+                                ? String((topic as any).description).trim()
+                                : null,
+                            subGoals: []
+                        };
+                    })
+                    .filter(Boolean)
+                : [];
+
             botData = {
                 ...botData,
+                researchGoal: (typeof botConfig.goal === 'string' && botConfig.goal.trim()) ||
+                    (typeof config.goal === 'string' && config.goal.trim()) ||
+                    (typeof config.researchGoal === 'string' && config.researchGoal.trim()) ||
+                    null,
                 tone: botConfig.tone,
                 enablePageContext: true,
                 leadCaptureStrategy: botConfig.leadCaptureStrategy || 'after_3_msgs',
                 candidateDataFields: botConfig.candidateDataFields,
                 collectCandidateData: hasLeadFields, // Auto-enable when lead fields are configured
+                fallbackMessage: typeof botConfig.fallbackMessage === 'string' ? botConfig.fallbackMessage : null,
+                boundaries: Array.isArray(botConfig.boundaries) ? botConfig.boundaries : [],
                 introMessage: botConfig.welcomeMessage,
                 bubblePosition: botConfig.bubblePosition || 'bottom-right',
+                topics: {
+                    create: chatbotTopics as any[]
+                },
                 knowledgeSources: {
                     create: processedSources
                 }

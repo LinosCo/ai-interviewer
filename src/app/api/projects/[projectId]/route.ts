@@ -174,27 +174,33 @@ export async function DELETE(
             return new Response('Nessun progetto di destinazione trovato per il trasferimento dei tool', { status: 500 });
         }
 
-        // Transfer all bots and visibility configs to personal project, then delete
+        // Check optional table existence to keep compatibility with older DB schemas.
+        const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+            SELECT EXISTS (
+                SELECT
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = 'ProjectVisibilityConfig'
+            )
+        `;
+        const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+        // Transfer all bots and visibility configs to personal project, then delete.
         await prisma.$transaction([
-            // Transfer bots to personal project
             prisma.bot.updateMany({
                 where: { projectId },
                 data: { projectId: transferTarget.id }
             }),
-            // Unlink visibility configs (they become available for linking to other projects)
             prisma.visibilityConfig.updateMany({
                 where: { projectId },
                 data: { projectId: null }
             }),
-            // Remove multi-project brand associations for this project
-            prisma.projectVisibilityConfig.deleteMany({
-                where: { projectId }
-            }),
-            // Delete project access entries
+            ...(projectVisibilityConfigExists
+                ? [prisma.projectVisibilityConfig.deleteMany({ where: { projectId } })]
+                : []),
             prisma.projectAccess.deleteMany({
                 where: { projectId }
             }),
-            // Delete the project
             prisma.project.delete({
                 where: { id: projectId }
             })

@@ -12,7 +12,15 @@ import { PLANS, PlanType, isUnlimited } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
-import { getProjectTranscriptsTool, getChatbotConversationsTool, getProjectIntegrationsTool } from '@/lib/copilot/chat-tools';
+import {
+    createProjectTranscriptsTool,
+    createChatbotConversationsTool,
+    createProjectIntegrationsTool,
+    createVisibilityInsightsTool,
+    createExternalAnalyticsTool,
+    createKnowledgeBaseTool,
+    createScrapeWebSourceTool
+} from '@/lib/copilot/chat-tools';
 
 export const maxDuration = 60;
 
@@ -230,19 +238,34 @@ export async function POST(req: Request) {
 
         // 8. Generate response (Anthropic primary, OpenAI fallback on network failures)
 
+        const toolContext = {
+            userId: session.user.id,
+            organizationId: organization.id,
+            projectId: projectId || null
+        };
+
         const tools = {
             getProjectTranscripts: {
-                ...getProjectTranscriptsTool,
-                execute: (args: any) => getProjectTranscriptsTool.execute({ ...args, projectId })
+                ...createProjectTranscriptsTool(toolContext),
             },
             getChatbotConversations: {
-                ...getChatbotConversationsTool,
-                execute: (args: any) => getChatbotConversationsTool.execute({ ...args, projectId })
+                ...createChatbotConversationsTool(toolContext),
             },
             getProjectIntegrations: {
-                ...getProjectIntegrationsTool,
-                execute: (args: any) => getProjectIntegrationsTool.execute({ ...args, projectId })
+                ...createProjectIntegrationsTool(toolContext),
             },
+            getVisibilityInsights: {
+                ...createVisibilityInsightsTool(toolContext),
+            },
+            getExternalAnalytics: {
+                ...createExternalAnalyticsTool(toolContext),
+            },
+            getKnowledgeBase: {
+                ...createKnowledgeBaseTool(toolContext),
+            },
+            scrapeWebSource: {
+                ...createScrapeWebSourceTool(toolContext),
+            }
         };
 
         const runLLM = async (provider: 'anthropic' | 'openai', model: string) => {
@@ -250,7 +273,7 @@ export async function POST(req: Request) {
                 ? createAnthropic({ apiKey: anthropicApiKey })(model)
                 : createOpenAI({ apiKey: openaiApiKey })(model);
 
-            const toolSet = hasProjectAccess && projectId ? (tools as any) : undefined;
+            const toolSet = hasProjectAccess ? (tools as any) : undefined;
 
             return generateText({
                 model: llm as any,

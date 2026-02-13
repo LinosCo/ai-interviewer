@@ -141,13 +141,15 @@ export default function PlatformSettingsForm({
         }
     }, [isAdmin]);
 
+    const normalize = (value?: string | null) => value ?? '';
+
     const isDirty = (
-        (openaiKey && openaiKey !== platformOpenaiApiKey) ||
-        (anthropicKey && anthropicKey !== platformAnthropicApiKey) ||
-        (geminiKey && geminiKey !== platformGeminiApiKey) ||
-        (serpKey && serpKey !== googleSerpApiKey) ||
-        (sSecretKey && sSecretKey !== stripeSecretKey) ||
-        (sWebhookSecret && sWebhookSecret !== stripeWebhookSecret) ||
+        openaiKey !== normalize(platformOpenaiApiKey) ||
+        anthropicKey !== normalize(platformAnthropicApiKey) ||
+        geminiKey !== normalize(platformGeminiApiKey) ||
+        serpKey !== normalize(googleSerpApiKey) ||
+        sSecretKey !== normalize(stripeSecretKey) ||
+        sWebhookSecret !== normalize(stripeWebhookSecret) ||
         sPriceStarter !== stripePriceStarter ||
         sPriceStarterYearly !== stripePriceStarterYearly ||
         sPricePro !== stripePricePro ||
@@ -186,14 +188,14 @@ export default function PlatformSettingsForm({
                     organizationId,
                     methodologyKnowledge: knowledge,
                     strategicPlan: strategicPlan,
-                    platformOpenaiApiKey: openaiKey || undefined,
-                    platformAnthropicApiKey: anthropicKey || undefined,
-                    platformGeminiApiKey: geminiKey || undefined,
-                    googleSerpApiKey: serpKey || undefined,
+                    platformOpenaiApiKey: openaiKey,
+                    platformAnthropicApiKey: anthropicKey,
+                    platformGeminiApiKey: geminiKey,
+                    googleSerpApiKey: serpKey,
 
                     // Stripe
-                    stripeSecretKey: sSecretKey || undefined,
-                    stripeWebhookSecret: sWebhookSecret || undefined,
+                    stripeSecretKey: sSecretKey,
+                    stripeWebhookSecret: sWebhookSecret,
                     stripePriceStarter: sPriceStarter,
                     stripePriceStarterYearly: sPriceStarterYearly,
                     stripePricePro: sPricePro,
@@ -211,15 +213,24 @@ export default function PlatformSettingsForm({
                     smtpPort: smtpPortValue ? Number(smtpPortValue) : null,
                     smtpSecure: smtpSecureValue,
                     smtpUser: smtpUserValue,
-                    smtpPass: smtpPassValue || undefined,
+                    smtpPass: smtpPassValue,
                     smtpFromEmail: smtpFromEmailValue,
                     smtpNotificationEmail: smtpNotificationEmailValue,
-                    publicDemoBotId: demoBotId || undefined
+                    publicDemoBotId: demoBotId
                 })
             });
 
             if (!response.ok) {
-                throw new Error('Failed to save settings');
+                let message = 'Failed to save settings';
+                try {
+                    const errorData = await response.json();
+                    if (errorData?.missingColumns?.length) {
+                        message = `Colonne mancanti nel DB: ${errorData.missingColumns.join(', ')}`;
+                    } else if (errorData?.error) {
+                        message = errorData.error;
+                    }
+                } catch { }
+                throw new Error(message);
             }
 
             router.refresh();

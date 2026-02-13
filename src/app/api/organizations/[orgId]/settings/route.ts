@@ -5,6 +5,9 @@ import { Prisma } from '@prisma/client';
 import fs from 'node:fs';
 import path from 'node:path';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const GLOBAL_CONFIG_FIELDS = [
     'openaiApiKey',
     'anthropicApiKey',
@@ -21,6 +24,10 @@ const GLOBAL_CONFIG_FIELDS = [
     'stripePricePackSmall',
     'stripePricePackMedium',
     'stripePricePackLarge',
+    'stripePricePartner',
+    'stripePricePartnerYearly',
+    'stripePriceEnterprise',
+    'stripePriceEnterpriseYearly',
     'smtpHost',
     'smtpPort',
     'smtpSecure',

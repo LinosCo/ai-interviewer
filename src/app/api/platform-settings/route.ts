@@ -98,10 +98,14 @@ export async function POST(req: NextRequest) {
                   AND table_name = 'GlobalConfig'
             `).catch(() => []);
             const available = new Set(availableColumns.map((c) => c.column_name));
+            const missingRequestedColumns = new Set<string>();
 
             const compatValues: Record<string, unknown> = {};
             const assignIfAvailable = (column: string, value: unknown) => {
-                if (!available.has(column)) return;
+                if (!available.has(column)) {
+                    missingRequestedColumns.add(column);
+                    return;
+                }
                 compatValues[column] = value;
             };
 
@@ -212,6 +216,16 @@ export async function POST(req: NextRequest) {
             if (publicDemoBotId !== undefined) {
                 const value = publicDemoBotId || null;
                 assignIfAvailable('publicDemoBotId', value);
+            }
+
+            if (missingRequestedColumns.size > 0) {
+                return NextResponse.json(
+                    {
+                        error: 'GlobalConfig schema mismatch',
+                        missingColumns: Array.from(missingRequestedColumns).sort()
+                    },
+                    { status: 500 }
+                );
             }
 
             if (available.has('updatedAt')) {

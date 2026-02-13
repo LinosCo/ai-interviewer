@@ -173,7 +173,7 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
                             {hasProjectAccess && (!selectedProject || selectedProject.id === '__ALL__') && (
                                 <div className="mt-3 bg-white/10 rounded-lg px-3 py-2 text-xs flex items-center gap-2">
                                     <AlertCircle className="w-4 h-4" />
-                                    Seleziona un progetto dalla sidebar per accedere ai tuoi dati
+                                    Vista multi-progetto attiva: il Copilot userà tutti i progetti a cui hai accesso
                                 </div>
                             )}
                         </div>

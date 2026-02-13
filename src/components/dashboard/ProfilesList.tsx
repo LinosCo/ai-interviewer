@@ -12,7 +12,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
-import { useState } from "react";
 
 interface Profile {
     id: string;
@@ -26,33 +25,69 @@ interface Profile {
         currentRole?: string;
         role?: string;          // alternative field name
         company?: string;
+        location?: string;
+        budget?: string;
+        availability?: string;
         alignmentScore?: number;
         cultureFitScore?: number; // legacy
         summaryNote?: string;
         recruiterNote?: string; // legacy
         linkedIn?: string;
+        portfolio?: string;
+        userMessage?: string;
     };
 }
 
 export default function ProfilesList({ profiles }: { profiles: Profile[] }) {
+    const escapeCsv = (value: unknown): string => {
+        const text = String(value ?? '');
+        if (/[",\n\r]/.test(text)) {
+            return `"${text.replace(/"/g, '""')}"`;
+        }
+        return text;
+    };
 
     const downloadCSV = () => {
-        const headers = ["Date", "Name", "Email", "Phone", "Role", "Company", "Score", "LinkedIn", "Summary"];
+        const headers = [
+            "Conversation ID",
+            "Date",
+            "Status",
+            "Name",
+            "Email",
+            "Phone",
+            "Role",
+            "Company",
+            "Location",
+            "LinkedIn",
+            "Portfolio",
+            "Availability",
+            "Budget",
+            "Score",
+            "Summary",
+            "User Message"
+        ];
         const rows = profiles.map(p => [
+            p.id,
             new Date(p.date).toLocaleDateString(),
+            p.status || "",
             p.data.fullName || p.data.name || "Anon",
             p.data.email || "",
             p.data.phone || "",
             p.data.currentRole || p.data.role || "",
             p.data.company || "",
-            p.data.alignmentScore || p.data.cultureFitScore || "",
+            p.data.location || "",
             p.data.linkedIn || "",
-            `"${(p.data.summaryNote || p.data.recruiterNote || "").replace(/"/g, '""')}"`
+            p.data.portfolio || "",
+            p.data.availability || "",
+            p.data.budget || "",
+            p.data.alignmentScore || p.data.cultureFitScore || "",
+            p.data.summaryNote || p.data.recruiterNote || "",
+            p.data.userMessage || ""
         ]);
 
         const csvContent = [
-            headers.join(","),
-            ...rows.map(row => row.join(","))
+            headers.map(escapeCsv).join(","),
+            ...rows.map(row => row.map(escapeCsv).join(","))
         ].join("\n");
 
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -134,7 +169,7 @@ export default function ProfilesList({ profiles }: { profiles: Profile[] }) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => window.location.href = `profiles/${profile.id}`}
+                                    onClick={() => window.location.href = `${profile.id}`}
                                 >
                                     Dettagli
                                 </Button>

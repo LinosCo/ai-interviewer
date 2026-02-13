@@ -369,6 +369,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
         // Let's rely on explicit 'false' setting via hidden fields if needed, OR:
         // For 'useWarmup':
         if (formData.get('useWarmup') === 'on') data.useWarmup = true;
+        else if (scope === 'constraints' || scope === 'all') data.useWarmup = false;
         // Same for collectCandidateData
         if (formData.get('collectCandidateData') === 'on') data.collectCandidateData = true;
         else if (scope === 'constraints' || scope === 'all') data.collectCandidateData = false;
@@ -393,6 +394,8 @@ export async function updateBotAction(botId: string, formData: FormData) {
         // Let's assume if we are in 'constraints' scope, we overwrite fields.
         if (data.collectCandidateData) {
             data.candidateDataFields = formData.getAll('candidateFields').map(v => String(v)); // empty array if none
+        } else if (scope === 'constraints' || scope === 'all') {
+            data.candidateDataFields = [];
         }
     }
 

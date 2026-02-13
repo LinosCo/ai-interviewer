@@ -237,37 +237,66 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'At least configId or projectId must be provided' }, { status: 400 });
         }
 
-        const config = await prisma.visibilityConfig.findFirst({
-            where: {
-                organizationId,
-                ...(configId
-                    ? { id: configId }
-                    : projectId
-                        ? {
-                            OR: [
-                                { projectId },
-                                { projectShares: { some: { projectId } } }
-                            ]
+        let config: any = null;
+        try {
+            config = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(configId
+                        ? { id: configId }
+                        : projectId
+                            ? {
+                                OR: [
+                                    { projectId },
+                                    { projectShares: { some: { projectId } } }
+                                ]
+                            }
+                            : {})
+                },
+                include: {
+                    prompts: {
+                        orderBy: { orderIndex: 'asc' }
+                    },
+                    competitors: true,
+                    projectShares: {
+                        select: { projectId: true }
+                    },
+                    scans: {
+                        orderBy: { startedAt: 'desc' },
+                        take: 1,
+                        include: {
+                            metrics: true
                         }
-                        : {})
-            },
-            include: {
-                prompts: {
-                    orderBy: { orderIndex: 'asc' }
-                },
-                competitors: true,
-                projectShares: {
-                    select: { projectId: true }
-                },
-                scans: {
-                    orderBy: { startedAt: 'desc' },
-                    take: 1,
-                    include: {
-                        metrics: true
                     }
                 }
-            }
-        });
+            });
+        } catch (err: any) {
+            if (err?.code !== 'P2021') throw err;
+            // Backward compatibility for databases missing ProjectVisibilityConfig.
+            config = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(configId
+                        ? { id: configId }
+                        : projectId
+                            ? { projectId }
+                            : {})
+                },
+                include: {
+                    prompts: {
+                        orderBy: { orderIndex: 'asc' }
+                    },
+                    competitors: true,
+                    scans: {
+                        orderBy: { startedAt: 'desc' },
+                        take: 1,
+                        include: {
+                            metrics: true
+                        }
+                    }
+                }
+            });
+        }
 
         if (!config) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });

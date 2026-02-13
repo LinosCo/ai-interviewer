@@ -27,6 +27,10 @@ interface GlobalConfigState {
     stripePricePackSmall?: string;
     stripePricePackMedium?: string;
     stripePricePackLarge?: string;
+    stripePricePartner?: string;
+    stripePricePartnerYearly?: string;
+    stripePriceEnterprise?: string;
+    stripePriceEnterpriseYearly?: string;
     smtpHost?: string;
     smtpPort?: number | null;
     smtpSecure?: boolean | null;
@@ -48,7 +52,9 @@ export default function PlatformSettingsPage() {
             if (!currentOrganization) return;
             try {
                 setLoading(true);
-                const res = await fetch(`/api/organizations/${currentOrganization.id}/settings`);
+                const res = await fetch(`/api/organizations/${currentOrganization.id}/settings`, {
+                    cache: 'no-store'
+                });
                 if (res.ok) {
                     const data = await res.json();
                     setSettings(data.settings);
@@ -118,6 +124,10 @@ export default function PlatformSettingsPage() {
                         stripePricePackSmall={globalConfig?.stripePricePackSmall}
                         stripePricePackMedium={globalConfig?.stripePricePackMedium}
                         stripePricePackLarge={globalConfig?.stripePricePackLarge}
+                        stripePricePartner={globalConfig?.stripePricePartner}
+                        stripePricePartnerYearly={globalConfig?.stripePricePartnerYearly}
+                        stripePriceEnterprise={globalConfig?.stripePriceEnterprise}
+                        stripePriceEnterpriseYearly={globalConfig?.stripePriceEnterpriseYearly}
                         smtpHost={globalConfig?.smtpHost}
                         smtpPort={globalConfig?.smtpPort}
                         smtpSecure={globalConfig?.smtpSecure}

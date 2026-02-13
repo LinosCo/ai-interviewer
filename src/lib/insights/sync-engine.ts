@@ -5,10 +5,8 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 const ActionSchema = z.object({
-    // Operational actions (can be automated)
+    // Potentially automatable actions (only when required integrations are available)
     // - add_faq: Add FAQ to chatbot knowledge base
-    // - add_interview_topic: Add new interview topic to collect more feedback
-    // - add_visibility_prompt: Add new monitoring query
     // Strategic actions (require consultation)
     // - create_content / modify_content: Website content changes
     // - respond_to_press: PR response needed
@@ -226,6 +224,17 @@ export class CrossChannelSyncEngine {
                 };
             }
         }
+
+        const hasChatbotInScope = (await prisma.bot.count({
+            where: {
+                botType: 'chatbot',
+                project: {
+                    organizationId,
+                    ...(projectId ? { id: projectId } : {})
+                }
+            }
+        })) > 0;
+        const canAutoPublishToCms = Boolean(cmsConnection && ['ACTIVE', 'PARTIAL'].includes(cmsConnection.status));
 
         // 6. Summarize data for LLM with compact identifiers for citations
         const truncate = (value: string, max: number) => (value || '').slice(0, max);
@@ -553,10 +562,18 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                         validation: { status: 'duplicate', matchTitle: match.title, score: match.score }
                     }];
                 }
+                const canAutoApply =
+                    (action.type === 'add_faq' && hasChatbotInScope) ||
+                    ((action.type === 'create_content' || action.type === 'modify_content') && canAutoPublishToCms);
+
                 return [{
                     ...action,
-                    autoApply: ['add_faq', 'add_interview_topic', 'add_visibility_prompt'].includes(action.type),
-                    ...(match ? { validation: { status: 'overlap', matchTitle: match.title, score: match.score } } : {})
+                    autoApply: canAutoApply,
+                    ...(match ? { validation: { status: 'overlap', matchTitle: match.title, score: match.score } } : {}),
+                    automationRequirements: {
+                        hasChatbotInScope,
+                        canAutoPublishToCms
+                    }
                 }];
             });
 

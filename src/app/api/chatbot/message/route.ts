@@ -4,6 +4,16 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import {
+    hasConfiguredScope,
+    hasRecentHelpfulAssistantReply,
+    isClearlyOutOfScope,
+    isExitIntentMessage,
+    isLeadCollectionQuestion,
+    normalizeScopeTokens,
+    shouldAttemptLeadExtraction,
+    shouldCollectOnExit
+} from '@/lib/chatbot/message-guards';
 
 export const maxDuration = 30;
 
@@ -35,9 +45,21 @@ function normalizeCandidateFields(raw: unknown): CandidateField[] {
 
     return raw
         .map((field) => {
+            if (typeof field === 'string') {
+                const fieldName = field.trim();
+                if (!fieldName) return null;
+                return {
+                    field: fieldName,
+                    required: false
+                };
+            }
             if (!field || typeof field !== 'object') return null;
             const typed = field as Record<string, unknown>;
-            const fieldName = typeof typed.field === 'string' ? typed.field.trim() : '';
+            const fieldName = typeof typed.field === 'string'
+                ? typed.field.trim()
+                : typeof typed.id === 'string'
+                    ? typed.id.trim()
+                    : '';
             if (!fieldName) return null;
 
             return {
@@ -89,13 +111,15 @@ function looksLikePromptLeak(text: string): boolean {
     return PROMPT_LEAK_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-function fallbackLeadResponse(field: CandidateField | null): string {
+function fallbackLeadResponse(field: CandidateField | null, botFallbackMessage?: string | null): string {
+    const fallback = typeof botFallbackMessage === 'string' ? botFallbackMessage.trim() : '';
     if (field) {
         const question = field.question || `Potresti dirmi ${field.field}, per favore?`;
-        return `Volentieri, continuo ad aiutarti. ${LEAD_SPLIT_TOKEN} ${question}`;
+        const preface = fallback || 'Volentieri, continuo ad aiutarti.';
+        return `${preface} ${LEAD_SPLIT_TOKEN} ${question}`;
     }
 
-    return 'Grazie per il messaggio. Come posso aiutarti in modo piu preciso?';
+    return fallback || 'Grazie per il messaggio. Come posso aiutarti in modo piu preciso?';
 }
 
 function isGreetingOnlyMessage(input: string): boolean {
@@ -107,23 +131,6 @@ function isGreetingOnlyMessage(input: string): boolean {
 function hasBuyingIntent(input: string): boolean {
     const text = input.toLowerCase();
     return /(prezzo|pricing|costo|preventivo|demo|trial|prova|abbonamento|piano|contratto|offerta|integrazion|implementazione|timeline|budget|acquisto)/.test(text);
-}
-
-const OFF_TOPIC_PATTERN = /\b(pizzeria|ristorante|pizza|meteo|oroscopo|barzelletta|barzellett|calcio|partita|bitcoin|crypto|borsa|azioni|ricetta|cucina|film|serie tv|vacanza|viaggio)\b/i;
-const SCOPE_STOPWORDS = new Set([
-    'the', 'and', 'for', 'with', 'this', 'that', 'from', 'your', 'you', 'are', 'about', 'into',
-    'per', 'con', 'che', 'della', 'delle', 'degli', 'dello', 'dall', 'dallai', 'dei', 'del', 'nel',
-    'nella', 'nelle', 'agli', 'allo', 'alla', 'alle', 'uno', 'una', 'sono', 'come', 'quale', 'quali',
-    'cosa', 'fare', 'puoi', 'solo', 'tema', 'temi', 'obiettivo', 'ai', 'llm', 'business'
-]);
-
-function normalizeScopeTokens(input: string): string[] {
-    return input
-        .toLowerCase()
-        .replace(/[^a-z0-9àèéìòù\s]/gi, ' ')
-        .split(/\s+/)
-        .map((t) => t.trim())
-        .filter((t) => t.length >= 4 && !SCOPE_STOPWORDS.has(t));
 }
 
 function buildScopeLexicon(bot: any): Set<string> {
@@ -162,20 +169,16 @@ function topicLabels(bot: any): string[] {
 
 function buildOutOfScopeReply(bot: any): string {
     const topics = topicLabels(bot);
+    const fallback = typeof bot?.fallbackMessage === 'string' ? bot.fallbackMessage.trim() : '';
     if (topics.length >= 2) {
-        return `Posso aiutarti solo sui temi di questa chat (${topics[0]} e ${topics[1]}). Se vuoi, partiamo da ${topics[0]}: quale aspetto ti interessa di più?`;
+        const preface = fallback || `Posso aiutarti solo sui temi di questa chat (${topics[0]} e ${topics[1]}).`;
+        return `${preface} Se vuoi, partiamo da ${topics[0]}: quale aspetto ti interessa di più?`;
     }
     if (topics.length === 1) {
-        return `Posso aiutarti solo sui temi di questa chat, in particolare su ${topics[0]}. Se vuoi, partiamo da lì: cosa ti interessa approfondire?`;
+        const preface = fallback || `Posso aiutarti solo sui temi di questa chat, in particolare su ${topics[0]}.`;
+        return `${preface} Se vuoi, partiamo da lì: cosa ti interessa approfondire?`;
     }
-    return 'Posso aiutarti solo sui temi previsti da questa chat. Se vuoi, dimmi cosa ti interessa rispetto al servizio o all’obiettivo configurato.';
-}
-
-function isClearlyOutOfScope(message: string, scopeLexicon: Set<string>): boolean {
-    if (!OFF_TOPIC_PATTERN.test(message)) return false;
-    const msgTokens = normalizeScopeTokens(message);
-    const overlap = msgTokens.some((token) => scopeLexicon.has(token));
-    return !overlap;
+    return fallback || 'Posso aiutarti solo sui temi previsti da questa chat. Se vuoi, dimmi cosa ti interessa rispetto al servizio o all’obiettivo configurato.';
 }
 
 export async function POST(req: Request) {
@@ -245,6 +248,7 @@ export async function POST(req: Request) {
 
         const systemPromptBase = buildChatbotPrompt(bot, session);
         const scopeLexicon = buildScopeLexicon(bot);
+        const scopeConfigured = hasConfiguredScope(bot);
 
         // Retrieve Global Config for API Key fallback
         const globalConfig = await prisma.globalConfig.findUnique({
@@ -281,6 +285,9 @@ export async function POST(req: Request) {
             leadCapture.lastAskedAt &&
             Date.now() - new Date(leadCapture.lastAskedAt).getTime() < 1000 * 60 * 3;
 
+        const awaitingLeadReply = Boolean(nextMissingField && leadCapture.lastAskedField === nextMissingField.field);
+        const hasExitIntent = isExitIntentMessage(message);
+
         let shouldCollect = Boolean(nextMissingField) && Boolean(canAskByCount) && !recentlyAsked;
 
         // Guardrail: never start lead capture on the very first user turn.
@@ -293,13 +300,16 @@ export async function POST(req: Request) {
             const enoughConversationHistory = totalUserMessages >= 2;
             const greetingOnly = isGreetingOnlyMessage(message);
             const explicitIntent = hasBuyingIntent(message);
+            const hasGivenUsefulInfo = hasRecentHelpfulAssistantReply(conversation.messages);
 
             if (
                 isLeadCollectionEnabled &&
                 !recentlyAsked &&
                 nextMissingField &&
                 enoughConversationHistory &&
-                !greetingOnly
+                !greetingOnly &&
+                !awaitingLeadReply &&
+                hasGivenUsefulInfo
             ) {
                 console.log('[SmartLeadGen] Evaluating for conversation:', conversationId, 'Msg count:', totalUserMessages);
                 try {
@@ -330,8 +340,22 @@ Return shouldAsk=true only when it is natural.`,
                     shouldCollect = false;
                 }
             } else {
-                console.log('[SmartLeadGen] Skipped. Conditions:', { isLeadCollectionEnabled, recentlyAsked, hasNextField: !!nextMissingField, enoughConversationHistory, greetingOnly });
+                console.log('[SmartLeadGen] Skipped. Conditions:', { isLeadCollectionEnabled, recentlyAsked, hasNextField: !!nextMissingField, enoughConversationHistory, greetingOnly, awaitingLeadReply, hasGivenUsefulInfo });
             }
+        }
+
+        if (shouldCollectOnExit({
+            triggerStrategy,
+            hasNextMissingField: Boolean(nextMissingField),
+            hasExitIntent,
+            totalUserMessages,
+            recentlyAsked: Boolean(recentlyAsked)
+        })) {
+            shouldCollect = true;
+        }
+
+        if (awaitingLeadReply) {
+            shouldCollect = true;
         }
 
         // If we have a missing field and triggered
@@ -341,7 +365,11 @@ Return shouldAsk=true only when it is natural.`,
         let extraction: any = null;
         if (nextMissingField && shouldCollect) {
             // Only try extraction if we actually asked this field recently
-            shouldAttemptExtraction = leadCapture.lastAskedField === nextMissingField.field;
+            shouldAttemptExtraction = shouldAttemptLeadExtraction({
+                hasNextMissingField: Boolean(nextMissingField),
+                shouldCollect,
+                awaitingLeadReply
+            });
 
             if (shouldAttemptExtraction) {
                 try {
@@ -482,7 +510,7 @@ NON-NEGOTIABLE RULES
             }
         }
 
-        if (isClearlyOutOfScope(message, scopeLexicon)) {
+        if (isClearlyOutOfScope(message, scopeLexicon, scopeConfigured)) {
             finalResponse = buildOutOfScopeReply(bot);
         }
 
@@ -502,7 +530,10 @@ NON-NEGOTIABLE RULES
             finalResponse = (result?.object.response || '').trim();
         }
         if (!finalResponse || looksLikePromptLeak(finalResponse)) {
-            finalResponse = fallbackLeadResponse(nextMissingField && shouldCollect ? nextMissingField : null);
+            finalResponse = fallbackLeadResponse(
+                nextMissingField && shouldCollect ? nextMissingField : null,
+                bot.fallbackMessage
+            );
         }
 
         let splitParts: { before: string; after: string } | null = null;
@@ -515,7 +546,15 @@ NON-NEGOTIABLE RULES
             }
         }
 
-        if (nextMissingField && shouldCollect) {
+        const askedLeadInThisReply =
+            Boolean(nextMissingField) &&
+            Boolean(shouldCollect) &&
+            (
+                (splitParts?.after ? isLeadCollectionQuestion(splitParts.after, nextMissingField) : false) ||
+                (!splitParts ? isLeadCollectionQuestion(finalResponse, nextMissingField) : false)
+            );
+
+        if (nextMissingField && askedLeadInThisReply) {
             leadCapture.lastAskedAt = new Date().toISOString();
             leadCapture.lastAskedField = nextMissingField.field;
             leadCapture.askedCount = (leadCapture.askedCount || 0) + 1;
@@ -612,10 +651,15 @@ function buildChatbotPrompt(bot: any, session: any): string {
             .filter((line: string) => line.length > 0)
             .join('\n')
         : '';
-    const boundaries =
-        bot.boundaries && typeof bot.boundaries === 'object'
-            ? JSON.stringify(bot.boundaries)
-            : '';
+    const boundariesList = Array.isArray(bot.boundaries)
+        ? bot.boundaries
+            .filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
+            .map((value: string) => value.trim())
+        : [];
+    const boundariesText = boundariesList.length > 0
+        ? boundariesList.map((item: string) => `- ${item}`).join('\n')
+        : '';
+    const fallbackMessage = typeof bot?.fallbackMessage === 'string' ? bot.fallbackMessage.trim() : '';
     const shouldUsePageContext = bot.enablePageContext !== false;
     const pageTitle = typeof session?.pageTitle === 'string' ? session.pageTitle.trim() : '';
     const pageUrl = typeof session?.pageUrl === 'string' ? session.pageUrl.trim() : '';
@@ -643,7 +687,8 @@ Tone: ${bot.tone || 'Professional'}
 Primary objective: ${researchGoal || 'Help users about the configured business context and goals.'}
 Allowed topics:
 ${topicScope || '- Use only the configured knowledge base and business context.'}
-Additional boundaries: ${boundaries || 'N/A'}
+Additional boundaries:
+${boundariesText || '- N/A'}
 
 ## KNOWLEDGE BASE
 ${kb}
@@ -653,6 +698,7 @@ ${pageContextSection}
 ## INSTRUCTIONS
 - Answer using Knowledge Base.
 - If unknown, admit it nicely.
+- If you cannot answer, use this fallback style/message: ${fallbackMessage || 'Spiega con trasparenza che non hai abbastanza informazioni e proponi un passo utile.'}
 - Keep it concise.
 - Prioritize user help first, then lead collection when requested.
 - Ask only one lead field at a time and keep it natural.
@@ -660,5 +706,6 @@ ${pageContextSection}
 - Use page context only when relevant to the user request.
 - Strict scope guardrail: if the user asks something unrelated to the objective/topics above, do NOT answer that out-of-scope request.
 - For out-of-scope requests, reply briefly and politely: state you can help only on the configured topics, propose 1-2 in-scope alternatives, and ask one in-scope follow-up question.
+- Boundary guardrail: if a user request conflicts with any boundary listed above, refuse that specific request briefly and redirect to an allowed alternative.
 `.trim();
 }

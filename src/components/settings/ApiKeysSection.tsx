@@ -19,9 +19,17 @@ export function ApiKeysSection() {
     useEffect(() => {
         const checkRole = async () => {
             try {
-                const response = await fetch('/api/user/settings');
+                const response = await fetch('/api/user/settings', { cache: 'no-store' });
                 const data = await response.json();
                 setIsAdmin(data.role === 'ADMIN');
+                const customApiKeys = (data?.customApiKeys && typeof data.customApiKeys === 'object')
+                    ? data.customApiKeys
+                    : {};
+                setApiKeys({
+                    openai: typeof customApiKeys.openai === 'string' ? customApiKeys.openai : '',
+                    anthropic: typeof customApiKeys.anthropic === 'string' ? customApiKeys.anthropic : '',
+                    google: typeof customApiKeys.google === 'string' ? customApiKeys.google : ''
+                });
             } catch (error) {
                 console.error('Failed to check role:', error);
             } finally {

@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType, PlanLimits, PlanFeatures } from '@/config/plans';
+import { Prisma } from '@prisma/client';
 
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
@@ -19,6 +20,48 @@ interface PriceConfig {
     priceIdYearly: string | null;
     limits: PlanLimits;
     features: PlanFeatures;
+}
+
+const GLOBAL_CONFIG_PRICE_COLUMNS = [
+    'stripePriceStarter',
+    'stripePriceStarterYearly',
+    'stripePricePro',
+    'stripePriceProYearly',
+    'stripePriceBusiness',
+    'stripePriceBusinessYearly',
+    'stripePricePartner',
+    'stripePricePartnerYearly',
+    'stripePriceEnterprise',
+    'stripePriceEnterpriseYearly',
+    'stripePricePackSmall',
+    'stripePricePackMedium',
+    'stripePricePackLarge'
+] as const;
+
+async function getGlobalConfigCompat(columns: readonly string[]): Promise<Record<string, unknown> | null> {
+    try {
+        const availableColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'GlobalConfig'
+        `);
+        const available = new Set(availableColumns.map((c) => c.column_name));
+        const selectable = columns.filter((column) => available.has(column));
+        if (selectable.length === 0) return null;
+
+        const columnSql = Prisma.join(selectable.map((column) => Prisma.raw(`"${column}"`)));
+        const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+            SELECT ${columnSql}
+            FROM "GlobalConfig"
+            WHERE id = 'default'
+            LIMIT 1
+        `);
+        return rows[0] ?? null;
+    } catch (error) {
+        console.warn('Failed to fetch GlobalConfig compat', error);
+        return null;
+    }
 }
 
 async function getStripeConfig() {
@@ -50,15 +93,10 @@ async function getStripeConfig() {
     let secretKeyFromDb: string | null = null;
 
     try {
-        // Keep this query minimal to avoid hard-failing when some optional
-        // pricing columns are missing in partially migrated environments.
-        const secretConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: {
-                stripeSecretKey: true
-            }
-        });
-        secretKeyFromDb = secretConfig?.stripeSecretKey || null;
+        const secretConfig = await getGlobalConfigCompat(['stripeSecretKey']);
+        secretKeyFromDb = typeof secretConfig?.stripeSecretKey === 'string'
+            ? secretConfig.stripeSecretKey
+            : null;
     } catch (e) {
         console.warn("Failed to fetch Stripe secret key from global config", e);
     }
@@ -67,24 +105,7 @@ async function getStripeConfig() {
         let dbPrices: Partial<Record<string, string | null>> = {};
 
         try {
-            const priceConfig = await prisma.globalConfig.findUnique({
-                where: { id: 'default' },
-                select: {
-                    stripePriceStarter: true,
-                    stripePriceStarterYearly: true,
-                    stripePricePro: true,
-                    stripePriceProYearly: true,
-                    stripePriceBusiness: true,
-                    stripePriceBusinessYearly: true,
-                    stripePricePartner: true,
-                    stripePricePartnerYearly: true,
-                    stripePriceEnterprise: true,
-                    stripePriceEnterpriseYearly: true,
-                    stripePricePackSmall: true,
-                    stripePricePackMedium: true,
-                    stripePricePackLarge: true
-                }
-            });
+            const priceConfig = await getGlobalConfigCompat(GLOBAL_CONFIG_PRICE_COLUMNS);
 
             if (priceConfig) {
                 const pc = priceConfig as any;

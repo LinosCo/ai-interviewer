@@ -218,14 +218,9 @@ export async function POST(req: NextRequest) {
                 assignIfAvailable('publicDemoBotId', value);
             }
 
-            if (missingRequestedColumns.size > 0) {
-                return NextResponse.json(
-                    {
-                        error: 'GlobalConfig schema mismatch',
-                        missingColumns: Array.from(missingRequestedColumns).sort()
-                    },
-                    { status: 500 }
-                );
+            const missingColumns = Array.from(missingRequestedColumns).sort();
+            if (missingColumns.length > 0) {
+                console.warn('[platform-settings] Ignoring unavailable GlobalConfig columns:', missingColumns);
             }
 
             if (available.has('updatedAt')) {

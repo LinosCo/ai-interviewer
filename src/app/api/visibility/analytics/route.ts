@@ -1,7 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET /api/visibility/analytics?configId=xxx
@@ -21,19 +20,27 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'configId required' }, { status: 400 });
         }
 
-        // Verify access to config
-        const orgId = await resolveActiveOrganizationIdForUser(session.user.id);
-        if (!orgId) {
-            return NextResponse.json({ error: 'No organization' }, { status: 403 });
-        }
-
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { id: configId, organizationId: orgId },
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
             include: { competitors: true }
         });
 
         if (!config) {
             return NextResponse.json({ error: 'Config not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { organizationId: true }
+        });
+
+        if (!membership) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         // 1. Fetch historical scans for trend chart (last 30 days)

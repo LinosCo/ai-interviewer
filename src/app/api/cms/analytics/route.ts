@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET /api/cms/analytics?range=7d|30d|90d&projectId=xxx
@@ -17,11 +18,9 @@ export async function GET(request: Request) {
         const projectId = url.searchParams.get('projectId');
         const range = url.searchParams.get('range') || '30d';
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
+        const activeOrgId = await resolveActiveOrganizationIdForUser(session.user.id);
 
-        // Verify user has access to this project
+        // Verify user access and load org projects with CMS connections
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
             include: {
@@ -29,12 +28,7 @@ export async function GET(request: Request) {
                     include: {
                         organization: {
                             include: {
-                                projects: {
-                                    where: { id: projectId },
-                                    include: {
-                                        cmsConnection: true
-                                    }
-                                }
+                                projects: { include: { cmsConnection: true } }
                             }
                         }
                     }
@@ -46,10 +40,34 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'No organization found' }, { status: 404 });
         }
 
-        // Find the project with CMS connection
+        // Pick project:
+        // - requested projectId when provided
+        // - otherwise first project with CMS in active organization
+        // - fallback to first project with CMS in any user organization
+        let targetProjectId = projectId;
+        if (!targetProjectId) {
+            const activeMembership = activeOrgId
+                ? user.memberships.find((m) => m.organizationId === activeOrgId)
+                : undefined;
+
+            const activeOrgProject = activeMembership?.organization.projects.find((p) => p.cmsConnection);
+            if (activeOrgProject) {
+                targetProjectId = activeOrgProject.id;
+            } else {
+                for (const membership of user.memberships) {
+                    const project = membership.organization.projects.find((p) => p.cmsConnection);
+                    if (project) {
+                        targetProjectId = project.id;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Find CMS connection for target project
         let cmsConnection = null;
         for (const membership of user.memberships) {
-            const project = membership.organization.projects.find(p => p.id === projectId);
+            const project = membership.organization.projects.find(p => p.id === targetProjectId);
             if (project?.cmsConnection) {
                 cmsConnection = project.cmsConnection;
                 break;

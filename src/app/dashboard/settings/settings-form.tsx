@@ -300,7 +300,15 @@ export default function PlatformSettingsForm({
             const response = await fetch('/api/platform-settings/send-test-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to: testEmailTo.trim() })
+                body: JSON.stringify({
+                    to: testEmailTo.trim(),
+                    smtpHost: smtpHostValue || null,
+                    smtpPort: smtpPortValue ? Number(smtpPortValue) : null,
+                    smtpSecure: smtpSecureValue,
+                    smtpUser: smtpUserValue || null,
+                    smtpPass: smtpPassValue || null,
+                    smtpFromEmail: smtpFromEmailValue || null
+                })
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {

@@ -44,7 +44,7 @@ async function getGlobalConfigCompat() {
             SELECT column_name
             FROM information_schema.columns
             WHERE table_schema = 'public'
-              AND table_name = 'GlobalConfig'
+              AND LOWER(table_name) = LOWER('GlobalConfig')
         `);
         const available = new Set(columns.map((c) => c.column_name));
         const selectable = GLOBAL_CONFIG_FIELDS.filter((f) => available.has(f));
@@ -87,6 +87,12 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const currentUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
+        });
+        const isAdmin = currentUser?.role === 'ADMIN';
+
         // Verify membership
         const membership = await prisma.membership.findUnique({
             where: {
@@ -97,7 +103,7 @@ export async function GET(
             }
         });
 
-        if (!membership && (session.user as any).role !== 'ADMIN') {
+        if (!membership && !isAdmin) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
@@ -121,7 +127,7 @@ export async function GET(
 
         // If admin, also return global config
         let globalConfig = null;
-        if ((session.user as any).role === 'ADMIN') {
+        if (isAdmin) {
             globalConfig = await getGlobalConfigCompat();
         }
 

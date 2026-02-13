@@ -462,6 +462,15 @@ export async function sendEmail(params: {
     subject: string;
     html: string;
     from?: string;
+    smtpOverrides?: {
+        host?: string | null;
+        port?: number | null;
+        secure?: boolean | null;
+        user?: string | null;
+        pass?: string | null;
+        fromEmail?: string | null;
+        resendApiKey?: string | null;
+    };
 }) {
     const globalConfig = await prisma.globalConfig.findUnique({
         where: { id: 'default' },
@@ -477,17 +486,20 @@ export async function sendEmail(params: {
     }).catch(() => null);
 
     const from =
-        params.from ||
-        globalConfig?.smtpFromEmail ||
-        process.env.EMAIL_FROM ||
+        params.from ??
+        params.smtpOverrides?.fromEmail ??
+        globalConfig?.smtpFromEmail ??
+        process.env.EMAIL_FROM ??
         DEFAULT_FROM_EMAIL;
 
-    const smtpHost = globalConfig?.smtpHost || process.env.SMTP_HOST;
-    const smtpUser = globalConfig?.smtpUser || process.env.SMTP_USER;
-    const smtpPass = globalConfig?.smtpPass || process.env.SMTP_PASS;
-    const smtpPort = Number(globalConfig?.smtpPort || process.env.SMTP_PORT || 465);
-    const smtpSecure = typeof globalConfig?.smtpSecure === 'boolean'
-        ? globalConfig.smtpSecure
+    const smtpHost = params.smtpOverrides?.host ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST;
+    const smtpUser = params.smtpOverrides?.user ?? globalConfig?.smtpUser ?? process.env.SMTP_USER;
+    const smtpPass = params.smtpOverrides?.pass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS;
+    const smtpPort = Number(params.smtpOverrides?.port ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465);
+    const smtpSecure = typeof params.smtpOverrides?.secure === 'boolean'
+        ? params.smtpOverrides.secure
+        : typeof globalConfig?.smtpSecure === 'boolean'
+            ? globalConfig.smtpSecure
         : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
 
     if (smtpHost && smtpUser && smtpPass) {
@@ -510,8 +522,9 @@ export async function sendEmail(params: {
         }
     }
 
-    if (!resend && globalConfig?.resendApiKey) {
-        resend = new Resend(globalConfig.resendApiKey);
+    const resendApiKey = params.smtpOverrides?.resendApiKey ?? globalConfig?.resendApiKey ?? process.env.RESEND_API_KEY;
+    if (!resend && resendApiKey) {
+        resend = new Resend(resendApiKey);
     }
     const resendClient = getResendClient();
     if (!resendClient) {

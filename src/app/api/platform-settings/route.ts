@@ -95,13 +95,15 @@ export async function POST(req: NextRequest) {
                 SELECT column_name
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
-                  AND table_name = 'GlobalConfig'
+                  AND LOWER(table_name) = LOWER('GlobalConfig')
             `).catch(() => []);
             const available = new Set(availableColumns.map((c) => c.column_name));
             const missingRequestedColumns = new Set<string>();
+            let requestedGlobalFieldCount = 0;
 
             const compatValues: Record<string, unknown> = {};
             const assignIfAvailable = (column: string, value: unknown) => {
+                requestedGlobalFieldCount += 1;
                 if (!available.has(column)) {
                     missingRequestedColumns.add(column);
                     return;
@@ -221,6 +223,16 @@ export async function POST(req: NextRequest) {
             const missingColumns = Array.from(missingRequestedColumns).sort();
             if (missingColumns.length > 0) {
                 console.warn('[platform-settings] Ignoring unavailable GlobalConfig columns:', missingColumns);
+            }
+
+            if (requestedGlobalFieldCount > 0 && Object.keys(compatValues).length === 0) {
+                return NextResponse.json(
+                    {
+                        error: 'Global configuration columns are not available in database',
+                        missingColumns
+                    },
+                    { status: 500 }
+                );
             }
 
             if (available.has('updatedAt')) {

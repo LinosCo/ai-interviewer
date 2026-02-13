@@ -8,11 +8,23 @@ export const revalidate = 0;
 export async function GET() {
     try {
         const session = await auth();
-        if (!session?.user?.id || (session.user as any).role !== 'ADMIN') {
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const currentUser = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { role: true }
+        });
+        if (currentUser?.role !== 'ADMIN') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const bots = await prisma.bot.findMany({
+            where: {
+                botType: 'interview',
+                status: 'PUBLISHED'
+            },
             select: {
                 id: true,
                 name: true,

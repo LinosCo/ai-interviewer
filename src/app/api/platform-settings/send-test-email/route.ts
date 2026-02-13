@@ -27,6 +27,13 @@ export async function POST(req: NextRequest) {
         }
 
         const now = new Date();
+        const smtpHost = typeof body.smtpHost === 'string' ? body.smtpHost.trim() : '';
+        const smtpPort = typeof body.smtpPort === 'number' ? body.smtpPort : null;
+        const smtpSecure = typeof body.smtpSecure === 'boolean' ? body.smtpSecure : null;
+        const smtpUser = typeof body.smtpUser === 'string' ? body.smtpUser.trim() : '';
+        const smtpPass = typeof body.smtpPass === 'string' ? body.smtpPass : '';
+        const smtpFromEmail = typeof body.smtpFromEmail === 'string' ? body.smtpFromEmail.trim() : '';
+
         const result = await sendEmail({
             to,
             subject: '[Business Tuner] Test configurazione email',
@@ -37,7 +44,15 @@ export async function POST(req: NextRequest) {
                     <p><strong>Data:</strong> ${now.toISOString()}</p>
                     <p><strong>Inviata da:</strong> ${currentUser?.email || 'admin'}</p>
                 </div>
-            `
+            `,
+            smtpOverrides: {
+                host: smtpHost || null,
+                port: smtpPort,
+                secure: smtpSecure,
+                user: smtpUser || null,
+                pass: smtpPass || null,
+                fromEmail: smtpFromEmail || null
+            }
         });
 
         if (!result.success) {

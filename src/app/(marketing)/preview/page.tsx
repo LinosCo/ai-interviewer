@@ -9,11 +9,40 @@ import { Sparkles, ArrowRight, Play } from 'lucide-react';
 import { colors } from '@/lib/design-system';
 import Link from 'next/link';
 
+type DemoConversation = {
+    id: string;
+    botId: string;
+    currentTopicId?: string | null;
+    bot: {
+        name: string;
+        description?: string | null;
+        maxDurationMins?: number | null;
+        logoUrl?: string | null;
+        primaryColor?: string | null;
+        backgroundColor?: string | null;
+        language?: string | null;
+        introMessage?: string | null;
+        topics?: any;
+    };
+};
+
+function isDemoConversation(value: unknown): value is DemoConversation {
+    if (!value || typeof value !== 'object') return false;
+    const record = value as Record<string, unknown>;
+    const bot = record.bot as Record<string, unknown> | undefined;
+    return (
+        typeof record.id === 'string' &&
+        typeof record.botId === 'string' &&
+        !!bot &&
+        typeof bot.name === 'string'
+    );
+}
+
 export default function PublicPreviewPage() {
     const [botId, setBotId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isInitializing, setIsInitializing] = useState(false);
-    const [conversation, setConversation] = useState<Record<string, unknown> | null>(null);
+    const [conversation, setConversation] = useState<DemoConversation | null>(null);
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -41,8 +70,12 @@ export default function PublicPreviewPage() {
         try {
             const res = await fetch('/api/public/demo-config', { method: 'POST' });
             if (res.ok) {
-                const data = await res.json();
-                setConversation(data);
+                const data: unknown = await res.json();
+                if (isDemoConversation(data)) {
+                    setConversation(data);
+                } else {
+                    console.error('Invalid demo conversation payload', data);
+                }
             }
         } catch (error) {
             console.error('Error starting demo session:', error);

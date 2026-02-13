@@ -1,92 +1,45 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import { Prisma } from '@prisma/client';
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const GLOBAL_CONFIG_FIELDS = [
-    'openaiApiKey',
-    'anthropicApiKey',
-    'geminiApiKey',
-    'googleSerpApiKey',
-    'stripeSecretKey',
-    'stripeWebhookSecret',
-    'stripePriceStarter',
-    'stripePriceStarterYearly',
-    'stripePricePro',
-    'stripePriceProYearly',
-    'stripePriceBusiness',
-    'stripePriceBusinessYearly',
-    'stripePricePackSmall',
-    'stripePricePackMedium',
-    'stripePricePackLarge',
-    'stripePricePartner',
-    'stripePricePartnerYearly',
-    'stripePriceEnterprise',
-    'stripePriceEnterpriseYearly',
-    'smtpHost',
-    'smtpPort',
-    'smtpSecure',
-    'smtpUser',
-    'smtpPass',
-    'smtpFromEmail',
-    'smtpNotificationEmail',
-    'publicDemoBotId'
-] as const;
-const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
 async function getGlobalConfigCompat() {
-    try {
-        const columns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND LOWER(table_name) = LOWER('GlobalConfig')
-        `);
-        const actualByLower = new Map(columns.map((c) => [c.column_name.toLowerCase(), c.column_name]));
-        const selectable = GLOBAL_CONFIG_FIELDS.filter((f) => actualByLower.has(f.toLowerCase()));
-        const rowKeyMap = new Map<string, string>();
-        for (const c of columns) {
-            rowKeyMap.set(c.column_name.toLowerCase(), c.column_name);
+    return prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: {
+            openaiApiKey: true,
+            anthropicApiKey: true,
+            geminiApiKey: true,
+            googleSerpApiKey: true,
+            stripeSecretKey: true,
+            stripeWebhookSecret: true,
+            stripePriceStarter: true,
+            stripePriceStarterYearly: true,
+            stripePricePro: true,
+            stripePriceProYearly: true,
+            stripePriceBusiness: true,
+            stripePriceBusinessYearly: true,
+            stripePricePackSmall: true,
+            stripePricePackMedium: true,
+            stripePricePackLarge: true,
+            stripePricePartner: true,
+            stripePricePartnerYearly: true,
+            stripePriceEnterprise: true,
+            stripePriceEnterpriseYearly: true,
+            smtpHost: true,
+            smtpPort: true,
+            smtpSecure: true,
+            smtpUser: true,
+            smtpPass: true,
+            smtpFromEmail: true,
+            smtpNotificationEmail: true,
+            publicDemoBotId: true
         }
-
-        if (selectable.length === 0) return null;
-
-        const selectFragments: string[] = [];
-        for (const field of selectable) {
-            const actual = actualByLower.get(field.toLowerCase());
-            if (!actual) continue;
-            if (!SAFE_SQL_IDENTIFIER.test(actual) || !SAFE_SQL_IDENTIFIER.test(field)) {
-                throw new Error(`Unsafe GlobalConfig identifier mapping: ${actual} -> ${field}`);
-            }
-            selectFragments.push(`"${actual}" AS "${field}"`);
-        }
-        if (selectFragments.length === 0) return null;
-
-        const rows = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
-            `SELECT ${selectFragments.join(', ')} FROM "GlobalConfig" WHERE id = 'default' LIMIT 1`
-        );
-
-        const raw = rows[0];
-        if (!raw) return null;
-
-        const normalized: Record<string, unknown> = {};
-        for (const field of selectable) {
-            const direct = raw[field];
-            const lower = raw[field.toLowerCase()];
-            const mappedKey = rowKeyMap.get(field.toLowerCase());
-            const mapped = mappedKey ? raw[mappedKey] : undefined;
-            normalized[field] = direct ?? lower ?? mapped ?? null;
-        }
-        return normalized;
-    } catch (error) {
-        console.error('Error loading global config compat:', error);
-        return null;
-    }
+    });
 }
 
 function getDefaultMethodologyKnowledge(): string {

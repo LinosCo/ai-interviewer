@@ -4,6 +4,7 @@ import { PLANS, PlanType, PURCHASABLE_PLANS, formatMonthlyCredits } from '@/conf
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import CheckoutButton from './checkout-button';
 
 const SALES_EMAIL = 'info@businesstuner.it';
 
@@ -187,15 +188,16 @@ export default async function PlansPage({
                                     Richiedi info via email <Icons.ArrowRight size={18} />
                                 </a>
                             ) : (
-                                <a
-                                    href={`/api/stripe/checkout?tier=${plan.id}&billing=${billingPeriod}`}
+                                <CheckoutButton
+                                    tier={plan.id}
+                                    billingPeriod={billingPeriod}
+                                    organizationId={activeMembership?.organizationId}
                                     className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${isPopular
                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20'
                                             : 'bg-stone-900 text-white hover:bg-stone-800'
                                         }`}
                                 >
-                                    Seleziona piano <Icons.ArrowRight size={18} />
-                                </a>
+                                </CheckoutButton>
                             )}
                         </div>
                     );
@@ -270,7 +272,7 @@ export default async function PlansPage({
                     <h4 className="text-lg font-bold text-stone-900 mb-1">Passa alla fatturazione annuale</h4>
                     <p className="text-stone-600 text-sm">Risparmia fino al 30% su tutti i piani attivando il pagamento annuale.</p>
                 </div>
-                <Link href="/api/stripe/portal">
+                <Link href={`/api/stripe/portal?organizationId=${activeMembership?.organizationId || ''}`}>
                     <button className="bg-white text-stone-900 font-bold px-8 py-3.5 rounded-xl border border-stone-200 hover:bg-stone-50 transition-all text-sm shadow-sm flex items-center gap-2">
                         <Icons.Settings2 size={16} /> Gestisci in Stripe
                     </button>

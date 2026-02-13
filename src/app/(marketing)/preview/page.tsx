@@ -124,13 +124,13 @@ export default function PublicPreviewPage() {
                                     botName={conversation.bot.name}
                                     botDescription={conversation.bot.description || undefined}
                                     estimatedDuration={`~${conversation.bot.maxDurationMins || 10} mins`}
-                                    logoUrl={conversation.bot.logoUrl}
+                                    logoUrl={conversation.bot.logoUrl || undefined}
                                     primaryColor={conversation.bot.primaryColor || colors.amber}
                                     backgroundColor={conversation.bot.backgroundColor || '#f9fafb'}
-                                    language={conversation.bot.language}
-                                    introMessage={conversation.bot.introMessage}
+                                    language={conversation.bot.language || undefined}
+                                    introMessage={conversation.bot.introMessage || undefined}
                                     topics={conversation.bot.topics}
-                                    currentTopicId={conversation.currentTopicId}
+                                    currentTopicId={conversation.currentTopicId || undefined}
                                     skipWelcome={true}
                                     isEmbedded={true}
                                 />

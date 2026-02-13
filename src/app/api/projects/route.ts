@@ -31,8 +31,18 @@ export async function GET(req: Request) {
             return new Response('Organization not found or access denied', { status: 403 });
         }
 
+        const isOrgAdmin = ['OWNER', 'ADMIN'].includes(membership.role);
+
         const projects = await prisma.project.findMany({
-            where: { organizationId },
+            where: {
+                organizationId,
+                ...(isOrgAdmin ? {} : {
+                    OR: [
+                        { ownerId: session.user.id },
+                        { accessList: { some: { userId: session.user.id } } }
+                    ]
+                })
+            },
             select: {
                 id: true,
                 name: true,
@@ -40,8 +50,6 @@ export async function GET(req: Request) {
                 createdAt: true
             }
         });
-
-        const isOrgAdmin = ['OWNER', 'ADMIN'].includes(membership.role);
 
         return Response.json({ projects, isOrgAdmin });
 

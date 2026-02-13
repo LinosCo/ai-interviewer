@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import SimulatorChat from '@/components/simulator/simulator-chat';
 import InterviewChat from '@/components/interview-chat';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { Footer } from '@/components/Footer';
@@ -10,41 +9,11 @@ import { Sparkles, ArrowRight, Play } from 'lucide-react';
 import { colors } from '@/lib/design-system';
 import Link from 'next/link';
 
-// Default configuration for the public demo
-const DEFAULT_DEMO_CONFIG = {
-    name: "Intervista Demo",
-    researchGoal: "Scoprire come le aziende italiane usano l'AI",
-    targetAudience: "Imprenditori e Manager",
-    language: "it",
-    tone: "Professional/Empathetic",
-    topics: [
-        {
-            label: "Introduzione",
-            description: "Capire il ruolo dell'intervistato e della sua azienda.",
-            subGoals: ["Settore", "Dimensione azienda", "Ruolo"],
-            maxTurns: 3
-        },
-        {
-            label: "Uso attuale di AI",
-            description: "Approfondire gli strumenti AI già in uso.",
-            subGoals: ["ChatGPT", "Automazioni", "Analisi dati"],
-            maxTurns: 5
-        },
-        {
-            label: "Sfide e Barriere",
-            description: "Identificare cosa blocca l'adozione dell'AI.",
-            subGoals: ["Costi", "Competenze", "Privacy"],
-            maxTurns: 4
-        }
-    ]
-};
-
 export default function PublicPreviewPage() {
-    const [config, setConfig] = useState<any>(DEFAULT_DEMO_CONFIG);
     const [botId, setBotId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isInitializing, setIsInitializing] = useState(false);
-    const [conversation, setConversation] = useState<any>(null);
+    const [conversation, setConversation] = useState<Record<string, unknown> | null>(null);
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -53,7 +22,6 @@ export default function PublicPreviewPage() {
                 if (res.ok) {
                     const data = await res.json();
                     if (!data.useDefault && data.config) {
-                        setConfig(data.config);
                         setBotId(data.botId);
                     }
                 }
@@ -102,7 +70,7 @@ export default function PublicPreviewPage() {
                             Testa la potenza di <span className="gradient-text">Business Tuner</span>
                         </h1>
                         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                            Questa è una simulazione di come i tuoi stakeholder vivranno l'intervista.
+                            Questa è una simulazione di come i tuoi stakeholder vivranno l&apos;intervista.
                             {botId ? "I dati verranno salvati come lead nel sistema." : "Nessun dato verrà salvato in questa sessione demo."}
                         </p>
                     </motion.div>
@@ -150,10 +118,12 @@ export default function PublicPreviewPage() {
                                     </button>
                                 </div>
                             ) : (
-                                <SimulatorChat
-                                    config={config}
-                                    onClose={() => { }}
-                                />
+                                <div className="flex-1 flex flex-col items-center justify-center p-20 text-center">
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Demo non disponibile</h2>
+                                    <p className="text-gray-600 max-w-md">
+                                        Nessuna intervista pubblicata disponibile per la demo. Seleziona un bot intervista come demo pubblica nelle impostazioni.
+                                    </p>
+                                </div>
                             )}
                         </div>
                     </div>

@@ -27,6 +27,10 @@ interface ChatbotsListProps {
     hasChatbot?: boolean;
 }
 
+function formatDateITUtc(date: string): string {
+    return new Date(date).toLocaleDateString('it-IT', { timeZone: 'UTC' });
+}
+
 export function ChatbotsList({ hasChatbot = true }: ChatbotsListProps) {
     const { selectedProject, isAllProjectsSelected } = useProject();
     const { data: bots, loading, error } = useProjectData<ChatBot[]>({
@@ -114,7 +118,7 @@ export function ChatbotsList({ hasChatbot = true }: ChatbotsListProps) {
                                 <div>
                                     <h3 className="font-semibold text-gray-900">{bot.name}</h3>
                                     <p className="text-xs text-gray-500">
-                                        Creato il {new Date(bot.createdAt).toLocaleDateString('it-IT')}
+                                        Creato il {formatDateITUtc(bot.createdAt)}
                                         {isAllProjectsSelected && bot.project?.name && (
                                             <span className="ml-2 bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{bot.project.name}</span>
                                         )}

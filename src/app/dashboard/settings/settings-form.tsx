@@ -120,6 +120,13 @@ export default function PlatformSettingsForm({
     const [demoBotId, setDemoBotId] = useState(publicDemoBotId);
     const [availableBots, setAvailableBots] = useState<AdminBot[]>([]);
     const [isLoadingBots, setIsLoadingBots] = useState(false);
+    const [isTestingEmail, setIsTestingEmail] = useState(false);
+    const [emailTestMessage, setEmailTestMessage] = useState<string | null>(null);
+    const [emailTestError, setEmailTestError] = useState<string | null>(null);
+    const [testEmailTo, setTestEmailTo] = useState('');
+    const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
+    const [sendTestEmailMessage, setSendTestEmailMessage] = useState<string | null>(null);
+    const [sendTestEmailError, setSendTestEmailError] = useState<string | null>(null);
 
     useEffect(() => {
         if (isAdmin) {
@@ -246,6 +253,64 @@ export default function PlatformSettingsForm({
     const handleReset = () => {
         if (confirm('Reset to default methodology knowledge? This will overwrite your current settings.')) {
             setKnowledge(currentKnowledge);
+        }
+    };
+
+    const handleTestEmailConnection = async () => {
+        setIsTestingEmail(true);
+        setEmailTestMessage(null);
+        setEmailTestError(null);
+        try {
+            const response = await fetch('/api/platform-settings/test-connection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    smtpHost: smtpHostValue || null,
+                    smtpPort: smtpPortValue ? Number(smtpPortValue) : null,
+                    smtpSecure: smtpSecureValue,
+                    smtpUser: smtpUserValue || null,
+                    smtpPass: smtpPassValue || null
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data?.error || data?.details?.error || 'Connessione email non valida');
+            }
+
+            if (data.provider === 'smtp') {
+                setEmailTestMessage(`SMTP OK: ${data.details.host}:${data.details.port} (${data.details.secure ? 'secure' : 'starttls/plain'})`);
+            } else if (data.provider === 'resend') {
+                setEmailTestMessage('Resend configurato correttamente.');
+            } else {
+                setEmailTestMessage('Provider email configurato correttamente.');
+            }
+        } catch (error: any) {
+            setEmailTestError(error?.message || 'Test connessione fallito');
+        } finally {
+            setIsTestingEmail(false);
+        }
+    };
+
+    const handleSendTestEmail = async () => {
+        setIsSendingTestEmail(true);
+        setSendTestEmailMessage(null);
+        setSendTestEmailError(null);
+        try {
+            const response = await fetch('/api/platform-settings/send-test-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to: testEmailTo.trim() })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data?.details || data?.error || 'Invio email di test fallito');
+            }
+            setSendTestEmailMessage(`Email di test inviata a ${data.to}`);
+        } catch (error: any) {
+            setSendTestEmailError(error?.message || 'Invio email di test fallito');
+        } finally {
+            setIsSendingTestEmail(false);
         }
     };
 
@@ -710,6 +775,53 @@ export default function PlatformSettingsForm({
                                         />
                                         SMTP Secure (TLS/SSL)
                                     </label>
+                                </div>
+                                <div className="md:col-span-2 flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handleTestEmailConnection}
+                                        disabled={isTestingEmail}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isTestingEmail ? 'Test in corso...' : 'Test connessione email'}
+                                    </button>
+                                    {emailTestMessage && (
+                                        <span className="text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded">
+                                            {emailTestMessage}
+                                        </span>
+                                    )}
+                                    {emailTestError && (
+                                        <span className="text-xs text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded">
+                                            {emailTestError}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-center">
+                                    <input
+                                        type="email"
+                                        value={testEmailTo}
+                                        onChange={(e) => setTestEmailTo(e.target.value)}
+                                        placeholder="destinatario@test.com"
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSendTestEmail}
+                                        disabled={isSendingTestEmail || !testEmailTo.trim()}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {isSendingTestEmail ? 'Invio...' : 'Invia email di test'}
+                                    </button>
+                                    {sendTestEmailMessage && (
+                                        <span className="md:col-span-2 text-xs text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded">
+                                            {sendTestEmailMessage}
+                                        </span>
+                                    )}
+                                    {sendTestEmailError && (
+                                        <span className="md:col-span-2 text-xs text-red-700 bg-red-50 border border-red-200 px-2 py-1 rounded">
+                                            {sendTestEmailError}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                             <div className="pt-6 border-t border-gray-100">

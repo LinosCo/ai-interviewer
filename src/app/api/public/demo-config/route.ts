@@ -1,19 +1,43 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+async function resolveDemoInterviewBotId(): Promise<string | null> {
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: { publicDemoBotId: true }
+    });
+
+    if (globalConfig?.publicDemoBotId) {
+        const explicitBot = await prisma.bot.findUnique({
+            where: { id: globalConfig.publicDemoBotId },
+            select: { id: true, botType: true, status: true }
+        });
+        if (explicitBot && explicitBot.botType === 'interview') {
+            return explicitBot.id;
+        }
+    }
+
+    const fallbackBot = await prisma.bot.findFirst({
+        where: {
+            botType: 'interview',
+            status: 'PUBLISHED'
+        },
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true }
+    });
+
+    return fallbackBot?.id || null;
+}
+
 export async function GET() {
     try {
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: { publicDemoBotId: true }
-        });
-
-        if (!globalConfig?.publicDemoBotId) {
+        const botId = await resolveDemoInterviewBotId();
+        if (!botId) {
             return NextResponse.json({ useDefault: true });
         }
 
         const bot = await prisma.bot.findUnique({
-            where: { id: globalConfig.publicDemoBotId },
+            where: { id: botId },
             include: {
                 topics: {
                     orderBy: { orderIndex: 'asc' }
@@ -51,17 +75,13 @@ export async function GET() {
 
 export async function POST() {
     try {
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: { publicDemoBotId: true }
-        });
-
-        if (!globalConfig?.publicDemoBotId) {
+        const botId = await resolveDemoInterviewBotId();
+        if (!botId) {
             return NextResponse.json({ error: 'Demo bot not configured' }, { status: 400 });
         }
 
         const bot = await prisma.bot.findUnique({
-            where: { id: globalConfig.publicDemoBotId },
+            where: { id: botId },
             include: { topics: { orderBy: { orderIndex: 'asc' } } }
         });
 

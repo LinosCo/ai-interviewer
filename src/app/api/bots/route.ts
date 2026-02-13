@@ -37,13 +37,28 @@ export async function GET(req: Request) {
         if (orgMembership.status !== 'ACTIVE') {
             return new Response('Organization membership is not active', { status: 403 });
         }
-        // Keep "All Projects" behavior aligned with /api/projects:
-        // any ACTIVE organization member can view resources across organization projects.
+        const canViewAllOrgProjects = ['OWNER', 'ADMIN'].includes(orgMembership.role);
+        const accessibleProjects = await prisma.project.findMany({
+            where: {
+                organizationId: orgId,
+                ...(canViewAllOrgProjects ? {} : {
+                    OR: [
+                        { ownerId: session.user.id },
+                        { accessList: { some: { userId: session.user.id } } }
+                    ]
+                })
+            },
+            select: { id: true }
+        });
+        const accessibleProjectIds = accessibleProjects.map((p) => p.id);
+
+        if (accessibleProjectIds.length === 0) {
+            return NextResponse.json([]);
+        }
+
         const bots = await prisma.bot.findMany({
             where: {
-                project: {
-                    organizationId: orgId
-                },
+                projectId: { in: accessibleProjectIds },
                 ...(botType && { botType })
             },
             include: {

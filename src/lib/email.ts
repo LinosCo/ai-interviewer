@@ -147,6 +147,136 @@ async function sendEmailViaSmtp(params: {
     }
 }
 
+async function verifySmtpConnection(params: {
+    host: string;
+    port: number;
+    secure: boolean;
+    user: string;
+    pass: string;
+}) {
+    const { host, port, secure, user, pass } = params;
+
+    const socket = secure
+        ? tls.connect({ host, port, servername: host })
+        : net.connect({ host, port });
+
+    socket.setTimeout(20_000);
+    socket.setEncoding('utf8');
+
+    await new Promise<void>((resolve, reject) => {
+        socket.once('connect', () => resolve());
+        socket.once('error', reject);
+        socket.once('timeout', () => reject(new Error('SMTP connection timeout')));
+    });
+
+    try {
+        const greet = await readSmtpResponse(socket);
+        if (!greet.startsWith('220')) {
+            throw new Error(`SMTP greeting failed: ${greet.trim()}`);
+        }
+
+        await sendSmtpCommand(socket, `EHLO ${host}`, [250]);
+        await sendSmtpCommand(socket, 'AUTH LOGIN', [334]);
+        await sendSmtpCommand(socket, Buffer.from(user).toString('base64'), [334]);
+        await sendSmtpCommand(socket, Buffer.from(pass).toString('base64'), [235]);
+        await sendSmtpCommand(socket, 'QUIT', [221]);
+        socket.end();
+        return { success: true };
+    } catch (error) {
+        socket.destroy();
+        throw error;
+    }
+}
+
+export async function testEmailProviderConnection(overrides?: {
+    smtpHost?: string | null;
+    smtpPort?: number | null;
+    smtpSecure?: boolean | null;
+    smtpUser?: string | null;
+    smtpPass?: string | null;
+}) {
+    const globalConfig = await prisma.globalConfig.findUnique({
+        where: { id: 'default' },
+        select: {
+            smtpHost: true,
+            smtpPort: true,
+            smtpSecure: true,
+            smtpUser: true,
+            smtpPass: true,
+            resendApiKey: true
+        }
+    }).catch(() => null);
+
+    const smtpHost = overrides?.smtpHost ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST ?? null;
+    const smtpUser = overrides?.smtpUser ?? globalConfig?.smtpUser ?? process.env.SMTP_USER ?? null;
+    const smtpPass = overrides?.smtpPass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS ?? null;
+    const smtpPortRaw = overrides?.smtpPort ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465;
+    const smtpPort = Number(smtpPortRaw);
+    const smtpSecure = typeof (overrides?.smtpSecure) === 'boolean'
+        ? Boolean(overrides?.smtpSecure)
+        : typeof globalConfig?.smtpSecure === 'boolean'
+            ? globalConfig.smtpSecure
+            : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
+
+    if (smtpHost && smtpUser && smtpPass) {
+        try {
+            await verifySmtpConnection({
+                host: smtpHost,
+                port: smtpPort,
+                secure: smtpSecure,
+                user: smtpUser,
+                pass: smtpPass
+            });
+            return {
+                success: true,
+                provider: 'smtp' as const,
+                details: {
+                    host: smtpHost,
+                    port: smtpPort,
+                    secure: smtpSecure,
+                    user: smtpUser
+                }
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                provider: 'smtp' as const,
+                error: error?.message || 'SMTP validation failed',
+                details: {
+                    host: smtpHost,
+                    port: smtpPort,
+                    secure: smtpSecure,
+                    user: smtpUser
+                }
+            };
+        }
+    }
+
+    const hasResend =
+        Boolean(globalConfig?.resendApiKey) ||
+        Boolean(process.env.RESEND_API_KEY);
+
+    if (hasResend) {
+        return {
+            success: true,
+            provider: 'resend' as const,
+            details: { configured: true }
+        };
+    }
+
+    return {
+        success: false,
+        provider: 'none' as const,
+        error: 'No email provider configured. Set SMTP_* or RESEND_API_KEY.',
+        details: {
+            smtpHostConfigured: Boolean(smtpHost),
+            smtpUserConfigured: Boolean(smtpUser),
+            smtpPassConfigured: Boolean(smtpPass),
+            resendConfigured: hasResend
+        }
+    };
+}
+
 
 export async function sendPasswordResetEmail(email: string, resetToken: string) {
     const appBaseUrl = getAppBaseUrl();

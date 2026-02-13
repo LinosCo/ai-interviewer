@@ -45,8 +45,9 @@ export default function OrganizationProjectSelector() {
         org.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const showAllProjectsOption = isOrgAdmin || projects.length > 1;
     const filteredProjects = [
-        ...(isOrgAdmin ? [ALL_PROJECTS_OPTION] : []),
+        ...(showAllProjectsOption ? [ALL_PROJECTS_OPTION] : []),
         ...projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     ];
 

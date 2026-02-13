@@ -28,12 +28,26 @@ interface SimulatorChatProps {
     onClose?: () => void;
 }
 
+interface SimulationState {
+    phase: 'INTERVIEW' | 'DATA_COLLECTION_CONSENT' | 'DATA_COLLECTION_FIELDS' | 'COMPLETED';
+    consentGiven: boolean | null;
+    currentFieldIndex: number;
+    collectedFields: Record<string, string>;
+}
+
 export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [currentTopicIndex, setCurrentTopicIndex] = useState(0);
     const [effectiveDuration, setEffectiveDuration] = useState(0);
+    const [simulationState, setSimulationState] = useState<SimulationState>({
+        phase: 'INTERVIEW',
+        consentGiven: null,
+        currentFieldIndex: 0,
+        collectedFields: {}
+    });
+    const [isCompleted, setIsCompleted] = useState(false);
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -86,7 +100,8 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                     messages: currentMessages,
                     config,
                     currentTopicIndex,
-                    effectiveDuration
+                    effectiveDuration,
+                    simulationState
                 })
             });
 
@@ -113,6 +128,12 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
             } else if (data.meta?.newTopicIndex !== undefined) {
                 setCurrentTopicIndex(data.meta.newTopicIndex);
             }
+            if (data.simulationState) {
+                setSimulationState(data.simulationState);
+            }
+            if (data.isCompleted) {
+                setIsCompleted(true);
+            }
 
         } catch (err) {
             console.error(err);
@@ -129,7 +150,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading) return;
+        if (!input.trim() || isLoading || isCompleted) return;
 
         const userMsg: Message = {
             id: Date.now().toString(),
@@ -291,8 +312,8 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                                 typingIntervalRef.current = setTimeout(() => setIsTyping(false), 2000);
                             }}
                             onKeyDown={handleKeyDown}
-                            disabled={isLoading}
-                            placeholder="Scrivi la tua risposta..."
+                            disabled={isLoading || isCompleted}
+                            placeholder={isCompleted ? "Simulazione completata" : "Scrivi la tua risposta..."}
                             rows={1}
                             className="w-full resize-none border-none bg-transparent px-6 py-5 pr-16 text-lg text-gray-900 placeholder-gray-400 focus:ring-0"
                             style={{
@@ -302,7 +323,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                         />
                         <button
                             type="submit"
-                            disabled={!input.trim() || isLoading}
+                            disabled={!input.trim() || isLoading || isCompleted}
                             className="absolute right-3 bottom-3 w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-md"
                             style={{ background: 'linear-gradient(135deg, #E85D3B 0%, #F5A623 100%)' }}
                         >
@@ -316,7 +337,7 @@ export default function SimulatorChat({ config, onClose }: SimulatorChatProps) {
                         </button>
                     </form>
                     <div className="mt-3 flex items-center justify-between text-[10px] text-gray-400 font-bold uppercase tracking-widest px-2">
-                        <span>Premi <strong>Invio</strong> per inviare</span>
+                        <span>{isCompleted ? 'Simulazione completata' : <>Premi <strong>Invio</strong> per inviare</>}</span>
                         <span>Domanda {totalQuestions}</span>
                     </div>
                 </div>

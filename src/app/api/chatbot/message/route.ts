@@ -122,6 +122,27 @@ function fallbackLeadResponse(field: CandidateField | null, botFallbackMessage?:
     return fallback || 'Grazie per il messaggio. Come posso aiutarti in modo piu preciso?';
 }
 
+function extractResponseFromObjectError(error: unknown): string | null {
+    if (!error || typeof error !== 'object') return null;
+    const maybeError = error as { text?: unknown };
+    if (typeof maybeError.text !== 'string' || !maybeError.text.trim()) return null;
+
+    try {
+        const parsed = JSON.parse(maybeError.text) as Record<string, unknown>;
+        if (typeof parsed.response === 'string' && parsed.response.trim()) {
+            return parsed.response.trim();
+        }
+        const properties = parsed.properties as Record<string, unknown> | undefined;
+        if (properties && typeof properties.response === 'string' && properties.response.trim()) {
+            return properties.response.trim();
+        }
+    } catch {
+        // Ignore malformed JSON in error payload and continue with safe fallback.
+    }
+
+    return null;
+}
+
 function isGreetingOnlyMessage(input: string): boolean {
     const text = input.trim().toLowerCase();
     if (!text) return true;
@@ -514,17 +535,27 @@ NON-NEGOTIABLE RULES
             finalResponse = buildOutOfScopeReply(bot);
         }
 
-        const result = finalResponse
-            ? null
-            : await generateObject({
-            model: openai('gpt-4o-mini'),
-            schema,
-            system: systemPrompt,
-            messages: conversation.messages.slice(-10).map((m: any) => ({
-                role: m.role as any,
-                content: m.content
-            })).concat({ role: 'user', content: message }),
-        });
+        let result: any = null;
+        if (!finalResponse) {
+            try {
+                result = await generateObject({
+                    model: openai('gpt-4o-mini'),
+                    schema,
+                    system: systemPrompt,
+                    messages: conversation.messages.slice(-10).map((m: any) => ({
+                        role: m.role as any,
+                        content: m.content
+                    })).concat({ role: 'user', content: message }),
+                });
+            } catch (generationError) {
+                console.error('[CHATBOT_RESPONSE_OBJECT_ERROR]', generationError);
+                finalResponse = extractResponseFromObjectError(generationError)
+                    || fallbackLeadResponse(
+                        nextMissingField && shouldCollect ? nextMissingField : null,
+                        bot.fallbackMessage
+                    );
+            }
+        }
 
         if (!finalResponse) {
             finalResponse = (result?.object.response || '').trim();

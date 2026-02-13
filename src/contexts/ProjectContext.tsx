@@ -40,6 +40,8 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
     const [isOrgAdmin, setIsOrgAdmin] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
     const maxRetries = 2;
+    const canUseAllProjects = (projectsList: Project[], adminStatus: boolean) =>
+        adminStatus || projectsList.length > 1;
 
     const fetchProjects = useCallback(async () => {
         // Don't fetch if organization context is still loading
@@ -85,13 +87,15 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
                 const storageKey = `${SELECTED_PROJECT_KEY_PREFIX}${currentOrganization.id}`;
                 const savedProjectId = localStorage.getItem(storageKey);
 
-                if (savedProjectId === ALL_PROJECTS_OPTION.id && adminStatus) {
+                const allProjectsEnabled = canUseAllProjects(projectsList, adminStatus);
+
+                if (savedProjectId === ALL_PROJECTS_OPTION.id && allProjectsEnabled) {
                     setSelectedProjectState(ALL_PROJECTS_OPTION);
                 } else if (savedProjectId) {
                     const savedProject = projectsList.find((p: Project) => p.id === savedProjectId);
                     if (savedProject) {
                         setSelectedProjectState(savedProject);
-                    } else if (adminStatus) {
+                    } else if (allProjectsEnabled) {
                         setSelectedProjectState(ALL_PROJECTS_OPTION);
                         localStorage.setItem(storageKey, ALL_PROJECTS_OPTION.id);
                     } else if (projectsList.length > 0) {
@@ -100,7 +104,7 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
                     } else {
                         setSelectedProjectState(null);
                     }
-                } else if (adminStatus) {
+                } else if (allProjectsEnabled) {
                     setSelectedProjectState(ALL_PROJECTS_OPTION);
                     localStorage.setItem(storageKey, ALL_PROJECTS_OPTION.id);
                 } else if (projectsList.length > 0) {
@@ -144,10 +148,18 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
             let targetProject = null;
 
             if (savedProjectId) {
-                targetProject = initialData.find(p => p.id === savedProjectId);
+                if (savedProjectId === ALL_PROJECTS_OPTION.id && canUseAllProjects(initialData, isOrgAdmin)) {
+                    targetProject = ALL_PROJECTS_OPTION;
+                } else {
+                    targetProject = initialData.find(p => p.id === savedProjectId);
+                }
             }
-            if (!targetProject && initialData.length > 0) {
-                targetProject = initialData[0];
+            if (!targetProject) {
+                if (canUseAllProjects(initialData, isOrgAdmin)) {
+                    targetProject = ALL_PROJECTS_OPTION;
+                } else if (initialData.length > 0) {
+                    targetProject = initialData[0];
+                }
             }
             if (targetProject) {
                 setSelectedProjectState(targetProject);

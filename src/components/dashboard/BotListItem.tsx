@@ -24,6 +24,10 @@ interface BotListItemProps {
     showProject?: boolean;
 }
 
+function formatDateITUtc(date: string): string {
+    return new Date(date).toLocaleDateString('it-IT', { timeZone: 'UTC' });
+}
+
 export function BotListItem({ bot, compact = false, showProject = false }: BotListItemProps) {
     const router = useRouter();
     const [isDeleting, setIsDeleting] = useState(false);
@@ -103,7 +107,7 @@ export function BotListItem({ bot, compact = false, showProject = false }: BotLi
                 <div>
                     <h3 className="font-semibold text-gray-900">{bot.name}</h3>
                     <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
-                        <span>{new Date(bot.updatedAt).toLocaleDateString('it-IT')}</span>
+                        <span>{formatDateITUtc(bot.updatedAt)}</span>
                         <span>•</span>
                         <span>{completedCount} risposte</span>
                         {showProject && bot.project?.name && (

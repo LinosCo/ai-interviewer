@@ -40,6 +40,10 @@ export async function GET(req: Request) {
         }
 
         const organization = membership.organization;
+        const userEmail = session.user?.email;
+        if (!userEmail) {
+            return new NextResponse('User email missing', { status: 400 });
+        }
         let stripe;
         try {
             stripe = await getStripeClient();
@@ -69,7 +73,7 @@ export async function GET(req: Request) {
             }
 
             const customers = await stripe.customers.list({
-                email: session.user.email!,
+                email: userEmail,
                 limit: 1
             });
 
@@ -78,7 +82,7 @@ export async function GET(req: Request) {
             }
 
             const customer = await stripe.customers.create({
-                email: session.user.email!,
+                email: userEmail,
                 name: organization.name,
                 metadata: {
                     organizationId: organization.id

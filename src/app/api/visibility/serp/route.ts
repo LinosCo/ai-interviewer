@@ -72,11 +72,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
-        if (!organizationId) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-        }
-
         // Use user's plan (admin has unlimited access)
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
         const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
@@ -96,25 +91,60 @@ export async function POST(request: Request) {
         const projectId = body.projectId;
         const configId = body.configId;
 
-        // Get config - prioritized by configId, then projectId, then organizationId (fallback)
-        const config = await prisma.visibilityConfig.findFirst({
-            where: {
-                organizationId,
-                ...(configId ? { id: configId } : {}),
-                ...(projectId ? {
-                    OR: [
-                        { projectId: projectId },
-                        { projectShares: { some: { projectId: projectId } } }
-                    ]
-                } : {})
+        let config: { id: string; organizationId: string } | null = null;
+        if (configId) {
+            config = await prisma.visibilityConfig.findUnique({
+                where: { id: configId },
+                select: { id: true, organizationId: true }
+            });
+        } else {
+            const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+            if (!organizationId) {
+                return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
             }
-        });
+            try {
+                config = await prisma.visibilityConfig.findFirst({
+                    where: {
+                        organizationId,
+                        ...(projectId ? {
+                            OR: [
+                                { projectId: projectId },
+                                { projectShares: { some: { projectId: projectId } } }
+                            ]
+                        } : {})
+                    },
+                    select: { id: true, organizationId: true }
+                });
+            } catch (err: any) {
+                if (err?.code !== 'P2021') throw err;
+                config = await prisma.visibilityConfig.findFirst({
+                    where: {
+                        organizationId,
+                        ...(projectId ? { projectId } : {})
+                    },
+                    select: { id: true, organizationId: true }
+                });
+            }
+        }
 
         if (!config) {
             return NextResponse.json(
                 { error: 'Visibility configuration not found. Please set up your visibility tracking first.' },
                 { status: 404 }
             );
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
         // Run scan

@@ -129,81 +129,51 @@ export async function POST(req: NextRequest) {
 
         // If allowed, update Global Config API Keys and Stripe Config
         if (canManageGlobalConfig) {
-            const availableColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND LOWER(table_name) = LOWER('GlobalConfig')
-            `).catch(() => []);
-            const actualByLower = new Map(availableColumns.map((c) => [c.column_name.toLowerCase(), c.column_name]));
+            const globalConfigUpdate: Prisma.GlobalConfigUpdateInput = {};
 
-            const requested: Record<string, unknown> = {
-                openaiApiKey: platformOpenaiApiKey !== undefined ? platformOpenaiApiKey || null : undefined,
-                anthropicApiKey: platformAnthropicApiKey !== undefined ? platformAnthropicApiKey || null : undefined,
-                geminiApiKey: platformGeminiApiKey !== undefined ? platformGeminiApiKey || null : undefined,
-                googleSerpApiKey: googleSerpApiKey !== undefined ? googleSerpApiKey || null : undefined,
-                stripeSecretKey: stripeSecretKey !== undefined ? stripeSecretKey || null : undefined,
-                stripeWebhookSecret: stripeWebhookSecret !== undefined ? stripeWebhookSecret || null : undefined,
-                stripePriceStarter: stripePriceStarter !== undefined ? stripePriceStarter || null : undefined,
-                stripePriceStarterYearly: stripePriceStarterYearly !== undefined ? stripePriceStarterYearly || null : undefined,
-                stripePricePro: stripePricePro !== undefined ? stripePricePro || null : undefined,
-                stripePriceProYearly: stripePriceProYearly !== undefined ? stripePriceProYearly || null : undefined,
-                stripePriceBusiness: stripePriceBusiness !== undefined ? stripePriceBusiness || null : undefined,
-                stripePriceBusinessYearly: stripePriceBusinessYearly !== undefined ? stripePriceBusinessYearly || null : undefined,
-                stripePricePackSmall: stripePricePackSmall !== undefined ? stripePricePackSmall || null : undefined,
-                stripePricePackMedium: stripePricePackMedium !== undefined ? stripePricePackMedium || null : undefined,
-                stripePricePackLarge: stripePricePackLarge !== undefined ? stripePricePackLarge || null : undefined,
-                stripePricePartner: stripePricePartner !== undefined ? stripePricePartner || null : undefined,
-                stripePricePartnerYearly: stripePricePartnerYearly !== undefined ? stripePricePartnerYearly || null : undefined,
-                stripePriceEnterprise: stripePriceEnterprise !== undefined ? stripePriceEnterprise || null : undefined,
-                stripePriceEnterpriseYearly: stripePriceEnterpriseYearly !== undefined ? stripePriceEnterpriseYearly || null : undefined,
-                smtpHost: smtpHost !== undefined ? smtpHost || null : undefined,
-                smtpPort: smtpPort !== undefined ? (smtpPort ? Number(smtpPort) : null) : undefined,
-                smtpSecure: smtpSecure !== undefined ? Boolean(smtpSecure) : undefined,
-                smtpUser: smtpUser !== undefined ? smtpUser || null : undefined,
-                smtpPass: smtpPass !== undefined ? smtpPass || null : undefined,
-                smtpFromEmail: smtpFromEmail !== undefined ? smtpFromEmail || null : undefined,
-                smtpNotificationEmail: smtpNotificationEmail !== undefined ? smtpNotificationEmail || null : undefined,
-                publicDemoBotId: publicDemoBotId !== undefined ? publicDemoBotId || null : undefined
-            };
+            if (platformOpenaiApiKey !== undefined) globalConfigUpdate.openaiApiKey = platformOpenaiApiKey;
+            if (platformAnthropicApiKey !== undefined) globalConfigUpdate.anthropicApiKey = platformAnthropicApiKey;
+            if (platformGeminiApiKey !== undefined) globalConfigUpdate.geminiApiKey = platformGeminiApiKey;
+            if (googleSerpApiKey !== undefined) globalConfigUpdate.googleSerpApiKey = googleSerpApiKey;
 
-            const assignments: Array<[string, unknown]> = [];
-            const missingRequestedColumns: string[] = [];
-            for (const [field, value] of Object.entries(requested)) {
-                if (value === undefined) continue;
-                const actual = actualByLower.get(field.toLowerCase());
-                if (!actual) {
-                    missingRequestedColumns.push(field);
-                    continue;
-                }
-                assignments.push([actual, value]);
-            }
+            if (stripeSecretKey !== undefined) globalConfigUpdate.stripeSecretKey = stripeSecretKey;
+            if (stripeWebhookSecret !== undefined) globalConfigUpdate.stripeWebhookSecret = stripeWebhookSecret;
 
-            if (missingRequestedColumns.length > 0) {
-                console.warn('[platform-settings] Missing GlobalConfig columns in DB:', missingRequestedColumns);
-            }
+            if (stripePriceStarter !== undefined) globalConfigUpdate.stripePriceStarter = stripePriceStarter;
+            if (stripePriceStarterYearly !== undefined) globalConfigUpdate.stripePriceStarterYearly = stripePriceStarterYearly;
+            if (stripePricePro !== undefined) globalConfigUpdate.stripePricePro = stripePricePro;
+            if (stripePriceProYearly !== undefined) globalConfigUpdate.stripePriceProYearly = stripePriceProYearly;
+            if (stripePriceBusiness !== undefined) globalConfigUpdate.stripePriceBusiness = stripePriceBusiness;
+            if (stripePriceBusinessYearly !== undefined) globalConfigUpdate.stripePriceBusinessYearly = stripePriceBusinessYearly;
+            if (stripePricePackSmall !== undefined) globalConfigUpdate.stripePricePackSmall = stripePricePackSmall;
+            if (stripePricePackMedium !== undefined) globalConfigUpdate.stripePricePackMedium = stripePricePackMedium;
+            if (stripePricePackLarge !== undefined) globalConfigUpdate.stripePricePackLarge = stripePricePackLarge;
+            if (stripePricePartner !== undefined) globalConfigUpdate.stripePricePartner = stripePricePartner;
+            if (stripePricePartnerYearly !== undefined) globalConfigUpdate.stripePricePartnerYearly = stripePricePartnerYearly;
+            if (stripePriceEnterprise !== undefined) globalConfigUpdate.stripePriceEnterprise = stripePriceEnterprise;
+            if (stripePriceEnterpriseYearly !== undefined) globalConfigUpdate.stripePriceEnterpriseYearly = stripePriceEnterpriseYearly;
 
-            if (assignments.length > 0) {
-                for (const [column] of assignments) {
-                    if (!SAFE_SQL_IDENTIFIER.test(column)) {
-                        throw new Error(`[platform-settings] Unsafe GlobalConfig column name: ${column}`);
+            if (smtpHost !== undefined) globalConfigUpdate.smtpHost = smtpHost;
+            if (smtpPort !== undefined) globalConfigUpdate.smtpPort = smtpPort ? Number(smtpPort) : null;
+            if (smtpSecure !== undefined) globalConfigUpdate.smtpSecure = Boolean(smtpSecure);
+            if (smtpUser !== undefined) globalConfigUpdate.smtpUser = smtpUser;
+            if (smtpPass !== undefined) globalConfigUpdate.smtpPass = smtpPass;
+            if (smtpFromEmail !== undefined) globalConfigUpdate.smtpFromEmail = smtpFromEmail;
+            if (smtpNotificationEmail !== undefined) globalConfigUpdate.smtpNotificationEmail = smtpNotificationEmail;
+
+            if (publicDemoBotId !== undefined) globalConfigUpdate.publicDemoBotId = publicDemoBotId;
+
+            // Only perform update if there are fields to update
+            if (Object.keys(globalConfigUpdate).length > 0) {
+                console.log('Updating GlobalConfig with:', globalConfigUpdate);
+                await prisma.globalConfig.upsert({
+                    where: { id: 'default' },
+                    update: globalConfigUpdate,
+                    create: {
+                        id: 'default',
+                        ...globalConfigUpdate as Prisma.GlobalConfigCreateInput
                     }
-                }
-
-                const updatedAtColumn = actualByLower.get('updatedat');
-                await prisma.$executeRawUnsafe(
-                    updatedAtColumn
-                        ? `INSERT INTO "GlobalConfig" ("id", "${updatedAtColumn}") VALUES ('default', NOW()) ON CONFLICT ("id") DO NOTHING`
-                        : `INSERT INTO "GlobalConfig" ("id") VALUES ('default') ON CONFLICT ("id") DO NOTHING`
-                );
-
-                const setClause = assignments
-                    .map(([column], index) => `"${column}" = $${index + 1}`)
-                    .join(', ');
-                await prisma.$executeRawUnsafe(
-                    `UPDATE "GlobalConfig" SET ${setClause} WHERE "id" = 'default'`,
-                    ...assignments.map(([, value]) => value)
-                );
+                });
             }
         }
 

@@ -30,17 +30,28 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'configId required' }, { status: 400 });
         }
 
-        const configSelect: any = {
-            id: true,
-            organizationId: true,
-            projectId: true,
-            projectShares: { select: { projectId: true } }
-        };
-
-        const config = await prisma.visibilityConfig.findUnique({
-            where: { id: configId },
-            select: configSelect
-        }) as { organizationId: string; projectId: string | null; projectShares: Array<{ projectId: string }> } | null;
+        let config: { organizationId: string; projectId: string | null; projectShares?: Array<{ projectId: string }> } | null = null;
+        try {
+            config = await prisma.visibilityConfig.findUnique({
+                where: { id: configId },
+                select: {
+                    id: true,
+                    organizationId: true,
+                    projectId: true,
+                    projectShares: { select: { projectId: true } }
+                }
+            }) as { organizationId: string; projectId: string | null; projectShares: Array<{ projectId: string }> } | null;
+        } catch (err: any) {
+            if (err?.code !== 'P2021') throw err;
+            config = await prisma.visibilityConfig.findUnique({
+                where: { id: configId },
+                select: {
+                    id: true,
+                    organizationId: true,
+                    projectId: true
+                }
+            }) as { organizationId: string; projectId: string | null } | null;
+        }
 
         if (!config) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
@@ -60,7 +71,8 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
-        if (projectId && config.projectId !== projectId && !(config.projectShares as Array<{ projectId: string }>).some((p) => p.projectId === projectId)) {
+        const sharedProjectIds = (config.projectShares || []).map((p) => p.projectId);
+        if (projectId && config.projectId !== projectId && !sharedProjectIds.includes(projectId)) {
             return NextResponse.json({ error: 'Configuration not in selected project' }, { status: 404 });
         }
 

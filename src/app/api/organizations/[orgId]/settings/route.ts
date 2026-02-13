@@ -11,61 +11,42 @@ const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 async function getGlobalConfigCompat() {
     try {
-        const fields = [
-            'openaiApiKey',
-            'anthropicApiKey',
-            'geminiApiKey',
-            'googleSerpApiKey',
-            'stripeSecretKey',
-            'stripeWebhookSecret',
-            'stripePriceStarter',
-            'stripePriceStarterYearly',
-            'stripePricePro',
-            'stripePriceProYearly',
-            'stripePriceBusiness',
-            'stripePriceBusinessYearly',
-            'stripePricePackSmall',
-            'stripePricePackMedium',
-            'stripePricePackLarge',
-            'stripePricePartner',
-            'stripePricePartnerYearly',
-            'stripePriceEnterprise',
-            'stripePriceEnterpriseYearly',
-            'smtpHost',
-            'smtpPort',
-            'smtpSecure',
-            'smtpUser',
-            'smtpPass',
-            'smtpFromEmail',
-            'smtpNotificationEmail',
-            'publicDemoBotId'
-        ] as const;
+        const config = await prisma.globalConfig.findUnique({
+            where: { id: 'default' }
+        });
 
-        const columns = await prisma.$queryRaw<Array<{ table_name: string; column_name: string }>>(Prisma.sql`
-            SELECT table_name, column_name
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND LOWER(table_name) = LOWER('GlobalConfig')
-        `).catch(() => []);
-        if (columns.length === 0) return null;
+        if (!config) return null;
 
-        const tableName = columns[0]?.table_name;
-        if (!tableName || !SAFE_SQL_IDENTIFIER.test(tableName)) return null;
-
-        const actualByLower = new Map(columns.map((c) => [c.column_name.toLowerCase(), c.column_name]));
-        const selectParts: string[] = [];
-        for (const field of fields) {
-            const actual = actualByLower.get(field.toLowerCase());
-            if (actual && SAFE_SQL_IDENTIFIER.test(actual)) {
-                selectParts.push(`"${actual}" AS "${field}"`);
-            }
-        }
-        if (selectParts.length === 0) return null;
-
-        const rows = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
-            `SELECT ${selectParts.join(', ')} FROM "public"."${tableName}" WHERE "id" = 'default' LIMIT 1`
-        );
-        return rows[0] ?? null;
+        // Return only the fields we expect, to match previous behavior (though returning the whole object is fine for admin)
+        return {
+            openaiApiKey: config.openaiApiKey,
+            anthropicApiKey: config.anthropicApiKey,
+            geminiApiKey: config.geminiApiKey,
+            googleSerpApiKey: config.googleSerpApiKey,
+            stripeSecretKey: config.stripeSecretKey,
+            stripeWebhookSecret: config.stripeWebhookSecret,
+            stripePriceStarter: config.stripePriceStarter,
+            stripePriceStarterYearly: config.stripePriceStarterYearly,
+            stripePricePro: config.stripePricePro,
+            stripePriceProYearly: config.stripePriceProYearly,
+            stripePriceBusiness: config.stripePriceBusiness,
+            stripePriceBusinessYearly: config.stripePriceBusinessYearly,
+            stripePricePackSmall: config.stripePricePackSmall,
+            stripePricePackMedium: config.stripePricePackMedium,
+            stripePricePackLarge: config.stripePricePackLarge,
+            stripePricePartner: config.stripePricePartner,
+            stripePricePartnerYearly: config.stripePricePartnerYearly,
+            stripePriceEnterprise: config.stripePriceEnterprise,
+            stripePriceEnterpriseYearly: config.stripePriceEnterpriseYearly,
+            smtpHost: config.smtpHost,
+            smtpPort: config.smtpPort,
+            smtpSecure: config.smtpSecure,
+            smtpUser: config.smtpUser,
+            smtpPass: config.smtpPass,
+            smtpFromEmail: config.smtpFromEmail,
+            smtpNotificationEmail: config.smtpNotificationEmail,
+            publicDemoBotId: config.publicDemoBotId
+        };
     } catch (error) {
         console.error('[settings] getGlobalConfigCompat error:', error);
         return null;

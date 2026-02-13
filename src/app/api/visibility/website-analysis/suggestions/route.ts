@@ -95,24 +95,32 @@ export async function POST(request: Request) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                id: true,
-                memberships: { take: 1, select: { organizationId: true } }
-            }
+            select: { id: true }
         });
-
-        const organizationId = user?.memberships?.[0]?.organizationId;
-        if (!organizationId) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { id: configId, organizationId },
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
             include: { project: true }
         });
 
         if (!config) {
             return NextResponse.json({ error: 'Config not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
         if (!config.projectId) {

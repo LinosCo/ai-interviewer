@@ -10,19 +10,21 @@ import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 export async function GET(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id || !session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const userId = session.user.id;
+        const userEmail = session.user.email;
 
         const url = new URL(request.url);
         const projectId = url.searchParams.get('projectId');
         const range = url.searchParams.get('range') || '30d';
 
-        const activeOrgId = await resolveActiveOrganizationIdForUser(session.user.id);
+        const activeOrgId = await resolveActiveOrganizationIdForUser(userId);
 
         // Verify user access and load org projects with CMS connections
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: userEmail },
             include: {
                 memberships: {
                     include: {

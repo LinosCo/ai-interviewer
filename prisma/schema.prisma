@@ -120,35 +120,35 @@ model PlatformSettings {
 }
 
 model GlobalConfig {
-  id                        String   @id @default("default")
-  openaiApiKey              String?
-  anthropicApiKey           String?
-  stripeSecretKey           String?
-  stripeWebhookSecret       String?
-  stripePriceStarter        String?
-  stripePricePro            String?
-  stripePriceBusiness       String?
-  updatedAt                 DateTime @updatedAt
-  stripePriceProYearly      String?
-  stripePriceStarterYearly  String?
-  geminiApiKey              String?
-  googleSerpApiKey          String?
-  stripePriceBusinessYearly String?
-  stripePricePackSmall      String?
-  stripePricePackMedium     String?
-  stripePricePackLarge      String?
-  smtpHost                  String?
-  smtpPort                  Int?
-  smtpSecure                Boolean?
-  smtpUser                  String?
-  smtpPass                  String?
-  smtpFromEmail             String?
-  smtpNotificationEmail     String?
-  resendApiKey              String?
-  publicDemoBotId           String?
-  stripePricePartner        String?
-  stripePricePartnerYearly  String?
-  stripePriceEnterprise     String?
+  id                          String   @id @default("default")
+  openaiApiKey                String?
+  anthropicApiKey             String?
+  stripeSecretKey             String?
+  stripeWebhookSecret         String?
+  stripePriceStarter          String?
+  stripePricePro              String?
+  stripePriceBusiness         String?
+  updatedAt                   DateTime @updatedAt
+  stripePriceProYearly        String?
+  stripePriceStarterYearly    String?
+  geminiApiKey                String?
+  googleSerpApiKey            String?
+  stripePriceBusinessYearly   String?
+  stripePricePackSmall        String?
+  stripePricePackMedium       String?
+  stripePricePackLarge        String?
+  smtpHost                    String?
+  smtpPort                    Int?
+  smtpSecure                  Boolean?
+  smtpUser                    String?
+  smtpPass                    String?
+  smtpFromEmail               String?
+  smtpNotificationEmail       String?
+  resendApiKey                String?
+  publicDemoBotId             String?
+  stripePricePartner          String?
+  stripePricePartnerYearly    String?
+  stripePriceEnterprise       String?
   stripePriceEnterpriseYearly String?
 }
 
@@ -313,9 +313,9 @@ model Project {
   creditTransactions   CreditTransaction[]
   crossChannelInsights CrossChannelInsight[]
   googleConnection     GoogleConnection?
-  n8nConnection        N8NConnection?
   itemTransfers        ItemTransferInvite[]       @relation("ProjectItemTransfers")
   mcpConnections       MCPConnection[]
+  n8nConnection        N8NConnection?
   firstAttributions    PartnerClientAttribution[] @relation("FirstAttributionProject")
   cmsConnection        CMSConnection?             @relation("ProjectToCMS", fields: [cmsConnectionId], references: [id])
   organization         Organization?              @relation(fields: [organizationId], references: [id])
@@ -1376,18 +1376,18 @@ model GoogleAnalyticsData {
 }
 
 model N8NConnection {
-  id             String           @id @default(cuid())
-  projectId      String           @unique
-  name           String           @default("n8n Automation")
-  webhookUrl     String
-  status         ConnectionStatus @default(PENDING)
-  lastTriggerAt  DateTime?
-  lastError      String?
-  triggerOnTips  Boolean          @default(true) // Auto-trigger when AI tips are generated
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  createdBy      String
-  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id            String           @id @default(cuid())
+  projectId     String           @unique
+  name          String           @default("n8n Automation")
+  webhookUrl    String
+  status        ConnectionStatus @default(PENDING)
+  lastTriggerAt DateTime?
+  lastError     String?
+  triggerOnTips Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  createdBy     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
@@ -1535,8 +1535,8 @@ enum PlanType {
   BUSINESS
   FREE
   PARTNER
-  ENTERPRISE
   ADMIN
+  ENTERPRISE
 }
 
 enum UserPlanType {
@@ -1546,8 +1546,8 @@ enum UserPlanType {
   PRO
   BUSINESS
   PARTNER
-  ENTERPRISE
   ADMIN
+  ENTERPRISE
 }
 
 enum BillingCycle {

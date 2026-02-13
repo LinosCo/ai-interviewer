@@ -117,15 +117,25 @@ export async function registerUser(prevState: string | undefined, formData: Form
             ? `/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`
             : undefined;
 
-        await sendAccountVerificationEmail({
+        const verificationEmailResult = await sendAccountVerificationEmail({
             to: email,
             userName: name,
             token: verificationToken,
             nextPath: checkoutPath
         });
+        if (!verificationEmailResult.success) {
+            const reason =
+                typeof verificationEmailResult.error === 'string'
+                    ? verificationEmailResult.error
+                    : (verificationEmailResult.error as any)?.message || 'Unknown email error';
+            throw new Error(`Verification email send failed: ${reason}`);
+        }
 
     } catch (error) {
         console.error('Registration error:', error);
+        if (error instanceof Error && error.message.includes('Verification email send failed:')) {
+            return 'Account creato, ma invio email di conferma fallito. Contatta supporto o riprova più tardi.';
+        }
         return 'Registration failed.';
     }
 

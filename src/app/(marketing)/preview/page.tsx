@@ -47,7 +47,7 @@ export default function PublicPreviewPage() {
     useEffect(() => {
         const fetchConfig = async () => {
             try {
-                const res = await fetch('/api/public/demo-config');
+                const res = await fetch(`/api/public/demo-config?_ts=${Date.now()}`, { cache: 'no-store' });
                 if (res.ok) {
                     const data = await res.json();
                     if (!data.useDefault && data.config) {
@@ -64,11 +64,14 @@ export default function PublicPreviewPage() {
     }, []);
 
     const handleStartDemo = async () => {
-        if (!botId) return; // Fallback to simulator if no botId (static default)
+        if (!botId) return;
 
         setIsInitializing(true);
         try {
-            const res = await fetch('/api/public/demo-config', { method: 'POST' });
+            const res = await fetch('/api/public/demo-config', {
+                method: 'POST',
+                cache: 'no-store'
+            });
             if (res.ok) {
                 const data: unknown = await res.json();
                 if (isDemoConversation(data)) {

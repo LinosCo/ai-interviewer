@@ -47,7 +47,18 @@ export async function POST(request: NextRequest) {
             });
 
             // Send reset email
-            await sendPasswordResetEmail(user.email, resetToken);
+            const sendResult = await sendPasswordResetEmail(user.email, resetToken);
+            if (!sendResult.success) {
+                const reason =
+                    typeof sendResult.error === 'string'
+                        ? sendResult.error
+                        : (sendResult.error as any)?.message || 'Unknown email error';
+                console.error('[forgot-password] password reset email failed:', {
+                    userId: user.id,
+                    email: user.email,
+                    reason
+                });
+            }
         }
 
         // Always return success message

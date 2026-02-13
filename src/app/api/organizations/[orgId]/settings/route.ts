@@ -37,6 +37,7 @@ const GLOBAL_CONFIG_FIELDS = [
     'smtpNotificationEmail',
     'publicDemoBotId'
 ] as const;
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 async function getGlobalConfigCompat() {
     try {
@@ -46,20 +47,42 @@ async function getGlobalConfigCompat() {
             WHERE table_schema = 'public'
               AND LOWER(table_name) = LOWER('GlobalConfig')
         `);
-        const available = new Set(columns.map((c) => c.column_name));
-        const selectable = GLOBAL_CONFIG_FIELDS.filter((f) => available.has(f));
+        const actualByLower = new Map(columns.map((c) => [c.column_name.toLowerCase(), c.column_name]));
+        const selectable = GLOBAL_CONFIG_FIELDS.filter((f) => actualByLower.has(f.toLowerCase()));
+        const rowKeyMap = new Map<string, string>();
+        for (const c of columns) {
+            rowKeyMap.set(c.column_name.toLowerCase(), c.column_name);
+        }
 
         if (selectable.length === 0) return null;
 
-        const columnSql = Prisma.join(selectable.map((f) => Prisma.raw(`"${f}"`)));
-        const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
-            SELECT ${columnSql}
-            FROM "GlobalConfig"
-            WHERE id = 'default'
-            LIMIT 1
-        `);
+        const selectFragments: string[] = [];
+        for (const field of selectable) {
+            const actual = actualByLower.get(field.toLowerCase());
+            if (!actual) continue;
+            if (!SAFE_SQL_IDENTIFIER.test(actual) || !SAFE_SQL_IDENTIFIER.test(field)) {
+                throw new Error(`Unsafe GlobalConfig identifier mapping: ${actual} -> ${field}`);
+            }
+            selectFragments.push(`"${actual}" AS "${field}"`);
+        }
+        if (selectFragments.length === 0) return null;
 
-        return rows[0] ?? null;
+        const rows = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+            `SELECT ${selectFragments.join(', ')} FROM "GlobalConfig" WHERE id = 'default' LIMIT 1`
+        );
+
+        const raw = rows[0];
+        if (!raw) return null;
+
+        const normalized: Record<string, unknown> = {};
+        for (const field of selectable) {
+            const direct = raw[field];
+            const lower = raw[field.toLowerCase()];
+            const mappedKey = rowKeyMap.get(field.toLowerCase());
+            const mapped = mappedKey ? raw[mappedKey] : undefined;
+            normalized[field] = direct ?? lower ?? mapped ?? null;
+        }
+        return normalized;
     } catch (error) {
         console.error('Error loading global config compat:', error);
         return null;

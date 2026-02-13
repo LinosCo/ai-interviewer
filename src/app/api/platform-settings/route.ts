@@ -97,18 +97,21 @@ export async function POST(req: NextRequest) {
                 WHERE table_schema = 'public'
                   AND LOWER(table_name) = LOWER('GlobalConfig')
             `).catch(() => []);
-            const available = new Set(availableColumns.map((c) => c.column_name));
+            const availableByLower = new Map(
+                availableColumns.map((c) => [c.column_name.toLowerCase(), c.column_name])
+            );
             const missingRequestedColumns = new Set<string>();
             let requestedGlobalFieldCount = 0;
 
             const compatValues: Record<string, unknown> = {};
             const assignIfAvailable = (column: string, value: unknown) => {
                 requestedGlobalFieldCount += 1;
-                if (!available.has(column)) {
+                const actualColumn = availableByLower.get(column.toLowerCase());
+                if (!actualColumn) {
                     missingRequestedColumns.add(column);
                     return;
                 }
-                compatValues[column] = value;
+                compatValues[actualColumn] = value;
             };
 
             if (platformOpenaiApiKey !== undefined) {
@@ -235,8 +238,9 @@ export async function POST(req: NextRequest) {
                 );
             }
 
-            if (available.has('updatedAt')) {
-                compatValues.updatedAt = new Date();
+            const updatedAtColumn = availableByLower.get('updatedat');
+            if (updatedAtColumn) {
+                compatValues[updatedAtColumn] = new Date();
             }
 
             const assignments = Object.entries(compatValues);
@@ -248,7 +252,7 @@ export async function POST(req: NextRequest) {
                 }
 
                 await prisma.$executeRawUnsafe(
-                    available.has('updatedAt')
+                    Boolean(updatedAtColumn)
                         ? `INSERT INTO "GlobalConfig" ("id", "updatedAt") VALUES ('default', NOW()) ON CONFLICT ("id") DO NOTHING`
                         : `INSERT INTO "GlobalConfig" ("id") VALUES ('default') ON CONFLICT ("id") DO NOTHING`
                 );

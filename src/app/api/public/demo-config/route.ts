@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 async function resolveDemoInterviewBotId(): Promise<string | null> {
     const globalConfig = await prisma.globalConfig.findUnique({
         where: { id: 'default' },
@@ -26,14 +29,25 @@ async function resolveDemoInterviewBotId(): Promise<string | null> {
         select: { id: true }
     });
 
-    return fallbackBot?.id || null;
+    if (fallbackBot?.id) return fallbackBot.id;
+
+    const fallbackAnyInterviewBot = await prisma.bot.findFirst({
+        where: { botType: 'interview' },
+        orderBy: { updatedAt: 'desc' },
+        select: { id: true }
+    });
+
+    return fallbackAnyInterviewBot?.id || null;
 }
 
 export async function GET() {
     try {
         const botId = await resolveDemoInterviewBotId();
         if (!botId) {
-            return NextResponse.json({ useDefault: true });
+            return NextResponse.json(
+                { useDefault: true },
+                { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+            );
         }
 
         const bot = await prisma.bot.findUnique({
@@ -46,27 +60,33 @@ export async function GET() {
         });
 
         if (!bot) {
-            return NextResponse.json({ useDefault: true });
+            return NextResponse.json(
+                { useDefault: true },
+                { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+            );
         }
 
-        return NextResponse.json({
-            useDefault: false,
-            botId: bot.id,
-            config: {
-                name: bot.name,
-                researchGoal: bot.researchGoal || "",
-                targetAudience: bot.targetAudience || "",
-                language: bot.language || "it",
-                tone: bot.tone || "Professional",
-                topics: bot.topics.map(t => ({
-                    id: t.id,
-                    label: t.label,
-                    description: t.description || "",
-                    subGoals: Array.isArray(t.subGoals) ? t.subGoals : [],
-                    maxTurns: t.maxTurns || 5
-                }))
-            }
-        });
+        return NextResponse.json(
+            {
+                useDefault: false,
+                botId: bot.id,
+                config: {
+                    name: bot.name,
+                    researchGoal: bot.researchGoal || "",
+                    targetAudience: bot.targetAudience || "",
+                    language: bot.language || "it",
+                    tone: bot.tone || "Professional",
+                    topics: bot.topics.map(t => ({
+                        id: t.id,
+                        label: t.label,
+                        description: t.description || "",
+                        subGoals: Array.isArray(t.subGoals) ? t.subGoals : [],
+                        maxTurns: t.maxTurns || 5
+                    }))
+                }
+            },
+            { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+        );
     } catch (error) {
         console.error('Error fetching public demo config:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -77,7 +97,13 @@ export async function POST() {
     try {
         const botId = await resolveDemoInterviewBotId();
         if (!botId) {
-            return NextResponse.json({ error: 'Demo bot not configured' }, { status: 400 });
+            return NextResponse.json(
+                { error: 'Demo bot not configured' },
+                {
+                    status: 400,
+                    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+                }
+            );
         }
 
         const bot = await prisma.bot.findUnique({
@@ -112,7 +138,9 @@ export async function POST() {
             }
         });
 
-        return NextResponse.json(conversation);
+        return NextResponse.json(conversation, {
+            headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+        });
     } catch (error) {
         console.error('Error starting demo conversation:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

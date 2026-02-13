@@ -129,6 +129,66 @@ export default function PlatformSettingsForm({
     const [sendTestEmailError, setSendTestEmailError] = useState<string | null>(null);
 
     useEffect(() => {
+        setOpenaiKey(platformOpenaiApiKey || '');
+        setAnthropicKey(platformAnthropicApiKey || '');
+        setGeminiKey(platformGeminiApiKey || '');
+        setSerpKey(googleSerpApiKey || '');
+
+        setSSecretKey(stripeSecretKey || '');
+        setSWebhookSecret(stripeWebhookSecret || '');
+        setSPriceStarter(stripePriceStarter || '');
+        setSPriceStarterYearly(stripePriceStarterYearly || '');
+        setSPricePro(stripePricePro || '');
+        setSPriceProYearly(stripePriceProYearly || '');
+        setSPriceBusiness(stripePriceBusiness || '');
+        setSPriceBusinessYearly(stripePriceBusinessYearly || '');
+        setSPricePartner(stripePricePartner || '');
+        setSPricePartnerYearly(stripePricePartnerYearly || '');
+        setSPriceEnterprise(stripePriceEnterprise || '');
+        setSPriceEnterpriseYearly(stripePriceEnterpriseYearly || '');
+        setSPricePackSmall(stripePricePackSmall || '');
+        setSPricePackMedium(stripePricePackMedium || '');
+        setSPricePackLarge(stripePricePackLarge || '');
+
+        setSmtpHostValue(smtpHost || '');
+        setSmtpPortValue(smtpPort ? String(smtpPort) : '');
+        setSmtpSecureValue(smtpSecure === null || smtpSecure === undefined ? true : smtpSecure);
+        setSmtpUserValue(smtpUser || '');
+        setSmtpPassValue(smtpPass || '');
+        setSmtpFromEmailValue(smtpFromEmail || '');
+        setSmtpNotificationEmailValue(smtpNotificationEmail || '');
+        setDemoBotId(publicDemoBotId || '');
+    }, [
+        platformOpenaiApiKey,
+        platformAnthropicApiKey,
+        platformGeminiApiKey,
+        googleSerpApiKey,
+        stripeSecretKey,
+        stripeWebhookSecret,
+        stripePriceStarter,
+        stripePriceStarterYearly,
+        stripePricePro,
+        stripePriceProYearly,
+        stripePriceBusiness,
+        stripePriceBusinessYearly,
+        stripePricePartner,
+        stripePricePartnerYearly,
+        stripePriceEnterprise,
+        stripePriceEnterpriseYearly,
+        stripePricePackSmall,
+        stripePricePackMedium,
+        stripePricePackLarge,
+        smtpHost,
+        smtpPort,
+        smtpSecure,
+        smtpUser,
+        smtpPass,
+        smtpFromEmail,
+        smtpNotificationEmail,
+        publicDemoBotId
+    ]);
+
+    useEffect(() => {
         if (isAdmin) {
             const fetchBots = async () => {
                 setIsLoadingBots(true);

@@ -1,45 +1,75 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { Prisma } from '@prisma/client';
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 async function getGlobalConfigCompat() {
-    return prisma.globalConfig.findUnique({
-        where: { id: 'default' },
-        select: {
-            openaiApiKey: true,
-            anthropicApiKey: true,
-            geminiApiKey: true,
-            googleSerpApiKey: true,
-            stripeSecretKey: true,
-            stripeWebhookSecret: true,
-            stripePriceStarter: true,
-            stripePriceStarterYearly: true,
-            stripePricePro: true,
-            stripePriceProYearly: true,
-            stripePriceBusiness: true,
-            stripePriceBusinessYearly: true,
-            stripePricePackSmall: true,
-            stripePricePackMedium: true,
-            stripePricePackLarge: true,
-            stripePricePartner: true,
-            stripePricePartnerYearly: true,
-            stripePriceEnterprise: true,
-            stripePriceEnterpriseYearly: true,
-            smtpHost: true,
-            smtpPort: true,
-            smtpSecure: true,
-            smtpUser: true,
-            smtpPass: true,
-            smtpFromEmail: true,
-            smtpNotificationEmail: true,
-            publicDemoBotId: true
+    try {
+        const fields = [
+            'openaiApiKey',
+            'anthropicApiKey',
+            'geminiApiKey',
+            'googleSerpApiKey',
+            'stripeSecretKey',
+            'stripeWebhookSecret',
+            'stripePriceStarter',
+            'stripePriceStarterYearly',
+            'stripePricePro',
+            'stripePriceProYearly',
+            'stripePriceBusiness',
+            'stripePriceBusinessYearly',
+            'stripePricePackSmall',
+            'stripePricePackMedium',
+            'stripePricePackLarge',
+            'stripePricePartner',
+            'stripePricePartnerYearly',
+            'stripePriceEnterprise',
+            'stripePriceEnterpriseYearly',
+            'smtpHost',
+            'smtpPort',
+            'smtpSecure',
+            'smtpUser',
+            'smtpPass',
+            'smtpFromEmail',
+            'smtpNotificationEmail',
+            'publicDemoBotId'
+        ] as const;
+
+        const columns = await prisma.$queryRaw<Array<{ table_name: string; column_name: string }>>(Prisma.sql`
+            SELECT table_name, column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND LOWER(table_name) = LOWER('GlobalConfig')
+        `).catch(() => []);
+        if (columns.length === 0) return null;
+
+        const tableName = columns[0]?.table_name;
+        if (!tableName || !SAFE_SQL_IDENTIFIER.test(tableName)) return null;
+
+        const actualByLower = new Map(columns.map((c) => [c.column_name.toLowerCase(), c.column_name]));
+        const selectParts: string[] = [];
+        for (const field of fields) {
+            const actual = actualByLower.get(field.toLowerCase());
+            if (actual && SAFE_SQL_IDENTIFIER.test(actual)) {
+                selectParts.push(`"${actual}" AS "${field}"`);
+            }
         }
-    });
+        if (selectParts.length === 0) return null;
+
+        const rows = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+            `SELECT ${selectParts.join(', ')} FROM "public"."${tableName}" WHERE "id" = 'default' LIMIT 1`
+        );
+        return rows[0] ?? null;
+    } catch (error) {
+        console.error('[settings] getGlobalConfigCompat error:', error);
+        return null;
+    }
 }
 
 function getDefaultMethodologyKnowledge(): string {

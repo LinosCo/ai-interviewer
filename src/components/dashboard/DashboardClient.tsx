@@ -85,11 +85,36 @@ export default function DashboardClient({
 
     // All CMS connections for "All Projects" view
     const allCmsConnections = isAllProjects
-        ? projectsWithCms.filter(p => p.cmsConnection).map(p => ({
-            ...p.cmsConnection,
-            projectName: p.name,
-            projectId: p.id
-        }))
+        ? (() => {
+            const unique = new Map<string, any>();
+
+            for (const p of projectsWithCms) {
+                if (!p.cmsConnection) continue;
+
+                const entry = {
+                    ...p.cmsConnection,
+                    projectName: p.name,
+                    projectId: p.id,
+                    ownerProjectId: p.cmsConnection.projectId || null
+                };
+                const existing = unique.get(entry.id);
+
+                if (!existing) {
+                    unique.set(entry.id, entry);
+                    continue;
+                }
+
+                const isDirect = entry.ownerProjectId && entry.ownerProjectId === entry.projectId;
+                const existingIsDirect = existing.ownerProjectId && existing.ownerProjectId === existing.projectId;
+
+                // Prefer displaying the direct owner project over a shared-project duplicate.
+                if (isDirect && !existingIsDirect) {
+                    unique.set(entry.id, entry);
+                }
+            }
+
+            return Array.from(unique.values());
+        })()
         : [];
 
     const handleOpenIntegrations = (projectId: string) => {

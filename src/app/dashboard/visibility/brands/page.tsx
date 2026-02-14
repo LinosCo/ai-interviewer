@@ -12,29 +12,24 @@ export default async function BrandsListPage() {
     const cookieStore = await cookies();
     const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
 
-    // Get user's subscription info for the selected organization
+    // Resolve membership with fallback to first available org when cookie is stale.
+    const userWithMemberships = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+            memberships: {
+                include: {
+                    organization: {
+                        include: { subscription: true }
+                    }
+                }
+            }
+        }
+    });
+
     const membership = activeOrgId
-        ? await prisma.membership.findUnique({
-            where: {
-                userId_organizationId: {
-                    userId: session.user.id,
-                    organizationId: activeOrgId
-                }
-            },
-            include: {
-                organization: {
-                    include: { subscription: true }
-                }
-            }
-        })
-        : await prisma.membership.findFirst({
-            where: { userId: session.user.id },
-            include: {
-                organization: {
-                    include: { subscription: true }
-                }
-            }
-        });
+        ? userWithMemberships?.memberships.find((m) => m.organizationId === activeOrgId)
+            || userWithMemberships?.memberships[0]
+        : userWithMemberships?.memberships[0];
 
     if (!membership?.organization) redirect("/login");
 

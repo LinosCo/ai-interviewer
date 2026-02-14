@@ -204,6 +204,32 @@ export default function CreateVisibilityWizardPage() {
         loadConfig();
     }, [configIdParam, projectIdParam]);
 
+    useEffect(() => {
+        const projectId = config.projectId;
+        if (!projectId || config.websiteUrl) return;
+
+        const prefillWebsiteFromCms = async () => {
+            try {
+                const res = await fetch(`/api/cms/connection?projectId=${projectId}`);
+                if (!res.ok) return;
+
+                const data = await res.json();
+                const cmsPublicUrl = data?.connection?.cmsPublicUrl;
+                if (typeof cmsPublicUrl !== 'string' || !cmsPublicUrl.startsWith('http')) return;
+
+                setConfig((prev) => {
+                    if (prev.websiteUrl) return prev;
+                    if (prev.projectId !== projectId) return prev;
+                    return { ...prev, websiteUrl: cmsPublicUrl };
+                });
+            } catch (error) {
+                console.warn('Unable to prefill website URL from CMS connection:', error);
+            }
+        };
+
+        void prefillWebsiteFromCms();
+    }, [config.projectId, config.websiteUrl]);
+
     const handleNext = () => {
         if (currentStep < STEPS.length) {
             setCurrentStep(currentStep + 1);

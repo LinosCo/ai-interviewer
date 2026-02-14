@@ -18,7 +18,7 @@ type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
 
 interface IntegrationCardProps {
   id: string;
-  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'GOOGLE' | 'CMS_VOLER';
+  type: 'WORDPRESS' | 'WOOCOMMERCE' | 'GOOGLE' | 'CMS_VOLER' | 'N8N';
   name: string;
   status: ConnectionStatus;
   description?: string;
@@ -93,6 +93,10 @@ const TYPE_CONFIG: Record<string, {
   CMS_VOLER: {
     icon: '🚀',
     gradient: 'from-amber-500 to-orange-600',
+  },
+  N8N: {
+    icon: '⚡',
+    gradient: 'from-green-500 to-teal-600',
   },
 };
 
@@ -316,7 +320,7 @@ export function IntegrationCard({
       {upgradeRequired && (
         <div className="pt-4 border-t border-gray-100">
           <a
-            href="/dashboard/settings/billing"
+            href="/dashboard/billing"
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
           >
             Upgrade

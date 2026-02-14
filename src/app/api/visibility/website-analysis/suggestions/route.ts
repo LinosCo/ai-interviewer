@@ -2,7 +2,13 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { CMSSuggestionType } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
+import {
+    inferContentKind,
+    normalizePublicationRouting,
+    resolvePublishingCapabilities
+} from '@/lib/cms/publishing';
 
 function slugify(value: string) {
     return value
@@ -14,8 +20,14 @@ function slugify(value: string) {
         .slice(0, 80);
 }
 
-function mapRecommendationType(recType: string, title?: string): CMSSuggestionType {
+function mapRecommendationType(recType: string, title?: string, contentKind?: string): CMSSuggestionType {
     const lowerTitle = (title || '').toLowerCase();
+    const lowerKind = (contentKind || '').toLowerCase();
+
+    if (lowerKind === 'faq_page') return 'CREATE_FAQ';
+    if (lowerKind === 'blog_post' || lowerKind === 'news_article' || lowerKind === 'social_post') return 'CREATE_BLOG_POST';
+    if (lowerKind === 'schema_patch' || lowerKind === 'seo_patch' || lowerKind === 'product_description') return 'MODIFY_CONTENT';
+
     if (recType === 'add_faq' || lowerTitle.includes('faq') || lowerTitle.includes('domanda')) {
         return 'CREATE_FAQ';
     }
@@ -37,6 +49,36 @@ function priorityToScore(priority: string) {
     return 40;
 }
 
+function fallbackDraftFromRecommendation(recommendation: any) {
+    const title = String(recommendation?.title || '').trim();
+    const description = String(recommendation?.description || recommendation?.impact || '').trim();
+    if (!title || !description) return null;
+    const lowerTitle = title.toLowerCase();
+    const lowerType = String(recommendation?.type || '').toLowerCase();
+
+    let targetSection = 'pages';
+    if (lowerType === 'social_post' || lowerTitle.includes('linkedin') || lowerTitle.includes('social')) {
+        targetSection = 'social';
+    } else if (lowerType === 'add_faq' || lowerTitle.includes('faq') || lowerTitle.includes('domanda')) {
+        targetSection = 'faq';
+    } else if (lowerTitle.includes('news') || lowerTitle.includes('aggiornamento')) {
+        targetSection = 'news';
+    } else if (lowerTitle.includes('blog') || lowerTitle.includes('articolo')) {
+        targetSection = 'blog';
+    }
+
+    return {
+        title,
+        slug: slugify(title),
+        body: description,
+        metaDescription: String(recommendation?.impact || '').trim().slice(0, 160),
+        targetSection,
+        mediaBrief: recommendation?.type === 'social_post'
+            ? 'Visual consigliato: immagine/video breve focalizzato sul beneficio principale con CTA chiara.'
+            : undefined
+    };
+}
+
 export async function POST(request: Request) {
     try {
         const session = await auth();
@@ -53,24 +95,32 @@ export async function POST(request: Request) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                id: true,
-                memberships: { take: 1, select: { organizationId: true } }
-            }
+            select: { id: true }
         });
-
-        const organizationId = user?.memberships?.[0]?.organizationId;
-        if (!organizationId) {
-            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        if (!user) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { id: configId, organizationId },
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
             include: { project: true }
         });
 
         if (!config) {
             return NextResponse.json({ error: 'Config not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
         if (!config.projectId) {
@@ -95,13 +145,34 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'CMS integration not enabled for this project' }, { status: 400 });
         }
 
-        const contentDraft = draft || recommendation.contentDraft;
+        const contentDraft = draft || recommendation.contentDraft || fallbackDraftFromRecommendation(recommendation);
         if (!contentDraft?.title || !contentDraft?.body) {
             return NextResponse.json({ error: 'contentDraft.title and contentDraft.body are required' }, { status: 400 });
         }
 
+        const capabilities = await resolvePublishingCapabilities({
+            projectId: config.projectId,
+            hasCmsApi: Boolean(cmsConnection?.id),
+            hasGoogleAnalytics: Boolean(cmsConnection?.googleAnalyticsConnected),
+            hasSearchConsole: Boolean(cmsConnection?.searchConsoleConnected)
+        });
+
+        const inferredKind = inferContentKind({
+            suggestionType: mapRecommendationType(recommendation.type, contentDraft.title || recommendation.title),
+            tipType: recommendation.type,
+            targetSection: contentDraft.targetSection,
+            title: contentDraft.title || recommendation.title
+        });
+
+        const publishRouting = normalizePublicationRouting(
+            recommendation.implementation,
+            inferredKind,
+            capabilities,
+            contentDraft.targetSection
+        );
+
         const tipKey = createHash('md5')
-            .update(`${recommendation.title}-${recommendation.type}`)
+            .update(`${recommendation.title}-${recommendation.type}-${publishRouting.contentKind}`)
             .digest('hex')
             .substring(0, 16);
 
@@ -124,25 +195,39 @@ export async function POST(request: Request) {
             return NextResponse.json({ suggestionId: existing.id, alreadyExists: true });
         }
 
+        const sourceSignals = JSON.parse(JSON.stringify({
+            origin: recommendation?.dataSource ? 'ai_tip' : 'visibility_tip',
+            configId,
+            projectId: config.projectId,
+            tipKey,
+            tipType: recommendation.type,
+            dataSource: recommendation.dataSource,
+            relatedPrompts: recommendation.relatedPrompts || [],
+            strategyAlignment: recommendation.strategyAlignment || recommendation?.explainability?.strategicGoal || null,
+            evidencePoints: recommendation.evidencePoints || recommendation?.explainability?.evidence || [],
+            explainability: recommendation.explainability || null,
+            publishRouting,
+            mediaBrief: contentDraft.mediaBrief || null,
+            dataCapabilities: {
+                hasGoogleAnalytics: capabilities.hasGoogleAnalytics,
+                hasSearchConsole: capabilities.hasSearchConsole,
+                hasWordPress: capabilities.hasWordPress,
+                hasWooCommerce: capabilities.hasWooCommerce
+            }
+        })) as Prisma.InputJsonValue;
+
         const suggestion = await prisma.cMSSuggestion.create({
             data: {
                 connectionId: cmsConnection.id,
                 createdBy: user?.id,
-                type: mapRecommendationType(recommendation.type, contentDraft.title || recommendation.title),
+                type: mapRecommendationType(recommendation.type, contentDraft.title || recommendation.title, publishRouting.contentKind),
                 title: contentDraft.title,
                 slug: contentDraft.slug || slugify(contentDraft.title),
                 body: contentDraft.body,
                 metaDescription: contentDraft.metaDescription || null,
-                targetSection: contentDraft.targetSection || null,
-                reasoning: recommendation.description || recommendation.impact || 'Suggerimento generato dal Brand Monitor',
-                sourceSignals: {
-                    origin: 'visibility_tip',
-                    configId,
-                    tipKey,
-                    tipType: recommendation.type,
-                    dataSource: recommendation.dataSource,
-                    relatedPrompts: recommendation.relatedPrompts || []
-                },
+                targetSection: contentDraft.targetSection || publishRouting.targetSection || null,
+                reasoning: recommendation.description || recommendation.impact || 'Suggerimento AI tip multi-canale',
+                sourceSignals,
                 priorityScore: priorityToScore(recommendation.priority),
                 status: 'PENDING'
             }

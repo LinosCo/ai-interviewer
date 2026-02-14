@@ -24,7 +24,7 @@ interface Project {
 type DropdownMode = 'org' | 'project' | null;
 
 export default function OrganizationProjectSelector() {
-    const { organizations, currentOrganization, setCurrentOrganization, loading: orgLoading } = useOrganization();
+    const { organizations, currentOrganization, setCurrentOrganization, loading: orgLoading, error: orgError, refetchOrganizations } = useOrganization();
     const { projects, selectedProject, setSelectedProject, loading: projectLoading, isOrgAdmin } = useProject();
 
     const [dropdownMode, setDropdownMode] = useState<DropdownMode>(null);
@@ -33,85 +33,112 @@ export default function OrganizationProjectSelector() {
 
     const containerRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setDropdownMode(null);
-                setSearchQuery('');
-            }
-        }
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+    const hasAutoRetriedRef = useRef(false);
+    const closeDropdown = useCallback(() => {
+        setDropdownMode(null);
+        setSearchQuery('');
+        setHighlightedIndex(0);
     }, []);
 
-    // Focus search input when dropdown opens
-    useEffect(() => {
-        if (dropdownMode && searchInputRef.current) {
-            searchInputRef.current.focus();
-        }
-    }, [dropdownMode]);
-
+    // Filtered lists
     const filteredOrganizations = organizations.filter(org =>
         org.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const filteredProjects = (() => {
-        const baseProjects = isOrgAdmin ? [ALL_PROJECTS_OPTION, ...projects] : projects;
-        return baseProjects.filter(project =>
-            project.name.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    })();
+    const showAllProjectsOption = isOrgAdmin || projects.length > 1;
+    const filteredProjects = [
+        ...(showAllProjectsOption ? [ALL_PROJECTS_OPTION] : []),
+        ...projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ];
 
-    const handleOrgSelect = useCallback((org: Organization) => {
-        setCurrentOrganization(org);
-        setDropdownMode(null);
-        setSearchQuery('');
-    }, [setCurrentOrganization]);
-
-    const handleProjectSelect = useCallback((project: Project) => {
-        setSelectedProject(project);
-        setDropdownMode(null);
-        setSearchQuery('');
-    }, [setSelectedProject]);
+    // Focus input when opening dropdown
+    useEffect(() => {
+        if (dropdownMode) {
+            // Focus input when opening
+            setTimeout(() => {
+                searchInputRef.current?.focus();
+            }, 50);
+        }
+    }, [dropdownMode]);
 
     const handleSearchChange = (value: string) => {
         setSearchQuery(value);
         setHighlightedIndex(0);
     };
 
-    const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-        const items = dropdownMode === 'org' ? filteredOrganizations : filteredProjects;
+    const handleOrgSelect = useCallback((org: Organization) => {
+        setCurrentOrganization(org);
+        closeDropdown();
+    }, [setCurrentOrganization, closeDropdown]);
 
-        switch (e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                setHighlightedIndex(prev => Math.min(prev + 1, items.length - 1));
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                setHighlightedIndex(prev => Math.max(prev - 1, 0));
-                break;
-            case 'Enter':
-                e.preventDefault();
-                if (items[highlightedIndex]) {
-                    if (dropdownMode === 'org') {
-                        handleOrgSelect(items[highlightedIndex] as Organization);
-                    } else {
-                        handleProjectSelect(items[highlightedIndex] as Project);
-                    }
-                }
-                break;
-            case 'Escape':
-                setDropdownMode(null);
-                setSearchQuery('');
-                break;
+    const handleProjectSelect = useCallback((project: Project) => {
+        setSelectedProject(project);
+        closeDropdown();
+    }, [setSelectedProject, closeDropdown]);
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        const itemsCount = dropdownMode === 'org' ? filteredOrganizations.length : filteredProjects.length;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev + 1) % itemsCount);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setHighlightedIndex(prev => (prev - 1 + itemsCount) % itemsCount);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (dropdownMode === 'org' && filteredOrganizations[highlightedIndex]) {
+                handleOrgSelect(filteredOrganizations[highlightedIndex]);
+            } else if (dropdownMode === 'project' && filteredProjects[highlightedIndex]) {
+                handleProjectSelect(filteredProjects[highlightedIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            closeDropdown();
         }
-    }, [dropdownMode, filteredOrganizations, filteredProjects, highlightedIndex, handleOrgSelect, handleProjectSelect]);
+    };
 
-    // Loading state
-    if (orgLoading || !currentOrganization || organizations.length === 0) {
+    // Close on click outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                closeDropdown();
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [closeDropdown]);
+
+    if (orgError) {
+        return (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-xs text-red-600 mb-2 font-medium">Errore caricamento</p>
+                <p className="text-[10px] text-red-500 mb-3">{orgError}</p>
+                <button
+                    onClick={() => refetchOrganizations()}
+                    className="text-xs font-semibold text-red-700 hover:text-red-800 underline"
+                >
+                    Riprova
+                </button>
+            </div>
+        );
+    }
+
+    if (organizations.length === 0) {
+        return (
+            <div className="mb-6 rounded-lg border border-gray-200 bg-white p-3">
+                <p className="text-xs text-gray-500 mb-2">Nessuna organizzazione disponibile</p>
+                <button
+                    onClick={() => refetchOrganizations()}
+                    className="text-xs font-medium text-amber-700 hover:text-amber-800"
+                >
+                    Riprova caricamento
+                </button>
+            </div>
+        );
+    }
+
+    if (!currentOrganization) {
         return (
             <div className="space-y-2 mb-6">
                 <div className="w-full h-11 bg-gray-50 animate-pulse rounded-lg border border-gray-200" />
@@ -126,15 +153,18 @@ export default function OrganizationProjectSelector() {
             <div className="relative">
                 <button
                     onClick={() => {
-                        setDropdownMode(dropdownMode === 'org' ? null : 'org');
-                        setSearchQuery('');
-                        setHighlightedIndex(0);
+                        if (dropdownMode === 'org') {
+                            closeDropdown();
+                        } else {
+                            setDropdownMode('org');
+                            setSearchQuery('');
+                            setHighlightedIndex(0);
+                        }
                     }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-all ${
-                        dropdownMode === 'org'
-                            ? 'bg-amber-50 border-amber-200 ring-2 ring-amber-100'
-                            : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-all ${dropdownMode === 'org'
+                        ? 'bg-amber-50 border-amber-200 ring-2 ring-amber-100'
+                        : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
                     aria-expanded={dropdownMode === 'org'}
                     aria-haspopup="listbox"
                     aria-label="Seleziona organizzazione"
@@ -192,9 +222,8 @@ export default function OrganizationProjectSelector() {
                                         <button
                                             key={org.id}
                                             onClick={() => handleOrgSelect(org)}
-                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
-                                                isHighlighted ? 'bg-gray-100' : ''
-                                            } ${isSelected ? 'bg-amber-50' : 'hover:bg-gray-50'}`}
+                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${isHighlighted ? 'bg-gray-100' : ''
+                                                } ${isSelected ? 'bg-amber-50' : 'hover:bg-gray-50'}`}
                                             role="option"
                                             aria-selected={isSelected}
                                         >
@@ -243,11 +272,10 @@ export default function OrganizationProjectSelector() {
                         setSearchQuery('');
                         setHighlightedIndex(0);
                     }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-all ${
-                        dropdownMode === 'project'
-                            ? 'bg-amber-50 border-amber-200 ring-2 ring-amber-100'
-                            : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-all ${dropdownMode === 'project'
+                        ? 'bg-amber-50 border-amber-200 ring-2 ring-amber-100'
+                        : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
                     aria-expanded={dropdownMode === 'project'}
                     aria-haspopup="listbox"
                     aria-label="Seleziona progetto"
@@ -314,9 +342,8 @@ export default function OrganizationProjectSelector() {
                                         <button
                                             key={project.id}
                                             onClick={() => handleProjectSelect(project)}
-                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
-                                                isHighlighted ? 'bg-gray-100' : ''
-                                            } ${isSelected ? 'bg-amber-50' : 'hover:bg-gray-50'}`}
+                                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${isHighlighted ? 'bg-gray-100' : ''
+                                                } ${isSelected ? 'bg-amber-50' : 'hover:bg-gray-50'}`}
                                             role="option"
                                             aria-selected={isSelected}
                                         >

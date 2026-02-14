@@ -2,11 +2,12 @@ import { getUsers, getProjects } from '@/app/actions/admin';
 import UsersView from './users-view';
 
 export default async function UsersPage() {
-    try {
-        const users = await getUsers();
-        const projects = await getProjects();
+    let users;
+    let projects;
 
-        return <UsersView users={users} projects={projects} />;
+    try {
+        users = await getUsers();
+        projects = await getProjects();
     } catch (error) {
         return (
             <div className="p-6 text-red-600">
@@ -15,4 +16,6 @@ export default async function UsersPage() {
             </div>
         );
     }
+
+    return <UsersView users={users} projects={projects} />;
 }

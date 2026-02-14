@@ -87,6 +87,7 @@ export async function PATCH(
         if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const currentUserId = session.user.id;
 
         const { configId } = await params;
         const body = await request.json();
@@ -102,7 +103,7 @@ export async function PATCH(
 
         // Verify user has permission (ADMIN or ORG OWNER/ADMIN)
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: currentUserId },
             select: { role: true }
         });
 
@@ -110,7 +111,7 @@ export async function PATCH(
 
         const membership = await prisma.membership.findFirst({
             where: {
-                userId: session.user.id,
+                userId: currentUserId,
                 organizationId: config.organizationId,
                 role: { in: ['OWNER', 'ADMIN'] }
             }
@@ -142,6 +143,23 @@ export async function PATCH(
                 }
             }
         });
+
+        if (body.projectId) {
+            await prisma.projectVisibilityConfig.upsert({
+                where: {
+                    projectId_configId: {
+                        projectId: body.projectId,
+                        configId
+                    }
+                },
+                update: {},
+                create: {
+                    projectId: body.projectId,
+                    configId,
+                    createdBy: currentUserId
+                }
+            });
+        }
 
         return NextResponse.json({
             success: true,

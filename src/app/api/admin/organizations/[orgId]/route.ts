@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
@@ -56,6 +59,12 @@ export async function PATCH(
                 // Sync monthlyCreditsLimit from PLANS
                 const planConfig = PLANS[planValue as PlanType] || PLANS[PlanType.FREE];
                 data.monthlyCreditsLimit = BigInt(planConfig.monthlyCredits);
+                data.customLimits = {
+                    ...(typeof org.customLimits === 'object' && org.customLimits !== null
+                        ? (org.customLimits as Record<string, unknown>)
+                        : {}),
+                    monthlyCreditsLimitCustom: false
+                };
 
                 // Also upsert Subscription to keep strictly in sync
                 const subscriptionTier = plan.toUpperCase();

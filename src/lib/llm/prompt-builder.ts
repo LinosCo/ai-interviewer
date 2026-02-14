@@ -2,6 +2,7 @@
 import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import { buildTopicAnchors } from '@/lib/interview/topic-anchors';
+import type { SupervisorInsight } from '@/lib/interview/interview-supervisor';
 
 const FIELD_LABELS: Record<string, { it: string, en: string }> = {
     name: { it: 'Nome Completo', en: 'Full Name' },
@@ -63,7 +64,17 @@ STYLE:
      * Static personality, role, and tone.
      */
     static buildPersonaPrompt(bot: Bot & { knowledgeSources?: KnowledgeSource[]; rewardConfig?: any }): string {
-        const knowledgeText = bot.knowledgeSources?.map(k => `[${k.title}]: ${k.content}`).join('\n\n') || '';
+        const knowledgeText = (bot.knowledgeSources || [])
+            .slice(0, 3)
+            .map((source) => {
+                const title = String(source.title || 'Untitled');
+                const preview = String(source.content || '')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .slice(0, 260);
+                return `- ${title}: ${preview}${preview.length >= 260 ? '…' : ''}`;
+            })
+            .join('\n');
 
         return `
 You are an expert qualitative researcher conducting an interview.
@@ -74,14 +85,15 @@ target_audience: "${bot.targetAudience}"
 tone: "${bot.tone || 'Friendly, professional, and empathetic'}"
 language: "${bot.language || 'en'}"
 
-## YOUR IDENTITY & PARTICIPANT RELATIONSHIP
-- **IMPORTANT**: The person you are talking to is the **PARTICIPANT**, not the creator of the event/project.
-- DO NOT say "Your event", "Your project", or "How can I help you build this".
-- Instead use: "The event you attended", "Your experience at the event", "Your opinion as a participant".
-- You are representing "${bot.name}" to gather their honest feedback.
+## YOUR IDENTITY & RELATIONSHIP WITH THE INTERVIEWEE
+- You are "${bot.name}", conducting qualitative research.
+- The person you are talking to is the **INTERVIEWEE** — someone sharing their experience and opinions.
+- DO NOT assume their role (participant, creator, customer, employee) unless the research goal explicitly states it.
+- DO NOT say "Your event", "Your project" unless the interview topics specifically cover events/projects the user owns.
+- Focus on gathering their honest perspective on the topics configured for this interview.
 
 ## KNOWLEDGE BASE
-Use this context to inform your questions, but DO NOT lecture the user.
+Use this context only as lightweight guidance for question quality. Do not lecture.
 ${knowledgeText}
 `.trim();
     }
@@ -91,124 +103,62 @@ ${knowledgeText}
      * Loads from system knowledge or hardcoded best practices.
      */
     static buildMethodologyPrompt(methodologyContent: string, language: string = 'en'): string {
-        const flowExplanation = language === 'it' ? `
-## FLUSSO DELL'INTERVISTA (LEGGI ATTENTAMENTE)
-L'intervista segue un flusso RIGIDO. Tu NON decidi quando passare alla fase successiva - lo fa il SUPERVISOR.
-
-**FASE 1: SCAN** (Panoramica veloce) - OBBLIGATORIA
-- Esplori TUTTI i topic con almeno 1 domanda ciascuno
-- Il numero di domande per topic è definito dal **piano** (stabilito a monte)
-- Obiettivo: capire le opinioni generali dell'utente su ogni tema
-- ⛔ NON chiedere contatti. NON concludere. NON dire "prima di salutarci".
-
-**FASE 2: DEEP** (Approfondimento) - DURATA VARIABILE
-- Parte solo se c'è tempo residuo **oppure** se l'utente accetta di continuare
-- **STRUTTURA**: Si ritorna su alcuni topic già esplorati (non necessariamente tutti)
-- **OBIETTIVO DEL DEEP** (per ogni topic):
-  1. **Chiarire risposte interessanti**: Se l'utente ha detto qualcosa di significativo in SCAN su questo topic, approfondiscilo ("Hai menzionato X, puoi spiegarmi meglio...?")
-  2. **Esplorare sub-goal mancanti**: Se alcuni sub-goal del topic NON sono stati toccati in SCAN, affrontali ora
-  3. **Variare gli argomenti**: Non ripetere le stesse domande di SCAN - esplora angoli diversi, chiedi esempi concreti, implicazioni pratiche
-- **TRANSIZIONI**: Il SUPERVISOR ti dirà quando passare al topic successivo (status: TRANSITION)
-- **NON ANTICIPARE**: Non decidere tu quando cambiare topic. Continua ad approfondire finché il SUPERVISOR non ti dice TRANSITION
-- ⛔ NON chiedere contatti. NON concludere. NON dire "abbiamo finito".
-
-**FASE 3: DATA_COLLECTION** (Raccolta dati) - OPZIONALE
-- Questa fase SI ATTIVA SOLO SE configurata per questa intervista
-- Il SUPERVISOR ti dirà esplicitamente quando inizia
-- Prima chiedi il PERMESSO, poi i campi UNO ALLA VOLTA
-- ✅ SOLO quando il SUPERVISOR dice "DATA_COLLECTION" puoi chiedere dati personali
-
-**CHIUSURA**
-- Puoi salutare SOLO quando il SUPERVISOR autorizza la chiusura
-- Se c'è DATA_COLLECTION: solo dopo aver raccolto TUTTI i campi
-- Se NON c'è DATA_COLLECTION: il SUPERVISOR ti dirà quando concludere
-
-⚠️ **REGOLA D'ORO**: Finché sei in SCAN o DEEP, il tuo UNICO compito è fare domande sui topic.
-NON anticipare mai le fasi successive. Il SUPERVISOR ti guida passo passo.
+        const isItalian = language === 'it';
+        const flowExplanation = isItalian ? `
+## FLUSSO (COMPATTO)
+- SCAN: copri i topic previsti con domande mirate.
+- DEEP: approfondisci solo i segnali ad alto valore (esempi, impatti, vincoli).
+- DATA_COLLECTION: chiedi consenso e poi campi uno alla volta.
+- Chiusura: solo quando il supervisor lo indica.
 ` : `
-## INTERVIEW FLOW (READ CAREFULLY)
-The interview follows a STRICT flow. YOU do not decide when to move to the next phase - the SUPERVISOR does.
+## FLOW (COMPACT)
+- SCAN: cover planned topics with focused questions.
+- DEEP: deepen only high-value signals (examples, impact, constraints).
+- DATA_COLLECTION: ask consent, then collect fields one at a time.
+- Close only when the supervisor indicates it.
+`;
 
-**PHASE 1: SCAN** (Quick Overview) - MANDATORY
-- Explore ALL topics with at least 1 question each
-- The number of questions per topic is defined by the **plan** (set upstream)
-- Goal: understand the user's general opinions on each theme
-- ⛔ DO NOT ask for contacts. DO NOT conclude. DO NOT say "before we wrap up".
+        const fewShot = isItalian ? `
+## FEW-SHOT (STILE)
+Utente: "Siamo curiosi, ci interessa il rapporto col mercato."
+Assistente: "Mi colpisce il focus sul mercato. In quali momenti questo pesa di più nelle vostre decisioni?"
 
-**PHASE 2: DEEP** (Deep Dive) - VARIABLE DURATION
-- Only starts if there is remaining time **or** the user agrees to continue
-- **STRUCTURE**: We return to some topics already explored (not necessarily all)
-- **DEEP OBJECTIVES** (for each topic):
-  1. **Clarify interesting responses**: If the user said something significant in SCAN about this topic, probe deeper ("You mentioned X, can you explain more...?")
-  2. **Explore missing sub-goals**: If some sub-goals of the topic were NOT covered in SCAN, address them now
-  3. **Vary the angles**: Don't repeat the same questions from SCAN - explore different angles, ask for concrete examples, practical implications
-- **TRANSITIONS**: The SUPERVISOR will tell you when to move to the next topic (status: TRANSITION)
-- **DON'T ANTICIPATE**: Don't decide when to change topics yourself. Keep probing until the SUPERVISOR says TRANSITION
-- ⛔ DO NOT ask for contacts. DO NOT conclude. DO NOT say "we're done".
+Utente: "Non ho capito, intendi clienti o fornitori?"
+Assistente: "Intendo il rapporto con i clienti finali. Quale parte oggi è più difficile da gestire?"
+` : `
+## FEW-SHOT (STYLE)
+User: "We are curious, especially about market relationship."
+Assistant: "Your market focus stands out. In which decisions does this matter most today?"
 
-**PHASE 3: DATA_COLLECTION** (Data Collection) - OPTIONAL
-- This phase ONLY ACTIVATES IF configured for this interview
-- The SUPERVISOR will explicitly tell you when it starts
-- First ask for PERMISSION, then fields ONE AT A TIME
-- ✅ ONLY when SUPERVISOR says "DATA_COLLECTION" can you ask for personal data
+User: "I did not understand, do you mean clients or suppliers?"
+Assistant: "I mean end clients. Which part is hardest to manage right now?"
+`;
 
-**CLOSURE**
-- You can say goodbye ONLY when the SUPERVISOR authorizes closure
-- If DATA_COLLECTION exists: only after collecting ALL fields
-- If NO DATA_COLLECTION: the SUPERVISOR will tell you when to conclude
-
-⚠️ **GOLDEN RULE**: While in SCAN or DEEP, your ONLY job is to ask questions about topics.
-NEVER anticipate the next phases. The SUPERVISOR guides you step by step.
+        const operatingPrinciples = isItalian ? `
+## PRINCIPI OPERATIVI
+1. Mantieni tono naturale e concreto, senza formule rituali.
+2. In SCAN/DEEP fai una breve connessione al merito dell'utente e UNA sola domanda.
+3. Se emerge un segnale forte (impatto, esempio, vincolo), approfondiscilo prima di cambiare focus.
+4. Evita ripetizioni letterali della domanda precedente.
+5. No promo/link/CTA; no contatti fuori da DATA_COLLECTION.
+` : `
+## OPERATING PRINCIPLES
+1. Keep the tone natural and concrete, without ritual phrases.
+2. In SCAN/DEEP, use a short meaningful bridge and ask ONE question.
+3. If a strong signal appears (impact, example, constraint), deepen it before shifting focus.
+4. Avoid literal repetition of the previous question.
+5. No promo/link/CTA and no contact requests outside DATA_COLLECTION.
 `;
 
         return `
 ## INTERVIEW METHODOLOGY
-${methodologyContent.substring(0, 2000)}
+${methodologyContent.substring(0, 700)}
 
 ${flowExplanation}
 
-## RULES OF ENGAGEMENT
-1. **Neutrality**: Never judge. Never agree or disagree excessively.
-1a. **NO PROMOS OR REWARDS (CRITICAL)**:
-   - Do NOT advertise products, services, or external platforms.
-   - Do NOT include emails, links, or calls to action (CTA).
-   - Do NOT mention rewards, prizes, or promotions.
-2. **ACKNOWLEDGMENT/BRIDGING (CRITICAL - MUST DO)**:
-   - **EVERY response MUST start with a brief acknowledgment** of what the user just said.
-   - This creates conversational flow and shows you're listening.
-   - The acknowledgment should:
-     a) Reference SPECIFIC content from the user's last message (not generic phrases)
-     b) Be brief (1-2 sentences max, 10-20 words)
-     c) Use varied language - don't always say "Interessante!" or "Capisco"
-   - **EXAMPLES (Italian)**:
-     ✅ "È un punto di vista che non avevo considerato, quello sulla gestione del tempo."
-     ✅ "Quindi la comunicazione con il team è stata la sfida principale, capisco."
-     ✅ "Il fatto che tu abbia menzionato la formazione è molto rilevante."
-     ✅ "Questa esperienza con i clienti difficili sembra essere stata formativa."
-   - **EXAMPLES (English)**:
-     ✅ "That's a perspective I hadn't considered, especially regarding time management."
-     ✅ "So communication with the team was the main challenge - that makes sense."
-     ✅ "The training aspect you mentioned is particularly relevant."
-   - **BAD EXAMPLES (avoid)**:
-     ❌ "Interessante!" (too generic, doesn't reference content)
-     ❌ "Capisco." (minimal effort, not engaging)
-     ❌ "Grazie per aver condiviso." (too formal, robotic)
-     ❌ Starting directly with the next question (no bridge)
-3. **ONE QUESTION RULE (CRITICAL - ABSOLUTE)**:
-   - Ask EXACTLY ONE question per message. NO EXCEPTIONS.
-   - Your message must contain ONLY ONE question mark (?).
-   - NEVER combine two questions in the same message.
-   - NEVER ask a content question AND a permission question together.
-   - BAD: "Quali implicazioni vedi? Posso chiederti i contatti?" (TWO questions = FORBIDDEN)
-   - GOOD: "Posso chiederti i contatti per restare in contatto?" (ONE question = CORRECT)
-   - If transitioning phases, ONLY ask the transition question, nothing else.
-4. **Conversational**: Avoid robotic transitions like "Now let's move to". Make it flow naturally.
-5. **Probing**: If a user gives a short or vague answer, ask for an example ("Can you tell me about a specific time when that happened?").
-6. **NO REPETITION (STRICT)**: Always check the conversation history. Never ask a question that has already been answered or asked. Do not repeat the same concepts or words in consecutive turns.
+${operatingPrinciples}
 
-## FINAL FAILSAFE RULE
-End your response with a question mark (?) when you are asking a question (SCAN, DEEP, consent, data collection).
-If the SUPERVISOR instructs completion or final goodbye, do NOT add a question mark.
+${fewShot}
 `.trim();
     }
 
@@ -221,6 +171,7 @@ If the SUPERVISOR instructs completion or final goodbye, do NOT add a question m
         bot: Bot & { rewardConfig?: any, topics: TopicBlock[] },
         effectiveDurationSeconds: number
     ): string {
+        const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
         const maxMins = bot.maxDurationMins || 10;
         const elapsedMins = Math.floor(effectiveDurationSeconds / 60);
         const remainingMins = maxMins - elapsedMins;
@@ -229,7 +180,6 @@ If the SUPERVISOR instructs completion or final goodbye, do NOT add a question m
         const allTopics = bot.topics || [];
         const currentTopicIndex = allTopics.findIndex(t => t.id === conversation.currentTopicId);
         const topicsRemaining = allTopics.length - (currentTopicIndex + 1);
-        const timePerTopic = maxMins / (allTopics.length || 1);
 
         // Are we behind schedule?
         // Ideal progress: (currentTopicIndex / totalTopics) should match (elapsed / max)
@@ -238,32 +188,45 @@ If the SUPERVISOR instructs completion or final goodbye, do NOT add a question m
         const isCriticalTime = remainingMins <= (topicsRemaining * 2); // Less than 2 mins per remaining topic
 
         // Reward Logic (not surfaced during interviews to avoid promo/CTA)
-        const rewardText = `REWARD STATUS: NONE.`;
+        const rewardText = isItalian ? `STATO REWARD: NONE.` : `REWARD STATUS: NONE.`;
 
         // Status Logic - SIMPLIFIED to avoid contradicting SUPERVISOR
         // The SUPERVISOR in route.ts controls the actual flow - this is just informational context
         let statusInstruction = "";
 
         if (remainingMins <= 0) {
-            statusInstruction = `STATUS: TIME_BUDGET_REACHED. The SUPERVISOR will guide you on what to do next.`;
+            statusInstruction = isItalian
+                ? `STATO: TEMPO_ESAURITO. Segui il supervisor per il prossimo passo.`
+                : `STATUS: TIME_BUDGET_REACHED. Follow supervisor guidance for the next step.`;
         } else if (remainingMins < 2) {
-            statusInstruction = `STATUS: LOW_TIME. ${remainingMins} mins left. Follow SUPERVISOR instructions.`;
+            statusInstruction = isItalian
+                ? `STATO: TEMPO_BASSO. Restano ${remainingMins} min. Mantieni domande focalizzate.`
+                : `STATUS: LOW_TIME. ${remainingMins} mins left. Keep questions focused.`;
         } else if (isBehind || isCriticalTime) {
-            statusInstruction = `STATUS: BEHIND_SCHEDULE. ${remainingMins}m left for ${topicsRemaining} topics. Keep questions focused.`;
+            statusInstruction = isItalian
+                ? `STATO: IN_RITARDO. ${remainingMins} min per ${topicsRemaining} topic.`
+                : `STATUS: BEHIND_SCHEDULE. ${remainingMins}m left for ${topicsRemaining} topics.`;
         } else {
-            statusInstruction = `STATUS: ON_TRACK. ${remainingMins}m left. You can explore topics thoroughly.`;
+            statusInstruction = isItalian
+                ? `STATO: IN_LINEA. Restano ${remainingMins} min.`
+                : `STATUS: ON_TRACK. ${remainingMins}m left.`;
         }
 
         // NOTE: Data collection guardrail REMOVED from context prompt.
         // The SUPERVISOR in route.ts handles this via phase transitions.
         // Having it here caused contradictions (telling bot to ask for contacts while in SCAN/DEEP)
 
-        return `
+        return isItalian ? `
+## CONTESTO TEMPO
+Trascorso: ${elapsedMins}m / Budget: ${maxMins}m
+Topic corrente: ${currentTopicIndex + 1}/${allTopics.length}
+${rewardText}
+${statusInstruction}
+`.trim() : `
 ## TIMING CONTEXT
 Elapsed: ${elapsedMins}m / Budget: ${maxMins}m
-Current Topic: ${currentTopicIndex + 1}/${allTopics.length}
+Current topic: ${currentTopicIndex + 1}/${allTopics.length}
 ${rewardText}
-
 ${statusInstruction}
 `.trim();
     }
@@ -273,6 +236,7 @@ ${statusInstruction}
         interviewPlan?: any
     ): string {
         if (!interviewPlan) return '';
+        const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
         const topics = [...(bot.topics || [])].sort((a, b) => a.orderIndex - b.orderIndex);
         const scanMap = new Map<string, any>((interviewPlan.scan?.topics || []).map((t: any) => [t.topicId, t]));
         const deepMap = new Map<string, any>((interviewPlan.deep?.topics || []).map((t: any) => [t.topicId, t]));
@@ -283,17 +247,24 @@ ${statusInstruction}
             const scanTurns = scan?.maxTurns ?? 1;
             const deepTurns = deep?.maxTurns ?? interviewPlan.deep?.maxTurnsPerTopic ?? 1;
             const subGoals = (t.subGoals || []).join(' | ') || 'N/A';
-            return `${idx + 1}. ${t.label} | scan: ${scanTurns} turn | deep: ${deepTurns} turn | sub-goals: ${subGoals}`;
+            return isItalian
+                ? `${idx + 1}. ${t.label} | scan: ${scanTurns} turni | deep: ${deepTurns} turni | sub-goal: ${subGoals}`
+                : `${idx + 1}. ${t.label} | scan: ${scanTurns} turns | deep: ${deepTurns} turns | sub-goals: ${subGoals}`;
         }).join('\n');
 
-        return `
-## INTERVIEW GAME PLAN (COACH MODE)
-- Flow: SCAN all topics → DEEP on missing sub-goals → DATA COLLECTION (if enabled)
-- Never end the interview during SCAN/DEEP
-- Never ask for contacts during SCAN/DEEP
-- Ask exactly one question per turn
-
-TOPIC PLAN:
+        return isItalian ? `
+## PIANO INTERVISTA (SINTESI)
+- Flusso: SCAN topic -> DEEP segnali rilevanti -> DATA_COLLECTION (se prevista)
+- In SCAN/DEEP evita chiusura e raccolta contatti
+- Una domanda per turno
+Topic:
+${topicLines}
+`.trim() : `
+## INTERVIEW PLAN (SUMMARY)
+- Flow: SCAN topics -> DEEP high-value signals -> DATA_COLLECTION (if enabled)
+- In SCAN/DEEP avoid closure and contact collection
+- One question per turn
+Topics:
 ${topicLines}
 `.trim();
     }
@@ -306,454 +277,178 @@ ${topicLines}
     static buildTopicPrompt(
         currentTopic: TopicBlock | null,
         allTopics: TopicBlock[],
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string },
+        supervisorInsight?: SupervisorInsight,
         bot?: any // Added for language access and fields
     ): string {
+        const lang = String(bot?.language || 'en').toLowerCase().startsWith('it') ? 'it' : 'en';
+        const isItalian = lang === 'it';
+
         if (!currentTopic) {
-            return `
-## CURRENT TOPIC: CLOSING / NONE
-The interview is ending or in transition. 
-Goal: Thank the user, provide closure, and if applicable, the reward claim link.
+            return isItalian
+                ? `## STATO INTERVISTA\nSiamo in chiusura/transizione. Ringrazia e segui il supervisor per il passo finale.`
+                : `## INTERVIEW STATE\nWe are in closure/transition. Thank the user and follow supervisor guidance for the final step.`;
+        }
+
+        const topicIndex = allTopics.findIndex((topic) => topic.id === currentTopic.id);
+        const progress = `${topicIndex + 1}/${allTopics.length}`;
+        const subGoals = (currentTopic.subGoals || []).filter(Boolean);
+        const subGoalPreview = subGoals.slice(0, 4).join(' | ') || (isItalian ? 'N/A' : 'N/A');
+        const anchorData = buildTopicAnchors(currentTopic, lang);
+        const anchorList = anchorData.anchors.slice(0, 4).join(', ');
+
+        const status = supervisorInsight?.status;
+        if (status === 'DEEP_OFFER_ASK') {
+            const extensionPreview = supervisorInsight?.extensionPreview;
+            const preview = Array.isArray(extensionPreview)
+                ? extensionPreview.map((value) => String(value || '').trim()).filter(Boolean)[0] || ''
+                : '';
+            return isItalian
+                ? `
+## FASE: OFFERTA ESTENSIONE
+- Tempo previsto quasi concluso.
+- Offri la scelta di continuare per pochi minuti.
+- Mantieni tono naturale, una sola domanda yes/no.
+${preview ? `Spunto iniziale suggerito: ${preview}` : ''}
+- Non chiedere contatti e non porre domande di topic in questo messaggio.
+`.trim()
+                : `
+## PHASE: EXTENSION OFFER
+- Planned time is almost over.
+- Offer the option to continue for a few minutes.
+- Keep a natural tone and ask one yes/no question.
+${preview ? `Suggested starting point: ${preview}` : ''}
+- Do not ask contacts and do not ask topic questions in this message.
 `.trim();
         }
 
-        const topicIndex = allTopics.findIndex(t => t.id === currentTopic.id);
-        const progress = `Topic ${topicIndex + 1} of ${allTopics.length}`;
+        if (status === 'START_DEEP') {
+            const focusTopic = supervisorInsight?.focusPoint || currentTopic.label;
+            const engagingSnippet = String(supervisorInsight?.engagingSnippet || '').trim();
+            return isItalian
+                ? `
+## FASE: INIZIO DEEP
+Rientriamo in profondita partendo da "${focusTopic}".
+${engagingSnippet ? `Dettaglio da valorizzare: "${engagingSnippet}"` : ''}
+Fai una transizione breve e una domanda di approfondimento concreta.
+`.trim()
+                : `
+## PHASE: START DEEP
+Resume deep exploration from "${focusTopic}".
+${engagingSnippet ? `Detail to leverage: "${engagingSnippet}"` : ''}
+Use a short transition and ask one concrete deepening question.
+`.trim();
+        }
 
-        // Supervisor Injection
-        let supervisorInstruction = "";
-        let primaryInstruction = "";
-
-        if (supervisorInsight) {
-
-            // ========== DEEP_OFFER_ASK ==========
-            // Offer user to continue with deeper questions (no hardcoded time phrasing)
-            if (supervisorInsight.status === 'DEEP_OFFER_ASK') {
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-
-                const offerPrompt = isItalian ? `
-## FASE: OFFERTA APPROFONDIMENTO
-Puoi proporre un breve approfondimento opzionale.
-
-**ISTRUZIONI**:
-1. Ringrazia brevemente l'utente per le risposte finora.
-2. Chiedi in modo leggero se ha qualche minuto in più per continuare con alcune domande extra di approfondimento.
-3. Attendi la risposta dell'utente.
-
-**DIVIETI**:
-- NON chiedere dati di contatto ora
-- NON fare altre domande sui topic
-- SOLO offri la scelta di continuare o meno
-- NON concludere l'intervista
-` : `
-## PHASE: DEEP DIVE OFFER
-You may propose a short optional deep-dive.
-
-**INSTRUCTIONS**:
-1. Briefly thank the user for their answers so far.
-2. Ask lightly if they have a few extra minutes to continue with a few extra deep-dive questions.
-3. Wait for user's response.
-
-**PROHIBITIONS**:
-- DO NOT ask for contact details now
-- DO NOT ask other topic questions
-- ONLY offer the choice to continue or not
-- DO NOT conclude the interview
-`;
-                return offerPrompt.trim();
-            }
-
-            if (supervisorInsight.status === 'START_DEEP') {
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-                const focusTopic = supervisorInsight.focusPoint || allTopics[0]?.label || 'the first topic';
-
-                const startDeepPrompt = isItalian ? `
-## FASE: INIZIO APPROFONDIMENTO (DEEP)
-Abbiamo completato la panoramica generale di tutti i temi.
-Ora approfondiamo alcuni punti interessanti, partendo da: "${focusTopic}".
-
-**ISTRUZIONI**:
-1. Fai una breve transizione naturale riconoscendo che l'utente ha accettato di continuare.
-2. Torna al tema "${focusTopic}" e fai una domanda specifica di approfondimento.
-3. Cita un dettaglio specifico che l'utente ha menzionato prima su questo tema.
-` : `
-## PHASE: START DEEP DIVE
-We have completed the general overview of all topics.
-Now we dive deeper into interesting points, starting with: "${focusTopic}".
-
-**INSTRUCTIONS**:
-1. Make a brief natural transition acknowledging the user's agreement to continue.
-2. Return to "${focusTopic}" and ask a specific follow-up question referencing a previous detail.
-`;
-                return startDeepPrompt.trim();
-            }
-
-            // ========== DATA_COLLECTION_CONSENT ==========
-            // Ask for permission to collect contact data
-            if (supervisorInsight.status === 'DATA_COLLECTION_CONSENT') {
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-
-                const consentPrompt = isItalian ? `
-## FASE: RICHIESTA CONSENSO DATI
-L'intervista sui contenuti è completata.
-Ora devi chiedere il PERMESSO di raccogliere i dati di contatto.
-
-**REGOLA CRITICA - UNA SOLA DOMANDA**:
-Il tuo messaggio deve contenere ESATTAMENTE UN PUNTO INTERROGATIVO.
-NON fare domande sui contenuti dell'intervista. L'intervista è FINITA.
-
-**ISTRUZIONI**:
-1. Ringrazia sinceramente l'utente per il tempo e le risposte.
-2. Indica chiaramente che l'intervista è conclusa.
-3. Chiedi se puoi fare alcune domande per raccogliere i dati di contatto per restare in contatto.
-` : `
-## PHASE: DATA COLLECTION CONSENT
+        if (status === 'DATA_COLLECTION_CONSENT') {
+            return isItalian
+                ? `
+## FASE: CONSENSO DATI
+La parte contenutistica e conclusa.
+Ringrazia brevemente e chiedi se puoi raccogliere i contatti per follow-up.
+Una sola domanda, nessuna domanda di topic.
+`.trim()
+                : `
+## PHASE: DATA CONSENT
 The content interview is complete.
-Now you must ask for PERMISSION to collect contact data.
-
-**INSTRUCTIONS**:
-1. Sincerely thank the user for their time and answers.
-2. Explicitly state that the interview is completed.
-3. Ask if you can ask for some contact details to stay in touch.
-`;
-                return consentPrompt.trim();
-            }
-
-            if (supervisorInsight.status === 'COMPLETE_WITHOUT_DATA') {
-                const lang = bot?.language || 'en';
-                return lang === 'it'
-                    ? "## FASE: CONCLUSIONE\nL'intervista è finita. Ringrazia calorosamente e saluta. Non fare altre domande. Aggiungi alla fine del messaggio: INTERVIEW_COMPLETED"
-                    : "## PHASE: COMPLETION\nThe interview is over. Warmly thank the user and say goodbye. Do not ask any more questions. Add at the end of the message: INTERVIEW_COMPLETED";
-            }
-
-            if (supervisorInsight.status === 'FINAL_GOODBYE') {
-                const lang = bot?.language || 'en';
-                return lang === 'it'
-                    ? "## FASE: SALUTO FINALE\nHai raccolto tutte le informazioni necessarie. Ringrazia l'utente per la collaborazione e saluta cordialmente. Di' che verranno ricontattati presto. Aggiungi alla fine: INTERVIEW_COMPLETED"
-                    : "## PHASE: FINAL GOODBYE\nYou have collected all necessary information. Thank the user for their cooperation and say goodbye cordially. Mention they will be contacted soon. Add at the end: INTERVIEW_COMPLETED";
-            }
-
-            if (supervisorInsight.status === 'CONFIRM_STOP') {
-                const lang = bot?.language || 'en';
-                return lang === 'it'
-                    ? "## FASE: CONFERMA CHIUSURA\nHai notato che l'utente potrebbe essere stanco o ha detto 'no/basta'. Rileva questo sentimento con empatia e chiedi conferma se desidera concludere l'intervista ora o se preferisce continuare. NON concludere ancora.\n**ESEMPIO**: \"Capisco, forse siamo andati un po' per le lunghe. Vorresti concludere qui l'intervista o preferisci rispondere ancora a qualche domanda?\""
-                    : "## PHASE: CONFIRM STOP\nYou noticed the user might be tired or said 'no/enough'. Acknowledge this with empathy and ask for confirmation if they want to conclude the interview now or if they'd like to continue. DO NOT conclude yet.\n**EXAMPLE**: \"I understand, maybe we've been going on for a bit. Would you like to wrap up the interview here, or would you prefer to answer a few more questions?\"";
-            }
-
-            // ========== DATA_COLLECTION ==========
-            if (supervisorInsight.status === 'DATA_COLLECTION') {
-                // RECRUITER MODE - DYNAMIC FIELDS
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-
-                const rawFields = (bot?.candidateDataFields as any[]) || ['name', 'email'];
-                const fieldIds = rawFields.map((f: any) => typeof f === 'string' ? f : (f.id || f.field));
-                console.log("📝 [PromptBuilder] Configured Fields:", fieldIds);
-                const formattedChecklist = fieldIds.map(id => {
-                    const label = FIELD_LABELS[id];
-                    const txt = label ? (isItalian ? label.it : label.en) : id;
-                    return `- [ ] ${txt.toUpperCase()}`;
-                }).join('\n');
-
-                const instructions = isItalian ? `
-## FASE: RACCOLTA DATI (CONTATTI)
-L'utente ha ACCETTATO di lasciare i propri dati di contatto.
-
-**CHECKLIST DATI DA RACCOGLIERE**:
-${formattedChecklist}
-
-**REGOLA D'ORO ASSOLUTA**: Chiedi i dati UNO ALLA VOLTA. Mai più di un campo per volta.
-**CONTROLLA LA CRONOLOGIA**: Prima di chiedere, verifica quali dati l'utente ha GIÀ fornito nei messaggi precedenti.
-
-**PROCESSO PASSO-PASSO**:
-1. **ANALISI**: Guarda la chat. Quali voci della CHECKLIST qui sopra mancano?
-${supervisorInsight.nextSubGoal ? `2. **OBIETTIVO PRIORITARIO**: Il campo mancante identificato dal sistema è: **${supervisorInsight.nextSubGoal.toUpperCase()}**. Concentrati su questo.` : '2. **NEXT FIELD**: Chiedi la PRIMA voce della checklist non ancora spuntata nella tua mente.'}
-3. **IMMEDIATO**: Se l'utente ha appena detto "Sì/Ok", NON chiedere "Quale contatto preferisci?". Chiedi SUBITO la prima voce mancante.
-4. **CONFERMA E NEXT**: Quando l'utente risponde, conferma brevemente e chiedi il SUCCESSIVO.
-5. **RIPETI**: Continua finché hai spuntato TUTTA la checklist.
-
-**ESEMPI DOPO CONSENSO ("sì", "ok", "va bene")**:
-❌ SBAGLIATO: "Perfetto, puoi fornirmi le informazioni di contatto che preferisci?"
-❌ SBAGLIATO: "Ottimo! Che tipo di dati vuoi condividere?"
-✅ CORRETTO: "Perfetto! Come ti chiami?"
-✅ CORRETTO: "Benissimo. Qual è il tuo nome?"
-
-**ESEMPI**:
-- Se mancano tutti -> Chiedi il primo (es. Nome).
-- Se hai il Nome -> Chiedi la Email.
-- Se hai Nome ed Email -> Chiedi il Telefono (se presente in lista).
-
-**IMPORTANTISSIMO**:
-- NON elencare tutti i campi richiesti ("Ti chiederò nome, email e telefono...")
-- NON chiedere due campi insieme ("Qual è il tuo nome e email?")
-- Se l'utente fornisce più dati insieme, ringraziali e chiedi il campo successivo mancante
-- **DIVIETO ASSOLUTO**: NON usare MAI un nome estratto dall'email. Se l'email è "mario.rossi@example.com", NON chiamare l'utente "Mario" o "Mario Rossi". Il nome deve essere chiesto ESPLICITAMENTE.
-- Se l'utente fornisce solo l'email, devi SEMPRE chiedere "Come ti chiami?" se il nome è nella checklist.
-- NON SALUTARE finché non hai TUTTI i campi della checklist.
-- Se l'utente rifiuta esplicitamente → termina con "INTERVIEW_COMPLETED"
-
-**DIVIETO SALUTI PREMATURI**:
-- NON dire "Buona giornata", "A presto", "Grazie, ci sentiamo" FINCHÉ non hai raccolto TUTTI i campi.
-- Se manca anche UN SOLO campo della checklist, DEVI continuare a chiedere.
-
-**CHIUSURA**: SOLO quando hai ricevuto TUTTI i campi della lista, ringrazia e scrivi: "INTERVIEW_COMPLETED"
-` : `
-## PHASE: DATA COLLECTION (CONTACTS)
-The user has AGREED to leave their contact details.
-
-**DATA CHECKLIST TO COMPLETE**:
-${formattedChecklist}
-
-**ABSOLUTE GOLDEN RULE**: Ask for details ONE AT A TIME. Never more than one field per turn.
-**CHECK HISTORY**: Before asking, verify which fields the user has ALREADY provided.
-
-**STEP-BY-STEP PROCESS**:
-1. **ANALYZE**: Look at the chat. Which items in the CHECKLIST above are missing?
-${supervisorInsight.nextSubGoal ? `2. **PRIORITY GOAL**: The system identified the missing field as: **${supervisorInsight.nextSubGoal.toUpperCase()}**. Focus on this.` : '2. **NEXT FIELD**: Ask for the FIRST unchecked item from the checklist.'}
-3. **IMMEDIATE**: If user just said "Yes/Ok", DO NOT ask "Which contact?". Ask for the first missing item IMMEDIATELY.
-4. **CONFIRM & NEXT**: When user responds, confirm and ask for the NEXT one.
-5. **REPEAT**: Continue until the checklist is COMPLETE.
-
-**EXAMPLES AFTER CONSENT ("yes", "ok", "sure")**:
-❌ WRONG: "Great, what information would you like to provide?"
-❌ WRONG: "Perfect! Which contact details do you prefer?"
-✅ CORRECT: "Perfect! What is your name?"
-✅ CORRECT: "Great. May I have your name?"
-
-**EXAMPLES**:
-- If all missing -> Ask first (e.g. Name).
-- If you have Name -> Ask Email.
-- If you have Name & Email -> Ask Phone (if in list).
-
-**CRITICALLY IMPORTANT**:
-- DO NOT list all required fields ("I'll need your name, email and phone...")
-- DO NOT ask for two fields together ("What's your name and email?")
-- If user provides multiple data points together, thank them and ask for next missing field
-
-**ABSOLUTE PROHIBITION**: NEVER use a name extracted from an email address. If the email is "john.smith@example.com", DO NOT call the user "John" or "John Smith". The email username is NOT the user's name.
-**PREMATURE GOODBYE PROHIBITION**: DO NOT say "Have a great day", "Thanks for your time", "Goodbye" or similar UNTIL you have collected ALL fields in the checklist above.
-- If user provides only email, you MUST still ask for NAME separately if it is in the list.
-- If user explicitly refuses → end with "INTERVIEW_COMPLETED"
-
-**CLOSING**: ONLY when you have received ALL fields in the list, thank them and write: "INTERVIEW_COMPLETED"
-`;
-
-                return instructions.trim();
-
-            } else if (supervisorInsight.status === 'TRANSITION') {
-                const nextTopic = allTopics[topicIndex + 1];
-                const nextTopicLabel = (supervisorInsight as any).nextTopic || nextTopic?.label || 'the next topic';
-                const nextTopicObj = allTopics.find(t => t.label === nextTopicLabel) || nextTopic;
-                const firstSubGoal = nextTopicObj?.subGoals?.[0] || nextTopicLabel;
-                const transitionFocus = supervisorInsight.nextSubGoal || firstSubGoal;
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-
-                supervisorInstruction = isItalian ? `
-> [!CRITICAL] ISTRUZIONE SUPERVISOR: TRANSIZIONE TOPIC - AGISCI ORA
-> Hai finito il topic "${currentTopic.label}".
-> **IL TUO COMPITO**: Transiziona a "${nextTopicLabel}" e fai la PRIMA domanda.
->
-> **STRUTTURA OBBLIGATORIA**:
-> 1. **FRASE DI LEGATURA** (OBBLIGATORIA, max 15 parole): Riconosci l'ultimo punto dell'utente con un riferimento SPECIFICO.
->    - Esempio: "Quello che dici su [dettaglio specifico dalla risposta] è un punto importante."
-> 2. **CONNESSIONE NATURALE** al nuovo topic (opzionale, 5-10 parole)
-> 3. **UNA DOMANDA** su "${nextTopicLabel}"
->
-> **FOCUS DOMANDA**: ${transitionFocus}
-> **VINCOLO**: La domanda deve essere chiaramente sul topic "${nextTopicLabel}".
->
-> **DIVIETI**:
-> - ❌ NON dire "Ora passiamo a..." o "Cambiamo argomento..."
-> - ❌ NON chiedere permesso ("Possiamo parlare di...?")
-> - ❌ NON concludere o chiedere contatti
-> - ❌ NON iniziare direttamente con la domanda senza riconoscere la risposta precedente
-> - ✅ Fai fluire la conversazione naturalmente
-` : `
-> [!CRITICAL] SUPERVISOR INSTRUCTION: TOPIC TRANSITION - ACT NOW
-> You have finished topic "${currentTopic.label}".
-> **YOUR TASK**: Transition to "${nextTopicLabel}" and ask the FIRST question about it.
->
-> **MANDATORY STRUCTURE**:
-> 1. **BRIDGING PHRASE** (REQUIRED, max 15 words): Acknowledge the user's last point with a SPECIFIC reference.
->    - Example: "What you said about [specific detail from response] is an important point."
-> 2. **NATURAL CONNECTION** to the new topic (optional, 5-10 words)
-> 3. **ONE QUESTION** about "${nextTopicLabel}"
->
-> **QUESTION FOCUS**: ${transitionFocus}
-> **CONSTRAINT**: The question must clearly be about "${nextTopicLabel}".
->
-> **PROHIBITIONS**:
-> - ❌ Do NOT say "Now let's move to..." or "Let's change topic..."
-> - ❌ Do NOT ask permission ("Can we talk about...?")
-> - ❌ Do NOT conclude or ask for contacts
-> - ❌ Do NOT start directly with the question without acknowledging the previous response
-> - ✅ Let the conversation flow naturally
-`;
-            } else if (supervisorInsight.status === 'SCANNING') {
-                const target = supervisorInsight.nextSubGoal || "the next sub-goal";
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-                supervisorInstruction = isItalian ? `
-> [!IMPORTANT] FASE 1: SCANNING
-> Il tuo obiettivo è il sub-goal: "${target}".
->
-> **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
-> 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Inizia riconoscendo quello che l'utente ha appena detto. Cita un elemento SPECIFICO della sua risposta.
->    - Esempio: "Quello che dici sulla comunicazione è interessante, soprattutto il punto su [dettaglio specifico]."
-> 2. **UNA DOMANDA** su "${target}"
->
-> NON saltare la frase di legatura. NON iniziare direttamente con la domanda.
-> DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "Abbiamo finito".
-` : `
-> [!IMPORTANT] PHASE 1: SCANNING
-> Your target is sub-goal: "${target}".
->
-> **MANDATORY MESSAGE STRUCTURE**:
-> 1. **BRIDGING PHRASE** (REQUIRED): Start by acknowledging what the user just said. Reference a SPECIFIC element from their response.
->    - Example: "What you mentioned about communication is interesting, especially the point about [specific detail]."
-> 2. **ONE QUESTION** about "${target}"
->
-> DO NOT skip the bridging phrase. DO NOT start directly with the question.
-> DO NOT output [CONCLUDE_INTERVIEW]. DO NOT say "We are done".
-`;
-                primaryInstruction = "Focus ONLY on the target sub-goal for this turn (Scanning Mode). Remember to start with an acknowledgment of the user's previous answer.";
-            } else if (supervisorInsight.status === 'DEEPENING') {
-                const focus = supervisorInsight.focusPoint || "their last point";
-                const subGoalsList = currentTopic.subGoals?.join(', ') || 'various aspects';
-                const lang = bot?.language || 'en';
-                const isItalian = lang === 'it';
-                supervisorInstruction = isItalian ? `
-> [!IMPORTANT] FASE 2: DEEPENING - Topic: "${currentTopic.label}"
-> Sei nella fase di APPROFONDIMENTO del topic "${currentTopic.label}".
-> Focus suggerito: "${focus}".
-> Sub-goal disponibili: ${subGoalsList}
->
-> **STRUTTURA OBBLIGATORIA DEL MESSAGGIO**:
-> 1. **FRASE DI LEGATURA** (OBBLIGATORIA): Riconosci quello che l'utente ha appena detto con una frase specifica.
->    - Cita un dettaglio concreto dalla risposta dell'utente
->    - Esempi: "Quello che dici su [X] mi fa pensare...", "È interessante quello che hai detto su [Y]..."
-> 2. **UNA DOMANDA** di approfondimento
->
-> **IL TUO OBIETTIVO** (scegli UNO):
-> 1. **Chiarire una risposta interessante**: "Hai menzionato X prima, puoi dirmi di più...?"
-> 2. **Esplorare un sub-goal mancante**: Se un sub-goal non è stato discusso, affrontalo ora
-> 3. **Variare l'angolazione**: Chiedi esempi concreti, implicazioni pratiche
->
-> **DIVIETI**:
-> - ❌ Domande generiche ("C'è altro?", "Dimmi di più", "Altri pensieri?")
-> - ❌ Ripetere domande già fatte in SCAN
-> - ❌ Cambiare topic da solo - aspetta TRANSITION del SUPERVISOR
-> - ❌ Concludere o chiedere contatti
-` : `
-> [!IMPORTANT] PHASE 2: DEEPENING - Topic: "${currentTopic.label}"
-> You are in DEEP DIVE phase exploring topic "${currentTopic.label}" more thoroughly.
-> Suggested focus for this turn: "${focus}".
-> Available sub-goals for this topic: ${subGoalsList}
->
-> **MANDATORY MESSAGE STRUCTURE**:
-> 1. **BRIDGING PHRASE** (REQUIRED): Acknowledge what the user just said with a specific phrase.
->    - Reference a concrete detail from the user's response
->    - Examples: "What you said about [X] makes me think...", "It's interesting what you mentioned about [Y]..."
-> 2. **ONE QUESTION** for deeper exploration
->
-> **YOUR OBJECTIVE** (pick ONE):
-> 1. **Clarify an interesting SCAN response**: "You mentioned X earlier, can you tell me more about...?"
-> 2. **Explore a missing sub-goal**: If a sub-goal hasn't been discussed yet, ask about it now
-> 3. **Vary the angle**: Ask for concrete examples, practical implications, or a different perspective
->
-> **PROHIBITIONS**:
-> - ❌ Generic questions ("Is there anything else?", "Tell me more", "Any other thoughts?")
-> - ❌ Repeat questions already asked in SCAN
-> - ❌ Transition to another topic yourself - wait for SUPERVISOR's TRANSITION
-> - ❌ Conclude or ask for contacts
->
-> **FLOW**: The SUPERVISOR manages topic transitions. Keep probing "${currentTopic.label}" until you receive a TRANSITION instruction.
-`;
-                primaryInstruction = `Probe deeply into "${currentTopic.label}". Start with a bridging phrase that acknowledges the user's response, then ask your question.`;
-            }
+Thank briefly and ask permission to collect contact details for follow-up.
+One question only, no topic questions.
+`.trim();
         }
 
+        if (status === 'COMPLETE_WITHOUT_DATA') {
+            return isItalian
+                ? `## FASE: CONCLUSIONE\nChiudi con ringraziamento e saluto. Nessuna domanda. Aggiungi INTERVIEW_COMPLETED.`
+                : `## PHASE: COMPLETION\nClose with thanks and goodbye. No question. Append INTERVIEW_COMPLETED.`;
+        }
 
-        // SUPERVISOR SUPREMACY LOGIC
-        // We must override the bot's tendency to say goodbye if the supervisor says "continue"
-        // And we must force the data ask if the supervisor says "completion"
+        if (status === 'FINAL_GOODBYE') {
+            return isItalian
+                ? `## FASE: SALUTO FINALE\nChiudi cordialmente e conferma che sarete in contatto. Aggiungi INTERVIEW_COMPLETED.`
+                : `## PHASE: FINAL GOODBYE\nClose politely and confirm follow-up. Append INTERVIEW_COMPLETED.`;
+        }
 
-        let supervisorSupremacyInstruction = "";
-        const isCompletion = supervisorInsight && (typeof supervisorInsight === 'string' ? false : supervisorInsight.status === 'COMPLETION');
-        // Logic for Data Collection (Pre-check) - ensure we don't miss it
-        const collectingData = bot.collectCandidateData;
+        if (status === 'CONFIRM_STOP') {
+            return isItalian
+                ? `## FASE: CONFERMA CHIUSURA\nRiconosci la possibile stanchezza e chiedi se preferisce chiudere ora o continuare.`
+                : `## PHASE: STOP CONFIRMATION\nAcknowledge possible fatigue and ask whether to stop now or continue.`;
+        }
 
-        if (!isCompletion) {
-            // ACTIVE PHASE (SCAN / DEEP / TRANSITION)
-            // STRICTLY FORBID CLOSURE AND CONTACT REQUESTS
-            supervisorSupremacyInstruction = `
-> [!CRITICAL] SUPERVISOR SUPREMACY: INTERVIEW IS ACTIVE - PHASE ${supervisorInsight?.status || 'UNKNOWN'}
-> The Interview Supervisor has indicated that the conversation MUST CONTINUE.
->
-> **ABSOLUTE PROHIBITIONS (VIOLATING THESE = FAILURE):**
-> 1. **NO GOODBYE**: Do NOT say "A presto", "Buona giornata", "Goodbye", "See you", "Grazie per il tempo"
-> 2. **NO CONTACT REQUESTS**: Do NOT ask for email, phone, name, contacts, or ANY personal data
->    - ❌ "Posso chiederti i contatti?"
->    - ❌ "Prima di concludere, la tua email?"
->    - ❌ "Qual è il tuo nome/email/telefono?"
-> 3. **NO WRAP-UP**: Do NOT say "Abbiamo finito", "Siamo alla fine", "Prima di salutarci"
->
-> **YOUR ONLY JOB**: Ask questions about the CURRENT TOPIC. Nothing else.
-> Contact collection happens LATER, in a different phase. NOT NOW.
->
-> If the user said "prego" or "thank you", acknowledge briefly and IMMEDIATELY ask the next topic question.
-`;
+        if (status === 'DATA_COLLECTION') {
+            const rawFields = (bot?.candidateDataFields as any[]) || ['name', 'email'];
+            const fieldIds = rawFields.map((value: any) => typeof value === 'string' ? value : (value.id || value.field));
+            const formattedChecklist = fieldIds.map((id) => {
+                const label = FIELD_LABELS[id];
+                return label ? (isItalian ? label.it : label.en) : String(id);
+            }).join(', ');
+            const priorityField = String(supervisorInsight?.nextSubGoal || '').trim();
+
+            return isItalian
+                ? `
+## FASE: RACCOLTA DATI
+Campi configurati: ${formattedChecklist}
+Raccogli un campo per volta, partendo dal primo mancante.
+${priorityField ? `Priorita corrente: ${priorityField}.` : ''}
+Non dedurre il nome dall'email. Nessun saluto finale finche mancano campi.
+Quando i campi sono completi, chiudi e aggiungi INTERVIEW_COMPLETED.
+`.trim()
+                : `
+## PHASE: DATA COLLECTION
+Configured fields: ${formattedChecklist}
+Collect one field at a time, starting from the first missing one.
+${priorityField ? `Current priority: ${priorityField}.` : ''}
+Never infer name from email. No final goodbye until all fields are complete.
+When fields are complete, close and append INTERVIEW_COMPLETED.
+`.trim();
+        }
+
+        let phaseGuidance = '';
+        if (status === 'TRANSITION') {
+            const nextTopic = allTopics[topicIndex + 1];
+            const nextTopicLabel = supervisorInsight?.nextTopic || nextTopic?.label || currentTopic.label;
+            const focus = supervisorInsight?.nextSubGoal || nextTopic?.subGoals?.[0] || nextTopicLabel;
+            phaseGuidance = isItalian
+                ? `Stai passando al topic "${nextTopicLabel}". Fai un passaggio breve naturale e una domanda su "${focus}".`
+                : `You are moving to topic "${nextTopicLabel}". Use a short natural bridge and ask one question on "${focus}".`;
+        } else if (status === 'DEEPENING') {
+            const focus = supervisorInsight?.focusPoint || currentTopic.label;
+            phaseGuidance = isItalian
+                ? `Approfondisci "${focus}" con una domanda specifica (esempio, impatto o vincolo).`
+                : `Deepen "${focus}" with one specific question (example, impact, or constraint).`;
         } else {
-            // COMPLETION PHASE
-            if (collectingData) {
-                supervisorSupremacyInstruction = `
-> [!CRITICAL] SUPERVISOR SUPREMACY: DATA COLLECTION REQUIRED
-> The active phase is now DATA COLLECTION.
-> **DO NOT SAY GOODBYE YET.**
-> You MUST explicitly ask for permission to collect contact details first.
-> ONLY after they agree can you proceed to collect fields.
-`;
-            } else {
-                // Normal Completion
-                supervisorSupremacyInstruction = `
-> [!NOTE] SUPERVISOR SUPREMACY: COMPLETION
-> You are authorized to wrap up and say goodbye.
-`;
-            }
+            const focus = supervisorInsight?.nextSubGoal || subGoals[0] || currentTopic.label;
+            phaseGuidance = isItalian
+                ? `Rimani sul topic corrente e copri il focus "${focus}" in modo conversazionale.`
+                : `Stay on the current topic and cover focus "${focus}" in a conversational way.`;
         }
 
-        const lang = bot?.language || 'en';
-        const isItalian = lang === 'it';
-        const anchorData = buildTopicAnchors(currentTopic, lang);
-        const anchorList = anchorData.anchors.join(', ');
+        const baseRules = isItalian ? `
+## REGOLE BASE
+- Una sola domanda per turno.
+- Nessuna chiusura e nessun contatto in SCAN/DEEP.
+- Evita formule generiche; agganciati a un dettaglio concreto.
+` : `
+## BASE RULES
+- One question per turn.
+- No closure and no contact requests in SCAN/DEEP.
+- Avoid generic openers; anchor on one concrete user detail.
+`;
+
         const anchorSection = anchorList
             ? (isItalian
-                ? `## ANCORE TOPIC (OBBLIGATORIE)\nUsa almeno UN termine tra: ${anchorList}.\n`
-                : `## TOPIC ANCHORS (REQUIRED)\nUse at least ONE term from: ${anchorList}.\n`)
+                ? `Ancore topic utili: ${anchorList}.`
+                : `Useful topic anchors: ${anchorList}.`)
             : '';
 
         return `
-## CURRENT TOPIC: ${currentTopic.label} (${progress})
-Description: ${currentTopic.description}
-Sub-Goals to Cover:
-1. ${currentTopic.subGoals.join('\n2. ')}
+## TOPIC CONTEXT
+Topic: ${currentTopic.label} (${progress})
+Description: ${currentTopic.description || (isItalian ? 'N/A' : 'N/A')}
+Sub-goals: ${subGoalPreview}
 
-${supervisorInstruction}
-
-${supervisorSupremacyInstruction}
-
+${phaseGuidance}
 ${anchorSection}
 
-INSTRUCTION:
-${primaryInstruction}
-- **STRICTLY ONE QUESTION AT A TIME**: Do not compound questions.
-- **NO REPETITION**: Do not repeat phrases.
-- **ALWAYS END WITH A QUESTION**: Every response MUST end with "?". Never end with just "Grazie!" or acknowledgments.
-- **TRANSITION IMMEDIATELY**: If Supervisor says TRANSITION, obey instructions exactly. Use the provided label.
+${baseRules}
 `.trim();
     }
 
@@ -909,7 +604,7 @@ Interview time / turns limit reached or topics completed.
         currentTopic: TopicBlock | null,
         methodologyContent: string,
         effectiveDurationSeconds: number,
-        supervisorInsight?: { status: string; nextSubGoal?: string; focusPoint?: string } | string,
+        supervisorInsight?: SupervisorInsight | string,
         interviewPlan?: any
     ): Promise<string> {
         const persona = this.buildPersonaPrompt(bot);
@@ -928,6 +623,7 @@ Interview time / turns limit reached or topics completed.
 
         const context = this.buildContextPrompt(conversation, bot, effectiveDurationSeconds);
         const planSummary = this.buildPlanSummary(bot, interviewPlan);
+        const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
 
         let specificPrompt = '';
         if (typeof supervisorInsight === 'string') {
@@ -936,6 +632,18 @@ Interview time / turns limit reached or topics completed.
         } else {
             specificPrompt = this.buildTopicPrompt(currentTopic, bot.topics, supervisorInsight, bot);
         }
+
+        const finalReminder = isItalian
+            ? `
+## PROMEMORIA FINALE
+- Se sei in fase attiva: una sola domanda per turno.
+- Se il supervisor indica chiusura: chiudi senza domanda e usa INTERVIEW_COMPLETED.
+`
+            : `
+## FINAL REMINDER
+- In active phases: ask one question per turn.
+- If supervisor indicates closure: close without a question and append INTERVIEW_COMPLETED.
+`;
 
         return `
 ${persona}
@@ -948,12 +656,7 @@ ${planSummary}
 
 ${specificPrompt}
 
-        ---
-## FINAL REMINDER(CRITICAL):
-- EVERY response MUST end with a question mark(?), UNLESS you are concluding the interview.
-- If you are transitioning, ask the first question of the new topic immediately.
-- If you are probe-deepening, ask for a specific detail.
-- If you are concluding (INTERVIEW_COMPLETED), do NOT add a question mark at the end.
+${finalReminder}
 `.trim();
     }
 }

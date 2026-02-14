@@ -3,24 +3,49 @@ import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType, PURCHASABLE_PLANS, formatMonthlyCredits } from '@/config/plans';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import CheckoutButton from './checkout-button';
 
-export default async function PlansPage() {
+const SALES_EMAIL = 'info@businesstuner.it';
+
+export default async function PlansPage({
+    searchParams
+}: {
+    searchParams?: Promise<{ billing?: string }>
+}) {
     const session = await auth();
     if (!session?.user?.email) return null;
+    const resolvedSearchParams = await searchParams;
+    const billingPeriod = resolvedSearchParams?.billing === 'yearly' ? 'yearly' : 'monthly';
+
+    const cookieStore = await cookies();
+    const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
 
     const user = await prisma.user.findUnique({
         where: { email: session.user.email },
         select: {
-            id: true,
-            plan: true
+            memberships: {
+                select: {
+                    organizationId: true,
+                    organization: {
+                        select: {
+                            plan: true
+                        }
+                    }
+                }
+            }
         }
     });
 
-    const currentPlan = (user?.plan as PlanType) || PlanType.FREE;
+    const activeMembership = activeOrgId
+        ? user?.memberships.find(m => m.organizationId === activeOrgId) || user?.memberships[0]
+        : user?.memberships[0];
+    const currentPlan = (activeMembership?.organization.plan as PlanType) || PlanType.FREE;
 
     // Build plans array with current plan info
     const plans = PURCHASABLE_PLANS.map(planType => ({
         ...PLANS[planType],
+        requiresSalesContact: planType === PlanType.BUSINESS || planType === PlanType.ENTERPRISE,
         isCurrent: currentPlan === planType
     }));
 
@@ -89,9 +114,8 @@ export default async function PlansPage() {
                     return (
                         <div
                             key={plan.id}
-                            className={`bg-white/80 backdrop-blur-md rounded-[32px] p-8 border ${
-                                isPopular ? 'border-amber-400 shadow-xl' : 'border-white/50 shadow-sm'
-                            } flex flex-col relative`}
+                            className={`bg-white/80 backdrop-blur-md rounded-[32px] p-8 border ${isPopular ? 'border-amber-400 shadow-xl' : 'border-white/50 shadow-sm'
+                                } flex flex-col relative`}
                         >
                             {isPopular && (
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">
@@ -103,13 +127,29 @@ export default async function PlansPage() {
                             <p className="text-sm text-stone-500 mb-4">{plan.description}</p>
 
                             <div className="mb-4 flex items-baseline gap-1">
-                                <span className="text-4xl font-black text-stone-900">€{plan.monthlyPrice}</span>
-                                <span className="text-stone-400 text-sm">/mese</span>
+                                {plan.requiresSalesContact ? (
+                                    <>
+                                        <span className="text-4xl font-black text-stone-900">Su richiesta</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-4xl font-black text-stone-900">
+                                            €{billingPeriod === 'yearly' ? plan.yearlyMonthlyEquivalent : plan.monthlyPrice}
+                                        </span>
+                                        <span className="text-stone-400 text-sm">/mese</span>
+                                    </>
+                                )}
                             </div>
 
-                            {plan.yearlyMonthlyEquivalent < plan.monthlyPrice && (
+                            {!plan.requiresSalesContact && billingPeriod === 'yearly' && plan.yearlyMonthlyEquivalent < plan.monthlyPrice && (
                                 <div className="mb-4 text-sm text-green-600 font-medium bg-green-50 rounded-lg px-3 py-2">
-                                    €{plan.yearlyMonthlyEquivalent}/mese con piano annuale
+                                    Fatturato annualmente: €{plan.yearlyPrice}/anno
+                                </div>
+                            )}
+
+                            {plan.requiresSalesContact && (
+                                <div className="mb-4 text-sm text-amber-700 font-medium bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+                                    Piano Business attivabile tramite contatto commerciale.
                                 </div>
                             )}
 
@@ -140,26 +180,43 @@ export default async function PlansPage() {
                                 <button disabled className="w-full bg-stone-100 text-stone-400 font-bold py-4 rounded-2xl cursor-not-allowed">
                                     Piano attuale
                                 </button>
-                            ) : plan.id === PlanType.BUSINESS ? (
-                                <Link href="mailto:hello@voler.ai?subject=Richiesta%20Piano%20Business" className="w-full">
-                                    <button className="w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 bg-stone-900 text-white hover:bg-stone-800">
-                                        Contatta Sales <Icons.ArrowRight size={18} />
-                                    </button>
-                                </Link>
+                            ) : plan.requiresSalesContact ? (
+                                <a
+                                    href={`mailto:${SALES_EMAIL}?subject=Richiesta%20Piano%20Business`}
+                                    className="w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 bg-stone-900 text-white hover:bg-stone-800"
+                                >
+                                    Richiedi info via email <Icons.ArrowRight size={18} />
+                                </a>
                             ) : (
-                                <Link href={`/api/stripe/checkout?plan=${plan.id}`} className="w-full">
-                                    <button className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${
-                                        isPopular
+                                <CheckoutButton
+                                    tier={plan.id}
+                                    billingPeriod={billingPeriod}
+                                    organizationId={activeMembership?.organizationId}
+                                    className={`w-full font-bold py-4 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 ${isPopular
                                             ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20'
                                             : 'bg-stone-900 text-white hover:bg-stone-800'
-                                    }`}>
-                                        Seleziona piano <Icons.ArrowRight size={18} />
-                                    </button>
-                                </Link>
+                                        }`}
+                                >
+                                </CheckoutButton>
                             )}
                         </div>
                     );
                 })}
+            </div>
+
+            <div className="mt-6 max-w-6xl flex items-center justify-center gap-3">
+                <Link
+                    href="/dashboard/billing/plans?billing=monthly"
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'monthly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
+                >
+                    Mensile
+                </Link>
+                <Link
+                    href="/dashboard/billing/plans?billing=yearly"
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'yearly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
+                >
+                    Annuale
+                </Link>
             </div>
 
             {/* Feature Comparison Table */}
@@ -194,9 +251,8 @@ export default async function PlansPage() {
                                                         <span className="text-stone-300">—</span>
                                                     )
                                                 ) : (
-                                                    <span className={`text-sm font-medium ${
-                                                        feature.key === 'credits' ? 'text-amber-600 font-bold' : 'text-stone-600'
-                                                    }`}>
+                                                    <span className={`text-sm font-medium ${feature.key === 'credits' ? 'text-amber-600 font-bold' : 'text-stone-600'
+                                                        }`}>
                                                         {value}
                                                     </span>
                                                 )}
@@ -216,7 +272,7 @@ export default async function PlansPage() {
                     <h4 className="text-lg font-bold text-stone-900 mb-1">Passa alla fatturazione annuale</h4>
                     <p className="text-stone-600 text-sm">Risparmia fino al 30% su tutti i piani attivando il pagamento annuale.</p>
                 </div>
-                <Link href="/api/stripe/portal">
+                <Link href={`/api/stripe/portal?organizationId=${activeMembership?.organizationId || ''}`}>
                     <button className="bg-white text-stone-900 font-bold px-8 py-3.5 rounded-xl border border-stone-200 hover:bg-stone-50 transition-all text-sm shadow-sm flex items-center gap-2">
                         <Icons.Settings2 size={16} /> Gestisci in Stripe
                     </button>

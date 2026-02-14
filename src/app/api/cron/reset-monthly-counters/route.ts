@@ -13,7 +13,7 @@ import { planService } from '@/services/planService';
  * - Serverless function with scheduler
  */
 
-export async function resetMonthlyCounters(): Promise<void> {
+async function resetMonthlyCounters(): Promise<void> {
     console.log('🔄 Starting monthly counter reset...');
 
     try {

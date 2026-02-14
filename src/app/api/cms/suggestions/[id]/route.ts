@@ -1,6 +1,12 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import {
+    buildPublishOptions,
+    inferContentKind,
+    normalizePublicationRouting,
+    resolvePublishingCapabilities
+} from '@/lib/cms/publishing';
 
 /**
  * GET /api/cms/suggestions/[id]
@@ -46,6 +52,32 @@ export async function GET(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
+        const sourceSignals = (suggestion.sourceSignals && typeof suggestion.sourceSignals === 'object')
+            ? { ...(suggestion.sourceSignals as any) }
+            : {};
+        const projectId = typeof sourceSignals.projectId === 'string'
+            ? sourceSignals.projectId
+            : suggestion.connection.projectId || null;
+
+        const capabilities = await resolvePublishingCapabilities({
+            projectId,
+            hasCmsApi: Boolean(suggestion.connection.id),
+            hasGoogleAnalytics: Boolean(suggestion.connection.googleAnalyticsConnected),
+            hasSearchConsole: Boolean(suggestion.connection.searchConsoleConnected)
+        });
+        const inferredKind = inferContentKind({
+            suggestionType: suggestion.type,
+            tipType: typeof sourceSignals.tipType === 'string' ? sourceSignals.tipType : undefined,
+            targetSection: suggestion.targetSection || undefined,
+            title: suggestion.title
+        });
+        sourceSignals.publishRouting = normalizePublicationRouting(
+            sourceSignals.publishRouting,
+            inferredKind,
+            capabilities,
+            suggestion.targetSection || undefined
+        );
+
         return NextResponse.json({
             suggestion: {
                 id: suggestion.id,
@@ -56,7 +88,7 @@ export async function GET(
                 metaDescription: suggestion.metaDescription,
                 targetSection: suggestion.targetSection,
                 reasoning: suggestion.reasoning,
-                sourceSignals: suggestion.sourceSignals,
+                sourceSignals,
                 priorityScore: suggestion.priorityScore,
                 status: suggestion.status,
                 cmsContentId: suggestion.cmsContentId,
@@ -66,6 +98,10 @@ export async function GET(
                 publishedAt: suggestion.publishedAt,
                 rejectedAt: suggestion.rejectedAt,
                 rejectedReason: suggestion.rejectedReason
+            },
+            publish: {
+                capabilities,
+                options: buildPublishOptions(capabilities)
             }
         });
 
@@ -130,6 +166,45 @@ export async function PATCH(
         if ('metaDescription' in payload) data.metaDescription = payload.metaDescription ? String(payload.metaDescription).trim() : null;
         if ('targetSection' in payload) data.targetSection = payload.targetSection ? String(payload.targetSection).trim() : null;
 
+        const sourceSignals = (suggestion.sourceSignals && typeof suggestion.sourceSignals === 'object')
+            ? { ...(suggestion.sourceSignals as any) }
+            : {};
+
+        let sourceSignalsChanged = false;
+        if (payload.publishRouting && typeof payload.publishRouting === 'object') {
+            const projectId = typeof sourceSignals.projectId === 'string'
+                ? sourceSignals.projectId
+                : suggestion.connection.projectId || null;
+            const capabilities = await resolvePublishingCapabilities({
+                projectId,
+                hasCmsApi: Boolean(suggestion.connection.id),
+                hasGoogleAnalytics: Boolean(suggestion.connection.googleAnalyticsConnected),
+                hasSearchConsole: Boolean(suggestion.connection.searchConsoleConnected)
+            });
+
+            const inferredKind = inferContentKind({
+                suggestionType: suggestion.type,
+                tipType: typeof sourceSignals.tipType === 'string' ? sourceSignals.tipType : undefined,
+                targetSection: (typeof payload.targetSection === 'string' ? payload.targetSection : suggestion.targetSection) || undefined,
+                title: (typeof payload.title === 'string' ? payload.title : suggestion.title) || suggestion.title
+            });
+
+            sourceSignals.publishRouting = normalizePublicationRouting(
+                payload.publishRouting,
+                inferredKind,
+                capabilities,
+                (typeof payload.targetSection === 'string' ? payload.targetSection : suggestion.targetSection) || undefined
+            );
+            sourceSignalsChanged = true;
+        }
+        if ('mediaBrief' in payload) {
+            sourceSignals.mediaBrief = payload.mediaBrief ? String(payload.mediaBrief).trim() : null;
+            sourceSignalsChanged = true;
+        }
+        if (sourceSignalsChanged) {
+            data.sourceSignals = sourceSignals;
+        }
+
         if (!Object.keys(data).length) {
             return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
         }
@@ -147,7 +222,8 @@ export async function PATCH(
                 slug: updated.slug,
                 body: updated.body,
                 metaDescription: updated.metaDescription,
-                targetSection: updated.targetSection
+                targetSection: updated.targetSection,
+                sourceSignals: updated.sourceSignals
             }
         });
     } catch (error: any) {

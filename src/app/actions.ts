@@ -15,6 +15,48 @@ import path from 'path';
 import { User, Prisma } from '@prisma/client';
 import { transferBotToProject } from './actions/project-tools';
 import { regenerateInterviewPlan } from '@/lib/interview/plan-service';
+import { checkTrialResourceLimit } from '@/lib/trial-limits';
+import {
+    ensureAutoInterviewKnowledgeSource,
+    regenerateAutoInterviewKnowledgeSource
+} from '@/lib/interview/manual-knowledge-source';
+
+const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+async function ensureInterviewGuideForBot(botId: string) {
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        select: {
+            id: true,
+            botType: true,
+            language: true,
+            name: true,
+            researchGoal: true,
+            targetAudience: true,
+            topics: {
+                orderBy: { orderIndex: 'asc' },
+                select: {
+                    label: true,
+                    description: true,
+                    subGoals: true
+                }
+            }
+        }
+    });
+
+    if (!bot) return;
+    if (bot.botType === 'chatbot') return;
+    if (!Array.isArray(bot.topics) || bot.topics.length === 0) return;
+
+    await ensureAutoInterviewKnowledgeSource({
+        botId: bot.id,
+        language: bot.language || 'it',
+        botName: bot.name,
+        researchGoal: bot.researchGoal,
+        targetAudience: bot.targetAudience,
+        topics: bot.topics
+    });
+}
 
 async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
     // 1. Bot-specific key always wins (decrypt if needed)
@@ -25,7 +67,10 @@ async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
 
     // 3. ADMIN Logic: Fallback to Global/Env allowed
     if (user.role === 'ADMIN') {
-        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        const globalConfig = await prisma.globalConfig.findUnique({
+            where: { id: "default" },
+            select: { openaiApiKey: true }
+        });
         if (globalConfig?.openaiApiKey) return decryptIfNeeded(globalConfig.openaiApiKey);
         // Never expose env key directly - should be set in DB encrypted
         return process.env.OPENAI_API_KEY;
@@ -63,6 +108,24 @@ export async function createBotAction(projectId: string, formData: FormData) {
 
     if (!name) throw new Error("Name required");
 
+    const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { organizationId: true }
+    });
+
+    if (!project) throw new Error("Project not found");
+
+    if (project.organizationId) {
+        const trialLimitCheck = await checkTrialResourceLimit({
+            organizationId: project.organizationId,
+            resource: 'interview'
+        });
+
+        if (!trialLimitCheck.allowed) {
+            throw new Error(trialLimitCheck.reason || 'Trial limit reached');
+        }
+    }
+
     let topicsToCreate = [
         { orderIndex: 0, label: "Introduction", description: "Welcome the user and explain the context." },
         { orderIndex: 1, label: "Main Questions", description: "Core research questions." }
@@ -89,12 +152,30 @@ export async function createBotAction(projectId: string, formData: FormData) {
             description,
             researchGoal: researchGoal || null,
             targetAudience: targetAudience || null,
+            botType: 'interview',
             slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + crypto.randomUUID().split('-')[0],
             topics: {
                 create: topicsToCreate
             }
         }
     });
+
+    try {
+        await ensureAutoInterviewKnowledgeSource({
+            botId: bot.id,
+            language: 'it',
+            botName: bot.name,
+            researchGoal: researchGoal || null,
+            targetAudience: targetAudience || null,
+            topics: topicsToCreate.map((topic: any) => ({
+                label: topic.label,
+                description: topic.description,
+                subGoals: Array.isArray(topic.subGoals) ? topic.subGoals : []
+            }))
+        });
+    } catch (error) {
+        console.error('[createBotAction] Auto interview knowledge generation failed:', error);
+    }
 
     revalidatePath('/dashboard');
     redirect(`/dashboard/bots/${bot.id}`);
@@ -344,6 +425,7 @@ export async function updateBotAction(botId: string, formData: FormData) {
         // Let's rely on explicit 'false' setting via hidden fields if needed, OR:
         // For 'useWarmup':
         if (formData.get('useWarmup') === 'on') data.useWarmup = true;
+        else if (scope === 'constraints' || scope === 'all') data.useWarmup = false;
         // Same for collectCandidateData
         if (formData.get('collectCandidateData') === 'on') data.collectCandidateData = true;
         else if (scope === 'constraints' || scope === 'all') data.collectCandidateData = false;
@@ -368,6 +450,8 @@ export async function updateBotAction(botId: string, formData: FormData) {
         // Let's assume if we are in 'constraints' scope, we overwrite fields.
         if (data.collectCandidateData) {
             data.candidateDataFields = formData.getAll('candidateFields').map(v => String(v)); // empty array if none
+        } else if (scope === 'constraints' || scope === 'all') {
+            data.candidateDataFields = [];
         }
     }
 
@@ -418,6 +502,12 @@ export async function updateBotAction(botId: string, formData: FormData) {
 
     if (shouldRegeneratePlan) {
         await regenerateInterviewPlan(botId);
+    }
+
+    try {
+        await ensureInterviewGuideForBot(botId);
+    } catch (error) {
+        console.error('[updateBotAction] Auto interview knowledge ensure failed:', error);
     }
 
     revalidatePath(`/dashboard/bots/${botId}`);
@@ -696,6 +786,9 @@ export async function addTopicAction(botId: string, orderIndex: number) {
         }
     });
     await regenerateInterviewPlan(botId);
+    await ensureInterviewGuideForBot(botId).catch((error) => {
+        console.error('[addTopicAction] Auto interview knowledge ensure failed:', error);
+    });
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -718,6 +811,9 @@ export async function updateTopicAction(topicId: string, botId: string, data: an
         }
     });
     await regenerateInterviewPlan(botId);
+    await ensureInterviewGuideForBot(botId).catch((error) => {
+        console.error('[updateTopicAction] Auto interview knowledge ensure failed:', error);
+    });
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -745,6 +841,9 @@ export async function deleteTopicAction(topicId: string, botId: string) {
     }
 
     await regenerateInterviewPlan(botId);
+    await ensureInterviewGuideForBot(botId).catch((error) => {
+        console.error('[deleteTopicAction] Auto interview knowledge ensure failed:', error);
+    });
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -813,6 +912,122 @@ export async function deleteKnowledgeSourceAction(sourceId: string, botId: strin
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
+export async function updateKnowledgeSourceAction(sourceId: string, botId: string, formData: FormData) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: {
+            ownedProjects: true,
+            projectAccess: true
+        }
+    });
+    if (!user) throw new Error("User not found");
+
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: { project: true }
+    });
+    if (!bot) throw new Error("Bot not found");
+
+    const isOwner = user.ownedProjects.some(p => p.id === bot.projectId);
+    const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
+    if (!isOwner && !hasAccess) {
+        throw new Error("Unauthorized - No access to this bot");
+    }
+
+    const source = await prisma.knowledgeSource.findFirst({
+        where: {
+            id: sourceId,
+            botId
+        },
+        select: { id: true }
+    });
+    if (!source) {
+        throw new Error("Knowledge source not found for this bot");
+    }
+
+    const title = String(formData.get('title') || '').trim();
+    const content = String(formData.get('content') || '').trim();
+
+    if (!content) {
+        throw new Error("Content is required");
+    }
+
+    const maxContentLength = 50000;
+    if (content.length > maxContentLength) {
+        throw new Error(`Content too long. Maximum ${maxContentLength} characters allowed.`);
+    }
+
+    const sanitizedContent = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    await prisma.knowledgeSource.update({
+        where: { id: sourceId },
+        data: {
+            title: (title || 'Untitled Source').substring(0, 200),
+            content: sanitizedContent
+        }
+    });
+
+    revalidatePath(`/dashboard/bots/${botId}`);
+    return { success: true };
+}
+
+export async function regenerateInterviewGuideAction(botId: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: {
+            ownedProjects: true,
+            projectAccess: true
+        }
+    });
+    if (!user) throw new Error("User not found");
+
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: {
+            project: true,
+            topics: {
+                orderBy: { orderIndex: 'asc' },
+                select: {
+                    label: true,
+                    description: true,
+                    subGoals: true
+                }
+            }
+        }
+    });
+    if (!bot) throw new Error("Bot not found");
+
+    const isOwner = user.ownedProjects.some((project) => project.id === bot.projectId);
+    const hasAccess = user.projectAccess.some((access) => access.projectId === bot.projectId);
+    if (!isOwner && !hasAccess) {
+        throw new Error("Unauthorized - No access to this bot");
+    }
+
+    if (bot.botType === 'chatbot') {
+        throw new Error("Interview guide regeneration is available only for interview bots");
+    }
+    if (!Array.isArray(bot.topics) || bot.topics.length === 0) {
+        throw new Error("Cannot regenerate interview guide without topics");
+    }
+
+    await regenerateAutoInterviewKnowledgeSource({
+        botId: bot.id,
+        language: bot.language || 'it',
+        botName: bot.name,
+        researchGoal: bot.researchGoal,
+        targetAudience: bot.targetAudience,
+        topics: bot.topics
+    });
+
+    revalidatePath(`/dashboard/bots/${botId}`);
+    return { success: true };
+}
+
 export async function updateSettingsAction(organizationId: string, formData: FormData) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
@@ -838,18 +1053,48 @@ export async function updateSettingsAction(organizationId: string, formData: For
 
     // If Admin, update Global Config with encrypted keys
     if (currentUser.role === 'ADMIN') {
-        await prisma.globalConfig.upsert({
-            where: { id: "default" },
-            update: {
-                openaiApiKey: encryptIfNeeded(openaiKey),
-                anthropicApiKey: encryptIfNeeded(anthropicKey),
-            },
-            create: {
-                id: "default",
-                openaiApiKey: encryptIfNeeded(openaiKey),
-                anthropicApiKey: encryptIfNeeded(anthropicKey),
+        const availableColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'GlobalConfig'
+        `).catch(() => []);
+        const available = new Set(availableColumns.map((c) => c.column_name));
+
+        const compatValues: Record<string, unknown> = {};
+        if (available.has('openaiApiKey')) {
+            compatValues.openaiApiKey = encryptIfNeeded(openaiKey);
+        }
+        if (available.has('anthropicApiKey')) {
+            compatValues.anthropicApiKey = encryptIfNeeded(anthropicKey);
+        }
+        if (available.has('updatedAt')) {
+            compatValues.updatedAt = new Date();
+        }
+
+        const assignments = Object.entries(compatValues);
+        if (assignments.length > 0) {
+            for (const [column] of assignments) {
+                if (!SAFE_SQL_IDENTIFIER.test(column)) {
+                    throw new Error(`[updateSettingsAction] Unsafe GlobalConfig column name: ${column}`);
+                }
             }
-        });
+
+            await prisma.$executeRawUnsafe(
+                available.has('updatedAt')
+                    ? `INSERT INTO "GlobalConfig" ("id", "updatedAt") VALUES ('default', NOW()) ON CONFLICT ("id") DO NOTHING`
+                    : `INSERT INTO "GlobalConfig" ("id") VALUES ('default') ON CONFLICT ("id") DO NOTHING`
+            );
+
+            const setClause = assignments
+                .map(([column], index) => `"${column}" = $${index + 1}`)
+                .join(', ');
+
+            await prisma.$executeRawUnsafe(
+                `UPDATE "GlobalConfig" SET ${setClause} WHERE "id" = 'default'`,
+                ...assignments.map(([, value]) => value)
+            );
+        }
     }
 
     // Always update User Platform Settings linked to user (for methodology etc, but maybe remove API keys from user?)

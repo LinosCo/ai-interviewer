@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType, formatMonthlyCredits } from '@/config/plans';
-import { CREDIT_PACKS } from '@/config/creditPacks';
+import { CREDIT_PACKS, formatCredits } from '@/config/creditPacks';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import BillingClient from './billing-client';
 import { UsageDashboard } from '@/components/dashboard/UsageDashboard';
@@ -46,14 +46,9 @@ export default async function BillingPage() {
     const currentPlan = (organization.plan as PlanType) || PlanType.FREE;
     const planConfig = PLANS[currentPlan] || PLANS[PlanType.FREE];
 
-    // Calculate credits info from Organization
-    // If organization.monthlyCreditsLimit is exactly 500,000 (default) but the plan specifies more, 
-    // it means the limit haven't been updated in DB yet for this plan.
-    const dbMonthlyLimit = Number(organization.monthlyCreditsLimit);
-    const planMonthlyLimit = planConfig.monthlyCredits;
-
-    // We use the higher of the two, unless DB limit is -1 (unlimited)
-    const monthlyLimit = dbMonthlyLimit === -1 ? -1 : Math.max(dbMonthlyLimit, planMonthlyLimit);
+    // Source of truth: organization's configured monthlyCreditsLimit
+    // (can be customized by admins from the default plan value).
+    const monthlyLimit = Number(organization.monthlyCreditsLimit);
     const monthlyUsed = Number(organization.monthlyCreditsUsed);
     const packAvailable = Number(organization.packCreditsAvailable);
     const isUnlimited = monthlyLimit === -1;
@@ -213,13 +208,13 @@ export default async function BillingPage() {
                                     <div>
                                         <p className="font-bold text-stone-900">{pack.name}</p>
                                         <p className="text-xs text-stone-500">
-                                            {(pack.credits / 1_000_000).toFixed(0)}M crediti
+                                            {formatCredits(pack.credits)} crediti
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <p className="font-bold text-amber-600">€{pack.price}</p>
                                         <p className="text-[10px] text-stone-400">
-                                            €{pack.pricePerMillion.toFixed(2)}/M
+                                            €{pack.pricePerThousand.toFixed(2)}/1K
                                         </p>
                                     </div>
                                 </div>

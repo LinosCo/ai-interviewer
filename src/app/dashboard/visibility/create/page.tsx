@@ -37,6 +37,41 @@ export interface VisibilityConfig {
     }>;
 }
 
+interface VisibilityConfigApiResponse {
+    config?: {
+        brandName?: string;
+        category?: string;
+        description?: string;
+        websiteUrl?: string | null;
+        additionalUrls?: AdditionalUrl[] | null;
+        language?: string;
+        territory?: string;
+        projectId?: string | null;
+        prompts?: Array<{
+            id: string;
+            text: string;
+            enabled: boolean;
+            aiOverviewEnabled?: boolean | null;
+            aiOverviewVariant?: string | null;
+            aiOverviewLastFound?: Date | string | null;
+            referenceUrl?: string | null;
+        }>;
+        competitors?: Array<{
+            id: string;
+            name: string;
+        }>;
+    };
+}
+
+interface UserSettingsResponse {
+    memberships?: Array<{
+        organization?: {
+            projects?: Array<{ id: string; name: string }>;
+            subscription?: { tier?: string | null };
+        } | null;
+    }>;
+}
+
 const STEPS = [
     { id: 1, title: 'Brand Info', description: 'Descrivi il tuo brand' },
     { id: 2, title: 'Prompts', description: 'Genera e affina i prompt' },
@@ -48,11 +83,13 @@ export default function CreateVisibilityWizardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const projectIdParam = searchParams.get('projectId');
+    const configIdParam = searchParams.get('configId') || searchParams.get('id');
 
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [configId, setConfigId] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const [config, setConfig] = useState<VisibilityConfig>({
         brandName: '',
@@ -73,53 +110,76 @@ export default function CreateVisibilityWizardPage() {
     useEffect(() => {
         const loadConfig = async () => {
             try {
+                setLoadError(null);
+
                 // Only load existing config if configId is provided (edit mode)
-                const configIdParam = searchParams.get('configId');
                 if (configIdParam) {
-                    const res = await fetch(`/api/visibility/create?id=${configIdParam}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.config) {
-                            setConfig({
-                                brandName: data.config.brandName || '',
-                                category: data.config.category || '',
-                                description: data.config.description || '',
-                                websiteUrl: data.config.websiteUrl || undefined,
-                                additionalUrls: Array.isArray(data.config.additionalUrls)
-                                    ? data.config.additionalUrls
-                                    : [],
-                                language: data.config.language || 'it',
-                                territory: data.config.territory || 'IT',
-                                projectId: data.config.projectId || projectIdParam || undefined,
-                                prompts: data.config.prompts?.map((p: any) => ({
-                                    id: p.id,
-                                    text: p.text,
-                                    enabled: p.enabled,
-                                    aiOverviewEnabled: p.aiOverviewEnabled ?? true,
-                                    aiOverviewVariant: p.aiOverviewVariant || null,
-                                    aiOverviewLastFound: p.aiOverviewLastFound || null,
-                                    referenceUrl: p.referenceUrl || undefined
-                                })) || [],
-                                competitors: data.config.competitors?.map((c: any) => ({
-                                    id: c.id,
-                                    name: c.name
-                                })) || []
-                            });
-                            setIsEdit(true);
-                            setConfigId(configIdParam);
+                    let data: VisibilityConfigApiResponse | null = null;
+                    let loaded = false;
+
+                    // Preferred endpoint for single config
+                    const byIdRes = await fetch(`/api/visibility/${configIdParam}`);
+                    if (byIdRes.ok) {
+                        data = await byIdRes.json();
+                        loaded = Boolean(data?.config);
+                    }
+
+                    // Backward-compat fallback
+                    if (!loaded) {
+                        const fallbackRes = await fetch(`/api/visibility/create?id=${configIdParam}`);
+                        if (fallbackRes.ok) {
+                            data = await fallbackRes.json();
+                            loaded = Boolean(data?.config);
                         }
+                    }
+
+                    if (!loaded) {
+                        setLoadError('Impossibile caricare questa configurazione brand. Potrebbe non esistere o non essere accessibile.');
+                    } else if (data?.config) {
+                        setConfig({
+                            brandName: data.config.brandName || '',
+                            category: data.config.category || '',
+                            description: data.config.description || '',
+                            websiteUrl: data.config.websiteUrl || undefined,
+                            additionalUrls: Array.isArray(data.config.additionalUrls)
+                                ? data.config.additionalUrls
+                                : [],
+                            language: data.config.language || 'it',
+                            territory: data.config.territory || 'IT',
+                            projectId: data.config.projectId || projectIdParam || undefined,
+                            prompts: data.config.prompts?.map((p) => ({
+                                id: p.id,
+                                text: p.text,
+                                enabled: p.enabled,
+                                aiOverviewEnabled: p.aiOverviewEnabled ?? true,
+                                aiOverviewVariant: p.aiOverviewVariant || null,
+                                aiOverviewLastFound: (() => {
+                                    if (!p.aiOverviewLastFound) return null;
+                                    return p.aiOverviewLastFound instanceof Date
+                                        ? p.aiOverviewLastFound
+                                        : new Date(p.aiOverviewLastFound);
+                                })(),
+                                referenceUrl: p.referenceUrl || undefined
+                            })) || [],
+                            competitors: data.config.competitors?.map((c) => ({
+                                id: c.id,
+                                name: c.name
+                            })) || []
+                        });
+                        setIsEdit(true);
+                        setConfigId(configIdParam);
                     }
                 }
 
                 // Load Limits and Projects
                 const limitRes = await fetch('/api/user/settings');
                 if (limitRes.ok) {
-                    const limitData = await limitRes.json();
+                    const limitData: UserSettingsResponse = await limitRes.json();
 
                     // Extract projects
                     const org = limitData.memberships?.[0]?.organization;
                     const orgProjects = org?.projects || [];
-                    setProjects(orgProjects.map((p: any) => ({ id: p.id, name: p.name })));
+                    setProjects(orgProjects.map((p) => ({ id: p.id, name: p.name })));
 
                     const tier = org?.subscription?.tier || 'FREE';
 
@@ -142,7 +202,7 @@ export default function CreateVisibilityWizardPage() {
             }
         };
         loadConfig();
-    }, [projectIdParam]);
+    }, [configIdParam, projectIdParam]);
 
     const handleNext = () => {
         if (currentStep < STEPS.length) {
@@ -175,9 +235,10 @@ export default function CreateVisibilityWizardPage() {
 
             // Redirect to the monitoring page for this specific brand
             router.push(`/dashboard/visibility?brandId=${savedConfigId}`);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Save error:', error);
-            alert(error.message || 'Errore nel salvataggio. Riprova.');
+            const errorMessage = error instanceof Error ? error.message : 'Errore nel salvataggio. Riprova.';
+            alert(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -238,6 +299,11 @@ export default function CreateVisibilityWizardPage() {
 
                 {/* Step Content */}
                 <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+                    {loadError && (
+                        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {loadError}
+                        </div>
+                    )}
                     {currentStep === 1 && (
                         <WizardStepBrand config={config} setConfig={setConfig} projects={projects} />
                     )}

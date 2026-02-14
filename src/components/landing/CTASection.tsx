@@ -43,7 +43,7 @@ export function CTASection() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/onboarding/preview"
+              href="/preview"
               className="bg-[hsl(var(--card))] text-[hsl(var(--coral))] hover:bg-[hsl(var(--card)/0.9)] text-lg px-8 py-4 font-semibold shadow-lg hover:scale-105 transition-transform border border-[hsl(var(--border)/0.5)] rounded-xl inline-flex items-center justify-center gap-2"
             >
               <Play className="w-5 h-5" />

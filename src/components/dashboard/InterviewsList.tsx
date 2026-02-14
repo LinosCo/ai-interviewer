@@ -138,7 +138,7 @@ export function InterviewsList() {
                     </h3>
                     <p className="text-gray-500 mb-6">Crea la tua prima intervista in meno di 5 minuti</p>
                     <Link
-                        href="/onboarding"
+                        href="/dashboard/interviews/create"
                         className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
                     >
                         <Plus className="w-5 h-5" aria-hidden="true" />

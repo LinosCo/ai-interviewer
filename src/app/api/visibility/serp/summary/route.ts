@@ -1,7 +1,7 @@
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET - Fetch SERP summary for cross-channel insights
@@ -9,24 +9,14 @@ import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
 export async function GET(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
-                memberships: {
-                    take: 1
-                }
-            }
-        });
-
-        if (!user || !user.memberships[0]) {
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
-
-        const organizationId = user.memberships[0].organizationId;
 
         const summary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId);
 

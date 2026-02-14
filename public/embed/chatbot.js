@@ -1,4 +1,6 @@
 (function (window) {
+  const PAGE_CONTEXT_MAX = 3500;
+
   // Robust detection of the script tag and configuration
   function getScriptConfig() {
     let script = document.currentScript;
@@ -34,7 +36,7 @@
         botId: script.getAttribute('data-bot-id'),
         apiBase: script.getAttribute('data-domain') || scriptUrl.origin
       };
-    } catch (_e) {
+    } catch {
       return {
         botId: script.getAttribute('data-bot-id'),
         apiBase: script.getAttribute('data-domain') || window.location.origin
@@ -47,6 +49,70 @@
   if (!CONFIG || !CONFIG.botId || CONFIG.botId === 'undefined') {
     console.error('BusinessTuner: data-bot-id is required and must be valid', CONFIG);
     return;
+  }
+
+  function sanitizeContextText(text, maxLen) {
+    if (!text || typeof text !== 'string') return '';
+
+    const cleaned = text
+      .replace(/\[\/?[\w:-]+(?:\s+[^\]]*)?\]/g, ' ')
+      .replace(/\{\{[\s\S]*?\}\}/g, ' ')
+      .replace(/\{%\s*[\s\S]*?%\}/g, ' ')
+      .replace(/<%[\s\S]*?%>/g, ' ')
+      .replace(/<\?php[\s\S]*?\?>/gi, ' ')
+      .replace(/<!--\s*wp:[\s\S]*?-->/g, ' ')
+      .replace(/<!--\s*\/wp:[\s\S]*?-->/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    if (cleaned.length <= maxLen) return cleaned;
+    return cleaned.slice(0, maxLen) + '...';
+  }
+
+  function extractMainContent() {
+    try {
+      var source = document.querySelector('main, article, [role="main"], #content, .content, .main') || document.body;
+      var clone = source.cloneNode(true);
+
+      if (clone && clone.querySelectorAll) {
+        var noisy = clone.querySelectorAll(
+          'script,style,noscript,template,svg,canvas,iframe,nav,footer,header,aside,form,button,' +
+          '.ad,.ads,.cookie-banner,.cookies,.popup,.modal,.sidebar,.widget,.newsletter,' +
+          '[aria-hidden="true"],[hidden],[role="dialog"]'
+        );
+        for (var i = 0; i < noisy.length; i++) noisy[i].remove();
+
+        var blockLike = clone.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,tr,section,article,div,br');
+        for (var j = 0; j < blockLike.length; j++) {
+          if (blockLike[j].tagName === 'BR') {
+            blockLike[j].replaceWith('\n');
+          } else {
+            blockLike[j].append('\n');
+          }
+        }
+      }
+
+      var text = clone && clone.textContent ? clone.textContent : '';
+      return sanitizeContextText(text, PAGE_CONTEXT_MAX);
+    } catch {
+      return '';
+    }
+  }
+
+  function buildPageContext() {
+    var metaDesc = '';
+    var descEl = document.querySelector('meta[name="description"], meta[property="og:description"]');
+    if (descEl) {
+      metaDesc = descEl.getAttribute('content') || '';
+    }
+
+    return {
+      url: window.location.href,
+      title: document.title || '',
+      description: sanitizeContextText(metaDesc, 600),
+      mainContent: extractMainContent()
+    };
   }
 
   // Create Iframe Container
@@ -82,7 +148,17 @@
 
   // Communication
   window.addEventListener('message', (event) => {
-    const data = event.data;
+    let data = event.data;
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!data || typeof data !== 'object') return;
+
     if (data && data.type === 'bt-widget-resize') {
       const isMobile = window.innerWidth < 640;
 
@@ -100,6 +176,16 @@
         container.style.width = '120px';
         container.style.height = '120px';
         container.style.padding = '20px';
+      }
+    }
+
+    if (data && data.type === 'bt-widget-get-context') {
+      // Reply only to our widget iframe.
+      if (event.source === iframe.contentWindow && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({
+          type: 'bt-widget-page-context',
+          pageContext: buildPageContext()
+        }, '*');
       }
     }
   });

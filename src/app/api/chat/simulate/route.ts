@@ -86,7 +86,10 @@ export async function POST(req: Request) {
 
         // Fallback to Global Settings if env var is missing
         if (!apiKey) {
-            const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } }).catch(() => null);
+            const globalConfig = await prisma.globalConfig.findUnique({
+                where: { id: "default" },
+                select: { openaiApiKey: true }
+            }).catch(() => null);
             apiKey = globalConfig?.openaiApiKey || undefined;
         }
 
@@ -115,11 +118,14 @@ When you determine that the current topic has been sufficiently covered, include
 When the interview is complete (all topics covered OR time is up), include this EXACT marker at the END of your response:
 [CONCLUDE_INTERVIEW]
 
-IMPORTANT: 
-- Only include ONE marker per response, and only when appropriate
-- The marker must be on its own line at the very end
-- Do NOT include these markers in your conversational text - they are control signals only
-- Continue the conversation naturally before adding any marker
+IMPORTANT CONSTRAINTS: 
+- Ask ONLY ONE question at a time.
+- Be concise and direct.
+- Do NOT repeat yourself or ask the same thing in different ways.
+- Only include ONE transition marker per response, and only when appropriate.
+- The marker must be on its own line at the very end.
+- Do NOT include these markers in your conversational text - they are control signals only.
+- Continue the conversation naturally before adding any marker.
 `;
 
         const result = await generateText({

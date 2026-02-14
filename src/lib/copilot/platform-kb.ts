@@ -231,6 +231,19 @@ Questo ti aiuta a capire quanto sei "visibile" nel nuovo mondo delle ricerche AI
         keywords: ['configurare', 'brand', 'competitor', 'prompt', 'scansione', 'setup']
     },
     {
+        id: 'vis-2b',
+        title: 'Spostare un Brand Monitor tra progetti e organizzazioni',
+        content: `Il Brand Monitor puo essere gestito come gli altri tool:
+
+- puoi associarlo a piu progetti della stessa organizzazione;
+- puoi spostarlo da un progetto a un altro;
+- puoi trasferirlo in un'altra organizzazione (se hai permessi OWNER/ADMIN su entrambe).
+
+Quando trasferisci un Brand Monitor verso un'altra organizzazione, le associazioni ai progetti vengono azzerate e puoi ricollegarlo ai progetti della nuova organizzazione.`,
+        category: 'visibility',
+        keywords: ['trasferire', 'organizzazione', 'progetti', 'spostare', 'brand monitor', 'associazione']
+    },
+    {
         id: 'vis-3',
         title: 'SERP Monitoring (Google Search)',
         content: `Il SERP Monitoring traccia come il tuo brand appare nei risultati di ricerca Google.
@@ -561,6 +574,272 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
         category: 'copilot',
         keywords: ['copilot', 'strategico', 'assistente', 'ai', 'claude', 'analisi', 'dati']
     },
+    {
+        id: 'cop-2',
+        title: 'Come leggere e applicare gli AI Tips',
+        content: `Gli AI Tips sono suggerimenti operativi generati incrociando piu fonti dati, non solo Brand Monitor.
+
+**Fonti usate in sinergia:**
+- Interviste AI (temi, sentiment, citazioni)
+- Chatbot (FAQ frequenti, knowledge gaps, intenti)
+- Brand Monitor / Visibility scan (menzioni e competitor)
+- Google Analytics + Search Console (pagine, query, bounce, opportunita SEO)
+- SERP monitoring (news e reputazione)
+
+**Per ogni tip trovi:**
+- Coerenza strategica con Vision, Value Proposition e Piano Strategico Copilot
+- Evidenze sintetiche (numeri o segnali concreti)
+- Logica del suggerimento (perche e stato proposto)
+- Canali dati considerati
+
+**Tipologie principali:**
+- Nuove pagine o aggiornamenti contenuto
+- FAQ e arricchimento knowledge base
+- Schema.org e SEO patch
+- Suggerimenti social (testo + descrizione visual/video)
+- Ottimizzazione contenuti prodotto (se WooCommerce attivo)`,
+        category: 'copilot',
+        keywords: ['ai tips', 'suggerimenti', 'logica', 'spiegazione', 'evidenze', 'strategia', 'cross-channel']
+    },
+    {
+        id: 'cop-3',
+        title: 'Workflow pubblicazione: CMS, WordPress, WooCommerce',
+        content: `Ogni suggerimento contenuto puo avere un routing di pubblicazione configurabile.
+
+**Canali disponibili:**
+- CMS API integrato
+- WordPress MCP
+- WooCommerce MCP (per contenuti prodotto)
+- Manuale (solo bozza, nessun push automatico)
+
+**Regola operativa:**
+- Lo stato iniziale e sempre PENDING (conferma manuale).
+- L'utente puo modificare bozza, routing e media brief prima dell'invio.
+- FAQ e aggiornamenti KB restano con conferma manuale.
+
+**Quando usare cosa:**
+- WordPress MCP: pagine/news/blog
+- WooCommerce MCP: descrizioni prodotto e ottimizzazioni catalogo
+- CMS API: integrazione custom del sito
+- Manuale: revisione interna o canale non ancora connesso`,
+        category: 'copilot',
+        keywords: ['cms', 'wordpress', 'woocommerce', 'routing', 'pending', 'bozza', 'pubblicazione', 'manuale']
+    },
+    {
+        id: 'cop-4',
+        title: 'Scraping contenuti e confronto con sito esistente',
+        content: `Il motore AI analizza il sito in profondita per evitare suggerimenti ridondanti.
+
+**Cosa include lo scraping:**
+- Homepage + sottopagine principali
+- URL aggiuntive indicate dall'utente
+- Pulizia automatica di shortcodes, markup residuale e rumore HTML
+- Estrazione testo utile per analisi SEO/LLMO
+
+**Confronto intelligente:**
+- Il sistema confronta bozza proposta vs contenuti gia presenti
+- Se trova overlap alto, converte il suggerimento da \"nuovo contenuto\" a \"modifica contenuto\"
+- Questo riduce duplicazioni e migliora la coerenza editoriale
+
+**Chatbot embeddato:**
+- Raccoglie anche contesto pagina (URL, title, description, contenuto principale) per risposte piu pertinenti.`,
+        category: 'copilot',
+        keywords: ['scraping', 'shortcode', 'html', 'sottopagine', 'overlap', 'contesto pagina', 'chatbot']
+    },
+    {
+        id: 'cop-5',
+        title: 'Guida setup canali dati (WP, Woo, GA4, GSC)',
+        content: `Per ottenere AI Tips affidabili devi prima configurare correttamente i canali dati.
+
+**Step 1: Apri integrazioni progetto**
+- Vai su Progetto > Integrazioni
+- Verifica che il progetto selezionato sia quello corretto
+
+**Step 2: Collega canali CMS**
+- WordPress MCP: per pagine, blog e news
+- WooCommerce MCP: per descrizioni prodotto e catalogo
+- CMS API: se usi un CMS custom
+
+**Step 3: Collega canali analytics**
+- GA4: comportamento utenti (sessioni, bounce, pagine)
+- GSC: query, impression, click, posizione media
+
+**Step 4: Esegui test connessioni**
+- Usa il test integrazione per ogni canale
+- Correggi subito eventuali errori di permessi o endpoint
+
+**Step 5: Controlla capabilities attive**
+- Nella scheda suggerimenti verifica quali canali risultano attivi
+- I tipi di tip e il routing dipendono dalle connessioni disponibili
+
+**Checklist minima consigliata**
+- WordPress o CMS API attivo
+- GA4 attivo
+- GSC attivo
+- (Opzionale) WooCommerce attivo per use case prodotto`,
+        category: 'copilot',
+        keywords: ['setup', 'integrazioni', 'wordpress', 'woocommerce', 'ga4', 'gsc', 'connessione', 'test']
+    },
+    {
+        id: 'cop-6',
+        title: 'Processo operativo guidato: da AI Tip a pubblicazione',
+        content: `Flusso pratico consigliato per usare i suggerimenti in modo controllato.
+
+**Fase 1: Generazione**
+1. Avvia analisi sito/brand monitor
+2. Attendi AI Tips con logica, evidenze e allineamento strategico
+
+**Fase 2: Revisione**
+1. Apri il tip e leggi \"Perche\" + \"Logica del suggerimento AI\"
+2. Verifica coerenza con Piano Strategico Copilot
+3. Controlla se il tip e new content o update di contenuto esistente
+
+**Fase 3: Editing manuale (obbligatorio per quality control)**
+1. Modifica titolo, body, meta description
+2. Imposta routing (CMS/WordPress/Woo/manuale)
+3. Completa media brief per social
+4. Usa copia rapida (contenuto o JSON) se vuoi revisione esterna
+
+**Fase 4: Approvazione e invio**
+1. Mantieni stato PENDING finche la bozza non e valida
+2. Invia al canale scelto solo dopo review
+3. Per FAQ/KB continua con conferma manuale prima del push
+
+**Fase 5: Misurazione e ciclo continuo**
+1. Monitora impatto su GA4/GSC/visibility/chatbot
+2. Confronta prima vs dopo
+3. Rigenera tips e ripeti il ciclo`,
+        category: 'copilot',
+        keywords: ['processo', 'workflow', 'approvazione', 'pending', 'review', 'pubblicazione', 'misurazione', 'ciclo']
+    },
+    {
+        id: 'cop-7',
+        title: 'Guida step by step: creare e gestire progetti',
+        content: `Questa guida aiuta a organizzare bene i progetti prima di attivare i tool.
+
+**Step 1: Crea il progetto**
+1. Vai in Dashboard e clicca \"Nuovo Progetto\"
+2. Dai un nome chiaro (es. \"Brand X - Italia\")
+3. Definisci obiettivo principale (lead generation, supporto, brand visibility)
+
+**Step 2: Imposta contesto strategico**
+1. Compila Vision e Value Proposition
+2. Inserisci il Piano Strategico nel Copilot settings
+3. Verifica che i membri del team vedano lo stesso contesto
+
+**Step 3: Struttura i tool nel progetto**
+1. AI Interviews per insight qualitativi
+2. Chatbot per supporto e raccolta intenti reali
+3. Visibility/Brand Monitor per SEO-LLMO e competitor
+
+**Step 4: Gestisci utenti e ruoli**
+1. Aggiungi membri solo necessari
+2. Usa ruoli OWNER/ADMIN/EDITOR/VIEWER in base alle responsabilita
+3. Verifica accessi alle integrazioni sensibili
+
+**Step 5: Routine di governance**
+1. Weekly check su insights e AI tips
+2. Review mensile di obiettivi e KPI
+3. Archivio decisioni: cosa e stato approvato, scartato, pubblicato`,
+        category: 'copilot',
+        keywords: ['progetti', 'project setup', 'gestione progetto', 'ruoli', 'team', 'governance']
+    },
+    {
+        id: 'cop-8',
+        title: 'Guida step by step: configurare AI Interviews',
+        content: `Configurazione consigliata per ottenere insight utili e confrontabili nel tempo.
+
+**Step 1: Definisci obiettivo ricerca**
+1. Scrivi una domanda decisionale concreta (es. \"Perche perdiamo lead?\")
+2. Definisci target utenti da intervistare
+3. Imposta metrica di successo (es. temi ricorrenti, sentiment, citazioni)
+
+**Step 2: Crea topic blocks**
+1. Inserisci 3-5 topic ordinati dal generale allo specifico
+2. Per ogni topic aggiungi sub-goals misurabili
+3. Imposta max turns per evitare interviste troppo lunghe
+
+**Step 3: Configura stile intervista**
+1. Tono coerente con brand
+2. Durata realistica
+3. Domande aperte con follow-up mirati
+
+**Step 4: Lancio e raccolta**
+1. Pubblica il link intervista
+2. Monitora completamenti e drop-off
+3. Assicurati di coprire segmenti diversi
+
+**Step 5: Analisi e azioni**
+1. Leggi temi, sentiment e key quotes
+2. Confronta insight con chatbot e visibility
+3. Trasforma i pattern in AI tips e contenuti`,
+        category: 'copilot',
+        keywords: ['interviste', 'ai interviews', 'topic blocks', 'ricerca', 'insight', 'setup intervista']
+    },
+    {
+        id: 'cop-9',
+        title: 'Guida step by step: configurare Chatbot Intelligence',
+        content: `Setup pratico per chatbot orientato a supporto e lead generation.
+
+**Step 1: Crea il chatbot nel progetto**
+1. Nome e descrizione coerenti con il caso d'uso
+2. Definisci tono e obiettivi di risposta
+3. Attiva raccolta lead solo dove ha senso
+
+**Step 2: Popola la Knowledge Base**
+1. Carica FAQ e contenuti ufficiali
+2. Aggiungi URL chiave del sito
+3. Mantieni testi aggiornati e non contraddittori
+
+**Step 3: Configura embed**
+1. Inserisci script nel sito
+2. Verifica dominio whitelist
+3. Controlla UX mobile/desktop
+
+**Step 4: Attiva processo miglioramento continuo**
+1. Monitora Knowledge Gaps
+2. Valuta FAQ suggestions
+3. Approva manualmente gli aggiornamenti KB
+
+**Step 5: Allinea al funnel**
+1. Definisci quando chiedere dati utente
+2. Evita richieste premature
+3. Misura conversione lead e qualita conversazioni`,
+        category: 'copilot',
+        keywords: ['chatbot setup', 'knowledge base', 'embed', 'knowledge gaps', 'faq suggestions', 'lead generation']
+    },
+    {
+        id: 'cop-10',
+        title: 'Guida step by step: configurare Visibility e AI Tips',
+        content: `Configurazione consigliata per ottenere suggerimenti contenuto affidabili.
+
+**Step 1: Setup Visibility Brand**
+1. Inserisci brand, categoria, lingua, territorio
+2. Aggiungi competitor rilevanti
+3. Definisci prompt monitorati
+
+**Step 2: Setup sito e scraping**
+1. Inserisci website URL
+2. Aggiungi URL strategiche extra (sottopagine chiave)
+3. Verifica qualita contenuto estratto
+
+**Step 3: Collega integrazioni dati**
+1. WordPress/WooCommerce o CMS API
+2. Google Analytics (GA4)
+3. Google Search Console (GSC)
+
+**Step 4: Esegui analisi**
+1. Avvia scan e website analysis
+2. Leggi score, coverage prompt e raccomandazioni
+3. Usa explainability per capire il perche di ogni tip
+
+**Step 5: Trasforma tip in esecuzione**
+1. Modifica bozza e routing pubblicazione
+2. Conferma manualmente prima dell'invio
+3. Misura impatto post-pubblicazione su GA/GSC/visibility`,
+        category: 'copilot',
+        keywords: ['visibility setup', 'brand monitor', 'ai tips', 'prompt monitoring', 'ga4', 'gsc', 'routing']
+    },
 
     // Account & Billing
     {
@@ -568,49 +847,55 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
         title: 'Piani e prezzi',
         content: `Business Tuner offre diversi piani:
 
-**Starter** (da 49€/mese):
-- 6M crediti/mese
+**Starter**:
+- 69€/mese oppure 588€/anno (49€/mese equivalente)
+- 6K crediti/mese
 - Interviste e chatbot base
 - Analytics base
 
-**Pro** (da 149€/mese):
-- 20M crediti/mese
+**Pro**:
+- 199€/mese oppure 1788€/anno (149€/mese equivalente)
+- 20K crediti/mese
 - Brand Monitor (1 brand)
 - Strategy Copilot con analisi dati
 - Cross-channel insights
 
-**Business** (da 349€/mese):
-- 50M crediti/mese
+**Business**:
+- 399€/mese oppure 3588€/anno (299€/mese equivalente)
+- 50K crediti/mese
 - Brand Monitor (3 brand)
 - White label, API, dominio custom
 - Supporto prioritario
 
 **Trial** (14 giorni gratuiti):
-- 2M crediti
+- 2K crediti
 - Accesso a tutte le funzionalita Pro
 
-Tutti i prezzi sono mensili. Sconto 20% con fatturazione annuale.`,
+Puoi scegliere fatturazione mensile o annuale direttamente in checkout.`,
         category: 'account',
-        keywords: ['piani', 'prezzi', 'costo', 'abbonamento', 'upgrade', 'starter', 'pro', 'business']
+        keywords: ['piani', 'prezzi', 'costo', 'abbonamento', 'upgrade', 'starter', 'pro', 'business', 'annuale', 'mensile']
     },
     {
         id: 'acc-2',
         title: 'Gestire l\'abbonamento',
         content: `Per gestire il tuo abbonamento:
 
-1. Vai in "Impostazioni" > "Abbonamento"
+1. Vai in "Dashboard" > "Billing"
 2. Qui puoi:
    - Vedere il piano attuale e utilizzo
    - Effettuare upgrade o downgrade
+   - Cambiare ciclo (mensile/annuale)
    - Gestire metodi di pagamento
    - Scaricare fatture
    - Annullare (alla fine del periodo)
 
-Per cambio piano contatta il supporto se hai esigenze particolari.
+**Upgrade/Downgrade**
+- Se hai una subscription attiva, il cambio piano aggiorna la subscription esistente.
+- Stripe applica automaticamente la prorazione in base al tempo residuo del periodo.
 
 Le fatture sono emesse automaticamente e disponibili nel portale.`,
         category: 'account',
-        keywords: ['abbonamento', 'gestire', 'upgrade', 'fatture', 'pagamento', 'annullare']
+        keywords: ['abbonamento', 'gestire', 'upgrade', 'downgrade', 'fatture', 'pagamento', 'annullare', 'billing', 'prorazione']
     },
     {
         id: 'acc-3',
@@ -622,20 +907,31 @@ Ogni operazione AI consuma crediti in base alla complessita:
 
 | Operazione | Crediti |
 |------------|---------|
-| Messaggio intervista | ~5.000 |
-| Messaggio chatbot | ~3.000 |
-| Analisi sentiment | ~8.000 |
-| Estrazione temi | ~10.000 |
-| Copilot message | 20.000 |
-| Copilot analysis | 35.000 |
-| Brand scan (per LLM) | ~15.000 |
+| Messaggio intervista | ~5 |
+| Messaggio chatbot | ~3 |
+| Analisi sentiment | ~8 |
+| Estrazione temi | ~10 |
+| Copilot message | 20 |
+| Copilot analysis | 35 |
+| Brand scan (per LLM) | ~15 |
 
 **Budget mensili per piano:**
-- FREE: 500K crediti
-- STARTER: 6M crediti
-- PRO: 20M crediti
-- BUSINESS: 50M crediti
+- FREE: 500 crediti
+- STARTER: 6K crediti
+- PRO: 20K crediti
+- BUSINESS: 50K crediti
 - ADMIN: Illimitati
+
+**Credit Pack extra (one-time):**
+- Small: 2K
+- Medium: 6K
+- Large: 15K
+
+I pack non scadono e si acquistano da Billing.
+
+**Ordine di consumo:**
+1. Prima usa i crediti mensili
+2. Poi usa i crediti pack
 
 **Monitoraggio:**
 - Dashboard mostra crediti usati/rimanenti
@@ -644,9 +940,9 @@ Ogni operazione AI consuma crediti in base alla complessita:
 
 **Cosa succede a esaurimento:**
 - Le funzionalita AI si bloccano
-- Puoi fare upgrade o attendere il reset mensile`,
+- Puoi acquistare un Credit Pack, fare upgrade o attendere il reset mensile`,
         category: 'account',
-        keywords: ['crediti', 'credits', 'limiti', 'utilizzo', 'token', 'quota', 'reset', 'budget']
+        keywords: ['crediti', 'credits', 'limiti', 'utilizzo', 'token', 'quota', 'reset', 'budget', 'pack', 'small', 'medium', 'large']
     },
     {
         id: 'acc-4',
@@ -665,16 +961,16 @@ Ogni operazione AI consuma crediti in base alla complessita:
 - Chatbot: max messaggi per sessione configurabile
 
 **Monitoraggio utilizzo:**
-- Dashboard "Usage" mostra tutti i consumi
+- Dashboard "Billing" mostra tutti i consumi
 - Breakdown per categoria (interviste, chatbot, visibility)
 - Storico mensile
 
 **Al raggiungimento limiti:**
 - Ricevi notifica
-- Funzionalita specifica si blocca
-- Upgrade o attendi reset mensile`,
+- Le API AI vengono bloccate con errore crediti esauriti
+- Acquista pack, fai upgrade o attendi reset mensile`,
         category: 'account',
-        keywords: ['limiti', 'utilizzo', 'quota', 'reset', 'extra', 'cooldown']
+        keywords: ['limiti', 'utilizzo', 'quota', 'reset', 'extra', 'cooldown', 'billing', 'credits_exhausted']
     },
 
     // Troubleshooting

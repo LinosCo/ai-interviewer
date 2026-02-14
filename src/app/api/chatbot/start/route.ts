@@ -1,6 +1,21 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest } from 'next/server';
 
+function sanitizeContextValue(value: unknown, maxLen: number): string {
+    if (typeof value !== 'string') return '';
+    const cleaned = value
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (cleaned.length <= maxLen) return cleaned;
+    return `${cleaned.slice(0, maxLen)}...`;
+}
+
+function toStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { botId, sessionId, pageContext } = await req.json();
@@ -23,15 +38,15 @@ export async function POST(req: NextRequest) {
         // if (bot.botType !== 'chatbot') { ... } 
 
         // Check domain whitelist
-        if ((bot as any).allowedDomains && Array.isArray((bot as any).allowedDomains) && ((bot as any).allowedDomains as string[]).length > 0) {
-            const allowedList = (bot as any).allowedDomains as string[];
+        const allowedList = toStringArray(bot.allowedDomains);
+        if (allowedList.length > 0) {
             const currentUrl = pageContext?.url || '';
 
             // Extract hostname from URL
             let hostname = '';
             try {
                 hostname = new URL(currentUrl).hostname;
-            } catch (e) {
+            } catch {
                 // Invalid URL
             }
 
@@ -58,22 +73,27 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        // Create chatbot session with page context
-        if (pageContext) {
-            await (prisma as any).chatbotSession.create({
-                data: {
-                    botId,
-                    conversationId: conversation.id,
-                    sessionId,
-                    pageUrl: pageContext.url || '',
-                    pageTitle: pageContext.title || '',
-                    pageDescription: pageContext.description || '',
-                    pageContent: pageContext.mainContent || '',
-                    userAgent: req.headers.get('user-agent') || '',
-                    referrer: req.headers.get('referer') || ''
-                }
-            });
-        }
+        // Create chatbot session (always), optionally enriched with page context.
+        const normalizedPageContext = {
+            url: sanitizeContextValue(pageContext?.url, 800),
+            title: sanitizeContextValue(pageContext?.title, 400),
+            description: sanitizeContextValue(pageContext?.description, 1000),
+            mainContent: sanitizeContextValue(pageContext?.mainContent, 4000)
+        };
+
+        await prisma.chatbotSession.create({
+            data: {
+                botId,
+                conversationId: conversation.id,
+                sessionId,
+                pageUrl: normalizedPageContext.url || '',
+                pageTitle: normalizedPageContext.title || '',
+                pageDescription: normalizedPageContext.description || '',
+                pageContent: normalizedPageContext.mainContent || '',
+                userAgent: req.headers.get('user-agent') || '',
+                referrer: req.headers.get('referer') || ''
+            }
+        });
 
         // Generate welcome message
         const welcomeMessage = bot.introMessage ||

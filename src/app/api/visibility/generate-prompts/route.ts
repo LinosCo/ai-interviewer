@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { PLANS, PlanType } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { cookies } from 'next/headers';
 
 const PromptGenerationSchema = z.object({
     prompts: z.array(z.string()).describe("Array of monitoring prompts in the specified language")
@@ -43,8 +45,15 @@ export async function POST(request: Request) {
                 plan: true,
                 role: true,
                 memberships: {
-                    take: 1,
-                    select: { organizationId: true }
+                    select: {
+                        organizationId: true,
+                        status: true,
+                        organization: {
+                            select: {
+                                plan: true
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -53,11 +62,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const cookieStore = await cookies();
+        const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
+        const activeMembership = user.memberships.find(
+            m => m.organizationId === selectedOrgId && m.status === 'ACTIVE'
+        ) || user.memberships.find(m => m.status === 'ACTIVE');
+        const organizationId = activeMembership?.organizationId;
 
-        // Use user's plan (admin has unlimited access)
+        // Use active organization plan as source of truth.
+        // User plan can differ (e.g. default FREE) and would wrongly block features.
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
-        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
+        const effectivePlan = (activeMembership?.organization?.plan as PlanType) || (user.plan as PlanType) || PlanType.FREE;
+        const plan = PLANS[effectivePlan] || PLANS[PlanType.FREE];
         // Admin bypasses, 10 prompts if visibility enabled
         const maxPrompts = isAdmin ? 999 : (plan.features.visibilityTracker ? 10 : 0);
 
@@ -70,6 +86,22 @@ export async function POST(request: Request) {
 
         const body = await request.json();
         const { brandName, category, description, language = 'it', territory = 'IT', count } = body;
+
+        const creditsCheck = await checkCreditsForAction(
+            'visibility_query',
+            undefined,
+            undefined,
+            organizationId
+        );
+        if (!creditsCheck.allowed) {
+            return NextResponse.json({
+                code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                error: creditsCheck.error,
+                creditsNeeded: creditsCheck.creditsNeeded,
+                creditsAvailable: creditsCheck.creditsAvailable
+            }, { status: creditsCheck.status || 403 });
+        }
+        const chargedOrganizationId = (creditsCheck as { organizationId?: string | null }).organizationId || organizationId || null;
 
         if (!brandName || !category) {
             return NextResponse.json(
@@ -127,16 +159,22 @@ Examples of good prompt types:
 
         // Track credit usage
         if (result.usage) {
-            TokenTrackingService.logTokenUsage({
-                organizationId: organizationId || 'unknown',
-                userId: user.id,
-                inputTokens: result.usage.inputTokens || 0,
-                outputTokens: result.usage.outputTokens || 0,
-                category: 'VISIBILITY',
-                model: 'gpt-4o-mini',
-                operation: 'visibility-generate-prompts',
-                resourceType: 'visibility'
-            }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+            try {
+                if (chargedOrganizationId) {
+                    await TokenTrackingService.logTokenUsage({
+                        organizationId: chargedOrganizationId,
+                        userId: user.id,
+                        inputTokens: result.usage.inputTokens || 0,
+                        outputTokens: result.usage.outputTokens || 0,
+                        category: 'VISIBILITY',
+                        model: 'gpt-4o-mini',
+                        operation: 'visibility-generate-prompts',
+                        resourceType: 'visibility'
+                    });
+                }
+            } catch (err) {
+                console.error('[Visibility] Credit tracking failed:', err);
+            }
         }
 
         return NextResponse.json({

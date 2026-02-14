@@ -2,24 +2,40 @@
 
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
+import { prisma } from '@/lib/prisma';
 
 export async function authenticate(
     prevState: string | null | undefined,
     formData: FormData,
 ): Promise<string | null> {
     try {
+        const email = (formData.get('email') as string | null)?.toLowerCase().trim();
+        const password = formData.get('password');
+
+        if (email) {
+            const user = await prisma.user.findUnique({
+                where: { email },
+                select: { emailVerified: true }
+            });
+
+            if (user && !user.emailVerified) {
+                return 'Prima di accedere devi confermare la tua email dal link ricevuto.';
+            }
+        }
+
         const result = await signIn('credentials', {
-            email: formData.get('email'),
-            password: formData.get('password'),
+            email,
+            password,
             redirect: false,
         });
 
         // If we get here without error, login was successful
         console.log('Login successful, result:', result);
         return null;
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const unknownError = error as { digest?: string };
         // Check if it's a redirect error (NEXT_REDIRECT)
-        if (error?.digest?.startsWith('NEXT_REDIRECT')) {
+        if (unknownError?.digest?.startsWith('NEXT_REDIRECT')) {
             console.log('Redirect error caught (this is actually success)');
             return null;
         }

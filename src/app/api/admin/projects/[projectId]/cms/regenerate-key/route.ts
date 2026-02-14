@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { CMSConnectionService } from '@/lib/cms/connection.service';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * POST /api/admin/projects/[projectId]/cms/regenerate-key
  * Regenerate the API key for a CMS connection.

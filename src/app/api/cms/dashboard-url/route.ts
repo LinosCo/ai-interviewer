@@ -23,10 +23,42 @@ export async function POST(request: Request) {
       );
     }
 
-    // Trova la connessione CMS per il progetto
-    const connection = await prisma.cMSConnection.findUnique({
+    // Verifica accesso al progetto
+    const project = await prisma.project.findFirst({
+      where: {
+        id: projectId,
+        organization: {
+          members: {
+            some: {
+              userId: session.user.id
+            }
+          }
+        }
+      },
+      select: { id: true }
+    });
+
+    if (!project) {
+      return NextResponse.json(
+        { error: 'Project not found or access denied' },
+        { status: 403 }
+      );
+    }
+
+    // Trova connessione CMS diretta o condivisa per il progetto
+    const directConnection = await prisma.cMSConnection.findUnique({
       where: { projectId }
     });
+
+    const sharedAssociation = directConnection
+      ? null
+      : await prisma.projectCMSConnection.findFirst({
+          where: { projectId },
+          include: { connection: true },
+          orderBy: { createdAt: 'asc' }
+        });
+
+    const connection = directConnection || sharedAssociation?.connection || null;
 
     if (!connection) {
       return NextResponse.json(

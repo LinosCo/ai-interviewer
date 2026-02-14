@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
-import { PLANS, PlanType, PlanLimits } from '@/config/plans';
+import { PLANS, PlanType, PlanLimits, PlanFeatures } from '@/config/plans';
+import { Prisma } from '@prisma/client';
 
 // Lazy Stripe client
 let _stripe: Stripe | null = null;
@@ -18,65 +19,165 @@ interface PriceConfig {
     priceYearly: number | null;
     priceIdYearly: string | null;
     limits: PlanLimits;
-    features: string[];
+    features: PlanFeatures;
+}
+
+const GLOBAL_CONFIG_PRICE_COLUMNS = [
+    'stripePriceStarter',
+    'stripePriceStarterYearly',
+    'stripePricePro',
+    'stripePriceProYearly',
+    'stripePriceBusiness',
+    'stripePriceBusinessYearly',
+    'stripePricePartner',
+    'stripePricePartnerYearly',
+    'stripePriceEnterprise',
+    'stripePriceEnterpriseYearly',
+    'stripePricePackSmall',
+    'stripePricePackMedium',
+    'stripePricePackLarge'
+] as const;
+
+async function getGlobalConfigCompat(columns: readonly string[]): Promise<Record<string, unknown> | null> {
+    try {
+        const availableColumns = await prisma.$queryRaw<Array<{ column_name: string }>>(Prisma.sql`
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'GlobalConfig'
+        `);
+        const available = new Set(availableColumns.map((c) => c.column_name));
+        const selectable = columns.filter((column) => available.has(column));
+        if (selectable.length === 0) return null;
+
+        const columnSql = Prisma.join(selectable.map((column) => Prisma.raw(`"${column}"`)));
+        const rows = await prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+            SELECT ${columnSql}
+            FROM "GlobalConfig"
+            WHERE id = 'default'
+            LIMIT 1
+        `);
+        return rows[0] ?? null;
+    } catch (error) {
+        console.warn('Failed to fetch GlobalConfig compat', error);
+        return null;
+    }
 }
 
 async function getStripeConfig() {
+    const envPrices = {
+        STARTER: process.env.STRIPE_PRICE_STARTER,
+        STARTER_YEARLY: process.env.STRIPE_PRICE_STARTER_YEARLY,
+        PRO: process.env.STRIPE_PRICE_PRO,
+        PRO_YEARLY: process.env.STRIPE_PRICE_PRO_YEARLY,
+        BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
+        BUSINESS_YEARLY: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
+        PACK_SMALL: process.env.STRIPE_PRICE_PACK_SMALL,
+        PACK_MEDIUM: process.env.STRIPE_PRICE_PACK_MEDIUM,
+        PACK_LARGE: process.env.STRIPE_PRICE_PACK_LARGE,
+        PARTNER: process.env.STRIPE_PRICE_PARTNER,
+        PARTNER_YEARLY: process.env.STRIPE_PRICE_PARTNER_YEARLY,
+        ENTERPRISE: process.env.STRIPE_PRICE_ENTERPRISE,
+        ENTERPRISE_YEARLY: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY
+    };
+
     // 1. Env vars take precedence
     if (process.env.STRIPE_SECRET_KEY) {
         return {
             secretKey: process.env.STRIPE_SECRET_KEY,
-            prices: {
-                STARTER: process.env.STRIPE_PRICE_STARTER,
-                STARTER_YEARLY: process.env.STRIPE_PRICE_STARTER_YEARLY,
-                PRO: process.env.STRIPE_PRICE_PRO,
-                PRO_YEARLY: process.env.STRIPE_PRICE_PRO_YEARLY,
-                BUSINESS: process.env.STRIPE_PRICE_BUSINESS,
-            }
+            prices: envPrices
         };
     }
 
     // 2. DB fallback
+    let secretKeyFromDb: string | null = null;
+
     try {
-        const config = await prisma.globalConfig.findUnique({ where: { id: 'default' } });
-        if (config?.stripeSecretKey) {
-            return {
-                secretKey: config.stripeSecretKey,
-                prices: {
-                    STARTER: config.stripePriceStarter,
-                    STARTER_YEARLY: config.stripePriceStarterYearly,
-                    PRO: config.stripePricePro,
-                    PRO_YEARLY: config.stripePriceProYearly,
-                    BUSINESS: config.stripePriceBusiness,
-                }
-            };
-        }
+        const secretConfig = await getGlobalConfigCompat(['stripeSecretKey']);
+        secretKeyFromDb = typeof secretConfig?.stripeSecretKey === 'string'
+            ? secretConfig.stripeSecretKey
+            : null;
     } catch (e) {
-        console.warn("Failed to fetch global config for Stripe", e);
+        console.warn("Failed to fetch Stripe secret key from global config", e);
+    }
+
+    if (secretKeyFromDb) {
+        let dbPrices: Partial<Record<string, string | null>> = {};
+
+        try {
+            const priceConfig = await getGlobalConfigCompat(GLOBAL_CONFIG_PRICE_COLUMNS);
+
+            if (priceConfig) {
+                const pc = priceConfig as any;
+                dbPrices = {
+                    STARTER: pc.stripePriceStarter,
+                    STARTER_YEARLY: pc.stripePriceStarterYearly,
+                    PRO: pc.stripePricePro,
+                    PRO_YEARLY: pc.stripePriceProYearly,
+                    BUSINESS: pc.stripePriceBusiness,
+                    BUSINESS_YEARLY: pc.stripePriceBusinessYearly,
+                    PARTNER: pc.stripePricePartner,
+                    PARTNER_YEARLY: pc.stripePricePartnerYearly,
+                    ENTERPRISE: pc.stripePriceEnterprise,
+                    ENTERPRISE_YEARLY: pc.stripePriceEnterpriseYearly,
+                    PACK_SMALL: pc.stripePricePackSmall,
+                    PACK_MEDIUM: pc.stripePricePackMedium,
+                    PACK_LARGE: pc.stripePricePackLarge
+                };
+            }
+        } catch (e) {
+            // Non-fatal: keep Stripe enabled using secret key + env/default prices.
+            console.warn("Failed to fetch Stripe prices from global config", e);
+        }
+
+        return {
+            secretKey: secretKeyFromDb,
+            prices: {
+                ...envPrices,
+                ...dbPrices
+            }
+        };
     }
 
     return null;
 }
 
-export async function getStripeClient(): Promise<Stripe> {
+/**
+ * Returns the Stripe client, or null if Stripe is not configured.
+ * Use this when Stripe being unconfigured is acceptable (e.g. loading pages).
+ */
+export async function getStripeClientSafe(): Promise<Stripe | null> {
     if (_stripe) return _stripe;
 
     const config = await getStripeConfig();
     if (!config || !config.secretKey) {
-        throw new Error("Stripe is not configured. Please set env vars or configure in dashboard.");
+        console.warn('[Stripe] Not configured – set STRIPE_SECRET_KEY in env or via Admin dashboard.');
+        return null;
     }
 
     _stripe = new Stripe(config.secretKey, {
         typescript: true,
-        apiVersion: '2025-12-15.clover', // Updated to a stable version used in other files
+        apiVersion: '2025-12-15.clover',
     });
 
     return _stripe;
 }
 
+/**
+ * Returns the Stripe client or throws if not configured.
+ * Use in API routes that strictly require Stripe (checkout, webhook, etc.).
+ */
+export async function getStripeClient(): Promise<Stripe> {
+    const client = await getStripeClientSafe();
+    if (!client) {
+        throw new Error('Stripe is not configured. Please set env vars or configure in dashboard.');
+    }
+    return client;
+}
+
 export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
     const config = await getStripeConfig();
-    const dbPrices = config?.prices || {};
+    const dbPrices = (config?.prices || {}) as Record<string, string | undefined>;
 
     const getPriceId = (tier: PlanType) => {
         const upperTier = tier.toUpperCase() as keyof typeof dbPrices;
@@ -88,10 +189,11 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
         return dbPrices[upperTier] || PLANS[tier].stripePriceIdYearly || null;
     };
 
-    const result: any = {};
+    const result: Partial<Record<PlanKey, PriceConfig>> = {};
 
     for (const key of PRICING_CONSTANTS.PLANS) {
         const plan = PLANS[key as PlanType];
+        if (!plan) continue;
         result[key] = {
             name: plan.name,
             price: plan.monthlyPrice,
@@ -104,4 +206,44 @@ export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {
     }
 
     return result as Record<PlanKey, PriceConfig>;
+}
+
+export async function getStripePriceIdForPlan(
+    tier: PlanType,
+    billingPeriod: 'monthly' | 'yearly'
+): Promise<string | null> {
+    const config = await getStripeConfig();
+    const dbPrices = (config?.prices || {}) as Record<string, string | undefined>;
+    const key =
+        billingPeriod === 'yearly'
+            ? `${tier.toUpperCase()}_YEARLY`
+            : tier.toUpperCase();
+
+    const fromConfig = dbPrices[key as keyof typeof dbPrices];
+    if (fromConfig) return fromConfig;
+
+    const plan = PLANS[tier];
+    if (!plan) return null;
+
+    return billingPeriod === 'yearly'
+        ? plan.stripePriceIdYearly || null
+        : plan.stripePriceIdMonthly || null;
+}
+
+export async function getStripePriceIdForPack(packType: string): Promise<string | null> {
+    const config = await getStripeConfig();
+    const dbPrices = (config?.prices || {}) as Record<string, string | undefined>;
+    const normalized = packType.toLowerCase();
+
+    if (normalized === 'small') {
+        return dbPrices.PACK_SMALL || process.env.STRIPE_PRICE_PACK_SMALL || null;
+    }
+    if (normalized === 'medium') {
+        return dbPrices.PACK_MEDIUM || process.env.STRIPE_PRICE_PACK_MEDIUM || null;
+    }
+    if (normalized === 'large') {
+        return dbPrices.PACK_LARGE || process.env.STRIPE_PRICE_PACK_LARGE || null;
+    }
+
+    return null;
 }

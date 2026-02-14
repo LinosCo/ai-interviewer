@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { getStripeClient } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 
 export async function GET(req: Request) {
     try {
@@ -39,6 +40,10 @@ export async function GET(req: Request) {
         }
 
         const organization = membership.organization;
+        const userEmail = session.user?.email;
+        if (!userEmail) {
+            return new NextResponse('User email missing', { status: 400 });
+        }
         let stripe;
         try {
             stripe = await getStripeClient();
@@ -52,29 +57,47 @@ export async function GET(req: Request) {
             }, { status: 503 });
         }
 
-        // 1. Find or create stripe customer if missing from subscription record
-        let customerId = organization.subscription?.stripeCustomerId;
+        const resolveCustomerId = async (): Promise<string> => {
+            let customerId = organization.subscription?.stripeCustomerId || null;
 
-        if (!customerId) {
-            // Check if we have any previous subscription or customer
+            if (customerId) {
+                try {
+                    await stripe.customers.retrieve(customerId);
+                    return customerId;
+                } catch (error) {
+                    const stripeErr = error as Stripe.StripeRawError & { code?: string; statusCode?: number };
+                    const missingCustomer = stripeErr?.code === 'resource_missing' || stripeErr?.statusCode === 404;
+                    if (!missingCustomer) throw error;
+                    customerId = null;
+                }
+            }
+
             const customers = await stripe.customers.list({
-                email: session.user.email!,
+                email: userEmail,
                 limit: 1
             });
 
             if (customers.data.length > 0) {
-                customerId = customers.data[0].id;
-            } else {
-                // If no customer, we create one so they can manage their future billing
-                const customer = await stripe.customers.create({
-                    email: session.user.email!,
-                    name: organization.name,
-                    metadata: {
-                        organizationId: organization.id
-                    }
-                });
-                customerId = customer.id;
+                return customers.data[0].id;
             }
+
+            const customer = await stripe.customers.create({
+                email: userEmail,
+                name: organization.name,
+                metadata: {
+                    organizationId: organization.id
+                }
+            });
+            return customer.id;
+        };
+
+        const customerId = await resolveCustomerId();
+
+        if (organization.subscription?.id && organization.subscription.stripeCustomerId !== customerId) {
+            await prisma.subscription.update({
+                where: { id: organization.subscription.id },
+                data: { stripeCustomerId: customerId }
+            });
         }
 
         const portalSession = await stripe.billingPortal.sessions.create({

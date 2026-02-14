@@ -4,10 +4,14 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { canCreateChatbot, canPublishBot, getUsageStats } from '@/lib/usage';
 import DashboardClient from '@/components/dashboard/DashboardClient';
+import { getOrCreateDefaultOrganization } from '@/lib/organizations';
 
 export default async function DashboardPage() {
     const session = await auth();
     if (!session?.user?.id) redirect('/login');
+
+    // Hard guard for first-login races: ensure at least one organization exists.
+    await getOrCreateDefaultOrganization(session.user.id);
 
     // Read active organization from cookies
     const cookieStore = await cookies();
@@ -34,7 +38,13 @@ export default async function DashboardPage() {
                                         orderBy: { updatedAt: 'desc' }
                                     },
                                     cmsConnection: true,
-                                    newCmsConnection: true
+                                    newCmsConnection: true,
+                                    cmsShares: {
+                                        include: {
+                                            connection: true
+                                        },
+                                        orderBy: { createdAt: 'asc' }
+                                    }
                                 }
                             }
                         }
@@ -61,7 +71,10 @@ export default async function DashboardPage() {
     const usage = await getUsageStats(organizationId);
     const subscription = organization.subscription;
     const status = subscription?.status || 'ACTIVE';
-    const trialDaysLeft = subscription?.currentPeriodEnd ? Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+    const nowMs = new Date().getTime();
+    const trialDaysLeft = subscription?.currentPeriodEnd
+        ? Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - nowMs) / (1000 * 60 * 60 * 24))
+        : 0;
 
     // Permissions based on organization's subscription
     const canCreateInterview = isAdmin ? { allowed: true } : await canPublishBot(organizationId);
@@ -81,11 +94,14 @@ export default async function DashboardPage() {
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
         .slice(0, 5);
 
-    const projectsWithCms = organization.projects.map(p => ({
-        id: p.id,
-        name: p.name,
-        cmsConnection: p.newCmsConnection || p.cmsConnection
-    }));
+    const projectsWithCms = organization.projects.map(p => {
+        const sharedCms = p.cmsShares?.find(s => s.connection.status !== 'DISABLED')?.connection || null;
+        return {
+            id: p.id,
+            name: p.name,
+            cmsConnection: p.newCmsConnection || p.cmsConnection || sharedCms
+        };
+    });
 
     // Serialize BigInts in usage stats
     const serializedUsage = JSON.parse(JSON.stringify(usage, (key, value) =>

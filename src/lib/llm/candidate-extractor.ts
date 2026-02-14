@@ -14,7 +14,18 @@ export class CandidateExtractor {
     static async extractProfile(
         messages: Message[],
         apiKey: string,
-        conversationId?: string
+        conversationId?: string,
+        options?: {
+            onUsage?: (payload: {
+                source: string;
+                model?: string | null;
+                usage?: {
+                    inputTokens?: number | null;
+                    outputTokens?: number | null;
+                    totalTokens?: number | null;
+                } | null;
+            }) => void;
+        }
     ) {
         // Check cache first
         if (conversationId && extractionCache.has(conversationId)) {
@@ -38,6 +49,7 @@ export class CandidateExtractor {
         }
 
         const openai = createOpenAI({ apiKey });
+        const extractionModel = openai('gpt-4o');
         const transcript = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
         const schema = z.object({
@@ -65,7 +77,7 @@ export class CandidateExtractor {
         try {
             // Add timeout protection (10 seconds)
             const extractionPromise = generateObject({
-                model: openai('gpt-4o'),
+                model: extractionModel,
                 schema,
                 prompt: `
 You are an expert Lead Qualifier and Profiler.
@@ -87,7 +99,25 @@ ${transcript}
                 setTimeout(() => reject(new Error('Extraction timeout after 10s')), 10000)
             );
 
-            const result = await Promise.race([extractionPromise, timeoutPromise]) as { object: Record<string, unknown> };
+            const result = await Promise.race([extractionPromise, timeoutPromise]) as {
+                object: Record<string, unknown>;
+                usage?: {
+                    inputTokens?: number | null;
+                    outputTokens?: number | null;
+                    totalTokens?: number | null;
+                };
+            };
+            if (options?.onUsage) {
+                try {
+                    options.onUsage({
+                        source: 'candidate_extractor',
+                        model: (extractionModel as any)?.modelId || 'gpt-4o',
+                        usage: result.usage || null
+                    });
+                } catch (usageError) {
+                    console.error('[CandidateExtractor] usage callback failed', usageError);
+                }
+            }
 
             // Cache the result
             if (conversationId && result.object) {

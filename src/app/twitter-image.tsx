@@ -4,7 +4,9 @@ import { ImageResponse } from 'next/og';
 export const runtime = 'edge';
 
 // Image metadata
-export const alt = 'Business Tuner - Ascolta il mercato. Decidi meglio.';
+const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || 'Voler AI';
+
+export const alt = `${BRAND_NAME} - Ascolta il mercato. Decidi meglio.`;
 export const size = {
     width: 1200,
     height: 630,
@@ -70,7 +72,7 @@ export default function Image() {
                             display: 'flex',
                         }}
                     >
-                        Business Tuner
+                        {BRAND_NAME}
                     </div>
                 </div>
 

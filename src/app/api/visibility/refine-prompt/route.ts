@@ -6,6 +6,8 @@ import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { cookies } from 'next/headers';
 
 const RefinePromptSchema = z.object({
     refinedPrompt: z.string().describe("The improved version of the original prompt"),
@@ -42,16 +44,36 @@ export async function POST(request: Request) {
             select: {
                 id: true,
                 memberships: {
-                    take: 1,
-                    select: { organizationId: true }
+                    select: { organizationId: true, status: true }
                 }
             }
         });
 
-        const organizationId = user?.memberships[0]?.organizationId;
+        const cookieStore = await cookies();
+        const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
+        const activeMembership = user?.memberships.find(
+            m => m.organizationId === selectedOrgId && m.status === 'ACTIVE'
+        ) || user?.memberships.find(m => m.status === 'ACTIVE');
+        const organizationId = activeMembership?.organizationId;
 
         const body = await request.json();
         const { promptText, brandName, language = 'it', territory = 'IT' } = body;
+
+        const creditsCheck = await checkCreditsForAction(
+            'visibility_query',
+            undefined,
+            undefined,
+            organizationId
+        );
+        if (!creditsCheck.allowed) {
+            return NextResponse.json({
+                code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                error: creditsCheck.error,
+                creditsNeeded: creditsCheck.creditsNeeded,
+                creditsAvailable: creditsCheck.creditsAvailable
+            }, { status: creditsCheck.status || 403 });
+        }
+        const chargedOrganizationId = (creditsCheck as { organizationId?: string | null }).organizationId || organizationId || null;
 
         if (!promptText || !brandName) {
             return NextResponse.json(
@@ -96,16 +118,22 @@ Keep the same intent but improve clarity, naturalness, and effectiveness.`;
 
         // Track credit usage
         if (result.usage) {
-            TokenTrackingService.logTokenUsage({
-                organizationId: organizationId || 'unknown',
-                userId: user?.id,
-                inputTokens: result.usage.inputTokens || 0,
-                outputTokens: result.usage.outputTokens || 0,
-                category: 'VISIBILITY',
-                model: 'gpt-4o-mini',
-                operation: 'visibility-refine-prompt',
-                resourceType: 'visibility'
-            }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+            try {
+                if (chargedOrganizationId) {
+                    await TokenTrackingService.logTokenUsage({
+                        organizationId: chargedOrganizationId,
+                        userId: user?.id,
+                        inputTokens: result.usage.inputTokens || 0,
+                        outputTokens: result.usage.outputTokens || 0,
+                        category: 'VISIBILITY',
+                        model: 'gpt-4o-mini',
+                        operation: 'visibility-refine-prompt',
+                        resourceType: 'visibility'
+                    });
+                }
+            } catch (err) {
+                console.error('[Visibility] Credit tracking failed:', err);
+            }
         }
 
         return NextResponse.json({

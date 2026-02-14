@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { HIDDEN_LIMITS } from '@/config/limits';
 import { prisma as db } from '@/lib/prisma';
 
 /**
@@ -12,37 +11,29 @@ const cooldownStore = new Map<string, number>();
 let requestCount = 0;
 const CLEANUP_THRESHOLD = 50; // Every 50 requests
 const CLEANUP_AGE = 3600000; // 1 hour
+const SAFETY_MIN_INTERVAL_MS = 250;
 
 export async function enforceMessageCooldown(
     sessionId: string,
-    orgId: string
+    _orgId: string
 ): Promise<{ allowed: boolean; error?: NextResponse; retryAfter?: number }> {
     try {
-        const org = await db.organization.findUnique({ where: { id: orgId } });
-        if (!org) {
-            return {
-                allowed: false,
-                error: NextResponse.json({ error: 'Organization not found' }, { status: 404 })
-            };
-        }
-
-        const planKey = org.plan.toLowerCase() as keyof typeof HIDDEN_LIMITS.rateLimit;
-        const limits = HIDDEN_LIMITS.rateLimit[planKey];
+        void _orgId;
 
         const lastMessageKey = `cooldown:${sessionId}`;
         const lastMessageTime = cooldownStore.get(lastMessageKey);
 
         if (lastMessageTime) {
             const elapsed = Date.now() - lastMessageTime;
-            if (elapsed < limits.messageCooldownMs) {
-                const retryAfter = Math.ceil((limits.messageCooldownMs - elapsed) / 1000);
+            if (elapsed < SAFETY_MIN_INTERVAL_MS) {
+                const retryAfter = Math.ceil((SAFETY_MIN_INTERVAL_MS - elapsed) / 1000);
                 return {
                     allowed: false,
                     retryAfter,
                     error: NextResponse.json(
                         {
-                            error: 'Please wait before sending another message',
-                            code: 'MESSAGE_COOLDOWN',
+                            error: 'Please wait a brief moment before sending another message',
+                            code: 'MESSAGE_SAFETY_THROTTLE',
                             retryAfter
                         },
                         { status: 429 }
@@ -89,10 +80,8 @@ export async function checkParallelInterviewsLimit(
         return { allowed: false, current: 0, limit: 0 };
     }
 
-    const planKey = org.plan.toLowerCase() as keyof typeof HIDDEN_LIMITS.rateLimit;
-    const limits = HIDDEN_LIMITS.rateLimit[planKey];
-
-    // Count active conversations in the last hour
+    // Legacy parallel interview hard limits are removed.
+    // Keep this as informational telemetry only.
     const oneHourAgo = new Date(Date.now() - 3600000);
     const activeConversations = await db.conversation.count({
         where: {
@@ -109,8 +98,8 @@ export async function checkParallelInterviewsLimit(
     });
 
     return {
-        allowed: activeConversations < limits.maxParallelInterviews,
+        allowed: true,
         current: activeConversations,
-        limit: limits.maxParallelInterviews
+        limit: Number.MAX_SAFE_INTEGER
     };
 }

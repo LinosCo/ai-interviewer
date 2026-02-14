@@ -8,11 +8,33 @@ interface WidgetPageProps {
     params: Promise<{ botId: string }>;
 }
 
+type HostPageContext = {
+    url?: string;
+    title?: string;
+    description?: string;
+    mainContent?: string;
+};
+
+type PublicBotConfig = {
+    id: string;
+    name: string;
+    primaryColor?: string | null;
+    introMessage?: string | null;
+    privacyPolicyUrl?: string | null;
+    enablePageContext?: boolean | null;
+    consentText?: string | null;
+    privacyNotice?: string | null;
+    dataUsageInfo?: string | null;
+    showAnonymityInfo?: boolean | null;
+    showDataUsageInfo?: boolean | null;
+};
+
 export default function PublicWidgetPage({ params }: WidgetPageProps) {
     const { botId } = use(params);
-    const [bot, setBot] = useState<any>(null);
+    const [bot, setBot] = useState<PublicBotConfig | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [hostPageContext, setHostPageContext] = useState<HostPageContext | null>(null);
 
     // Check if we are in "full" mode (straight to chat window)
     const isFullMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('full') === 'true';
@@ -28,7 +50,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
             try {
                 const res = await fetch(`/api/chatbot/${botId}/config`);
                 if (res.ok) {
-                    const data = await res.json();
+                    const data: PublicBotConfig = await res.json();
                     setBot(data);
                 }
             } catch (err) {
@@ -40,14 +62,51 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
         fetchBot();
     }, [botId]);
 
+    // Ask parent page for context (URL/title/description/main content) when embedded in iframe.
+    useEffect(() => {
+        if (typeof window === 'undefined' || window.parent === window) return;
+
+        const handleMessage = (event: MessageEvent) => {
+            const data = event.data;
+            if (data?.type !== 'bt-widget-page-context' || !data.pageContext) return;
+
+            const pageContext = data.pageContext as HostPageContext;
+            setHostPageContext({
+                url: typeof pageContext.url === 'string' ? pageContext.url : '',
+                title: typeof pageContext.title === 'string' ? pageContext.title : '',
+                description: typeof pageContext.description === 'string' ? pageContext.description : '',
+                mainContent: typeof pageContext.mainContent === 'string' ? pageContext.mainContent : ''
+            });
+        };
+
+        window.addEventListener('message', handleMessage);
+        window.parent.postMessage({ type: 'bt-widget-get-context' }, '*');
+
+        return () => {
+            window.removeEventListener('message', handleMessage);
+        };
+    }, []);
+
     // Notify parent window of resize
     useEffect(() => {
-        if (window.parent !== window) {
+        if (window.parent === window) return;
+
+        const notifyResize = () => {
             window.parent.postMessage({
                 type: 'bt-widget-resize',
-                isOpen: isOpen
+                isOpen
             }, '*');
-        }
+        };
+
+        // Send immediately and repeat briefly to avoid missed first handshake.
+        notifyResize();
+        const t1 = window.setTimeout(notifyResize, 120);
+        const t2 = window.setTimeout(notifyResize, 420);
+
+        return () => {
+            window.clearTimeout(t1);
+            window.clearTimeout(t2);
+        };
     }, [isOpen]);
 
     if (loading) return null;
@@ -63,7 +122,9 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                     botName={bot.name}
                     primaryColor={bot.primaryColor || '#7C3AED'}
                     welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
-                    privacyPolicyUrl={bot.privacyPolicyUrl}
+                    privacyPolicyUrl={bot.privacyPolicyUrl ?? undefined}
+                    hostPageContext={hostPageContext}
+                    enablePageContext={bot.enablePageContext !== false}
                 />
                 <style jsx global>{`
                     body { margin: 0; padding: 0; overflow: hidden; }
@@ -86,14 +147,16 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
 
     return (
         <div className="relative w-full h-full min-h-screen bg-transparent">
-            <ChatBubble
-                botId={botId}
-                primaryColor={bot.primaryColor || '#7C3AED'}
-                welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
-                isOpen={isOpen}
-                onToggle={setIsOpen}
-                position="bottom-right"
-            />
+            {!isOpen && (
+                <ChatBubble
+                    botId={botId}
+                    primaryColor={bot.primaryColor || '#7C3AED'}
+                    welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
+                    isOpen={isOpen}
+                    onToggle={setIsOpen}
+                    position="bottom-right"
+                />
+            )}
             <ChatWindow
                 botId={botId}
                 isOpen={isOpen}
@@ -101,7 +164,14 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                 botName={bot.name}
                 primaryColor={bot.primaryColor || '#7C3AED'}
                 welcomeMessage={bot.introMessage || 'Ciao! Come posso aiutarti?'}
-                privacyPolicyUrl={bot.privacyPolicyUrl}
+                privacyPolicyUrl={bot.privacyPolicyUrl ?? undefined}
+                consentText={bot.consentText ?? undefined}
+                privacyNotice={bot.privacyNotice ?? undefined}
+                dataUsageInfo={bot.dataUsageInfo ?? undefined}
+                showAnonymityInfo={bot.showAnonymityInfo ?? undefined}
+                showDataUsageInfo={bot.showDataUsageInfo ?? undefined}
+                hostPageContext={hostPageContext}
+                enablePageContext={bot.enablePageContext !== false}
             />
             {/* Minimal styles for the iframe body */}
             <style jsx global>{`

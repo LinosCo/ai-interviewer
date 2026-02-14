@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { CMSConnectionService } from '@/lib/cms/connection.service';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/admin/projects/[projectId]/cms/status
  * Get full status of the CMS connection.

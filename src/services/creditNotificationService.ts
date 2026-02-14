@@ -13,22 +13,47 @@ import {
     sendCreditsExhaustedEmail,
     sendCreditsPurchaseConfirmation
 } from '@/lib/email';
-import { CREDIT_WARNING_THRESHOLDS, formatCredits } from '@/config/creditPacks';
+import { CREDIT_WARNING_THRESHOLDS, formatCredits, getCreditPack } from '@/config/creditPacks';
 
 // Chiavi per tracciare notifiche già inviate (in memory per semplicità)
 // In produzione, usare Redis o un campo nel database
 const notificationsSent = new Map<string, Set<string>>();
 
+async function getOrgRecipients(organizationId: string) {
+    const members = await prisma.membership.findMany({
+        where: {
+            organizationId,
+            status: 'ACTIVE',
+            receiveAlerts: true
+        },
+        select: {
+            userId: true,
+            user: {
+                select: {
+                    email: true,
+                    name: true
+                }
+            }
+        }
+    });
+
+    return members
+        .map(member => ({
+            userId: member.userId,
+            email: member.user.email,
+            name: member.user.name || 'Utente'
+        }))
+        .filter(member => Boolean(member.email));
+}
+
 export const CreditNotificationService = {
     /**
-     * Verifica e invia notifiche basate sulla percentuale di utilizzo
+     * Verifica e invia notifiche basate sulla percentuale di utilizzo (org-based)
      */
-    async checkAndNotify(userId: string, percentage: number): Promise<void> {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
+    async checkAndNotifyOrg(organizationId: string, percentage: number): Promise<void> {
+        const organization = await prisma.organization.findUnique({
+            where: { id: organizationId },
             select: {
-                email: true,
-                name: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true,
@@ -36,52 +61,115 @@ export const CreditNotificationService = {
             }
         });
 
-        if (!user?.email) return;
+        if (!organization) return;
+        if (organization.monthlyCreditsLimit === BigInt(-1)) return;
 
-        const userNotifications = notificationsSent.get(userId) || new Set();
+        const recipients = await getOrgRecipients(organizationId);
+        if (!recipients.length) return;
+
+        const orgNotifications = notificationsSent.get(organizationId) || new Set();
         const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
         // Calcola crediti rimanenti
-        const monthlyRemaining = Number(user.monthlyCreditsLimit) - Number(user.monthlyCreditsUsed);
-        const totalRemaining = monthlyRemaining + Number(user.packCreditsAvailable);
+        const monthlyRemaining = Number(organization.monthlyCreditsLimit) - Number(organization.monthlyCreditsUsed);
+        const totalRemaining = Math.max(0, monthlyRemaining) + Number(organization.packCreditsAvailable);
 
-        const resetDateFormatted = user.creditsResetDate
-            ? user.creditsResetDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })
+        const resetDateFormatted = organization.creditsResetDate
+            ? organization.creditsResetDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })
             : 'il prossimo mese';
 
         // Warning al 85% (danger)
         if (percentage >= CREDIT_WARNING_THRESHOLDS.danger && percentage < 100) {
             const key = `warning_${currentMonth}`;
-            if (!userNotifications.has(key)) {
-                await sendCreditsWarningEmail({
-                    to: user.email,
-                    userName: user.name || 'Utente',
-                    percentageUsed: Math.round(percentage),
-                    creditsRemaining: formatCredits(totalRemaining),
-                    resetDate: resetDateFormatted
-                });
-                userNotifications.add(key);
-                notificationsSent.set(userId, userNotifications);
+            if (!orgNotifications.has(key)) {
+                await Promise.all(recipients.map(recipient =>
+                    sendCreditsWarningEmail({
+                        to: recipient.email,
+                        userName: recipient.name,
+                        percentageUsed: Math.round(percentage),
+                        creditsRemaining: formatCredits(totalRemaining),
+                        resetDate: resetDateFormatted
+                    })
+                ));
+                orgNotifications.add(key);
+                notificationsSent.set(organizationId, orgNotifications);
             }
         }
 
         // Alert al 100% (exhausted)
         if (percentage >= 100) {
             const key = `exhausted_${currentMonth}`;
-            if (!userNotifications.has(key)) {
-                await sendCreditsExhaustedEmail({
-                    to: user.email,
-                    userName: user.name || 'Utente',
-                    resetDate: resetDateFormatted
-                });
-                userNotifications.add(key);
-                notificationsSent.set(userId, userNotifications);
+            if (!orgNotifications.has(key)) {
+                await Promise.all(recipients.map(recipient =>
+                    sendCreditsExhaustedEmail({
+                        to: recipient.email,
+                        userName: recipient.name,
+                        resetDate: resetDateFormatted
+                    })
+                ));
+                orgNotifications.add(key);
+                notificationsSent.set(organizationId, orgNotifications);
             }
         }
     },
 
     /**
-     * Invia conferma acquisto pack
+     * Compatibilità legacy user-based
+     */
+    async checkAndNotify(userId: string, percentage: number): Promise<void> {
+        const membership = await prisma.membership.findFirst({
+            where: { userId, status: 'ACTIVE' },
+            select: { organizationId: true }
+        });
+
+        if (!membership) return;
+        await this.checkAndNotifyOrg(membership.organizationId, percentage);
+    },
+
+    /**
+     * Invia conferma acquisto pack (org-based)
+     */
+    async sendPurchaseConfirmationForOrg(
+        organizationId: string,
+        packType: string,
+        creditsAdded: number,
+        pricePaid?: number
+    ): Promise<void> {
+        const organization = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                monthlyCreditsLimit: true,
+                monthlyCreditsUsed: true,
+                packCreditsAvailable: true
+            }
+        });
+
+        if (!organization) return;
+
+        const recipients = await getOrgRecipients(organizationId);
+        if (!recipients.length) return;
+
+        const pack = getCreditPack(packType);
+        const packName = pack?.name || packType;
+        const amountPaid = typeof pricePaid === 'number' ? pricePaid : (pack?.price ?? 0);
+
+        const monthlyRemaining = Number(organization.monthlyCreditsLimit) - Number(organization.monthlyCreditsUsed);
+        const newTotal = Math.max(0, monthlyRemaining) + Number(organization.packCreditsAvailable);
+
+        await Promise.all(recipients.map(recipient =>
+            sendCreditsPurchaseConfirmation({
+                to: recipient.email,
+                userName: recipient.name,
+                packName,
+                creditsAdded: formatCredits(creditsAdded),
+                pricePaid: `€${amountPaid}`,
+                newTotal: formatCredits(newTotal)
+            })
+        ));
+    },
+
+    /**
+     * Compatibilità legacy user-based
      */
     async sendPurchaseConfirmation(
         userId: string,
@@ -89,30 +177,13 @@ export const CreditNotificationService = {
         creditsAdded: number,
         pricePaid: number
     ): Promise<void> {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: {
-                email: true,
-                name: true,
-                monthlyCreditsLimit: true,
-                monthlyCreditsUsed: true,
-                packCreditsAvailable: true
-            }
+        const membership = await prisma.membership.findFirst({
+            where: { userId, status: 'ACTIVE' },
+            select: { organizationId: true }
         });
 
-        if (!user?.email) return;
-
-        const monthlyRemaining = Number(user.monthlyCreditsLimit) - Number(user.monthlyCreditsUsed);
-        const newTotal = monthlyRemaining + Number(user.packCreditsAvailable);
-
-        await sendCreditsPurchaseConfirmation({
-            to: user.email,
-            userName: user.name || 'Utente',
-            packName,
-            creditsAdded: formatCredits(creditsAdded),
-            pricePaid: `€${pricePaid}`,
-            newTotal: formatCredits(newTotal)
-        });
+        if (!membership) return;
+        await this.sendPurchaseConfirmationForOrg(membership.organizationId, packName, creditsAdded, pricePaid);
     },
 
     /**
@@ -120,6 +191,13 @@ export const CreditNotificationService = {
      */
     resetUserNotifications(userId: string): void {
         notificationsSent.delete(userId);
+    },
+
+    /**
+     * Resetta notifiche inviate per organizzazione
+     */
+    resetOrganizationNotifications(organizationId: string): void {
+        notificationsSent.delete(organizationId);
     },
 
     /**

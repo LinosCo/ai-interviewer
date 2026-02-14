@@ -2,6 +2,7 @@ export type InterviewPlan = {
   version: number;
   meta: {
     generatedAt: string;
+    planLogicVersion: string;
     maxDurationMins: number;
     totalTimeSec: number;
     perTopicTimeSec: number;

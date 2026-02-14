@@ -11,7 +11,13 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export async function getAdminApiKey(provider: 'OPENAI' | 'ANTHROPIC' | 'GEMINI' | 'GOOGLE_SERP'): Promise<string | null> {
     try {
         const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: "default" }
+            where: { id: "default" },
+            select: {
+                openaiApiKey: true,
+                anthropicApiKey: true,
+                geminiApiKey: true,
+                googleSerpApiKey: true
+            }
         }) as any;
 
         if (!globalConfig) return null;

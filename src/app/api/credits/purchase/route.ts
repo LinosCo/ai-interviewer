@@ -6,8 +6,8 @@
 
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getCreditPack, CREDIT_PACKS } from '@/config/creditPacks';
-import { getStripeClient } from '@/lib/stripe';
+import { getCreditPack, CREDIT_PACKS, formatCredits } from '@/config/creditPacks';
+import { getStripeClient, getStripePriceIdForPack } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: Request) {
@@ -35,8 +35,10 @@ export async function POST(request: Request) {
             );
         }
 
+        const stripePackPriceId = await getStripePriceIdForPack(pack.id);
+
         // Check for Stripe price ID
-        if (!pack.stripePriceId) {
+        if (!stripePackPriceId) {
             return NextResponse.json(
                 { error: 'Prezzo Stripe non configurato per questo pack' },
                 { status: 503 }
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
             customer: customerId,
             line_items: [
                 {
-                    price: pack.stripePriceId,
+                    price: stripePackPriceId,
                     quantity: 1
                 }
             ],
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
             cancel_url: `${baseUrl}/dashboard/billing?pack_cancelled=true`,
             metadata: {
                 userId: session.user.id,
+                organizationId: org.id,
                 packType,
                 credits: pack.credits.toString(),
                 type: 'credit_pack'
@@ -152,11 +155,11 @@ export async function GET() {
                 id: pack.id,
                 name: pack.name,
                 credits: pack.credits,
-                creditsFormatted: `${(pack.credits / 1_000_000).toFixed(0)}M`,
+                creditsFormatted: formatCredits(pack.credits),
                 price: pack.price,
                 priceFormatted: `€${pack.price}`,
-                pricePerMillion: pack.pricePerMillion,
-                pricePerMillionFormatted: `€${pack.pricePerMillion.toFixed(2)}`
+                pricePerThousand: pack.pricePerThousand,
+                pricePerThousandFormatted: `€${pack.pricePerThousand.toFixed(2)}`
             }))
         });
     } catch (error) {

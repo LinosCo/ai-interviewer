@@ -81,7 +81,8 @@ export const CreditService = {
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true,
-                creditsResetDate: true
+                creditsResetDate: true,
+                customLimits: true
             }
         });
 
@@ -93,6 +94,25 @@ export const CreditService = {
                 usedFromPack: false,
                 error: 'Organization not found'
             };
+        }
+
+        const planConfig = PLANS[org.plan as PlanType] || PLANS[PlanType.FREE];
+        const defaultPlanLimit = planConfig.monthlyCredits;
+        const hasCustomMonthlyLimit =
+            typeof org.customLimits === 'object' &&
+            org.customLimits !== null &&
+            (org.customLimits as Record<string, unknown>).monthlyCreditsLimitCustom === true;
+
+        if (
+            !hasCustomMonthlyLimit &&
+            defaultPlanLimit > 500 &&
+            org.monthlyCreditsLimit === BigInt(500)
+        ) {
+            await prisma.organization.update({
+                where: { id: organizationId },
+                data: { monthlyCreditsLimit: BigInt(defaultPlanLimit) }
+            });
+            org.monthlyCreditsLimit = BigInt(defaultPlanLimit);
         }
 
         // Check if unlimited (ADMIN)
@@ -197,9 +217,7 @@ export const CreditService = {
         );
         const warningLevel = getWarningLevel(usagePercentage);
 
-        // Trigger notifications asynchronously (to organizational members who should receive them)
-        // TODO: Refactor notification service to handle organizations
-        /*
+        // Trigger notifications asynchronously for active org members with alerts enabled.
         if (warningLevel === 'danger' || warningLevel === 'critical' || warningLevel === 'exhausted') {
             getNotificationService().then(service => {
                 service.checkAndNotifyOrg(organizationId, usagePercentage).catch(err => {
@@ -207,7 +225,6 @@ export const CreditService = {
                 });
             });
         }
-        */
 
         return {
             success: true,
@@ -228,11 +245,31 @@ export const CreditService = {
                 plan: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
-                packCreditsAvailable: true
+                packCreditsAvailable: true,
+                customLimits: true
             }
         });
 
         if (!org) return false;
+
+        const planConfig = PLANS[org.plan as PlanType] || PLANS[PlanType.FREE];
+        const defaultPlanLimit = planConfig.monthlyCredits;
+        const hasCustomMonthlyLimit =
+            typeof org.customLimits === 'object' &&
+            org.customLimits !== null &&
+            (org.customLimits as Record<string, unknown>).monthlyCreditsLimitCustom === true;
+
+        if (
+            !hasCustomMonthlyLimit &&
+            defaultPlanLimit > 500 &&
+            org.monthlyCreditsLimit === BigInt(500)
+        ) {
+            await prisma.organization.update({
+                where: { id: organizationId },
+                data: { monthlyCreditsLimit: BigInt(defaultPlanLimit) }
+            });
+            org.monthlyCreditsLimit = BigInt(defaultPlanLimit);
+        }
 
         // Unlimited
         if (org.plan === PlanType.ADMIN || org.monthlyCreditsLimit === BigInt(-1)) return true;
@@ -254,11 +291,31 @@ export const CreditService = {
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true,
-                creditsResetDate: true
+                creditsResetDate: true,
+                customLimits: true
             }
         });
 
         if (!org) return null;
+
+        const planConfig = PLANS[org.plan as PlanType] || PLANS[PlanType.FREE];
+        const defaultPlanLimit = planConfig.monthlyCredits;
+        const hasCustomMonthlyLimit =
+            typeof org.customLimits === 'object' &&
+            org.customLimits !== null &&
+            (org.customLimits as Record<string, unknown>).monthlyCreditsLimitCustom === true;
+
+        if (
+            !hasCustomMonthlyLimit &&
+            defaultPlanLimit > 500 &&
+            org.monthlyCreditsLimit === BigInt(500)
+        ) {
+            await prisma.organization.update({
+                where: { id: organizationId },
+                data: { monthlyCreditsLimit: BigInt(defaultPlanLimit) }
+            });
+            org.monthlyCreditsLimit = BigInt(defaultPlanLimit);
+        }
 
         const isUnlimitedCredits = org.plan === PlanType.ADMIN || org.monthlyCreditsLimit === BigInt(-1);
         const monthlyRemaining = isUnlimitedCredits
@@ -307,7 +364,14 @@ export const CreditService = {
             select: {
                 id: true,
                 plan: true,
-                monthlyCreditsUsed: true
+                monthlyCreditsUsed: true,
+                monthlyCreditsLimit: true,
+                customLimits: true,
+                subscription: {
+                    select: {
+                        status: true
+                    }
+                }
             }
         });
 
@@ -319,12 +383,21 @@ export const CreditService = {
 
             // Get piano config per limite crediti
             const planConfig = PLANS[org.plan as PlanType] || PLANS[PlanType.FREE];
+            const hasCustomMonthlyLimit =
+                typeof org.customLimits === 'object' &&
+                org.customLimits !== null &&
+                (org.customLimits as Record<string, unknown>).monthlyCreditsLimitCustom === true;
+            const isTrialing = org.subscription?.status === 'TRIALING';
+            const trialingLimit = PLANS[PlanType.PARTNER]?.monthlyCredits ?? planConfig.monthlyCredits;
+            const limitToApply = hasCustomMonthlyLimit
+                ? Number(org.monthlyCreditsLimit)
+                : (isTrialing ? trialingLimit : planConfig.monthlyCredits);
 
             await prisma.organization.update({
                 where: { id: org.id },
                 data: {
                     monthlyCreditsUsed: BigInt(0),
-                    monthlyCreditsLimit: BigInt(planConfig.monthlyCredits),
+                    monthlyCreditsLimit: BigInt(limitToApply),
                     creditsResetDate: nextReset
                 }
             });
@@ -336,7 +409,7 @@ export const CreditService = {
                     type: 'monthly_reset',
                     description: 'Reset mensile crediti',
                     metadata: { previousUsed: Number(org.monthlyCreditsUsed) },
-                    balanceAfter: BigInt(planConfig.monthlyCredits)
+                    balanceAfter: BigInt(limitToApply)
                 });
             }
 
@@ -387,6 +460,13 @@ export const CreditService = {
             metadata: { type, stripePaymentId },
             balanceAfter: updatedOrg.packCreditsAvailable,
             executedById: purchasedBy
+        });
+
+        // Invia conferma acquisto agli utenti che ricevono alert.
+        getNotificationService().then(service => {
+            service.sendPurchaseConfirmationForOrg(organizationId, type, amount).catch(err => {
+                console.error('[Credits] Purchase confirmation email error:', err);
+            });
         });
     },
 

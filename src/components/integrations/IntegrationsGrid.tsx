@@ -45,6 +45,16 @@ interface CMSConnection {
   lastSyncError?: string | null;
 }
 
+interface N8NConnection {
+  id: string;
+  name: string;
+  webhookUrl: string;
+  status: ConnectionStatus;
+  lastTriggerAt?: string | null;
+  lastError?: string | null;
+  triggerOnTips: boolean;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -61,6 +71,7 @@ interface IntegrationsGridProps {
   mcpConnections: MCPConnection[];
   googleConnection: GoogleConnection | null;
   cmsConnection: CMSConnection | null;
+  n8nConnection: N8NConnection | null;
   userPlan: 'FREE' | 'STARTER' | 'PRO' | 'BUSINESS' | 'PARTNER';
   onTestMCP: (id: string) => Promise<void>;
   onDeleteMCP: (id: string) => Promise<void>;
@@ -72,6 +83,9 @@ interface IntegrationsGridProps {
   onDeleteCMS: (id: string) => Promise<void>;
   onOpenCMSDashboard?: () => Promise<void>;
   onConfigureCMS?: () => void;
+  onTestN8N?: (id: string) => Promise<void>;
+  onDeleteN8N?: (id: string) => Promise<void>;
+  onConfigureN8N?: () => void;
   projects: Project[];
   organizations?: Organization[];
   currentProjectId: string;
@@ -84,6 +98,7 @@ export function IntegrationsGrid({
   mcpConnections,
   googleConnection,
   cmsConnection,
+  n8nConnection,
   userPlan,
   onTestMCP,
   onDeleteMCP,
@@ -95,6 +110,9 @@ export function IntegrationsGrid({
   onDeleteCMS,
   onOpenCMSDashboard,
   onConfigureCMS,
+  onTestN8N,
+  onDeleteN8N,
+  onConfigureN8N,
   projects,
   organizations = [],
   currentProjectId,
@@ -220,6 +238,22 @@ export function IntegrationsGrid({
           disabled={!cmsConnection}
           upgradeRequired={!canWrite}
         />
+
+        {/* n8n Automation */}
+        <IntegrationCard
+          id={n8nConnection?.id || 'n8n'}
+          type="N8N"
+          name="n8n"
+          description="Automazione workflow (social, notifiche, ecc.)"
+          status={n8nConnection?.status || 'DISABLED'}
+          lastSyncAt={n8nConnection?.lastTriggerAt}
+          lastError={n8nConnection?.lastError}
+          onTest={n8nConnection && onTestN8N ? () => onTestN8N(n8nConnection.id) : undefined}
+          onConfigure={onConfigureN8N}
+          onDelete={n8nConnection && onDeleteN8N ? () => onDeleteN8N(n8nConnection.id) : undefined}
+          disabled={!n8nConnection}
+          upgradeRequired={!canWrite}
+        />
       </div>
 
       {/* Upgrade Banner for FREE/STARTER */}
@@ -233,7 +267,7 @@ export function IntegrationsGrid({
             Con BUSINESS puoi pubblicare direttamente su WordPress e WooCommerce.
           </p>
           <a
-            href="/dashboard/settings/billing"
+            href="/dashboard/billing"
             className="inline-flex items-center gap-2 px-6 py-3 bg-white text-indigo-600 font-semibold rounded-lg hover:bg-indigo-50 transition-colors"
           >
             Scopri i piani

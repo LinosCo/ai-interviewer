@@ -16,6 +16,7 @@ import {
     DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useProject } from '@/contexts/ProjectContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -34,6 +35,12 @@ interface Brand {
     };
 }
 
+interface Organization {
+    id: string;
+    name: string;
+    slug: string;
+}
+
 interface BrandsListProps {
     hasVisibility: boolean;
     planType: string;
@@ -41,11 +48,14 @@ interface BrandsListProps {
 
 export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
     const { selectedProject, isAllProjectsSelected, loading: projectLoading, projects } = useProject();
+    const { currentOrganization } = useOrganization();
     const [brands, setBrands] = useState<Brand[]>([]);
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [movingId, setMovingId] = useState<string | null>(null);
+    const [transferringOrgId, setTransferringOrgId] = useState<string | null>(null);
     const router = useRouter();
 
     const handleDeleteBrand = async (brandId: string, brandName: string) => {
@@ -119,8 +129,8 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
             try {
                 // If a specific project is selected, filter by it
                 const url = isAllProjectsSelected || !selectedProject
-                    ? '/api/visibility/brands'
-                    : `/api/visibility/brands?projectId=${selectedProject.id}`;
+                    ? `/api/visibility/brands${currentOrganization?.id ? `?organizationId=${currentOrganization.id}` : ''}`
+                    : `/api/visibility/brands?projectId=${selectedProject.id}${currentOrganization?.id ? `&organizationId=${currentOrganization.id}` : ''}`;
 
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('Failed to fetch brands');
@@ -135,7 +145,48 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
         };
 
         fetchBrands();
-    }, [selectedProject?.id, isAllProjectsSelected, projectLoading]);
+    }, [selectedProject?.id, isAllProjectsSelected, projectLoading, currentOrganization?.id]);
+
+    useEffect(() => {
+        const fetchOrganizations = async () => {
+            try {
+                const res = await fetch('/api/organizations');
+                if (!res.ok) return;
+                const data = await res.json();
+                setOrganizations(data.organizations || []);
+            } catch (err) {
+                console.error('Failed to fetch organizations:', err);
+            }
+        };
+        fetchOrganizations();
+    }, []);
+
+    const handleTransferBrandToOrganization = async (brandId: string, brandName: string, targetOrganizationId: string, targetOrganizationName: string) => {
+        if (!confirm(`Vuoi trasferire il brand "${brandName}" nell'organizzazione "${targetOrganizationName}"? L'associazione ai progetti verrà rimossa.`)) {
+            return;
+        }
+
+        setTransferringOrgId(brandId);
+        try {
+            const res = await fetch(`/api/visibility/${brandId}/transfer-organization`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetOrganizationId })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Errore durante il trasferimento organizzazione');
+            }
+
+            setBrands(prev => prev.filter(b => b.id !== brandId));
+            router.refresh();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Errore durante il trasferimento organizzazione');
+        } finally {
+            setTransferringOrgId(null);
+        }
+    };
 
     const canAddMore = hasVisibility;
 
@@ -194,12 +245,18 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                             </Button>
                         </Link>
                     ) : (
-                        <Link href="/dashboard/billing/plans">
-                            <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
-                                <Zap className="w-4 h-4" />
-                                Upgrade per Brand Monitor
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" className="gap-2 border-gray-200 text-gray-400 cursor-not-allowed" disabled>
+                                <Plus className="w-4 h-4" />
+                                Nuovo Brand
                             </Button>
-                        </Link>
+                            <Link href="/dashboard/billing/plans">
+                                <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
+                                    <Zap className="w-4 h-4" />
+                                    Upgrade
+                                </Button>
+                            </Link>
+                        </div>
                     )}
                 </div>
             </div>
@@ -216,17 +273,29 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                             }
                         </h3>
                         <p className="text-gray-500 mb-6 max-w-md mx-auto">
-                            Configura il monitoraggio della visibilità per scoprire come i principali LLM parlano del tuo brand.
+                            {canAddMore
+                                ? 'Configura il monitoraggio della visibilità per scoprire come i principali LLM parlano del tuo brand.'
+                                : 'Azione bloccata dal piano attuale: il monitoraggio visibilità non è incluso.'
+                            }
                         </p>
-                        <Link href={selectedProject && !isAllProjectsSelected
-                            ? `/dashboard/visibility/create?projectId=${selectedProject.id}`
-                            : "/dashboard/visibility/create"
-                        }>
-                            <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
-                                <Plus className="w-4 h-4" />
-                                Configura il primo brand
-                            </Button>
-                        </Link>
+                        {canAddMore ? (
+                            <Link href={selectedProject && !isAllProjectsSelected
+                                ? `/dashboard/visibility/create?projectId=${selectedProject.id}`
+                                : "/dashboard/visibility/create"
+                            }>
+                                <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
+                                    <Plus className="w-4 h-4" />
+                                    Configura il primo brand
+                                </Button>
+                            </Link>
+                        ) : (
+                            <Link href="/dashboard/billing/plans">
+                                <Button variant="outline" className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50">
+                                    <Zap className="w-4 h-4" />
+                                    Upgrade per sbloccare
+                                </Button>
+                            </Link>
+                        )}
                     </CardContent>
                 </Card>
             ) : (
@@ -234,6 +303,9 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                     {brands.map((brand) => {
                         const latestScan = brand.scans[0];
                         const score = latestScan?.score || 0;
+                        const editHref = isAllProjectsSelected
+                            ? `/dashboard/visibility/create?configId=${brand.id}${brand.project?.id ? `&projectId=${brand.project.id}` : ''}`
+                            : `/dashboard/visibility/create?configId=${brand.id}${selectedProject?.id ? `&projectId=${selectedProject.id}` : ''}`;
 
                         return (
                             <Card key={brand.id} className="hover:shadow-lg transition-all group overflow-hidden">
@@ -316,7 +388,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem asChild>
-                                                        <Link href={`/dashboard/visibility/create?configId=${brand.id}`} className="flex items-center gap-2">
+                                                        <Link href={editHref} className="flex items-center gap-2">
                                                             <Settings className="w-4 h-4" />
                                                             Modifica
                                                         </Link>
@@ -351,6 +423,25 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                                                         </DropdownMenuItem>
                                                                     </>
                                                                 )}
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuSub>
+                                                    )}
+                                                    {organizations.length > 1 && (
+                                                        <DropdownMenuSub>
+                                                            <DropdownMenuSubTrigger>
+                                                                <ArrowRightLeft className="w-4 h-4 mr-2" />
+                                                                Trasferisci organizzazione
+                                                            </DropdownMenuSubTrigger>
+                                                            <DropdownMenuSubContent>
+                                                                {organizations.map(org => (
+                                                                    <DropdownMenuItem
+                                                                        key={org.id}
+                                                                        onClick={() => handleTransferBrandToOrganization(brand.id, brand.brandName, org.id, org.name)}
+                                                                        disabled={transferringOrgId === brand.id}
+                                                                    >
+                                                                        {org.name}
+                                                                    </DropdownMenuItem>
+                                                                ))}
                                                             </DropdownMenuSubContent>
                                                         </DropdownMenuSub>
                                                     )}

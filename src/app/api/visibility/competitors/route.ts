@@ -7,6 +7,8 @@ import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { cookies } from 'next/headers';
 
 const CompetitorSuggestionSchema = z.object({
     suggestions: z.array(z.string()).describe("List of competitor names")
@@ -27,8 +29,7 @@ export async function POST(request: Request) {
                 plan: true,
                 role: true,
                 memberships: {
-                    take: 1,
-                    select: { organizationId: true }
+                    select: { organizationId: true, status: true }
                 }
             }
         });
@@ -37,7 +38,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const cookieStore = await cookies();
+        const selectedOrgId = cookieStore.get('bt_selected_org_id')?.value;
+        const activeMembership = user.memberships.find(
+            m => m.organizationId === selectedOrgId && m.status === 'ACTIVE'
+        ) || user.memberships.find(m => m.status === 'ACTIVE');
+        const organizationId = activeMembership?.organizationId;
 
         // Use user's plan (admin has unlimited access)
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
@@ -49,6 +55,22 @@ export async function POST(request: Request) {
         // Handle AI suggestion (Stateless, no config needed)
         if (action === 'suggest' && category && brandName) {
             try {
+                const creditsCheck = await checkCreditsForAction(
+                    'visibility_query',
+                    undefined,
+                    undefined,
+                    organizationId
+                );
+                if (!creditsCheck.allowed) {
+                    return NextResponse.json({
+                        code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                        error: creditsCheck.error,
+                        creditsNeeded: creditsCheck.creditsNeeded,
+                        creditsAvailable: creditsCheck.creditsAvailable
+                    }, { status: creditsCheck.status || 403 });
+                }
+                const chargedOrganizationId = (creditsCheck as { organizationId?: string | null }).organizationId || organizationId || null;
+
                 // Default limit for suggestions if config not present
                 const suggestionLimit = 5;
 
@@ -65,16 +87,22 @@ Return only the company/product names, without descriptions.`,
 
                 // Track credit usage
                 if (result.usage) {
-                    TokenTrackingService.logTokenUsage({
-                        organizationId: organizationId || 'unknown',
-                        userId: user.id,
-                        inputTokens: result.usage.inputTokens || 0,
-                        outputTokens: result.usage.outputTokens || 0,
-                        category: 'VISIBILITY',
-                        model: 'gpt-4o-mini',
-                        operation: 'visibility-suggest-competitors',
-                        resourceType: 'visibility'
-                    }).catch(err => console.error('[Visibility] Credit tracking failed:', err));
+                    try {
+                        if (chargedOrganizationId) {
+                            await TokenTrackingService.logTokenUsage({
+                                organizationId: chargedOrganizationId,
+                                userId: user.id,
+                                inputTokens: result.usage.inputTokens || 0,
+                                outputTokens: result.usage.outputTokens || 0,
+                                category: 'VISIBILITY',
+                                model: 'gpt-4o-mini',
+                                operation: 'visibility-suggest-competitors',
+                                resourceType: 'visibility'
+                            });
+                        }
+                    } catch (err) {
+                        console.error('[Visibility] Credit tracking failed:', err);
+                    }
                 }
 
                 return NextResponse.json({

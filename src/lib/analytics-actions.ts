@@ -28,7 +28,10 @@ export async function generateConversationInsightAction(conversationId: string) 
     // 2. Resolve Key (Use Bot key or fallback)
     let apiKey = conversation.bot.openaiApiKey;
     if (!apiKey) {
-        const globalConfig = await prisma.globalConfig.findUnique({ where: { id: "default" } });
+        const globalConfig = await prisma.globalConfig.findUnique({
+            where: { id: "default" },
+            select: { openaiApiKey: true }
+        });
         apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || null;
     }
 

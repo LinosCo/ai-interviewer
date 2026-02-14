@@ -11,6 +11,8 @@ interface CopilotContext {
         topThemes: { name: string; count: number; sentiment: number }[];
         avgSentiment: number;
         period: string;
+        strategicVision?: string | null;
+        valueProposition?: string | null;
     } | null;
     strategicPlan?: string | null;
 }
@@ -33,8 +35,9 @@ export function buildCopilotSystemPrompt(ctx: CopilotContext): string {
 
 ### Per tutti gli utenti:
 - Rispondere a domande su come usare Business Tuner
-- Spiegare funzionalita, limiti, piani
+- Spiegare funzionalita, limiti e piani
 - Guidare nella configurazione di interviste, chatbot, visibility tracker
+- Guidare nella connessione di WordPress e WooCommerce (usando il tool getProjectIntegrations per verificare lo stato)
 - Risolvere problemi comuni
 - Mostrare lo stato dell'account e utilizzo
 
@@ -68,6 +71,7 @@ ${ctx.projectContext ? `
 - Conversazioni (${ctx.projectContext.period}): ${ctx.projectContext.conversationsCount}
 - Sentiment medio: ${ctx.projectContext.avgSentiment > 0 ? '+' : ''}${(ctx.projectContext.avgSentiment * 100).toFixed(0)}%
 - Temi principali: ${ctx.projectContext.topThemes.slice(0, 5).map(t => t.name).join(', ')}
+${ctx.projectContext.strategicVision ? `- Visione Strategica di Progetto: ${ctx.projectContext.strategicVision}\n` : ''}${ctx.projectContext.valueProposition ? `- Value Proposition di Progetto: ${ctx.projectContext.valueProposition}\n` : ''}
 ` : 'Nessun progetto selezionato. Chiedi all\'utente di selezionare un progetto dalla dashboard.'}
 
 ## Come comportarti con i dati

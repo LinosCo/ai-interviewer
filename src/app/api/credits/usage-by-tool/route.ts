@@ -41,7 +41,7 @@ export async function GET(req: Request) {
                     }
                 }
             });
-            if (!membership && (session.user as any).role !== 'ADMIN') {
+            if (!membership) {
                 return NextResponse.json({ error: 'Access denied' }, { status: 403 });
             }
         }

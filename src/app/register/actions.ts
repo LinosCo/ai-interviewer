@@ -2,16 +2,17 @@
 
 import { prisma } from '@/lib/prisma';
 import { hash } from 'bcryptjs';
-import { signIn } from '@/auth';
 import { redirect } from 'next/navigation';
-import { sendSystemNotification } from '@/lib/email';
+import crypto from 'crypto';
+import { PlanType, PLANS } from '@/config/plans';
+import { sendAccountVerificationEmail, sendSystemNotification } from '@/lib/email';
 
 export async function registerUser(prevState: string | undefined, formData: FormData) {
-    const email = formData.get('email') as string;
+    const email = (formData.get('email') as string)?.toLowerCase().trim();
     const password = formData.get('password') as string;
-    const name = formData.get('name') as string;
-    const companyName = formData.get('companyName') as string;
-    const vatId = formData.get('vatId') as string;
+    const name = (formData.get('name') as string)?.trim();
+    const companyName = (formData.get('companyName') as string)?.trim();
+    const vatId = (formData.get('vatId') as string)?.trim();
     const plan = formData.get('plan') as string;
     const billing = formData.get('billing') as string;
 
@@ -29,9 +30,12 @@ export async function registerUser(prevState: string | undefined, formData: Form
         }
 
         const hashedPassword = await hash(password, 10);
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ore
+        const partnerTrialCredits = PLANS[PlanType.PARTNER].monthlyCredits;
 
         // Create user, organization and membership in a transaction
-        const result = await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx) => {
             const user = await tx.user.create({
                 data: {
                     email,
@@ -50,18 +54,23 @@ export async function registerUser(prevState: string | undefined, formData: Form
                     name: companyName,
                     vatId: vatId || null,
                     plan: 'PRO', // Start as PRO for trial
+                    monthlyCreditsLimit: BigInt(partnerTrialCredits),
                     slug: `org-${Math.random().toString(36).substring(2, 10)}`,
                     members: {
                         create: {
                             userId: user.id,
                             role: 'OWNER',
+                            status: 'ACTIVE',
+                            acceptedAt: new Date(),
+                            joinedAt: new Date()
                         },
                     },
                     subscription: {
                         create: {
-                            tier: 'PRO',
+                            tier: 'TRIAL',
                             status: 'TRIALING',
                             currentPeriodEnd: trialEnd,
+                            trialEndsAt: trialEnd,
                         }
                     },
                     projects: {
@@ -80,21 +89,20 @@ export async function registerUser(prevState: string | undefined, formData: Form
                 },
             });
 
+            await tx.verificationToken.deleteMany({
+                where: { identifier: email }
+            });
+
+            await tx.verificationToken.create({
+                data: {
+                    identifier: email,
+                    token: verificationToken,
+                    expires: verificationExpires
+                }
+            });
+
             return { user, org };
         });
-
-        // Auto-login after registration
-        try {
-            await signIn('credentials', {
-                email,
-                password,
-                redirect: false,
-            });
-        } catch (signInError) {
-            console.error('SignIn error during registration:', signInError);
-            // We don't return here because the user is created, 
-            // the redirect below will handle the rest or they can login manually.
-        }
 
         await sendSystemNotification(
             'Nuova Registrazione Utente',
@@ -103,15 +111,38 @@ export async function registerUser(prevState: string | undefined, formData: Form
              <p>Piano selezionato: ${plan || 'FREE'}</p>`
         );
 
+        // Keep paid-plan intent for post-verification login.
+        const normalizedPlan = plan?.toUpperCase();
+        const checkoutPath = normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)
+            ? `/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`
+            : undefined;
+
+        const verificationEmailResult = await sendAccountVerificationEmail({
+            to: email,
+            userName: name,
+            token: verificationToken,
+            nextPath: checkoutPath
+        });
+        if (!verificationEmailResult.success) {
+            const reason =
+                typeof verificationEmailResult.error === 'string'
+                    ? verificationEmailResult.error
+                    : (verificationEmailResult.error as any)?.message || 'Unknown email error';
+            throw new Error(`Verification email send failed: ${reason}`);
+        }
+
     } catch (error) {
         console.error('Registration error:', error);
+        if (error instanceof Error && error.message.includes('Verification email send failed:')) {
+            return 'Account creato, ma invio email di conferma fallito. Contatta supporto o riprova più tardi.';
+        }
         return 'Registration failed.';
     }
 
-    // Redirect logic - include all paid plans
-    if (plan && ['STARTER', 'PRO', 'BUSINESS'].includes(plan.toUpperCase())) {
-        redirect(`/api/stripe/checkout?tier=${plan.toUpperCase()}${billing ? `&billing=${billing}` : ''}`);
-    } else {
-        redirect('/dashboard');
-    }
+    const normalizedPlan = plan?.toUpperCase();
+    const nextPath = normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)
+        ? `/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`
+        : '';
+
+    redirect(`/login?verification=sent${nextPath ? `&next=${encodeURIComponent(nextPath)}` : ''}`);
 }

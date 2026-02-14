@@ -8,6 +8,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { encrypt } from '@/lib/integrations/encryption';
+import { normalizeMcpEndpoint } from '@/lib/integrations/mcp/endpoint';
 import { NextResponse } from 'next/server';
 
 // GET - Get connection details
@@ -120,7 +121,10 @@ export async function PUT(
   // Build update data
   const updateData: Record<string, unknown> = {};
   if (name) updateData.name = name;
-  if (endpoint) updateData.endpoint = endpoint;
+  if (endpoint) {
+    updateData.endpoint = normalizeMcpEndpoint(connection.type, endpoint);
+    updateData.status = 'PENDING'; // Re-test needed after endpoint change
+  }
   if (credentials) {
     updateData.credentials = encrypt(JSON.stringify(credentials));
     updateData.status = 'PENDING'; // Reset status when credentials change

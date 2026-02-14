@@ -10,7 +10,7 @@ const HERO_PHRASES = [
   'se il team è motivato?',
   'come parlano di te online?',
   'dove ottimizzare il budget?',
-  "se l&apos;assistenza funziona?",
+  "se l'assistenza funziona?",
   'come ti vede la filiera?',
   'perché i clienti comprano?',
   'cosa cercano i talenti?',
@@ -21,17 +21,8 @@ const HERO_PHRASES = [
   'come migliorare il servizio?',
 ];
 
-export function HeroSection() {
-  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentPhraseIndex((prev) => (prev + 1) % HERO_PHRASES.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const TrustBadges = () => (
+function TrustBadgesView() {
+  return (
     <div className="flex flex-wrap justify-center gap-4 md:gap-6 text-[hsl(var(--muted-foreground))] text-sm">
       <span className="flex items-center gap-2">
         <svg className="w-4 h-4 text-[hsl(var(--coral))]" fill="currentColor" viewBox="0 0 20 20">
@@ -53,6 +44,17 @@ export function HeroSection() {
       </span>
     </div>
   );
+}
+
+export function HeroSection() {
+  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentPhraseIndex((prev) => (prev + 1) % HERO_PHRASES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <>
@@ -76,7 +78,7 @@ export function HeroSection() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -30, scale: 0.95 }}
                     transition={{ duration: 0.4, ease: 'easeOut' }}
-                    className="absolute inset-x-0 gradient-text"
+                    className="absolute inset-x-0 gradient-text font-display"
                   >
                     {HERO_PHRASES[currentPhraseIndex]}
                   </motion.span>
@@ -101,7 +103,7 @@ export function HeroSection() {
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
-                href="/onboarding/preview"
+                href="/preview"
                 className="bg-[hsl(var(--foreground))] text-[hsl(var(--background))] hover:opacity-90 text-lg px-10 py-4 font-semibold shadow-lg hover:scale-105 transition-transform rounded-xl inline-flex items-center justify-center gap-2"
               >
                 <Play className="w-5 h-5" />
@@ -137,7 +139,7 @@ export function HeroSection() {
               transition={{ delay: 0.6 }}
               className="hidden md:block mt-16"
             >
-              <TrustBadges />
+              <TrustBadgesView />
             </motion.div>
           </motion.div>
         </div>
@@ -150,7 +152,7 @@ export function HeroSection() {
         transition={{ delay: 0.6 }}
         className="md:hidden py-8 px-6"
       >
-        <TrustBadges />
+        <TrustBadgesView />
       </motion.div>
     </>
   );

@@ -12,6 +12,7 @@ const updateSchema = z.object({
     fallbackMessage: z.string().optional(),
     boundaries: z.array(z.string()).optional(),
     candidateDataFields: z.array(z.any()).optional(), // Allow full JSON array
+    collectCandidateData: z.boolean().optional(), // Explicit override if needed
     primaryColor: z.string().optional(),
     backgroundColor: z.string().optional(),
     textColor: z.string().optional(),
@@ -79,13 +80,23 @@ export async function PATCH(
 
         // Remove botType from data before updating (it's not a DB field)
         // Also filter out undefined/null values that could cause issues
-        const { botType, backgroundColor, ...restData } = data;
+        const { botType, backgroundColor, collectCandidateData, ...restData } = data;
 
         const updateData: Record<string, any> = { ...restData };
 
         // Only include backgroundColor if it's a non-empty string
         if (backgroundColor && typeof backgroundColor === 'string') {
             updateData.backgroundColor = backgroundColor;
+        }
+
+        // Auto-set collectCandidateData based on candidateDataFields presence
+        // If candidateDataFields is provided in the request, infer collectCandidateData from it
+        if (data.candidateDataFields !== undefined) {
+            const hasLeadFields = Array.isArray(data.candidateDataFields) && data.candidateDataFields.length > 0;
+            updateData.collectCandidateData = hasLeadFields;
+        } else if (collectCandidateData !== undefined) {
+            // If explicitly provided without candidateDataFields, use the explicit value
+            updateData.collectCandidateData = collectCandidateData;
         }
 
         const updatedBot = await prisma.bot.update({

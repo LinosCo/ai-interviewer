@@ -81,7 +81,17 @@ STRIPE_SECRET_KEY=sk_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
 # Email
+# SiteGround SMTP
+SMTP_HOST=mail.voler.ai
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=businesstuner@voler.ai
+SMTP_PASS=your_mail_password
+
+# Optional fallback (if SMTP missing)
 RESEND_API_KEY=re_...
+EMAIL_FROM="Business Tuner <businesstuner@voler.ai>"
+NOTIFICATION_EMAIL=businesstuner@voler.ai
 ```
 
 ### Installation

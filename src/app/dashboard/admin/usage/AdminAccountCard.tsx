@@ -30,7 +30,6 @@ function UsageBar({ used, limit, extra = 0, label, color }: {
     const isNearLimit = percentage >= 80;
 
     const formatNumber = (n: number) => {
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
         if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
         return n.toString();
     };
@@ -67,14 +66,15 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
 
     const sub = account.subscription;
     const planConfig = PLANS[(sub?.tier || 'FREE') as PlanType] || PLANS[PlanType.FREE];
-    const limits = planConfig.limits;
+    const creditsLimit = account.monthlyCreditsLimit;
+    const copilotAndTipsCredits = account.creditUsageByTool.copilot + account.creditUsageByTool.ai_tips;
 
     const [editLimits, setEditLimits] = useState({
         extraTokens: sub?.extraTokens || 0,
         extraInterviews: sub?.extraInterviews || 0,
         extraChatbotSessions: sub?.extraChatbotSessions || 0,
         plan: sub?.tier || account.plan,
-        monthlyCreditsLimit: Number(account.monthlyCreditsLimit)
+        monthlyCreditsLimit: account.monthlyCreditsLimit
     });
 
     const handleSave = async () => {
@@ -102,7 +102,6 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
     };
 
     const formatNumber = (n: number) => {
-        if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
         if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
         return n.toString();
     };
@@ -123,10 +122,6 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
         'PAST_DUE': 'text-red-600',
         'CANCELED': 'text-gray-500'
     };
-
-    const ownerDisplay = account.owner
-        ? `${account.owner.name || 'Senza nome'}`
-        : 'Nessun owner';
 
     return (
         <Card className="p-6">
@@ -152,7 +147,15 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                     {isEditing ? (
                         <select
                             value={editLimits.plan}
-                            onChange={(e) => setEditLimits(prev => ({ ...prev, plan: e.target.value }))}
+                            onChange={(e) => {
+                                const nextPlan = e.target.value as PlanType;
+                                const planConfig = PLANS[nextPlan] || PLANS[PlanType.FREE];
+                                setEditLimits(prev => ({
+                                    ...prev,
+                                    plan: nextPlan,
+                                    monthlyCreditsLimit: planConfig.monthlyCredits
+                                }));
+                            }}
                             className="px-2 py-1 rounded text-xs font-bold border border-gray-300"
                         >
                             <option value="FREE">FREE</option>
@@ -180,14 +183,14 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                     <span className="font-semibold text-violet-900">Crediti Organizzazione</span>
                 </div>
                 <UsageBar
-                    used={Number(account.monthlyCreditsUsed)}
-                    limit={Number(account.monthlyCreditsLimit)}
+                    used={account.monthlyCreditsUsed}
+                    limit={account.monthlyCreditsLimit}
                     label="Crediti Mensili"
                     color="bg-violet-500"
                 />
-                {account.packCreditsAvailable > BigInt(0) && (
+                {account.packCreditsAvailable > 0 && (
                     <p className="text-xs text-violet-600 mt-2">
-                        + {formatNumber(Number(account.packCreditsAvailable))} crediti da pack
+                        + {formatNumber(account.packCreditsAvailable)} crediti da pack
                     </p>
                 )}
                 {account.creditsResetDate && (
@@ -200,30 +203,27 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
             {/* Usage Bars */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <UsageBar
-                    used={sub?.tokensUsedThisMonth || 0}
-                    limit={limits.monthlyTokenBudget}
-                    extra={sub?.extraTokens || 0}
-                    label="Token AI"
+                    used={account.creditUsageByTool.interview}
+                    limit={creditsLimit}
+                    label="Interviste AI (crediti)"
                     color="bg-violet-500"
                 />
                 <UsageBar
-                    used={sub?.interviewsUsedThisMonth || 0}
-                    limit={limits.maxInterviewsPerMonth}
-                    extra={sub?.extraInterviews || 0}
-                    label="Interviste"
+                    used={account.creditUsageByTool.chatbot}
+                    limit={creditsLimit}
+                    label="Chatbot (crediti)"
                     color="bg-amber-500"
                 />
                 <UsageBar
-                    used={sub?.chatbotSessionsUsedThisMonth || 0}
-                    limit={limits.maxChatbotSessionsPerMonth}
-                    extra={sub?.extraChatbotSessions || 0}
-                    label="Sessioni Chatbot"
+                    used={account.creditUsageByTool.visibility}
+                    limit={creditsLimit}
+                    label="Visibility (crediti)"
                     color="bg-blue-500"
                 />
                 <UsageBar
-                    used={sub?.visibilityQueriesUsedThisMonth || 0}
-                    limit={limits.maxVisibilityQueriesPerMonth}
-                    label="Query Visibility"
+                    used={copilotAndTipsCredits}
+                    limit={creditsLimit}
+                    label="Copilot + AI Tips (crediti)"
                     color="bg-emerald-500"
                 />
             </div>
@@ -288,28 +288,43 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
             )}
 
             {/* Token Breakdown (mini) */}
-            {(sub?.tokensUsedThisMonth || 0) > 0 && (
+            {account.creditUsageByTool.total > 0 && (
                 <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                    <p className="text-xs font-medium text-gray-600 mb-2">Breakdown Token</p>
+                    <p className="text-xs font-medium text-gray-600 mb-2">Breakdown Crediti (mese corrente)</p>
                     <div className="flex gap-2 text-xs flex-wrap">
-                        {sub?.interviewTokensUsed ? (
+                        {account.creditUsageByTool.interview > 0 ? (
                             <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded">
-                                Interviste: {formatNumber(sub.interviewTokensUsed)}
+                                Interviste: {formatNumber(account.creditUsageByTool.interview)}
                             </span>
                         ) : null}
-                        {sub?.chatbotTokensUsed ? (
+                        {account.creditUsageByTool.chatbot > 0 ? (
                             <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                                Chatbot: {formatNumber(sub.chatbotTokensUsed)}
+                                Chatbot: {formatNumber(account.creditUsageByTool.chatbot)}
                             </span>
                         ) : null}
-                        {sub?.visibilityTokensUsed ? (
+                        {account.creditUsageByTool.visibility > 0 ? (
                             <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded">
-                                Visibility: {formatNumber(sub.visibilityTokensUsed)}
+                                Visibility: {formatNumber(account.creditUsageByTool.visibility)}
                             </span>
                         ) : null}
-                        {sub?.suggestionTokensUsed ? (
+                        {account.creditUsageByTool.ai_tips > 0 ? (
                             <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
-                                AI Tips: {formatNumber(sub.suggestionTokensUsed)}
+                                AI Tips: {formatNumber(account.creditUsageByTool.ai_tips)}
+                            </span>
+                        ) : null}
+                        {account.creditUsageByTool.copilot > 0 ? (
+                            <span className="px-2 py-1 bg-rose-100 text-rose-700 rounded">
+                                Copilot: {formatNumber(account.creditUsageByTool.copilot)}
+                            </span>
+                        ) : null}
+                        {account.creditUsageByTool.export > 0 ? (
+                            <span className="px-2 py-1 bg-slate-200 text-slate-700 rounded">
+                                Export: {formatNumber(account.creditUsageByTool.export)}
+                            </span>
+                        ) : null}
+                        {account.creditUsageByTool.other > 0 ? (
+                            <span className="px-2 py-1 bg-gray-200 text-gray-700 rounded">
+                                Altro: {formatNumber(account.creditUsageByTool.other)}
                             </span>
                         ) : null}
                     </div>
@@ -374,7 +389,7 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                                         />
                                     ) : (
                                         <p className="text-lg font-semibold">
-                                            {account.monthlyCreditsLimit === BigInt(-1) ? '∞' : formatNumber(Number(account.monthlyCreditsLimit))}
+                                            {account.monthlyCreditsLimit === -1 ? '∞' : formatNumber(account.monthlyCreditsLimit)}
                                         </p>
                                     )}
                                 </div>
@@ -428,24 +443,24 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
 
                         {/* Plan Limits Info */}
                         <div className="bg-blue-50 rounded-lg p-4">
-                            <h4 className="font-medium text-blue-900 mb-2">Limiti Piano {sub?.tier || 'FREE'}</h4>
+                            <h4 className="font-medium text-blue-900 mb-2">Riferimenti Crediti {sub?.tier || 'FREE'}</h4>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                                 <div>
-                                    <p className="text-xs text-blue-600">Token/Mese</p>
+                                    <p className="text-xs text-blue-600">Default Piano</p>
                                     <p className="font-bold text-blue-900">
-                                        {limits.monthlyTokenBudget === -1 ? '∞' : formatNumber(limits.monthlyTokenBudget)}
+                                        {planConfig.monthlyCredits === -1 ? '∞' : formatNumber(planConfig.monthlyCredits)}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-blue-600">Interviste/Mese</p>
+                                    <p className="text-xs text-blue-600">Limite Organizzazione</p>
                                     <p className="font-bold text-blue-900">
-                                        {limits.maxInterviewsPerMonth === -1 ? '∞' : limits.maxInterviewsPerMonth}
+                                        {creditsLimit === -1 ? '∞' : formatNumber(creditsLimit)}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-blue-600">Sessioni Chatbot</p>
+                                    <p className="text-xs text-blue-600">Usato Organizzazione</p>
                                     <p className="font-bold text-blue-900">
-                                        {limits.maxChatbotSessionsPerMonth === -1 ? '∞' : formatNumber(limits.maxChatbotSessionsPerMonth)}
+                                        {formatNumber(Number(account.monthlyCreditsUsed))}
                                     </p>
                                 </div>
                             </div>

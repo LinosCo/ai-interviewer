@@ -62,6 +62,26 @@ interface InterviewChatProps {
     warmupContextPrompt?: string | null;
     warmupFollowup?: boolean;
     skipWelcome?: boolean;
+    isEmbedded?: boolean;
+}
+
+function toUserFacingInterviewError(status: number, payload: unknown, language?: string): string {
+    const isItalian = (language || 'it').toLowerCase().startsWith('it');
+    const fallback = isItalian
+        ? 'Intervista temporaneamente non disponibile. Riprova tra poco.'
+        : 'Interview temporarily unavailable. Please try again shortly.';
+
+    if (!payload || typeof payload !== 'object') return fallback;
+    const data = payload as Record<string, unknown>;
+    const code = typeof data.code === 'string' ? data.code : '';
+
+    if (code === 'ACCESS_DENIED' || status === 401 || status === 403) {
+        return isItalian
+            ? 'Intervista non disponibile per limiti di accesso o crediti. Riprova più tardi.'
+            : 'Interview unavailable due to access or credit limits. Please try again later.';
+    }
+
+    return fallback;
 }
 
 const TRANSLATIONS: Record<string, any> = {
@@ -139,7 +159,8 @@ export default function InterviewChat({
     warmupIcebreaker,
     warmupContextPrompt,
     warmupFollowup = true,
-    skipWelcome = false
+    skipWelcome = false,
+    isEmbedded = false
 }: InterviewChatProps) {
     const router = useRouter();
     const t = TRANSLATIONS[language?.toLowerCase().startsWith('it') ? 'it' : 'en'];
@@ -154,6 +175,7 @@ export default function InterviewChat({
     // ... (rest of the file) ...
 
     const [messages, setMessages] = useState<Message[]>(initialMessages);
+    const messagesRef = useRef<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -162,6 +184,7 @@ export default function InterviewChat({
     const [hasStarted, setHasStarted] = useState(initialMessages.length > 0 || skipWelcome);
     const [showLanding, setShowLanding] = useState(initialMessages.length === 0 && !skipWelcome);
     const [consentGiven, setConsentGiven] = useState(false);
+    const [isInputFocused, setIsInputFocused] = useState(false);
 
     // Warm-up State
     const [showWarmup, setShowWarmup] = useState(false);
@@ -178,6 +201,21 @@ export default function InterviewChat({
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
     const [isTyping, setIsTyping] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
+    const [showCompletionActions, setShowCompletionActions] = useState(false);
+    const inFlightRequestRef = useRef(false);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
+
+    useEffect(() => {
+        if (!isCompleted) {
+            setShowCompletionActions(false);
+            return;
+        }
+        const timer = setTimeout(() => setShowCompletionActions(true), 2200);
+        return () => clearTimeout(timer);
+    }, [isCompleted]);
 
     // Active Timer
     useEffect(() => {
@@ -258,6 +296,7 @@ export default function InterviewChat({
     const resizeRafRef = useRef<number | null>(null);
     const lastTextareaHeightRef = useRef<number | null>(null);
     const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const INPUT_MAX_HEIGHT_PX = 280;
 
     // Auto-resize textarea function (deferred to next frame to avoid blocking input)
     const autoResizeTextarea = () => {
@@ -269,11 +308,9 @@ export default function InterviewChat({
             const el = inputRef.current;
             if (!el) return;
             el.style.height = 'auto';
-            const nextHeight = Math.min(el.scrollHeight, 150);
-            if (lastTextareaHeightRef.current !== nextHeight) {
-                el.style.height = `${nextHeight}px`;
-                lastTextareaHeightRef.current = nextHeight;
-            }
+            const nextHeight = Math.min(el.scrollHeight, INPUT_MAX_HEIGHT_PX);
+            el.style.height = `${nextHeight}px`;
+            lastTextareaHeightRef.current = nextHeight;
         });
     };
 
@@ -319,15 +356,20 @@ export default function InterviewChat({
     }, [input]);
 
     const handleSendMessage = async (messageContent: string, isInitial = false, overrideHistory?: Message[]) => {
-        if ((!messageContent.trim() || isLoading) && !isInitial) return;
+        if ((!messageContent.trim() || isLoading || inFlightRequestRef.current) && !isInitial) return;
+        if (inFlightRequestRef.current) return;
 
         // If isInitial=true and we have overrideHistory (intro), we DON'T add a user message to UI
         // We just use 'messageContent' as a hidden trigger for the AI
 
         const isHiddenTrigger = isInitial && overrideHistory && overrideHistory.length > 0;
 
+        const userMessageId = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
         const userMessage: Message = {
-            id: Date.now().toString(),
+            id: userMessageId,
             role: 'user',
             content: messageContent
         };
@@ -341,6 +383,7 @@ export default function InterviewChat({
         }
 
         setIsLoading(true);
+        inFlightRequestRef.current = true;
 
         try {
             // Construct payload
@@ -353,8 +396,10 @@ export default function InterviewChat({
             } else if (isInitial) {
                 messagesPayload = [];
             } else {
-                messagesPayload = [...messages, userMessage];
+                messagesPayload = [...messagesRef.current, userMessage];
             }
+
+            const requestClientMessageId = (!isInitial || isHiddenTrigger) ? userMessage.id : undefined;
 
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -363,13 +408,19 @@ export default function InterviewChat({
                     messages: messagesPayload,
                     conversationId,
                     botId,
-                    effectiveDuration: Math.floor(effectiveSeconds)
+                    effectiveDuration: Math.floor(effectiveSeconds),
+                    clientMessageId: requestClientMessageId
                 })
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || 'Failed to get response');
+                let payload: unknown = null;
+                try {
+                    payload = await response.json();
+                } catch {
+                    payload = null;
+                }
+                throw new Error(toUserFacingInterviewError(response.status, payload, language));
             }
 
             const data = await response.json();
@@ -406,6 +457,7 @@ export default function InterviewChat({
             }]);
         } finally {
             setIsLoading(false);
+            inFlightRequestRef.current = false;
         }
     };
 
@@ -432,6 +484,18 @@ export default function InterviewChat({
     // Dynamic Background logic
     const brandColor = primaryColor || colors.amber;
     const mainBackground = backgroundColor || gradients.mesh;
+    const isMobileKeyboardOpen = isInputFocused && !isEmbedded;
+    const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-start md:justify-center' : 'justify-center';
+    const chatBottomPaddingClass = isEmbedded
+        ? 'pb-24'
+        : isMobileKeyboardOpen
+            ? 'pb-28 md:pb-56'
+            : 'pb-48 md:pb-56';
+    const inputTopPaddingClass = isEmbedded
+        ? 'pt-4'
+        : isMobileKeyboardOpen
+            ? 'pt-2 md:pt-12'
+            : 'pt-8 md:pt-12';
 
 
 
@@ -630,7 +694,7 @@ export default function InterviewChat({
 
             {/* Progress bar */}
             {showProgressBar && (
-                <div className="fixed top-0 left-0 right-0 z-30 backdrop-blur-sm pt-20 md:pt-16 pb-2">
+                <div className={`${isEmbedded ? 'absolute' : 'fixed'} top-0 left-0 right-0 z-30 backdrop-blur-sm ${isEmbedded ? 'pt-8' : 'pt-20 md:pt-16'} pb-2`}>
                     <div className="max-w-7xl mx-auto px-4 md:px-12">
                         {progressBarStyle === 'semantic' && topics.length > 0 ? (
                             <SemanticProgressBar
@@ -657,7 +721,7 @@ export default function InterviewChat({
             )}
 
             {/* Header - Moved to top for mobile, custom position for larger screens */}
-            <header className="fixed top-2 left-0 right-0 z-50 px-3 py-2 md:p-4 flex items-start justify-between pointer-events-none transition-all duration-300">
+            <header className={`${isEmbedded ? 'absolute' : 'fixed'} top-2 left-0 right-0 z-50 px-3 py-2 md:p-4 flex items-start justify-between pointer-events-none transition-all duration-300`}>
                 <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md border border-stone-200/50 p-2 pl-3 pr-4 rounded-full shadow-lg pointer-events-auto transition-all hover:shadow-xl hover:scale-105">
                     {logoUrl ? (
                         <div className="h-8 w-8 rounded-full overflow-hidden border border-stone-100 flex-shrink-0 bg-stone-50">
@@ -704,7 +768,7 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col items-center justify-center px-4 pt-32 md:pt-40 pb-48 md:pb-56 w-full max-w-4xl mx-auto relative z-10">
+            <div className={`flex-1 flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} ${chatBottomPaddingClass} w-full max-w-4xl mx-auto relative z-10`}>
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
                 {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && (
@@ -731,7 +795,7 @@ export default function InterviewChat({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-40 flex items-center justify-center"
+                        className={`${isEmbedded ? 'absolute' : 'fixed'} inset-0 z-40 flex items-center justify-center`}
                     >
                         {/* Subtle backdrop */}
                         <div className="absolute inset-0 bg-gradient-to-b from-white/60 to-white/40 backdrop-blur-[2px]" />
@@ -828,8 +892,8 @@ export default function InterviewChat({
 
                                                     return (
                                                         <p className={`
-                                                            ${isShort ? 'text-xl md:text-2xl font-semibold text-gray-900' : ''} 
-                                                            ${!isShort && !isLong ? 'text-lg md:text-xl font-medium text-gray-800' : ''}
+                                                            ${isShort ? 'text-lg md:text-xl font-semibold text-gray-900' : ''} 
+                                                            ${!isShort && !isLong ? 'text-base md:text-lg font-medium text-gray-800' : ''}
                                                             ${isLong ? 'text-base md:text-lg text-gray-700' : ''}
                                                             leading-relaxed mb-6
                                                         `} style={{ textShadow: 'none' }}>
@@ -869,7 +933,7 @@ export default function InterviewChat({
             </div>
 
             {/* Input Area or Completion Screen */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 p-3 md:p-6 pb-4 md:pb-8 bg-gradient-to-t from-white via-white/95 to-transparent pt-8 md:pt-12">
+            <div className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${inputTopPaddingClass}`}>
                 <div className="max-w-3xl mx-auto w-full relative">
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">
@@ -884,13 +948,14 @@ export default function InterviewChat({
                                     ? 'Grazie per il tuo prezioso contributo.'
                                     : 'Thank you for your valuable contribution.'}
                             </p>
-                            {rewardConfig?.enabled && rewardConfig.displayText && (
+                            {showCompletionActions && rewardConfig?.enabled && rewardConfig.displayText && (
                                 <div className="bg-emerald-50 text-emerald-700 px-4 py-3 rounded-lg mb-6 flex items-center justify-center gap-2">
                                     <Icons.Gift size={18} />
                                     <span className="font-medium">{rewardConfig.displayText}</span>
                                 </div>
                             )}
                             {rewardConfig?.enabled ? (
+                                showCompletionActions ? (
                                 rewardConfig.type === 'redirect' && rewardConfig.payload ? (
                                     <button
                                         onClick={() => window.open(rewardConfig.payload, '_blank')}
@@ -907,6 +972,13 @@ export default function InterviewChat({
                                     >
                                         {language?.toLowerCase().startsWith('it') ? 'Richiedi il tuo premio' : 'Claim your reward'}
                                     </button>
+                                )
+                                ) : (
+                                    <p className="text-sm text-gray-500">
+                                        {language?.toLowerCase().startsWith('it')
+                                            ? 'Sto preparando la tua ricompensa...'
+                                            : 'Preparing your reward...'}
+                                    </p>
                                 )
                             ) : (
                                 <button
@@ -930,14 +1002,11 @@ export default function InterviewChat({
                                     value={input}
                                     onChange={(e) => {
                                         setInput(e.target.value);
+                                        autoResizeTextarea();
                                     }}
                                     onKeyDown={handleKeyDown}
-                                    onFocus={() => {
-                                        // Scroll to bottom on mobile when focused to keep input visible
-                                        setTimeout(() => {
-                                            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                                        }, 300);
-                                    }}
+                                    onFocus={() => setIsInputFocused(true)}
+                                    onBlur={() => setIsInputFocused(false)}
                                     disabled={isLoading}
                                     placeholder={t.typePlaceholder}
                                     rows={1}
@@ -946,8 +1015,8 @@ export default function InterviewChat({
                                     autoComplete="off"
                                     autoCorrect="on"
                                     spellCheck="true"
-                                    className="w-full resize-none border-none bg-transparent px-4 md:px-6 py-4 md:py-5 pr-16 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:ring-0 focus:outline-none overflow-hidden"
-                                    style={{ minHeight: '56px', maxHeight: '150px' }}
+                                    className="w-full resize-none border-none bg-transparent px-4 md:px-6 py-4 md:py-5 pr-16 text-base md:text-lg text-gray-900 placeholder-gray-400 focus:ring-0 focus:outline-none overflow-y-auto"
+                                    style={{ minHeight: '56px', maxHeight: `${INPUT_MAX_HEIGHT_PX}px` }}
                                 />
 
                                 <div className="pb-2 md:pb-3 pr-2 md:pr-3 flex items-end">

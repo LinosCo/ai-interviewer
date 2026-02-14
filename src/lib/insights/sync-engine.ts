@@ -5,10 +5,8 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 
 const ActionSchema = z.object({
-    // Operational actions (can be automated)
+    // Potentially automatable actions (only when required integrations are available)
     // - add_faq: Add FAQ to chatbot knowledge base
-    // - add_interview_topic: Add new interview topic to collect more feedback
-    // - add_visibility_prompt: Add new monitoring query
     // Strategic actions (require consultation)
     // - create_content / modify_content: Website content changes
     // - respond_to_press: PR response needed
@@ -63,41 +61,74 @@ export class CrossChannelSyncEngine {
         // 0. Fetch strategic context (project-level if available, otherwise org-level)
         let strategicVision: string | null = null;
         let valueProposition: string | null = null;
+        let strategicPlan: string | null = null;
+
+        const org = await prisma.organization.findUnique({
+            where: { id: organizationId },
+            select: {
+                strategicVision: true,
+                valueProposition: true,
+                platformSettings: {
+                    select: {
+                        strategicPlan: true
+                    }
+                }
+            }
+        });
+
+        strategicVision = org?.strategicVision || null;
+        valueProposition = org?.valueProposition || null;
+        strategicPlan = org?.platformSettings?.strategicPlan || null;
 
         if (projectId) {
             const project = await prisma.project.findUnique({
                 where: { id: projectId },
                 select: { strategicVision: true, valueProposition: true }
             });
-            strategicVision = project?.strategicVision || null;
-            valueProposition = project?.valueProposition || null;
-        }
-
-        // Fallback to org-level if project doesn't have strategy
-        if (!strategicVision && !valueProposition) {
-            const org = await prisma.organization.findUnique({
-                where: { id: organizationId },
-                select: { strategicVision: true, valueProposition: true }
-            });
-            strategicVision = org?.strategicVision || null;
-            valueProposition = org?.valueProposition || null;
+            strategicVision = project?.strategicVision || strategicVision;
+            valueProposition = project?.valueProposition || valueProposition;
         }
 
         // 1. Fetch visibility data (filter by project if provided)
-        const visibilityConfig = await prisma.visibilityConfig.findFirst({
-            where: {
-                organizationId,
-                ...(projectId ? { projectId } : {})
-            },
-            include: {
-                scans: {
-                    where: { status: 'completed' },
-                    orderBy: { completedAt: 'desc' },
-                    take: 1,
-                    include: { responses: true }
+        let visibilityConfig: any = null;
+        try {
+            visibilityConfig = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(projectId ? {
+                        OR: [
+                            { projectId },
+                            { projectShares: { some: { projectId } } }
+                        ]
+                    } : {})
+                },
+                include: {
+                    scans: {
+                        where: { status: 'completed' },
+                        orderBy: { completedAt: 'desc' },
+                        take: 1,
+                        include: { responses: true }
+                    }
                 }
-            }
-        });
+            });
+        } catch (err: any) {
+            if (err?.code !== 'P2021') throw err;
+            // Fallback for missing ProjectVisibilityConfig table
+            visibilityConfig = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(projectId ? { projectId } : {})
+                },
+                include: {
+                    scans: {
+                        where: { status: 'completed' },
+                        orderBy: { completedAt: 'desc' },
+                        take: 1,
+                        include: { responses: true }
+                    }
+                }
+            });
+        }
 
         // 2-6 ... (skipping for BREVITY in replacement targetContent/content)
 
@@ -160,7 +191,7 @@ export class CrossChannelSyncEngine {
         });
 
         // 5. Fetch SERP Monitoring Data (Google News/Search)
-        const serpSummary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId);
+        const serpSummary = await SerpMonitoringEngine.getSerpSummaryForInsights(organizationId, projectId);
 
         // 5b. Fetch CMS/Website analytics if available
         let websiteAnalytics = null;
@@ -194,6 +225,17 @@ export class CrossChannelSyncEngine {
             }
         }
 
+        const hasChatbotInScope = (await prisma.bot.count({
+            where: {
+                botType: 'chatbot',
+                project: {
+                    organizationId,
+                    ...(projectId ? { id: projectId } : {})
+                }
+            }
+        })) > 0;
+        const canAutoPublishToCms = Boolean(cmsConnection && ['ACTIVE', 'PARTIAL'].includes(cmsConnection.status));
+
         // 6. Summarize data for LLM with compact identifiers for citations
         const truncate = (value: string, max: number) => (value || '').slice(0, max);
         const limitArray = <T>(arr: T[] | null | undefined, max: number) => (arr || []).slice(0, max);
@@ -221,12 +263,12 @@ export class CrossChannelSyncEngine {
         };
 
         const visibilitySummary = limitArray(
-            visibilityConfig?.scans[0]?.responses?.map(r => ({
-            platform: r.platform,
-            responseText: truncate(r.responseText || '', 220),
-            brandMentioned: r.brandMentioned,
-            competitors: r.competitorPositions
-        })) || [],
+            (visibilityConfig?.scans[0]?.responses as any[])?.map((r: any) => ({
+                platform: r.platform,
+                responseText: truncate(r.responseText || '', 220),
+                brandMentioned: r.brandMentioned,
+                competitors: r.competitorPositions
+            })) || [],
             6
         );
 
@@ -288,7 +330,7 @@ export class CrossChannelSyncEngine {
         const { model } = await getSystemLLM();
 
         // Build a strong strategic context for the LLM
-        const hasStrategicContext = strategicVision || valueProposition;
+        const hasStrategicContext = strategicVision || valueProposition || strategicPlan;
         const strategicContextText = hasStrategicContext
             ? `
             🎯 VISIONE STRATEGICA del Brand:
@@ -297,11 +339,14 @@ export class CrossChannelSyncEngine {
             💎 VALUE PROPOSITION:
             "${valueProposition}"
 
+            🧭 PIANO STRATEGICO COPILOT:
+            "${strategicPlan}"
+
             ⚠️ IMPORTANTE: Ogni suggerimento DEVE essere direttamente collegato a questa visione.
             Se un suggerimento non supporta la visione strategica, NON includerlo.`
             : `
-            ⚠️ L'utente non ha ancora definito una visione strategica o una value proposition.
-            In questo caso genera SOLO 1-2 suggerimenti mirati a definire vision e value proposition, con domande concrete da fare agli stakeholder.
+            ⚠️ L'utente non ha ancora definito visione, value proposition e piano strategico.
+            In questo caso genera SOLO 1-2 suggerimenti mirati a definire questi elementi con domande concrete da fare agli stakeholder.
             Non generare altri suggerimenti operativi finché la strategia non è definita.`;
 
         const { object } = await generateObject({
@@ -456,12 +501,29 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
         };
 
         const savedInsights: any[] = [];
+        const visibilityPayload = {
+            visibilitySummary,
+            websiteAnalytics: websiteAnalytics || null,
+            serpSummary: serpSummary || null,
+            strategicContext: {
+                strategicVision,
+                valueProposition,
+                strategicPlan
+            },
+            activeChannels: [
+                visibilitySummary.length > 0 ? 'visibility' : null,
+                interviewSummary.length > 0 ? 'interviews' : null,
+                chatbotSummary.length > 0 ? 'chatbot' : null,
+                websiteAnalytics ? 'analytics' : null,
+                serpSummary ? 'serp' : null
+            ].filter(Boolean)
+        };
 
         // Save the summary report as a special record (single, updatable)
         const healthInsight = await upsertInsight("Health Report: Brand & Sito", {
             visibilityData: {
+                ...visibilityPayload,
                 report: object.healthReport,
-                serpSummary: serpSummary || null
             } as any,
             interviewData: interviewSummary as any,
             chatbotData: chatbotSummary as any,
@@ -500,17 +562,25 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                         validation: { status: 'duplicate', matchTitle: match.title, score: match.score }
                     }];
                 }
+                const canAutoApply =
+                    (action.type === 'add_faq' && hasChatbotInScope) ||
+                    ((action.type === 'create_content' || action.type === 'modify_content') && canAutoPublishToCms);
+
                 return [{
                     ...action,
-                    autoApply: ['add_faq', 'add_interview_topic', 'add_visibility_prompt'].includes(action.type),
-                    ...(match ? { validation: { status: 'overlap', matchTitle: match.title, score: match.score } } : {})
+                    autoApply: canAutoApply,
+                    ...(match ? { validation: { status: 'overlap', matchTitle: match.title, score: match.score } } : {}),
+                    automationRequirements: {
+                        hasChatbotInScope,
+                        canAutoPublishToCms
+                    }
                 }];
             });
 
             if (preparedActions.length === 0) continue;
 
             const insight = await upsertInsight(rawInsight.topicName, {
-                visibilityData: visibilitySummary as any,
+                visibilityData: visibilityPayload as any,
                 interviewData: interviewSummary as any,
                 chatbotData: chatbotSummary as any,
                 crossChannelScore: 100,

@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET /api/cms/analytics?range=7d|30d|90d&projectId=xxx
@@ -9,32 +10,27 @@ import { NextResponse } from 'next/server';
 export async function GET(request: Request) {
     try {
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id || !session?.user?.email) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const userId = session.user.id;
+        const userEmail = session.user.email;
 
         const url = new URL(request.url);
         const projectId = url.searchParams.get('projectId');
         const range = url.searchParams.get('range') || '30d';
 
-        if (!projectId) {
-            return NextResponse.json({ error: 'projectId is required' }, { status: 400 });
-        }
+        const activeOrgId = await resolveActiveOrganizationIdForUser(userId);
 
-        // Verify user has access to this project
+        // Verify user access and load org projects with CMS connections
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { email: userEmail },
             include: {
                 memberships: {
                     include: {
                         organization: {
                             include: {
-                                projects: {
-                                    where: { id: projectId },
-                                    include: {
-                                        cmsConnection: true
-                                    }
-                                }
+                                projects: { include: { cmsConnection: true } }
                             }
                         }
                     }
@@ -46,10 +42,34 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'No organization found' }, { status: 404 });
         }
 
-        // Find the project with CMS connection
+        // Pick project:
+        // - requested projectId when provided
+        // - otherwise first project with CMS in active organization
+        // - fallback to first project with CMS in any user organization
+        let targetProjectId = projectId;
+        if (!targetProjectId) {
+            const activeMembership = activeOrgId
+                ? user.memberships.find((m) => m.organizationId === activeOrgId)
+                : undefined;
+
+            const activeOrgProject = activeMembership?.organization.projects.find((p) => p.cmsConnection);
+            if (activeOrgProject) {
+                targetProjectId = activeOrgProject.id;
+            } else {
+                for (const membership of user.memberships) {
+                    const project = membership.organization.projects.find((p) => p.cmsConnection);
+                    if (project) {
+                        targetProjectId = project.id;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Find CMS connection for target project
         let cmsConnection = null;
         for (const membership of user.memberships) {
-            const project = membership.organization.projects.find(p => p.id === projectId);
+            const project = membership.organization.projects.find(p => p.id === targetProjectId);
             if (project?.cmsConnection) {
                 cmsConnection = project.cmsConnection;
                 break;

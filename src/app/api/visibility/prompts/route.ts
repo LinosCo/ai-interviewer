@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { PLANS, PlanType } from '@/config/plans';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 // Create new prompt
 export async function POST(request: Request) {
@@ -16,11 +17,7 @@ export async function POST(request: Request) {
             select: {
                 id: true,
                 plan: true,
-                role: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
+                role: true
             }
         });
 
@@ -28,7 +25,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        }
 
         // Use user's plan (admin has unlimited access)
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';

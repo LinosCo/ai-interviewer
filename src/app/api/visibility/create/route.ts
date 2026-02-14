@@ -2,6 +2,8 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { PLANS, PlanType } from '@/config/plans';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
+import { checkTrialResourceLimit } from '@/lib/trial-limits';
 
 export async function POST(request: Request) {
     try {
@@ -30,11 +32,11 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { brandName, category, description, language, territory, prompts, competitors, organizationId, websiteUrl, additionalUrls } = body;
 
-        // Determine organizationId: use provided if admin, or fallback to first membership
+        // Determine organizationId: use provided if admin, or fallback to selected org cookie
         let finalOrganizationId = organizationId;
 
         if (!finalOrganizationId || user.role !== 'ADMIN') {
-            finalOrganizationId = user.memberships[0]?.organizationId;
+            finalOrganizationId = await resolveActiveOrganizationIdForUser(user.id);
         }
 
         if (!finalOrganizationId) {
@@ -56,6 +58,20 @@ export async function POST(request: Request) {
                 { error: 'Visibility tracking non disponibile nel tuo piano' },
                 { status: 403 }
             );
+        }
+
+        if (!isAdmin) {
+            const trialLimitCheck = await checkTrialResourceLimit({
+                organizationId: finalOrganizationId,
+                resource: 'brand'
+            });
+
+            if (!trialLimitCheck.allowed) {
+                return NextResponse.json(
+                    { error: trialLimitCheck.reason || 'Trial limit reached' },
+                    { status: 403 }
+                );
+            }
         }
 
         // Check brand limit (unlimited if visibility enabled)
@@ -149,6 +165,29 @@ export async function POST(request: Request) {
             }
         });
 
+        // Check if ProjectVisibilityConfig table exists to avoid transaction poisoning
+        const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+            SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
+        `;
+        const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+        if (projectId && projectVisibilityConfigExists) {
+            await prisma.projectVisibilityConfig.upsert({
+                where: {
+                    projectId_configId: {
+                        projectId,
+                        configId: config.id
+                    }
+                },
+                update: {},
+                create: {
+                    projectId,
+                    configId: config.id,
+                    createdBy: user.id
+                }
+            });
+        }
+
         return NextResponse.json({
             success: true,
             configId: config.id,
@@ -174,6 +213,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const configId = searchParams.get('id');
         const projectId = searchParams.get('projectId');
+        const organizationIdParam = searchParams.get('organizationId');
 
         const session = await auth();
         if (!session?.user?.id) {
@@ -182,41 +222,128 @@ export async function GET(request: Request) {
 
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            select: {
-                id: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
-            }
+            select: { id: true }
         });
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
-
-        const config = await prisma.visibilityConfig.findFirst({
-            where: {
-                organizationId,
-                ...(configId ? { id: configId } : {}),
-                ...(projectId ? { projectId } : {})
-            },
-            include: {
-                prompts: {
-                    orderBy: { orderIndex: 'asc' }
-                },
-                competitors: true,
-                scans: {
-                    orderBy: { startedAt: 'desc' },
-                    take: 1,
-                    include: {
-                        metrics: true
+        // Fast path by configId: authorize by membership on config org, independent from active org.
+        if (configId) {
+            const configById = await prisma.visibilityConfig.findUnique({
+                where: { id: configId },
+                include: {
+                    prompts: { orderBy: { orderIndex: 'asc' } },
+                    competitors: true,
+                    projectShares: { select: { projectId: true } },
+                    scans: {
+                        orderBy: { startedAt: 'desc' },
+                        take: 1,
+                        include: { metrics: true }
                     }
                 }
+            });
+
+            if (!configById) {
+                return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
             }
-        });
+
+            const membership = await prisma.membership.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: session.user.id,
+                        organizationId: configById.organizationId
+                    }
+                },
+                select: { organizationId: true }
+            });
+
+            if (!membership) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+
+            return NextResponse.json({
+                config: {
+                    ...configById,
+                    latestScan: configById.scans[0] || null
+                }
+            });
+        }
+
+        const organizationId = organizationIdParam || await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        }
+
+        if (organizationIdParam) {
+            const membership = await prisma.membership.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: session.user.id,
+                        organizationId: organizationIdParam
+                    }
+                },
+                select: { organizationId: true }
+            });
+            if (!membership) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+        }
+
+        let config: any = null;
+        try {
+            config = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(projectId
+                        ? {
+                            OR: [
+                                { projectId },
+                                { projectShares: { some: { projectId } } }
+                            ]
+                        }
+                        : {})
+                },
+                include: {
+                    prompts: {
+                        orderBy: { orderIndex: 'asc' }
+                    },
+                    competitors: true,
+                    projectShares: {
+                        select: { projectId: true }
+                    },
+                    scans: {
+                        orderBy: { startedAt: 'desc' },
+                        take: 1,
+                        include: {
+                            metrics: true
+                        }
+                    }
+                }
+            });
+        } catch (err: any) {
+            if (err?.code !== 'P2021') throw err;
+            config = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId,
+                    ...(projectId ? { projectId } : {})
+                },
+                include: {
+                    prompts: {
+                        orderBy: { orderIndex: 'asc' }
+                    },
+                    competitors: true,
+                    scans: {
+                        orderBy: { startedAt: 'desc' },
+                        take: 1,
+                        include: {
+                            metrics: true
+                        }
+                    }
+                }
+            });
+        }
 
         if (!config) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
@@ -250,11 +377,7 @@ export async function PATCH(request: Request) {
             select: {
                 id: true,
                 plan: true,
-                role: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
+                role: true
             }
         });
 
@@ -262,22 +385,38 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
-
         const body = await request.json();
         const { id, brandName, category, description, language, territory, isActive, prompts, competitors, projectId, websiteUrl, additionalUrls } = body;
 
-        // Check if config exists
-        const existingConfig = await prisma.visibilityConfig.findFirst({
-            where: {
-                organizationId,
-                ...(id ? { id } : {})
-            }
+        if (!id) {
+            return NextResponse.json({ error: 'Configuration id is required' }, { status: 400 });
+        }
+
+        // Check if config exists and user belongs to the same organization.
+        const existingConfig = await prisma.visibilityConfig.findUnique({
+            where: { id },
+            select: { id: true, organizationId: true }
         });
 
         if (!existingConfig) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: existingConfig.organizationId
+                }
+            },
+            select: { organizationId: true }
+        });
+
+        if (!membership && user.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+
+        const organizationId = existingConfig.organizationId;
 
         // Get organization's subscription
         const subscription = await prisma.subscription.findUnique({
@@ -313,7 +452,7 @@ export async function PATCH(request: Request) {
             }
         }
 
-        // Use a transaction to ensure atomic updates
+        // Use a transaction to ensure atomic updates for prompts and competitors
         const updatedConfig = await prisma.$transaction(async (tx) => {
             // 1. Update basic info
             const config = await tx.visibilityConfig.update({
@@ -376,6 +515,32 @@ export async function PATCH(request: Request) {
 
             return config;
         });
+
+        // 4. Project-Visibility association (OUTSIDE transaction to avoid poisoning)
+        if (projectId !== undefined && projectId) {
+            // Check if ProjectVisibilityConfig table exists using a clean query outside the main transaction
+            const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+                SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
+            `;
+            const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+            if (projectVisibilityConfigExists) {
+                await prisma.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
+                            projectId,
+                            configId: updatedConfig.id
+                        }
+                    },
+                    update: {},
+                    create: {
+                        projectId,
+                        configId: updatedConfig.id,
+                        createdBy: user.id
+                    }
+                });
+            }
+        }
 
         return NextResponse.json({
             success: true,

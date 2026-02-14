@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { MCPConnectionType } from '@prisma/client';
+import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 
 export interface CreateMCPConnectionInput {
     projectId: string;
@@ -45,6 +46,13 @@ export class MCPConnectionService {
 
         if (!project) {
             return { success: false, error: 'Project not found' };
+        }
+
+        if (project.organizationId) {
+            const integrationCheck = await checkIntegrationCreationAllowed(project.organizationId);
+            if (!integrationCheck.allowed) {
+                return { success: false, error: integrationCheck.reason || 'Integration creation unavailable on trial' };
+            }
         }
 
         // Verify user has permission in the connection's organization

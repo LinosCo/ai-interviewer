@@ -197,7 +197,7 @@ export function PricingSection() {
                                 <div className="flex items-baseline gap-1">
                                     <span className="text-2xl font-bold">€{pack.price}</span>
                                     <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                                        (€{pack.pricePerMillion}/M)
+                                        (€{pack.pricePerThousand}/1K)
                                     </span>
                                 </div>
                             </div>

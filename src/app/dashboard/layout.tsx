@@ -4,8 +4,11 @@ import { gradients } from '@/lib/design-system';
 import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
 import { DashboardProviders } from '@/components/dashboard/DashboardProviders';
 import { StrategyCopilot } from '@/components/copilot/StrategyCopilot';
+import { CreditsAlertBanner } from '@/components/dashboard/CreditsAlertBanner';
+import { CreditsExhaustedModal } from '@/components/dashboard/CreditsExhaustedModal';
 import { PLANS, PlanType } from '@/config/plans';
 import { cookies } from 'next/headers';
+import { getOrCreateDefaultOrganization } from '@/lib/organizations';
 
 export default async function DashboardLayout({
     children,
@@ -22,15 +25,22 @@ export default async function DashboardLayout({
     let hasVisibilityTracker = false;
     let hasAiTips = false;
 
+    let initialOrganizations: any[] = [];
+    let initialProjects: any[] = [];
+
     if (session?.user?.id) {
+        // Hard guard for first-login races: ensure at least one organization exists.
+        await getOrCreateDefaultOrganization(session.user.id);
+
         // Read active organization from cookies
         const cookieStore = await cookies();
         const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
 
-        // Get user and their memberships
+        // Get user and their memberships + directly get organizations for pre-hydration
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
+                id: true,
                 role: true,
                 plan: true,
                 memberships: {
@@ -54,6 +64,15 @@ export default async function DashboardLayout({
         isAdmin = user?.role === 'ADMIN' || user?.plan === 'ADMIN';
 
         if (user) {
+            // Pre-hydrate organizations
+            initialOrganizations = user.memberships.map(m => ({
+                id: m.organization.id,
+                name: m.organization.name,
+                slug: m.organization.slug,
+                plan: m.organization.plan,
+                role: m.role
+            }));
+
             // Find active membership based on cookie or default to first
             const membership = activeOrgId
                 ? user.memberships.find(m => m.organizationId === activeOrgId) || user.memberships[0]
@@ -61,6 +80,24 @@ export default async function DashboardLayout({
 
             if (membership) {
                 organizationId = membership.organizationId;
+
+                // Pre-hydrate projects for the active organization
+                const dbProjects = await prisma.project.findMany({
+                    where: { organizationId: organizationId },
+                    select: {
+                        id: true,
+                        name: true,
+                        isPersonal: true,
+                        ownerId: true
+                    }
+                });
+
+                initialProjects = dbProjects.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    isPersonal: p.isPersonal,
+                    role: p.ownerId === session.user?.id ? 'OWNER' : 'MEMBER'
+                }));
 
                 // Source of truth for tier is now the Organization
                 userTier = membership.organization.plan || 'FREE';
@@ -94,13 +131,8 @@ export default async function DashboardLayout({
         }
     }
 
-    const signOutAction = async () => {
-        'use server';
-        await signOut({ redirectTo: "/" });
-    };
-
     return (
-        <DashboardProviders>
+        <DashboardProviders initialOrganizations={initialOrganizations} initialProjects={initialProjects}>
             <div className="flex flex-col md:flex-row h-screen overflow-hidden font-sans" style={{ background: gradients.mesh }}>
 
                 <DashboardSidebar
@@ -116,9 +148,12 @@ export default async function DashboardLayout({
                 {/* Main Content Area */}
                 <div className="flex-grow overflow-y-auto p-4 md:p-8 relative z-10">
                     <div style={{ maxWidth: '1200px', margin: '0 auto', minHeight: '100%' }}>
+                        <CreditsAlertBanner />
                         {children}
                     </div>
                 </div>
+
+                <CreditsExhaustedModal />
 
                 {/* Strategy Copilot - AI Assistant */}
                 <StrategyCopilot
@@ -130,3 +165,7 @@ export default async function DashboardLayout({
     );
 }
 
+const signOutAction = async () => {
+    'use server';
+    await signOut({ redirectTo: "/" });
+};

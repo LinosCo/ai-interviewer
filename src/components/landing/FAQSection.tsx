@@ -8,42 +8,42 @@ const faqs = [
   {
     question: "Cos'è Business Tuner e a chi è rivolto?",
     answer:
-      'Business Tuner è una piattaforma di marketing e business intelligence nativa AI, pensata per PMI, manager e consulenti aziendali. Ti permette di raccogliere feedback, gestire chatbot intelligenti e monitorare la reputazione del brand, tutto in un unico posto.',
+      'Business Tuner è una piattaforma AI per interviste, chatbot, visibility monitoring e copilot strategico. È pensata per team marketing, prodotto e consulenza che vogliono un unico workspace con controllo costi tramite crediti organizzazione.',
   },
   {
-    question: 'Come funzionano le interviste AI?',
+    question: 'Come funziona il modello a crediti?',
     answer:
-      'Le nostre AI conducono conversazioni naturali con i tuoi stakeholder (clienti, team, partner) tramite chat o email. Fanno domande adattive basate sulle risposte ricevute, proprio come farebbe un intervistatore umano, ma disponibili 24/7.',
+      'Ogni organizzazione ha un budget mensile di crediti in base al piano. Ogni operazione AI consuma crediti. Quando i crediti mensili finiscono, il sistema usa automaticamente gli eventuali Credit Pack acquistati.',
   },
   {
-    question: 'Posso personalizzare il chatbot con il mio brand?',
+    question: 'Cosa succede quando i crediti finiscono?',
     answer:
-      'Assolutamente! Il chatbot impara dal tuo tono di voce, può essere addestrato sui tuoi documenti e FAQ, e si adatta perfettamente al look & feel del tuo sito web. Con il piano Business, offriamo anche soluzioni white-label.',
+      'Le API AI vengono bloccate automaticamente finché non hai crediti disponibili. Puoi acquistare un Credit Pack (small/medium/large) o attendere il reset mensile.',
   },
   {
-    question: 'I miei dati sono al sicuro?',
+    question: 'I Credit Pack scadono?',
     answer:
-      'La sicurezza è la nostra priorità. I dati sono crittografati, ospitati su server europei e trattiamo tutto in conformità al GDPR. Non vendiamo né condividiamo mai i tuoi dati con terze parti.',
+      'No. I Credit Pack non scadono, restano disponibili sull’organizzazione e vengono consumati dopo i crediti mensili del piano.',
   },
   {
-    question: 'Quanto tempo serve per iniziare?',
+    question: 'Posso acquistare il piano Business online?',
     answer:
-      'Meno di 5 minuti! Crei un account, configuri il tuo primo progetto e puoi già iniziare a raccogliere feedback o attivare il chatbot. Non serve nessuna competenza tecnica.',
+      'No. Il piano Business è gestito solo tramite team Sales, con proposta su misura per volumi, integrazioni e supporto.',
   },
   {
     question: 'Posso provare prima di pagare?',
     answer:
-      'Certo! Offriamo un piano gratuito per sempre con funzionalità base, più 14 giorni di prova gratuita su tutti i piani a pagamento. Nessuna carta di credito richiesta per iniziare.',
+      'Sì. Puoi partire dal piano gratuito e passare a Starter/Pro quando vuoi. Business viene attivato solo tramite contatto Sales.',
+  },
+  {
+    question: 'I miei dati sono al sicuro?',
+    answer:
+      'Sì. Dati cifrati in transito e a riposo, infrastruttura europea e gestione conforme GDPR. I dati restano sotto il controllo della tua organizzazione.',
   },
   {
     question: 'Come funziona il supporto?',
     answer:
-      'Offriamo supporto via email per tutti i piani e supporto prioritario con tempi di risposta garantiti per i piani Pro ed Business. Il nostro team è 100% italiano e sempre disponibile ad aiutarti.',
-  },
-  {
-    question: 'Posso integrare Business Tuner con altri strumenti?',
-    answer:
-      'Sì! Offriamo integrazioni native con i principali CRM, strumenti di email marketing e piattaforme di analytics. I piani Pro ed Business hanno anche accesso alle API per integrazioni personalizzate.',
+      'Supporto standard su tutti i piani. Per Business includiamo onboarding e supporto commerciale dedicato concordato in fase Sales.',
   },
 ];
 
@@ -89,7 +89,6 @@ export function FAQSection() {
 
   return (
     <section id="faq" className="py-20 md:py-28 relative">
-      {/* White overlay */}
       <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px]" />
 
       <div className="max-w-3xl mx-auto px-6 relative z-10">
@@ -104,7 +103,7 @@ export function FAQSection() {
             Domande <span className="gradient-text">frequenti</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))]">
-            Tutto quello che devi sapere su Business Tuner
+            Prezzi, crediti, pack e gestione piani
           </p>
         </motion.div>
 

@@ -1,0 +1,1591 @@
+{
+  "generatedAt": "2026-02-12T08:43:51.606Z",
+  "botId": "cmke4ayef000613i8m5dkiuli",
+  "runsPerEnv": 6,
+  "maxTurns": 12,
+  "production": {
+    "env": "production",
+    "runs": 6,
+    "completionRate": 0,
+    "avgSemanticScore": 79,
+    "passRate": 0,
+    "hasDeepRate": 0,
+    "hasDataCollectionRate": 0,
+    "avgTransitionFailures": 0,
+    "avgConsentFailures": 0,
+    "avgInterestingSignalCaptureRate": 0.7916666666666666,
+    "avgEngagementQualityRate": 0.16666666666666666,
+    "avgSemanticUnderstandingRate": 0.625,
+    "avgNonGenericRate": 0.986111111111111,
+    "httpErrorRuns": 0
+  },
+  "staging": {
+    "env": "staging",
+    "runs": 6,
+    "completionRate": 0.3333333333333333,
+    "avgSemanticScore": 76.5,
+    "passRate": 0,
+    "hasDeepRate": 1,
+    "hasDataCollectionRate": 0.5,
+    "avgTransitionFailures": 2.6666666666666665,
+    "avgConsentFailures": 0,
+    "avgInterestingSignalCaptureRate": 0.7916666666666666,
+    "avgEngagementQualityRate": 0.2222222222222222,
+    "avgSemanticUnderstandingRate": 0.6805555555555555,
+    "avgNonGenericRate": 1,
+    "httpErrorRuns": 0
+  },
+  "delta": {
+    "avgSemanticScore": -2.5,
+    "passRate": 0,
+    "hasDeepRate": 1,
+    "hasDataCollectionRate": 0.5,
+    "interestingSignalCaptureRate": 0,
+    "engagementQualityRate": 0.056,
+    "semanticUnderstandingRate": 0.056,
+    "avgTransitionFailures": 2.667,
+    "avgConsentFailures": 0
+  },
+  "runs": {
+    "production": [
+      {
+        "env": "production",
+        "run": 1,
+        "persona": "manager_pragmatico",
+        "conversationId": "cmlj7awls0000odrquv85yl6a",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 83,
+        "transitionFailures": 0,
+        "consentFailures": 0,
+        "hasDeep": false,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.9166666666666666,
+        "engagementQualityRate": 0.25,
+        "semanticUnderstandingRate": 0.8333333333333334,
+        "nonGenericRate": 0.9166666666666666,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "Serve concretezza: meno hype e più risultati misurabili."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, quindi la ricerca di risultati concreti è fondamentale per te. Quali aspettative specifiche hai riguardo all'integrazione dell'intelligenza artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver condiviso. Ci sono progetti specifici attualmente in corso presso Bianchi SRL che coinvolgono l'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Il rischio principale è implementare troppo presto senza governance."
+          },
+          {
+            "role": "assistant",
+            "content": "È un'osservazione importante, il rischio di mancanza di governance può essere significativo. Quali misure pensi potrebbero aiutare a gestire questi rischi nel contesto dei vostri progetti AI?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "content": "È comprensibile, l'applicazione pratica è cruciale. Quali tipi di casi reali o esperienze concrete ti piacerebbe vedere trattati durante il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "content": "È comprensibile, l'applicazione pratica è cruciale. Quali tipi di casi reali o esperienze concrete ti piacerebbe vedere trattati durante il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Per me conta avere KPI chiari e ownership interna."
+          },
+          {
+            "role": "assistant",
+            "content": "È chiaro che la trasparenza e la responsabilità siano fondamentali. Ci sono esempi di KPI o modelli di governance che avete già implementato con successo in altri progetti?"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "content": "È interessante sapere che l'AI sta influenzando velocità decisionale e qualità del servizio. Puoi condividere come avete misurato questi impatti nella vostra azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per averlo sottolineato. Tornando ai progetti futuri, ci sono iniziative specifiche che prevedete di sviluppare con l'AI in futuro?"
+          },
+          {
+            "role": "user",
+            "content": "Per me conta avere KPI chiari e ownership interna."
+          },
+          {
+            "role": "assistant",
+            "content": "Apprezzo molto la tua attenzione ai KPI chiari e all'ownership interna. Vorresti dedicare qualche minuto in più per approfondire alcune domande su questi temi?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per la disponibilità. Hai menzionato l'importanza di avere casi reali piuttosto che teorie. Potresti raccontarmi di un caso concreto in cui l'AI ha avuto un impatto significativo nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "content": "Hai menzionato Bianchi SRL in precedenza. Potresti condividere qualcosa di più sui progetti AI che avete avviato o che state considerando?"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "content": "Il fatto che l'impatto sia sulla velocità decisionale e sulla qualità del servizio è davvero cruciale. Hai qualche esempio specifico di come l'AI ha influenzato questi aspetti nella tua azienda?"
+          }
+        ]
+      },
+      {
+        "env": "production",
+        "run": 2,
+        "persona": "leader_collaborativo",
+        "conversationId": "cmlj7c7140001odrq4w8ihvpd",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 74,
+        "transitionFailures": 0,
+        "consentFailures": 0,
+        "hasDeep": false,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.75,
+        "engagementQualityRate": 0,
+        "semanticUnderstandingRate": 0.4166666666666667,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "L urgenza è culturale: servono competenze e fiducia nel cambiamento."
+          },
+          {
+            "role": "assistant",
+            "content": "È un punto cruciale quello che hai sollevato riguardo alla cultura e al cambiamento. Quali aspettative ha la tua azienda rispetto all'introduzione dell'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Ferri SPA"
+          },
+          {
+            "role": "assistant",
+            "content": "È interessante vedere come Ferri SPA stia affrontando il tema. Ci sono progetti significativi in corso legati all'intelligenza artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per avermi aggiornato. Parlando del valore percepito delle iniziative AI, come vengono viste queste innovazioni all'interno della tua organizzazione?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, grazie per la pazienza. Tornando al TEDx, ci sono temi specifici o iniziative legate all'intelligenza artificiale che ti interesserebbe vedere affrontati durante l'evento?"
+          },
+          {
+            "role": "user",
+            "content": "Le aspettative sul TEDx sono alte: mi aspetto visione ma anche strumenti pratici."
+          },
+          {
+            "role": "assistant",
+            "content": "È un'aspettativa importante quella di combinare visione e praticità. Ci sono temi specifici o strumenti pratici che pensi potrebbero essere particolarmente utili per la tua azienda durante il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver condiviso le tue aspettative. Se dovessi pensare alla collaborazione con TEDx, quali aspetti ritieni avrebbero più valore per la tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, grazie per la tua pazienza. Se ci sono altre considerazioni che ritieni importanti riguardo al TEDx, sentiti libero di condividerle."
+          },
+          {
+            "role": "user",
+            "content": "Le aspettative sul TEDx sono alte: mi aspetto visione ma anche strumenti pratici."
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver ribadito questo punto. Se ci fosse un percorso di co-progettazione con alcuni reparti della tua azienda, quali temi o progetti ti piacerebbe esplorare?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco che tu abbia già condiviso alcune informazioni. Grazie per la tua pazienza. Hai qualche minuto in più per rispondere ad alcune domande di approfondimento?"
+          },
+          {
+            "role": "user",
+            "content": "Le aspettative sul TEDx sono alte: mi aspetto visione ma anche strumenti pratici."
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver condiviso le tue aspettative sul TEDx. Hai qualche minuto in più per continuare con alcune domande extra di approfondimento?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "content": "Perfetto, grazie per la disponibilità. Tornando al tema dell'intelligenza artificiale, ci sono timori o resistenze particolari nel tuo settore riguardo all'adozione di queste tecnologie?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa capire come trasformare insight in iniziative concrete."
+          },
+          {
+            "role": "assistant",
+            "content": "Questa è una prospettiva molto pratica. Ci sono esempi o idee specifiche su come vorresti vedere questi insight trasformarsi in iniziative nella tua azienda?"
+          }
+        ]
+      },
+      {
+        "env": "production",
+        "run": 3,
+        "persona": "scettico_costruttivo",
+        "conversationId": "cmlj7dbud0002odrq4rwkihv5",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 82,
+        "transitionFailures": 0,
+        "consentFailures": 0,
+        "hasDeep": false,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.9166666666666666,
+        "engagementQualityRate": 0.16666666666666666,
+        "semanticUnderstandingRate": 0.6666666666666666,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "L urgenza è evitare decisioni guidate dalla fomo."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, il timore di prendere decisioni affrettate per non perdere opportunità è comprensibile. Quali sono le aspettative della tua azienda rispetto all'introduzione dell'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Riva Tech"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver condiviso. Quali iniziative aziendali sulla AI sono attualmente in corso presso Riva Tech?"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "content": "È interessante che tu abbia menzionato i rischi di superficialità. Potresti condividere un esempio di un progetto che state valutando o sviluppando?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa il tema etico e l impatto sul lavoro."
+          },
+          {
+            "role": "assistant",
+            "content": "Il tema etico e l'impatto sul lavoro sono sicuramente rilevanti. Quali aspetti specifici di questi temi ti piacerebbe vedere affrontati al TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Sono aperto a sperimentare, ma solo con casi d uso ben delimitati."
+          },
+          {
+            "role": "assistant",
+            "content": "È comprensibile voler procedere con cautela. Ci sono iniziative o progetti specifici che ritieni potrebbero essere esplorati durante il TEDx, sempre con un approccio ben definito?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa il tema etico e l impatto sul lavoro."
+          },
+          {
+            "role": "assistant",
+            "content": "Comprendo il tuo interesse per questi temi. Come pensi che il TEDx possa contribuire a esplorare l'etica e l'impatto dell'AI sul lavoro in modo significativo per la tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Scusami per la ripetizione. C'è un aspetto particolare della co-progettazione con il TEDx che pensi potrebbe essere vantaggioso per la tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver condiviso le tue opinioni finora. Ti andrebbe di proseguire con qualche domanda di approfondimento?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco concludere"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per il tuo tempo e le tue risposte. Se avrai altre domande o vorrai condividere ulteriori pensieri in futuro, saremo felici di ascoltarti. Buona giornata!"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "content": "Il tuo commento sulle potenzialità e i rischi di superficialità è molto interessante. Potresti condividere un esempio di un contesto dove hai visto questo rischio manifestarsi?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa il tema etico e l impatto sul lavoro."
+          },
+          {
+            "role": "assistant",
+            "content": "Il tuo interesse per l'etica e l'impatto sul lavoro è fondamentale. C'è un aspetto etico specifico che ritieni dovrebbe essere prioritario per la tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, e ti ringrazio per la pazienza. Se ci fosse un tema o un'iniziativa che non abbiamo menzionato, quale sarebbe importante per te esplorare al TEDx?"
+          }
+        ]
+      },
+      {
+        "env": "production",
+        "run": 4,
+        "persona": "manager_pragmatico",
+        "conversationId": "cmlj7ej1f0003odrqg8p4dqu5",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 76,
+        "transitionFailures": 0,
+        "consentFailures": 0,
+        "hasDeep": false,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.75,
+        "engagementQualityRate": 0.08333333333333333,
+        "semanticUnderstandingRate": 0.5,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "Nel breve periodo la priorità è capire dove l AI porta margine operativo reale."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco che state cercando di identificare aree dove l'AI può realmente migliorare il margine operativo. Quali aspettative specifiche avete rispetto all'implementazione dell'AI nella vostra azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver menzionato la vostra azienda. Ci sono progetti significativi sull'AI che Bianchi SRL sta attualmente sviluppando?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Chiedo scusa per la ripetizione. Quali sono i progetti futuri sull'AI che Bianchi SRL sta considerando?"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "content": "È interessante sapere che l'AI influisce sulla velocità decisionale e sulla qualità del servizio. Per quanto riguarda il TEDx, ci sono temi specifici che vi interesserebbe approfondire su questo argomento?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco concludere"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per il tuo tempo e le tue risposte. Se avrai altre domande o vorrai condividere ulteriori dettagli in futuro, saremo lieti di ascoltarti. Buona giornata!"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, la velocità decisionale e la qualità del servizio sono aspetti cruciali. Pensate che ci siano delle aree specifiche in cui il TEDx potrebbe offrire un valore aggiunto per migliorare ulteriormente questi aspetti?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "content": "Comprendo l'importanza dei casi reali. Ci sono settori o aziende specifiche di cui vorreste saperne di più attraverso esempi concreti al TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Per me conta avere KPI chiari e ownership interna."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, la chiarezza dei KPI e l'ownership interna sono fondamentali per il successo in un progetto di AI. Avresti qualche minuto in più per approfondire con alcune domande extra?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco concludere"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie mille per il tuo tempo e le tue risposte preziose. Se avrai altre domande o desideri partecipare a future discussioni, saremo felici di averti con noi. Buona giornata!"
+          },
+          {
+            "role": "user",
+            "content": "Per me conta avere KPI chiari e ownership interna."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, avere KPI chiari e ownership interna è fondamentale per il successo di un progetto. Ti andrebbe di proseguire con qualche domanda di approfondimento?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "content": "Ottimo! Potresti condividere un esempio di come avete implementato KPI chiari e ownership interna in un progetto AI recente?"
+          },
+          {
+            "role": "user",
+            "content": "Il rischio principale è implementare troppo presto senza governance."
+          },
+          {
+            "role": "assistant",
+            "content": "È un punto cruciale, quello del rischio di implementare senza una governance adeguata. Come pensate di affrontare questo rischio nella vostra azienda?"
+          }
+        ]
+      },
+      {
+        "env": "production",
+        "run": 5,
+        "persona": "leader_collaborativo",
+        "conversationId": "cmlj7fw3a0004odrqy1n1rral",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 82,
+        "transitionFailures": 0,
+        "consentFailures": 0,
+        "hasDeep": false,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.75,
+        "engagementQualityRate": 0.3333333333333333,
+        "semanticUnderstandingRate": 0.75,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "Per me la priorità è accompagnare le persone nella trasformazione con un piano chiaro."
+          },
+          {
+            "role": "assistant",
+            "content": "Quello che hai detto sulla necessità di un piano chiaro è fondamentale. Quali sono le tue aspettative rispetto all'intelligenza artificiale nel contesto aziendale?"
+          },
+          {
+            "role": "user",
+            "content": "Le aspettative sul TEDx sono alte: mi aspetto visione ma anche strumenti pratici."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, la combinazione di visione e strumenti pratici è cruciale. Parlando delle iniziative aziendali sull'AI, ci sono progetti significativi in corso nella tua organizzazione che ritieni particolarmente rilevanti?"
+          },
+          {
+            "role": "user",
+            "content": "Ferri SPA"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver condiviso. Puoi dirmi di più su un progetto AI specifico di Ferri SPA che consideri significativo?"
+          },
+          {
+            "role": "user",
+            "content": "Le aspettative sul TEDx sono alte: mi aspetto visione ma anche strumenti pratici."
+          },
+          {
+            "role": "assistant",
+            "content": "È comprensibile avere aspettative elevate per un evento come il TEDx. Ci sono temi specifici o iniziative che ti interesserebbe vedere trattati durante il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa capire come trasformare insight in iniziative concrete."
+          },
+          {
+            "role": "assistant",
+            "content": "È un punto davvero interessante. Come pensi che questi insight possano essere integrati nel tuo contesto lavorativo per creare valore concreto?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "content": "È un approccio molto strategico. Puoi condividere un esempio di come questi processi cross-team stanno aiutando a sperimentare con l'AI in modo responsabile?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa capire come trasformare insight in iniziative concrete."
+          },
+          {
+            "role": "assistant",
+            "content": "Hai menzionato l'importanza di trasformare gli insight in iniziative concrete. Quali strumenti o supporti pensi possano facilitare questo processo nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver condiviso le tue opinioni finora. Hai qualche minuto in più per approfondire ulteriormente con alcune domande extra?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per la disponibilità! Hai menzionato l'importanza di un piano chiaro per la trasformazione. Potresti condividere un esempio di come questo piano potrebbe aiutare la tua azienda a implementare meglio l'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Ferri SPA"
+          },
+          {
+            "role": "assistant",
+            "content": "Ho capito che Ferri SPA è un punto di riferimento importante per te. Grazie per aver condiviso questa informazione. Hai qualche minuto in più per continuare con alcune domande extra di approfondimento?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per la disponibilità! Parlando di Ferri SPA, quali sfide specifiche state affrontando nell'implementazione dell'AI che richiederebbero un piano chiaro di trasformazione?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "content": "È un approccio molto interessante. In che modo questi processi cross-team stanno influenzando la cultura aziendale e il modo in cui sperimentate con l'AI?"
+          }
+        ]
+      },
+      {
+        "env": "production",
+        "run": 6,
+        "persona": "scettico_costruttivo",
+        "conversationId": "cmlj7h2dj0005odrqooh2ygyl",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 77,
+        "transitionFailures": 0,
+        "consentFailures": 0,
+        "hasDeep": false,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.6666666666666666,
+        "engagementQualityRate": 0.16666666666666666,
+        "semanticUnderstandingRate": 0.5833333333333334,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "Prima di tutto voglio vedere utilità concreta, non slogan."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, il desiderio di vedere risultati tangibili è fondamentale. Quali aspettative hai rispetto all'implementazione dell'Intelligenza Artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco non dirlo"
+          },
+          {
+            "role": "assistant",
+            "content": "Va bene, non c'è problema. Ci sono progetti significativi sull'AI attualmente in corso nella tua azienda di cui sei a conoscenza?"
+          },
+          {
+            "role": "user",
+            "content": "Riva Tech"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per aver menzionato Riva Tech. Puoi dirmi di più su cosa stanno facendo in ambito AI?"
+          },
+          {
+            "role": "user",
+            "content": "Se non definiamo limiti e responsabilità, il progetto deraglia."
+          },
+          {
+            "role": "assistant",
+            "content": "È un punto cruciale, la gestione dei limiti è essenziale. Ci sono aspetti specifici del progetto in cui vedi la necessità di una maggiore chiarezza?"
+          },
+          {
+            "role": "user",
+            "content": "Se non definiamo limiti e responsabilità, il progetto deraglia."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, la definizione di limiti e responsabilità è davvero importante. Quali temi o iniziative specifiche ti interesserebbero maggiormente in un contesto come il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Sono aperto a sperimentare, ma solo con casi d uso ben delimitati."
+          },
+          {
+            "role": "assistant",
+            "content": "È comprensibile voler sperimentare in modo controllato. Ci sono aspetti specifici della collaborazione con TEDx che ritieni potrebbero avere più valore per la tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Riva Tech"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per il chiarimento. Quanto ritieni utile esplorare percorsi di co-progettazione tra i reparti della tua azienda e iniziative come TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per averlo sottolineato. C'è qualcos'altro che vorresti aggiungere riguardo all'Intelligenza Artificiale o alle iniziative future che potrebbero essere esplorate?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa il tema etico e l impatto sul lavoro."
+          },
+          {
+            "role": "assistant",
+            "content": "È interessante che tu abbia menzionato l'aspetto etico e l'impatto sul lavoro. Puoi dirmi di più su quali specifiche preoccupazioni o speranze hai riguardo a questi temi?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa il tema etico e l impatto sul lavoro."
+          },
+          {
+            "role": "assistant",
+            "content": "È un argomento molto rilevante. Come pensi che le questioni etiche legate all'intelligenza artificiale possano influenzare il tuo settore specifico?"
+          },
+          {
+            "role": "user",
+            "content": "Sono aperto a sperimentare, ma solo con casi d uso ben delimitati."
+          },
+          {
+            "role": "assistant",
+            "content": "Capisco, la sperimentazione controllata è fondamentale. Ci sono esempi di casi d'uso ben delimitati che hai in mente per l'AI nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "content": "Grazie per averlo ribadito. Se ci sono altri aspetti o domande che vorresti esplorare, fammi sapere."
+          }
+        ]
+      }
+    ],
+    "staging": [
+      {
+        "env": "staging",
+        "run": 1,
+        "persona": "manager_pragmatico",
+        "conversationId": "cmlj7ib4u0006odrq9a4c13bw",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 77,
+        "transitionFailures": 3,
+        "consentFailures": 0,
+        "hasDeep": true,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.9166666666666666,
+        "engagementQualityRate": 0.25,
+        "semanticUnderstandingRate": 0.5833333333333334,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "Serve concretezza: meno hype e più risultati misurabili."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Capisco, la ricerca di risultati tangibili è fondamentale. Quali aspettative hai rispetto all'uso dell'intelligenza artificiale nella tua azienda per ottenere questi risultati concreti?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco non dirlo"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Va bene, nessun problema. Ci sono delle aree in cui senti di avere buone competenze sull'AI o dove pensi ci sia bisogno di miglioramento?"
+          },
+          {
+            "role": "user",
+            "content": "Il rischio principale è implementare troppo presto senza governance."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Quello che dici sull'importanza della governance è cruciale. Ci sono progetti significativi in corso nella tua azienda che stanno affrontando questo tema?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Interessante sapere di Bianchi SRL. Ci sono iniziative specifiche che stanno sviluppando in ambito AI?"
+          },
+          {
+            "role": "user",
+            "content": "Il rischio principale è implementare troppo presto senza governance."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Capisco la preoccupazione. In che modo Bianchi SRL sta affrontando la questione della governance nei suoi progetti AI?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Quello che dici sui casi reali è un punto importante. Quali temi specifici ti piacerebbe vedere esplorati al TEDx, che potrebbero essere utili per la tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Grazie per aver condiviso. Ci sono aspetti particolari nella collaborazione con TEDx che ritieni possano apportare valore a Bianchi SRL?"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "È interessante sapere dell'impatto sulla velocità decisionale e sulla qualità del servizio. Come potrebbe una collaborazione con TEDx supportare questi obiettivi?"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Comprendo, questi sono aspetti cruciali. Ci sono esempi concreti in cui l'AI ha già migliorato queste aree nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP_OFFER",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Ti va di estendere l'intervista di qualche minuto per continuare?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Bene, grazie per la disponibilità! Potresti condividere un esempio di come l'intelligenza artificiale ha influenzato positivamente la velocità decisionale o la qualità del servizio in Bianchi SRL?"
+          },
+          {
+            "role": "user",
+            "content": "Per me conta avere KPI chiari e ownership interna."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "È un approccio molto focalizzato. In che modo Bianchi SRL sta lavorando per definire KPI e stabilire ownership nell’ambito dei progetti AI?"
+          }
+        ]
+      },
+      {
+        "env": "staging",
+        "run": 2,
+        "persona": "leader_collaborativo",
+        "conversationId": "cmlj7jhs90007odrqj8mni91f",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 74,
+        "transitionFailures": 3,
+        "consentFailures": 0,
+        "hasDeep": true,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.75,
+        "engagementQualityRate": 0.16666666666666666,
+        "semanticUnderstandingRate": 0.6666666666666666,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "L urgenza è culturale: servono competenze e fiducia nel cambiamento."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Hai toccato un punto cruciale riguardo l'importanza delle competenze e della fiducia nel cambiamento. Quali sono le tue aspettative rispetto all'utilizzo dell'intelligenza artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Ferri SPA"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per aver menzionato Ferri SPA. Mi interessa sapere, attualmente, qual è il livello di conoscenza e competenza sull'intelligenza artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Ferri SPA"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "È utile sapere che lavori presso Ferri SPA. Puoi raccontarmi se ci sono progetti significativi in corso legati all'intelligenza artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Grazie per la pazienza. Passando ad un altro aspetto, ci sono progetti futuri in sviluppo che coinvolgono l'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "È interessante che stiate adottando un approccio cross-team. Quali benefici sperate di ottenere attraverso queste sperimentazioni con l'AI?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Capisco, grazie per aver condiviso. Pensando al TEDx, quali temi o iniziative specifiche legate all'intelligenza artificiale ti interesserebbero particolarmente?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Grazie per aver sottolineato il focus sui processi cross-team. In relazione al TEDx, ci sono aspetti particolari di questa collaborazione che ritieni potrebbero avere un valore aggiunto per Ferri SPA?"
+          },
+          {
+            "role": "user",
+            "content": "Il valore emerge quando tecnologia e persone crescono insieme."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Quello che dici è molto significativo. In che modo pensi che una collaborazione con TEDx possa supportare questa crescita congiunta di tecnologia e persone?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa capire come trasformare insight in iniziative concrete."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "È un obiettivo importante. Quali tipi di supporto o risorse pensi potrebbero facilitare questa trasformazione degli insight in azioni concrete all'interno della tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP_OFFER",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per la tua pazienza. Vuoi continuare l'intervista per qualche minuto in più per esplorare altri aspetti?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Ottimo, grazie! Parlando di aspettative, quali risultati speri di vedere dall'integrazione dell'intelligenza artificiale nei vostri processi aziendali?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Capisco che i processi cross-team siano fondamentali. Quali sfide avete incontrato finora in questo approccio e come le state affrontando?"
+          }
+        ]
+      },
+      {
+        "env": "staging",
+        "run": 3,
+        "persona": "scettico_costruttivo",
+        "conversationId": "cmlj7kj7r0008odrqawt5orgq",
+        "httpErrors": 0,
+        "completed": true,
+        "totalMessages": 24,
+        "semanticScore": 79,
+        "transitionFailures": 3,
+        "consentFailures": 0,
+        "hasDeep": true,
+        "hasDataCollection": true,
+        "interestingSignalCaptureRate": 0.75,
+        "engagementQualityRate": 0.25,
+        "semanticUnderstandingRate": 0.9166666666666666,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "L urgenza è evitare decisioni guidate dalla fomo."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "È un punto cruciale quello che menzioni riguardo la fomo. Quali sono le tue aspettative rispetto all'adozione dell'intelligenza artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco non dirlo"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Va bene, capisco. Potresti condividere il tuo attuale livello di conoscenza e competenze sull'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Quello che dici sui rischi di superficialità è un punto importante. Ci sono iniziative aziendali sull'AI che reputi significative attualmente in corso?"
+          },
+          {
+            "role": "user",
+            "content": "Se non definiamo limiti e responsabilità, il progetto deraglia."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Hai toccato un aspetto critico riguardo ai limiti e responsabilità. Come pensi che questi possano essere gestiti nei progetti AI che state considerando o implementando?"
+          },
+          {
+            "role": "user",
+            "content": "Sono aperto a sperimentare, ma solo con casi d uso ben delimitati."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "La tua apertura verso casi d'uso ben delimitati è interessante. Ci sono progetti futuri che stai valutando e che rientrano in questa categoria?"
+          },
+          {
+            "role": "user",
+            "content": "Se non definiamo limiti e responsabilità, il progetto deraglia."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Quello che dici su limiti e responsabilità è un punto fondamentale. Passando ora alle aspettative per il TEDx, quali temi specifici o iniziative ti interesserebbero particolarmente?"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Capisco, hai menzionato rischi di superficialità. Quali aspetti di un evento come TEDx potrebbero aiutare a mitigare questi rischi secondo te?"
+          },
+          {
+            "role": "user",
+            "content": "Se non definiamo limiti e responsabilità, il progetto deraglia."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "La definizione di limiti e responsabilità è chiaramente fondamentale per te. Pensi che ci siano percorsi di co-progettazione con TEDx che potrebbero aiutare a mantenere questa struttura?"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Comprendo il tuo punto di vista sui rischi. Quali aspetti della collaborazione con TEDx potrebbero avere più valore per te?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa il tema etico e l impatto sul lavoro."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP_OFFER",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per aver condiviso il tuo interesse per l'etica e l'impatto sul lavoro. Ti andrebbe di estendere l'intervista di qualche minuto per approfondire ulteriormente?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco concludere"
+          },
+          {
+            "role": "assistant",
+            "phase": "DATA_COLLECTION",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie mille per il tuo tempo e le tue risposte. L'intervista è conclusa. Posso chiederti se sei disponibile a fornire i tuoi dati di contatto per restare in contatto?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco non lasciare i miei dati"
+          },
+          {
+            "role": "assistant",
+            "phase": "DATA_COLLECTION",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Va bene, grazie ancora per la tua partecipazione. Se avrai altre domande o desideri discutere ulteriormente in futuro, non esitare a contattarci."
+          }
+        ]
+      },
+      {
+        "env": "staging",
+        "run": 4,
+        "persona": "manager_pragmatico",
+        "conversationId": "cmlj7lomk0009odrqy0sszu6y",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 75,
+        "transitionFailures": 2,
+        "consentFailures": 0,
+        "hasDeep": true,
+        "hasDataCollection": false,
+        "interestingSignalCaptureRate": 0.9166666666666666,
+        "engagementQualityRate": 0.08333333333333333,
+        "semanticUnderstandingRate": 0.5,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "Nel breve periodo la priorità è capire dove l AI porta margine operativo reale."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Capisco, è interessante che tu menzioni il margine operativo. Quali aspettative specifiche avete rispetto all'introduzione dell'AI in termini di efficienza o innovazione?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Quello che dici sui casi reali è molto chiaro. Attualmente, quanto pensi che la tua azienda conosca e comprenda l'AI e le sue applicazioni pratiche?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Grazie per la condivisione. Ci sono progetti significativi sull'AI che Bianchi SRL sta attualmente portando avanti?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Capisco l'importanza dei casi pratici. Ci sono progetti attuali nell'ambito dell'AI che stai vedendo nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Bianchi SRL"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Interessante, quindi con Bianchi SRL. Quali sono le iniziative specifiche sull'AI che state considerando per il futuro?"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Quello che dici sull'impatto sulla velocità decisionale è un punto importante. Quali temi specifici ti piacerebbe vedere affrontati al TEDx riguardo all'AI?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Capisco la tua preferenza per un approccio pratico. Ti interesserebbe vedere esempi di co-progettazione tra aziende e il TEDx per sviluppare soluzioni AI?"
+          },
+          {
+            "role": "user",
+            "content": "Vorrei più casi reali e meno teoria."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Capisco, l'accento sui casi reali è chiaro. Ci sono reparti specifici in cui vedi un potenziale per collaborare con il TEDx per sviluppare soluzioni AI?"
+          },
+          {
+            "role": "user",
+            "content": "Nel nostro caso l impatto è sulla velocità decisionale e sulla qualità del servizio."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per aver evidenziato l'importanza di questi aspetti. Ci sono esempi concreti di come l'AI abbia già migliorato la velocità decisionale o la qualità del servizio nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP_OFFER",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Hai ragione, grazie per averlo ribadito. Ti ringrazio per il tempo dedicato finora. Ti andrebbe di estendere l'intervista di qualche minuto per continuare?"
+          },
+          {
+            "role": "user",
+            "content": "si continuiamo"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Ottimo, grazie per la disponibilità. Parlando di percezione dell'intelligenza artificiale, ci sono timori o resistenze specifiche che hai riscontrato all'interno della tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco non dirlo"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Va bene, comprendo la tua scelta. Passando ad altro, ci sono progetti futuri in cui vedi un ruolo significativo dell'AI all'interno di Bianchi SRL?"
+          }
+        ]
+      },
+      {
+        "env": "staging",
+        "run": 5,
+        "persona": "leader_collaborativo",
+        "conversationId": "cmlj7mt2u000aodrqxpbadsfr",
+        "httpErrors": 0,
+        "completed": false,
+        "totalMessages": 24,
+        "semanticScore": 77,
+        "transitionFailures": 2,
+        "consentFailures": 0,
+        "hasDeep": true,
+        "hasDataCollection": true,
+        "interestingSignalCaptureRate": 0.6666666666666666,
+        "engagementQualityRate": 0.3333333333333333,
+        "semanticUnderstandingRate": 0.6666666666666666,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "Per me la priorità è accompagnare le persone nella trasformazione con un piano chiaro."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Capisco, il supporto nella trasformazione è un punto cruciale. Quali aspettative hai rispetto all'uso dell'intelligenza artificiale in questo contesto?"
+          },
+          {
+            "role": "user",
+            "content": "Le aspettative sul TEDx sono alte: mi aspetto visione ma anche strumenti pratici."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "È interessante vedere come cerchi un equilibrio tra visione e praticità. Qual è il tuo attuale livello di conoscenza e competenze in tema di intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Questo approccio cross-team è molto interessante. Ci sono progetti significativi in corso legati all'intelligenza artificiale nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "Ferri SPA"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Grazie per averlo condiviso. Puoi parlarmi di qualche progetto specifico in cui state utilizzando l'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Il valore emerge quando tecnologia e persone crescono insieme."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "È un concetto molto potente. In che modo avete visto questo valore emergere nei vostri progetti attuali legati all'AI?"
+          },
+          {
+            "role": "user",
+            "content": "Le aspettative sul TEDx sono alte: mi aspetto visione ma anche strumenti pratici."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Capisco, desideri un evento che offra sia ispirazione che applicabilità. Quali temi specifici o iniziative ti piacerebbe vedere affrontati al TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Stiamo lavorando su processi cross-team per sperimentare in modo responsabile."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "La collaborazione cross-team è un elemento chiave. Come pensi che il TEDx potrebbe supportare o arricchire questi processi nella tua azienda?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco non dirlo"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Va bene, nessun problema. Ci sono altri aspetti della collaborazione con TEDx che ritieni importanti?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa capire come trasformare insight in iniziative concrete."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "È un obiettivo molto pratico. Ci sono aree specifiche in cui vorresti vedere questi insight trasformati in azioni concrete?"
+          },
+          {
+            "role": "user",
+            "content": "Il valore emerge quando tecnologia e persone crescono insieme."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP_OFFER",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Ti va di estendere l'intervista di qualche minuto per continuare?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco concludere"
+          },
+          {
+            "role": "assistant",
+            "phase": "DATA_COLLECTION",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie mille per il tuo tempo e le tue risposte. L'intervista è conclusa. Posso chiederti se possiamo raccogliere i tuoi dati di contatto per restare in contatto?"
+          },
+          {
+            "role": "user",
+            "content": "si va bene"
+          },
+          {
+            "role": "assistant",
+            "phase": "DATA_COLLECTION",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Perfetto! Qual è il tuo indirizzo email?"
+          }
+        ]
+      },
+      {
+        "env": "staging",
+        "run": 6,
+        "persona": "scettico_costruttivo",
+        "conversationId": "cmlj7nym3000bodrq9jpesbmt",
+        "httpErrors": 0,
+        "completed": true,
+        "totalMessages": 24,
+        "semanticScore": 77,
+        "transitionFailures": 3,
+        "consentFailures": 0,
+        "hasDeep": true,
+        "hasDataCollection": true,
+        "interestingSignalCaptureRate": 0.75,
+        "engagementQualityRate": 0.25,
+        "semanticUnderstandingRate": 0.75,
+        "nonGenericRate": 1,
+        "transcript": [
+          {
+            "role": "user",
+            "content": "L urgenza è evitare decisioni guidate dalla fomo."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Capisco, evitare decisioni affrettate è fondamentale. Quali sono le aspettative della tua azienda riguardo all'introduzione dell'intelligenza artificiale?"
+          },
+          {
+            "role": "user",
+            "content": "Riva Tech"
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per aver condiviso. Qual è il livello di conoscenza e competenze in AI all'interno di Riva Tech?"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Quello che dici sui rischi di superficialità è un punto importante. Ci sono iniziative aziendali sull'AI in corso alla Riva Tech che ritieni significative?"
+          },
+          {
+            "role": "user",
+            "content": "Se non definiamo limiti e responsabilità, il progetto deraglia."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "È un'osservazione cruciale. Quali misure state considerando per definire questi limiti e responsabilità nei vostri progetti AI?"
+          },
+          {
+            "role": "user",
+            "content": "Sono aperto a sperimentare, ma solo con casi d uso ben delimitati."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Iniziative Aziendali sull'AI",
+            "content": "Comprendo il tuo approccio cauto. Ci sono progetti futuri specifici in fase di sviluppo che seguono questa logica nei casi d'uso?"
+          },
+          {
+            "role": "user",
+            "content": "Sono aperto a sperimentare, ma solo con casi d uso ben delimitati."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Capisco, l'importanza di casi d'uso ben definiti è chiara. Quali temi o iniziative specifiche ti interesserebbero maggiormente in un evento come il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Mi interessa il tema etico e l impatto sul lavoro."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "È interessante che tu menzioni l'etica e l'impatto sul lavoro. In che modo questi temi potrebbero influenzare la tua partecipazione o collaborazione con eventi come il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "phase": "SCAN",
+            "topicLabel": "Aspettative per il TEDx",
+            "content": "Capisco, la superficialità è una preoccupazione. Troveresti utile un percorso di co-progettazione con alcuni reparti della tua azienda per affrontare questi rischi?"
+          },
+          {
+            "role": "user",
+            "content": "te l ho gia detto"
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per averlo sottolineato. Ci sono aspetti specifici che ritieni avrebbero più valore per te nella collaborazione con il TEDx?"
+          },
+          {
+            "role": "user",
+            "content": "Sono aperto a sperimentare, ma solo con casi d uso ben delimitati."
+          },
+          {
+            "role": "assistant",
+            "phase": "DEEP_OFFER",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per la tua risposta. Ti andrebbe di estendere l'intervista di qualche minuto per continuare?"
+          },
+          {
+            "role": "user",
+            "content": "preferisco concludere"
+          },
+          {
+            "role": "assistant",
+            "phase": "DATA_COLLECTION",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per aver condiviso le tue opinioni con noi. Possiamo raccogliere i tuoi contatti per eventuali aggiornamenti futuri?"
+          },
+          {
+            "role": "user",
+            "content": "Ci sono potenzialità ma anche rischi forti di superficialità."
+          },
+          {
+            "role": "assistant",
+            "phase": "DATA_COLLECTION",
+            "topicLabel": "Percezione dell'Intelligenza Artificiale",
+            "content": "Grazie per il tuo tempo e per aver condiviso le tue preziose intuizioni. Se avrai altre domande o desideri ulteriori informazioni, non esitare a contattarci."
+          }
+        ]
+      }
+    ]
+  }
+}

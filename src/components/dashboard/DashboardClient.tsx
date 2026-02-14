@@ -25,7 +25,8 @@ import {
     Activity,
     Settings,
     Globe,
-    ExternalLink
+    ExternalLink,
+    Link as LinkIcon
 } from "lucide-react";
 import { useState } from 'react';
 import Link from 'next/link';
@@ -91,9 +92,8 @@ export default function DashboardClient({
         }))
         : [];
 
-    // Handle CMS transfer navigation
-    const handleTransfer = (connectionId: string) => {
-        router.push(`/dashboard/cms/${connectionId}/settings`);
+    const handleOpenIntegrations = (projectId: string) => {
+        router.push(`/dashboard/projects/${projectId}/integrations`);
     };
 
     const handleDeleteConnection = async (connectionId: string) => {
@@ -154,7 +154,7 @@ export default function DashboardClient({
                         </div>
                     </div>
                     <Link
-                        href="/dashboard/settings/billing"
+                        href="/dashboard/billing"
                         className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all shadow-md active:scale-95"
                     >
                         Attiva Piano Pro
@@ -173,7 +173,7 @@ export default function DashboardClient({
                             <p className="text-sm text-red-700">Il tuo abbonamento è sospeso. Aggiorna il metodo di pagamento per riattivare i tuoi bot.</p>
                         </div>
                     </div>
-                    <Link href="/dashboard/settings/billing" className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">
+                    <Link href="/dashboard/billing" className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700">
                         Risolvi Ora
                     </Link>
                 </div>
@@ -240,7 +240,7 @@ export default function DashboardClient({
                         </Link>
                     )}
                     <Link
-                        href="/dashboard/settings/billing"
+                        href="/dashboard/billing"
                         className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
                     >
                         <TrendingUp className="w-4 h-4" />
@@ -305,8 +305,8 @@ export default function DashboardClient({
                     </div>
                     <div>
                         <div className="flex items-end justify-between mb-2">
-                            <p className="text-2xl font-bold text-gray-900">{(usage?.tokens.used || 0) > 1000 ? `${Math.round(usage!.tokens.used / 1000)}k` : usage?.tokens.used || 0}</p>
-                            <p className="text-xs text-gray-500">di {(usage?.tokens.limit || 0) >= 1000000 ? `${(usage!.tokens.limit / 1000000).toFixed(1)}M` : `${Math.round((usage?.tokens.limit || 0) / 1000)}k`}</p>
+                            <p className="text-2xl font-bold text-gray-900">{(usage?.tokens.used || 0) >= 1000 ? `${Math.round(usage!.tokens.used / 1000)}K` : usage?.tokens.used || 0}</p>
+                            <p className="text-xs text-gray-500">di {(usage?.tokens.limit || 0) >= 1000 ? `${Math.round((usage?.tokens.limit || 0) / 1000)}K` : usage?.tokens.limit || 0}</p>
                         </div>
                         <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
                             <div
@@ -324,7 +324,7 @@ export default function DashboardClient({
                         <p className="text-xs text-indigo-100/80">Acquista pacchetti extra senza abbonamento.</p>
                     </div>
                     <Link
-                        href="/dashboard/settings/billing#packages"
+                        href="/dashboard/billing#packages"
                         className="mt-3 flex items-center justify-center gap-2 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-all"
                     >
                         Compra Pacchetti <ArrowRight className="w-3 h-3" />
@@ -343,19 +343,25 @@ export default function DashboardClient({
                     </h2>
 
                     {/* CMS Dashboard Quick Access */}
-                    {currentCmsConnection && currentCmsConnection.status === 'ACTIVE' && (
-                        <button
-                            onClick={handleOpenCmsDashboard}
-                            disabled={isOpeningCms}
-                            className="w-full text-left block bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-wait"
+                    {currentCmsConnection && (
+                        <div className="block bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5 relative group cursor-pointer"
+                            onClick={() => {
+                                if (currentCmsConnection.status === 'ACTIVE') {
+                                    handleOpenCmsDashboard();
+                                } else if (selectedProject?.id) {
+                                    handleOpenIntegrations(selectedProject.id);
+                                }
+                            }}
                         >
                             <div className="flex items-start justify-between">
                                 <div>
                                     <h3 className="text-xl font-semibold mb-2">
-                                        {isOpeningCms ? 'Apertura...' : currentCmsConnection.name || 'Gestisci Sito Web'}
+                                        {isOpeningCms ? 'Apertura...' : currentCmsConnection.name || 'Sito Web Collegato'}
                                     </h3>
                                     <p className="text-emerald-100 text-sm">
-                                        Accedi alla dashboard CMS per gestire contenuti e pagine.
+                                        {currentCmsConnection.status === 'ACTIVE'
+                                            ? 'Accedi alla dashboard CMS per gestire contenuti.'
+                                            : 'Configura o gestisci la connessione CMS.'}
                                     </p>
                                 </div>
                                 <div className="p-2 bg-white/20 rounded-lg">
@@ -366,13 +372,49 @@ export default function DashboardClient({
                                     )}
                                 </div>
                             </div>
-                        </button>
+                            <div className="mt-4 flex gap-2 overflow-hidden h-0 group-hover:h-auto transition-all opacity-0 group-hover:opacity-100">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (selectedProject?.id) {
+                                            handleOpenIntegrations(selectedProject.id);
+                                        }
+                                    }}
+                                    className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded text-xs font-medium backdrop-blur-sm"
+                                >
+                                    Impostazioni
+                                </button>
+                                {currentCmsConnection.status === 'ACTIVE' && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenCmsDashboard();
+                                        }}
+                                        className="px-3 py-1.5 bg-white text-emerald-600 hover:bg-emerald-50 rounded text-xs font-medium shadow-sm"
+                                    >
+                                        Apri CMS
+                                    </button>
+                                )}
+                            </div>
+                        </div>
                     )}
-
+                    {/* Show all CMS connections when "All Projects" is selected */}
+                    {isAllProjects && allCmsConnections.map((conn: any) => (
+                        <CMSConnectionCard
+                            key={conn.id}
+                            connection={{
+                                ...conn,
+                                status: conn.status || 'ACTIVE'
+                            }}
+                            canManage={true}
+                            onSettings={handleOpenIntegrations}
+                            onDelete={handleDeleteConnection}
+                        />
+                    ))}
                     {/* Create Interview */}
                     {canCreateInterview.allowed ? (
                         <Link
-                            href="/onboarding"
+                            href="/dashboard/interviews/create"
                             className="block bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5"
                         >
                             <div className="flex items-start justify-between">
@@ -400,7 +442,7 @@ export default function DashboardClient({
                             </div>
                             <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-3 border-t border-gray-100 flex items-center justify-between px-6">
                                 <span className="text-xs font-semibold text-gray-600">Sblocca altre interviste</span>
-                                <Link href="/dashboard/settings/billing" className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-gray-800">
+                                <Link href="/dashboard/billing" className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-gray-800">
                                     Upgrade Piano
                                 </Link>
                             </div>
@@ -445,6 +487,24 @@ export default function DashboardClient({
                         </div>
                     )}
 
+                    {/* Brand Monitor (Renamed & Styled) */}
+                    <Link
+                        href="/dashboard/visibility/brands"
+                        className="block bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5"
+                    >
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h3 className="text-xl font-semibold mb-2">Brand Monitor</h3>
+                                <p className="text-purple-100 text-sm">
+                                    Monitora la visibilità del tuo brand negli LLM e motori di ricerca.
+                                </p>
+                            </div>
+                            <div className="p-2 bg-white/20 rounded-lg">
+                                <Eye className="w-6 h-6 text-white" />
+                            </div>
+                        </div>
+                    </Link>
+
                     <Link
                         href="/dashboard/templates"
                         className="block platform-card rounded-xl p-4 hover:border-gray-300 transition-colors group"
@@ -463,51 +523,25 @@ export default function DashboardClient({
                         </div>
                     </Link>
 
-                    <Link
-                        href="/dashboard/visibility/brands"
-                        className="block platform-card rounded-xl p-4 hover:border-purple-300 transition-colors group"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100">
-                                    <Eye className="w-4 h-4 text-purple-600" />
+                    {!isAllProjects && selectedProject && (
+                        <Link
+                            href={`/dashboard/projects/${selectedProject.id}/integrations`}
+                            className="block platform-card rounded-xl p-4 hover:border-emerald-300 transition-colors group"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-100">
+                                        <LinkIcon className="w-4 h-4 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900 text-sm">Integrazioni</h3>
+                                        <p className="text-gray-500 text-xs">Gestisci connessioni WordPress, WooCommerce e Google</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-900 text-sm">Brand Monitor</h3>
-                                    <p className="text-gray-500 text-xs">Monitora la visibilità del tuo brand</p>
-                                </div>
+                                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
                             </div>
-                            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                    </Link>
-
-                    {/* CMS Connection Card(s) */}
-                    {currentCmsConnection && (
-                        <CMSConnectionCard
-                            connection={{
-                                ...currentCmsConnection,
-                                projectName: selectedProject?.name || '',
-                                projectId: selectedProject?.id || '',
-                                status: currentCmsConnection.status || 'ACTIVE'
-                            }}
-                            canManage={true}
-                            onTransfer={handleTransfer}
-                            onDelete={handleDeleteConnection}
-                        />
+                        </Link>
                     )}
-                    {/* Show all CMS connections when "All Projects" is selected */}
-                    {isAllProjects && allCmsConnections.map((conn: any) => (
-                        <CMSConnectionCard
-                            key={conn.id}
-                            connection={{
-                                ...conn,
-                                status: conn.status || 'ACTIVE'
-                            }}
-                            canManage={true}
-                            onTransfer={handleTransfer}
-                            onDelete={handleDeleteConnection}
-                        />
-                    ))}
                 </div>
 
                 {/* Recent Activity List */}

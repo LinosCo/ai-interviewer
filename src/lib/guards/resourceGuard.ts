@@ -3,6 +3,18 @@ import { prisma } from '@/lib/prisma';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { CreditAction } from '@/config/creditCosts';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
+
+type GuardResult = {
+    allowed: boolean;
+    error?: string;
+    status?: number;
+    code?: 'CREDITS_EXHAUSTED' | 'ACCESS_DENIED';
+    userId?: string;
+    organizationId?: string | null;
+    creditsNeeded?: number;
+    creditsAvailable?: number;
+};
 
 /**
  * Mappa i vecchi resourceType ai nuovi CreditAction
@@ -14,6 +26,20 @@ const resourceToAction: Record<string, CreditAction> = {
     'VISIBILITY_QUERY': 'visibility_query',
     'AI_SUGGESTION': 'ai_tip_generation'
 };
+
+async function resolveOrganizationIdForUser(userId: string, projectId?: string): Promise<string | null> {
+    if (projectId) {
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { organizationId: true }
+        });
+        if (project?.organizationId) {
+            return project.organizationId;
+        }
+    }
+
+    return resolveActiveOrganizationIdForUser(userId);
+}
 
 /**
  * Verifica se l'utente può usare una risorsa
@@ -36,24 +62,15 @@ export async function checkResourceAccess(
     }
 
     const currentUserId = session.user.id;
-    let organizationId: string | null = null;
+    const currentUserRole = ('role' in session.user ? (session.user as { role?: string }).role : undefined);
+    const organizationId = await resolveOrganizationIdForUser(currentUserId, options?.projectId);
 
-    // 1. Determina l'organizzazione
-    if (options?.projectId) {
-        const project = await prisma.project.findUnique({
-            where: { id: options.projectId },
-            select: { organizationId: true }
-        });
-        organizationId = project?.organizationId || null;
-    }
-
-    // 2. Fallback alla prima organizzazione dell'utente (o quella personale) se manca projectId o orgId
-    if (!organizationId) {
-        const membership = await prisma.membership.findFirst({
-            where: { userId: currentUserId, status: 'ACTIVE' },
-            select: { organizationId: true }
-        });
-        organizationId = membership?.organizationId || null;
+    if (currentUserRole === 'ADMIN') {
+        return {
+            allowed: true,
+            userId: currentUserId,
+            organizationId
+        };
     }
 
     if (!organizationId) {
@@ -69,10 +86,12 @@ export async function checkResourceAccess(
     });
 
     if (!check.allowed) {
+        const isCreditsExhausted = check.reason === 'Crediti insufficienti';
         return {
             allowed: false,
             error: check.reason || 'Crediti insufficienti',
-            status: 403,
+            status: isCreditsExhausted ? 429 : 403,
+            code: isCreditsExhausted ? 'CREDITS_EXHAUSTED' : 'ACCESS_DENIED',
             userId: currentUserId,
             organizationId,
             creditsNeeded: check.creditsNeeded,
@@ -93,14 +112,15 @@ export async function checkResourceAccess(
  * Wrapper per API route handler con verifica crediti
  */
 export function withResourceGuard(
-    handler: Function,
+    handler: (req: Request, context: Record<string, unknown>) => Promise<Response>,
     resourceType: 'TOKENS' | 'INTERVIEW' | 'CHATBOT_SESSION' | 'VISIBILITY_QUERY' | 'AI_SUGGESTION'
 ) {
-    return async (req: Request, ...args: any[]) => {
-        const access = await checkResourceAccess(resourceType);
+    return async (req: Request, ...args: unknown[]) => {
+        const access = await checkResourceAccess(resourceType) as GuardResult;
 
         if (!access.allowed) {
             return NextResponse.json({
+                code: access.code || 'ACCESS_DENIED',
                 error: access.error,
                 creditsNeeded: access.creditsNeeded,
                 creditsAvailable: access.creditsAvailable
@@ -108,10 +128,10 @@ export function withResourceGuard(
         }
 
         return handler(req, {
-            ...args[0],
-            userId: access.userId,
-            organizationId: access.organizationId
-        });
+                ...((args[0] as Record<string, unknown>) || {}),
+                userId: access.userId,
+                organizationId: access.organizationId
+            });
     };
 }
 
@@ -121,30 +141,77 @@ export function withResourceGuard(
 export async function checkCreditsForAction(
     action: CreditAction,
     customAmount?: number,
-    projectId?: string
+    projectId?: string,
+    forcedOrganizationId?: string
 ) {
     const session = await auth();
     if (!session?.user?.id) {
-        return { allowed: false, error: 'Unauthorized', status: 401 };
+        // Public interview links must work for anonymous users.
+        // In that case we can charge credits directly to the interview owner's organization.
+        if (!forcedOrganizationId) {
+            return { allowed: false, error: 'Unauthorized', status: 401 };
+        }
+
+        const check = await TokenTrackingService.checkCanUseResource({
+            organizationId: forcedOrganizationId,
+            action,
+            customAmount
+        });
+
+        if (!check.allowed) {
+            const isCreditsExhausted = check.reason === 'Crediti insufficienti';
+            return {
+                allowed: false,
+                error: check.reason || 'Crediti insufficienti',
+                status: isCreditsExhausted ? 429 : 403,
+                code: isCreditsExhausted ? 'CREDITS_EXHAUSTED' : 'ACCESS_DENIED',
+                userId: undefined,
+                organizationId: forcedOrganizationId,
+                creditsNeeded: check.creditsNeeded,
+                creditsAvailable: check.creditsAvailable
+            };
+        }
+
+        return {
+            allowed: true,
+            userId: undefined,
+            organizationId: forcedOrganizationId,
+            creditsNeeded: check.creditsNeeded,
+            creditsAvailable: check.creditsAvailable
+        };
     }
 
     const currentUserId = session.user.id;
-    let organizationId: string | null = null;
+    const currentUserRole = ('role' in session.user ? (session.user as { role?: string }).role : undefined);
 
-    if (projectId) {
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { organizationId: true }
-        });
-        organizationId = project?.organizationId || null;
+    if (currentUserRole === 'ADMIN') {
+        return {
+            allowed: true,
+            userId: currentUserId,
+            organizationId: forcedOrganizationId || await resolveOrganizationIdForUser(currentUserId, projectId)
+        };
     }
 
-    if (!organizationId) {
-        const membership = await prisma.membership.findFirst({
-            where: { userId: currentUserId, status: 'ACTIVE' },
-            select: { organizationId: true }
+    let organizationId: string | null = null;
+
+    if (forcedOrganizationId) {
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: currentUserId,
+                    organizationId: forcedOrganizationId
+                }
+            },
+            select: { organizationId: true, status: true }
         });
-        organizationId = membership?.organizationId || null;
+
+        if (membership?.status !== 'ACTIVE') {
+            return { allowed: false, error: 'Organizzazione non accessibile', status: 403 };
+        }
+
+        organizationId = forcedOrganizationId;
+    } else {
+        organizationId = await resolveOrganizationIdForUser(currentUserId, projectId);
     }
 
     if (!organizationId) {
@@ -158,10 +225,12 @@ export async function checkCreditsForAction(
     });
 
     if (!check.allowed) {
+        const isCreditsExhausted = check.reason === 'Crediti insufficienti';
         return {
             allowed: false,
             error: check.reason || 'Crediti insufficienti',
-            status: 403,
+            status: isCreditsExhausted ? 429 : 403,
+            code: isCreditsExhausted ? 'CREDITS_EXHAUSTED' : 'ACCESS_DENIED',
             userId: currentUserId,
             organizationId,
             creditsNeeded: check.creditsNeeded,

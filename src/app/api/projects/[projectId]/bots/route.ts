@@ -9,6 +9,7 @@ export async function GET(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
         const { searchParams } = new URL(req.url);
@@ -19,7 +20,7 @@ export async function GET(
         const access = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId
                 }
             }
@@ -30,14 +31,17 @@ export async function GET(
             where: { id: projectId },
             select: { ownerId: true, organizationId: true }
         });
+        if (!project) {
+            return new Response('Project not found', { status: 404 });
+        }
 
         // Admin can access all
         const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: currentUserId },
             select: { role: true }
         });
 
-        const isOwner = project?.ownerId === session.user.id;
+        const isOwner = project.ownerId === currentUserId;
         const isAdmin = user?.role === 'ADMIN';
 
         if (!access && !isOwner && !isAdmin) {
@@ -46,6 +50,8 @@ export async function GET(
 
         // If includeAll, return both linked and available tools (bots + trackers)
         if (includeAll) {
+            const projectOrganizationId = project.organizationId;
+
             // 1. Fetch Bots
             const linkedBots = await prisma.bot.findMany({
                 where: { projectId },
@@ -54,25 +60,41 @@ export async function GET(
             });
 
             // 2. Fetch Trackers (VisibilityConfigs)
-            const linkedTrackers = await prisma.visibilityConfig.findMany({
-                where: { projectId },
-                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
-                orderBy: { updatedAt: 'desc' }
-            });
+            let linkedTrackers: any[] = [];
+            try {
+                linkedTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: projectOrganizationId || undefined,
+                        OR: [
+                            { projectId },
+                            { projectShares: { some: { projectId } } }
+                        ]
+                    },
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } },
+                        projectShares: { select: { projectId: true } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            } catch (error: any) {
+                if (error?.code !== 'P2021') throw error;
+                linkedTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: projectOrganizationId || undefined,
+                        projectId
+                    },
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            }
 
-            // Get all accessible projects
-            const userMemberships = await prisma.membership.findMany({
-                where: { userId: session.user.id },
-                select: { organizationId: true }
-            });
-            const orgIds = userMemberships.map(m => m.organizationId);
-
+            // Keep tool association scope consistent with current project organization.
+            // This avoids cross-organization leakage in the project tools manager.
             const allAccessibleProjects = await prisma.project.findMany({
                 where: {
-                    OR: [
-                        { organizationId: { in: orgIds } },
-                        { ownerId: session.user.id }
-                    ]
+                    organizationId: projectOrganizationId || undefined
                 },
                 select: { id: true }
             });
@@ -86,17 +108,45 @@ export async function GET(
                 orderBy: { updatedAt: 'desc' }
             });
 
-            const availableTrackers = await prisma.visibilityConfig.findMany({
-                where: {
-                    projectId: { in: allProjectIds, not: projectId }
-                },
-                include: { project: { select: { name: true, organization: { select: { name: true } } } } },
-                orderBy: { updatedAt: 'desc' }
-            });
+            let availableTrackers: any[] = [];
+            try {
+                availableTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: projectOrganizationId || undefined,
+                        NOT: {
+                            OR: [
+                                { projectId },
+                                { projectShares: { some: { projectId } } }
+                            ]
+                        },
+                        OR: [
+                            { projectId: { in: allProjectIds, not: projectId } },
+                            { projectShares: { some: { projectId: { in: allProjectIds, not: projectId } } } }
+                        ]
+                    },
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } },
+                        projectShares: { select: { projectId: true } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            } catch (error: any) {
+                if (error?.code !== 'P2021') throw error;
+                availableTrackers = await prisma.visibilityConfig.findMany({
+                    where: {
+                        organizationId: projectOrganizationId || undefined,
+                        projectId: { in: allProjectIds, not: projectId }
+                    },
+                    include: {
+                        project: { select: { name: true, organization: { select: { name: true } } } }
+                    },
+                    orderBy: { updatedAt: 'desc' }
+                });
+            }
 
             // Find the owner's personal project ID
             const personalProject = await prisma.project.findFirst({
-                where: { ownerId: session.user.id, isPersonal: true },
+                where: { ownerId: currentUserId, isPersonal: true },
                 select: { id: true }
             });
 
@@ -115,7 +165,7 @@ export async function GET(
                 name: t.brandName,
                 type: 'tracker',
                 botType: 'tracker',
-                projectId: t.projectId,
+                projectId: t.projectId || t.projectShares?.[0]?.projectId || null,
                 projectName: t.project?.name || null,
                 orgName: t.project?.organization?.name || null
             });
@@ -166,6 +216,7 @@ export async function POST(
     try {
         const session = await auth();
         if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+        const currentUserId = session.user.id;
 
         const { projectId } = await params;
         const body = await req.json();
@@ -182,7 +233,7 @@ export async function POST(
         const currentAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId
                 }
             }
@@ -194,7 +245,7 @@ export async function POST(
             select: { ownerId: true }
         });
 
-        const isOwner = currentProject?.ownerId === session.user.id;
+        const isOwner = currentProject?.ownerId === currentUserId;
         const hasOwnerAccess = currentAccess?.role === 'OWNER';
 
         if (!isOwner && !hasOwnerAccess) {
@@ -208,7 +259,7 @@ export async function POST(
         const targetAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId: targetProjectId
                 }
             }
@@ -227,7 +278,7 @@ export async function POST(
             );
         }
 
-        const isTargetOwner = targetProject.ownerId === session.user.id;
+        const isTargetOwner = targetProject.ownerId === currentUserId;
 
         if (!targetAccess && !isTargetOwner) {
             return NextResponse.json(
@@ -271,14 +322,14 @@ export async function POST(
         const botProjectAccess = await prisma.projectAccess.findUnique({
             where: {
                 userId_projectId: {
-                    userId: session.user.id,
+                    userId: currentUserId,
                     projectId: toolCurrentProjectId
                 }
             }
         });
 
         // Also check if user is owner of tool's current project
-        const isToolProjectOwner = tool?.project?.ownerId === session.user.id;
+        const isToolProjectOwner = tool?.project?.ownerId === currentUserId;
 
         if (!botProjectAccess && !isToolProjectOwner) {
             return NextResponse.json(
@@ -294,7 +345,7 @@ export async function POST(
                 data: { projectId: targetProjectId }
             });
         } else {
-            // For visibility configs, we also need to update organizationId
+            // For visibility configs, we update organizationId and projectId
             await prisma.visibilityConfig.update({
                 where: { id: botId },
                 data: {
@@ -302,6 +353,39 @@ export async function POST(
                     ...(targetProject.organizationId && { organizationId: targetProject.organizationId })
                 }
             });
+
+            // Handle ProjectVisibilityConfig associations (OUTSIDE transaction to avoid poisoning)
+            // 1. Check if table exists
+            const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
+                SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ProjectVisibilityConfig')
+            `;
+            const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+
+            if (projectVisibilityConfigExists) {
+                // 2. Upsert target association
+                await prisma.projectVisibilityConfig.upsert({
+                    where: {
+                        projectId_configId: {
+                            projectId: targetProjectId,
+                            configId: botId
+                        }
+                    },
+                    update: {},
+                    create: {
+                        projectId: targetProjectId,
+                        configId: botId,
+                        createdBy: currentUserId
+                    }
+                });
+
+                // 3. Delete source association
+                await prisma.projectVisibilityConfig.deleteMany({
+                    where: {
+                        projectId,
+                        configId: botId
+                    }
+                });
+            }
         }
 
         return NextResponse.json({
@@ -312,5 +396,5 @@ export async function POST(
     } catch (error) {
         console.error('Transfer Bot Error:', error);
         return new Response('Internal Server Error', { status: 500 });
-}
+    }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface Message {
     id: string;
@@ -8,12 +8,24 @@ interface Message {
     content: string;
 }
 
-export default function ChatInterface({ conversationId, botId, initialMessages, topics }: any) {
+interface ChatInterfaceProps {
+    conversationId: string;
+    botId: string;
+    initialMessages?: Message[];
+    topics?: unknown;
+}
+
+export default function ChatInterface({ conversationId, botId, initialMessages, topics }: ChatInterfaceProps) {
+    void topics;
+
     const [messages, setMessages] = useState<Message[]>(initialMessages || []);
+    const messagesRef = useRef<Message[]>(initialMessages || []);
+    const hasAutoStartedRef = useRef(false);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [effectiveSeconds, setEffectiveSeconds] = useState(0);
     const [isTyping, setIsTyping] = useState(false);
+    const inFlightRequestRef = useRef(false);
     const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -25,15 +37,14 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
         scrollToBottom();
     }, [messages]);
 
-    // Auto-start conversation if no messages
     useEffect(() => {
-        if (messages.length === 0 && !isLoading) {
-            startInterview();
-        }
-    }, []);
+        messagesRef.current = messages;
+    }, [messages]);
 
-    const startInterview = async () => {
+    const startInterview = useCallback(async () => {
+        if (inFlightRequestRef.current) return;
         setIsLoading(true);
+        inFlightRequestRef.current = true;
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -48,7 +59,8 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
             if (!response.ok) throw new Error('Failed to start');
 
-            const assistantText = await response.text();
+            const data = await response.json();
+            const assistantText = data.text || '';
             setMessages(prev => [...prev, {
                 id: Date.now().toString(),
                 role: 'assistant',
@@ -58,8 +70,18 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
             console.error('Start error:', error);
         } finally {
             setIsLoading(false);
+            inFlightRequestRef.current = false;
         }
-    };
+    }, [botId, conversationId]);
+
+    // Auto-start conversation if no messages (run once).
+    useEffect(() => {
+        if (hasAutoStartedRef.current) return;
+        if (messagesRef.current.length === 0) {
+            hasAutoStartedRef.current = true;
+            void startInterview();
+        }
+    }, [startInterview]);
 
     // Effective Time Timer
     useEffect(() => {
@@ -73,10 +95,12 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
     }, [isTyping, isLoading]);
 
     const handleSendMessage = async (messageContent: string) => {
-        if (!messageContent.trim() || isLoading) return;
+        if (!messageContent.trim() || isLoading || inFlightRequestRef.current) return;
 
         const userMessage: Message = {
-            id: Date.now().toString(),
+            id: (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+                ? crypto.randomUUID()
+                : Date.now().toString(),
             role: 'user',
             content: messageContent
         };
@@ -86,16 +110,18 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
 
         // Let's add interval for Thinking Time
         setIsLoading(true);
+        inFlightRequestRef.current = true;
 
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    messages: [...messages, userMessage],
+                    messages: [...messagesRef.current, userMessage],
                     conversationId,
                     botId,
-                    effectiveDuration: Math.floor(effectiveSeconds)
+                    effectiveDuration: Math.floor(effectiveSeconds),
+                    clientMessageId: userMessage.id
                 })
             });
 
@@ -103,8 +129,8 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
                 throw new Error('Failed to get response');
             }
 
-            // Read plain text response
-            const assistantText = await response.text();
+            const data = await response.json();
+            const assistantText = data.text || '';
 
             // Calculate Reading Time: ~225 words per minute
             const wordCount = assistantText.split(/\s+/).length;
@@ -125,6 +151,7 @@ export default function ChatInterface({ conversationId, botId, initialMessages, 
             }]);
         } finally {
             setIsLoading(false);
+            inFlightRequestRef.current = false;
         }
     };
 

@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import {
     LayoutGrid,
     Bot,
@@ -12,13 +13,15 @@ import {
     Calendar,
     ArrowRight,
     Zap,
-    Search
+    Search,
+    Link as LinkIcon
 } from "lucide-react";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ProjectUserManagementDialog } from './user-management-dialog';
+import { PLANS, subscriptionTierToPlanType, PlanType } from '@/config/plans';
 
 export default async function ProjectCockpitPage({ params }: { params: Promise<{ projectId: string }> }) {
     const session = await auth();
@@ -49,9 +52,54 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
     const hasAccess = project.ownerId === userId || project.accessList.some(a => a.userId === userId);
     if (!hasAccess) redirect('/dashboard/projects');
 
+    const cookieStore = await cookies();
+    const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
+    const membership = project.organizationId
+        ? await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId: activeOrgId || project.organizationId
+                }
+            },
+            include: {
+                organization: { include: { subscription: true } }
+            }
+        })
+        : null;
+    const planType = membership?.organization?.subscription
+        ? subscriptionTierToPlanType(membership.organization.subscription.tier)
+        : PlanType.TRIAL;
+    const plan = PLANS[planType];
+    const hasChatbot = plan.features.chatbot;
+    const hasVisibilityTracker = plan.features.visibilityTracker;
+
     const interviews = project.bots.filter(b => (b as any).botType === 'interview' || !(b as any).botType);
     const chatbots = project.bots.filter(b => (b as any).botType === 'chatbot');
-    const trackers = project.visibilityConfigs;
+    let trackers = [];
+    try {
+        trackers = await prisma.visibilityConfig.findMany({
+            where: {
+                organizationId: project.organizationId || undefined,
+                OR: [
+                    { projectId },
+                    { projectShares: { some: { projectId } } }
+                ]
+            },
+            orderBy: { createdAt: 'desc' },
+            include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
+        });
+    } catch (error: any) {
+        if (error?.code !== 'P2021') throw error;
+        trackers = await prisma.visibilityConfig.findMany({
+            where: {
+                organizationId: project.organizationId || undefined,
+                projectId
+            },
+            orderBy: { createdAt: 'desc' },
+            include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
+        });
+    }
 
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto">
@@ -96,7 +144,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                                 <MessageSquare className="w-5 h-5 text-amber-500" />
                                 Interviste AI
                             </h3>
-                            <Link href={`/onboarding?projectId=${projectId}`}>
+                            <Link href={`/dashboard/interviews/create?projectId=${projectId}`}>
                                 <Button variant="ghost" size="sm" className="text-amber-600 font-bold hover:bg-amber-50 rounded-lg">
                                     <Plus className="w-4 h-4 mr-1" /> Nuova
                                 </Button>
@@ -106,7 +154,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             <Card className="border-dashed bg-slate-50/50">
                                 <CardContent className="py-10 text-center">
                                     <p className="text-sm text-slate-500 mb-4">Nessuna intervista creata in questo progetto.</p>
-                                    <Link href={`/onboarding?projectId=${projectId}`}>
+                                    <Link href={`/dashboard/interviews/create?projectId=${projectId}`}>
                                         <Button size="sm" variant="outline" className="rounded-xl font-bold">Crea la prima intervista</Button>
                                     </Link>
                                 </CardContent>
@@ -142,19 +190,40 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                                 <Bot className="w-5 h-5 text-blue-500" />
                                 Chatbot Assistenti
                             </h3>
-                            <Link href={`/dashboard/bots/create-chatbot?projectId=${projectId}`}>
-                                <Button variant="ghost" size="sm" className="text-blue-600 font-bold hover:bg-blue-50 rounded-lg">
-                                    <Plus className="w-4 h-4 mr-1" /> Nuovo
-                                </Button>
-                            </Link>
+                            {hasChatbot ? (
+                                <Link href={`/dashboard/bots/create-chatbot?projectId=${projectId}`}>
+                                    <Button variant="ghost" size="sm" className="text-blue-600 font-bold hover:bg-blue-50 rounded-lg">
+                                        <Plus className="w-4 h-4 mr-1" /> Nuovo
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <Link href="/dashboard/billing/plans">
+                                    <Button variant="outline" size="sm" className="border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg">
+                                        Upgrade
+                                    </Button>
+                                </Link>
+                            )}
                         </div>
                         {chatbots.length === 0 ? (
                             <Card className="border-dashed bg-slate-50/50">
                                 <CardContent className="py-10 text-center">
-                                    <p className="text-sm text-slate-500 mb-4">Nessun chatbot configurato per questo progetto.</p>
-                                    <Link href={`/dashboard/bots/create-chatbot?projectId=${projectId}`}>
-                                        <Button size="sm" variant="outline" className="rounded-xl font-bold">Configura un chatbot</Button>
-                                    </Link>
+                                    {hasChatbot ? (
+                                        <>
+                                            <p className="text-sm text-slate-500 mb-4">Nessun chatbot configurato per questo progetto.</p>
+                                            <Link href={`/dashboard/bots/create-chatbot?projectId=${projectId}`}>
+                                                <Button size="sm" variant="outline" className="rounded-xl font-bold">Configura un chatbot</Button>
+                                            </Link>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm text-amber-700 mb-4">Azione bloccata dal piano attuale: i chatbot non sono inclusi.</p>
+                                            <Link href="/dashboard/billing/plans">
+                                                <Button size="sm" variant="outline" className="rounded-xl font-bold border-amber-200 text-amber-700 hover:bg-amber-50">
+                                                    Upgrade per sbloccare
+                                                </Button>
+                                            </Link>
+                                        </>
+                                    )}
                                 </CardContent>
                             </Card>
                         ) : (
@@ -181,31 +250,54 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         )}
                     </section>
 
-                    {/* Sezione Presenza Online */}
-                    <div className="bg-white rounded-[2rem] border border-stone-100 p-8 shadow-sm">
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h3 className="text-xl font-bold text-stone-900 flex items-center gap-2">
-                                    <Eye className="w-5 h-5 text-purple-500" />
-                                    Monitor visibilità
-                                </h3>
-                            </div>
-                            <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
-                                <Button variant="ghost" size="sm" className="text-purple-600 font-bold hover:bg-purple-50 rounded-lg">
-                                    <Plus className="w-4 h-4 mr-1" /> Nuovo
-                                </Button>
-                            </Link>
+                    {/* Monitor visibilita */}
+                    <section className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                                <Eye className="w-5 h-5 text-purple-500" />
+                                Monitor visibilità
+                            </h3>
+                            {hasVisibilityTracker ? (
+                                <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
+                                    <Button variant="ghost" size="sm" className="text-purple-600 font-bold hover:bg-purple-50 rounded-lg">
+                                        <Plus className="w-4 h-4 mr-1" /> Nuovo
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <Link href="/dashboard/billing/plans">
+                                    <Button variant="outline" size="sm" className="border-amber-200 text-amber-700 hover:bg-amber-50 rounded-lg">
+                                        Upgrade
+                                    </Button>
+                                </Link>
+                            )}
                         </div>
                         {trackers.length === 0 ? (
-                            <div className="text-center py-10 bg-stone-50 rounded-2xl border border-stone-100">
-                                <Search className="w-10 h-10 text-stone-300 mx-auto mb-4" />
-                                <p className="text-stone-500 mb-6">
-                                    Configura almeno un un <strong>monitoraggio visibilità</strong> per iniziare a ricevere insights unificati su questo progetto.
-                                </p>
-                                <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
-                                    <Button size="sm" variant="outline" className="rounded-xl font-bold">Attiva monitoraggio</Button>
-                                </Link>
-                            </div>
+                            <Card className="border-dashed bg-slate-50/50">
+                                <CardContent className="py-10 text-center">
+                                <Search className="w-10 h-10 text-slate-300 mx-auto mb-4" />
+                                {hasVisibilityTracker ? (
+                                    <>
+                                        <p className="text-sm text-slate-500 mb-6">
+                                            Configura almeno un un <strong>monitoraggio visibilità</strong> per iniziare a ricevere insights unificati su questo progetto.
+                                        </p>
+                                        <Link href={`/dashboard/visibility/create?projectId=${projectId}`}>
+                                            <Button size="sm" variant="outline" className="rounded-xl font-bold">Attiva monitoraggio</Button>
+                                        </Link>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-sm text-amber-700 mb-6">
+                                            Azione bloccata dal piano attuale: il monitor visibilità non è incluso.
+                                        </p>
+                                        <Link href="/dashboard/billing/plans">
+                                            <Button size="sm" variant="outline" className="rounded-xl font-bold border-amber-200 text-amber-700 hover:bg-amber-50">
+                                                Upgrade per sbloccare
+                                            </Button>
+                                        </Link>
+                                    </>
+                                )}
+                                </CardContent>
+                            </Card>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {trackers.map(config => (
@@ -228,7 +320,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </section>
                 </div>
 
                 {/* Right Column: Project Info & Quick Tools */}
@@ -279,8 +371,27 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                             </div>
                         </CardContent>
                     </Card>
-                </div>
-            </div>
-        </div>
+
+                    <Card className="border-slate-200">
+                        <CardHeader>
+                            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+                                <LinkIcon className="w-4 h-4 text-emerald-500" />
+                                Integrazioni
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                                Connetti questo progetto a piattaforme esterne come <strong>WordPress</strong>, <strong>WooCommerce</strong> o <strong>Google Search Console</strong>.
+                            </p>
+                            <Link href={`/dashboard/projects/${projectId}/integrations`}>
+                                <Button variant="outline" className="w-full border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] font-black uppercase tracking-widest h-10 rounded-xl">
+                                    Gestisci Connessioni
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                </div >
+            </div >
+        </div >
     );
 }

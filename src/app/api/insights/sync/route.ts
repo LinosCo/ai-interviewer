@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { CrossChannelSyncEngine } from '@/lib/insights/sync-engine';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 export async function POST(request: Request) {
     try {
@@ -12,13 +13,11 @@ export async function POST(request: Request) {
 
         const { searchParams } = new URL(request.url);
         const projectId = searchParams.get('projectId');
+        const selectedOrganizationId = searchParams.get('organizationId');
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: { memberships: { take: 1 } }
+        const orgId = await resolveActiveOrganizationIdForUser(session.user.id, {
+            preferredOrganizationId: selectedOrganizationId
         });
-
-        const orgId = user?.memberships[0]?.organizationId;
         if (!orgId) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
@@ -59,13 +58,11 @@ export async function GET(request: Request) {
 
         const { searchParams } = new URL(request.url);
         const projectId = searchParams.get('projectId');
+        const selectedOrganizationId = searchParams.get('organizationId');
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: { memberships: { take: 1 } }
+        const orgId = await resolveActiveOrganizationIdForUser(session.user.id, {
+            preferredOrganizationId: selectedOrganizationId
         });
-
-        const orgId = user?.memberships[0]?.organizationId;
         if (!orgId) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }

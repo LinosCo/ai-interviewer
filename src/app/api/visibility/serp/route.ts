@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
 import { PLANS, PlanType } from '@/config/plans';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET - Fetch recent SERP monitoring results
@@ -17,11 +18,7 @@ export async function GET(request: Request) {
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: {
-                id: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
+                id: true
             }
         });
 
@@ -29,13 +26,17 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const organizationId = user.memberships[0]?.organizationId;
+        const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+        if (!organizationId) {
+            return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+        }
 
         // Get URL params
         const { searchParams } = new URL(request.url);
         const limit = parseInt(searchParams.get('limit') || '50');
+        const projectId = searchParams.get('projectId');
 
-        const data = await SerpMonitoringEngine.getRecentResults(organizationId, limit);
+        const data = await SerpMonitoringEngine.getRecentResults(organizationId, limit, { projectId });
 
         return NextResponse.json(data);
 
@@ -63,19 +64,13 @@ export async function POST(request: Request) {
             select: {
                 id: true,
                 plan: true,
-                role: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
+                role: true
             }
         });
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
-
-        const organizationId = user.memberships[0]?.organizationId;
 
         // Use user's plan (admin has unlimited access)
         const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
@@ -89,10 +84,48 @@ export async function POST(request: Request) {
             );
         }
 
-        // Get config
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { organizationId }
-        });
+        // Parse request body
+        const body = await request.json().catch(() => ({}));
+        const dateRange = body.dateRange || 'last_week';
+        const resultType = body.resultType || 'news';
+        const projectId = body.projectId;
+        const configId = body.configId;
+
+        let config: { id: string; organizationId: string } | null = null;
+        if (configId) {
+            config = await prisma.visibilityConfig.findUnique({
+                where: { id: configId },
+                select: { id: true, organizationId: true }
+            });
+        } else {
+            const organizationId = await resolveActiveOrganizationIdForUser(session.user.id);
+            if (!organizationId) {
+                return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+            }
+            try {
+                config = await prisma.visibilityConfig.findFirst({
+                    where: {
+                        organizationId,
+                        ...(projectId ? {
+                            OR: [
+                                { projectId: projectId },
+                                { projectShares: { some: { projectId: projectId } } }
+                            ]
+                        } : {})
+                    },
+                    select: { id: true, organizationId: true }
+                });
+            } catch (err: any) {
+                if (err?.code !== 'P2021') throw err;
+                config = await prisma.visibilityConfig.findFirst({
+                    where: {
+                        organizationId,
+                        ...(projectId ? { projectId } : {})
+                    },
+                    select: { id: true, organizationId: true }
+                });
+            }
+        }
 
         if (!config) {
             return NextResponse.json(
@@ -101,10 +134,18 @@ export async function POST(request: Request) {
             );
         }
 
-        // Parse request body
-        const body = await request.json().catch(() => ({}));
-        const dateRange = body.dateRange || 'last_week';
-        const resultType = body.resultType || 'news';
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
 
         // Run scan
         const result = await SerpMonitoringEngine.runScan(config.id, dateRange, resultType);

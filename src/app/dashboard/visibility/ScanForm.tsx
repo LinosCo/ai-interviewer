@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { ScanProgress } from "@/components/visibility/ScanProgress";
 import { showToast } from "@/components/toast";
 
@@ -56,16 +55,11 @@ export function ScanForm({ configId }: ScanFormProps) {
                 <Button
                     onClick={handleScan}
                     disabled={loading}
+                    loading={loading}
+                    loadingText="Scansione in corso..."
                     className="rounded-full px-6"
                 >
-                    {loading ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Scansione in corso...
-                        </>
-                    ) : (
-                        "Esegui Nuova Scansione"
-                    )}
+                    Esegui Nuova Scansione
                 </Button>
                 <p className="text-xs text-gray-500">Consuma crediti AI dal tuo piano</p>
             </div>

@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType } from '@/config/plans';
 import { TokenCategory } from '@prisma/client';
 import { CreditService } from './creditService';
-import { CreditAction, getCreditCost } from '@/config/creditCosts';
+import { CreditAction, getCreditCost, getModelCreditMultiplier, TOKEN_TO_CREDIT_RATE } from '@/config/creditCosts';
 
 /**
  * TokenTrackingService
@@ -46,6 +46,7 @@ export class TokenTrackingService {
         operation: string;
         resourceType?: string;
         resourceId?: string;
+        actionOverride?: CreditAction;
     }) {
         let { organizationId } = params;
         const {
@@ -58,17 +59,31 @@ export class TokenTrackingService {
             model,
             operation,
             resourceType,
-            resourceId
+            resourceId,
+            actionOverride
         } = params;
 
-        // Fallback: if organizationId is missing, try to find it from the user
+        // Fallback: if organizationId is missing, resolve from project first, then user membership
         if (!organizationId && (userId || executedById)) {
-            const userWithOrg = await prisma.user.findUnique({
-                where: { id: userId || executedById },
-                include: { memberships: { take: 1 } }
-            });
-            if (userWithOrg?.memberships?.[0]) {
-                organizationId = userWithOrg.memberships[0].organizationId;
+            if (projectId) {
+                const project = await prisma.project.findUnique({
+                    where: { id: projectId },
+                    select: { organizationId: true }
+                });
+                if (project?.organizationId) {
+                    organizationId = project.organizationId;
+                }
+            }
+
+            if (!organizationId) {
+                const membership = await prisma.membership.findFirst({
+                    where: { userId: userId || executedById, status: 'ACTIVE' },
+                    orderBy: { joinedAt: 'asc' },
+                    select: { organizationId: true }
+                });
+                if (membership?.organizationId) {
+                    organizationId = membership.organizationId;
+                }
             }
         }
 
@@ -96,12 +111,14 @@ export class TokenTrackingService {
         const totalTokens = inputTokens + outputTokens;
 
         // 1. Determina l'azione crediti dalla categoria
-        const action = this.categoryToAction[category] || 'interview_question';
+        const action = actionOverride || this.categoryToAction[category] || 'interview_question';
 
         // 2. Calcola crediti da consumare
         const baseCost = getCreditCost(action);
-        const tokenBasedCost = Math.ceil(totalTokens * 0.5); // 0.5 crediti per token
-        const creditsToConsume = Math.max(baseCost, tokenBasedCost);
+        const modelMultiplier = getModelCreditMultiplier(model);
+        const modelAdjustedBaseCost = Math.max(1, Math.ceil(baseCost * modelMultiplier));
+        const tokenBasedCost = Math.max(1, Math.ceil(totalTokens * TOKEN_TO_CREDIT_RATE * modelMultiplier));
+        const creditsToConsume = Math.max(modelAdjustedBaseCost, tokenBasedCost);
 
         // 3. Consuma i crediti dall'organizzazione
         const creditResult = await CreditService.consumeCredits(organizationId, action, {
@@ -199,7 +216,8 @@ export class TokenTrackingService {
                 plan: true,
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
-                packCreditsAvailable: true
+                packCreditsAvailable: true,
+                customLimits: true
             }
         });
 
@@ -208,6 +226,25 @@ export class TokenTrackingService {
         }
 
         const organization = org as any; // Bypass Prisma selection typing lag
+        const planConfig = PLANS[organization.plan as PlanType] || PLANS[PlanType.FREE];
+        const defaultPlanLimit = planConfig.monthlyCredits;
+        const hasCustomMonthlyLimit =
+            typeof organization.customLimits === 'object' &&
+            organization.customLimits !== null &&
+            (organization.customLimits as Record<string, unknown>).monthlyCreditsLimitCustom === true;
+
+        // Auto-heal stale prelaunch data: paid/business orgs left with old free-tier default.
+        if (
+            !hasCustomMonthlyLimit &&
+            defaultPlanLimit > 500 &&
+            organization.monthlyCreditsLimit === BigInt(500)
+        ) {
+            await prisma.organization.update({
+                where: { id: organizationId },
+                data: { monthlyCreditsLimit: BigInt(defaultPlanLimit) }
+            });
+            organization.monthlyCreditsLimit = BigInt(defaultPlanLimit);
+        }
 
         // Admin role o piano ADMIN hanno accesso illimitato
         if (organization.plan === 'ADMIN' || organization.monthlyCreditsLimit === BigInt(-1)) {
@@ -215,8 +252,7 @@ export class TokenTrackingService {
         }
 
         // Verifica feature disponibile per il piano
-        const plan = PLANS[organization.plan as PlanType] || PLANS[PlanType.FREE];
-        const featureCheck = this.checkFeatureForAction(action, plan);
+        const featureCheck = this.checkFeatureForAction(action, planConfig);
         if (!featureCheck.allowed) {
             return featureCheck;
         }

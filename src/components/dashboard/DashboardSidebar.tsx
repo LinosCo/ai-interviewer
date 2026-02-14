@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useProject } from '@/contexts/ProjectContext';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import OrganizationProjectSelector from './OrganizationProjectSelector';
 import { ChevronDown } from 'lucide-react';
+import CreditsWidget from './CreditsWidget';
 
 interface DashboardSidebarProps {
     isAdmin: boolean;
@@ -29,24 +31,41 @@ export function DashboardSidebar({
     const [isOpen, setIsOpen] = useState(false);
     const [adminExpanded, setAdminExpanded] = useState(false);
     const pathname = usePathname();
+    const { projects, selectedProject, isAllProjectsSelected } = useProject();
+
+    const activeProjectId = !isAllProjectsSelected && selectedProject?.id ? selectedProject.id : null;
 
     const toggleMenu = () => setIsOpen(!isOpen);
 
     // Navigation items configuration
-    const navigationItems = [
+    // Primary features (App core)
+    const primaryItems = [
         { href: '/dashboard/interviews', icon: Icons.MessageSquare, label: 'Interviste AI', visible: true },
         { href: '/dashboard/bots', icon: Icons.Bot, label: 'Chatbot AI', visible: hasChatbot },
         { href: '/dashboard/visibility', icon: Icons.Search, label: 'Brand Monitor', visible: hasVisibilityTracker },
         { href: '/dashboard/insights', icon: Icons.Layers, label: 'AI Tips', visible: hasAiTips },
-        { href: '/dashboard/cms', icon: Icons.Globe, label: 'Gestione Sito', visible: hasCMSIntegration, highlight: true },
-        { href: '/dashboard/templates', icon: Icons.LayoutTemplate, label: 'Template', visible: true },
+    ].filter(item => item.visible);
+
+    // Secondary features (Management & Tools)
+    const secondaryItems = [
         { href: '/dashboard/projects', icon: Icons.FolderKanban, label: 'Progetti', visible: canManageProjects },
-        { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
         { href: '/dashboard/settings/members', icon: Icons.Users, label: 'Team', visible: true },
+        { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
+        { href: '/dashboard/cms', icon: Icons.Globe, label: 'Gestione Sito', visible: hasCMSIntegration },
+        {
+            href: activeProjectId
+                ? `/dashboard/projects/${activeProjectId}/integrations`
+                : (projects?.length > 0 ? `/dashboard/projects/${projects[0].id}/integrations` : '/dashboard/projects'),
+            icon: Icons.Link,
+            label: 'Connessioni',
+            visible: true
+        },
+        { href: '/dashboard/templates', icon: Icons.LayoutTemplate, label: 'Template', visible: true },
     ].filter(item => item.visible);
 
     const adminItems = [
         { href: '/dashboard/admin/usage', icon: Icons.Activity, label: 'Monitoraggio' },
+        { href: '/dashboard/admin/interviews', icon: Icons.BarChart, label: 'Qualita Interviste' },
         { href: '/dashboard/admin/organizations', icon: Icons.Building, label: 'Organizzazioni' },
         { href: '/dashboard/admin/users', icon: Icons.Users, label: 'Utenti' },
         { href: '/dashboard/admin/projects', icon: Icons.FolderKanban, label: 'Progetti' },
@@ -98,67 +117,96 @@ export function DashboardSidebar({
                     <span className="font-bold text-xl text-gray-900 tracking-tight">Business Tuner</span>
                 </Link>
 
-                {/* Organization & Project Selector */}
-                <OrganizationProjectSelector />
+                {/* Organization & Project Selector (Fixed Header) */}
+                <div className="flex-shrink-0 space-y-4 mb-4">
+                    <OrganizationProjectSelector />
+                </div>
 
-                {/* Main Navigation */}
-                <nav className="flex flex-col gap-1 flex-1 overflow-y-auto -mx-2 px-2">
-                    {navigationItems.map((item) => (
-                        <DashboardLink
-                            key={item.href}
-                            href={item.href}
-                            icon={<item.icon size={20} />}
-                            label={item.label}
-                            isActive={pathname?.startsWith(item.href)}
-                            highlight={item.highlight}
-                            onClick={() => setIsOpen(false)}
-                        />
-                    ))}
-                </nav>
+                {/* Main Navigation (Scrollable) */}
+                <div className="flex-1 overflow-y-auto min-h-0 -mx-2 px-2 py-2 space-y-6">
+                    {/* Primary Features */}
+                    <div className="space-y-0.5">
+                        <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            App
+                        </div>
+                        {primaryItems.map((item) => (
+                            <DashboardLink
+                                key={item.href}
+                                href={item.href}
+                                icon={<item.icon size={20} />}
+                                label={item.label}
+                                isActive={pathname?.startsWith(item.href)}
+                                onClick={() => setIsOpen(false)}
+                            />
+                        ))}
+                    </div>
 
-                {/* Bottom Section */}
-                <div className="border-t border-gray-200 pt-4 mt-4 space-y-1 -mx-2 px-2">
+                    {/* Secondary Features */}
+                    <div className="space-y-0.5">
+                        <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                            Gestione
+                        </div>
+                        {secondaryItems.map((item) => (
+                            <DashboardLink
+                                key={item.href}
+                                href={item.href}
+                                icon={<item.icon size={18} />}
+                                label={item.label}
+                                isActive={pathname?.startsWith(item.href)}
+                                onClick={() => setIsOpen(false)}
+                                compact={true} // Slightly smaller for secondary items
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Footer Section (Fixed) */}
+                <div className="flex-shrink-0 border-t border-slate-100 pt-3 mt-2 space-y-1">
+                    <div className="mb-2">
+                        <CreditsWidget />
+                    </div>
+
                     {/* Admin Section */}
                     {isAdmin && (
-                        <div className="mb-2">
+                        <div className="mb-1">
                             <button
                                 onClick={() => setAdminExpanded(!adminExpanded)}
                                 className={`
-                                    flex items-center justify-between w-full px-3 py-2.5 rounded-lg
-                                    text-sm font-medium transition-colors
+                                    flex items-center justify-between w-full px-3 py-2 rounded-lg
+                                    text-xs font-bold transition-colors
                                     ${adminExpanded || pathname?.startsWith('/dashboard/admin')
                                         ? 'bg-amber-50 text-amber-900'
-                                        : 'text-amber-700 hover:bg-amber-50'
+                                        : 'text-slate-600 hover:bg-slate-50'
                                     }
                                 `}
                                 aria-expanded={adminExpanded}
                             >
-                                <div className="flex items-center gap-3">
-                                    <Icons.Shield size={20} className="text-amber-600" />
-                                    <span>Admin</span>
+                                <div className="flex items-center gap-2.5">
+                                    <Icons.Shield size={16} className="text-amber-500" />
+                                    <span>Amministrazione</span>
                                 </div>
                                 <ChevronDown
-                                    size={16}
-                                    className={`text-amber-500 transition-transform duration-200 ${adminExpanded ? 'rotate-180' : ''}`}
+                                    size={14}
+                                    className={`text-slate-400 transition-transform duration-200 ${adminExpanded ? 'rotate-0' : '-rotate-90'}`}
                                 />
                             </button>
                             {adminExpanded && (
-                                <div className="mt-1 ml-3 pl-3 border-l-2 border-amber-100 space-y-0.5">
+                                <div className="mt-1 ml-2 pl-2 border-l border-amber-200/50 space-y-0.5">
                                     {adminItems.map((item) => (
                                         <Link
                                             key={item.href}
                                             href={item.href}
                                             onClick={() => setIsOpen(false)}
                                             className={`
-                                                flex items-center gap-2.5 px-2.5 py-2 rounded-lg
-                                                text-sm transition-colors
+                                                flex items-center gap-2 px-2.5 py-1.5 rounded-md
+                                                text-xs transition-colors
                                                 ${pathname === item.href
-                                                    ? 'bg-amber-50 text-amber-900 font-medium'
-                                                    : 'text-amber-700 hover:bg-amber-50'
+                                                    ? 'bg-amber-50 text-amber-900 font-bold'
+                                                    : 'text-slate-500 hover:text-amber-700 hover:bg-amber-50/50'
                                                 }
                                             `}
                                         >
-                                            <item.icon size={16} className="text-amber-600" />
+                                            <div className="w-1 h-1 rounded-full bg-amber-400" />
                                             <span>{item.label}</span>
                                         </Link>
                                     ))}
@@ -167,33 +215,40 @@ export function DashboardSidebar({
                         </div>
                     )}
 
-                    {/* Settings */}
-                    <DashboardLink
-                        href="/dashboard/settings"
-                        icon={<Icons.Settings size={20} />}
-                        label="Impostazioni"
-                        isActive={pathname === '/dashboard/settings'}
-                        onClick={() => setIsOpen(false)}
-                    />
+                    {/* Settings & Sign Out */}
+                    <div className="pt-1 flex items-center justify-between px-1">
+                        <Link
+                            href="/dashboard/settings"
+                            onClick={() => setIsOpen(false)}
+                            className={`
+                                flex items-center gap-2 px-2 py-1.5 rounded-lg
+                                text-xs font-medium transition-colors hover:bg-slate-50 text-slate-500
+                                ${pathname === '/dashboard/settings' ? 'text-slate-900 bg-slate-50' : ''}
+                            `}
+                        >
+                            <Icons.Settings size={16} />
+                            <span>Impostazioni</span>
+                        </Link>
 
-                    {/* Sign Out */}
-                    <button
-                        onClick={() => signOutAction()}
-                        className="
-                            flex items-center gap-3 px-3 py-2.5 rounded-lg w-full text-left
-                            text-sm font-medium transition-colors
-                            text-gray-500 hover:text-red-600 hover:bg-red-50
-                            group
-                        "
-                    >
-                        <Icons.LogOut size={20} className="text-gray-400 group-hover:text-red-500 transition-colors" />
-                        <span>Esci</span>
-                    </button>
+                        <button
+                            onClick={() => signOutAction()}
+                            className="
+                                flex items-center gap-2 px-2 py-1.5 rounded-lg
+                                text-xs font-medium transition-colors
+                                text-slate-400 hover:text-red-600 hover:bg-red-50
+                            "
+                        >
+                            <Icons.LogOut size={16} />
+                            <span>Esci</span>
+                        </button>
+                    </div>
                 </div>
             </aside>
         </>
     );
 }
+
+// Helper: Navigation arrays extraction (removed as it's now inside)
 
 interface DashboardLinkProps {
     href: string;
@@ -201,10 +256,11 @@ interface DashboardLinkProps {
     label: string;
     isActive?: boolean;
     highlight?: boolean;
+    compact?: boolean;
     onClick?: () => void;
 }
 
-function DashboardLink({ href, icon, label, isActive = false, highlight = false, onClick }: DashboardLinkProps) {
+function DashboardLink({ href, icon, label, isActive = false, highlight = false, compact = false, onClick }: DashboardLinkProps) {
     if (highlight) {
         return (
             <Link
@@ -233,16 +289,17 @@ function DashboardLink({ href, icon, label, isActive = false, highlight = false,
             href={href}
             onClick={onClick}
             className={`
-                flex items-center gap-3 px-3 py-2.5 rounded-lg
-                text-sm font-medium transition-colors
+                flex items-center gap-3 rounded-lg
+                font-medium transition-colors
+                ${compact ? 'px-3 py-2 text-xs' : 'px-3 py-2.5 text-sm'}
                 ${isActive
                     ? 'bg-amber-50 text-amber-900'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }
             `}
             aria-current={isActive ? 'page' : undefined}
         >
-            <span className={`transition-colors ${isActive ? 'text-amber-500' : 'text-gray-400'}`}>
+            <span className={`transition-colors ${isActive ? 'text-amber-500' : 'text-slate-400'}`}>
                 {icon}
             </span>
             <span>{label}</span>

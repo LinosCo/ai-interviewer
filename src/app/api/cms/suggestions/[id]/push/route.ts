@@ -47,21 +47,15 @@ export async function POST(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // Check connection status
-        if (suggestion.connection.status !== 'ACTIVE') {
-            return NextResponse.json(
-                { error: 'CMS connection is not active. Please verify the connection first.' },
-                { status: 400 }
-            );
-        }
-
         // Push suggestion
         const result = await CMSConnectionService.pushSuggestion(id);
 
         if (!result.success) {
+            const errorMessage = result.error || 'Failed to push suggestion';
+            const isValidationError = /manual|missing|not active|already|available only|not found/i.test(errorMessage);
             return NextResponse.json(
-                { error: result.error || 'Failed to push suggestion' },
-                { status: 500 }
+                { error: errorMessage },
+                { status: isValidationError ? 400 : 500 }
             );
         }
 

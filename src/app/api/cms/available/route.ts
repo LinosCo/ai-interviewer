@@ -38,11 +38,16 @@ export async function GET(request: Request) {
       );
     }
 
-    // Trova le connessioni CMS dell'organizzazione
+    // Trova le connessioni CMS dell'organizzazione, incluse quelle legacy senza organizationId
+    // ma associate a progetti dell'organizzazione o condivise con i suoi progetti.
     const connections = await prisma.cMSConnection.findMany({
       where: {
-        organizationId,
         status: { not: 'DISABLED' },
+        OR: [
+          { organizationId },
+          { project: { organizationId } },
+          { projectShares: { some: { project: { organizationId } } } },
+        ],
       },
       select: {
         id: true,

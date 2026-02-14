@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 // GET all bots across all projects (admin only)
 export async function GET(req: Request) {
@@ -10,36 +11,54 @@ export async function GET(req: Request) {
 
         const { searchParams } = new URL(req.url);
         const botType = searchParams.get('type'); // 'chatbot' or 'interview'
+        const selectedOrganizationId = searchParams.get('organizationId');
 
         // Get user with organization membership
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             include: {
                 memberships: {
-                    select: { role: true, organizationId: true }
+                    select: { role: true, organizationId: true, status: true }
                 }
             }
         });
 
         if (!user) return new Response('User not found', { status: 404 });
 
-        // Check if user is ADMIN or OWNER in organization
-        const isOrgAdmin = user.memberships.some(m => ['OWNER', 'ADMIN'].includes(m.role));
-
-        if (!isOrgAdmin) {
-            return new Response('Access denied - Admin only', { status: 403 });
-        }
-
-        // Get organization ID
-        const orgId = user.memberships[0]?.organizationId;
+        const orgId = await resolveActiveOrganizationIdForUser(session.user.id, {
+            preferredOrganizationId: selectedOrganizationId
+        });
         if (!orgId) return new Response('Organization not found', { status: 404 });
 
-        // Fetch all bots from all projects in the organization
+        const orgMembership = user.memberships.find((m) => m.organizationId === orgId);
+        if (!orgMembership) {
+            return new Response('Organization not found or access denied', { status: 403 });
+        }
+        if (orgMembership.status !== 'ACTIVE') {
+            return new Response('Organization membership is not active', { status: 403 });
+        }
+        const canViewAllOrgProjects = ['OWNER', 'ADMIN'].includes(orgMembership.role);
+        const accessibleProjects = await prisma.project.findMany({
+            where: {
+                organizationId: orgId,
+                ...(canViewAllOrgProjects ? {} : {
+                    OR: [
+                        { ownerId: session.user.id },
+                        { accessList: { some: { userId: session.user.id } } }
+                    ]
+                })
+            },
+            select: { id: true }
+        });
+        const accessibleProjectIds = accessibleProjects.map((p) => p.id);
+
+        if (accessibleProjectIds.length === 0) {
+            return NextResponse.json([]);
+        }
+
         const bots = await prisma.bot.findMany({
             where: {
-                project: {
-                    organizationId: orgId
-                },
+                projectId: { in: accessibleProjectIds },
                 ...(botType && { botType })
             },
             include: {

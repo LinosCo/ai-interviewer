@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 
 /**
  * GET /api/visibility/analytics?configId=xxx
@@ -14,30 +15,47 @@ export async function GET(request: Request) {
         }
 
         const { searchParams } = new URL(request.url);
-        const configId = searchParams.get('configId');
+        const configIdParam = searchParams.get('configId');
+        const projectId = searchParams.get('projectId');
 
-        if (!configId) {
-            return NextResponse.json({ error: 'configId required' }, { status: 400 });
+        let config = configIdParam
+            ? await prisma.visibilityConfig.findUnique({
+                where: { id: configIdParam },
+                include: { competitors: true }
+            })
+            : null;
+
+        if (!config) {
+            const orgId = await resolveActiveOrganizationIdForUser(session.user.id);
+            if (!orgId) {
+                return NextResponse.json({ error: 'No organization' }, { status: 403 });
+            }
+            config = await prisma.visibilityConfig.findFirst({
+                where: {
+                    organizationId: orgId,
+                    ...(projectId ? { projectId } : {})
+                },
+                include: { competitors: true }
+            });
         }
-
-        // Verify access to config
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: { memberships: { take: 1, select: { organizationId: true } } }
-        });
-
-        const orgId = user?.memberships[0]?.organizationId;
-        if (!orgId) {
-            return NextResponse.json({ error: 'No organization' }, { status: 403 });
-        }
-
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { id: configId, organizationId: orgId },
-            include: { competitors: true }
-        });
 
         if (!config) {
             return NextResponse.json({ error: 'Config not found' }, { status: 404 });
+        }
+
+        const configId = config.id;
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { organizationId: true }
+        });
+
+        if (!membership) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         // 1. Fetch historical scans for trend chart (last 30 days)

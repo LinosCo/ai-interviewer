@@ -3,6 +3,8 @@ import { canPublishBot } from '@/lib/usage';
 import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { scrapeUrl } from '@/lib/scraping';
+import { checkTrialResourceLimit, normalizeBotTypeForTrialLimit } from '@/lib/trial-limits';
+import { ensureAutoInterviewKnowledgeSource } from '@/lib/interview/manual-knowledge-source';
 
 function generateSlug(name: string): string {
     const base = name
@@ -34,7 +36,15 @@ export async function POST(req: Request) {
 
         const user = await prisma.user.findUnique({
             where: { email: session.user.email },
-            include: { ownedProjects: true }
+            select: {
+                id: true,
+                role: true,
+                ownedProjects: {
+                    select: {
+                        id: true
+                    }
+                }
+            }
         });
 
         console.log('👤 [CREATE-BOT] User lookup:', {
@@ -106,6 +116,24 @@ export async function POST(req: Request) {
 
         console.log('🎯 [CREATE-BOT] Checking usage limits for org');
 
+        const requestedBotType = normalizeBotTypeForTrialLimit(config.botType);
+        if (user.role !== 'ADMIN') {
+            const trialLimitCheck = await checkTrialResourceLimit({
+                organizationId: project.organizationId,
+                resource: requestedBotType
+            });
+
+            if (!trialLimitCheck.allowed) {
+                return new Response(JSON.stringify({
+                    error: 'TRIAL_LIMIT_REACHED',
+                    message: trialLimitCheck.reason
+                }), {
+                    status: 403,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+        }
+
         const publishCheck = await canPublishBot(project.organizationId);
         console.log('📊 [CREATE-BOT] Usage check result:', {
             allowed: publishCheck.allowed,
@@ -127,7 +155,7 @@ export async function POST(req: Request) {
 
         // Create the bot with topics/KB based on type
         const slug = generateSlug(config.name || 'intervista');
-        const botType = config.botType || 'interview';
+        const botType = requestedBotType;
         const isChatbot = botType === 'chatbot';
         const botConfig = config.config || {}; // Chatbot config wrapper
 
@@ -175,14 +203,46 @@ export async function POST(req: Request) {
             }
 
             // Chatbot specific fields
+            const hasLeadFields = Array.isArray(botConfig.candidateDataFields) && botConfig.candidateDataFields.length > 0;
+            const chatbotTopics = Array.isArray(botConfig.topics)
+                ? botConfig.topics
+                    .map((topic: unknown, index: number) => {
+                        const label = typeof topic === 'string'
+                            ? topic.trim()
+                            : (typeof topic === 'object' && topic !== null && typeof (topic as any).label === 'string'
+                                ? String((topic as any).label).trim()
+                                : '');
+                        if (!label) return null;
+                        return {
+                            orderIndex: index,
+                            label,
+                            description: typeof topic === 'object' && topic !== null && typeof (topic as any).description === 'string'
+                                ? String((topic as any).description).trim()
+                                : null,
+                            subGoals: []
+                        };
+                    })
+                    .filter(Boolean)
+                : [];
+
             botData = {
                 ...botData,
+                researchGoal: (typeof botConfig.goal === 'string' && botConfig.goal.trim()) ||
+                    (typeof config.goal === 'string' && config.goal.trim()) ||
+                    (typeof config.researchGoal === 'string' && config.researchGoal.trim()) ||
+                    null,
                 tone: botConfig.tone,
                 enablePageContext: true,
                 leadCaptureStrategy: botConfig.leadCaptureStrategy || 'after_3_msgs',
                 candidateDataFields: botConfig.candidateDataFields,
+                collectCandidateData: hasLeadFields, // Auto-enable when lead fields are configured
+                fallbackMessage: typeof botConfig.fallbackMessage === 'string' ? botConfig.fallbackMessage : null,
+                boundaries: Array.isArray(botConfig.boundaries) ? botConfig.boundaries : [],
                 introMessage: botConfig.welcomeMessage,
                 bubblePosition: botConfig.bubblePosition || 'bottom-right',
+                topics: {
+                    create: chatbotTopics as any[]
+                },
                 knowledgeSources: {
                     create: processedSources
                 }
@@ -226,6 +286,25 @@ export async function POST(req: Request) {
                 knowledgeSources: true
             }
         });
+
+        if (!isChatbot) {
+            try {
+                await ensureAutoInterviewKnowledgeSource({
+                    botId: bot.id,
+                    language: bot.language || 'it',
+                    botName: bot.name,
+                    researchGoal: bot.researchGoal,
+                    targetAudience: bot.targetAudience,
+                    topics: (bot.topics || []).map((topic: any) => ({
+                        label: topic.label,
+                        description: topic.description,
+                        subGoals: topic.subGoals
+                    }))
+                });
+            } catch (error) {
+                console.error('[CREATE-BOT] Auto interview knowledge generation failed:', error);
+            }
+        }
 
         console.log('🎉 [CREATE-BOT] Bot created successfully:', {
             botId: bot.id,

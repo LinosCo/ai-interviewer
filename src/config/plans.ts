@@ -15,6 +15,7 @@ export enum PlanType {
     PRO = 'PRO',
     BUSINESS = 'BUSINESS',
     PARTNER = 'PARTNER',
+    ENTERPRISE = 'ENTERPRISE',
     ADMIN = 'ADMIN'
 }
 
@@ -101,7 +102,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.FREE,
         name: 'Free',
         description: 'Per sempre gratuito',
-        monthlyCredits: 500_000,
+        monthlyCredits: 500,
         monthlyPrice: 0,
         yearlyPrice: 0,
         yearlyMonthlyEquivalent: 0,
@@ -121,7 +122,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: 1
         },
         limits: {
-            monthlyTokenBudget: 500_000,
+            monthlyTokenBudget: 500,
             maxInterviewsPerMonth: -1,
             maxChatbots: 0,
             maxChatbotSessionsPerMonth: 0,
@@ -140,7 +141,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: false
         },
         featureList: [
-            '500K crediti/mese',
+            '500 crediti/mese',
             'Interview AI base',
             '1 progetto',
             'Analytics base',
@@ -152,7 +153,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.TRIAL,
         name: 'Trial',
         description: 'Prova gratuita 14 giorni',
-        monthlyCredits: 2_000_000,
+        monthlyCredits: 2_000,
         monthlyPrice: 0,
         yearlyPrice: 0,
         yearlyMonthlyEquivalent: 0,
@@ -172,7 +173,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 2_000_000,
+            monthlyTokenBudget: 2_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -191,7 +192,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: false
         },
         featureList: [
-            '2M crediti per 14 giorni',
+            '2K crediti per 14 giorni',
             'Tutte le funzionalità PRO',
             'Progetti illimitati',
             'Prova gratuita completa'
@@ -202,7 +203,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.STARTER,
         name: 'Starter',
         description: 'Per iniziare',
-        monthlyCredits: 6_000_000,
+        monthlyCredits: 6_000,
         monthlyPrice: 69,
         yearlyPrice: 588,
         yearlyMonthlyEquivalent: 49,
@@ -224,7 +225,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 6_000_000,
+            monthlyTokenBudget: 6_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -243,7 +244,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: false
         },
         featureList: [
-            '6M crediti/mese',
+            '6K crediti/mese',
             'Interview AI completo',
             'Chatbot illimitati',
             'Progetti illimitati',
@@ -256,7 +257,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.PRO,
         name: 'Pro',
         description: 'Per professionisti',
-        monthlyCredits: 20_000_000,
+        monthlyCredits: 20_000,
         monthlyPrice: 199,
         yearlyPrice: 1788,
         yearlyMonthlyEquivalent: 149,
@@ -279,7 +280,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 20_000_000,
+            monthlyTokenBudget: 20_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -298,7 +299,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: true
         },
         featureList: [
-            '20M crediti/mese',
+            '20K crediti/mese',
             'Interview AI completo',
             'Chatbot illimitati',
             'Brand Monitor',
@@ -314,7 +315,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.BUSINESS,
         name: 'Business',
         description: 'Per aziende',
-        monthlyCredits: 50_000_000,
+        monthlyCredits: 50_000,
         monthlyPrice: 399,
         yearlyPrice: 3588,
         yearlyMonthlyEquivalent: 299,
@@ -336,7 +337,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 50_000_000,
+            monthlyTokenBudget: 50_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -355,7 +356,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: true
         },
         featureList: [
-            '50M crediti/mese',
+            '50K crediti/mese',
             'Tutte le funzionalità PRO',
             'White Label',
             'API Access',
@@ -371,10 +372,12 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.PARTNER,
         name: 'Partner',
         description: 'Per agenzie e consulenti',
-        monthlyCredits: 10_000_000,
+        monthlyCredits: 10_000,
         monthlyPrice: 29, // €0 con 3+ clienti attivi
         yearlyPrice: 348,
         yearlyMonthlyEquivalent: 29,
+        stripePriceIdMonthly: process.env.STRIPE_PRICE_PARTNER,
+        stripePriceIdYearly: process.env.STRIPE_PRICE_PARTNER_YEARLY,
         features: {
             interviewAI: 'full',
             chatbot: true,
@@ -393,7 +396,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             customLogoReports: true
         },
         limits: {
-            monthlyTokenBudget: 10_000_000,
+            monthlyTokenBudget: 10_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -412,13 +415,67 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: true
         },
         featureList: [
-            '10M crediti/mese',
+            '10K crediti/mese',
             'Tutte le funzionalità PRO',
             'Trasferimento progetti',
             'Dashboard multi-cliente',
             'Report con logo personalizzato',
             '€0/mese con 3+ clienti',
             'White Label con 10+ clienti'
+        ]
+    },
+
+    [PlanType.ENTERPRISE]: {
+        id: PlanType.ENTERPRISE,
+        name: 'Enterprise',
+        description: 'Per grandi organizzazioni',
+        monthlyCredits: -1, // Custom -1 per mostrare illimitato o gestire via custom limits
+        monthlyPrice: 999,
+        yearlyPrice: 9990,
+        yearlyMonthlyEquivalent: 832.5,
+        stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE,
+        stripePriceIdYearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY,
+        features: {
+            interviewAI: 'full',
+            chatbot: true,
+            visibilityTracker: true,
+            aiTips: true,
+            copilotStrategico: true,
+            whiteLabel: true,
+            apiAccess: true,
+            cmsIntegrations: true,
+            exportPdf: 'clean',
+            exportCsv: true,
+            analytics: 'full',
+            canTransferProjects: true,
+            maxProjects: -1,
+            multiClientDashboard: true,
+            customLogoReports: true
+        },
+        limits: {
+            monthlyTokenBudget: -1,
+            maxInterviewsPerMonth: -1,
+            maxChatbots: -1,
+            maxChatbotSessionsPerMonth: -1,
+            maxVisibilityQueriesPerMonth: -1,
+            maxAiSuggestionsPerMonth: -1,
+            visibilityEnabled: true,
+            aiTipsEnabled: true,
+            whiteLabelEnabled: true,
+            apiAccessEnabled: true,
+            canTransferProjects: true,
+            customLogo: true,
+            customColor: true,
+            themeExtraction: true,
+            knowledgeBase: true,
+            conditionalLogic: true
+        },
+        featureList: [
+            'Crediti illimitati',
+            'White Label completo',
+            'API Access & Custom Integration',
+            'Supporto dedicato',
+            'SLA garantiti'
         ]
     },
 
@@ -542,9 +599,6 @@ export function hasFeatureAccess(
  */
 export function formatMonthlyCredits(credits: number): string {
     if (credits === -1) return 'Illimitati';
-    if (credits >= 1_000_000) {
-        return `${(credits / 1_000_000).toFixed(0)}M`;
-    }
     if (credits >= 1_000) {
         return `${(credits / 1_000).toFixed(0)}K`;
     }
@@ -567,7 +621,9 @@ export const PLAN_ORDER: PlanType[] = [
 export const PURCHASABLE_PLANS: PlanType[] = [
     PlanType.STARTER,
     PlanType.PRO,
-    PlanType.BUSINESS
+    PlanType.BUSINESS,
+    PlanType.PARTNER,
+    PlanType.ENTERPRISE
 ];
 
 // ============================================

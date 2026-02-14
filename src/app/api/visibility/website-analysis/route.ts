@@ -10,23 +10,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                id: true,
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
-            }
-        });
-
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
-        const organizationId = user.memberships[0]?.organizationId;
-
         const body = await request.json();
         const { configId } = body;
 
@@ -34,13 +17,26 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'configId is required' }, { status: 400 });
         }
 
-        // Verify config belongs to user's organization
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { id: configId, organizationId }
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
+            select: { id: true, websiteUrl: true, organizationId: true }
         });
 
         if (!config) {
             return NextResponse.json({ error: 'Config not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
         if (!config.websiteUrl) {
@@ -95,25 +91,26 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'configId is required' }, { status: 400 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                memberships: {
-                    take: 1,
-                    select: { organizationId: true }
-                }
-            }
-        });
-
-        const organizationId = user?.memberships[0]?.organizationId;
-
-        // Verify config belongs to user's organization
-        const config = await prisma.visibilityConfig.findFirst({
-            where: { id: configId, organizationId }
+        const config = await prisma.visibilityConfig.findUnique({
+            where: { id: configId },
+            select: { id: true, organizationId: true }
         });
 
         if (!config) {
             return NextResponse.json({ error: 'Config not found' }, { status: 404 });
+        }
+
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: {
+                    userId: session.user.id,
+                    organizationId: config.organizationId
+                }
+            },
+            select: { status: true }
+        });
+        if (membership?.status !== 'ACTIVE') {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
         // Get latest completed analysis

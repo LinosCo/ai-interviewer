@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 /**
  * GET /api/cms/connection?projectId=xxx
  * Get the CMS connection status for a specific project.
+ * If projectId is omitted, resolves the first eligible project in the user's organizations.
  */
 export async function GET(request: Request) {
     try {
@@ -26,49 +27,78 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        // Find projects with CMS connections that the user has access to
+        // Find projects and any CMS connection (direct or shared) that the user can access
         const projects = await prisma.project.findMany({
             where: {
-                id: projectId || undefined,
+                ...(projectId ? { id: projectId } : {}),
                 organization: {
                     members: {
                         some: {
                             userId: user.id
                         }
                     }
-                },
-                OR: [
-                    { cmsConnection: { isNot: null } },
-                    { newCmsConnection: { isNot: null } }
-                ] as any
+                }
             },
             include: {
                 cmsConnection: true,
-                newCmsConnection: true
-            } as any
+                newCmsConnection: true,
+                cmsShares: {
+                    include: {
+                        connection: true
+                    }
+                }
+            }
         });
 
-        if (projects.length === 0) {
+        if (!projects.length) {
+            return NextResponse.json({
+                enabled: false,
+                message: 'Project not found or access denied'
+            });
+        }
+
+        type ProjectWithConnections = (typeof projects)[number];
+        type ResolvedConnection = NonNullable<
+            ProjectWithConnections['newCmsConnection']
+            | ProjectWithConnections['cmsConnection']
+            | ProjectWithConnections['cmsShares'][number]['connection']
+        >;
+
+        const resolveConnection = (project: ProjectWithConnections): ResolvedConnection | null => {
+            const directConnection = project.newCmsConnection || project.cmsConnection;
+            if (directConnection && directConnection.status !== 'DISABLED') {
+                return directConnection;
+            }
+            return project.cmsShares.find((share) => share.connection.status !== 'DISABLED')?.connection || null;
+        };
+
+        const eligibleProjects = projects
+            .map(project => ({
+                project,
+                connection: resolveConnection(project)
+            }))
+            .filter(
+                (entry): entry is { project: ProjectWithConnections; connection: ResolvedConnection } => Boolean(entry.connection)
+            );
+
+        if (!eligibleProjects.length) {
             return NextResponse.json({
                 enabled: false,
                 message: 'CMS integration is not enabled for this project'
             });
         }
 
-        const project = projects[0];
-        const cmsConnection = (project as any).newCmsConnection || (project as any).cmsConnection;
-        const foundProjectId = project.id;
-
-        if (!cmsConnection) {
-            return NextResponse.json({
-                enabled: false,
-                message: 'CMS integration is not enabled for this project'
-            });
-        }
+        const preferredProjectId = process.env.BUSINESS_TUNER_SELF_PROJECT_ID;
+        const selected = eligibleProjects.find(entry => entry.project.id === preferredProjectId)
+            || eligibleProjects.find(entry => entry.project.name.trim().toLowerCase() === 'business tuner')
+            || eligibleProjects[0];
+        const cmsConnection = selected.connection;
+        const project = selected.project;
 
         return NextResponse.json({
             enabled: true,
-            projectId: foundProjectId,
+            projectId: project.id,
+            projectName: project.name,
             connection: {
                 id: cmsConnection.id,
                 name: cmsConnection.name,
@@ -82,7 +112,7 @@ export async function GET(request: Request) {
             }
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error getting CMS connection:', error);
         return NextResponse.json(
             { error: 'Failed to get CMS connection' },

@@ -1,43 +1,39 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useActionState, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { authenticate } from './actions';
 import Link from 'next/link';
-import { colors, gradients, shadows } from '@/lib/design-system';
+import { colors, gradients } from '@/lib/design-system';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Input } from '@/components/ui/business-tuner/Input';
 import { Card } from '@/components/ui/business-tuner/Card';
 
-export default function LoginPage() {
+function LoginForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
-    const [isNavigating, setIsNavigating] = useState(false);
     const [hasSubmitted, setHasSubmitted] = useState(false);
+    const nextPathRaw = searchParams.get('next');
+    const nextPath = nextPathRaw && nextPathRaw.startsWith('/') ? nextPathRaw : null;
+    const verificationState = searchParams.get('verification');
+    const verifiedState = searchParams.get('verified');
+    const verificationReason = searchParams.get('reason');
 
     // Combined loading state: pending action OR navigating to dashboard
-    const isLoading = isPending || isNavigating;
+    const isLoading = isPending || (hasSubmitted && errorMessage === null);
 
     useEffect(() => {
-        if (errorMessage) {
-            setIsNavigating(false);
-            setHasSubmitted(false);
-            return;
-        }
-
         if (!isPending && errorMessage === null && hasSubmitted) {
             // Login successful, start navigation and refresh session
-            setIsNavigating(true);
             router.refresh();
-            router.replace('/dashboard');
-            // Note: isNavigating stays true - page will unmount during navigation
+            router.replace(nextPath || '/dashboard');
         }
-    }, [errorMessage, isPending, router, hasSubmitted]);
+    }, [errorMessage, isPending, router, hasSubmitted, nextPath]);
 
     const handleSubmit = () => {
         setHasSubmitted(true);
-        setIsNavigating(true);
     };
 
     return (
@@ -102,6 +98,26 @@ export default function LoginPage() {
                             </div>
                         )}
 
+                        {!errorMessage && verificationState === 'sent' && (
+                            <div style={{ padding: '0.75rem', background: '#DBEAFE', border: '1px solid #93C5FD', borderRadius: '8px', color: '#1D4ED8', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                                Ti abbiamo inviato una email di conferma. Apri il link per attivare l&apos;account.
+                            </div>
+                        )}
+
+                        {!errorMessage && verifiedState === '1' && (
+                            <div style={{ padding: '0.75rem', background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: '8px', color: '#166534', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                                Email confermata con successo. Ora puoi accedere.
+                            </div>
+                        )}
+
+                        {!errorMessage && verifiedState === '0' && (
+                            <div style={{ padding: '0.75rem', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', color: '#92400E', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+                                {verificationReason === 'expired_token'
+                                    ? 'Il link di conferma è scaduto. Richiedi un nuovo link dal supporto.'
+                                    : 'Il link di conferma non è valido.'}
+                            </div>
+                        )}
+
                         <Button
                             type="submit"
                             fullWidth
@@ -123,5 +139,13 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: gradients.mesh }}>Caricamento...</div>}>
+            <LoginForm />
+        </Suspense>
     );
 }

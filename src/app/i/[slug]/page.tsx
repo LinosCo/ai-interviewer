@@ -6,6 +6,15 @@ import { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { Suspense } from 'react';
 
+function normalizeBigIntForCache<T>(data: T): T {
+    return JSON.parse(JSON.stringify(data, (_, value) => {
+        if (typeof value !== 'bigint') return value;
+        const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+        const minSafe = BigInt(Number.MIN_SAFE_INTEGER);
+        return value <= maxSafe && value >= minSafe ? Number(value) : value.toString();
+    }));
+}
+
 // Helper to serialize BigInt values for client components
 function serializeData<T>(data: T): T {
     return JSON.parse(JSON.stringify(data, (_, value) =>
@@ -16,13 +25,14 @@ function serializeData<T>(data: T): T {
 // Cache bot data for 60 seconds - landing pages can tolerate slight staleness
 const getBotBySlug = unstable_cache(
     async (slug: string) => {
-        return prisma.bot.findUnique({
+        const bot = await prisma.bot.findUnique({
             where: { slug },
             include: {
                 project: { include: { organization: true } },
                 topics: { orderBy: { orderIndex: 'asc' } }
             }
         });
+        return normalizeBigIntForCache(bot);
     },
     ['bot-by-slug'],
     { revalidate: 60, tags: ['bot'] }
@@ -35,11 +45,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     if (!bot) return {};
 
     const title = bot.landingTitle || bot.name;
-    const brandName = bot.project?.organization?.name || 'Business Tuner';
+    const defaultBrandName = process.env.NEXT_PUBLIC_BRAND_NAME || 'Voler AI';
+    const brandName = bot.project?.organization?.name || defaultBrandName;
     const fullTitle = `${title} | ${brandName}`;
     const description = bot.landingDescription || bot.researchGoal || `Partecipa all'intervista interattiva "${title}" - Un'esperienza conversazionale intelligente creata con Business Tuner.`;
     const image = bot.landingImageUrl || bot.logoUrl;
-    const canonicalUrl = `https://businesstuner.voler.ai/i/${slug}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai';
+    const canonicalUrl = `${appUrl}/i/${slug}`;
+    const fallbackSocialImage = `${appUrl}/opengraph-image`;
 
     return {
         title: fullTitle,
@@ -78,10 +91,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
                 height: 630,
                 alt: `${title} - Intervista interattiva`,
             }] : [{
-                url: 'https://businesstuner.voler.ai/og-default.png',
+                url: fallbackSocialImage,
                 width: 1200,
                 height: 630,
-                alt: 'Business Tuner - Interviste AI',
+                alt: `${brandName} - Interviste AI`,
             }],
         },
         twitter: {
@@ -90,7 +103,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
             creator: '@businesstuner',
             title: fullTitle,
             description,
-            images: image ? [image] : ['https://businesstuner.voler.ai/og-default.png'],
+            images: image ? [image] : [fallbackSocialImage],
         },
         other: {
             'theme-color': bot.primaryColor || '#f59e0b',

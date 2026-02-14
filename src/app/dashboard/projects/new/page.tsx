@@ -3,7 +3,8 @@
 import { createProjectAction } from '@/app/actions';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSearchParams } from 'next/navigation';
-import { Building2, LayoutGrid, Plus } from 'lucide-react';
+import { useFormStatus } from 'react-dom';
+import { Building2, LayoutGrid, Loader2, Plus } from 'lucide-react';
 
 export default function NewProjectPage() {
     const { organizations, currentOrganization } = useOrganization();
@@ -79,18 +80,37 @@ export default function NewProjectPage() {
                 </div>
 
                 <div className="pt-4">
-                    <button
-                        type="submit"
-                        className="w-full bg-amber-600 hover:bg-amber-700 text-white py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-amber-200 flex items-center justify-center gap-2"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Crea Progetto
-                    </button>
+                    <CreateProjectSubmitButton />
                     <p className="text-center text-[10px] text-gray-400 mt-4 uppercase font-black tracking-widest">
                         I progetti sono isolati per team
                     </p>
                 </div>
             </form>
         </div>
+    );
+}
+
+function CreateProjectSubmitButton() {
+    const { pending } = useFormStatus();
+
+    return (
+        <button
+            type="submit"
+            disabled={pending}
+            className="w-full bg-amber-600 hover:bg-amber-700 text-white py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-amber-200 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            aria-busy={pending}
+        >
+            {pending ? (
+                <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Creazione in corso...
+                </>
+            ) : (
+                <>
+                    <Plus className="w-5 h-5" />
+                    Crea Progetto
+                </>
+            )}
+        </button>
     );
 }

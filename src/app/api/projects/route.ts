@@ -4,9 +4,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { WorkspaceError, assertOrganizationAccess, syncLegacyProjectAccessForProject } from '@/lib/domain/workspace';
+import { createProjectWithNameGuard } from '@/lib/projects/create-project';
 
 const createProjectSchema = z.object({
-  name: z.string().min(1, 'Nome progetto richiesto'),
+  name: z.string().trim().min(1, 'Nome progetto richiesto'),
   organizationId: z.string().optional()
 });
 
@@ -83,16 +84,16 @@ export async function POST(req: Request) {
 
     await assertOrganizationAccess(session.user.id, finalOrgId, 'ADMIN');
 
-    const project = await prisma.project.create({
-      data: {
-        name,
-        organizationId: finalOrgId,
-        ownerId: session.user.id,
-        isPersonal: false
-      }
+    const { project, created } = await createProjectWithNameGuard({
+      name,
+      organizationId: finalOrgId,
+      ownerId: session.user.id,
+      isPersonal: false
     });
 
-    await syncLegacyProjectAccessForProject(project.id);
+    if (created) {
+      await syncLegacyProjectAccessForProject(project.id);
+    }
 
     return NextResponse.json(project);
   } catch (error) {

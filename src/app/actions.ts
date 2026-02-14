@@ -26,6 +26,7 @@ import {
     ensureAutoInterviewKnowledgeSource,
     regenerateAutoInterviewKnowledgeSource
 } from '@/lib/interview/manual-knowledge-source';
+import { createProjectWithNameGuard, normalizeProjectName } from '@/lib/projects/create-project';
 
 const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -191,7 +192,8 @@ export async function createProjectAction(formData: FormData) {
     const session = await auth();
     if (!session?.user?.id) throw new Error("Unauthorized");
 
-    const name = formData.get('name') as string;
+    const rawName = formData.get('name');
+    const name = typeof rawName === 'string' ? normalizeProjectName(rawName) : '';
     if (!name) throw new Error("Name required");
 
     let organizationId = formData.get('organizationId') as string;
@@ -209,16 +211,16 @@ export async function createProjectAction(formData: FormData) {
     if (!organizationId) throw new Error("No organization found for project");
     await assertOrganizationAccess(session.user.id, organizationId, 'ADMIN');
 
-    // Create project and add owner access in a transaction
-    const project = await prisma.project.create({
-        data: {
-            name,
-            ownerId: session.user.id,
-            organizationId: organizationId,
-            isPersonal: false
-        }
+    const { project, created } = await createProjectWithNameGuard({
+        name,
+        ownerId: session.user.id,
+        organizationId,
+        isPersonal: false
     });
-    await syncLegacyProjectAccessForProject(project.id);
+
+    if (created) {
+        await syncLegacyProjectAccessForProject(project.id);
+    }
 
     revalidatePath('/dashboard');
     redirect(`/dashboard/projects/${project.id}`);

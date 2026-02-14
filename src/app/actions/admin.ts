@@ -10,6 +10,7 @@ import {
     syncLegacyProjectAccessForOrganization
 } from '@/lib/domain/workspace';
 import { getOrCreateDefaultOrganization } from '@/lib/organizations';
+import { createProjectWithNameGuard } from '@/lib/projects/create-project';
 
 // Middleware-like check for admin
 // Moved to @/lib/admin-auth
@@ -260,15 +261,16 @@ export async function createProject(name: string, ownerId: string) {
 
     const organizationId = ownerMembership?.organizationId || (await getOrCreateDefaultOrganization(ownerId)).id;
 
-    const project = await prisma.project.create({
-        data: {
-            name,
-            ownerId,
-            organizationId
-        }
+    const { project, created } = await createProjectWithNameGuard({
+        name,
+        ownerId,
+        organizationId,
+        isPersonal: false
     });
 
-    await syncLegacyProjectAccessForOrganization(organizationId);
+    if (created) {
+        await syncLegacyProjectAccessForOrganization(organizationId);
+    }
 
     revalidatePath('/dashboard/admin/projects');
     return project;

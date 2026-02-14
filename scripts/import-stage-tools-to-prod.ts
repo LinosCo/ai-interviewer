@@ -21,7 +21,7 @@ function quoteIdent(id: string): string {
 }
 
 async function getColumns(client: PgClient, table: string): Promise<string[]> {
-  const res = await client.query<{ column_name: string }>(
+  const res = await client.query(
     `
       SELECT column_name
       FROM information_schema.columns
@@ -30,11 +30,11 @@ async function getColumns(client: PgClient, table: string): Promise<string[]> {
     `,
     [table]
   );
-  return res.rows.map((r) => r.column_name);
+  return (res.rows as Array<{ column_name: string }>).map((r: { column_name: string }) => r.column_name);
 }
 
 async function tableExists(client: PgClient, table: string): Promise<boolean> {
-  const res = await client.query<{ exists: number }>(
+  const res = await client.query(
     `
       SELECT 1 as exists
       FROM information_schema.tables
@@ -74,7 +74,7 @@ async function copyTable(params: {
   }
 
   const colList = columns.map(quoteIdent).join(', ');
-  const srcRowsRes = await src.query<Record<string, unknown>>(`SELECT ${colList} FROM ${quoteIdent(table)}`);
+  const srcRowsRes = await src.query(`SELECT ${colList} FROM ${quoteIdent(table)}`);
   const sourceRows = srcRowsRes.rows.length;
 
   if (!sourceRows) {
@@ -84,7 +84,7 @@ async function copyTable(params: {
   let insertedRows = 0;
   let skippedRows = 0;
 
-  for (const row of srcRowsRes.rows) {
+  for (const row of srcRowsRes.rows as Array<Record<string, unknown>>) {
     const values = columns.map((c) => row[c]);
     const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
     const sql = `

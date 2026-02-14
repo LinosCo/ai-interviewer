@@ -19,12 +19,26 @@ export default async function PartnerDashboardPage() {
     // Get clients data
     const clientsData = await PartnerService.getPartnerClientsDetailed(session.user.id);
 
-    // Get user's projects for transfer
-    const projects = await prisma.project.findMany({
-        where: { ownerId: session.user.id },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' }
+    // Get projects the partner can actually manage (org OWNER/ADMIN), not legacy ownerId.
+    const adminMemberships = await prisma.membership.findMany({
+        where: {
+            userId: session.user.id,
+            status: 'ACTIVE',
+            role: { in: ['OWNER', 'ADMIN'] }
+        },
+        select: { organizationId: true }
     });
+
+    const managedOrganizationIds = adminMemberships.map((m) => m.organizationId);
+    const projects = managedOrganizationIds.length
+        ? await prisma.project.findMany({
+            where: {
+                organizationId: { in: managedOrganizationIds }
+            },
+            select: { id: true, name: true },
+            orderBy: { name: 'asc' }
+        })
+        : [];
 
     // Get pending invites
     const pendingInvitesCount = await prisma.projectTransferInvite.count({

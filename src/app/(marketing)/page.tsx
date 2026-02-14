@@ -34,6 +34,7 @@ function LandingChatbotScript() {
     script.defer = true;
     script.setAttribute('data-bot-id', CHATBOT_BOT_ID);
     script.setAttribute('data-domain', scriptBase);
+    script.setAttribute('data-force-consent', 'true');
     document.body.appendChild(script);
 
     return () => {

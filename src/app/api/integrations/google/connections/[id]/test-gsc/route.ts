@@ -3,71 +3,63 @@
  * POST - Test Google Search Console connection
  */
 
+import { NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { GoogleService } from '@/lib/integrations/google';
-import { NextResponse } from 'next/server';
+import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
+
+function toErrorResponse(error: unknown) {
+  if (error instanceof WorkspaceError) {
+    return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+  }
+  console.error('GSC test route error:', error);
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+}
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const connection = await prisma.googleConnection.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        projectId: true,
+        gscEnabled: true,
+        gscSiteUrl: true
+      }
+    });
+
+    if (!connection) {
+      throw new WorkspaceError('Connection not found', 404, 'GOOGLE_NOT_FOUND');
+    }
+
+    await assertProjectAccess(session.user.id, connection.projectId, 'ADMIN');
+
+    if (!connection.gscEnabled || !connection.gscSiteUrl) {
+      return NextResponse.json(
+        { error: 'Search Console is not configured. Please set gscSiteUrl first.' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.googleConnection.update({
+      where: { id },
+      data: { gscStatus: 'TESTING' }
+    });
+
+    const result = await GoogleService.testGSC(id);
+    return NextResponse.json(result);
+  } catch (error) {
+    return toErrorResponse(error);
   }
-  const userEmail = session.user.email;
-
-  const { id } = await params;
-
-  // Get connection and verify access
-  const connection = await prisma.googleConnection.findUnique({
-    where: { id },
-    include: {
-      project: {
-        include: {
-          owner: { select: { email: true } },
-          organization: {
-            include: {
-              members: { select: { user: { select: { email: true } } } },
-            },
-          },
-          accessList: { select: { user: { select: { email: true } } } },
-        },
-      },
-    },
-  });
-
-  if (!connection || !connection.project) {
-    return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
-  }
-
-  // Verify access
-  const hasAccess =
-    connection.project.owner?.email === userEmail ||
-    connection.project.accessList.some(a => a.user.email === userEmail) ||
-    connection.project.organization?.members.some(m => m.user.email === userEmail);
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  }
-
-  // Check GSC is configured
-  if (!connection.gscEnabled || !connection.gscSiteUrl) {
-    return NextResponse.json(
-      { error: 'Search Console is not configured. Please set gscSiteUrl first.' },
-      { status: 400 }
-    );
-  }
-
-  // Update status to TESTING
-  await prisma.googleConnection.update({
-    where: { id },
-    data: { gscStatus: 'TESTING' },
-  });
-
-  // Test connection
-  const result = await GoogleService.testGSC(id);
-
-  return NextResponse.json(result);
 }

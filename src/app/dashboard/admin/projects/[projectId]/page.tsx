@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import { checkAdmin } from '@/lib/admin-auth';
 import ProjectDetailView from './project-detail-view';
+import { ensureProjectOrganization } from '@/lib/domain/workspace';
 
 export default async function AdminProjectDetailPage({ params }: { params: Promise<{ projectId: string }> }) {
     if (!await checkAdmin()) return <div>Access Denied</div>;
@@ -32,23 +33,8 @@ export default async function AdminProjectDetailPage({ params }: { params: Promi
         select: { id: true, name: true }
     });
 
-    // FALLBACK: If project has no organizationId, try to find it from the owner's memberships
-    let orgId = project.organizationId;
-    if (!orgId && project.ownerId) {
-        const owner = await prisma.user.findUnique({
-            where: { id: project.ownerId },
-            include: { memberships: { take: 1 } }
-        });
-        orgId = owner?.memberships[0]?.organizationId || null;
-
-        // Auto-fix the project record if possible
-        if (orgId) {
-            await prisma.project.update({
-                where: { id: project.id },
-                data: { organizationId: orgId }
-            });
-        }
-    }
+    // Normalize legacy projects without organization and keep details in one org scope.
+    const orgId = project.organizationId || await ensureProjectOrganization(project.id);
 
     let availableBots: any[] = [];
     let availableVisibilityConfigs: any[] = [];

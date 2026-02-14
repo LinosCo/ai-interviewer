@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 interface CMSSessionPayload {
   userId: string;
@@ -131,32 +132,12 @@ export class CMSSessionService {
     userId: string,
     projectId: string
   ): Promise<boolean> {
-    // Check direct project access
-    const directAccess = await prisma.projectAccess.findUnique({
-      where: {
-        userId_projectId: { userId, projectId }
-      }
-    });
-    if (directAccess) return true;
-
-    // Check if user is project owner
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { ownerId: true, organizationId: true }
-    });
-    if (project?.ownerId === userId) return true;
-
-    // Check organization membership
-    if (project?.organizationId) {
-      const membership = await prisma.membership.findUnique({
-        where: {
-          userId_organizationId: { userId, organizationId: project.organizationId }
-        }
-      });
-      if (membership) return true;
+    try {
+      await assertProjectAccess(userId, projectId, 'MEMBER');
+      return true;
+    } catch {
+      return false;
     }
-
-    return false;
   }
 
   /**

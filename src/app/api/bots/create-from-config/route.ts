@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import { scrapeUrl } from '@/lib/scraping';
 import { checkTrialResourceLimit, normalizeBotTypeForTrialLimit } from '@/lib/trial-limits';
 import { ensureAutoInterviewKnowledgeSource } from '@/lib/interview/manual-knowledge-source';
+import { assertProjectAccess, syncLegacyProjectAccessForProject } from '@/lib/domain/workspace';
 
 function generateSlug(name: string): string {
     const base = name
@@ -29,19 +30,20 @@ export async function POST(req: Request) {
             hasUser: !!session?.user
         });
 
-        if (!session?.user?.email) {
-            console.error('❌ [CREATE-BOT] Unauthorized: No session or email');
+        if (!session?.user?.id) {
+            console.error('❌ [CREATE-BOT] Unauthorized: No session or user id');
             return new Response('Unauthorized', { status: 401 });
         }
 
         const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
+            where: { id: session.user.id },
             select: {
                 id: true,
                 role: true,
-                ownedProjects: {
+                memberships: {
+                    where: { status: 'ACTIVE' },
                     select: {
-                        id: true
+                        organizationId: true
                     }
                 }
             }
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
 
         console.log('👤 [CREATE-BOT] User lookup:', {
             found: !!user,
-            projectsCount: user?.ownedProjects?.length || 0
+            organizationsCount: user?.memberships?.length || 0
         });
 
         if (!user) {
@@ -68,27 +70,25 @@ export async function POST(req: Request) {
 
             // Create default project linked to this org
             let project = await prisma.project.findFirst({
-                where: { ownerId: user.id, organizationId: organization.id }
+                where: { organizationId: organization.id },
+                orderBy: { createdAt: 'asc' }
             });
 
             if (!project) {
                 project = await prisma.project.create({
                     data: {
-                        name: 'Il mio workspace',
+                        name: 'Default Project',
                         ownerId: user.id,
                         organizationId: organization.id
                     }
                 });
+                await syncLegacyProjectAccessForProject(project.id);
             }
             projectId = project.id;
         } else {
-            // Verify access (basic check: user owns it or has access via ProjectAccess)
-            const hasAccess = user.ownedProjects.some(p => p.id === projectId) ||
-                await prisma.projectAccess.findUnique({
-                    where: { userId_projectId: { userId: user.id, projectId } }
-                });
-
-            if (!hasAccess) {
+            try {
+                await assertProjectAccess(user.id, projectId, 'MEMBER');
+            } catch {
                 return new Response('Forbidden: Acceduto negato al progetto', { status: 403 });
             }
         }
@@ -112,6 +112,12 @@ export async function POST(req: Request) {
                 data: { organizationId: organization.id }
             });
             project.organizationId = organization.id;
+        }
+
+        // Ensure user still belongs to the organization that owns this project.
+        const canUseProjectOrg = user.memberships.some((membership) => membership.organizationId === project.organizationId);
+        if (!canUseProjectOrg && user.role !== 'ADMIN') {
+            return new Response('Forbidden: organization access denied', { status: 403 });
         }
 
         console.log('🎯 [CREATE-BOT] Checking usage limits for org');

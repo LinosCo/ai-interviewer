@@ -10,6 +10,7 @@ import { ProjectTransferSection } from './ProjectTransferSection';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, LayoutGrid } from "lucide-react";
 import Link from 'next/link';
+import { assertProjectAccess, hasRequiredRole } from '@/lib/domain/workspace';
 
 export default async function ProjectSettingsPage({ params }: { params: Promise<{ projectId: string }> }) {
     const session = await auth();
@@ -19,10 +20,14 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
 
     const project = await prisma.project.findUnique({
         where: { id: projectId },
-        select: { id: true, name: true, ownerId: true, isPersonal: true, organizationId: true }
+        select: { id: true, name: true, isPersonal: true, organizationId: true }
     });
 
     if (!project) notFound();
+
+    const projectAccess = await assertProjectAccess(session.user.id, projectId, 'MEMBER')
+        .catch(() => redirect('/dashboard/projects'));
+    const canManageProject = projectAccess.isPlatformAdmin || hasRequiredRole(projectAccess.role, 'ADMIN');
 
     // Fetch user organizations for transfer
     const user = await prisma.user.findUnique({
@@ -36,22 +41,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
     });
 
     const availableOrganizations = user?.memberships.map(m => m.organization) || [];
-
-    // Check user has access (via ProjectAccess with OWNER role OR is the project owner)
-    const userAccess = await prisma.projectAccess.findUnique({
-        where: {
-            userId_projectId: {
-                userId: session.user.id,
-                projectId
-            }
-        }
-    });
-
-    const isOwner = project.ownerId === session.user.id;
-    const hasOwnerAccess = userAccess?.role === 'OWNER';
-
-    // Only OWNER can access settings (via ProjectAccess role OR project.ownerId)
-    if (!isOwner && !hasOwnerAccess) {
+    if (!canManageProject) {
         redirect('/dashboard/projects');
     }
 
@@ -79,7 +69,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
                 <ProjectRenameSection projectId={projectId} projectName={project.name} isPersonal={project.isPersonal} />
 
                 {/* Transfer Project (only for project owner or org owner/admin) */}
-                {(isOwner || hasOwnerAccess) && (
+                {canManageProject && (
                     <ProjectTransferSection
                         projectId={projectId}
                         projectName={project.name}

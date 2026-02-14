@@ -14,6 +14,12 @@ import fs from 'fs';
 import path from 'path';
 import { User, Prisma } from '@prisma/client';
 import { transferBotToProject } from './actions/project-tools';
+import {
+    assertOrganizationAccess,
+    assertProjectAccess,
+    ensureDefaultProjectForOrganization,
+    syncLegacyProjectAccessForProject
+} from '@/lib/domain/workspace';
 import { regenerateInterviewPlan } from '@/lib/interview/plan-service';
 import { checkTrialResourceLimit } from '@/lib/trial-limits';
 import {
@@ -190,40 +196,29 @@ export async function createProjectAction(formData: FormData) {
 
     let organizationId = formData.get('organizationId') as string;
 
-    // Get user and verify membership
-    const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        include: { memberships: true }
+    const memberships = await prisma.membership.findMany({
+        where: { userId: session.user.id, status: 'ACTIVE' },
+        orderBy: [{ role: 'desc' }, { createdAt: 'asc' }],
+        select: { organizationId: true }
     });
 
-    if (!user) throw new Error("User not found");
-
     if (!organizationId) {
-        // Fallback to first membership if none provided
-        organizationId = user.memberships[0]?.organizationId;
+        organizationId = memberships[0]?.organizationId;
     }
 
     if (!organizationId) throw new Error("No organization found for project");
-
-    // Verify membership in that specific organization
-    const hasMembership = user.memberships.some(m => m.organizationId === organizationId);
-    if (!hasMembership) throw new Error("Access denied to organization");
+    await assertOrganizationAccess(session.user.id, organizationId, 'ADMIN');
 
     // Create project and add owner access in a transaction
     const project = await prisma.project.create({
         data: {
             name,
-            ownerId: user.id,
+            ownerId: session.user.id,
             organizationId: organizationId,
-            isPersonal: false,
-            accessList: {
-                create: {
-                    userId: user.id,
-                    role: 'OWNER'
-                }
-            }
+            isPersonal: false
         }
     });
+    await syncLegacyProjectAccessForProject(project.id);
 
     revalidatePath('/dashboard');
     redirect(`/dashboard/projects/${project.id}`);
@@ -231,74 +226,98 @@ export async function createProjectAction(formData: FormData) {
 
 export async function deleteProjectAction(projectId: string) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) throw new Error("User not found");
+    if (!session?.user?.id) throw new Error("Unauthorized");
 
-    // Get project to check ownership
+    const access = await assertProjectAccess(session.user.id, projectId, 'ADMIN');
+
     const project = await prisma.project.findUnique({
         where: { id: projectId },
         include: {
-            accessList: { where: { userId: user.id } }
+            mcpConnections: { select: { type: true } },
+            googleConnection: { select: { id: true } },
+            n8nConnection: { select: { id: true } },
+            newCmsConnection: { select: { id: true } }
         }
     });
     if (!project) throw new Error("Project not found");
 
-    // Check if user is admin or owner
-    const isOwner = project.ownerId === user.id || project.accessList.some(a => a.role === 'OWNER');
-    if (user.role !== 'ADMIN' && !isOwner) {
-        throw new Error("Solo l'owner o un admin può eliminare il progetto.");
-    }
-
-    // Cannot delete personal project
-    if (project.isPersonal) {
-        throw new Error("Non puoi eliminare il tuo progetto personale.");
-    }
-
-    // Find owner's personal project to transfer bots
-    const personalProject = await prisma.project.findFirst({
-        where: { ownerId: user.id, isPersonal: true }
+    const otherProjects = await prisma.project.findMany({
+        where: {
+            organizationId: access.organizationId,
+            id: { not: projectId }
+        },
+        include: {
+            mcpConnections: { select: { type: true } },
+            googleConnection: { select: { id: true } },
+            n8nConnection: { select: { id: true } },
+            newCmsConnection: { select: { id: true } }
+        },
+        orderBy: { createdAt: 'asc' }
     });
 
-    if (!personalProject) {
-        throw new Error("Progetto personale non trovato per il trasferimento dei bot.");
-    }
+    const sourceMcpTypes = project.mcpConnections.map((connection) => connection.type);
+    const transferTarget = otherProjects.find((candidate) => {
+        if (project.googleConnection && candidate.googleConnection) return false;
+        if (project.n8nConnection && candidate.n8nConnection) return false;
+        if (project.newCmsConnection && candidate.newCmsConnection) return false;
+        const targetMcpTypes = candidate.mcpConnections.map((connection) => connection.type);
+        return !targetMcpTypes.some((type) => sourceMcpTypes.includes(type));
+    });
 
-    // Transfer bots and delete project in transaction
-    await prisma.$transaction([
-        // Transfer bots to personal project
-        prisma.bot.updateMany({
+    const fallbackTarget =
+        transferTarget
+        ?? await ensureDefaultProjectForOrganization(access.organizationId);
+
+    const finalTransferTarget = fallbackTarget.id === projectId
+        ? await prisma.project.create({
+            data: {
+                name: 'Default Project (Recovery)',
+                organizationId: access.organizationId,
+                ownerId: session.user.id,
+                isPersonal: false
+            }
+        })
+        : fallbackTarget;
+
+    await prisma.$transaction(async (tx) => {
+        await tx.bot.updateMany({
             where: { projectId },
-            data: { projectId: personalProject.id }
-        }),
-        // Unlink visibility configs
-        prisma.visibilityConfig.updateMany({
+            data: { projectId: finalTransferTarget.id }
+        });
+        await tx.visibilityConfig.updateMany({
             where: { projectId },
-            data: { projectId: null }
-        }),
-        // Delete project access entries
-        prisma.projectAccess.deleteMany({
-            where: { projectId }
-        }),
-        // Delete the project
-        prisma.project.delete({ where: { id: projectId } })
-    ]);
+            data: { projectId: finalTransferTarget.id }
+        });
+        await tx.mCPConnection.updateMany({
+            where: { projectId },
+            data: { projectId: finalTransferTarget.id, organizationId: access.organizationId }
+        });
+        await tx.googleConnection.updateMany({
+            where: { projectId },
+            data: { projectId: finalTransferTarget.id }
+        });
+        await tx.n8NConnection.updateMany({
+            where: { projectId },
+            data: { projectId: finalTransferTarget.id }
+        });
+        await tx.cMSConnection.updateMany({
+            where: { projectId },
+            data: { projectId: finalTransferTarget.id, organizationId: access.organizationId }
+        });
+        await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+        await tx.projectCMSConnection.deleteMany({ where: { projectId } });
+        await tx.projectMCPConnection.deleteMany({ where: { projectId } });
+        await tx.projectAccess.deleteMany({ where: { projectId } });
+        await tx.project.delete({ where: { id: projectId } });
+    });
 
     revalidatePath('/dashboard');
 }
 
 export async function renameProjectAction(projectId: string, newName: string) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) throw new Error("User not found");
-
-    const project = await prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new Error("Project not found");
-
-    if (user.role !== 'ADMIN' && project.ownerId !== user.id) {
-        throw new Error("Unauthorized");
-    }
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    await assertProjectAccess(session.user.id, projectId, 'ADMIN');
 
     await prisma.project.update({
         where: { id: projectId },
@@ -309,30 +328,14 @@ export async function renameProjectAction(projectId: string, newName: string) {
 
 export async function deleteBotAction(botId: string) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            ownedProjects: true,
-            projectAccess: true
-        }
-    });
-    if (!user) throw new Error("User not found");
+    if (!session?.user?.id) throw new Error("Unauthorized");
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
-        include: { project: true }
+        select: { id: true, projectId: true }
     });
     if (!bot) throw new Error("Bot not found");
-
-    const isOwner = bot.project.ownerId === user.id;
-    const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
-
-    // Only owner can delete (not just any member with access)
-    if (!isOwner) {
-        console.error("Delete Bot Unauthorized - User is not project owner");
-        throw new Error("Unauthorized - Only project owner can delete bots");
-    }
+    await assertProjectAccess(session.user.id, bot.projectId, 'ADMIN');
 
     await prisma.bot.delete({ where: { id: botId } });
     revalidatePath('/dashboard');
@@ -849,30 +852,14 @@ export async function deleteTopicAction(topicId: string, botId: string) {
 
 export async function addKnowledgeSourceAction(botId: string, formData: FormData) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-
-    // Verify bot ownership
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            ownedProjects: true,
-            projectAccess: true
-        }
-    });
-    if (!user) throw new Error("User not found");
+    if (!session?.user?.id) throw new Error("Unauthorized");
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
-        include: { project: true }
+        select: { projectId: true }
     });
     if (!bot) throw new Error("Bot not found");
-
-    const isOwner = user.ownedProjects.some(p => p.id === bot.projectId);
-    const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
-
-    if (!isOwner && !hasAccess) {
-        throw new Error("Unauthorized - No access to this bot");
-    }
+    await assertProjectAccess(session.user.id, bot.projectId, 'MEMBER');
 
     const title = formData.get('title') as string;
     const content = formData.get('content') as string;
@@ -914,28 +901,14 @@ export async function deleteKnowledgeSourceAction(sourceId: string, botId: strin
 
 export async function updateKnowledgeSourceAction(sourceId: string, botId: string, formData: FormData) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            ownedProjects: true,
-            projectAccess: true
-        }
-    });
-    if (!user) throw new Error("User not found");
+    if (!session?.user?.id) throw new Error("Unauthorized");
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
-        include: { project: true }
+        select: { projectId: true }
     });
     if (!bot) throw new Error("Bot not found");
-
-    const isOwner = user.ownedProjects.some(p => p.id === bot.projectId);
-    const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
-    if (!isOwner && !hasAccess) {
-        throw new Error("Unauthorized - No access to this bot");
-    }
+    await assertProjectAccess(session.user.id, bot.projectId, 'MEMBER');
 
     const source = await prisma.knowledgeSource.findFirst({
         where: {
@@ -975,16 +948,7 @@ export async function updateKnowledgeSourceAction(sourceId: string, botId: strin
 
 export async function regenerateInterviewGuideAction(botId: string) {
     const session = await auth();
-    if (!session?.user?.email) throw new Error("Unauthorized");
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            ownedProjects: true,
-            projectAccess: true
-        }
-    });
-    if (!user) throw new Error("User not found");
+    if (!session?.user?.id) throw new Error("Unauthorized");
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
@@ -1002,11 +966,7 @@ export async function regenerateInterviewGuideAction(botId: string) {
     });
     if (!bot) throw new Error("Bot not found");
 
-    const isOwner = user.ownedProjects.some((project) => project.id === bot.projectId);
-    const hasAccess = user.projectAccess.some((access) => access.projectId === bot.projectId);
-    if (!isOwner && !hasAccess) {
-        throw new Error("Unauthorized - No access to this bot");
-    }
+    await assertProjectAccess(session.user.id, bot.projectId, 'MEMBER');
 
     if (bot.botType === 'chatbot') {
         throw new Error("Interview guide regeneration is available only for interview bots");

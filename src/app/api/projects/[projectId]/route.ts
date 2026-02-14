@@ -1,218 +1,230 @@
+import { z } from 'zod';
+import { NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
-import { z } from 'zod';
-
-// Helper to check if user is OWNER of project or organization
-async function canManageProject(userId: string, projectId: string): Promise<boolean> {
-    // 1. Check direct project access
-    const access = await prisma.projectAccess.findUnique({
-        where: { userId_projectId: { userId, projectId } }
-    });
-    if (access?.role === 'OWNER') return true;
-
-    // 2. Check project ownerId
-    const project = await prisma.project.findUnique({
-        where: { id: projectId },
-        select: { ownerId: true, organizationId: true }
-    });
-    if (project?.ownerId === userId) return true;
-
-    // 3. Check organization ownership
-    if (project?.organizationId) {
-        const orgMembership = await prisma.membership.findUnique({
-            where: {
-                userId_organizationId: {
-                    userId,
-                    organizationId: project.organizationId
-                }
-            }
-        });
-        if (orgMembership?.role === 'OWNER' || orgMembership?.role === 'ADMIN') return true;
-    }
-
-    return false;
-}
+import {
+  WorkspaceError,
+  assertProjectAccess,
+  autoFixOrphanToolsForOrganization,
+  ensureDefaultProjectForOrganization,
+  syncLegacyProjectAccessForProject
+} from '@/lib/domain/workspace';
 
 const updateProjectSchema = z.object({
-    name: z.string().min(1).optional()
+  name: z.string().min(1).optional()
 });
 
+function toErrorResponse(error: unknown) {
+  if (error instanceof WorkspaceError) {
+    return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+  }
+  if (error instanceof z.ZodError) {
+    return NextResponse.json({ error: error.issues[0]?.message || 'Invalid payload' }, { status: 400 });
+  }
+  console.error('Project route error:', error);
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+}
+
+function hasMcpTypeConflict(sourceTypes: string[], targetTypes: string[]) {
+  const source = new Set(sourceTypes);
+  return targetTypes.some((type) => source.has(type));
+}
+
 export async function GET(
-    req: Request,
-    { params }: { params: Promise<{ projectId: string }> }
+  req: Request,
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { projectId } = await params;
+    const { projectId } = await params;
+    const access = await assertProjectAccess(session.user.id, projectId, 'VIEWER');
 
-        // Check user has access
-        const access = await prisma.projectAccess.findUnique({
-            where: {
-                userId_projectId: {
-                    userId: session.user.id,
-                    projectId
-                }
-            }
-        });
-
-        if (!access) {
-            return new Response('Access denied', { status: 403 });
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        bots: { select: { id: true, name: true, botType: true } },
+        organization: { select: { id: true, name: true, slug: true, plan: true } },
+        _count: {
+          select: { bots: true }
         }
+      }
+    });
 
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            include: {
-                bots: { select: { id: true, name: true, botType: true } },
-                organization: { select: { id: true, name: true, slug: true, plan: true } },
-                _count: {
-                    select: { accessList: true, bots: true }
-                }
-            }
-        });
-
-        if (!project) {
-            return new Response('Project not found', { status: 404 });
-        }
-
-        return NextResponse.json({
-            ...project,
-            currentUserRole: access.role
-        });
-
-    } catch (error) {
-        console.error('Get Project Error:', error);
-        return new Response('Internal Server Error', { status: 500 });
+    if (!project) {
+      throw new WorkspaceError('Project not found', 404, 'PROJECT_NOT_FOUND');
     }
+
+    return NextResponse.json({
+      ...project,
+      currentUserRole: access.role
+    });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
 }
 
 export async function PATCH(
-    req: Request,
-    { params }: { params: Promise<{ projectId: string }> }
+  req: Request,
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { projectId } = await params;
-        const body = await req.json();
-        const data = updateProjectSchema.parse(body);
+    const { projectId } = await params;
+    const body = await req.json();
+    const data = updateProjectSchema.parse(body);
 
-        // Verify user is OWNER or Org Admin
-        if (!(await canManageProject(session.user.id, projectId))) {
-            return new Response('Solo il proprietario o un amministratore del team può modificare il progetto', { status: 403 });
-        }
+    await assertProjectAccess(session.user.id, projectId, 'ADMIN');
 
-        const project = await prisma.project.update({
-            where: { id: projectId },
-            data
-        });
+    const project = await prisma.project.update({
+      where: { id: projectId },
+      data
+    });
 
-        return NextResponse.json(project);
-
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            return new Response(error.issues[0].message, { status: 400 });
-        }
-        console.error('Update Project Error:', error);
-        return new Response('Internal Server Error', { status: 500 });
-    }
+    return NextResponse.json(project);
+  } catch (error) {
+    return toErrorResponse(error);
+  }
 }
 
 export async function DELETE(
-    req: Request,
-    { params }: { params: Promise<{ projectId: string }> }
+  req: Request,
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { projectId } = await params;
+    const { projectId } = await params;
+    const access = await assertProjectAccess(session.user.id, projectId, 'ADMIN');
+    const organizationId = access.organizationId;
 
-        // Get project with its bots and visibility configs
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            include: {
-                bots: { select: { id: true } },
-                visibilityConfigs: { select: { id: true } }
-            }
-        });
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        mcpConnections: { select: { type: true } },
+        googleConnection: { select: { id: true } },
+        n8nConnection: { select: { id: true } },
+        newCmsConnection: { select: { id: true } }
+      }
+    });
 
-        if (!project) {
-            return new Response('Project not found', { status: 404 });
-        }
-
-        // Restricted: Cannot delete the last project of the user
-        const otherProjectsCount = await prisma.project.count({
-            where: {
-                ownerId: project.ownerId || session.user.id,
-                id: { not: projectId }
-            }
-        });
-
-        if (otherProjectsCount === 0) {
-            return new Response('Non puoi eliminare l\'unico progetto rimasto. Crea un altro progetto prima di eliminare questo.', { status: 403 });
-        }
-
-        // Verify user is OWNER or Org Admin
-        if (!(await canManageProject(session.user.id, projectId))) {
-            return new Response('Solo il proprietario o un amministratore del team può eliminare il progetto', { status: 403 });
-        }
-
-        // Find a project to transfer tools to (prioritize personal, then any other)
-        const transferTarget = await prisma.project.findFirst({
-            where: {
-                ownerId: project.ownerId || session.user.id,
-                id: { not: projectId }
-            },
-            orderBy: { isPersonal: 'desc' } // Personal first
-        });
-
-        if (!transferTarget) {
-            return new Response('Nessun progetto di destinazione trovato per il trasferimento dei tool', { status: 500 });
-        }
-
-        // Check optional table existence to keep compatibility with older DB schemas.
-        const tableCheck = await prisma.$queryRaw<{ exists: boolean }[]>`
-            SELECT EXISTS (
-                SELECT
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                  AND table_name = 'ProjectVisibilityConfig'
-            )
-        `;
-        const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
-
-        // Transfer all bots and visibility configs to personal project, then delete.
-        await prisma.$transaction([
-            prisma.bot.updateMany({
-                where: { projectId },
-                data: { projectId: transferTarget.id }
-            }),
-            prisma.visibilityConfig.updateMany({
-                where: { projectId },
-                data: { projectId: null }
-            }),
-            ...(projectVisibilityConfigExists
-                ? [prisma.projectVisibilityConfig.deleteMany({ where: { projectId } })]
-                : []),
-            prisma.projectAccess.deleteMany({
-                where: { projectId }
-            }),
-            prisma.project.delete({
-                where: { id: projectId }
-            })
-        ]);
-
-        return NextResponse.json({
-            success: true,
-            message: 'Progetto eliminato. I tool sono stati spostati nel tuo progetto personale.'
-        });
-
-    } catch (error) {
-        console.error('Delete Project Error:', error);
-        return new Response('Internal Server Error', { status: 500 });
+    if (!project) {
+      throw new WorkspaceError('Project not found', 404, 'PROJECT_NOT_FOUND');
     }
+
+    const candidates = await prisma.project.findMany({
+      where: {
+        organizationId,
+        id: { not: projectId }
+      },
+      include: {
+        mcpConnections: { select: { type: true } },
+        googleConnection: { select: { id: true } },
+        n8nConnection: { select: { id: true } },
+        newCmsConnection: { select: { id: true } }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    let transferTargetId = candidates.find((candidate) => {
+      const sourceMcpTypes = project.mcpConnections.map((connection) => connection.type);
+      const targetMcpTypes = candidate.mcpConnections.map((connection) => connection.type);
+
+      if (project.googleConnection && candidate.googleConnection) return false;
+      if (project.n8nConnection && candidate.n8nConnection) return false;
+      if (project.newCmsConnection && candidate.newCmsConnection) return false;
+      if (hasMcpTypeConflict(sourceMcpTypes, targetMcpTypes)) return false;
+
+      return true;
+    })?.id;
+
+    if (!transferTargetId) {
+      const defaultProject = await ensureDefaultProjectForOrganization(organizationId);
+      transferTargetId = defaultProject.id;
+      if (transferTargetId === projectId) {
+        const recoveryProject = await prisma.project.create({
+          data: {
+            name: 'Default Project (Recovery)',
+            organizationId,
+            ownerId: session.user.id,
+            isPersonal: false
+          },
+          include: {
+            mcpConnections: { select: { type: true } },
+            googleConnection: { select: { id: true } },
+            n8nConnection: { select: { id: true } },
+            newCmsConnection: { select: { id: true } }
+          }
+        });
+        transferTargetId = recoveryProject.id;
+      }
+    }
+
+    if (!transferTargetId) {
+      throw new WorkspaceError('Unable to resolve transfer target project', 500, 'TRANSFER_TARGET_MISSING');
+    }
+
+    await prisma.$transaction(async (tx) => {
+        await tx.bot.updateMany({
+          where: { projectId },
+          data: { projectId: transferTargetId }
+        });
+
+        await tx.visibilityConfig.updateMany({
+          where: { projectId },
+          data: {
+            projectId: transferTargetId,
+            organizationId
+          }
+        });
+
+        await tx.mCPConnection.updateMany({
+          where: { projectId },
+          data: {
+            projectId: transferTargetId,
+            organizationId
+          }
+        });
+
+        await tx.googleConnection.updateMany({
+          where: { projectId },
+          data: { projectId: transferTargetId }
+        });
+
+        await tx.n8NConnection.updateMany({
+          where: { projectId },
+          data: { projectId: transferTargetId }
+        });
+
+        await tx.cMSConnection.updateMany({
+          where: { projectId },
+          data: {
+            projectId: transferTargetId,
+            organizationId
+          }
+        });
+
+      await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+      await tx.projectCMSConnection.deleteMany({ where: { projectId } });
+      await tx.projectMCPConnection.deleteMany({ where: { projectId } });
+      await tx.projectAccess.deleteMany({ where: { projectId } });
+      await tx.project.delete({ where: { id: projectId } });
+    });
+
+    await syncLegacyProjectAccessForProject(transferTargetId);
+    await autoFixOrphanToolsForOrganization(organizationId);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Progetto eliminato e tool riassegnati al progetto di default dell\'organizzazione.',
+      targetProjectId: transferTargetId
+    });
+  } catch (error) {
+    return toErrorResponse(error);
+  }
 }

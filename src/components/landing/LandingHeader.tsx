@@ -37,9 +37,9 @@ export function LandingHeader({ session }: LandingHeaderProps) {
         : 'py-5 bg-transparent'
         }`}
     >
-      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 shrink-0">
           <Icons.Logo size={32} />
           <span className="font-display font-bold text-xl text-[hsl(var(--foreground))]">
             Business Tuner
@@ -47,7 +47,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden xl:flex items-center gap-6 min-w-0">
           {navLinks.map((link) => (
             <a
               key={link.href}
@@ -60,7 +60,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
         </nav>
 
         {/* Desktop CTAs */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden xl:flex items-center gap-3 shrink-0">
           {session ? (
             <Link
               href="/dashboard"
@@ -86,7 +86,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
 
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden p-2 text-[hsl(var(--foreground))]"
+          className="xl:hidden p-2 text-[hsl(var(--foreground))] shrink-0"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           aria-label="Toggle menu"
         >

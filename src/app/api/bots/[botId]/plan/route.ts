@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getOrCreateInterviewPlan, updateInterviewPlanOverrides } from '@/lib/interview/plan-service';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 const overridesSchema = z.object({
   scan: z.object({
@@ -20,22 +21,19 @@ const overridesSchema = z.object({
   }).optional()
 }).strict();
 
-async function requireBotAccess(botId: string, email: string) {
+async function requireBotAccess(botId: string, userId: string) {
   const bot = await prisma.bot.findUnique({
     where: { id: botId },
     include: { project: { include: { organization: true } }, topics: { orderBy: { orderIndex: 'asc' } } }
   });
   if (!bot) return { bot: null, access: false };
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { ownedProjects: true, projectAccess: true }
-  });
-
-  const isOwner = user?.ownedProjects.some(p => p.id === bot.projectId);
-  const hasAccess = user?.projectAccess.some(pa => pa.projectId === bot.projectId);
-
-  return { bot, access: Boolean(isOwner || hasAccess) };
+  try {
+    await assertProjectAccess(userId, bot.projectId, 'MEMBER');
+    return { bot, access: true };
+  } catch {
+    return { bot, access: false };
+  }
 }
 
 export async function GET(
@@ -44,12 +42,12 @@ export async function GET(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const { botId } = await params;
-    const { bot, access } = await requireBotAccess(botId, session.user.email);
+    const { bot, access } = await requireBotAccess(botId, session.user.id);
     if (!bot) return new NextResponse('Bot not found', { status: 404 });
     if (!access) return new NextResponse('Forbidden', { status: 403 });
 
@@ -74,12 +72,12 @@ export async function PATCH(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const { botId } = await params;
-    const { bot, access } = await requireBotAccess(botId, session.user.email);
+    const { bot, access } = await requireBotAccess(botId, session.user.id);
     if (!bot) return new NextResponse('Bot not found', { status: 404 });
     if (!access) return new NextResponse('Forbidden', { status: 403 });
 

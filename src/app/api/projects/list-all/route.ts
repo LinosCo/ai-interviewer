@@ -1,55 +1,43 @@
-import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
+
 export async function GET() {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) {
-            return new Response('Unauthorized', { status: 401 });
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: {
-                ownedProjects: {
-                    select: {
-                        id: true,
-                        name: true,
-                        organizationId: true
-                    }
-                },
-                projectAccess: {
-                    where: { role: 'OWNER' },
-                    include: {
-                        project: {
-                            select: {
-                                id: true,
-                                name: true,
-                                organizationId: true
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        if (!user) {
-            return new Response('User not found', { status: 404 });
-        }
-
-        const userProjects = [
-            ...user.ownedProjects,
-            ...user.projectAccess.map(pa => pa.project)
-        ];
-
-        // Unique by ID
-        const projects = Array.from(new Map(userProjects.map(p => [p.id, p])).values());
-
-        return NextResponse.json({ projects });
-
-    } catch (error) {
-        console.error('Fetch All Projects Error:', error);
-        return new Response('Internal Server Error', { status: 500 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const memberships = await prisma.membership.findMany({
+      where: {
+        userId: session.user.id,
+        status: 'ACTIVE'
+      },
+      select: { organizationId: true }
+    });
+
+    const organizationIds = memberships.map((membership) => membership.organizationId);
+    if (organizationIds.length === 0) {
+      return NextResponse.json({ projects: [] });
+    }
+
+    const projects = await prisma.project.findMany({
+      where: {
+        organizationId: { in: organizationIds }
+      },
+      select: {
+        id: true,
+        name: true,
+        organizationId: true
+      },
+      orderBy: [{ createdAt: 'asc' }]
+    });
+
+    return NextResponse.json({ projects });
+  } catch (error) {
+    console.error('Fetch all projects error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
 }

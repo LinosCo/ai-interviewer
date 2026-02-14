@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ProjectUserManagementDialog } from './user-management-dialog';
 import { PLANS, subscriptionTierToPlanType, PlanType } from '@/config/plans';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 export default async function ProjectCockpitPage({ params }: { params: Promise<{ projectId: string }> }) {
     const session = await auth();
@@ -41,16 +42,24 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                 orderBy: { createdAt: 'desc' },
                 include: { scans: { orderBy: { startedAt: 'desc' }, take: 1 } }
             },
-            owner: { select: { name: true, email: true } },
-            accessList: { include: { user: { select: { name: true, email: true } } } }
+            organization: {
+                include: {
+                    members: {
+                        where: { status: 'ACTIVE' },
+                        include: { user: { select: { id: true, name: true, email: true } } },
+                        orderBy: [{ role: 'desc' }, { createdAt: 'asc' }]
+                    }
+                }
+            }
         }
     });
 
     if (!project) notFound();
-
-    // Verify access
-    const hasAccess = project.ownerId === userId || project.accessList.some(a => a.userId === userId);
-    if (!hasAccess) redirect('/dashboard/projects');
+    try {
+        await assertProjectAccess(userId, projectId, 'VIEWER');
+    } catch {
+        redirect('/dashboard/projects');
+    }
 
     const cookieStore = await cookies();
     const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
@@ -333,17 +342,18 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         <CardContent className="space-y-6 relative z-10">
                             <div>
                                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Proprietario</p>
-                                <p className="text-sm font-bold">{project.owner?.name || project.owner?.email}</p>
+                                <p className="text-sm font-bold">
+                                    {project.organization?.members?.find((m: any) => m.role === 'OWNER')?.user?.name
+                                        || project.organization?.members?.find((m: any) => m.role === 'OWNER')?.user?.email
+                                        || 'N/D'}
+                                </p>
                             </div>
                             <div>
                                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Team Access</p>
                                 <div className="flex -space-x-2">
-                                    <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-xs font-black border-2 border-slate-900" title="Proprietario">
-                                        {project.owner?.email[0].toUpperCase()}
-                                    </div>
-                                    {project.accessList.map(a => (
-                                        <div key={a.userId} className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-black border-2 border-slate-900" title={a.user.email}>
-                                            {a.user.email[0].toUpperCase()}
+                                    {project.organization?.members?.map((member: any) => (
+                                        <div key={member.userId} className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-black border-2 border-slate-900" title={member.user.email}>
+                                            {member.user.email[0].toUpperCase()}
                                         </div>
                                     ))}
                                 </div>

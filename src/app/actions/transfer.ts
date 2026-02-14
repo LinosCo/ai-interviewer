@@ -1,196 +1,411 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth';
-import { revalidatePath } from 'next/cache';
 import crypto from 'crypto';
+import { revalidatePath } from 'next/cache';
+
+import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
+import { PartnerService } from '@/services/partnerService';
+import {
+  WorkspaceError,
+  assertOrganizationAccess,
+  assertProjectAccess,
+  moveProjectToOrganization
+} from '@/lib/domain/workspace';
 
 export type ItemTransferType = 'ORGANIZATION' | 'PROJECT' | 'BOT' | 'TOOL';
 
+function getBaseUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
+
+async function resolveDefaultOrganizationIdForUser(userId: string): Promise<string | null> {
+  const membership = await prisma.membership.findFirst({
+    where: {
+      userId,
+      status: 'ACTIVE'
+    },
+    orderBy: [{ role: 'desc' }, { createdAt: 'asc' }],
+    select: { organizationId: true }
+  });
+
+  return membership?.organizationId || null;
+}
+
 export async function createTransferInvite(params: {
-    itemId: string;
-    itemType: ItemTransferType;
-    recipientEmail: string;
+  itemId: string;
+  itemType: ItemTransferType;
+  recipientEmail: string;
+  targetOrganizationId?: string;
 }) {
-    const session = await auth();
-    if (!session?.user?.id) throw new Error('Unauthorized');
+  const session = await auth();
+  if (!session?.user?.id) throw new WorkspaceError('Unauthorized', 401, 'UNAUTHORIZED');
 
-    const { itemId, itemType, recipientEmail } = params;
+  const { itemId, itemType, recipientEmail, targetOrganizationId } = params;
+  const normalizedEmail = recipientEmail.trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw new WorkspaceError('Recipient email is required', 400, 'INVALID_EMAIL');
+  }
 
-    // 1. Permission Check
-    // For simplicity, we assume the user must be the OWNER of the item.
-    // Specific checks can be added per itemType if needed.
+  const token = crypto.randomUUID();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // 2. Generate Token
-    const token = crypto.randomUUID();
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+  const acceptUrl = `${getBaseUrl()}/transfer/accept?token=${token}`;
 
-    // 3. Create Invite
-    const invite = await prisma.itemTransferInvite.create({
-        data: {
-            itemId,
-            itemType,
-            recipientEmail: recipientEmail.toLowerCase(),
-            senderId: session.user.id,
-            token,
-            expiresAt,
-            status: 'PENDING'
-        }
+  if (itemType === 'PROJECT') {
+    await assertProjectAccess(session.user.id, itemId, 'ADMIN');
+
+    const existingInvite = await prisma.projectTransferInvite.findFirst({
+      where: {
+        projectId: itemId,
+        status: 'pending',
+        expiresAt: { gt: new Date() }
+      },
+      select: { id: true }
     });
 
-    // 4. Send Email
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const acceptUrl = `${baseUrl}/transfer/accept?token=${token}`;
-
-    try {
-        await sendEmail({
-            to: recipientEmail,
-            subject: `Invito a ricevere un ${itemType.toLowerCase()} su Business Tuner`,
-            html: `
-                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
-                    <h2 style="color: #1e293b;">Hai ricevuto un trasferimento!</h2>
-                    <p style="color: #475569; line-height: 1.6;">
-                        ${session.user.name || session.user.email} desidera trasferirti la proprietà di un <strong>${itemType.toLowerCase()}</strong>.
-                    </p>
-                    <div style="margin: 32px 0; text-align: center;">
-                        <a href="${acceptUrl}" style="background-color: #f59e0b; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
-                            Accetta Trasferimento
-                        </a>
-                    </div>
-                    <p style="color: #94a3b8; font-size: 12px;">
-                        Questo link scadrà il ${expiresAt.toLocaleDateString()}. Se non ti aspettavi questo trasferimento, puoi ignorare questa email.
-                    </p>
-                </div>
-            `
-        });
-    } catch (error) {
-        console.error('Failed to send transfer email:', error);
-        // We don't throw here to ensure the invite is still considered "created" in the DB
+    if (existingInvite) {
+      throw new WorkspaceError('Esiste già un invito pendente per questo progetto', 409, 'INVITE_EXISTS');
     }
 
-    return { success: true, inviteId: invite.id };
+    const metadata = targetOrganizationId ? JSON.stringify({ targetOrganizationId }) : null;
+
+    await prisma.projectTransferInvite.create({
+      data: {
+        projectId: itemId,
+        partnerId: session.user.id,
+        clientEmail: normalizedEmail,
+        token,
+        expiresAt,
+        status: 'pending',
+        personalMessage: metadata
+      }
+    });
+
+    try {
+      await sendEmail({
+        to: normalizedEmail,
+        subject: 'Richiesta trasferimento progetto',
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px">
+            <h2 style="color:#0f172a">Richiesta trasferimento progetto</h2>
+            <p style="color:#334155;line-height:1.5">È stato richiesto il trasferimento di un progetto verso la tua organizzazione.</p>
+            <div style="margin:24px 0">
+              <a href="${acceptUrl}" style="display:inline-block;padding:12px 20px;background:#0f172a;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">
+                Apri richiesta
+              </a>
+            </div>
+            <p style="color:#64748b;font-size:12px">Il link scade tra 7 giorni.</p>
+          </div>
+        `
+      });
+    } catch (error) {
+      console.error('Failed to send project transfer email:', error);
+    }
+
+    return { success: true, token };
+  }
+
+  const invite = await prisma.itemTransferInvite.create({
+    data: {
+      itemId,
+      itemType,
+      recipientEmail: normalizedEmail,
+      senderId: session.user.id,
+      token,
+      expiresAt,
+      status: 'PENDING'
+    }
+  });
+
+  try {
+    await sendEmail({
+      to: normalizedEmail,
+      subject: `Invito trasferimento ${itemType.toLowerCase()}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:20px;border:1px solid #e2e8f0;border-radius:12px">
+          <h2 style="color:#0f172a">Invito trasferimento</h2>
+          <p style="color:#334155;line-height:1.5">Hai ricevuto una richiesta di trasferimento per un item ${itemType.toLowerCase()}.</p>
+          <div style="margin:24px 0">
+            <a href="${acceptUrl}" style="display:inline-block;padding:12px 20px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">
+              Accetta trasferimento
+            </a>
+          </div>
+          <p style="color:#64748b;font-size:12px">Il link scade tra 7 giorni.</p>
+        </div>
+      `
+    });
+  } catch (error) {
+    console.error('Failed to send transfer email:', error);
+  }
+
+  return { success: true, inviteId: invite.id };
+}
+
+async function acceptProjectTransferInvite(
+  token: string,
+  acceptingUserId: string
+): Promise<{ success: true }> {
+  const invite = await prisma.projectTransferInvite.findUnique({
+    where: { token }
+  });
+
+  if (!invite) {
+    throw new WorkspaceError('Invito non trovato', 404, 'INVITE_NOT_FOUND');
+  }
+
+  if (invite.status !== 'pending') {
+    throw new WorkspaceError('Invito già utilizzato o non valido', 409, 'INVITE_NOT_PENDING');
+  }
+
+  if (new Date() > invite.expiresAt) {
+    await prisma.projectTransferInvite.update({
+      where: { id: invite.id },
+      data: { status: 'expired' }
+    });
+    throw new WorkspaceError('Invito scaduto', 410, 'INVITE_EXPIRED');
+  }
+
+  const acceptingUser = await prisma.user.findUnique({
+    where: { id: acceptingUserId },
+    select: { email: true }
+  });
+
+  if (!acceptingUser?.email || acceptingUser.email.toLowerCase() !== invite.clientEmail.toLowerCase()) {
+    throw new WorkspaceError('Questo invito è destinato a un altro utente', 403, 'INVITE_EMAIL_MISMATCH');
+  }
+
+  let targetOrganizationId: string | null = null;
+  try {
+    if (invite.personalMessage) {
+      const parsed = JSON.parse(invite.personalMessage) as { targetOrganizationId?: string };
+      targetOrganizationId = parsed.targetOrganizationId || null;
+    }
+  } catch {
+    targetOrganizationId = null;
+  }
+
+  if (!targetOrganizationId) {
+    targetOrganizationId = await resolveDefaultOrganizationIdForUser(acceptingUserId);
+  }
+
+  if (!targetOrganizationId) {
+    throw new WorkspaceError('Nessuna organizzazione di destinazione disponibile', 422, 'TARGET_ORG_MISSING');
+  }
+
+  await assertOrganizationAccess(acceptingUserId, targetOrganizationId, 'ADMIN');
+
+  await moveProjectToOrganization({
+    projectId: invite.projectId,
+    targetOrganizationId,
+    actorUserId: acceptingUserId
+  });
+
+  await prisma.projectTransferInvite.update({
+    where: { id: invite.id },
+    data: {
+      status: 'accepted',
+      acceptedAt: new Date()
+    }
+  });
+
+  await syncPartnerAttributionForAcceptedInvite({
+    partnerId: invite.partnerId,
+    acceptingUserId,
+    projectId: invite.projectId
+  });
+
+  return { success: true };
+}
+
+async function syncPartnerAttributionForAcceptedInvite(params: {
+  partnerId: string;
+  acceptingUserId: string;
+  projectId: string;
+}) {
+  const { partnerId, acceptingUserId, projectId } = params;
+
+  const partner = await prisma.user.findUnique({
+    where: { id: partnerId },
+    select: { isPartner: true }
+  });
+
+  // Only partner-originated transfers generate partner attribution metadata.
+  if (!partner?.isPartner) {
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const existingAttribution = await tx.partnerClientAttribution.findUnique({
+      where: { clientUserId: acceptingUserId }
+    });
+
+    if (!existingAttribution) {
+      await tx.partnerClientAttribution.create({
+        data: {
+          partnerId,
+          clientUserId: acceptingUserId,
+          firstProjectId: projectId,
+          status: 'active'
+        }
+      });
+    } else if (existingAttribution.partnerId === partnerId && existingAttribution.status !== 'active') {
+      await tx.partnerClientAttribution.update({
+        where: { id: existingAttribution.id },
+        data: {
+          status: 'active',
+          revokedAt: null,
+          revokedReason: null
+        }
+      });
+    }
+
+    await tx.project.updateMany({
+      where: {
+        id: projectId,
+        originPartnerId: null
+      },
+      data: {
+        originPartnerId: partnerId
+      }
+    });
+  });
+
+  await PartnerService.refreshPartnerActiveClientsCount(partnerId);
+  await PartnerService.updatePartnerStatus(partnerId);
+}
+
+async function acceptGenericItemInvite(
+  token: string,
+  acceptingUserId: string
+): Promise<{ success: true }> {
+  const invite = await prisma.itemTransferInvite.findUnique({
+    where: { token }
+  });
+
+  if (!invite) {
+    throw new WorkspaceError('Invito non trovato', 404, 'INVITE_NOT_FOUND');
+  }
+
+  if (invite.status !== 'PENDING') {
+    throw new WorkspaceError('Invito già utilizzato o scaduto', 409, 'INVITE_NOT_PENDING');
+  }
+
+  if (new Date() > invite.expiresAt) {
+    await prisma.itemTransferInvite.update({
+      where: { id: invite.id },
+      data: { status: 'EXPIRED' }
+    });
+    throw new WorkspaceError('Invito scaduto', 410, 'INVITE_EXPIRED');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: acceptingUserId },
+    select: { email: true }
+  });
+
+  if (!user?.email || user.email.toLowerCase() !== invite.recipientEmail.toLowerCase()) {
+    throw new WorkspaceError('Questo invito è destinato a un altro utente', 403, 'INVITE_EMAIL_MISMATCH');
+  }
+
+  if (invite.itemType === 'PROJECT') {
+    const targetOrganizationId = await resolveDefaultOrganizationIdForUser(acceptingUserId);
+    if (!targetOrganizationId) {
+      throw new WorkspaceError('Nessuna organizzazione disponibile', 422, 'TARGET_ORG_MISSING');
+    }
+
+    await assertOrganizationAccess(acceptingUserId, targetOrganizationId, 'ADMIN');
+    await moveProjectToOrganization({
+      projectId: invite.itemId,
+      targetOrganizationId,
+      actorUserId: acceptingUserId
+    });
+  } else if (invite.itemType === 'BOT') {
+    const targetOrganizationId = await resolveDefaultOrganizationIdForUser(acceptingUserId);
+    if (!targetOrganizationId) {
+      throw new WorkspaceError('Nessuna organizzazione disponibile', 422, 'TARGET_ORG_MISSING');
+    }
+    await assertOrganizationAccess(acceptingUserId, targetOrganizationId, 'ADMIN');
+
+    const targetProject = await prisma.project.findFirst({
+      where: { organizationId: targetOrganizationId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true }
+    });
+
+    if (!targetProject) {
+      throw new WorkspaceError('Nessun progetto disponibile nella tua organizzazione', 422, 'TARGET_PROJECT_MISSING');
+    }
+
+    await prisma.bot.update({
+      where: { id: invite.itemId },
+      data: { projectId: targetProject.id }
+    });
+  } else if (invite.itemType === 'TOOL') {
+    const targetOrganizationId = await resolveDefaultOrganizationIdForUser(acceptingUserId);
+    if (!targetOrganizationId) {
+      throw new WorkspaceError('Nessuna organizzazione disponibile', 422, 'TARGET_ORG_MISSING');
+    }
+    await assertOrganizationAccess(acceptingUserId, targetOrganizationId, 'ADMIN');
+
+    const targetProject = await prisma.project.findFirst({
+      where: { organizationId: targetOrganizationId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true }
+    });
+
+    if (!targetProject) {
+      throw new WorkspaceError('Nessun progetto disponibile nella tua organizzazione', 422, 'TARGET_PROJECT_MISSING');
+    }
+
+    await prisma.mCPConnection.updateMany({
+      where: { id: invite.itemId },
+      data: { projectId: targetProject.id, organizationId: targetOrganizationId }
+    });
+    await prisma.googleConnection.updateMany({
+      where: { id: invite.itemId },
+      data: { projectId: targetProject.id }
+    });
+    await prisma.cMSConnection.updateMany({
+      where: { id: invite.itemId },
+      data: { projectId: targetProject.id, organizationId: targetOrganizationId }
+    });
+  } else if (invite.itemType === 'ORGANIZATION') {
+    await assertOrganizationAccess(acceptingUserId, invite.itemId, 'OWNER');
+  }
+
+  await prisma.itemTransferInvite.update({
+    where: { id: invite.id },
+    data: {
+      status: 'ACCEPTED',
+      acceptedAt: new Date()
+    }
+  });
+
+  return { success: true };
 }
 
 export async function acceptTransferInvite(token: string) {
-    const session = await auth();
-    if (!session?.user?.id) throw new Error('Unauthorized');
+  const session = await auth();
+  if (!session?.user?.id) throw new WorkspaceError('Unauthorized', 401, 'UNAUTHORIZED');
 
-    const invite = await prisma.itemTransferInvite.findUnique({
-        where: { token },
-        include: { sender: true }
+  try {
+    const genericInvite = await prisma.itemTransferInvite.findUnique({
+      where: { token },
+      select: { id: true }
     });
 
-    if (!invite) throw new Error('Invito non trovato');
-    if (invite.status !== 'PENDING') throw new Error('Invito gia utilizzato o scaduto');
-    if (new Date() > invite.expiresAt) {
-        await prisma.itemTransferInvite.update({ where: { id: invite.id }, data: { status: 'EXPIRED' } });
-        throw new Error('Invito scaduto');
+    if (genericInvite) {
+      await acceptGenericItemInvite(token, session.user.id);
+    } else {
+      await acceptProjectTransferInvite(token, session.user.id);
     }
-
-    // Verify recipient email matches
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (user?.email.toLowerCase() !== invite.recipientEmail.toLowerCase()) {
-        throw new Error('Questo invito e per un altro indirizzo email');
-    }
-
-    // 5. Execute Transfer based on type
-    await prisma.$transaction(async (tx) => {
-        // Find recipient's default organization and project if needed
-        const recipientMemberships = await tx.membership.findMany({
-            where: { userId: session.user!.id, role: 'OWNER' },
-            include: { organization: true }
-        });
-
-        const targetOrgId = recipientMemberships[0]?.organizationId;
-
-        // If no organization, we might need to create one (but the app usually ensures this)
-        if (!targetOrgId) {
-            throw new Error('Non hai un\'organizzazione valida per ricevere questo item');
-        }
-
-        switch (invite.itemType) {
-            case 'ORGANIZATION':
-                // Transfer ownership of the whole organization
-                // 1. Current owner (sender) becomes ADMIN or is removed
-                await tx.membership.updateMany({
-                    where: { organizationId: invite.itemId, userId: invite.senderId },
-                    data: { role: 'ADMIN' }
-                });
-                // 2. New owner (recipient) is added or updated
-                const existingMember = await tx.membership.findFirst({
-                    where: { organizationId: invite.itemId, userId: session.user!.id }
-                });
-                if (existingMember) {
-                    await tx.membership.update({
-                        where: { id: existingMember.id },
-                        data: { role: 'OWNER' }
-                    });
-                } else {
-                    await tx.membership.create({
-                        data: {
-                            organizationId: invite.itemId,
-                            userId: session.user!.id as string,
-                            role: 'OWNER'
-                        }
-                    });
-                }
-                break;
-
-            case 'PROJECT':
-                // Move project to recipient's organization
-                await tx.project.update({
-                    where: { id: invite.itemId },
-                    data: {
-                        organizationId: targetOrgId,
-                        ownerId: session.user!.id,
-                        transferredAt: new Date(),
-                        transferredFromOrgId: (await tx.project.findUnique({ where: { id: invite.itemId } }))?.organizationId
-                    }
-                });
-                break;
-
-            case 'BOT':
-                // Move bot to recipient's first project in their default org
-                const targetProject = await tx.project.findFirst({
-                    where: { organizationId: targetOrgId }
-                });
-                if (!targetProject) throw new Error('Nessun progetto trovato nella tua organizzazione di destinazione');
-
-                await tx.bot.update({
-                    where: { id: invite.itemId },
-                    data: { projectId: targetProject.id }
-                });
-                break;
-
-            case 'TOOL':
-                // Handle various tool types (MCP, Google, CMS)
-                // Note: itemId might refer to different tables. In schema, itemId is just a string.
-                // We need to check which table it belongs to or use a more specific type.
-                // For now, let's look for MCPConnection as the primary "TOOL".
-                const targetProjectTool = await tx.project.findFirst({
-                    where: { organizationId: targetOrgId }
-                });
-                if (!targetProjectTool) throw new Error('Nessun progetto trovato nella tua organizzazione di destinazione');
-
-                // Try to update in all potential tool tables
-                await tx.mCPConnection.updateMany({ where: { id: invite.itemId }, data: { projectId: targetProjectTool.id } });
-                await tx.googleConnection.updateMany({ where: { id: invite.itemId }, data: { projectId: targetProjectTool.id } });
-                await tx.cMSConnection.updateMany({ where: { id: invite.itemId }, data: { projectId: targetProjectTool.id } });
-                break;
-        }
-
-        // Update invite status
-        await tx.itemTransferInvite.update({
-            where: { id: invite.id },
-            data: {
-                status: 'ACCEPTED',
-                acceptedAt: new Date()
-            }
-        });
-    });
-
+  } finally {
     revalidatePath('/dashboard');
-    return { success: true };
+    revalidatePath('/dashboard/projects');
+  }
+
+  return { success: true };
 }

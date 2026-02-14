@@ -35,6 +35,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [hostPageContext, setHostPageContext] = useState<HostPageContext | null>(null);
+    const forceConsent = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('forceConsent') === 'true';
 
     // Check if we are in "full" mode (straight to chat window)
     const isFullMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('full') === 'true';
@@ -125,6 +126,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                     privacyPolicyUrl={bot.privacyPolicyUrl ?? undefined}
                     hostPageContext={hostPageContext}
                     enablePageContext={bot.enablePageContext !== false}
+                    forceConsentScreen={forceConsent}
                 />
                 <style jsx global>{`
                     body { margin: 0; padding: 0; overflow: hidden; }
@@ -172,6 +174,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                 showDataUsageInfo={bot.showDataUsageInfo ?? undefined}
                 hostPageContext={hostPageContext}
                 enablePageContext={bot.enablePageContext !== false}
+                forceConsentScreen={forceConsent}
             />
             {/* Minimal styles for the iframe body */}
             <style jsx global>{`

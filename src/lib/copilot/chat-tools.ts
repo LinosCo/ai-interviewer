@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import Sitemapper from 'sitemapper';
 import { scrapeUrl } from '@/lib/scraping';
+import { assertOrganizationAccess, assertProjectAccess } from '@/lib/domain/workspace';
 
 type ToolContext = {
     userId: string;
@@ -15,25 +16,27 @@ const scopedInputSchema = z.object({
 });
 
 async function resolveAccessibleProjectIds(context: ToolContext, requestedProjectId?: string | null): Promise<string[]> {
-    const accessibleProjects = await prisma.project.findMany({
+    const effectiveProjectId = requestedProjectId || context.projectId || null;
+
+    if (effectiveProjectId) {
+        try {
+            const access = await assertProjectAccess(context.userId, effectiveProjectId, 'VIEWER');
+            return access.organizationId === context.organizationId ? [effectiveProjectId] : [];
+        } catch {
+            return [];
+        }
+    }
+
+    await assertOrganizationAccess(context.userId, context.organizationId, 'VIEWER');
+
+    const projects = await prisma.project.findMany({
         where: {
-            organizationId: context.organizationId,
-            OR: [
-                { ownerId: context.userId },
-                { accessList: { some: { userId: context.userId } } }
-            ]
+            organizationId: context.organizationId
         },
         select: { id: true }
     });
 
-    const allIds = accessibleProjects.map((p) => p.id);
-    const effectiveProjectId = requestedProjectId || context.projectId || null;
-
-    if (effectiveProjectId) {
-        return allIds.includes(effectiveProjectId) ? [effectiveProjectId] : [];
-    }
-
-    return allIds;
+    return projects.map((project) => project.id);
 }
 
 function clampLimit(limit?: number): number {

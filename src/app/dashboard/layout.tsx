@@ -87,8 +87,7 @@ export default async function DashboardLayout({
                     select: {
                         id: true,
                         name: true,
-                        isPersonal: true,
-                        ownerId: true
+                        isPersonal: true
                     }
                 });
 
@@ -96,7 +95,7 @@ export default async function DashboardLayout({
                     id: p.id,
                     name: p.name,
                     isPersonal: p.isPersonal,
-                    role: p.ownerId === session.user?.id ? 'OWNER' : 'MEMBER'
+                    role: ['OWNER', 'ADMIN'].includes(membership.role) ? 'OWNER' : 'MEMBER'
                 }));
 
                 // Source of truth for tier is now the Organization

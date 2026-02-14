@@ -45,8 +45,12 @@ export default function TransferProjectDialog({
 
         setIsSubmitting(true);
         try {
-            await onTransfer(selectedOrgId);
-            showToast('✅ Progetto trasferito con successo!', 'success');
+            const result = await onTransfer(selectedOrgId);
+            if (result?.mode === 'pending') {
+                showToast(`Richiesta inviata a ${result.recipientEmail}. In attesa di approvazione.`, 'success');
+            } else {
+                showToast('Progetto trasferito con successo', 'success');
+            }
             onClose();
         } catch (error: any) {
             console.error(error);

@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import ProfilesList from '@/components/dashboard/ProfilesList';
 import Link from 'next/link';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 export default async function BotProfilesPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
-    if (!session?.user?.email) redirect('/login');
+    if (!session?.user?.id) redirect('/login');
 
     const { botId } = await params;
 
@@ -19,20 +20,11 @@ export default async function BotProfilesPage({ params }: { params: Promise<{ bo
     });
 
     if (!bot) notFound();
-
-    // Verify access
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            ownedProjects: true,
-            projectAccess: true
-        }
-    });
-
-    const isOwner = user?.ownedProjects.some(p => p.id === bot.projectId);
-    const hasAccess = user?.projectAccess.some(pa => pa.projectId === bot.projectId);
-
-    if (!isOwner && !hasAccess) redirect('/dashboard');
+    try {
+        await assertProjectAccess(session.user.id, bot.projectId, 'VIEWER');
+    } catch {
+        redirect('/dashboard');
+    }
 
     // Fetch conversations with profiles
     // We filter raw SQL or just fetch and filter in JS if not heavy (candidateProfile is JSON)

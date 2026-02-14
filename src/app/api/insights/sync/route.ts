@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { CrossChannelSyncEngine } from '@/lib/insights/sync-engine';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
+import {
+    WorkspaceError,
+    assertOrganizationAccess,
+    assertProjectAccess
+} from '@/lib/domain/workspace';
 
 export async function POST(request: Request) {
     try {
@@ -22,16 +27,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
 
-        // Verify project access if projectId is provided
-        if (projectId) {
-            const access = await prisma.projectAccess.findUnique({
-                where: {
-                    userId_projectId: { userId: session.user.id, projectId }
+        try {
+            if (projectId) {
+                const access = await assertProjectAccess(session.user.id, projectId, 'MEMBER');
+                if (access.organizationId !== orgId) {
+                    return NextResponse.json({ error: 'Project does not belong to selected organization' }, { status: 403 });
                 }
-            });
-            if (!access) {
-                return NextResponse.json({ error: 'Project access denied' }, { status: 403 });
+            } else {
+                await assertOrganizationAccess(session.user.id, orgId, 'MEMBER');
             }
+        } catch (error) {
+            if (error instanceof WorkspaceError) {
+                return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+            }
+            throw error;
         }
 
         const result = await CrossChannelSyncEngine.sync(orgId, projectId || undefined);
@@ -67,15 +76,20 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
         }
 
-        if (projectId) {
-            const access = await prisma.projectAccess.findUnique({
-                where: {
-                    userId_projectId: { userId: session.user.id, projectId }
+        try {
+            if (projectId) {
+                const access = await assertProjectAccess(session.user.id, projectId, 'VIEWER');
+                if (access.organizationId !== orgId) {
+                    return NextResponse.json({ error: 'Project does not belong to selected organization' }, { status: 403 });
                 }
-            });
-            if (!access) {
-                return NextResponse.json({ error: 'Project access denied' }, { status: 403 });
+            } else {
+                await assertOrganizationAccess(session.user.id, orgId, 'VIEWER');
             }
+        } catch (error) {
+            if (error instanceof WorkspaceError) {
+                return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+            }
+            throw error;
         }
 
         const insights = await prisma.crossChannelInsight.findMany({

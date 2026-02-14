@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { VisibilityEngine } from '@/lib/visibility/visibility-engine';
 import { checkResourceAccess } from '@/lib/guards/resourceGuard';
+import { WorkspaceError, assertOrganizationAccess } from '@/lib/domain/workspace';
 
 // Extend timeout for long-running scans (5 minutes)
 export const maxDuration = 300;
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
             where: { id: configId },
             include: {
                 project: {
-                    select: { id: true, ownerId: true }
+                    select: { id: true }
                 }
             }
         });
@@ -35,17 +36,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Configuration not found' }, { status: 404 });
         }
 
-        const membership = await prisma.membership.findUnique({
-            where: {
-                userId_organizationId: {
-                    userId: session.user.id,
-                    organizationId: config.organizationId
-                }
-            },
-            select: { organizationId: true }
-        });
-
-        if (!membership) {
+        try {
+            await assertOrganizationAccess(session.user.id, config.organizationId, 'MEMBER');
+        } catch (error) {
+            if (error instanceof WorkspaceError) {
+                return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+            }
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 

@@ -34,6 +34,7 @@ interface ChatWindowProps {
         mainContent?: string;
     } | null;
     enablePageContext?: boolean;
+    forceConsentScreen?: boolean;
 }
 
 const LEAKED_INSTRUCTION_PATTERN =
@@ -280,7 +281,8 @@ export default function ChatWindow({
     showAnonymityInfo = true,
     showDataUsageInfo = true,
     hostPageContext = null,
-    enablePageContext = true
+    enablePageContext = true,
+    forceConsentScreen = false
 }: ChatWindowProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -295,6 +297,10 @@ export default function ChatWindow({
 
     // Check for existing consent on mount
     useEffect(() => {
+        if (forceConsentScreen) {
+            setHasConsented(false);
+            return;
+        }
         const consentKey = `bt_consent_${botId}`;
         const existingConsent = localStorage.getItem(consentKey);
         if (existingConsent) {
@@ -309,7 +315,7 @@ export default function ChatWindow({
                 // Invalid consent, require new one
             }
         }
-    }, [botId]);
+    }, [botId, forceConsentScreen]);
 
     // Handle consent acceptance
     const handleConsentAccept = (marketing: boolean) => {

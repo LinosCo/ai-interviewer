@@ -1,6 +1,8 @@
+import { NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
 function isMissingN8NConnectionTable(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -9,6 +11,20 @@ function isMissingN8NConnectionTable(error: unknown): boolean {
   const tableRef = String(prismaError.meta?.table || '').toLowerCase();
   const messageRef = String(prismaError.message || '').toLowerCase();
   return tableRef.includes('n8nconnection') || messageRef.includes('n8nconnection');
+}
+
+function toErrorResponse(error: unknown) {
+  if (error instanceof WorkspaceError) {
+    return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+  }
+  if (isMissingN8NConnectionTable(error)) {
+    return NextResponse.json(
+      { error: 'N8N integration unavailable: missing N8NConnection table. Run database migrations.' },
+      { status: 503 }
+    );
+  }
+  console.error('N8N test route error:', error);
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
 }
 
 export async function POST(
@@ -22,54 +38,37 @@ export async function POST(
     }
 
     const { id } = await params;
-
     const connection = await prisma.n8NConnection.findUnique({
       where: { id },
-      include: { project: { select: { id: true, name: true } } },
+      include: { project: { select: { id: true, name: true } } }
     });
 
     if (!connection) {
-      return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
+      throw new WorkspaceError('Connection not found', 404, 'N8N_NOT_FOUND');
     }
 
-    // Check access
-    const access = await prisma.projectAccess.findUnique({
-      where: {
-        userId_projectId: {
-          userId: session.user.id,
-          projectId: connection.projectId,
-        },
-      },
-    });
+    await assertProjectAccess(session.user.id, connection.projectId, 'ADMIN');
 
-    if (!access) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
-    // Update status to TESTING
     await prisma.n8NConnection.update({
       where: { id },
-      data: { status: 'TESTING' },
+      data: { status: 'TESTING' }
     });
 
     try {
-      // Send test payload to n8n webhook
       const testPayload = {
         event: 'test',
         timestamp: new Date().toISOString(),
         project: {
           id: connection.project.id,
-          name: connection.project.name,
+          name: connection.project.name
         },
-        message: 'Test connection from Voler.ai',
+        message: 'Test connection from Voler.ai'
       };
 
       const response = await fetch(connection.webhookUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(testPayload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testPayload)
       });
 
       if (response.ok) {
@@ -78,54 +77,45 @@ export async function POST(
           data: {
             status: 'ACTIVE',
             lastTriggerAt: new Date(),
-            lastError: null,
-          },
+            lastError: null
+          }
         });
 
-        return NextResponse.json({
-          success: true,
-          message: 'Webhook test successful',
-        });
-      } else {
-        const errorText = await response.text();
-        await prisma.n8NConnection.update({
-          where: { id },
-          data: {
-            status: 'ERROR',
-            lastError: `HTTP ${response.status}: ${errorText.slice(0, 200)}`,
-          },
-        });
-
-        return NextResponse.json({
-          success: false,
-          error: `Webhook returned ${response.status}`,
-        });
+        return NextResponse.json({ success: true, message: 'Webhook test successful' });
       }
-    } catch (fetchError: unknown) {
-      const fetchErrorMessage = fetchError instanceof Error
-        ? fetchError.message
-        : 'Failed to connect to webhook';
+
+      const errorText = await response.text();
       await prisma.n8NConnection.update({
         where: { id },
         data: {
           status: 'ERROR',
-          lastError: fetchErrorMessage,
-        },
+          lastError: `HTTP ${response.status}: ${errorText.slice(0, 200)}`
+        }
       });
 
       return NextResponse.json({
         success: false,
-        error: fetchErrorMessage,
+        error: `Webhook returned ${response.status}`
+      });
+    } catch (fetchError: unknown) {
+      const fetchErrorMessage = fetchError instanceof Error
+        ? fetchError.message
+        : 'Failed to connect to webhook';
+
+      await prisma.n8NConnection.update({
+        where: { id },
+        data: {
+          status: 'ERROR',
+          lastError: fetchErrorMessage
+        }
+      });
+
+      return NextResponse.json({
+        success: false,
+        error: fetchErrorMessage
       });
     }
   } catch (error) {
-    if (isMissingN8NConnectionTable(error)) {
-      return NextResponse.json(
-        { error: 'N8N integration unavailable: missing N8NConnection table. Run database migrations.' },
-        { status: 503 }
-      );
-    }
-    console.error('Test N8N Connection Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return toErrorResponse(error);
   }
 }

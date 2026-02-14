@@ -1621,7 +1621,6 @@ export async function POST(req: Request) {
             interviewProject?.organizationId ||
             null;
         const interviewProjectId: string | undefined = interviewProject?.id || undefined;
-        const interviewOwnerId: string | undefined = interviewProject?.ownerId || undefined;
 
         const llmUsageTotals = {
             inputTokens: 0,
@@ -1745,7 +1744,7 @@ export async function POST(req: Request) {
 
             try {
                 await TokenTrackingService.logTokenUsage({
-                    userId: interviewOwnerId,
+                    userId: undefined,
                     organizationId: interviewOrganizationId,
                     projectId: interviewProjectId,
                     inputTokens: llmUsageTotals.inputTokens,

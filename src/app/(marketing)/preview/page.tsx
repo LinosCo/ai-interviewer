@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import InterviewChat from '@/components/interview-chat';
-import { LandingHeader } from '@/components/landing/LandingHeader';
-import { Footer } from '@/components/Footer';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Play } from 'lucide-react';
 import { colors } from '@/lib/design-system';
@@ -89,8 +87,6 @@ export default function PublicPreviewPage() {
 
     return (
         <div className="min-h-screen bg-[#FAFAF8]">
-            <LandingHeader session={null} />
-
             <main className="pt-32 pb-20 px-6">
                 <div className="max-w-4xl mx-auto">
                     <motion.div
@@ -180,8 +176,6 @@ export default function PublicPreviewPage() {
                     </motion.div>
                 </div>
             </main>
-
-            <Footer />
         </div>
     );
 }

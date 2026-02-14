@@ -39,7 +39,7 @@ export function ProjectDeleteSection({ projectId, projectName }: ProjectDeleteSe
             });
 
             if (res.ok) {
-                showToast('Progetto eliminato. I tool sono stati spostati nel tuo progetto personale.');
+                showToast('Progetto eliminato. I tool sono stati spostati nel progetto di default dell\'organizzazione.');
                 router.push('/dashboard/projects');
             } else {
                 const data = await res.json().catch(() => ({ error: 'Errore durante l\'eliminazione' }));
@@ -61,14 +61,14 @@ export function ProjectDeleteSection({ projectId, projectName }: ProjectDeleteSe
                         Elimina Progetto
                     </CardTitle>
                     <CardDescription>
-                        Elimina definitivamente questo progetto. I tool verranno spostati in un&apos;altro dei tuoi progetti.
+                        Elimina definitivamente questo progetto. I tool verranno spostati nel progetto di default dell&apos;organizzazione.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="p-4 rounded-xl bg-red-50 border border-red-100 flex gap-3">
                         <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                         <div className="text-sm text-red-800">
-                            <strong>Attenzione:</strong> Questa azione non può essere annullata. Tutti i membri perderanno l&apos;accesso a questo progetto. I bot e le configurazioni di visibilità verranno spostati in un&apos;altro dei tuoi progetti.
+                            <strong>Attenzione:</strong> Questa azione non può essere annullata. Tutti i membri perderanno l&apos;accesso a questo progetto. I bot e le configurazioni di visibilità verranno riassegnati al progetto di default dell&apos;organizzazione.
                         </div>
                     </div>
                     <Button
@@ -99,8 +99,8 @@ export function ProjectDeleteSection({ projectId, projectName }: ProjectDeleteSe
                                 <strong>Cosa succederà:</strong>
                             </p>
                             <ul className="text-sm text-amber-700 mt-2 space-y-1 list-disc list-inside">
-                                <li>I bot verranno spostati in un altro dei tuoi progetti</li>
-                                <li>I brand di visibilità verranno scollegati (potrai riassociarli)</li>
+                                <li>I bot verranno spostati nel progetto di default dell&apos;organizzazione</li>
+                                <li>I brand di visibilità manterranno un progetto associato (nessun orfano)</li>
                                 <li>Tutti i membri perderanno l'accesso</li>
                             </ul>
                         </div>

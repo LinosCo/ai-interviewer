@@ -2,6 +2,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
+import { WorkspaceError, assertOrganizationAccess } from '@/lib/domain/workspace';
 
 // GET all bots across all projects (admin only)
 export async function GET(req: Request) {
@@ -13,40 +14,23 @@ export async function GET(req: Request) {
         const botType = searchParams.get('type'); // 'chatbot' or 'interview'
         const selectedOrganizationId = searchParams.get('organizationId');
 
-        // Get user with organization membership
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: {
-                memberships: {
-                    select: { role: true, organizationId: true, status: true }
-                }
-            }
-        });
-
-        if (!user) return new Response('User not found', { status: 404 });
-
         const orgId = await resolveActiveOrganizationIdForUser(session.user.id, {
             preferredOrganizationId: selectedOrganizationId
         });
         if (!orgId) return new Response('Organization not found', { status: 404 });
 
-        const orgMembership = user.memberships.find((m) => m.organizationId === orgId);
-        if (!orgMembership) {
-            return new Response('Organization not found or access denied', { status: 403 });
+        try {
+            await assertOrganizationAccess(session.user.id, orgId, 'VIEWER');
+        } catch (error) {
+            if (error instanceof WorkspaceError) {
+                return new Response(error.message, { status: error.status });
+            }
+            return new Response('Organization access denied', { status: 403 });
         }
-        if (orgMembership.status !== 'ACTIVE') {
-            return new Response('Organization membership is not active', { status: 403 });
-        }
-        const canViewAllOrgProjects = ['OWNER', 'ADMIN'].includes(orgMembership.role);
+
         const accessibleProjects = await prisma.project.findMany({
             where: {
-                organizationId: orgId,
-                ...(canViewAllOrgProjects ? {} : {
-                    OR: [
-                        { ownerId: session.user.id },
-                        { accessList: { some: { userId: session.user.id } } }
-                    ]
-                })
+                organizationId: orgId
             },
             select: { id: true }
         });

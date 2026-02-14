@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
 export async function PATCH(
     req: NextRequest,
@@ -9,7 +10,7 @@ export async function PATCH(
     try {
         // Check authentication
         const session = await auth();
-        if (!session?.user?.email) {
+        if (!session?.user?.id) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -26,18 +27,12 @@ export async function PATCH(
             return NextResponse.json({ error: 'Bot not found' }, { status: 404 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email: session.user.email },
-            include: {
-                ownedProjects: true,
-                projectAccess: true
+        try {
+            await assertProjectAccess(session.user.id, existingBot.projectId, 'MEMBER');
+        } catch (error) {
+            if (error instanceof WorkspaceError) {
+                return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
             }
-        });
-
-        const isOwner = user?.ownedProjects.some(p => p.id === existingBot.projectId);
-        const hasAccess = user?.projectAccess.some(pa => pa.projectId === existingBot.projectId);
-
-        if (!isOwner && !hasAccess) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 

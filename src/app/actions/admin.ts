@@ -1,11 +1,15 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/auth'; // Keeping auth if referenced elsewhere, but requireAdmin handles it
 import { UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/admin-auth';
+import {
+    ensureProjectOrganization,
+    syncLegacyProjectAccessForOrganization
+} from '@/lib/domain/workspace';
+import { getOrCreateDefaultOrganization } from '@/lib/organizations';
 
 // Middleware-like check for admin
 // Moved to @/lib/admin-auth
@@ -48,17 +52,17 @@ export async function transferProject(projectId: string, newOwnerId: string) {
     await requireAdmin();
     console.log(`[AdminAction] Transfer Project: projectId=${projectId}`);
 
+    const organizationId = await ensureProjectOrganization(projectId);
+
     const project = await prisma.$transaction(async (tx) => {
         const existingProject = await tx.project.findUnique({
             where: { id: projectId },
-            select: { id: true, ownerId: true, organizationId: true }
+            select: { id: true }
         });
 
         if (!existingProject) {
             throw new Error('Project not found');
         }
-
-        const previousOwnerId = existingProject.ownerId;
 
         const updatedProject = await tx.project.update({
             where: { id: projectId },
@@ -67,67 +71,33 @@ export async function transferProject(projectId: string, newOwnerId: string) {
             }
         });
 
-        // New owner must always be explicitly OWNER in ProjectAccess
-        await tx.projectAccess.upsert({
+        await tx.membership.upsert({
             where: {
-                userId_projectId: {
+                userId_organizationId: {
                     userId: newOwnerId,
-                    projectId
+                    organizationId
                 }
             },
-            update: { role: 'OWNER' },
+            update: {
+                role: 'ADMIN',
+                status: 'ACTIVE',
+                acceptedAt: new Date(),
+                joinedAt: new Date()
+            },
             create: {
                 userId: newOwnerId,
-                projectId,
-                role: 'OWNER'
+                organizationId,
+                role: 'ADMIN',
+                status: 'ACTIVE',
+                acceptedAt: new Date(),
+                joinedAt: new Date()
             }
         });
 
-        // Keep previous owner as MEMBER (unless same user)
-        if (previousOwnerId && previousOwnerId !== newOwnerId) {
-            await tx.projectAccess.upsert({
-                where: {
-                    userId_projectId: {
-                        userId: previousOwnerId,
-                        projectId
-                    }
-                },
-                update: { role: 'MEMBER' },
-                create: {
-                    userId: previousOwnerId,
-                    projectId,
-                    role: 'MEMBER'
-                }
-            });
-        }
-
-        // Ensure the new owner is also a member of the project organization.
-        if (existingProject.organizationId) {
-            await tx.membership.upsert({
-                where: {
-                    userId_organizationId: {
-                        userId: newOwnerId,
-                        organizationId: existingProject.organizationId
-                    }
-                },
-                update: {
-                    status: 'ACTIVE',
-                    acceptedAt: new Date(),
-                    joinedAt: new Date()
-                },
-                create: {
-                    userId: newOwnerId,
-                    organizationId: existingProject.organizationId,
-                    role: 'MEMBER',
-                    status: 'ACTIVE',
-                    acceptedAt: new Date(),
-                    joinedAt: new Date()
-                }
-            });
-        }
-
         return updatedProject;
     });
+
+    await syncLegacyProjectAccessForOrganization(organizationId);
 
     revalidatePath('/dashboard/admin/projects');
     revalidatePath(`/dashboard/admin/projects/${projectId}`);
@@ -152,14 +122,50 @@ export async function createUser(data: { name: string; email: string; password?:
             name,
             email,
             password: hashedPassword,
-            role,
-            projectAccess: {
-                create: projectIds.map(projectId => ({
-                    projectId
-                }))
-            }
+            role
         }
     });
+
+    if (projectIds.length > 0) {
+        const projects = await prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { organizationId: true }
+        });
+
+        const organizationIds = Array.from(
+            new Set(
+                projects
+                    .map((project) => project.organizationId)
+                    .filter((organizationId): organizationId is string => Boolean(organizationId))
+            )
+        );
+
+        for (const organizationId of organizationIds) {
+            await prisma.membership.upsert({
+                where: {
+                    userId_organizationId: {
+                        userId: user.id,
+                        organizationId
+                    }
+                },
+                update: {
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                },
+                create: {
+                    userId: user.id,
+                    organizationId,
+                    role: 'MEMBER',
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                }
+            });
+
+            await syncLegacyProjectAccessForOrganization(organizationId);
+        }
+    }
 
     revalidatePath('/dashboard/admin/users');
     return user;
@@ -179,16 +185,46 @@ export async function updateUser(userId: string, data: { name?: string; email?: 
     }
     if (role) updateData.role = role;
 
-    // Handle Project Access Update
+    // Handle project selection by ensuring membership on corresponding organizations.
     if (projectIds) {
-        // First delete existing access, then create new
-        // Note: transaction would be better but simple separate ops work for MVP
-        await prisma.projectAccess.deleteMany({ where: { userId } });
-        updateData.projectAccess = {
-            create: projectIds.map(projectId => ({
-                projectId
-            }))
-        };
+        const projects = await prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { organizationId: true }
+        });
+
+        const organizationIds = Array.from(
+            new Set(
+                projects
+                    .map((project) => project.organizationId)
+                    .filter((organizationId): organizationId is string => Boolean(organizationId))
+            )
+        );
+
+        for (const organizationId of organizationIds) {
+            await prisma.membership.upsert({
+                where: {
+                    userId_organizationId: {
+                        userId,
+                        organizationId
+                    }
+                },
+                update: {
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                },
+                create: {
+                    userId,
+                    organizationId,
+                    role: 'MEMBER',
+                    status: 'ACTIVE',
+                    acceptedAt: new Date(),
+                    joinedAt: new Date()
+                }
+            });
+
+            await syncLegacyProjectAccessForOrganization(organizationId);
+        }
     }
 
     const user = await prisma.user.update({
@@ -213,27 +249,26 @@ export async function deleteUser(userId: string) {
 
 export async function createProject(name: string, ownerId: string) {
     await requireAdmin();
-    // Get owner's organization
-    const owner = await prisma.user.findUnique({
-        where: { id: ownerId },
-        include: { memberships: { take: 1 } }
+    const ownerMembership = await prisma.membership.findFirst({
+        where: {
+            userId: ownerId,
+            status: 'ACTIVE'
+        },
+        select: { organizationId: true },
+        orderBy: { createdAt: 'asc' }
     });
-    const organizationId = owner?.memberships[0]?.organizationId;
+
+    const organizationId = ownerMembership?.organizationId || (await getOrCreateDefaultOrganization(ownerId)).id;
 
     const project = await prisma.project.create({
         data: {
             name,
             ownerId,
-            organizationId,
-            // Also add owner to access list for clarity
-            accessList: {
-                create: {
-                    userId: ownerId,
-                    role: 'OWNER'
-                }
-            }
+            organizationId
         }
     });
+
+    await syncLegacyProjectAccessForOrganization(organizationId);
 
     revalidatePath('/dashboard/admin/projects');
     return project;

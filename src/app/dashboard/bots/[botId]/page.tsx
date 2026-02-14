@@ -13,28 +13,13 @@ import CopyLinkButton from '@/components/copy-link-button';
 import ChatbotSettings from '@/components/chatbot/ChatbotSettings';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 import { isFeatureEnabled } from '@/lib/usage';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 export default async function BotEditorPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
-    if (!session?.user?.email) redirect('/login');
+    if (!session?.user?.id) redirect('/login');
 
     const { botId } = await params;
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: {
-            ownedProjects: true,
-            projectAccess: { include: { project: true } }
-        }
-    });
-
-    const userProjects = [
-        ...(user?.ownedProjects || []),
-        ...(user?.projectAccess.map(pa => pa.project) || [])
-    ];
-
-    // Unique by ID
-    const projects = Array.from(new Map(userProjects.map(p => [p.id, p])).values());
 
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
@@ -51,8 +36,21 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
     });
 
     if (!bot) notFound();
+    const projectAccess = await assertProjectAccess(session.user.id, bot.projectId, 'MEMBER');
 
-    const organizationId = bot.project?.organizationId || '';
+    const projects = await prisma.project.findMany({
+        where: {
+            organizationId: projectAccess.organizationId
+        },
+        select: {
+            id: true,
+            name: true,
+            isPersonal: true
+        },
+        orderBy: { createdAt: 'asc' }
+    });
+
+    const organizationId = projectAccess.organizationId;
 
     const canUseKnowledgeBase = await isFeatureEnabled(organizationId, 'knowledgeBase');
     const canUseConditionalLogic = await isFeatureEnabled(organizationId, 'conditionalLogic');

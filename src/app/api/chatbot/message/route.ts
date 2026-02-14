@@ -420,11 +420,10 @@ Rules:
 
             // Track extraction tokens - NUOVO: usa userId (owner del progetto) per sistema crediti
             const organizationId = bot.project?.organizationId;
-            const projectOwnerId = bot.project?.ownerId;
-            if (projectOwnerId && extraction?.usage) {
+            if (extraction?.usage) {
                 try {
                     await TokenTrackingService.logTokenUsage({
-                        userId: projectOwnerId,
+                        userId: undefined,
                         organizationId,
                         projectId: bot.project?.id,
                         inputTokens: extraction.usage?.inputTokens || 0,
@@ -605,11 +604,10 @@ NON-NEGOTIABLE RULES
         // Track response tokens - NUOVO: usa userId (owner del progetto) per sistema crediti
         const responseTokens = result?.usage?.totalTokens || 0;
         const orgId = bot.project?.organizationId;
-        const ownerId = bot.project?.ownerId;
-        if (ownerId && result?.usage) {
+        if (result?.usage) {
             try {
                 await TokenTrackingService.logTokenUsage({
-                    userId: ownerId,
+                    userId: undefined,
                     organizationId: orgId,
                     projectId: bot.project?.id,
                     inputTokens: result.usage.inputTokens || 0,

@@ -1,6 +1,8 @@
+import { NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
 function isMissingN8NConnectionTable(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -9,6 +11,34 @@ function isMissingN8NConnectionTable(error: unknown): boolean {
   const tableRef = String(prismaError.meta?.table || '').toLowerCase();
   const messageRef = String(prismaError.message || '').toLowerCase();
   return tableRef.includes('n8nconnection') || messageRef.includes('n8nconnection');
+}
+
+function toErrorResponse(error: unknown) {
+  if (error instanceof WorkspaceError) {
+    return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+  }
+  if (isMissingN8NConnectionTable(error)) {
+    return NextResponse.json(
+      { error: 'N8N integration unavailable: missing N8NConnection table. Run database migrations.' },
+      { status: 503 }
+    );
+  }
+  console.error('N8N connection by id route error:', error);
+  return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+}
+
+async function loadConnection(userId: string, id: string, minimumRole: 'MEMBER' | 'ADMIN') {
+  const connection = await prisma.n8NConnection.findUnique({
+    where: { id },
+    include: { project: { select: { id: true, name: true } } }
+  });
+
+  if (!connection) {
+    throw new WorkspaceError('Connection not found', 404, 'N8N_NOT_FOUND');
+  }
+
+  await assertProjectAccess(userId, connection.projectId, minimumRole);
+  return connection;
 }
 
 export async function GET(
@@ -22,40 +52,10 @@ export async function GET(
     }
 
     const { id } = await params;
-
-    const connection = await prisma.n8NConnection.findUnique({
-      where: { id },
-      include: { project: { select: { id: true, name: true } } },
-    });
-
-    if (!connection) {
-      return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
-    }
-
-    // Check access
-    const access = await prisma.projectAccess.findUnique({
-      where: {
-        userId_projectId: {
-          userId: session.user.id,
-          projectId: connection.projectId,
-        },
-      },
-    });
-
-    if (!access) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
+    const connection = await loadConnection(session.user.id, id, 'MEMBER');
     return NextResponse.json({ connection });
   } catch (error) {
-    if (isMissingN8NConnectionTable(error)) {
-      return NextResponse.json(
-        { error: 'N8N integration unavailable: missing N8NConnection table. Run database migrations.' },
-        { status: 503 }
-      );
-    }
-    console.error('Get N8N Connection Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return toErrorResponse(error);
   }
 }
 
@@ -70,42 +70,10 @@ export async function DELETE(
     }
 
     const { id } = await params;
-
-    const connection = await prisma.n8NConnection.findUnique({
-      where: { id },
-    });
-
-    if (!connection) {
-      return NextResponse.json({ error: 'Connection not found' }, { status: 404 });
-    }
-
-    // Check access
-    const access = await prisma.projectAccess.findUnique({
-      where: {
-        userId_projectId: {
-          userId: session.user.id,
-          projectId: connection.projectId,
-        },
-      },
-    });
-
-    if (!access) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
-    await prisma.n8NConnection.delete({
-      where: { id },
-    });
-
+    await loadConnection(session.user.id, id, 'ADMIN');
+    await prisma.n8NConnection.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (isMissingN8NConnectionTable(error)) {
-      return NextResponse.json(
-        { error: 'N8N integration unavailable: missing N8NConnection table. Run database migrations.' },
-        { status: 503 }
-      );
-    }
-    console.error('Delete N8N Connection Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return toErrorResponse(error);
   }
 }

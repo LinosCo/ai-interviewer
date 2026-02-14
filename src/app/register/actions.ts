@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import crypto from 'crypto';
 import { PlanType, PLANS } from '@/config/plans';
 import { sendAccountVerificationEmail, sendSystemNotification } from '@/lib/email';
+import { syncLegacyProjectAccessForOrganization } from '@/lib/domain/workspace';
 
 export async function registerUser(prevState: string | undefined, formData: FormData) {
     const email = (formData.get('email') as string)?.toLowerCase().trim();
@@ -35,7 +36,7 @@ export async function registerUser(prevState: string | undefined, formData: Form
         const partnerTrialCredits = PLANS[PlanType.PARTNER].monthlyCredits;
 
         // Create user, organization and membership in a transaction
-        await prisma.$transaction(async (tx) => {
+        const transactionResult = await prisma.$transaction(async (tx) => {
             const user = await tx.user.create({
                 data: {
                     email,
@@ -77,13 +78,7 @@ export async function registerUser(prevState: string | undefined, formData: Form
                         create: {
                             name: name, // Personal project named after user
                             ownerId: user.id,
-                            isPersonal: true,
-                            accessList: {
-                                create: {
-                                    userId: user.id,
-                                    role: 'OWNER'
-                                }
-                            }
+                            isPersonal: true
                         }
                     }
                 },
@@ -103,6 +98,8 @@ export async function registerUser(prevState: string | undefined, formData: Form
 
             return { user, org };
         });
+
+        await syncLegacyProjectAccessForOrganization(transactionResult.org.id);
 
         await sendSystemNotification(
             'Nuova Registrazione Utente',

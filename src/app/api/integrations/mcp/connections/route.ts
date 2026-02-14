@@ -10,11 +10,12 @@ import { encrypt } from '@/lib/integrations/encryption';
 import { normalizeMcpEndpoint } from '@/lib/integrations/mcp/endpoint';
 import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 import { NextResponse } from 'next/server';
+import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
 // GET - List MCP connections for a project
 export async function GET(request: Request) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -25,21 +26,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'projectId required' }, { status: 400 });
   }
 
-  // Verify user has access to project
-  const project = await prisma.project.findFirst({
-    where: {
-      id: projectId,
-      OR: [
-        { owner: { email: session.user.email } },
-        { accessList: { some: { user: { email: session.user.email } } } },
-        {
-          organization: {
-            members: { some: { user: { email: session.user.email } } },
-          },
-        },
-      ],
-    },
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true }
   });
+
+  try {
+    await assertProjectAccess(session.user.id, projectId, 'MEMBER');
+  } catch (error) {
+    if (error instanceof WorkspaceError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
 
   if (!project) {
     return NextResponse.json({ error: 'Project not found or access denied' }, { status: 404 });
@@ -69,7 +68,7 @@ export async function GET(request: Request) {
 // POST - Create new MCP connection
 export async function POST(request: Request) {
   const session = await auth();
-  if (!session?.user?.email) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -92,21 +91,19 @@ export async function POST(request: Request) {
     );
   }
 
-  // Verify user has access to project
-  const project = await prisma.project.findFirst({
-    where: {
-      id: projectId,
-      OR: [
-        { owner: { email: session.user.email } },
-        { accessList: { some: { user: { email: session.user.email } } } },
-        {
-          organization: {
-            members: { some: { user: { email: session.user.email } } },
-          },
-        },
-      ],
-    },
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, organizationId: true }
   });
+
+  try {
+    await assertProjectAccess(session.user.id, projectId, 'ADMIN');
+  } catch (error) {
+    if (error instanceof WorkspaceError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
 
   if (!project) {
     return NextResponse.json({ error: 'Project not found or access denied' }, { status: 404 });
@@ -148,7 +145,7 @@ export async function POST(request: Request) {
       endpoint: normalizedEndpoint,
       credentials: encryptedCredentials,
       status: 'PENDING',
-      createdBy: session.user.email,
+      createdBy: session.user.id,
       availableTools: [],
     },
     select: {

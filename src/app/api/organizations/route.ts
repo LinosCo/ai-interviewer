@@ -1,131 +1,77 @@
-import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
+import { getOrCreateDefaultOrganization } from '@/lib/organizations';
+import { syncLegacyProjectAccessForOrganization } from '@/lib/domain/workspace';
+
 export async function GET() {
-    console.log('[API] GET /api/organizations called');
-    try {
-        const session = await auth();
-        if (!session?.user?.id) {
-            return new Response('Unauthorized', { status: 401 });
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: {
-                ownedProjects: {
-                    select: {
-                        organizationId: true
-                    }
-                },
-                memberships: {
-                    include: {
-                        organization: {
-                            select: {
-                                id: true,
-                                name: true,
-                                slug: true,
-                                plan: true
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        if (!user) {
-            return new Response('User not found', { status: 404 });
-        }
-
-        // Backfill membership rows for legacy cases where ownerId was updated
-        // but membership was not created for the target organization.
-        try {
-            const membershipOrgIds = new Set(user.memberships.map((m) => m.organizationId));
-            const missingOwnedOrgIds = Array.from(
-                new Set(
-                    user.ownedProjects
-                        .map((p) => p.organizationId)
-                        .filter((orgId): orgId is string => Boolean(orgId))
-                        .filter((orgId) => !membershipOrgIds.has(orgId))
-                )
-            );
-
-            if (missingOwnedOrgIds.length > 0) {
-                const now = new Date();
-                await prisma.membership.createMany({
-                    data: missingOwnedOrgIds.map((organizationId) => ({
-                        userId: user.id,
-                        organizationId,
-                        role: 'MEMBER',
-                        status: 'ACTIVE',
-                        acceptedAt: now,
-                        joinedAt: now
-                    })),
-                    skipDuplicates: true
-                });
-            }
-        } catch (backfillError) {
-            console.error('Backfill memberships failed (non-critical):', backfillError);
-            // Continue execution, do not fail the request
-        }
-
-        const memberships = await prisma.membership.findMany({
-            where: { userId: user.id },
-            include: {
-                organization: {
-                    select: {
-                        id: true,
-                        name: true,
-                        slug: true,
-                        plan: true,
-                        monthlyCreditsLimit: true,
-                        monthlyCreditsUsed: true,
-                        packCreditsAvailable: true
-                    }
-                }
-            }
-        });
-
-        let organizations = memberships.map(m => ({
-            ...m.organization,
-            role: m.role
-        }));
-
-        // Se l'utente non ha organizzazioni, creane una di default (Personale)
-        if (organizations.length === 0) {
-            try {
-                const { getOrCreateDefaultOrganization } = await import('@/lib/organizations');
-                const newOrg = await getOrCreateDefaultOrganization(user.id);
-
-                // Migrazione progetti esistenti (se ce ne sono rimasti senza org)
-                await prisma.project.updateMany({
-                    where: { ownerId: user.id, organizationId: null },
-                    data: { organizationId: newOrg.id }
-                });
-
-                organizations = [{
-                    ...newOrg,
-                    role: 'OWNER'
-                } as any];
-            } catch (createError) {
-                console.error('Failed to create default organization:', createError);
-                // Return empty list instead of crashing, client will show empty state
-                // or we could return 500, but empty list allows the UI to render at least
-            }
-        }
-
-        const sanitizedOrganizations = organizations.map(org => ({
-            ...org,
-            monthlyCreditsLimit: org.monthlyCreditsLimit?.toString(),
-            monthlyCreditsUsed: org.monthlyCreditsUsed?.toString(),
-            packCreditsAvailable: org.packCreditsAvailable?.toString(),
-            role: org.role
-        }));
-
-        return NextResponse.json({ organizations: sanitizedOrganizations });
-
-    } catch (error: any) {
-        console.error('Fetch Organizations Error:', error);
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    let memberships = await prisma.membership.findMany({
+      where: {
+        userId: session.user.id,
+        status: 'ACTIVE'
+      },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            plan: true,
+            monthlyCreditsLimit: true,
+            monthlyCreditsUsed: true,
+            packCreditsAvailable: true
+          }
+        }
+      },
+      orderBy: [{ role: 'desc' }, { createdAt: 'asc' }]
+    });
+
+    if (memberships.length === 0) {
+      const organization = await getOrCreateDefaultOrganization(session.user.id);
+      memberships = await prisma.membership.findMany({
+        where: {
+          userId: session.user.id,
+          organizationId: organization.id
+        },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              plan: true,
+              monthlyCreditsLimit: true,
+              monthlyCreditsUsed: true,
+              packCreditsAvailable: true
+            }
+          }
+        }
+      });
+    }
+
+    const organizations = memberships.map((membership) => ({
+      ...membership.organization,
+      role: membership.role,
+      monthlyCreditsLimit: membership.organization.monthlyCreditsLimit?.toString(),
+      monthlyCreditsUsed: membership.organization.monthlyCreditsUsed?.toString(),
+      packCreditsAvailable: membership.organization.packCreditsAvailable?.toString()
+    }));
+
+    // Keep old projectAccess rows aligned with org memberships while legacy UI pieces are still present.
+    for (const membership of memberships) {
+      await syncLegacyProjectAccessForOrganization(membership.organizationId);
+    }
+
+    return NextResponse.json({ organizations });
+  } catch (error: any) {
+    console.error('Organizations route error:', error);
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+  }
 }

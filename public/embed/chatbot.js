@@ -34,12 +34,14 @@
       const scriptUrl = new URL(script.src);
       return {
         botId: script.getAttribute('data-bot-id'),
-        apiBase: script.getAttribute('data-domain') || scriptUrl.origin
+        apiBase: script.getAttribute('data-domain') || scriptUrl.origin,
+        forceConsent: script.getAttribute('data-force-consent') === 'true'
       };
     } catch {
       return {
         botId: script.getAttribute('data-bot-id'),
-        apiBase: script.getAttribute('data-domain') || window.location.origin
+        apiBase: script.getAttribute('data-domain') || window.location.origin,
+        forceConsent: script.getAttribute('data-force-consent') === 'true'
       };
     }
   }
@@ -132,7 +134,7 @@
   container.style.padding = '20px';
 
   // Construct Iframe URL
-  const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}`;
+  const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}${CONFIG.forceConsent ? '?forceConsent=true' : ''}`;
 
   const iframe = document.createElement('iframe');
   iframe.src = widgetUrl;

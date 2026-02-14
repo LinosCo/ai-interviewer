@@ -3,20 +3,13 @@ import { prisma } from '@/lib/prisma';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import InterviewPlanEditor from './plan-editor';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 export default async function InterviewPlanPage({ params }: { params: Promise<{ botId: string }> }) {
   const session = await auth();
-  if (!session?.user?.email) redirect('/login');
+  if (!session?.user?.id) redirect('/login');
 
   const { botId } = await params;
-
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    include: {
-      ownedProjects: true,
-      projectAccess: { include: { project: true } }
-    }
-  });
 
   const bot = await prisma.bot.findUnique({
     where: { id: botId },
@@ -24,10 +17,11 @@ export default async function InterviewPlanPage({ params }: { params: Promise<{ 
   });
 
   if (!bot) notFound();
-
-  const isOwner = user?.ownedProjects.some(p => p.id === bot.projectId);
-  const hasAccess = user?.projectAccess.some(pa => pa.projectId === bot.projectId);
-  if (!isOwner && !hasAccess) redirect('/dashboard');
+  try {
+    await assertProjectAccess(session.user.id, bot.projectId, 'VIEWER');
+  } catch {
+    redirect('/dashboard');
+  }
 
   return (
     <div className="space-y-6">

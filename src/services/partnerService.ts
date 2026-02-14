@@ -13,6 +13,7 @@
 import { prisma } from '@/lib/prisma';
 import { PARTNER_THRESHOLDS } from '@/config/plans';
 import crypto from 'crypto';
+import { assertProjectAccess, moveProjectToOrganization } from '@/lib/domain/workspace';
 
 // ============================================
 // TYPES
@@ -244,6 +245,7 @@ export const PartnerService = {
         toEmail: string; // Email della persona che riceverà il progetto (nella sua org)
     }): Promise<TransferResult> {
         const { partnerId, projectId, toEmail } = params;
+        const normalizedRecipientEmail = toEmail.trim().toLowerCase();
 
         // Verifica che l'utente sia partner
         const user = await prisma.user.findUnique({
@@ -259,14 +261,11 @@ export const PartnerService = {
             return { success: false, error: 'Il tuo account partner è sospeso' };
         }
 
-        // Verifica che il progetto esista e appartenga al partner
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { ownerId: true }
-        });
-
-        if (!project || project.ownerId !== partnerId) {
-            return { success: false, error: 'Progetto non trovato o non sei il proprietario' };
+        // Verifica accesso admin al progetto con il nuovo modello org-first
+        try {
+            await assertProjectAccess(partnerId, projectId, 'ADMIN');
+        } catch {
+            return { success: false, error: 'Progetto non trovato o non hai i permessi per trasferirlo' };
         }
 
         // Verifica se esiste già un invito pendente
@@ -291,7 +290,7 @@ export const PartnerService = {
             data: {
                 projectId,
                 partnerId: partnerId,
-                clientEmail: toEmail,
+                clientEmail: normalizedRecipientEmail,
                 token,
                 expiresAt,
                 status: 'pending'
@@ -310,7 +309,7 @@ export const PartnerService = {
 
     /**
      * Accetta un invito di trasferimento (da parte del cliente)
-     * Crea una copia del progetto nell'organizzazione attiva dell'utente
+     * Sposta il progetto nell'organizzazione target dell'utente
      */
     async acceptProjectTransfer(params: {
         token: string;
@@ -350,46 +349,22 @@ export const PartnerService = {
             return { success: false, error: 'Questo invito è per un altro indirizzo email' };
         }
 
-        // Get the project to duplicate
-        const originalProject = await prisma.project.findUnique({
-            where: { id: invite.projectId }
+        // Move project to target organization (no duplication).
+        await moveProjectToOrganization({
+            projectId: invite.projectId,
+            targetOrganizationId,
+            actorUserId: acceptingUserId
         });
 
-        if (!originalProject) {
-            return { success: false, error: 'Progetto originale non trovato' };
-        }
-
-        // Esegui trasferimento (duplica progetto invece di trasferirlo)
         await prisma.$transaction(async (tx) => {
-            // Aggiorna invito
             await tx.projectTransferInvite.update({
                 where: { id: invite.id },
-                data: { status: 'accepted' }
-            });
-
-            // Crea copia del progetto per l'organizzazione del cliente
-            const duplicatedProject = await tx.project.create({
                 data: {
-                    name: originalProject.name,
-                    ownerId: acceptingUserId, // L'utente che accetta diventa l'owner locale del progetto clonizzato
-                    organizationId: targetOrganizationId,
-                    originPartnerId: invite.partnerId // Traccia origine per reportistica partner
+                    status: 'accepted',
+                    acceptedAt: new Date()
                 }
             });
 
-            // Crea record trasferimento definitivo
-            await tx.projectTransfer.create({
-                data: {
-                    originalProjectId: invite.projectId,
-                    originalOrgId: originalProject.organizationId || '',
-                    duplicatedProjectId: duplicatedProject.id,
-                    targetOrgId: targetOrganizationId,
-                    partnerId: invite.partnerId,
-                    clientUserId: acceptingUserId, // Utente che ha accettato
-                }
-            });
-
-            // Crea attribuzione partner -> utente SE non esiste già
             const existingAttribution = await tx.partnerClientAttribution.findUnique({
                 where: { clientUserId: acceptingUserId }
             });
@@ -399,13 +374,12 @@ export const PartnerService = {
                     data: {
                         partnerId: invite.partnerId,
                         clientUserId: acceptingUserId,
-                        firstProjectId: duplicatedProject.id,
+                        firstProjectId: invite.projectId,
                         status: 'active'
                     }
                 });
             }
 
-            // Ricalcola clienti attivi per il partner
             await this.refreshPartnerActiveClientsCount(invite.partnerId, tx);
         });
 

@@ -26,7 +26,7 @@ interface ProjectToolsManagerProps {
 export function ProjectToolsManager({ projectId, projectName }: ProjectToolsManagerProps) {
     const [linkedTools, setLinkedTools] = useState<ToolItem[]>([]);
     const [availableTools, setAvailableTools] = useState<ToolItem[]>([]);
-    const [personalProjectId, setPersonalProjectId] = useState<string | null>(null);
+    const [defaultProjectId, setDefaultProjectId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [editingBotId, setEditingBotId] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                 const data = await res.json();
                 setLinkedTools(data.linkedTools || []);
                 setAvailableTools(data.availableTools || []);
-                setPersonalProjectId(data.personalProjectId);
+                setDefaultProjectId(data.defaultProjectId || null);
             }
         } catch (err) {
             console.error('Error fetching bots:', err);
@@ -217,13 +217,13 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                                 <Settings className="w-4 h-4 text-slate-500" />
                                             </Button>
                                         </Link>
-                                        {personalProjectId && (
+                                        {defaultProjectId && defaultProjectId !== projectId && (
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => transferBot(tool.id, personalProjectId)}
+                                                onClick={() => transferBot(tool.id, defaultProjectId)}
                                                 disabled={actionLoading === tool.id}
-                                                title="Rimuovi dal progetto (sposta nel progetto personale)"
+                                                title="Rimuovi dal progetto (sposta nel progetto di default dell'organizzazione)"
                                                 className="text-red-500 hover:text-red-600 hover:bg-red-50"
                                             >
                                                 {actionLoading === tool.id ? (

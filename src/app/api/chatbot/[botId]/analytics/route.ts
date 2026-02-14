@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
 export async function GET(
     req: NextRequest,
@@ -16,18 +17,17 @@ export async function GET(
     // Verify access
     const bot = await prisma.bot.findUnique({
         where: { id: botId },
-        include: { project: { include: { accessList: true, organization: { include: { members: true } } } } }
+        select: { id: true, projectId: true }
     });
 
     if (!bot) return new NextResponse("Bot not found", { status: 404 });
 
-    // Check permissions (assuming org membership or project access)
-    // Simplified checks for brevity, assuming standard RBAC
-    const userId = session.user.id;
-    const isOwner = bot.project.ownerId === userId;
-    const isMember = bot.project.organization?.members.some(m => m.userId === userId);
-
-    if (!isOwner && !isMember) {
+    try {
+        await assertProjectAccess(session.user.id, bot.projectId, 'VIEWER');
+    } catch (error) {
+        if (error instanceof WorkspaceError) {
+            return new NextResponse(error.message, { status: error.status });
+        }
         return new NextResponse("Forbidden", { status: 403 });
     }
 

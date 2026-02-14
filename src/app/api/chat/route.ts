@@ -47,6 +47,7 @@ const CONFIG = {
 };
 const ENABLE_SOFT_QUALITY_GUARDS = false;
 const ENABLE_NON_HARD_SAFETY_REGENERATIONS = false;
+type InterviewAbVariant = 'control' | 'treatment';
 
 function isLocalSimulationRequest(req: Request): boolean {
     const simulateHeader = req.headers.get('x-chat-simulate');
@@ -723,6 +724,7 @@ async function generateQuestionOnly(params: {
     lastUserMessage?: string | null;
     previousAssistantQuestion?: string | null;
     semanticBridgeHint?: string | null;
+    avoidBridgeStems?: string[];
     requireAcknowledgment?: boolean;
     transitionMode?: 'bridge' | 'clean_pivot';
     onUsage?: LLMUsageCollector;
@@ -736,6 +738,7 @@ async function generateQuestionOnly(params: {
         lastUserMessage,
         previousAssistantQuestion,
         semanticBridgeHint,
+        avoidBridgeStems,
         requireAcknowledgment,
         transitionMode
     } = params;
@@ -751,6 +754,12 @@ async function generateQuestionOnly(params: {
         : transitionMode === 'clean_pivot'
             ? `Transition mode: clean pivot. Use a neutral acknowledgment and do not paraphrase irrelevant user details.`
             : null;
+    const diagnosticHint = buildSoftDiagnosticHint({
+        language,
+        lastUserMessage: lastUserMessage || '',
+        topicLabel,
+        subGoal: subGoal || ''
+    });
 
     const prompt = [
         `Language: ${language}`,
@@ -759,9 +768,14 @@ async function generateQuestionOnly(params: {
         subGoal ? `Sub-goal: ${subGoal}` : null,
         lastUserMessage ? `User last message: "${lastUserMessage}"` : null,
         previousAssistantQuestion ? `Previous assistant question to avoid repeating: "${previousAssistantQuestion}"` : null,
+        avoidBridgeStems && avoidBridgeStems.length > 0
+            ? `Do NOT reuse these recent bridge openings (normalized): ${avoidBridgeStems.slice(0, 8).join(' | ')}`
+            : null,
         semanticBridgeHint ? `Bridge hint: ${semanticBridgeHint}` : null,
         `Acknowledgment quality: reference one concrete detail from the user's message (fact, constraint, example, or cause/effect).`,
         `Avoid stock openers like "molto interessante", "e un punto importante", "grazie per aver condiviso", "very interesting", "that's an important point", "thanks for sharing".`,
+        `Prefer concrete follow-ups over broad prompts like "cosa ne pensi?" / "what do you think?" unless no better signal is available.`,
+        diagnosticHint || null,
         structureInstruction,
         transitionInstruction,
         `Task: Ask exactly ONE concise interview question about the topic. Do NOT close the interview. Do NOT ask for contact data. Avoid literal quote of user's words. Do NOT repeat the topic title verbatim; use natural phrasing. End with a single question mark.`
@@ -1037,8 +1051,10 @@ Istruzioni di coerenza:
 4. ${transitionHintIt}
 5. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
 6. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
+7. Se naturale, preferisci una lente diagnostica (esempio, impatto, priorita o azione) con un vincolo leggero (tempo, segmento, canale o metrica). Se risulta forzato o fuori tema, resta su una domanda semplice.
+8. Non riutilizzare la stessa legatura di apertura usata nei turni recenti: varia l'incipit in modo sobrio.
 ${clarificationRequested
-                ? '7. L\'utente sta chiedendo un chiarimento/disambiguazione: chiarisci prima in modo diretto la domanda precedente e poi fai una sola domanda di follow-up coerente.'
+                ? '9. L\'utente sta chiedendo un chiarimento/disambiguazione: chiarisci prima in modo diretto la domanda precedente e poi fai una sola domanda di follow-up coerente.'
                 : ''}
 `.trim();
     }
@@ -1058,10 +1074,60 @@ Coherence instructions:
 4. ${transitionHintEn}
 5. Avoid rigid templates ("now let's move to") and premature closure cues.
 6. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
+7. If natural, prefer a diagnostic lens (example, impact, priority, or action) with one light constraint (timeframe, segment, channel, or metric). If this feels forced or off-topic, keep a simple focused question.
+8. Do not reuse the same opening bridge used in recent turns: vary the opening naturally.
 ${clarificationRequested
-            ? '7. The user is asking for clarification/disambiguation: first clarify your previous question directly, then ask one coherent follow-up question.'
+            ? '9. The user is asking for clarification/disambiguation: first clarify your previous question directly, then ask one coherent follow-up question.'
             : ''}
 `.trim();
+}
+
+function buildSoftDiagnosticHint(params: {
+    language: string;
+    lastUserMessage?: string | null;
+    topicLabel?: string | null;
+    subGoal?: string | null;
+}): string {
+    const language = String(params.language || 'en');
+    const isItalian = language.toLowerCase().startsWith('it');
+    const userText = String(params.lastUserMessage || '').trim();
+    const words = userText.split(/\s+/).filter(Boolean).length;
+    if (!userText || words < 5) return '';
+    if (isClarificationSignal(userText, language)) return '';
+
+    const lower = userText.toLowerCase();
+    const hasNegativeSignal = /(problema|critic|risch|limite|debolezz|poco|scarso|difficolt|non )/i.test(lower);
+    const hasPrioritySignal = /(priorit|prima|subito|urgent|urgente|piu importante|più importante)/i.test(lower);
+    const hasImpactSignal = /(impatto|effetto|risultato|crescita|calo|mercato|client|kpi|vendite|margine|tempo|costo)/i.test(lower);
+
+    let lens: 'example' | 'impact' | 'priority' | 'action' = 'example';
+    if (hasPrioritySignal || words >= 35) {
+        lens = 'priority';
+    } else if (hasNegativeSignal) {
+        lens = 'action';
+    } else if (hasImpactSignal || words >= 14) {
+        lens = 'impact';
+    }
+
+    if (isItalian) {
+        const lensLabel = lens === 'priority'
+            ? 'priorita'
+            : lens === 'action'
+                ? 'azione'
+                : lens === 'impact'
+                    ? 'impatto'
+                    : 'esempio';
+        return `Suggerimento soft: se coerente con il topic, prova una domanda diagnostica sul piano "${lensLabel}" con un vincolo leggero (tempo, segmento, canale o metrica). Se rischia di essere forzata, ignora questo suggerimento.`;
+    }
+
+    const lensLabel = lens === 'priority'
+        ? 'priority'
+        : lens === 'action'
+            ? 'action'
+            : lens === 'impact'
+                ? 'impact'
+                : 'example';
+    return `Soft suggestion: if coherent with the topic, use a diagnostic "${lensLabel}" follow-up with one light constraint (timeframe, segment, channel, or metric). If this feels forced, ignore this suggestion.`;
 }
 
 function escapeRegexLiteral(input: string): string {
@@ -1088,6 +1154,179 @@ function normalizeSingleQuestion(question: string): string {
         normalized = `${normalized.replace(/[.!?…]+$/g, '').trim()}?`;
     }
     return normalized;
+}
+
+const GENERIC_BRIDGE_OPENERS_IT = [
+    /^capisco\b/i,
+    /^chiaro\b/i,
+    /^perfetto\b/i,
+    /^ottimo\b/i,
+    /^bene\b/i,
+    /^grazie\b/i,
+    /^molto interessante\b/i,
+    /^e un punto importante\b/i,
+    /^è un punto importante\b/i,
+    /^quello che dici\b/i
+];
+
+const GENERIC_BRIDGE_OPENERS_EN = [
+    /^i see\b/i,
+    /^got it\b/i,
+    /^perfect\b/i,
+    /^great\b/i,
+    /^thanks\b/i,
+    /^very interesting\b/i,
+    /^that'?s an important point\b/i
+];
+
+function normalizeBridgeStem(text: string): string {
+    return String(text || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function extractBridgeStem(text: string): string {
+    const compact = String(text || '').trim();
+    if (!compact) return '';
+    const firstSentence = compact.split(/[?!\.]/)[0] || compact;
+    return normalizeBridgeStem(firstSentence.split(',')[0]);
+}
+
+function collectRecentBridgeStems(
+    messages: Array<{ role: string; content: string }>,
+    limit: number = 14
+): string[] {
+    const assistantMessages = messages
+        .filter((m) => m.role === 'assistant')
+        .slice(-Math.max(limit * 2, limit));
+    const seen = new Set<string>();
+    const stems: string[] = [];
+    for (let i = assistantMessages.length - 1; i >= 0; i -= 1) {
+        const normalizedStem = normalizeBridgeStem(extractBridgeStem(assistantMessages[i].content));
+        if (!normalizedStem || seen.has(normalizedStem)) continue;
+        seen.add(normalizedStem);
+        stems.push(normalizedStem);
+        if (stems.length >= limit) break;
+    }
+    return stems;
+}
+
+function startsWithGenericBridgeOpener(text: string, language: string): boolean {
+    const firstSentence = String(text || '').trim().split(/[?!\.]/)[0] || '';
+    const patterns = String(language || 'en').toLowerCase().startsWith('it')
+        ? GENERIC_BRIDGE_OPENERS_IT
+        : GENERIC_BRIDGE_OPENERS_EN;
+    return patterns.some((pattern) => pattern.test(firstSentence.trim()));
+}
+
+function isLikelyBridgeLead(text: string, language: string): boolean {
+    const source = String(text || '').trim();
+    if (!source) return false;
+    if (startsWithGenericBridgeOpener(source, language)) return true;
+    const parts = source.split(/(?<=[.?!])\s+/).filter(Boolean);
+    const firstSentence = parts[0] || source;
+    const firstWords = firstSentence.split(/\s+/).filter(Boolean).length;
+    if (firstSentence.includes(',') && firstWords <= 18) return true;
+    if (parts.length > 1 && firstWords <= 18) return true;
+    return false;
+}
+
+function replaceBridgeLead(responseText: string, opener: string): string {
+    const source = String(responseText || '').trim();
+    if (!source) return source;
+    const parts = source.split(/(?<=[.?!])\s+/).filter(Boolean);
+    if (parts.length > 1) {
+        const remaining = parts.slice(1).join(' ').trim();
+        if (remaining) return `${opener} ${remaining}`.trim();
+    }
+    const commaIdx = source.indexOf(',');
+    if (commaIdx > 0 && commaIdx < Math.min(source.length, 120)) {
+        const tail = source.slice(commaIdx + 1).trim();
+        if (tail) return `${opener} ${tail}`.trim();
+    }
+    return `${opener} ${source}`.trim();
+}
+
+function hasConcreteBridgeAnchor(text: string, userMessage: string, language: string): boolean {
+    const bridgeRoots = buildMessageAnchors(String(text || ''), language).anchorRoots;
+    const userRoots = buildMessageAnchors(String(userMessage || ''), language).anchorRoots;
+    return hasAnyAnchorOverlap(bridgeRoots, userRoots);
+}
+
+function pickConcreteUserAnchor(userMessage: string, language: string): string {
+    const anchors = buildMessageAnchors(String(userMessage || ''), language).anchors
+        .filter((anchor) => anchor.length >= 4);
+    if (anchors.length > 0) return anchors[0];
+    return sanitizeUserSnippet(String(userMessage || ''), 5);
+}
+
+function applyBridgeVariationIfNeeded(params: {
+    responseText: string;
+    userMessage?: string | null;
+    language: string;
+    recentBridgeStems?: string[];
+}): string {
+    const responseText = String(params.responseText || '').trim();
+    if (!responseText || !responseText.includes('?')) return responseText;
+
+    const currentStem = extractBridgeStem(responseText);
+    if (!currentStem) return responseText;
+
+    const recentStems = new Set((params.recentBridgeStems || []).map(normalizeBridgeStem));
+    if (!recentStems.has(normalizeBridgeStem(currentStem))) return responseText;
+    if (!isLikelyBridgeLead(responseText, params.language)) return responseText;
+
+    const userMessage = String(params.userMessage || '').trim();
+    const hasMeritAnchor = hasConcreteBridgeAnchor(responseText, userMessage, params.language);
+
+    const isItalian = String(params.language || 'en').toLowerCase().startsWith('it');
+    const anchor = pickConcreteUserAnchor(userMessage, params.language);
+    const prefersMeritOpeners = hasMeritAnchor && Boolean(anchor);
+
+    const candidateOpeners = prefersMeritOpeners
+        ? (
+            isItalian
+                ? [
+                    `Riprendendo il passaggio su ${anchor},`,
+                    `Entrando più nel concreto su ${anchor},`,
+                    `Sul nodo che hai evidenziato su ${anchor},`,
+                    `Rimanendo sul tema ${anchor},`
+                ]
+                : [
+                    `Building on your point about ${anchor},`,
+                    `Staying concrete on ${anchor},`,
+                    `On the issue you raised around ${anchor},`,
+                    `Keeping focus on ${anchor},`
+                ]
+        )
+        : isItalian
+        ? [
+            anchor ? `Sul punto che citi su ${anchor},` : 'Sul punto che citi,',
+            anchor ? `Riprendendo ${anchor},` : 'Riprendendo quanto hai detto,',
+            anchor ? `Entrando nel merito su ${anchor},` : 'Entrando nel merito,',
+            anchor ? `Partendo da ${anchor},` : 'Partendo dal tuo ultimo punto,',
+            anchor ? `Restando su ${anchor},` : 'Restando su questo punto,',
+            'Da qui,'
+        ]
+        : [
+            anchor ? `On your point about ${anchor},` : 'On your point,',
+            anchor ? `Building on what you said about ${anchor},` : 'Building on what you shared,',
+            anchor ? `Staying concrete on ${anchor},` : 'Staying concrete,',
+            anchor ? `Starting from ${anchor},` : 'Starting from your last point,',
+            anchor ? `Keeping focus on ${anchor},` : 'Keeping focus on this point,',
+            'From here,'
+        ];
+
+    const opener = candidateOpeners.find((candidate) => {
+        const stem = extractBridgeStem(candidate);
+        return stem && !recentStems.has(normalizeBridgeStem(stem));
+    }) || candidateOpeners[0];
+
+    return replaceBridgeLead(responseText, opener);
 }
 
 function isClarificationSignal(input: string, language: string): boolean {
@@ -1338,6 +1577,10 @@ export async function POST(req: Request) {
     let flushInterviewTokenUsage: (operationSuffix: string) => Promise<void> = async () => {};
     try {
         const simulationMode = isLocalSimulationRequest(req);
+        const abVariantHeader = String(req.headers.get('x-interview-ab') || '').trim().toLowerCase();
+        const abVariant: InterviewAbVariant = abVariantHeader === 'control' ? 'control' : 'treatment';
+        const softQualityGuardsEnabled = abVariant === 'control' ? true : ENABLE_SOFT_QUALITY_GUARDS;
+        const nonHardSafetyRegenerationsEnabled = abVariant === 'control' ? true : ENABLE_NON_HARD_SAFETY_REGENERATIONS;
         const body = await req.json();
         const parsedBody = ChatRequestSchema.safeParse(body);
         if (!parsedBody.success) {
@@ -1359,6 +1602,7 @@ export async function POST(req: Request) {
         if (simulationMode) {
             console.log('🧪 [CHAT_API] Local simulation mode enabled (credits and usage side effects disabled).');
         }
+        console.log(`🧪 [AB] Variant=${abVariant} softGuards=${softQualityGuardsEnabled} nonHardRegens=${nonHardSafetyRegenerationsEnabled}`);
 
         // ====================================================================
         // 1. LOAD DATA (with parallel operations for speed)
@@ -2657,6 +2901,7 @@ export async function POST(req: Request) {
             })
             : 'none';
         const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
+        const recentBridgeStems = collectRecentBridgeStems(canonicalMessages, 14);
         const plannerTopic = targetTopic || currentTopic;
         const plannerTopicId = plannerTopic?.id || currentTopic.id;
         const plannerMaxTurns = nextState.phase === 'DEEP'
@@ -2731,11 +2976,27 @@ export async function POST(req: Request) {
             const targetTopicId = bannerTopic?.id || currentTopic.id;
             const scanMaxTurns = getScanPlanTurns(interviewPlan, targetTopicId);
             const deepTurns = Math.max(1, (nextState.deepTurnsByTopic || {})[targetTopicId] || getDeepPlanTurns(interviewPlan, targetTopicId));
+            const isItalianPrompt = (language || '').toLowerCase().startsWith('it');
             const turnsInfo = nextState.phase === 'SCAN'
-                ? `Turn ${nextState.turnInTopic}/${scanMaxTurns}`
-                : `Turn ${nextState.turnInTopic}/${deepTurns}`;
-
-            systemPrompt += `
+                ? (isItalianPrompt
+                    ? `Turno ${nextState.turnInTopic}/${scanMaxTurns}`
+                    : `Turn ${nextState.turnInTopic}/${scanMaxTurns}`)
+                : (isItalianPrompt
+                    ? `Turno ${nextState.turnInTopic}/${deepTurns}`
+                    : `Turn ${nextState.turnInTopic}/${deepTurns}`);
+            const statusBanner = isItalianPrompt
+                ? `
+[SUPERVISOR_RUNTIME]
+fase=${nextState.phase}
+topic="${currentTopicLabel}" (${nextState.topicIndex + 1}/${numTopics})
+progresso=${turnsInfo}
+regole_dure:
+- Fai esattamente UNA domanda su "${currentTopicLabel}".
+- Non chiedere contatti.
+- Non chiudere l'intervista.
+- Non aggiungere promo/CTA.
+`
+                : `
 [SUPERVISOR_RUNTIME]
 phase=${nextState.phase}
 topic="${currentTopicLabel}" (${nextState.topicIndex + 1}/${numTopics})
@@ -2746,6 +3007,7 @@ hard_rules:
 - Do NOT close or wrap up.
 - Do NOT add promo/CTA.
 `;
+            systemPrompt += statusBanner;
         }
 
         if (lastMessage?.role === 'user') {
@@ -2793,7 +3055,9 @@ hard_rules:
 
         const shouldEndWithQuestion = !['COMPLETE_WITHOUT_DATA', 'FINAL_GOODBYE'].includes(supervisorInsight?.status);
         if (shouldEndWithQuestion) {
-            systemPrompt += `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
+            systemPrompt += (language || '').toLowerCase().startsWith('it')
+                ? `\n\n## OBBLIGATORIO: La risposta deve terminare con un punto interrogativo (?).`
+                : `\n\n## MANDATORY: Your response MUST end with a question mark (?).`;
         }
 
         // ====================================================================
@@ -2958,7 +3222,7 @@ hard_rules:
         // Clarification/scope enforcement on topic phases:
         // if the user asked a clarification or an off-topic question,
         // ensure the assistant acknowledges it explicitly before continuing.
-        if (ENABLE_NON_HARD_SAFETY_REGENERATIONS && !didRegenerate && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
+        if (nonHardSafetyRegenerationsEnabled && !didRegenerate && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
             if (userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language)) {
                 console.log(`⚠️ [SUPERVISOR] Clarification requested but not handled clearly. Regenerating.`);
                 const enforcedSystem = language === 'it'
@@ -2980,7 +3244,7 @@ hard_rules:
         }
 
         const isTopicPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
-        if (ENABLE_NON_HARD_SAFETY_REGENERATIONS && isTopicPhase && targetTopic && !didRegenerate) {
+        if (nonHardSafetyRegenerationsEnabled && isTopicPhase && targetTopic && !didRegenerate) {
             const anchorData = buildTopicAnchors(targetTopic, language);
             const allowUserAnchors = supervisorInsight?.status === 'SCANNING' || supervisorInsight?.status === 'DEEPENING';
             const userAnchorData = allowUserAnchors && lastMessage?.role === 'user'
@@ -3027,6 +3291,7 @@ hard_rules:
                         lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
                         previousAssistantQuestion: duplicateMatch.matchedQuestion || previousAssistantQuestion,
                         semanticBridgeHint: userBridgeHint,
+                        avoidBridgeStems: recentBridgeStems,
                         requireAcknowledgment: true,
                         transitionMode: supervisorInsight?.transitionMode,
                         onUsage: collectLlmUsage
@@ -3268,6 +3533,7 @@ hard_rules:
                             lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
+                            avoidBridgeStems: recentBridgeStems,
                             requireAcknowledgment: true,
                             onUsage: collectLlmUsage
                         });
@@ -3312,9 +3578,9 @@ hard_rules:
         // QUALITATIVE GUARDRAILS (naturalness-first, light-touch corrections)
         // ====================================================================
         const qualityGatePhases = new Set(['SCAN', 'DEEP', 'DEEP_OFFER']);
-        qualityTelemetry.eligible = ENABLE_SOFT_QUALITY_GUARDS && qualityGatePhases.has(nextState.phase);
+        qualityTelemetry.eligible = softQualityGuardsEnabled && qualityGatePhases.has(nextState.phase);
 
-        if (ENABLE_SOFT_QUALITY_GUARDS && qualityGatePhases.has(nextState.phase) && lastMessage?.role === 'user' && !/INTERVIEW_COMPLETED/i.test(responseText)) {
+        if (softQualityGuardsEnabled && qualityGatePhases.has(nextState.phase) && lastMessage?.role === 'user' && !/INTERVIEW_COMPLETED/i.test(responseText)) {
             qualityTelemetry.evaluated = true;
             const phaseForQuality = nextState.phase as 'SCAN' | 'DEEP' | 'DEEP_OFFER';
             const qualityTopicLabel = targetTopic?.label || currentTopic?.label || 'current topic';
@@ -3404,6 +3670,7 @@ hard_rules:
                             lastUserMessage: lastMessage?.content || null,
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
+                            avoidBridgeStems: recentBridgeStems,
                             requireAcknowledgment: true,
                             transitionMode: supervisorInsight?.transitionMode,
                             onUsage: collectLlmUsage
@@ -3413,6 +3680,15 @@ hard_rules:
                     }
                 }
             }
+        }
+
+        if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
+            responseText = applyBridgeVariationIfNeeded({
+                responseText,
+                userMessage: lastMessage.content,
+                language,
+                recentBridgeStems
+            });
         }
 
         // ====================================================================
@@ -3474,6 +3750,7 @@ hard_rules:
                             lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
+                            avoidBridgeStems: recentBridgeStems,
                             requireAcknowledgment: true,
                             transitionMode: supervisorInsight?.transitionMode,
                             onUsage: collectLlmUsage
@@ -3495,6 +3772,7 @@ hard_rules:
                             lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
+                            avoidBridgeStems: recentBridgeStems,
                             requireAcknowledgment: true,
                             transitionMode: supervisorInsight?.transitionMode,
                             onUsage: collectLlmUsage
@@ -3508,6 +3786,15 @@ hard_rules:
                     }
                 }
             }
+        }
+
+        if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
+            responseText = applyBridgeVariationIfNeeded({
+                responseText,
+                userMessage: lastMessage.content,
+                language,
+                recentBridgeStems
+            });
         }
 
         // DEEP_OFFER safety: must be an extension-consent question
@@ -3630,6 +3917,7 @@ hard_rules:
                 llmUsage: getLlmUsageSnapshot() as unknown as Prisma.InputJsonValue,
                 responseLatencyMs: Date.now() - startTime,
                 simulationMode,
+                abVariant,
                 ...(isCompletion ? { isCompletion: true } : {})
             };
         };

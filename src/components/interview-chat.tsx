@@ -184,6 +184,7 @@ export default function InterviewChat({
     const [hasStarted, setHasStarted] = useState(initialMessages.length > 0 || skipWelcome);
     const [showLanding, setShowLanding] = useState(initialMessages.length === 0 && !skipWelcome);
     const [consentGiven, setConsentGiven] = useState(false);
+    const [isInputFocused, setIsInputFocused] = useState(false);
 
     // Warm-up State
     const [showWarmup, setShowWarmup] = useState(false);
@@ -483,6 +484,18 @@ export default function InterviewChat({
     // Dynamic Background logic
     const brandColor = primaryColor || colors.amber;
     const mainBackground = backgroundColor || gradients.mesh;
+    const isMobileKeyboardOpen = isInputFocused && !isEmbedded;
+    const chatVerticalAlignClass = isMobileKeyboardOpen ? 'justify-start md:justify-center' : 'justify-center';
+    const chatBottomPaddingClass = isEmbedded
+        ? 'pb-24'
+        : isMobileKeyboardOpen
+            ? 'pb-28 md:pb-56'
+            : 'pb-48 md:pb-56';
+    const inputTopPaddingClass = isEmbedded
+        ? 'pt-4'
+        : isMobileKeyboardOpen
+            ? 'pt-2 md:pt-12'
+            : 'pt-8 md:pt-12';
 
 
 
@@ -755,7 +768,7 @@ export default function InterviewChat({
             </header>
 
             {/* Chat Area */}
-            <div className={`flex-1 flex flex-col items-center justify-center px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} ${isEmbedded ? 'pb-24' : 'pb-48 md:pb-56'} w-full max-w-4xl mx-auto relative z-10`}>
+            <div className={`flex-1 flex flex-col items-center ${chatVerticalAlignClass} px-4 ${isEmbedded ? 'pt-16' : 'pt-32 md:pt-40'} ${chatBottomPaddingClass} w-full max-w-4xl mx-auto relative z-10`}>
 
                 {/* Previous Answer Context - Moved outside keyed motion.div to prevent duplication */}
                 {messages.length > 1 && messages[messages.length - 2]?.role === 'user' && !isLoading && (
@@ -920,7 +933,7 @@ export default function InterviewChat({
             </div>
 
             {/* Input Area or Completion Screen */}
-            <div className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${isEmbedded ? 'pt-4' : 'pt-8 md:pt-12'}`}>
+            <div className={`${isEmbedded ? 'absolute' : 'fixed'} bottom-0 left-0 right-0 z-50 p-3 md:p-6 ${isEmbedded ? 'pb-4' : 'pb-4 md:pb-8'} bg-gradient-to-t from-white via-white/95 to-transparent ${inputTopPaddingClass}`}>
                 <div className="max-w-3xl mx-auto w-full relative">
                     {isCompleted ? (
                         <div className="bg-white rounded-[18px] shadow-2xl p-8 text-center border ring-1 ring-black/5 animate-in slide-in-from-bottom-5 fade-in duration-500">
@@ -992,12 +1005,8 @@ export default function InterviewChat({
                                         autoResizeTextarea();
                                     }}
                                     onKeyDown={handleKeyDown}
-                                    onFocus={() => {
-                                        // Scroll to bottom on mobile when focused to keep input visible
-                                        setTimeout(() => {
-                                            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                                        }, 300);
-                                    }}
+                                    onFocus={() => setIsInputFocused(true)}
+                                    onBlur={() => setIsInputFocused(false)}
                                     disabled={isLoading}
                                     placeholder={t.typePlaceholder}
                                     rows={1}

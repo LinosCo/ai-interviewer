@@ -348,6 +348,7 @@ Regole operative:
 3) Se strategia=cover_subgoal, orienta la domanda al sub-goal indicato.
 4) Se strategia=probe_example/probe_impact/probe_constraint, approfondisci quel punto prima di allargare.
 5) Mantieni naturalezza: UNA domanda sola, niente liste, niente chiusure.
+6) Se coerente con il contesto utente, preferisci un follow-up diagnostico concreto con un vincolo leggero (tempo, segmento, canale o metrica). Se forzato, evita.
 `.trim();
     }
 
@@ -367,5 +368,6 @@ Operational rules:
 3) If strategy=cover_subgoal, align the question to the selected sub-goal.
 4) If strategy=probe_example/probe_impact/probe_constraint, deepen that point before broadening.
 5) Keep it natural: one question only, no lists, no closure cues.
+6) If coherent with user context, prefer a concrete diagnostic follow-up with one light constraint (timeframe, segment, channel, or metric). If forced, skip it.
 `.trim();
 }

@@ -5,6 +5,8 @@ type TableCopySpec = {
   pk: string;
 };
 
+type PgClient = InstanceType<typeof Client>;
+
 const TABLES: TableCopySpec[] = [
   { table: 'CMSConnection', pk: 'id' },
   { table: 'MCPConnection', pk: 'id' },
@@ -18,7 +20,7 @@ function quoteIdent(id: string): string {
   return `"${id.replace(/"/g, '""')}"`;
 }
 
-async function getColumns(client: Client, table: string): Promise<string[]> {
+async function getColumns(client: PgClient, table: string): Promise<string[]> {
   const res = await client.query<{ column_name: string }>(
     `
       SELECT column_name
@@ -31,7 +33,7 @@ async function getColumns(client: Client, table: string): Promise<string[]> {
   return res.rows.map((r) => r.column_name);
 }
 
-async function tableExists(client: Client, table: string): Promise<boolean> {
+async function tableExists(client: PgClient, table: string): Promise<boolean> {
   const res = await client.query<{ exists: number }>(
     `
       SELECT 1 as exists
@@ -45,8 +47,8 @@ async function tableExists(client: Client, table: string): Promise<boolean> {
 }
 
 async function copyTable(params: {
-  src: Client;
-  dst: Client;
+  src: PgClient;
+  dst: PgClient;
   table: string;
   pk: string;
 }): Promise<{ sourceRows: number; insertedRows: number; skippedRows: number; skippedReason?: string }> {

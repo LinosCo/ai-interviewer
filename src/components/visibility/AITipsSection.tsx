@@ -231,9 +231,9 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
 
     const getPriorityBadge = (priority: string) => {
         const colors = {
-            high: 'bg-red-100 text-red-700 border-red-200',
-            medium: 'bg-amber-100 text-amber-700 border-amber-200',
-            low: 'bg-blue-100 text-blue-700 border-blue-200'
+            high: '!bg-red-100 !text-red-800 !border-red-300',
+            medium: '!bg-amber-100 !text-amber-800 !border-amber-300',
+            low: '!bg-blue-100 !text-blue-800 !border-blue-300'
         };
         return colors[priority as keyof typeof colors] || colors.medium;
     };

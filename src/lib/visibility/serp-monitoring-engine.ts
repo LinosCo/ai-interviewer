@@ -517,6 +517,10 @@ export class SerpMonitoringEngine {
 
         if (!response.ok) {
             const error = await response.text();
+            const normalized = error.toLowerCase();
+            if (normalized.includes('run out of searches')) {
+                throw new Error('SERP_API_QUOTA_EXCEEDED: Il credito SERP API è esaurito. Aggiorna il piano SERP API e riprova.');
+            }
             throw new Error(`SERP API error: ${error}`);
         }
 

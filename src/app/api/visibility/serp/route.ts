@@ -154,9 +154,15 @@ export async function POST(request: Request) {
 
     } catch (error) {
         console.error('Error running SERP scan:', error);
+        const message = error instanceof Error ? error.message : 'Failed to run SERP scan';
+        const isQuotaExceeded = message.includes('SERP_API_QUOTA_EXCEEDED');
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Failed to run SERP scan' },
-            { status: 500 }
+            {
+                error: isQuotaExceeded
+                    ? 'Credito SERP API esaurito. Ricarica/upgrade su SerpAPI per continuare le scansioni.'
+                    : message
+            },
+            { status: isQuotaExceeded ? 429 : 500 }
         );
     }
 }

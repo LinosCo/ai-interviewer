@@ -120,7 +120,7 @@ const FullAnalysisSchema = z.object({
     valueProposition: z.object({
         propositionsFound: z.array(z.string()),
         clarity: z.enum(['clear', 'moderate', 'unclear']),
-        uniqueness: z.enum(['unique', 'generic', 'missing']),
+        uniqueness: z.enum(['unique', 'generic', 'missing', 'moderate']),
         suggestions: z.array(z.string()),
         score: z.number().min(0).max(100)
     }),
@@ -141,6 +141,13 @@ const FullAnalysisSchema = z.object({
 });
 
 export class WebsiteAnalysisEngine {
+    private static normalizeAnalysisObject(object: z.infer<typeof FullAnalysisSchema>) {
+        if (object.valueProposition.uniqueness === 'moderate') {
+            object.valueProposition.uniqueness = 'generic';
+        }
+        return object;
+    }
+
     private static normalizeText(input: string): string {
         return input
             .toLowerCase()
@@ -843,11 +850,10 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
      • mediaBrief (solo per social_post: descrizione del visual/video più adatto)
      • targetEntityId/targetEntitySlug (solo product_content_optimization, se disponibile)
    - Il testo deve essere ottimizzato per LLM: esplicita brand, prodotto/servizio e termini chiave del prompt.
-   - Non includere claim non verificati; se un dato non è nelle fonti, riformula come ipotesi o suggerisci verifica.`,
-            temperature: 0.2
+   - Non includere claim non verificati; se un dato non è nelle fonti, riformula come ipotesi o suggerisci verifica.`
         });
 
-        return object;
+        return this.normalizeAnalysisObject(object);
     }
 
     /**

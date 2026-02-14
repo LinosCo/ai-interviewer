@@ -731,9 +731,9 @@ export default function InsightHubPage() {
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <div className="font-semibold text-sm text-slate-800 truncate">{rec.title}</div>
-                                                                <Badge variant="outline" className={`text-[9px] mt-0.5 ${rec.priority === 'high' ? 'border-red-200 bg-red-50 text-red-700' :
-                                                                        rec.priority === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-700' :
-                                                                            'border-blue-200 bg-blue-50 text-blue-700'
+                                                                <Badge variant="outline" className={`text-[9px] mt-0.5 font-semibold ${rec.priority === 'high' ? '!border-red-300 !bg-red-100 !text-red-800' :
+                                                                        rec.priority === 'medium' ? '!border-amber-300 !bg-amber-100 !text-amber-800' :
+                                                                            '!border-blue-300 !bg-blue-100 !text-blue-800'
                                                                     }`}>
                                                                     {rec.priority === 'high' ? 'Alta Priorità' : rec.priority === 'medium' ? 'Media' : 'Bassa'}
                                                                 </Badge>
@@ -913,7 +913,7 @@ export default function InsightHubPage() {
                                                                             } hover:bg-opacity-80 border-none px-2.5 py-0.5 font-bold uppercase text-[9px]`}>
                                                                             {getTargetLabel(action.target)}
                                                                         </Badge>
-                                                                        <Badge variant="outline" className={`text-[9px] uppercase font-bold ${canApply ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
+                                                                        <Badge variant="outline" className={`text-[9px] uppercase font-bold ${canApply ? '!border-green-300 !bg-green-100 !text-green-800' : '!border-slate-300 !bg-slate-100 !text-slate-700'}`}>
                                                                             {getActionTypeLabel(action.type)}
                                                                         </Badge>
                                                                     </div>

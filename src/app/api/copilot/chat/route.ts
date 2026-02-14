@@ -340,8 +340,12 @@ export async function POST(req: Request) {
             }
         }
 
+        const responseText = typeof finalObject?.response === 'string'
+            ? finalObject.response
+            : String(finalObject?.response ?? result.text ?? '');
+
         // 10. Log copilot session
-        const estimatedTokens = Math.ceil((message.length + result.object.response.length) / 4);
+        const estimatedTokens = Math.ceil((message.length + responseText.length) / 4);
         const sessionDate = new Date().toISOString().split('T')[0];
         const sessionKey = `${session.user.id}-${sessionDate}`;
 
@@ -367,7 +371,7 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({
-            response: finalObject.response,
+            response: responseText || 'Non sono riuscito a generare una risposta valida. Riprova tra poco.',
             hasProjectAccess,
             usedKnowledgeBase: finalObject.usedKnowledgeBase,
             suggestedFollowUp: finalObject.suggestedFollowUp,

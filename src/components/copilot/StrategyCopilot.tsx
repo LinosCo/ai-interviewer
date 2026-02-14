@@ -95,10 +95,14 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
                 throw new Error(data.message || data.error || 'Errore nella risposta');
             }
 
+            const assistantResponse = typeof data?.response === 'string'
+                ? data.response
+                : (typeof data?.message === 'string' ? data.message : 'Risposta non disponibile. Riprova.');
+
             setMessages(prev => [...prev, {
                 id: `assistant-${Date.now()}`,
                 role: 'assistant',
-                content: data.response,
+                content: assistantResponse,
                 timestamp: new Date(),
                 toolsUsed: data.toolsUsed
             }]);

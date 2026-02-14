@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, LogOut, Mail, Shield, UserMinus, UserPlus, Users } from 'lucide-react';
+import { Crown, Loader2, LogOut, Mail, Shield, UserMinus, UserPlus, Users } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -145,6 +145,21 @@ export function ProjectAccessManager({ projectId, variant = 'full' }: ProjectAcc
 
   const content = (
     <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Membri</p>
+          <p className="text-xl font-black text-slate-900">{data?.members.length ?? 0}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Il tuo ruolo</p>
+          <p className="text-xl font-black text-slate-900">{data?.currentUserRole || '-'}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Governance</p>
+          <p className="text-sm font-semibold text-slate-900">{canManageMembers ? 'Puoi gestire membri' : 'Accesso in sola lettura'}</p>
+        </div>
+      </div>
+
       {canManageMembers && (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Invita membro organizzazione</p>
@@ -209,6 +224,7 @@ export function ProjectAccessManager({ projectId, variant = 'full' }: ProjectAcc
                   <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wide">
                     {member.role}
                   </Badge>
+                  {member.role === 'OWNER' && <Crown className="h-4 w-4 text-amber-500" />}
                   {canManageMembers && member.role !== 'OWNER' && (
                     <Button
                       variant="ghost"

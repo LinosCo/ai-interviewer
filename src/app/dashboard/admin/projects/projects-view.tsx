@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { transferProject, createProject } from '@/app/actions/admin';
 import { Icons } from '@/components/ui/business-tuner/Icons';
@@ -41,12 +41,14 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
     const [createOwnerId, setCreateOwnerId] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
-    const router = useRouter(); // Added router
+    const router = useRouter();
 
-    const filteredProjects = projects.filter(project =>
+    const filteredProjects = useMemo(() => projects.filter(project =>
         project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.owner?.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ), [projects, searchTerm]);
+    const totalBots = useMemo(() => projects.reduce((sum, project) => sum + project._count.bots, 0), [projects]);
+    const orphanProjects = useMemo(() => projects.filter((project) => !project.owner).length, [projects]);
 
     const handleTransfer = async () => {
         if (!selectedProject || !newOwnerId) return;
@@ -56,6 +58,7 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
             alert('Project transferred successfully');
             setSelectedProject(null);
             setNewOwnerId('');
+            router.refresh();
         } catch (error) {
             console.error(error);
             alert('Failed to transfer project');
@@ -73,6 +76,7 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
             setIsCreateOpen(false);
             setCreateName('');
             setCreateOwnerId('');
+            router.refresh();
         } catch (error) {
             console.error(error);
             alert('Failed to create project');
@@ -83,74 +87,100 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold font-display">Project Management</h1>
-                <div className="flex items-center gap-4">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-amber-50 p-5">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Admin Control Center</p>
+                <p className="mt-1 text-sm text-slate-700">
+                    Vista coordinata per governo progetti: ownership, trasferimenti e coerenza con l&apos;area gestione tool/progetti.
+                </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Progetti</p>
+                    <p className="text-xl font-black text-slate-900">{projects.length}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tool totali</p>
+                    <p className="text-xl font-black text-slate-900">{totalBots}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Senza owner</p>
+                    <p className="text-xl font-black text-slate-900">{orphanProjects}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Filtrati</p>
+                    <p className="text-xl font-black text-slate-900">{filteredProjects.length}</p>
+                </div>
+            </div>
+
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <h1 className="text-2xl font-black text-slate-900">Amministrazione Progetti</h1>
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
                     <div className="relative">
-                        <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <Icons.Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search projects..."
+                            placeholder="Cerca progetto o owner..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 border rounded-lg w-64 text-sm"
+                            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30 sm:w-72"
                         />
                     </div>
                     <button
                         onClick={() => setIsCreateOpen(true)}
-                        className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-700 flex items-center gap-2"
+                        className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-amber-700"
                     >
                         <Icons.Plus className="w-4 h-4" />
-                        New Project
+                        Nuovo Progetto
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-700 font-medium border-b">
+                    <thead className="border-b bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600">
                         <tr>
-                            <th className="px-6 py-3">Project Name</th>
-                            <th className="px-6 py-3">Bots</th>
-                            <th className="px-6 py-3">Current Owner</th>
-                            <th className="px-6 py-3 text-right">Actions</th>
+                            <th className="px-6 py-3">Progetto</th>
+                            <th className="px-6 py-3">Tool</th>
+                            <th className="px-6 py-3">Owner corrente</th>
+                            <th className="px-6 py-3 text-right">Azioni</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-slate-100">
                         {filteredProjects.map(project => (
-                            <tr key={project.id} className="hover:bg-gray-50/50">
-                                <td className="px-6 py-4 font-medium text-gray-900">{project.name}</td>
-                                <td className="px-6 py-4 text-gray-500">{project._count.bots}</td>
-                                <td className="px-6 py-4 text-gray-600">
+                            <tr key={project.id} className="hover:bg-slate-50/70">
+                                <td className="px-6 py-4 font-semibold text-slate-900">{project.name}</td>
+                                <td className="px-6 py-4 text-slate-600">{project._count.bots}</td>
+                                <td className="px-6 py-4 text-slate-600">
                                     {project.owner ? (
                                         <div className="flex flex-col">
-                                            <span className="text-gray-900 font-medium">{project.owner.name || 'Unnamed'}</span>
-                                            <span className="text-xs text-gray-500">{project.owner.email}</span>
+                                            <span className="font-medium text-slate-900">{project.owner.name || 'Unnamed'}</span>
+                                            <span className="text-xs text-slate-500">{project.owner.email}</span>
                                         </div>
                                     ) : (
-                                        <span className="text-red-500 italic">No Owner</span>
+                                        <span className="italic text-red-600">Nessun owner</span>
                                     )}
                                 </td>
-                                <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
+                                <td className="flex items-center justify-end gap-2 px-6 py-4 text-right">
                                     <button
                                         onClick={() => router.push(`/dashboard/admin/projects/${project.id}`)}
-                                        className="text-gray-600 hover:text-gray-800 font-medium text-xs px-3 py-1 bg-gray-50 rounded-full hover:bg-gray-100 transition-colors border border-gray-200"
+                                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900"
                                     >
-                                        View Details
+                                        Apri scheda
                                     </button>
                                     <button
                                         onClick={() => setSelectedProject(project)}
-                                        className="text-amber-600 hover:text-amber-800 font-medium text-xs px-3 py-1 bg-amber-50 rounded-full hover:bg-amber-100 transition-colors"
+                                        className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 hover:text-amber-900"
                                     >
-                                        Transfer Ownership
+                                        Trasferisci owner
                                     </button>
                                 </td>
                             </tr>
                         ))}
                         {filteredProjects.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                                    No projects found matching your search.
+                                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                                    Nessun progetto trovato con questo filtro.
                                 </td>
                             </tr>
                         )}
@@ -160,35 +190,38 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
 
             {/* Create Dialog */}
             {isCreateOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
                         <div className="flex justify-between items-start mb-4">
-                            <h2 className="text-lg font-bold text-gray-900">Create New Project</h2>
-                            <button onClick={() => setIsCreateOpen(false)} className="text-gray-400 hover:text-gray-600">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900">Crea nuovo progetto</h2>
+                                <p className="text-sm text-slate-500">Il progetto verrà assegnato all&apos;organizzazione dell&apos;owner scelto.</p>
+                            </div>
+                            <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600">
                                 <Icons.X size={20} />
                             </button>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Nome progetto</label>
                                 <input
                                     type="text"
                                     value={createName}
                                     onChange={(e) => setCreateName(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
-                                    placeholder="My Project"
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
+                                    placeholder="Nuovo Progetto"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Owner</label>
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Owner</label>
                                 <select
                                     value={createOwnerId}
                                     onChange={(e) => setCreateOwnerId(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
                                 >
-                                    <option value="">Select an owner...</option>
+                                    <option value="">Seleziona owner...</option>
                                     {users.map(user => (
                                         <option key={user.id} value={user.id}>
                                             {user.name || user.email} ({user.email})
@@ -200,17 +233,17 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
                             <div className="flex justify-end gap-3 pt-4">
                                 <button
                                     onClick={() => setIsCreateOpen(false)}
-                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium"
+                                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
                                 >
-                                    Cancel
+                                    Annulla
                                 </button>
                                 <button
                                     onClick={handleCreate}
                                     disabled={!createName || !createOwnerId || isLoading}
-                                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {isLoading && <Icons.Loader2 className="w-4 h-4 animate-spin" />}
-                                    Create Project
+                                    Crea progetto
                                 </button>
                             </div>
                         </div>
@@ -220,34 +253,37 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
 
             {/* Transfer Dialog */}
             {selectedProject && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
                         <div className="flex justify-between items-start mb-4">
-                            <h2 className="text-lg font-bold text-gray-900">Transfer Project</h2>
-                            <button onClick={() => setSelectedProject(null)} className="text-gray-400 hover:text-gray-600">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900">Trasferisci ownership</h2>
+                                <p className="text-sm text-slate-500">Operazione di riallineamento governance.</p>
+                            </div>
+                            <button onClick={() => setSelectedProject(null)} className="text-slate-400 hover:text-slate-600">
                                 <Icons.X size={20} />
                             </button>
                         </div>
 
                         <div className="mb-6">
-                            <p className="text-sm text-gray-600 mb-2">
-                                You are transferring ownership of <strong>{selectedProject.name}</strong>.
+                            <p className="mb-2 text-sm text-slate-600">
+                                Stai trasferendo l&apos;ownership di <strong>{selectedProject.name}</strong>.
                             </p>
-                            <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-amber-800 text-sm">
+                            <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
                                 <Icons.AlertCircle className="inline-block w-4 h-4 mr-2 -mt-0.5" />
-                                The new owner will gain full control over this project and all its chatbots.
+                                Il nuovo owner ottiene controllo completo del progetto e dei suoi tool.
                             </div>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Select New Owner</label>
+                                <label className="mb-1 block text-sm font-medium text-slate-700">Nuovo owner</label>
                                 <select
                                     value={newOwnerId}
                                     onChange={(e) => setNewOwnerId(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
                                 >
-                                    <option value="">Select a user...</option>
+                                    <option value="">Seleziona utente...</option>
                                     {users.map(user => (
                                         <option key={user.id} value={user.id}>
                                             {user.name || user.email} ({user.email})
@@ -259,17 +295,17 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
                             <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     onClick={() => setSelectedProject(null)}
-                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium"
+                                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
                                 >
-                                    Cancel
+                                    Annulla
                                 </button>
                                 <button
                                     onClick={handleTransfer}
                                     disabled={!newOwnerId || isLoading}
-                                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {isLoading && <Icons.Loader2 className="w-4 h-4 animate-spin" />}
-                                    Confirm Transfer
+                                    Conferma trasferimento
                                 </button>
                             </div>
                         </div>

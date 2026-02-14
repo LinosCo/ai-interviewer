@@ -24,6 +24,12 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
 }
 
 export default auth(async (req) => {
+    // Never rate-limit Auth.js endpoints, otherwise session refresh/login can fail
+    // and appear as random logout.
+    if (req.nextUrl.pathname.startsWith('/api/auth')) {
+        return NextResponse.next();
+    }
+
     // Only rate limit API routes
     if (ratelimit && req.nextUrl.pathname.startsWith('/api')) {
         const identifier = req.auth?.user?.id || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || "127.0.0.1";

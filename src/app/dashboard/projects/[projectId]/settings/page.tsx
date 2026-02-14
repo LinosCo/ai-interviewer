@@ -46,7 +46,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
     }
 
     return (
-        <div className="space-y-6 p-6 max-w-4xl mx-auto">
+        <div className="mx-auto max-w-6xl space-y-8 p-6">
             <div className="flex items-center gap-4">
                 <Link href="/dashboard/projects">
                     <Button variant="ghost" size="sm" className="rounded-full p-2">
@@ -54,7 +54,7 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
                     </Button>
                 </Link>
                 <div>
-                    <div className="flex items-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
                         <LayoutGrid className="w-3 h-3" />
                         <span>Progetti</span>
                         <span className="text-slate-200">/</span>
@@ -64,31 +64,36 @@ export default async function ProjectSettingsPage({ params }: { params: Promise<
                 </div>
             </div>
 
-            <div className="grid gap-8">
-                {/* Rename Project */}
-                <ProjectRenameSection projectId={projectId} projectName={project.name} isPersonal={project.isPersonal} />
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-amber-50 p-5">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Control Center</p>
+                <p className="mt-1 text-sm text-slate-700">
+                    Qui gestisci identità progetto, trasferimenti tra organizzazioni, membri, strumenti e monitor.
+                    Tutto è allineato al modello organizzazione-first.
+                </p>
+            </div>
 
-                {/* Transfer Project (only for project owner or org owner/admin) */}
-                {canManageProject && (
-                    <ProjectTransferSection
-                        projectId={projectId}
-                        projectName={project.name}
-                        currentOrgId={project.organizationId || ''}
-                        availableOrganizations={availableOrganizations}
-                    />
-                )}
+            <div className="grid gap-8 lg:grid-cols-3">
+                <div className="space-y-8 lg:col-span-2">
+                    <ProjectRenameSection projectId={projectId} projectName={project.name} isPersonal={project.isPersonal} />
 
-                {/* Sharing Manager */}
-                <ProjectAccessManager projectId={projectId} />
+                    {canManageProject && (
+                        <ProjectTransferSection
+                            projectId={projectId}
+                            projectName={project.name}
+                            currentOrgId={project.organizationId || ''}
+                            availableOrganizations={availableOrganizations}
+                        />
+                    )}
 
-                {/* Tools Manager - Associate bots */}
-                <ProjectToolsManager projectId={projectId} projectName={project.name} />
+                    <ProjectToolsManager projectId={projectId} projectName={project.name} />
 
-                {/* Brand Manager */}
-                <ProjectBrandManager projectId={projectId} projectName={project.name} />
+                    <ProjectDeleteSection projectId={projectId} projectName={project.name} />
+                </div>
 
-                {/* Delete Project Section */}
-                <ProjectDeleteSection projectId={projectId} projectName={project.name} />
+                <div className="space-y-8">
+                    <ProjectAccessManager projectId={projectId} />
+                    <ProjectBrandManager projectId={projectId} projectName={project.name} />
+                </div>
             </div>
         </div>
     );

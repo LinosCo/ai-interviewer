@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bot, MessageSquare, Settings, Loader2, ArrowRight, Trash2, Pencil, Eye } from "lucide-react";
+import { Bot, MessageSquare, Settings, Loader2, ArrowRight, Trash2, Pencil, Eye, FolderCog, PlusCircle } from "lucide-react";
 import Link from 'next/link';
 import { showToast } from '@/components/toast';
 
@@ -131,24 +131,39 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
     };
 
     return (
-        <Card>
+        <Card className="border-slate-200">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2">
-                            <Bot className="w-5 h-5 text-blue-600" />
+                            <FolderCog className="w-5 h-5 text-amber-600" />
                             Gestione Tool
                         </CardTitle>
                         <CardDescription>
-                            Associa o rimuovi interviste e chatbot da questo progetto
+                            Associa o rimuovi bot e monitor dal progetto corrente
                         </CardDescription>
                     </div>
-                    <Badge variant="outline" className="text-sm">
+                    <Badge variant="outline" className="text-sm font-semibold">
                         {linkedTools.length} tool associati
                     </Badge>
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
+                <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tool nel progetto</p>
+                        <p className="text-xl font-black text-slate-900">{linkedTools.length}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tool disponibili</p>
+                        <p className="text-xl font-black text-slate-900">{availableTools.length}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Progetto fallback</p>
+                        <p className="text-sm font-semibold text-slate-900">{defaultProjectId ? 'Configurato' : 'Non trovato'}</p>
+                    </div>
+                </div>
+
                 {/* Linked Bots */}
                 <div>
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">
@@ -193,8 +208,9 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                             ) : (
                                                 <>
                                                     <p className="font-medium text-gray-900 line-clamp-1">{tool.name}</p>
-                                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">
+                                                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight flex items-center gap-1">
                                                         {tool.type === 'tracker' ? 'Monitor Visibilità' : getBotTypeLabel(tool.botType)}
+                                                        <span className="text-gray-400">• attivo in questo progetto</span>
                                                     </p>
                                                 </>
                                             )}
@@ -250,7 +266,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                             {availableTools.map(tool => (
                                 <div
                                     key={tool.id}
-                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className={`p-2 rounded-lg ${tool.type === 'tracker' ? 'bg-purple-50 text-purple-400' : tool.botType === 'chatbot' ? 'bg-blue-50 text-blue-400' : 'bg-amber-50 text-amber-400'}`}>
@@ -271,7 +287,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                         size="sm"
                                         onClick={() => transferBot(tool.id, projectId)}
                                         disabled={actionLoading === tool.id}
-                                        className="gap-1 border-slate-200 text-xs py-1 h-8 rounded-lg"
+                                        className="gap-1 border-slate-200 bg-white text-xs py-1 h-8 rounded-lg"
                                     >
                                         {actionLoading === tool.id ? (
                                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -291,8 +307,8 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                 {/* Create new chatbot */}
                 <div className="pt-4 border-t">
                     <Link href={`/dashboard/bots/create-chatbot?projectId=${projectId}`}>
-                        <Button variant="outline" className="w-full gap-2">
-                            <Bot className="w-4 h-4" />
+                        <Button variant="outline" className="w-full gap-2 border-amber-200 text-amber-700 hover:bg-amber-50">
+                            <PlusCircle className="w-4 h-4" />
                             Nuovo Chatbot
                         </Button>
                     </Link>

@@ -1,13 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { linkVisibilityConfig, unlinkVisibilityConfig, transferBotToProject, transferProjectToOrganization } from '@/app/actions/project-tools';
-import { ArrowLeft, Loader2, X, Link as LinkIcon, Unlink, Bot as BotIcon, Globe, MessageSquare, Search, LayoutGrid, ChevronRight, Users, Building2, ArrowLeftRight } from 'lucide-react';
+import {
+    ArrowLeft,
+    ArrowLeftRight,
+    Bot as BotIcon,
+    FolderCog,
+    Globe,
+    Link as LinkIcon,
+    Loader2,
+    MessageSquare,
+    Search,
+    Unlink,
+    Users,
+    X
+} from 'lucide-react';
 import TransferProjectDialog from '@/components/dashboard/TransferProjectDialog';
 import { ProjectAccessManager } from '@/app/dashboard/projects/access-manager';
 import { showToast } from '@/components/toast';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface Bot {
     id: string;
@@ -57,10 +70,18 @@ export default function ProjectDetailView({
     const [transferBotId, setTransferBotId] = useState<string | null>(null);
     const [targetProjectId, setTargetProjectId] = useState('');
     const [isTransferProjectOpen, setIsTransferProjectOpen] = useState(false);
-
     const [isManageToolsOpen, setIsManageToolsOpen] = useState(false);
     const [isManageUsersOpen, setIsManageUsersOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+
+    const transferTargets = useMemo(
+        () => allProjects.filter((candidate) => candidate.id !== project.id),
+        [allProjects, project.id]
+    );
+    const activeTransferBot = useMemo(
+        () => project.bots.find((bot) => bot.id === transferBotId) || null,
+        [project.bots, transferBotId]
+    );
 
     const handleTransfer = async () => {
         if (!transferBotId || !targetProjectId) return;
@@ -69,11 +90,11 @@ export default function ProjectDetailView({
             await transferBotToProject(transferBotId, targetProjectId);
             setTransferBotId(null);
             setTargetProjectId('');
-            showToast('Bot trasferito con successo', 'success');
+            showToast('Tool trasferito con successo', 'success');
             router.refresh();
         } catch (error) {
             console.error(error);
-            showToast('Errore durante il trasferimento del bot', 'error');
+            showToast('Errore durante il trasferimento del tool', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -87,7 +108,7 @@ export default function ProjectDetailView({
             router.refresh();
         } catch (error) {
             console.error(error);
-            showToast('Errore durante l\'associazione', 'error');
+            showToast('Errore durante l\'associazione del brand', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -101,7 +122,7 @@ export default function ProjectDetailView({
             router.refresh();
         } catch (error) {
             console.error(error);
-            showToast('Errore durante la dissociazione', 'error');
+            showToast('Errore durante la dissociazione del brand', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -115,7 +136,7 @@ export default function ProjectDetailView({
             router.refresh();
         } catch (error) {
             console.error(error);
-            showToast('Errore durante l\'associazione', 'error');
+            showToast('Errore durante l\'associazione del tool', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -123,88 +144,114 @@ export default function ProjectDetailView({
 
     return (
         <div className="space-y-8 pb-20">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 to-amber-50 p-5">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Admin Project Workspace</p>
+                <p className="mt-1 text-sm text-slate-700">
+                    Area coordinata con gestione progetti/tool: ownership, associazioni e trasferimenti nella stessa vista.
+                </p>
+            </div>
+
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-4">
+                    <button
+                        onClick={() => router.back()}
+                        className="rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100"
+                        aria-label="Torna indietro"
+                    >
                         <ArrowLeft size={20} />
                     </button>
                     <div>
-                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">{project.name}</h1>
-                        <p className="text-sm text-gray-500 font-medium">
-                            Owner: <span className="text-gray-900">{project.owner?.name || project.owner?.email || 'No Owner'}</span>
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900">{project.name}</h1>
+                        <p className="text-sm font-medium text-slate-500">
+                            Owner: <span className="text-slate-900">{project.owner?.name || project.owner?.email || 'Nessun owner'}</span>
+                            <span className="mx-2 text-slate-300">|</span>
+                            Org: <span className="text-slate-900">{project.organization?.name || 'Nessuna organizzazione'}</span>
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+
+                <div className="flex flex-wrap items-center gap-3">
                     <button
                         onClick={() => setIsManageUsersOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-bold hover:border-amber-500 hover:bg-amber-50 transition-all text-sm"
+                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-all hover:border-amber-400 hover:bg-amber-50"
                     >
-                        <Users className="w-4 h-4" />
-                        Gestisci Utenti
+                        <Users className="h-4 w-4" />
+                        Gestisci utenti
                     </button>
                     <button
                         onClick={() => setIsTransferProjectOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-bold hover:border-gray-900 hover:bg-gray-50 transition-all text-sm"
+                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-all hover:border-slate-400 hover:bg-slate-50"
                     >
-                        <ArrowLeftRight className="w-4 h-4" />
-                        Sposta Organizzazione
+                        <ArrowLeftRight className="h-4 w-4" />
+                        Trasferisci progetto
                     </button>
                     <button
                         onClick={() => setIsManageToolsOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all shadow-sm shadow-amber-200 text-sm"
+                        className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-amber-200 transition-all hover:bg-amber-600"
                     >
-                        <Search className="w-4 h-4" />
-                        Gestisci Tool
+                        <Search className="h-4 w-4" />
+                        Associa tool
                     </button>
                 </div>
             </div>
 
-            {/* Tools Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Interviews & Chatbots */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                            <BotIcon className="text-amber-500" />
-                            Interviste e Chatbot ({project.bots.length})
-                        </h2>
-                    </div>
+            <div className="grid gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tool associati</p>
+                    <p className="text-xl font-black text-slate-900">{project.bots.length}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Brand associati</p>
+                    <p className="text-xl font-black text-slate-900">{project.visibilityConfigs.length}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tool disponibili</p>
+                    <p className="text-xl font-black text-slate-900">{availableBots.length}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Org disponibili</p>
+                    <p className="text-xl font-black text-slate-900">{allOrganizations.length}</p>
+                </div>
+            </div>
 
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-50 overflow-hidden">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                <div className="space-y-4">
+                    <h2 className="flex items-center gap-2 text-xl font-black text-slate-900">
+                        <BotIcon className="text-amber-500" />
+                        Tool del progetto ({project.bots.length})
+                    </h2>
+
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50/50 text-gray-400 font-black uppercase tracking-widest text-[10px] border-b border-gray-100">
+                            <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
                                 <tr>
-                                    <th className="px-6 py-4">Nome</th>
-                                    <th className="px-6 py-4">Tipo</th>
-                                    <th className="px-6 py-4">Stato</th>
-                                    <th className="px-6 py-4 text-right">Azioni</th>
+                                    <th className="px-6 py-3">Nome</th>
+                                    <th className="px-6 py-3">Tipo</th>
+                                    <th className="px-6 py-3">Stato</th>
+                                    <th className="px-6 py-3 text-right">Azioni</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {project.bots.map(bot => (
-                                    <tr key={bot.id} className="hover:bg-gray-50/30 transition-colors">
+                            <tbody className="divide-y divide-slate-100">
+                                {project.bots.map((bot) => (
+                                    <tr key={bot.id} className="transition-colors hover:bg-slate-50/70">
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-gray-900">{bot.name}</div>
-                                            <div className="text-[10px] text-gray-400 font-medium truncate max-w-[150px]">{bot.id}</div>
+                                            <div className="font-semibold text-slate-900">{bot.name}</div>
+                                            <div className="max-w-[180px] truncate text-[10px] font-medium text-slate-400">{bot.id}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${bot.botType === 'chatbot' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'
-                                                }`}>
+                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${bot.botType === 'chatbot' ? 'bg-purple-50 text-purple-700' : 'bg-blue-50 text-blue-700'}`}>
                                                 {bot.botType === 'chatbot' ? 'Chatbot' : 'Intervista'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${bot.status === 'ACTIVE' || bot.status === 'PUBLISHED' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'
-                                                }`}>
+                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${bot.status === 'ACTIVE' || bot.status === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
                                                 {bot.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <button
                                                 onClick={() => setTransferBotId(bot.id)}
-                                                className="text-gray-400 hover:text-amber-600 transition-colors"
+                                                className="text-slate-400 transition-colors hover:text-amber-600"
                                                 title="Sposta in un altro progetto"
                                             >
                                                 <LinkIcon size={16} />
@@ -214,7 +261,7 @@ export default function ProjectDetailView({
                                 ))}
                                 {project.bots.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} className="px-6 py-10 text-center text-gray-400 font-medium italic">
+                                        <td colSpan={4} className="px-6 py-10 text-center text-sm italic text-slate-400">
                                             Nessun tool associato.
                                         </td>
                                     </tr>
@@ -224,37 +271,34 @@ export default function ProjectDetailView({
                     </div>
                 </div>
 
-                {/* Brands / Visibility Configs */}
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2">
-                            <Globe className="text-blue-500" />
-                            Brand e Visibilità ({project.visibilityConfigs.length})
-                        </h2>
-                    </div>
+                    <h2 className="flex items-center gap-2 text-xl font-black text-slate-900">
+                        <Globe className="text-blue-500" />
+                        Brand e visibilita ({project.visibilityConfigs.length})
+                    </h2>
 
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-50 overflow-hidden">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50/50 text-gray-400 font-black uppercase tracking-widest text-[10px] border-b border-gray-100">
+                            <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
                                 <tr>
-                                    <th className="px-6 py-4">Brand</th>
-                                    <th className="px-6 py-4">Categoria</th>
-                                    <th className="px-6 py-4 text-right">Azioni</th>
+                                    <th className="px-6 py-3">Brand</th>
+                                    <th className="px-6 py-3">Categoria</th>
+                                    <th className="px-6 py-3 text-right">Azioni</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {project.visibilityConfigs.map(config => (
-                                    <tr key={config.id} className="hover:bg-gray-50/30 transition-colors">
-                                        <td className="px-6 py-4 font-bold text-gray-900">{config.brandName}</td>
+                            <tbody className="divide-y divide-slate-100">
+                                {project.visibilityConfigs.map((config) => (
+                                    <tr key={config.id} className="transition-colors hover:bg-slate-50/70">
+                                        <td className="px-6 py-4 font-semibold text-slate-900">{config.brandName}</td>
                                         <td className="px-6 py-4">
-                                            <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
                                                 {config.category}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <button
                                                 onClick={() => handleUnlinkVisibility(config.id)}
-                                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                                className="text-slate-400 transition-colors hover:text-red-500 disabled:opacity-50"
                                                 title="Dissocia dal progetto"
                                                 disabled={isLoading}
                                             >
@@ -265,7 +309,7 @@ export default function ProjectDetailView({
                                 ))}
                                 {project.visibilityConfigs.length === 0 && (
                                     <tr>
-                                        <td colSpan={3} className="px-6 py-10 text-center text-gray-400 font-medium italic">
+                                        <td colSpan={3} className="px-6 py-10 text-center text-sm italic text-slate-400">
                                             Nessun brand associato.
                                         </td>
                                     </tr>
@@ -276,7 +320,6 @@ export default function ProjectDetailView({
                 </div>
             </div>
 
-            {/* Manage Tools Dialog */}
             <AnimatePresence>
                 {isManageToolsOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -285,91 +328,98 @@ export default function ProjectDetailView({
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsManageToolsOpen(false)}
-                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                         />
+
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            initial={{ opacity: 0, scale: 0.96, y: 18 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col relative z-10"
+                            exit={{ opacity: 0, scale: 0.96, y: 18 }}
+                            className="relative z-10 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
                         >
-                            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-gray-900 text-white rounded-2xl">
-                                        <LayoutGrid size={24} />
+                            <div className="flex items-start justify-between border-b border-slate-200 bg-slate-50 p-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-xl bg-amber-500 p-2 text-white">
+                                        <FolderCog size={20} />
                                     </div>
                                     <div>
-                                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Associa nuovi Tool</h2>
-                                        <p className="text-sm text-gray-500 font-medium">Trova tool esistenti nell&apos;organizzazione.</p>
+                                        <h3 className="text-xl font-black text-slate-900">Associazioni Tool</h3>
+                                        <p className="text-sm text-slate-500">Aggiungi tool e brand da altri progetti della stessa organizzazione.</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setIsManageToolsOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
-                                    <X size={24} />
+                                <button
+                                    onClick={() => setIsManageToolsOpen(false)}
+                                    className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                                >
+                                    <X size={20} />
                                 </button>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                                {/* Available Bots */}
-                                <section className="space-y-4">
-                                    <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                        <MessageSquare size={14} /> Interviste e Chatbot disponibili
-                                    </h3>
-                                    <div className="space-y-3">
-                                        {availableBots.map(bot => (
-                                            <div key={bot.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-amber-200 hover:bg-amber-50/30 transition-all group">
+                            <div className="space-y-6 overflow-y-auto p-6">
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tool disponibili</p>
+                                        <p className="text-xl font-black text-slate-900">{availableBots.length}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Brand disponibili</p>
+                                        <p className="text-xl font-black text-slate-900">{availableVisibilityConfigs.length}</p>
+                                    </div>
+                                </div>
+
+                                <section className="space-y-3">
+                                    <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                        <MessageSquare size={14} /> Bot disponibili
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {availableBots.map((bot) => (
+                                            <div key={bot.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
                                                 <div>
-                                                    <div className="font-bold text-gray-900 group-hover:text-amber-600 transition-colors uppercase text-[12px] tracking-tight">{bot.name}</div>
-                                                    <div className="text-[10px] text-gray-400 font-medium">Attualmente in: <span className="font-bold text-gray-600">{bot.project.name}</span></div>
+                                                    <p className="font-semibold text-slate-900">{bot.name}</p>
+                                                    <p className="text-xs text-slate-500">Attualmente in: {bot.project.name}</p>
                                                 </div>
                                                 <button
                                                     onClick={() => handleAssociateBot(bot.id)}
                                                     disabled={isLoading}
-                                                    className="px-4 py-2 bg-white text-gray-900 border-2 border-gray-900 rounded-xl text-xs font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all disabled:opacity-50"
+                                                    className="rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50"
                                                 >
                                                     Associa qui
                                                 </button>
                                             </div>
                                         ))}
                                         {availableBots.length === 0 && (
-                                            <div className="text-center py-6 px-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                                <p className="text-xs text-gray-400 font-medium italic">Nessun altro bot trovato nell&apos;organizzazione.</p>
+                                            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm italic text-slate-500">
+                                                Nessun bot disponibile.
                                             </div>
                                         )}
                                     </div>
                                 </section>
 
-                                <hr className="border-gray-100" />
-
-                                {/* Available Visibility Configs */}
-                                <section className="space-y-4">
-                                    <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                        <Globe size={14} /> Brand/Visibilità disponibili
-                                    </h3>
-                                    <div className="space-y-3">
-                                        {availableVisibilityConfigs.map(config => (
-                                            <div key={config.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border-2 border-transparent hover:border-blue-200 hover:bg-blue-50/30 transition-all group">
+                                <section className="space-y-3">
+                                    <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                        <Globe size={14} /> Brand disponibili
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {availableVisibilityConfigs.map((config) => (
+                                            <div key={config.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3">
                                                 <div>
-                                                    <div className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors uppercase text-[12px] tracking-tight">{config.brandName}</div>
-                                                    <div className="text-[10px] text-gray-400 font-medium">
-                                                        {config.projectId ? (
-                                                            <>Associato a: <span className="font-bold text-gray-600">{config.project?.name || 'Sconosciuto'}</span></>
-                                                        ) : (
-                                                            <span className="text-green-600 font-bold uppercase tracking-widest">Disponibile</span>
-                                                        )}
-                                                    </div>
+                                                    <p className="font-semibold text-slate-900">{config.brandName}</p>
+                                                    <p className="text-xs text-slate-500">
+                                                        {config.projectId ? `Associato a: ${config.project?.name || 'Sconosciuto'}` : 'Disponibile'}
+                                                    </p>
                                                 </div>
                                                 <button
                                                     onClick={() => handleLinkVisibility(config.id)}
                                                     disabled={isLoading}
-                                                    className="px-4 py-2 bg-white text-gray-900 border-2 border-gray-900 rounded-xl text-xs font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all disabled:opacity-50"
+                                                    className="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50 disabled:opacity-50"
                                                 >
                                                     Associa qui
                                                 </button>
                                             </div>
                                         ))}
                                         {availableVisibilityConfigs.length === 0 && (
-                                            <div className="text-center py-6 px-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                                <p className="text-xs text-gray-400 font-medium italic">Nessun altro brand trovato nell&apos;organizzazione.</p>
+                                            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm italic text-slate-500">
+                                                Nessun brand disponibile.
                                             </div>
                                         )}
                                     </div>
@@ -380,7 +430,6 @@ export default function ProjectDetailView({
                 )}
             </AnimatePresence>
 
-            {/* Manage Users Dialog */}
             <AnimatePresence>
                 {isManageUsersOpen && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -389,29 +438,34 @@ export default function ProjectDetailView({
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setIsManageUsersOpen(false)}
-                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                         />
+
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            initial={{ opacity: 0, scale: 0.96, y: 18 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col relative z-10"
+                            exit={{ opacity: 0, scale: 0.96, y: 18 }}
+                            className="relative z-10 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
                         >
-                            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-amber-500 text-white rounded-2xl">
-                                        <Users size={24} />
+                            <div className="flex items-start justify-between border-b border-slate-200 bg-slate-50 p-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-xl bg-amber-500 p-2 text-white">
+                                        <Users size={20} />
                                     </div>
                                     <div>
-                                        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Gestione Utenti</h2>
-                                        <p className="text-sm text-gray-500 font-medium">Invita collaboratori al progetto.</p>
+                                        <h3 className="text-xl font-black text-slate-900">Gestione membri</h3>
+                                        <p className="text-sm text-slate-500">Permessi e inviti all&apos;interno del progetto.</p>
                                     </div>
                                 </div>
-                                <button onClick={() => setIsManageUsersOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-400">
-                                    <X size={24} />
+                                <button
+                                    onClick={() => setIsManageUsersOpen(false)}
+                                    className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600"
+                                >
+                                    <X size={20} />
                                 </button>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-8">
+
+                            <div className="overflow-y-auto p-6">
                                 <ProjectAccessManager
                                     projectId={project.id}
                                     variant="compact"
@@ -423,7 +477,6 @@ export default function ProjectDetailView({
                 )}
             </AnimatePresence>
 
-            {/* Transfer Bot Dialog (Basic Transfer to another Project) */}
             <AnimatePresence>
                 {transferBotId && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -431,64 +484,71 @@ export default function ProjectDetailView({
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            onClick={() => setTransferBotId(null)}
-                            className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"
+                            onClick={() => {
+                                setTransferBotId(null);
+                                setTargetProjectId('');
+                            }}
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                         />
+
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            initial={{ opacity: 0, scale: 0.96, y: 18 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 relative z-10"
+                            exit={{ opacity: 0, scale: 0.96, y: 18 }}
+                            className="relative z-10 w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
                         >
-                            <div className="flex justify-between items-start mb-6">
+                            <div className="mb-5 flex items-start justify-between">
                                 <div>
-                                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sposta Tool</h2>
-                                    <p className="text-sm text-gray-500 font-medium">Seleziona il progetto di destinazione.</p>
+                                    <h3 className="text-xl font-black text-slate-900">Sposta tool</h3>
+                                    <p className="text-sm text-slate-500">
+                                        {activeTransferBot ? `Tool selezionato: ${activeTransferBot.name}` : 'Seleziona il progetto di destinazione.'}
+                                    </p>
                                 </div>
-                                <button onClick={() => setTransferBotId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
-                                    <X size={20} />
+                                <button
+                                    onClick={() => {
+                                        setTransferBotId(null);
+                                        setTargetProjectId('');
+                                    }}
+                                    className="rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                >
+                                    <X size={18} />
                                 </button>
                             </div>
 
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Progetto di Destinazione</label>
-                                    <div className="relative">
-                                        <select
-                                            value={targetProjectId}
-                                            onChange={(e) => setTargetProjectId(e.target.value)}
-                                            className="w-full bg-gray-50 border-2 border-transparent focus:border-gray-900 focus:bg-white rounded-2xl px-5 py-3 text-sm font-bold outline-none transition-all appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Seleziona...</option>
-                                            {allProjects
-                                                .filter(p => p.id !== project.id)
-                                                .map(p => (
-                                                    <option key={p.id} value={p.id}>
-                                                        {p.name}
-                                                    </option>
-                                                ))
-                                            }
-                                        </select>
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                                            <ChevronRight size={16} className="rotate-90" />
-                                        </div>
-                                    </div>
+                            <div className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Progetto destinazione</label>
+                                    <select
+                                        value={targetProjectId}
+                                        onChange={(e) => setTargetProjectId(e.target.value)}
+                                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-all focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
+                                    >
+                                        <option value="">Seleziona...</option>
+                                        {transferTargets.map((candidate) => (
+                                            <option key={candidate.id} value={candidate.id}>
+                                                {candidate.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
 
-                                <div className="flex gap-3 pt-4">
+                                <div className="flex justify-end gap-3 pt-2">
                                     <button
-                                        onClick={() => setTransferBotId(null)}
-                                        className="flex-1 px-6 py-4 border-2 border-gray-100 text-gray-500 rounded-2xl text-sm font-black hover:bg-gray-50 transition-all"
+                                        onClick={() => {
+                                            setTransferBotId(null);
+                                            setTargetProjectId('');
+                                        }}
+                                        className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
                                     >
                                         Annulla
                                     </button>
                                     <button
                                         onClick={handleTransfer}
                                         disabled={!targetProjectId || isLoading}
-                                        className="flex-1 px-6 py-4 bg-gray-900 text-white rounded-2xl text-sm font-black hover:bg-gray-800 shadow-lg shadow-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
+                                        className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                        {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                                        Sposta Tool
+                                        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                        Conferma
                                     </button>
                                 </div>
                             </div>

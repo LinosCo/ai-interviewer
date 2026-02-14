@@ -16,8 +16,47 @@ import { User, Prisma } from '@prisma/client';
 import { transferBotToProject } from './actions/project-tools';
 import { regenerateInterviewPlan } from '@/lib/interview/plan-service';
 import { checkTrialResourceLimit } from '@/lib/trial-limits';
+import {
+    ensureAutoInterviewKnowledgeSource,
+    regenerateAutoInterviewKnowledgeSource
+} from '@/lib/interview/manual-knowledge-source';
 
 const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+async function ensureInterviewGuideForBot(botId: string) {
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        select: {
+            id: true,
+            botType: true,
+            language: true,
+            name: true,
+            researchGoal: true,
+            targetAudience: true,
+            topics: {
+                orderBy: { orderIndex: 'asc' },
+                select: {
+                    label: true,
+                    description: true,
+                    subGoals: true
+                }
+            }
+        }
+    });
+
+    if (!bot) return;
+    if (bot.botType === 'chatbot') return;
+    if (!Array.isArray(bot.topics) || bot.topics.length === 0) return;
+
+    await ensureAutoInterviewKnowledgeSource({
+        botId: bot.id,
+        language: bot.language || 'it',
+        botName: bot.name,
+        researchGoal: bot.researchGoal,
+        targetAudience: bot.targetAudience,
+        topics: bot.topics
+    });
+}
 
 async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
     // 1. Bot-specific key always wins (decrypt if needed)
@@ -120,6 +159,23 @@ export async function createBotAction(projectId: string, formData: FormData) {
             }
         }
     });
+
+    try {
+        await ensureAutoInterviewKnowledgeSource({
+            botId: bot.id,
+            language: 'it',
+            botName: bot.name,
+            researchGoal: researchGoal || null,
+            targetAudience: targetAudience || null,
+            topics: topicsToCreate.map((topic: any) => ({
+                label: topic.label,
+                description: topic.description,
+                subGoals: Array.isArray(topic.subGoals) ? topic.subGoals : []
+            }))
+        });
+    } catch (error) {
+        console.error('[createBotAction] Auto interview knowledge generation failed:', error);
+    }
 
     revalidatePath('/dashboard');
     redirect(`/dashboard/bots/${bot.id}`);
@@ -448,6 +504,12 @@ export async function updateBotAction(botId: string, formData: FormData) {
         await regenerateInterviewPlan(botId);
     }
 
+    try {
+        await ensureInterviewGuideForBot(botId);
+    } catch (error) {
+        console.error('[updateBotAction] Auto interview knowledge ensure failed:', error);
+    }
+
     revalidatePath(`/dashboard/bots/${botId}`);
     return { success: true };
 }
@@ -724,6 +786,9 @@ export async function addTopicAction(botId: string, orderIndex: number) {
         }
     });
     await regenerateInterviewPlan(botId);
+    await ensureInterviewGuideForBot(botId).catch((error) => {
+        console.error('[addTopicAction] Auto interview knowledge ensure failed:', error);
+    });
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -746,6 +811,9 @@ export async function updateTopicAction(topicId: string, botId: string, data: an
         }
     });
     await regenerateInterviewPlan(botId);
+    await ensureInterviewGuideForBot(botId).catch((error) => {
+        console.error('[updateTopicAction] Auto interview knowledge ensure failed:', error);
+    });
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -773,6 +841,9 @@ export async function deleteTopicAction(topicId: string, botId: string) {
     }
 
     await regenerateInterviewPlan(botId);
+    await ensureInterviewGuideForBot(botId).catch((error) => {
+        console.error('[deleteTopicAction] Auto interview knowledge ensure failed:', error);
+    });
     revalidatePath(`/dashboard/bots/${botId}`);
 }
 
@@ -839,6 +910,122 @@ export async function deleteKnowledgeSourceAction(sourceId: string, botId: strin
 
     await prisma.knowledgeSource.delete({ where: { id: sourceId } });
     revalidatePath(`/dashboard/bots/${botId}`);
+}
+
+export async function updateKnowledgeSourceAction(sourceId: string, botId: string, formData: FormData) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: {
+            ownedProjects: true,
+            projectAccess: true
+        }
+    });
+    if (!user) throw new Error("User not found");
+
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: { project: true }
+    });
+    if (!bot) throw new Error("Bot not found");
+
+    const isOwner = user.ownedProjects.some(p => p.id === bot.projectId);
+    const hasAccess = user.projectAccess.some(pa => pa.projectId === bot.projectId);
+    if (!isOwner && !hasAccess) {
+        throw new Error("Unauthorized - No access to this bot");
+    }
+
+    const source = await prisma.knowledgeSource.findFirst({
+        where: {
+            id: sourceId,
+            botId
+        },
+        select: { id: true }
+    });
+    if (!source) {
+        throw new Error("Knowledge source not found for this bot");
+    }
+
+    const title = String(formData.get('title') || '').trim();
+    const content = String(formData.get('content') || '').trim();
+
+    if (!content) {
+        throw new Error("Content is required");
+    }
+
+    const maxContentLength = 50000;
+    if (content.length > maxContentLength) {
+        throw new Error(`Content too long. Maximum ${maxContentLength} characters allowed.`);
+    }
+
+    const sanitizedContent = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+    await prisma.knowledgeSource.update({
+        where: { id: sourceId },
+        data: {
+            title: (title || 'Untitled Source').substring(0, 200),
+            content: sanitizedContent
+        }
+    });
+
+    revalidatePath(`/dashboard/bots/${botId}`);
+    return { success: true };
+}
+
+export async function regenerateInterviewGuideAction(botId: string) {
+    const session = await auth();
+    if (!session?.user?.email) throw new Error("Unauthorized");
+
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        include: {
+            ownedProjects: true,
+            projectAccess: true
+        }
+    });
+    if (!user) throw new Error("User not found");
+
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: {
+            project: true,
+            topics: {
+                orderBy: { orderIndex: 'asc' },
+                select: {
+                    label: true,
+                    description: true,
+                    subGoals: true
+                }
+            }
+        }
+    });
+    if (!bot) throw new Error("Bot not found");
+
+    const isOwner = user.ownedProjects.some((project) => project.id === bot.projectId);
+    const hasAccess = user.projectAccess.some((access) => access.projectId === bot.projectId);
+    if (!isOwner && !hasAccess) {
+        throw new Error("Unauthorized - No access to this bot");
+    }
+
+    if (bot.botType === 'chatbot') {
+        throw new Error("Interview guide regeneration is available only for interview bots");
+    }
+    if (!Array.isArray(bot.topics) || bot.topics.length === 0) {
+        throw new Error("Cannot regenerate interview guide without topics");
+    }
+
+    await regenerateAutoInterviewKnowledgeSource({
+        botId: bot.id,
+        language: bot.language || 'it',
+        botName: bot.name,
+        researchGoal: bot.researchGoal,
+        targetAudience: bot.targetAudience,
+        topics: bot.topics
+    });
+
+    revalidatePath(`/dashboard/bots/${botId}`);
+    return { success: true };
 }
 
 export async function updateSettingsAction(organizationId: string, formData: FormData) {

@@ -20,6 +20,20 @@ import { evaluateInterviewQuestionQuality } from '@/lib/interview/qualitative-ev
 import { buildAdditiveQuestionPrompt, buildQualityCorrectionPrompt } from '@/lib/interview/quality-pipeline';
 import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
 import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
+import { findDuplicateQuestionMatch } from '@/lib/interview/question-dedup';
+import {
+    buildManualKnowledgePromptBlock,
+    buildRuntimeInterviewKnowledgeSignature,
+    buildRuntimeKnowledgePromptBlock,
+    extractManualInterviewGuideSource,
+    generateRuntimeInterviewKnowledge,
+    isRuntimeInterviewKnowledgeValid,
+    type RuntimeInterviewKnowledge
+} from '@/lib/interview/runtime-knowledge';
+import {
+    buildMicroPlannerDecision,
+    buildMicroPlannerPromptBlock
+} from '@/lib/interview/micro-planner';
 
 export const maxDuration = 60;
 
@@ -31,6 +45,8 @@ const CONFIG = {
     SAFETY_MAX_ASSISTANT_TURNS: 120,
     SAFETY_MAX_TOTAL_MESSAGES: 260,
 };
+const ENABLE_SOFT_QUALITY_GUARDS = false;
+const ENABLE_NON_HARD_SAFETY_REGENERATIONS = false;
 
 function isLocalSimulationRequest(req: Request): boolean {
     const simulateHeader = req.headers.get('x-chat-simulate');
@@ -73,6 +89,8 @@ interface InterviewState {
     extensionReturnTopicIndex?: number | null;
     extensionReturnTurnInTopic?: number | null;
     extensionOfferAttempts?: number;
+    runtimeInterviewKnowledge?: RuntimeInterviewKnowledge | null;
+    runtimeInterviewKnowledgeSignature?: string | null;
 }
 
 interface QualityTelemetry {
@@ -92,7 +110,20 @@ interface FlowGuardTelemetry {
     completionGuardIntercepted: boolean;
     completionBlockedForConsent: boolean;
     completionBlockedForMissingField: boolean;
+    questionDedupIntercepted: boolean;
 }
+
+interface LLMUsagePayload {
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    totalTokens?: number | null;
+}
+
+type LLMUsageCollector = (payload: {
+    source: string;
+    model?: string | null;
+    usage?: LLMUsagePayload | null;
+}) => void;
 
 const ChatRequestSchema = z.object({
     messages: z.array(z.object({
@@ -153,6 +184,40 @@ function computeEngagementScore(text: string, language: string): number {
     );
 
     return Math.max(0, Math.min(1, score));
+}
+
+function shouldUseCriticalModelForTopicTurn(params: {
+    phase: Phase;
+    supervisorStatus?: string;
+    userTurnSignal: 'none' | 'clarification' | 'off_topic_question';
+    userMessage?: string | null;
+    language: string;
+}): { useCritical: boolean; reason: string } {
+    if (params.phase !== 'SCAN' && params.phase !== 'DEEP') {
+        return { useCritical: false, reason: 'not_topic_phase' };
+    }
+
+    if (params.userTurnSignal === 'clarification') {
+        return { useCritical: true, reason: 'clarification_turn' };
+    }
+    if (params.userTurnSignal === 'off_topic_question') {
+        return { useCritical: true, reason: 'scope_recovery_turn' };
+    }
+
+    const supervisorStatus = String(params.supervisorStatus || '');
+    if (supervisorStatus === 'TRANSITION' || supervisorStatus === 'START_DEEP' || supervisorStatus === 'START_DEEP_BRIEF') {
+        return { useCritical: true, reason: 'topic_transition_turn' };
+    }
+
+    const userMessage = String(params.userMessage || '').trim();
+    const userWords = userMessage.split(/\s+/).filter(Boolean).length;
+    const signalScore = userMessage ? computeEngagementScore(userMessage, params.language) : 0;
+    const highSignalAnswer = userWords >= 35 || signalScore >= 0.28;
+    if (supervisorStatus === 'DEEPENING' && highSignalAnswer) {
+        return { useCritical: true, reason: 'high_signal_deepening' };
+    }
+
+    return { useCritical: false, reason: 'standard_turn' };
 }
 
 const ITALIAN_STOPWORDS = new Set([
@@ -451,7 +516,8 @@ async function extractFieldFromMessage(
     fieldName: string,
     userMessage: string,
     apiKey: string,
-    language: string = 'en'
+    language: string = 'en',
+    options?: { onUsage?: LLMUsageCollector }
 ): Promise<{ value: string | null; confidence: 'high' | 'low' | 'none' }> {
     const openai = createOpenAI({ apiKey });
 
@@ -495,6 +561,11 @@ async function extractFieldFromMessage(
             prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
             temperature: 0
         });
+        options?.onUsage?.({
+            source: 'extract_field_from_message',
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
         return { value: result.object.extractedValue, confidence: result.object.confidence };
     } catch (e) {
         console.error(`Field extraction failed for "${fieldName}":`, e);
@@ -509,7 +580,8 @@ async function checkUserIntent(
     userMessage: string,
     apiKey: string,
     language: string,
-    context: 'consent' | 'deep_offer' | 'stop_confirmation'
+    context: 'consent' | 'deep_offer' | 'stop_confirmation',
+    options?: { onUsage?: LLMUsageCollector }
 ): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> {
     const normalized = String(userMessage || '')
         .trim()
@@ -582,6 +654,11 @@ async function checkUserIntent(
             prompt: `${contextPrompts[context]}\nLanguage: ${language}\nUser message: "${userMessage}"\n\nClassify intent. ${classificationHints}.`,
             temperature: 0
         });
+        options?.onUsage?.({
+            source: `check_user_intent_${context}`,
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
         return result.object.intent;
     } catch (e) {
         console.error('Intent check failed:', e);
@@ -595,7 +672,8 @@ async function checkUserIntent(
 async function detectExplicitClosureIntent(
     userMessage: string,
     apiKey: string,
-    language: string
+    language: string,
+    options?: { onUsage?: LLMUsageCollector }
 ): Promise<{ wantsToConclude: boolean; confidence: 'high' | 'medium' | 'low'; reason: string }> {
     const text = String(userMessage || '').trim();
     if (!text) {
@@ -624,6 +702,11 @@ async function detectExplicitClosureIntent(
             ].join('\n'),
             temperature: 0
         });
+        options?.onUsage?.({
+            source: 'detect_explicit_closure_intent',
+            model: 'gpt-4o-mini',
+            usage: (result as any)?.usage
+        });
         return result.object;
     } catch (e) {
         console.error('Explicit closure intent detection failed:', e);
@@ -642,6 +725,7 @@ async function generateQuestionOnly(params: {
     semanticBridgeHint?: string | null;
     requireAcknowledgment?: boolean;
     transitionMode?: 'bridge' | 'clean_pivot';
+    onUsage?: LLMUsageCollector;
 }) {
     const {
         model,
@@ -689,6 +773,11 @@ async function generateQuestionOnly(params: {
         prompt,
         temperature: 0.2
     });
+    params.onUsage?.({
+        source: 'generate_question_only',
+        model: (model as any)?.modelId || null,
+        usage: (result as any)?.usage
+    });
 
     let question = normalizeSingleQuestion(String(result.object.question || '').trim());
     if (topicCue) {
@@ -701,6 +790,7 @@ async function generateDeepOfferOnly(params: {
     model: any;
     language: string;
     extensionPreview?: string[];
+    onUsage?: LLMUsageCollector;
 }) {
     const schema = z.object({
         message: z.string().describe('A short message that ends with one yes/no extension question.')
@@ -731,6 +821,11 @@ async function generateDeepOfferOnly(params: {
         prompt,
         temperature: 0.2
     });
+    params.onUsage?.({
+        source: 'generate_deep_offer_only',
+        model: (params.model as any)?.modelId || null,
+        usage: (result as any)?.usage
+    });
 
     return normalizeSingleQuestion(String(result.object.message || '').trim());
 }
@@ -740,6 +835,7 @@ async function enforceDeepOfferQuestion(params: {
     language: string;
     currentText?: string | null;
     extensionPreview?: string[];
+    onUsage?: LLMUsageCollector;
 }) {
     const { model, language, currentText, extensionPreview } = params;
     const cleanedCurrent = normalizeSingleQuestion(
@@ -753,7 +849,7 @@ async function enforceDeepOfferQuestion(params: {
     }
 
     try {
-        const generated = await generateDeepOfferOnly({ model, language, extensionPreview });
+        const generated = await generateDeepOfferOnly({ model, language, extensionPreview, onUsage: params.onUsage });
         if (isExtensionOfferQuestion(generated, language)) {
             return generated;
         }
@@ -783,6 +879,7 @@ function isExtensionOfferQuestion(message: string, language: string): boolean {
 async function generateConsentQuestionOnly(params: {
     model: any;
     language: string;
+    onUsage?: LLMUsageCollector;
 }) {
     const schema = z.object({
         question: z.string().describe('A single yes/no consent question ending with a question mark.')
@@ -802,6 +899,11 @@ async function generateConsentQuestionOnly(params: {
         prompt,
         temperature: 0.2
     });
+    params.onUsage?.({
+        source: 'generate_consent_question_only',
+        model: (params.model as any)?.modelId || null,
+        usage: (result as any)?.usage
+    });
 
     return normalizeSingleQuestion(String(result.object.question || '').trim());
 }
@@ -810,6 +912,7 @@ async function generateFieldQuestionOnly(params: {
     model: any;
     language: string;
     fieldLabel: string;
+    onUsage?: LLMUsageCollector;
 }) {
     const schema = z.object({
         question: z.string().describe('A single field collection question ending with a question mark.')
@@ -828,6 +931,11 @@ async function generateFieldQuestionOnly(params: {
         schema,
         prompt,
         temperature: 0.2
+    });
+    params.onUsage?.({
+        source: 'generate_field_question_only',
+        model: (params.model as any)?.modelId || null,
+        usage: (result as any)?.usage
     });
 
     return normalizeSingleQuestion(String(result.object.question || '').trim());
@@ -1184,7 +1292,7 @@ async function completeInterview(
     messages: any[],
     apiKey: string,
     existingProfile: any,
-    options?: { simulationMode?: boolean }
+    options?: { simulationMode?: boolean; onLlmUsage?: LLMUsageCollector }
 ): Promise<void> {
     // Run profile extraction and completion marking in PARALLEL
     // This saves time by not waiting for one before starting the other
@@ -1193,7 +1301,9 @@ async function completeInterview(
         (async () => {
             try {
                 const { CandidateExtractor } = await import('@/lib/llm/candidate-extractor');
-                return await CandidateExtractor.extractProfile(messages, apiKey, conversationId);
+                return await CandidateExtractor.extractProfile(messages, apiKey, conversationId, {
+                    onUsage: options?.onLlmUsage
+                });
             } catch (e) {
                 console.error("Profile extraction failed:", e);
                 return null;
@@ -1225,6 +1335,7 @@ async function completeInterview(
 // ============================================================================
 export async function POST(req: Request) {
     const startTime = Date.now();
+    let flushInterviewTokenUsage: (operationSuffix: string) => Promise<void> = async () => {};
     try {
         const simulationMode = isLocalSimulationRequest(req);
         const body = await req.json();
@@ -1260,6 +1371,151 @@ export async function POST(req: Request) {
         const interviewObjective = String((bot as any).researchGoal || '').trim();
         const shouldCollectData = (bot as any).collectCandidateData;
         const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
+        const interviewProject = (bot as any).project || {};
+        const interviewOrganizationId: string | null =
+            interviewProject?.organization?.id ||
+            interviewProject?.organizationId ||
+            null;
+        const interviewProjectId: string | undefined = interviewProject?.id || undefined;
+        const interviewOwnerId: string | undefined = interviewProject?.ownerId || undefined;
+
+        const llmUsageTotals = {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            calls: 0
+        };
+        const llmUsageByModel = new Map<string, {
+            inputTokens: number;
+            outputTokens: number;
+            totalTokens: number;
+            calls: number;
+        }>();
+
+        const normalizeLlmUsage = (usage?: LLMUsagePayload | null) => {
+            const inputTokens = Number(usage?.inputTokens || 0);
+            const outputTokens = Number(usage?.outputTokens || 0);
+            const fallbackTotal = Math.max(0, inputTokens) + Math.max(0, outputTokens);
+            const totalTokens = Number(usage?.totalTokens || fallbackTotal);
+            return {
+                inputTokens: Number.isFinite(inputTokens) ? Math.max(0, Math.floor(inputTokens)) : 0,
+                outputTokens: Number.isFinite(outputTokens) ? Math.max(0, Math.floor(outputTokens)) : 0,
+                totalTokens: Number.isFinite(totalTokens) ? Math.max(0, Math.floor(totalTokens)) : 0
+            };
+        };
+
+        const resolveModelIdForUsage = (modelLike: unknown): string => {
+            if (!modelLike) return 'unknown';
+            if (typeof modelLike === 'string') return modelLike;
+            if (typeof modelLike === 'object') {
+                const asObj = modelLike as Record<string, unknown>;
+                const direct = asObj.modelId;
+                if (typeof direct === 'string' && direct.trim()) return direct;
+                const spec = asObj.specification as Record<string, unknown> | undefined;
+                if (spec && typeof spec.modelId === 'string' && spec.modelId.trim()) {
+                    return spec.modelId;
+                }
+            }
+            return 'unknown';
+        };
+
+        const collectLlmUsage: LLMUsageCollector = ({ source, model, usage }) => {
+            const normalized = normalizeLlmUsage(usage);
+            if (normalized.totalTokens <= 0) return;
+
+            llmUsageTotals.inputTokens += normalized.inputTokens;
+            llmUsageTotals.outputTokens += normalized.outputTokens;
+            llmUsageTotals.totalTokens += normalized.totalTokens;
+            llmUsageTotals.calls += 1;
+
+            const modelKey = String(model || 'unknown').trim() || 'unknown';
+            const modelUsage = llmUsageByModel.get(modelKey) || {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                calls: 0
+            };
+            modelUsage.inputTokens += normalized.inputTokens;
+            modelUsage.outputTokens += normalized.outputTokens;
+            modelUsage.totalTokens += normalized.totalTokens;
+            modelUsage.calls += 1;
+            llmUsageByModel.set(modelKey, modelUsage);
+
+            console.log(
+                `📉 [LLM_USAGE] source=${source} model=${modelKey} in=${normalized.inputTokens} out=${normalized.outputTokens} total=${normalized.totalTokens}`
+            );
+        };
+
+        const trackedGenerateObject = (async (...args: Parameters<typeof generateObject>) => {
+            const result = await (generateObject as any)(...args);
+            const firstArg = (args[0] || {}) as { model?: unknown };
+            collectLlmUsage({
+                source: 'chat_route_generate_object',
+                model: resolveModelIdForUsage(firstArg.model),
+                usage: (result as any)?.usage
+            });
+            return result;
+        }) as typeof generateObject;
+
+        const trackedGenerateText = (async (...args: Parameters<typeof generateText>) => {
+            const result = await (generateText as any)(...args);
+            const firstArg = (args[0] || {}) as { model?: unknown };
+            collectLlmUsage({
+                source: 'chat_route_generate_text',
+                model: resolveModelIdForUsage(firstArg.model),
+                usage: (result as any)?.usage
+            });
+            return result;
+        }) as typeof generateText;
+
+        const getLlmUsageSnapshot = () => ({
+            inputTokens: llmUsageTotals.inputTokens,
+            outputTokens: llmUsageTotals.outputTokens,
+            totalTokens: llmUsageTotals.totalTokens,
+            calls: llmUsageTotals.calls,
+            byModel: [...llmUsageByModel.entries()].map(([model, usage]) => ({
+                model,
+                ...usage
+            }))
+        });
+
+        let llmUsageFlushed = false;
+        flushInterviewTokenUsage = async (operationSuffix: string) => {
+            if (llmUsageFlushed || simulationMode) return;
+            llmUsageFlushed = true;
+
+            if (llmUsageTotals.totalTokens <= 0) return;
+
+            if (!interviewOrganizationId) {
+                console.warn('[TokenTracking] Missing interview owner organization. Skipping token charge.', {
+                    conversationId,
+                    botId: bot.id,
+                    totalTokens: llmUsageTotals.totalTokens
+                });
+                return;
+            }
+
+            const dominantModel = [...llmUsageByModel.entries()]
+                .sort((a, b) => b[1].totalTokens - a[1].totalTokens)[0]?.[0]
+                || String((bot as any).modelName || 'gpt-4o-mini');
+
+            try {
+                await TokenTrackingService.logTokenUsage({
+                    userId: interviewOwnerId,
+                    organizationId: interviewOrganizationId,
+                    projectId: interviewProjectId,
+                    inputTokens: llmUsageTotals.inputTokens,
+                    outputTokens: llmUsageTotals.outputTokens,
+                    category: 'INTERVIEW',
+                    model: dominantModel,
+                    operation: `interview-response:${operationSuffix}`,
+                    resourceType: 'interview',
+                    resourceId: bot.id
+                });
+            } catch (err) {
+                console.error('[TokenTracking] Interview usage flush failed:', err);
+            }
+        };
 
         // Idempotent replay: if we already answered this client message, return the saved answer.
         if (clientMessageId) {
@@ -1400,7 +1656,7 @@ export async function POST(req: Request) {
                 canonicalMessages,
                 openAIKey,
                 conversation.candidateProfile || {},
-                { simulationMode }
+                { simulationMode, onLlmUsage: collectLlmUsage }
             );
             await prisma.message.create({
                 data: {
@@ -1413,6 +1669,7 @@ export async function POST(req: Request) {
                 }
             });
 
+            await flushInterviewTokenUsage('safety_cap_completion');
             return Response.json({
                 text: safetyMessage,
                 currentTopicId: conversation.currentTopicId,
@@ -1463,6 +1720,8 @@ export async function POST(req: Request) {
             extensionReturnTopicIndex: rawMetadata.extensionReturnTopicIndex ?? null,
             extensionReturnTurnInTopic: rawMetadata.extensionReturnTurnInTopic ?? null,
             extensionOfferAttempts: rawMetadata.extensionOfferAttempts ?? 0,
+            runtimeInterviewKnowledge: rawMetadata.runtimeInterviewKnowledge ?? null,
+            runtimeInterviewKnowledgeSignature: rawMetadata.runtimeInterviewKnowledgeSignature ?? null,
         };
 
         const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -1471,6 +1730,44 @@ export async function POST(req: Request) {
             ? safeEffectiveDuration
             : Number(conversation.effectiveDuration || 0);
         const maxDurationMins = bot.maxDurationMins || 10;
+
+        const runtimeKnowledgeSignature = buildRuntimeInterviewKnowledgeSignature({
+            language,
+            researchGoal: bot.researchGoal || '',
+            targetAudience: bot.targetAudience || '',
+            plan: interviewPlan
+        });
+        const manualInterviewGuide = extractManualInterviewGuideSource(
+            (bot.knowledgeSources || []).map((source: any) => ({
+                type: source.type,
+                title: source.title,
+                content: source.content
+            }))
+        );
+        const hasValidRuntimeKnowledge = isRuntimeInterviewKnowledgeValid(
+            state.runtimeInterviewKnowledge,
+            runtimeKnowledgeSignature
+        );
+        const shouldPrepareRuntimeKnowledge =
+            (state.phase === 'SCAN' || state.phase === 'DEEP') &&
+            !manualInterviewGuide &&
+            !hasValidRuntimeKnowledge;
+        const runtimeInterviewKnowledgePromise: Promise<RuntimeInterviewKnowledge | null> = shouldPrepareRuntimeKnowledge
+            ? generateRuntimeInterviewKnowledge({
+                model: runtimeModels.quality,
+                signature: runtimeKnowledgeSignature,
+                language,
+                interviewGoal: bot.researchGoal || '',
+                targetAudience: bot.targetAudience || '',
+                topics: interviewPlan.scan.topics.map((topic) => ({
+                    topicId: topic.topicId,
+                    topicLabel: topic.label,
+                    subGoals: topic.subGoals || []
+                })),
+                timeoutMs: 1200,
+                onUsage: collectLlmUsage
+            })
+            : Promise.resolve(hasValidRuntimeKnowledge ? state.runtimeInterviewKnowledge || null : null);
 
         console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
         console.log(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
@@ -1518,7 +1815,8 @@ export async function POST(req: Request) {
             const closureIntent = await detectExplicitClosureIntent(
                 lastMessage.content,
                 openAIKey,
-                language
+                language,
+                { onUsage: collectLlmUsage }
             );
             if (closureIntent.wantsToConclude && closureIntent.confidence !== 'low') {
                 forceEarlyClosureFromUser = true;
@@ -1620,16 +1918,10 @@ export async function POST(req: Request) {
                                 transitionBridgeSnippet
                             };
                         } else {
-                            // End of SCAN: always move to DEEP.
-                            // Time gate is handled only in DEEP (extension offer there).
+                            // End of SCAN: prepare DEEP and decide whether to offer extension first.
                             const maxDurationSec = maxDurationMins * 60;
                             const remainingSec = maxDurationSec - effectiveSec;
                             console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
-
-                            nextState.phase = 'DEEP';
-                            nextState.deepAccepted = state.deepAccepted === true ? true : null;
-                            nextState.topicIndex = 0;
-                            nextState.turnInTopic = 0;
                             const deepPlan = buildDeepPlan(
                                 botTopics,
                                 interviewPlan,
@@ -1643,11 +1935,29 @@ export async function POST(req: Request) {
                             nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
                             const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
                             nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-                            const bestSnippet = (state.interestingTopics || []).find(
-                                (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
-                            )?.bestSnippet || '';
-                            supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
-                            console.log(`✅ [SCAN→DEEP] SCAN complete. Starting DEEP.`);
+
+                            if (remainingSec <= 0 && state.deepAccepted !== true) {
+                                nextState.phase = 'DEEP_OFFER';
+                                nextState.deepAccepted = false;
+                                nextState.topicIndex = 0;
+                                nextState.turnInTopic = 0;
+                                nextState.extensionReturnPhase = 'DEEP';
+                                nextState.extensionReturnTopicIndex = 0;
+                                nextState.extensionReturnTurnInTopic = 0;
+                                nextState.extensionOfferAttempts = 0;
+                                supervisorInsight = buildDeepOfferInsight(nextState);
+                                console.log(`🎁 [SCAN→DEEP_OFFER] SCAN complete with no remaining time. Asking extension consent.`);
+                            } else {
+                                nextState.phase = 'DEEP';
+                                nextState.deepAccepted = state.deepAccepted === true ? true : null;
+                                nextState.topicIndex = 0;
+                                nextState.turnInTopic = 0;
+                                const bestSnippet = (state.interestingTopics || []).find(
+                                    (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
+                                )?.bestSnippet || '';
+                                supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
+                                console.log(`✅ [SCAN→DEEP] SCAN complete. Starting DEEP.`);
+                            }
                         }
                     }
                 } else {
@@ -1729,7 +2039,7 @@ export async function POST(req: Request) {
                     effectiveSec,
                     deps: {
                         checkUserIntent: async (userMessage: string, context: 'deep_offer') =>
-                            checkUserIntent(userMessage, openAIKey, language, context),
+                            checkUserIntent(userMessage, openAIKey, language, context, { onUsage: collectLlmUsage }),
                         isExtensionOfferQuestion: (message: string) => isExtensionOfferQuestion(message, language),
                         buildDeepOfferInsight: (sourceState: InterviewStateLike) =>
                             buildDeepOfferInsight(sourceState as InterviewState),
@@ -1972,7 +2282,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode }
+                        { simulationMode, onLlmUsage: collectLlmUsage }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                 }
@@ -1983,7 +2293,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode }
+                        { simulationMode, onLlmUsage: collectLlmUsage }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                     nextState.dataCollectionRefused = true;
@@ -2008,7 +2318,13 @@ export async function POST(req: Request) {
                     } else if (state.consentGiven === false) {
                         // We asked for consent, now check user's response
                         console.log(`📋 [DATA_COLLECTION] Checking consent response`);
-                        const intent = await checkUserIntent(lastMessage?.content || '', openAIKey, language, 'consent');
+                        const intent = await checkUserIntent(
+                            lastMessage?.content || '',
+                            openAIKey,
+                            language,
+                            'consent',
+                            { onUsage: collectLlmUsage }
+                        );
                         console.log(`📋 [DATA_COLLECTION] Intent detected: ${intent}`);
 
                         if (intent === 'ACCEPT') {
@@ -2023,7 +2339,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode }
+                                { simulationMode, onLlmUsage: collectLlmUsage }
                             );
                             // Set status for AI to say goodbye
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
@@ -2070,7 +2386,7 @@ export async function POST(req: Request) {
 
                         // CHECK (semantic): Did user change their mind mid-collection?
                         const midCollectionClosureIntent = lastMessage?.role === 'user'
-                            ? await detectExplicitClosureIntent(lastMessage.content, openAIKey, language)
+                            ? await detectExplicitClosureIntent(lastMessage.content, openAIKey, language, { onUsage: collectLlmUsage })
                             : { wantsToConclude: false, confidence: 'low' as const, reason: 'no_user_message' };
                         const userWantsToStopMidCollection =
                             midCollectionClosureIntent.wantsToConclude && midCollectionClosureIntent.confidence !== 'low';
@@ -2088,7 +2404,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode }
+                                { simulationMode, onLlmUsage: collectLlmUsage }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             nextState.dataCollectionRefused = true;
@@ -2137,7 +2453,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode }
+                                { simulationMode, onLlmUsage: collectLlmUsage }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             haltCollection = true;
@@ -2232,7 +2548,8 @@ export async function POST(req: Request) {
                                             prioritizedField,
                                             lastMessage.content,
                                             openAIKey,
-                                            language
+                                            language,
+                                            { onUsage: collectLlmUsage }
                                         );
                                         console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}"`);
                                         if (extraction.value && extraction.confidence !== 'none') {
@@ -2321,6 +2638,14 @@ export async function POST(req: Request) {
             ? getDeepTopics(botTopics, nextState.deepTopicOrder || state.deepTopicOrder)
             : botTopics;
         const targetTopic = nextActiveTopics[nextState.topicIndex] || currentTopic;
+        const runtimeInterviewKnowledge = await runtimeInterviewKnowledgePromise;
+        if (runtimeInterviewKnowledge) {
+            nextState.runtimeInterviewKnowledge = runtimeInterviewKnowledge;
+            nextState.runtimeInterviewKnowledgeSignature = runtimeKnowledgeSignature;
+        } else if (!manualInterviewGuide && !hasValidRuntimeKnowledge) {
+            nextState.runtimeInterviewKnowledge = null;
+            nextState.runtimeInterviewKnowledgeSignature = null;
+        }
         const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
             ? detectUserTurnSignal({
                 userMessage: lastMessage.content,
@@ -2331,6 +2656,28 @@ export async function POST(req: Request) {
                 interviewObjective
             })
             : 'none';
+        const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
+        const plannerTopic = targetTopic || currentTopic;
+        const plannerTopicId = plannerTopic?.id || currentTopic.id;
+        const plannerMaxTurns = nextState.phase === 'DEEP'
+            ? getDeepPlanTurns(interviewPlan, plannerTopicId)
+            : getScanPlanTurns(interviewPlan, plannerTopicId);
+        const plannerUsedSubGoals = (nextState.topicSubGoalHistory || {})[plannerTopicId] || [];
+        const microPlannerDecision = buildMicroPlannerDecision({
+            language,
+            phase: nextState.phase,
+            topicId: plannerTopicId,
+            topicLabel: plannerTopic?.label || currentTopic.label,
+            topicSubGoals: plannerTopic?.subGoals || currentTopic.subGoals || [],
+            usedSubGoals: plannerUsedSubGoals,
+            turnInTopic: nextState.turnInTopic,
+            maxTurnsInTopic: plannerMaxTurns,
+            userMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
+            userTurnSignal,
+            previousAssistantQuestion,
+            manualGuide: manualInterviewGuide,
+            runtimeKnowledge: runtimeInterviewKnowledge || state.runtimeInterviewKnowledge || null
+        });
 
 
         systemPrompt = await PromptBuilder.build(
@@ -2342,6 +2689,24 @@ export async function POST(req: Request) {
             supervisorInsight,
             interviewPlan
         );
+        const manualKnowledgePrompt = buildManualKnowledgePromptBlock({
+            manualGuide: manualInterviewGuide,
+            phase: nextState.phase,
+            language,
+            topicLabel: targetTopic?.label || currentTopic.label,
+            topicSubGoals: targetTopic?.subGoals || currentTopic.subGoals || []
+        });
+        const generatedKnowledgePrompt = manualKnowledgePrompt
+            ? ''
+            : buildRuntimeKnowledgePromptBlock({
+                knowledge: runtimeInterviewKnowledge || state.runtimeInterviewKnowledge || null,
+                phase: nextState.phase,
+                targetTopicId: targetTopic?.id || currentTopic.id,
+                language
+            });
+        if (manualKnowledgePrompt || generatedKnowledgePrompt) {
+            systemPrompt += `\n\n${manualKnowledgePrompt || generatedKnowledgePrompt}`;
+        }
 
         console.log("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);
         console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 1000) + "...");
@@ -2396,6 +2761,25 @@ hard_rules:
                 systemPrompt += `\n\n${runtimeSemanticContext}`;
             }
         }
+        if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
+            const microPlannerPrompt = buildMicroPlannerPromptBlock({
+                language,
+                phase: nextState.phase,
+                topicLabel: plannerTopic?.label || currentTopic.label,
+                decision: microPlannerDecision
+            });
+            if (microPlannerPrompt) {
+                systemPrompt += `\n\n${microPlannerPrompt}`;
+            }
+            console.log("🧭 [MICRO_PLANNER]", {
+                mode: microPlannerDecision.mode,
+                commentStyle: microPlannerDecision.commentStyle,
+                focusSubGoal: microPlannerDecision.focusSubGoal,
+                signalScore: Number(microPlannerDecision.signalScore.toFixed(2)),
+                coverage: microPlannerDecision.topicCoverage,
+                knowledgeSource: microPlannerDecision.knowledgeSource
+            });
+        }
 
         if (userTurnSignal === 'clarification') {
             systemPrompt += language === 'it'
@@ -2427,11 +2811,23 @@ hard_rules:
             messagesForAI = recentMessages;
         }
 
+        const criticalTurnRouting = shouldUseCriticalModelForTopicTurn({
+            phase: nextState.phase,
+            supervisorStatus: supervisorInsight?.status,
+            userTurnSignal,
+            userMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
+            language
+        });
         const modelForMainResponse = nextState.phase === 'DATA_COLLECTION'
             ? dataCollectionModel
             : nextState.phase === 'DEEP_OFFER'
                 ? criticalModel
-                : model;
+                : criticalTurnRouting.useCritical
+                    ? criticalModel
+                    : model;
+        if (criticalTurnRouting.useCritical && nextState.phase !== 'DATA_COLLECTION' && nextState.phase !== 'DEEP_OFFER') {
+            console.log(`🧠 [MODEL_ROUTING] Escalating to critical model for this turn. reason=${criticalTurnRouting.reason}`);
+        }
 
         console.log("⏳ [CHAT] Generating response...");
         console.time("LLM");
@@ -2439,7 +2835,7 @@ hard_rules:
         let result: any;
         try {
             result = await Promise.race([
-                generateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: systemPrompt, temperature: 0.7 }),
+                trackedGenerateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: systemPrompt, temperature: 0.7 }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 45000))
             ]);
         } catch (error: any) {
@@ -2457,6 +2853,7 @@ hard_rules:
                             : { type: 'timeout_fallback' }
                     }
                 });
+                await flushInterviewTokenUsage('timeout_fallback');
                 return Response.json({ text: fallback, currentTopicId: nextTopicId, isCompleted: false });
             }
             const errorName = String(error?.name || '');
@@ -2474,7 +2871,7 @@ hard_rules:
                     const minimalSchema = z.object({
                         response: z.string()
                     });
-                    const retry = await generateObject({
+                    const retry = await trackedGenerateObject({
                         model: modelForMainResponse,
                         schema: minimalSchema,
                         messages: messagesForAI,
@@ -2484,7 +2881,7 @@ hard_rules:
                     result = { object: { response: String(retry.object.response || '').trim(), meta_comment: 'minimal_schema_fallback' } };
                 } catch (innerError: any) {
                     console.error('⚠️ [LLM] Minimal-schema retry failed. Falling back to generateText.', innerError);
-                    const textFallback = await generateText({
+                    const textFallback = await trackedGenerateText({
                         model: modelForMainResponse,
                         messages: messagesForAI,
                         system: `${systemPrompt}\n\nCRITICAL: Return plain text only. Do not output JSON.`,
@@ -2522,12 +2919,12 @@ hard_rules:
             deepOfferClosureIntercepted: false,
             completionGuardIntercepted: false,
             completionBlockedForConsent: false,
-            completionBlockedForMissingField: false
+            completionBlockedForMissingField: false,
+            questionDedupIntercepted: false
         };
         const deepOfferPreviewHints: string[] = Array.isArray(supervisorInsight.extensionPreview)
             ? supervisorInsight.extensionPreview.map(v => String(v || '').trim()).filter(Boolean).slice(0, 1)
             : [];
-        const previousAssistantQuestion = extractLastAssistantQuestion(previousAssistantMessage);
         const userBridgeHint = lastMessage?.role === 'user'
             ? buildUserBridgeHint(lastMessage.content, language)
             : '';
@@ -2537,7 +2934,7 @@ hard_rules:
                 console.log(`⚠️ [SUPERVISOR] Deep offer response not an offer. Regenerating.`);
                 try {
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: You must ONLY ask (lightly) if the user wants to extend the interview by a few minutes to continue, and wait for yes/no. Do NOT ask any topic question.`;
-                    const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                     didRegenerate = true;
                 } catch (e) {
@@ -2551,7 +2948,8 @@ hard_rules:
                     model: criticalModel,
                     language,
                     currentText: responseText,
-                    extensionPreview: deepOfferPreviewHints
+                    extensionPreview: deepOfferPreviewHints,
+                    onUsage: collectLlmUsage
                 });
                 didRegenerate = true;
             }
@@ -2560,13 +2958,13 @@ hard_rules:
         // Clarification/scope enforcement on topic phases:
         // if the user asked a clarification or an off-topic question,
         // ensure the assistant acknowledges it explicitly before continuing.
-        if (!didRegenerate && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
+        if (ENABLE_NON_HARD_SAFETY_REGENERATIONS && !didRegenerate && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
             if (userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language)) {
                 console.log(`⚠️ [SUPERVISOR] Clarification requested but not handled clearly. Regenerating.`);
                 const enforcedSystem = language === 'it'
                     ? `${systemPrompt}\n\nCRITICAL: Rispondi prima al chiarimento in modo diretto e gentile (specifica esattamente cosa intendevi), poi fai UNA sola domanda coerente col topic corrente.`
                     : `${systemPrompt}\n\nCRITICAL: First answer the clarification directly and kindly (state exactly what you meant), then ask ONE coherent follow-up question on the current topic.`;
-                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.25 });
+                const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.25 });
                 responseText = retry.object.response?.trim() || responseText;
                 didRegenerate = true;
             } else if (userTurnSignal === 'off_topic_question' && !isScopeBoundaryHandledResponse(responseText, language)) {
@@ -2575,14 +2973,14 @@ hard_rules:
                 const enforcedSystem = language === 'it'
                     ? `${systemPrompt}\n\nCRITICAL: Spiega gentilmente in una frase che la domanda dell'utente è fuori scopo per questa intervista, poi riporta il focus su "${enforceTopic}" con UNA sola domanda.`
                     : `${systemPrompt}\n\nCRITICAL: In one polite sentence, explain the user's question is out of scope for this interview, then redirect to "${enforceTopic}" with ONE focused question.`;
-                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.25 });
+                const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.25 });
                 responseText = retry.object.response?.trim() || responseText;
                 didRegenerate = true;
             }
         }
 
         const isTopicPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
-        if (isTopicPhase && targetTopic && !didRegenerate) {
+        if (ENABLE_NON_HARD_SAFETY_REGENERATIONS && isTopicPhase && targetTopic && !didRegenerate) {
             const anchorData = buildTopicAnchors(targetTopic, language);
             const allowUserAnchors = supervisorInsight?.status === 'SCANNING' || supervisorInsight?.status === 'DEEPENING';
             const userAnchorData = allowUserAnchors && lastMessage?.role === 'user'
@@ -2595,28 +2993,54 @@ hard_rules:
                 console.log(`⚠️ [SUPERVISOR] Possible topic drift from "${targetTopic.label}". Regenerating with anchors.`);
                 const anchorList = anchorData.anchors.slice(0, 5).join(', ');
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Your question must stay on topic "${targetTopic.label}". Include at least ONE of these anchor terms: ${anchorList}. Ask exactly one question.`;
-                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
                 didRegenerate = true;
             }
         }
 
-        // Track token usage - NUOVO: usa userId (owner del progetto) per il sistema crediti
-        const organizationId = (bot as any).project?.organization?.id;
-        const projectOwnerId = (bot as any).project?.ownerId;
-        if (!simulationMode && projectOwnerId && result.usage) {
-            TokenTrackingService.logTokenUsage({
-                userId: projectOwnerId,
-                organizationId,
-                projectId: (bot as any).project?.id,
-                inputTokens: result.usage.inputTokens || 0,
-                outputTokens: result.usage.outputTokens || 0,
-                category: 'INTERVIEW',
-                model: modelForMainResponse.modelId || 'gpt-4o',
-                operation: 'interview-response',
-                resourceType: 'interview',
-                resourceId: bot.id
-            }).catch((err) => console.error('Token tracking failed:', err));
+        if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && !didRegenerate) {
+            const assistantHistory = canonicalMessages
+                .filter((m: ClientMessage) => m.role === 'assistant')
+                .map((m: ClientMessage) => String(m.content || ''))
+                .slice(-60);
+            const duplicateMatch = findDuplicateQuestionMatch({
+                candidateResponse: responseText,
+                historyAssistantMessages: assistantHistory,
+                language
+            });
+
+            if (duplicateMatch.isDuplicate) {
+                flowTelemetry.questionDedupIntercepted = true;
+                qualityTelemetry.gateTriggered = true;
+                const enforceTopic = targetTopic?.label || currentTopic.label;
+                console.log(
+                    `⚠️ [SUPERVISOR] Duplicate question detected. similarity=${duplicateMatch.similarity.toFixed(2)} reason=${duplicateMatch.reason}. Regenerating.`
+                );
+                try {
+                    responseText = await generateQuestionOnly({
+                        model: qualityModel,
+                        language,
+                        topicLabel: enforceTopic,
+                        topicCue: buildNaturalTopicCue(enforceTopic, language),
+                        subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
+                        lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
+                        previousAssistantQuestion: duplicateMatch.matchedQuestion || previousAssistantQuestion,
+                        semanticBridgeHint: userBridgeHint,
+                        requireAcknowledgment: true,
+                        transitionMode: supervisorInsight?.transitionMode,
+                        onUsage: collectLlmUsage
+                    });
+                    qualityTelemetry.regenerated = true;
+                    didRegenerate = true;
+                } catch (e) {
+                    console.error('Duplicate-question regeneration failed:', e);
+                    qualityTelemetry.fallbackUsed = true;
+                    responseText = language === 'it'
+                        ? 'Su questo punto, quale risultato pratico vorresti ottenere per primo?'
+                        : 'On this point, which practical outcome would you like to achieve first?';
+                }
+            }
         }
 
         // ====================================================================
@@ -2685,7 +3109,7 @@ hard_rules:
             console.log(`⚠️ [SUPERVISOR] Promo/CTA detected during active phase. Regenerating.`);
             const enforceTopic = targetTopic?.label || currentTopic.label;
             const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Remove any promo/CTA. Ask exactly ONE question about "${enforceTopic}".`;
-            const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+            const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
             responseText = retry.object.response?.trim() || responseText;
         }
 
@@ -2697,7 +3121,7 @@ hard_rules:
                 console.log(`⚠️ [SUPERVISOR] Forcing final closure after data collection refusal/completion.`);
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Conclude the interview now. Thank the user, and if a reward is configured, provide it. Do NOT ask any questions. Append "INTERVIEW_COMPLETED".`;
                 try {
-                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Final closure regeneration failed:', e);
@@ -2734,7 +3158,7 @@ hard_rules:
                     const consentSchema = z.object({ isConsent: z.boolean() });
                     let isConsent = false;
                     try {
-                        const consentCheck = await generateObject({
+                        const consentCheck = await trackedGenerateObject({
                             model: openai('gpt-4o-mini'),
                             schema: consentSchema,
                             prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
@@ -2748,11 +3172,11 @@ hard_rules:
                     if (!isConsent || forceConsent) {
                         console.log(`⚠️ [SUPERVISOR] Bot gave wrong response during DATA_COLLECTION consent. OVERRIDING with consent question.`);
                         const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Start with one short linking sentence acknowledging the content interview is complete, then ask ONLY one yes/no consent question to collect contact details. Do not ask topic questions.`;
-                        const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                        const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                         responseText = retry.object.response?.trim() || responseText;
 
                         try {
-                            const consentCheck2 = await generateObject({
+                            const consentCheck2 = await trackedGenerateObject({
                                 model: openai('gpt-4o-mini'),
                                 schema: consentSchema,
                                 prompt: `Determine if the assistant is explicitly asking for permission to collect contact details and waiting for yes/no.\nAssistant message: "${responseText}"\nReturn { isConsent: true/false }.`,
@@ -2760,7 +3184,7 @@ hard_rules:
                             });
                             if (!consentCheck2.object.isConsent) {
                                 const enforcedSystem2 = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
-                                const retry2 = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
+                                const retry2 = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem2, temperature: 0.1 });
                                 responseText = retry2.object.response?.trim() || responseText;
                             }
                         } catch (e) {
@@ -2780,7 +3204,7 @@ hard_rules:
                         console.log(`⚠️ [SUPERVISOR] Bot not asking for specific field "${missingField}". OVERRIDING with field question.`);
                         const fieldLabel = getFieldLabel(missingField, language);
                         const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask ONLY for ${fieldLabel}. One question only.`;
-                        const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                        const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                         responseText = retry.object.response?.trim() || responseText;
                     }
                 }
@@ -2788,7 +3212,7 @@ hard_rules:
                 else if (!missingField && !responseText.includes('INTERVIEW_COMPLETED')) {
                     console.log(`✅ [SUPERVISOR] All fields collected, adding completion tag.`);
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Thank the user, close the interview, and append \"INTERVIEW_COMPLETED\". Do not ask any questions.`;
-                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                     if (!/INTERVIEW_COMPLETED/i.test(responseText)) {
                         responseText = `${responseText.trim()} INTERVIEW_COMPLETED`.trim();
@@ -2816,7 +3240,7 @@ hard_rules:
                 supervisorInsight = buildDeepOfferInsight(nextState);
                 try {
                     const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Ask (lightly) if the user wants to extend the interview by a few minutes to continue. One question only.`;
-                    const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                    const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Extension offer regeneration after closure failed:', e);
@@ -2827,7 +3251,7 @@ hard_rules:
 
                 const enforceTopic = targetTopic?.label || currentTopic.label;
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing. The response MUST end with a question mark.`;
-                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
                 console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
 
@@ -2844,7 +3268,8 @@ hard_rules:
                             lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
-                            requireAcknowledgment: true
+                            requireAcknowledgment: true,
+                            onUsage: collectLlmUsage
                         });
                         console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
                     } catch (e) {
@@ -2867,7 +3292,7 @@ hard_rules:
             console.log(`⚠️ [SUPERVISOR] Bot tried to close during DEEP_OFFER. OVERRIDING with offer question.`);
             try {
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Offer the choice to extend the interview by a few minutes and continue. One question only. Do not ask any topic question.`;
-                const retry = await generateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
+                const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
             } catch (e) {
                 console.error('Deep offer closure regeneration failed:', e);
@@ -2877,7 +3302,8 @@ hard_rules:
                     model: criticalModel,
                     language,
                     currentText: responseText,
-                    extensionPreview: deepOfferPreviewHints
+                    extensionPreview: deepOfferPreviewHints,
+                    onUsage: collectLlmUsage
                 });
             }
         }
@@ -2886,9 +3312,9 @@ hard_rules:
         // QUALITATIVE GUARDRAILS (naturalness-first, light-touch corrections)
         // ====================================================================
         const qualityGatePhases = new Set(['SCAN', 'DEEP', 'DEEP_OFFER']);
-        qualityTelemetry.eligible = qualityGatePhases.has(nextState.phase);
+        qualityTelemetry.eligible = ENABLE_SOFT_QUALITY_GUARDS && qualityGatePhases.has(nextState.phase);
 
-        if (qualityGatePhases.has(nextState.phase) && lastMessage?.role === 'user' && !/INTERVIEW_COMPLETED/i.test(responseText)) {
+        if (ENABLE_SOFT_QUALITY_GUARDS && qualityGatePhases.has(nextState.phase) && lastMessage?.role === 'user' && !/INTERVIEW_COMPLETED/i.test(responseText)) {
             qualityTelemetry.evaluated = true;
             const phaseForQuality = nextState.phase as 'SCAN' | 'DEEP' | 'DEEP_OFFER';
             const qualityTopicLabel = targetTopic?.label || currentTopic?.label || 'current topic';
@@ -2952,7 +3378,7 @@ hard_rules:
                 });
 
                 try {
-                    const retry = await generateObject({
+                    const retry = await trackedGenerateObject({
                         model: qualityModel,
                         schema,
                         messages: messagesForAI,
@@ -2979,7 +3405,8 @@ hard_rules:
                             previousAssistantQuestion,
                             semanticBridgeHint: userBridgeHint,
                             requireAcknowledgment: true,
-                            transitionMode: supervisorInsight?.transitionMode
+                            transitionMode: supervisorInsight?.transitionMode,
+                            onUsage: collectLlmUsage
                         });
                     } catch (innerError) {
                         console.error('Qualitative fallback question generation failed:', innerError);
@@ -3023,38 +3450,34 @@ hard_rules:
                 });
 
                 try {
-                    // Clean the response first
-                    const cleanedResponse = responseText
-                        .replace(/INTERVIEW_COMPLETED/gi, '')
-                        .replace(goodbyePattern, '')
-                        .replace(contactRequestPattern, '')
-                        .trim();
+                    // Always regenerate contextually for conversational coherence.
+                    const additiveRetry = await trackedGenerateObject({
+                        model: qualityModel,
+                        schema,
+                        messages: [
+                            ...messagesForAI.slice(0, -1),
+                            { role: 'user' as const, content: lastMessage?.content || '' }
+                        ],
+                        system: `${systemPrompt}\n\n${additivePrompt}`,
+                        temperature: 0.35
+                    });
+                    responseText = additiveRetry.object.response?.trim() || responseText;
 
-                    // If there's still meaningful content, try to add a question to it
-                    if (cleanedResponse.length > 20 && !hasNoQuestionNow) {
-                        // Response has content and a question, just clean it
-                        responseText = cleanedResponse;
-                    } else {
-                        // Need to generate/add a question
-                        const additiveRetry = await generateObject({
-                            model: qualityModel,
-                            schema,
-                            messages: [
-                                ...messagesForAI.slice(0, -1),
-                                { role: 'user' as const, content: lastMessage?.content || '' }
-                            ],
-                            system: `${systemPrompt}\n\n${additivePrompt}`,
-                            temperature: 0.4  // Slightly higher for more natural responses
-                        });
-                        responseText = additiveRetry.object.response?.trim() || responseText;
-                    }
-
-                    // Final check: if still no question, append a simple one
+                    // If still malformed, ask a fresh contextual single-question turn.
                     if (!responseText.includes('?')) {
-                        const simpleFollowUp = language === 'it'
-                            ? ` Puoi dirmi di più su questo aspetto?`
-                            : ` Can you tell me more about this?`;
-                        responseText = responseText.replace(/[.!]+$/, '') + simpleFollowUp;
+                        responseText = await generateQuestionOnly({
+                            model: qualityModel,
+                            language,
+                            topicLabel: enforceTopic,
+                            topicCue: buildNaturalTopicCue(enforceTopic, language),
+                            subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
+                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
+                            previousAssistantQuestion,
+                            semanticBridgeHint: userBridgeHint,
+                            requireAcknowledgment: true,
+                            transitionMode: supervisorInsight?.transitionMode,
+                            onUsage: collectLlmUsage
+                        });
                     }
 
                     // Clean any remaining closure markers
@@ -3062,13 +3485,27 @@ hard_rules:
 
                 } catch (e) {
                     console.error('Additive fix failed:', e);
-                    // Fallback: just append a question
-                    const fallbackQuestion = language === 'it'
-                        ? ` Puoi approfondire questo punto?`
-                        : ` Can you elaborate on this?`;
-                    responseText = responseText
-                        .replace(/INTERVIEW_COMPLETED/gi, '')
-                        .replace(/[.!]+$/, '') + fallbackQuestion;
+                    try {
+                        responseText = await generateQuestionOnly({
+                            model: qualityModel,
+                            language,
+                            topicLabel: enforceTopic,
+                            topicCue: buildNaturalTopicCue(enforceTopic, language),
+                            subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
+                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
+                            previousAssistantQuestion,
+                            semanticBridgeHint: userBridgeHint,
+                            requireAcknowledgment: true,
+                            transitionMode: supervisorInsight?.transitionMode,
+                            onUsage: collectLlmUsage
+                        });
+                    } catch (innerError) {
+                        console.error('Final contextual fallback failed:', innerError);
+                        const fallbackQuestion = language === 'it'
+                            ? 'Puoi approfondire questo punto?'
+                            : 'Can you elaborate on this?';
+                        responseText = fallbackQuestion;
+                    }
                 }
             }
         }
@@ -3086,7 +3523,8 @@ hard_rules:
                     model: criticalModel,
                     language,
                     currentText: responseText,
-                    extensionPreview: deepOfferPreviewHints
+                    extensionPreview: deepOfferPreviewHints,
+                    onUsage: collectLlmUsage
                 });
             }
         }
@@ -3125,7 +3563,11 @@ hard_rules:
                 if (invalidConsentResponse) {
                     console.log('🛡️ [FINAL_GUARD] DATA_COLLECTION consent response invalid. Forcing consent question.');
                     try {
-                        responseText = await generateConsentQuestionOnly({ model: dataCollectionModel, language });
+                        responseText = await generateConsentQuestionOnly({
+                            model: dataCollectionModel,
+                            language,
+                            onUsage: collectLlmUsage
+                        });
                     } catch (e) {
                         console.error('Consent question fallback failed:', e);
                         responseText = normalizeSingleQuestion(String(responseText || '').replace(/INTERVIEW_COMPLETED/gi, '').trim());
@@ -3146,7 +3588,8 @@ hard_rules:
                         responseText = await generateFieldQuestionOnly({
                             model: dataCollectionModel,
                             language,
-                            fieldLabel
+                            fieldLabel,
+                            onUsage: collectLlmUsage
                         });
                     } catch (e) {
                         console.error('Field question fallback failed:', e);
@@ -3156,7 +3599,7 @@ hard_rules:
             } else if (nextState.consentGiven === true && !missingFieldForDataGuard && !hasCompletionTagNow) {
                 console.log('🛡️ [FINAL_GUARD] DATA_COLLECTION complete but missing completion tag. Forcing final goodbye.');
                 try {
-                    const retry = await generateObject({
+                    const retry = await trackedGenerateObject({
                         model: dataCollectionModel,
                         schema,
                         messages: messagesForAI,
@@ -3184,6 +3627,7 @@ hard_rules:
                 topicId: targetTopic?.id || currentTopic.id,
                 quality: qualityTelemetry as unknown as Prisma.InputJsonValue,
                 flowFlags: flowTelemetry as unknown as Prisma.InputJsonValue,
+                llmUsage: getLlmUsageSnapshot() as unknown as Prisma.InputJsonValue,
                 responseLatencyMs: Date.now() - startTime,
                 simulationMode,
                 ...(isCompletion ? { isCompletion: true } : {})
@@ -3223,7 +3667,7 @@ hard_rules:
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED before consent resolution. OVERRIDING with consent question.`);
                 const enforcedSystem = `Write one short linking sentence acknowledging interview closure, then ask a single yes/no question asking permission to collect contact details.`;
                 try {
-                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Consent regeneration after completion failed:', e);
@@ -3236,7 +3680,7 @@ hard_rules:
                 console.log(`⚠️ [SUPERVISOR] Bot said INTERVIEW_COMPLETED but "${missingFieldForCompletion}" is still missing. OVERRIDING with field question.`);
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT conclude. Ask ONLY for ${fieldLabel}. One question only.`;
                 try {
-                    const retry = await generateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
+                    const retry = await trackedGenerateObject({ model: dataCollectionModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.2 });
                     responseText = retry.object.response?.trim() || responseText;
                 } catch (e) {
                     console.error('Field regeneration after premature completion failed:', e);
@@ -3248,7 +3692,7 @@ hard_rules:
                     canonicalMessages,
                     openAIKey,
                     currentProfileForCompletion || {},
-                    { simulationMode }
+                    { simulationMode, onLlmUsage: collectLlmUsage }
                 );
                 const finalResponseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
                 await prisma.message.create({
@@ -3259,6 +3703,7 @@ hard_rules:
                         metadata: buildAssistantMetadata(true)
                     }
                 });
+                await flushInterviewTokenUsage('completed_response');
                 return Response.json({
                     text: finalResponseText,
                     currentTopicId: nextTopicId,
@@ -3306,6 +3751,7 @@ hard_rules:
             ).catch(err => console.error("Memory update failed", err));
         }
 
+        await flushInterviewTokenUsage('standard_response');
         return Response.json({
             text: responseText,
             currentTopicId: nextTopicId,
@@ -3314,6 +3760,7 @@ hard_rules:
 
     } catch (error: any) {
         console.error("Chat API Error:", error);
+        await flushInterviewTokenUsage('error_fallback');
         const safeFallback = "Mi dispiace, c'è stato un problema temporaneo. Possiamo riprendere da dove eravamo?";
         return Response.json(
             {

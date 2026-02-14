@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { randomBytes } from 'crypto';
 import { scrapeUrl } from '@/lib/scraping';
 import { checkTrialResourceLimit, normalizeBotTypeForTrialLimit } from '@/lib/trial-limits';
+import { ensureAutoInterviewKnowledgeSource } from '@/lib/interview/manual-knowledge-source';
 
 function generateSlug(name: string): string {
     const base = name
@@ -285,6 +286,25 @@ export async function POST(req: Request) {
                 knowledgeSources: true
             }
         });
+
+        if (!isChatbot) {
+            try {
+                await ensureAutoInterviewKnowledgeSource({
+                    botId: bot.id,
+                    language: bot.language || 'it',
+                    botName: bot.name,
+                    researchGoal: bot.researchGoal,
+                    targetAudience: bot.targetAudience,
+                    topics: (bot.topics || []).map((topic: any) => ({
+                        label: topic.label,
+                        description: topic.description,
+                        subGoals: topic.subGoals
+                    }))
+                });
+            } catch (error) {
+                console.error('[CREATE-BOT] Auto interview knowledge generation failed:', error);
+            }
+        }
 
         console.log('🎉 [CREATE-BOT] Bot created successfully:', {
             botId: bot.id,

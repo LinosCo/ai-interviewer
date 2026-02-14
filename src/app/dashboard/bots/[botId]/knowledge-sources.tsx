@@ -1,7 +1,12 @@
 'use client';
 
 import { KnowledgeSource } from '@prisma/client';
-import { addKnowledgeSourceAction, deleteKnowledgeSourceAction } from '@/app/actions';
+import {
+    addKnowledgeSourceAction,
+    deleteKnowledgeSourceAction,
+    regenerateInterviewGuideAction,
+    updateKnowledgeSourceAction
+} from '@/app/actions';
 import { useState } from 'react';
 
 import { Icons } from '@/components/ui/business-tuner/Icons';
@@ -9,6 +14,9 @@ import Link from 'next/link';
 
 export default function KnowledgeSourcesEditor({ botId, sources, disabled = false }: { botId: string, sources: KnowledgeSource[], disabled?: boolean }) {
     const [isAdding, setIsAdding] = useState(false);
+    const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+    const [isRegeneratingGuide, setIsRegeneratingGuide] = useState(false);
+    const hasInterviewGuide = sources.some((source) => source.type === 'INTERVIEW_GUIDE');
 
     // Bind actions
     const addAction = addKnowledgeSourceAction.bind(null, botId);
@@ -17,6 +25,25 @@ export default function KnowledgeSourcesEditor({ botId, sources, disabled = fals
         if (disabled) return;
         if (!confirm('Are you sure you want to delete this source?')) return;
         await deleteKnowledgeSourceAction(id, botId);
+    };
+
+    const handleRegenerateGuide = async () => {
+        if (disabled || isRegeneratingGuide) return;
+
+        const confirmMessage = hasInterviewGuide
+            ? 'Rigenerare la guida sovrascrivera il contenuto corrente della knowledge automatica. Continuare?'
+            : 'Generare ora la guida automatica dell\'intervista?';
+        if (!confirm(confirmMessage)) return;
+
+        setIsRegeneratingGuide(true);
+        try {
+            await regenerateInterviewGuideAction(botId);
+        } catch (error) {
+            console.error('Failed to regenerate interview guide:', error);
+            alert('Non sono riuscito a rigenerare la guida. Riprova.');
+        } finally {
+            setIsRegeneratingGuide(false);
+        }
     };
 
     return (
@@ -38,19 +65,92 @@ export default function KnowledgeSourcesEditor({ botId, sources, disabled = fals
             <h2 className="text-lg font-semibold mb-4 border-b pb-2">Knowledge Sources</h2>
             <p className="text-sm text-gray-500 mb-4">Add text content or guidelines for the bot to reference.</p>
 
+            <button
+                type="button"
+                onClick={handleRegenerateGuide}
+                disabled={disabled || isRegeneratingGuide}
+                className="mb-4 w-full text-sm border border-amber-300 bg-amber-50 text-amber-800 rounded p-2 hover:bg-amber-100 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+                {isRegeneratingGuide
+                    ? 'Rigenerazione in corso...'
+                    : hasInterviewGuide
+                        ? 'Rigenera Interview Guide automatica'
+                        : 'Genera Interview Guide automatica'}
+            </button>
+
             <ul className="space-y-3 mb-6">
                 {sources.map(ks => (
                     <li key={ks.id} className="flex justify-between items-center bg-gray-50 p-2 rounded border">
-                        <div>
-                            <div className="font-medium text-sm">{ks.title}</div>
-                            <div className="text-xs text-gray-500 truncate max-w-[200px]">{ks.content.substring(0, 50)}...</div>
-                        </div>
-                        <button
-                            onClick={() => handleDelete(ks.id)}
-                            className="text-red-500 hover:text-red-700 text-xs px-2 py-1"
-                        >
-                            Delete
-                        </button>
+                        {editingSourceId === ks.id ? (
+                            <form
+                                action={async (formData) => {
+                                    await updateKnowledgeSourceAction(ks.id, botId, formData);
+                                    setEditingSourceId(null);
+                                }}
+                                className="w-full space-y-2"
+                            >
+                                <input
+                                    name="title"
+                                    defaultValue={ks.title || ''}
+                                    className="w-full border p-2 rounded text-sm"
+                                    placeholder="Source title"
+                                    required
+                                />
+                                <textarea
+                                    name="content"
+                                    defaultValue={ks.content}
+                                    className="w-full border p-2 rounded text-sm h-36"
+                                    placeholder="Source content"
+                                    required
+                                />
+                                <div className="flex justify-end gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingSourceId(null)}
+                                        className="text-xs text-gray-600 px-3 py-1"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <>
+                                <div className="min-w-0">
+                                    <div className="font-medium text-sm flex items-center gap-2">
+                                        <span>{ks.title}</span>
+                                        {ks.type === 'INTERVIEW_GUIDE' && (
+                                            <span className="text-[10px] uppercase font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                                                Auto
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-gray-500 truncate max-w-[280px]">{ks.content.substring(0, 110)}...</div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingSourceId(ks.id)}
+                                        className="text-blue-600 hover:text-blue-800 text-xs px-2 py-1"
+                                        disabled={disabled}
+                                    >
+                                        Edit
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(ks.id)}
+                                        className="text-red-500 hover:text-red-700 text-xs px-2 py-1"
+                                        disabled={disabled}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </li>
                 ))}
                 {sources.length === 0 && (

@@ -15,25 +15,68 @@ export async function GET() {
         userId: session.user.id,
         status: 'ACTIVE'
       },
-      select: { organizationId: true }
+      select: {
+        organizationId: true,
+        role: true
+      }
     });
 
-    const organizationIds = memberships.map((membership) => membership.organizationId);
-    if (organizationIds.length === 0) {
+    if (memberships.length === 0) {
       return NextResponse.json({ projects: [] });
     }
 
-    const projects = await prisma.project.findMany({
-      where: {
-        organizationId: { in: organizationIds }
-      },
-      select: {
-        id: true,
-        name: true,
-        organizationId: true
-      },
-      orderBy: [{ createdAt: 'asc' }]
-    });
+    const adminOrganizationIds = memberships
+      .filter((membership) => membership.role === 'OWNER' || membership.role === 'ADMIN')
+      .map((membership) => membership.organizationId);
+    const memberOrganizationIds = memberships
+      .filter((membership) => membership.role === 'MEMBER' || membership.role === 'VIEWER')
+      .map((membership) => membership.organizationId);
+
+    let adminProjects: { id: string; name: string; organizationId: string | null; createdAt: Date }[] = [];
+    if (adminOrganizationIds.length > 0) {
+      adminProjects = await prisma.project.findMany({
+        where: { organizationId: { in: adminOrganizationIds } },
+        select: {
+          id: true,
+          name: true,
+          organizationId: true,
+          createdAt: true
+        },
+        orderBy: [{ createdAt: 'asc' }]
+      });
+    }
+
+    let memberProjects: { id: string; name: string; organizationId: string | null; createdAt: Date }[] = [];
+    if (memberOrganizationIds.length > 0) {
+      memberProjects = await prisma.project.findMany({
+        where: {
+          organizationId: { in: memberOrganizationIds },
+          accessList: {
+            some: { userId: session.user.id }
+          }
+        },
+        select: {
+          id: true,
+          name: true,
+          organizationId: true,
+          createdAt: true
+        },
+        orderBy: [{ createdAt: 'asc' }]
+      });
+    }
+
+    const projectMap = new Map<string, { id: string; name: string; organizationId: string | null; createdAt: Date }>();
+    for (const project of [...adminProjects, ...memberProjects]) {
+      projectMap.set(project.id, project);
+    }
+
+    const projects = Array.from(projectMap.values())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map((project) => ({
+        id: project.id,
+        name: project.name,
+        organizationId: project.organizationId
+      }));
 
     return NextResponse.json({ projects });
   } catch (error) {

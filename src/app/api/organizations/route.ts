@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { getOrCreateDefaultOrganization } from '@/lib/organizations';
-import { syncLegacyProjectAccessForOrganization } from '@/lib/domain/workspace';
 
 export async function GET() {
   try {
@@ -63,11 +62,6 @@ export async function GET() {
       monthlyCreditsUsed: membership.organization.monthlyCreditsUsed?.toString(),
       packCreditsAvailable: membership.organization.packCreditsAvailable?.toString()
     }));
-
-    // Keep old projectAccess rows aligned with org memberships while legacy UI pieces are still present.
-    for (const membership of memberships) {
-      await syncLegacyProjectAccessForOrganization(membership.organizationId);
-    }
 
     return NextResponse.json({ organizations });
   } catch (error: any) {

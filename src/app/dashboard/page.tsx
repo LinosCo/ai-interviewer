@@ -66,6 +66,24 @@ export default async function DashboardPage() {
     const organization = membership.organization;
     const organizationId = organization.id;
     const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
+    const isOrgAdminMember = isAdmin || ['OWNER', 'ADMIN'].includes(membership.role);
+
+    let accessibleProjectIds: Set<string> | null = null;
+    if (!isOrgAdminMember) {
+        const scopedProjectAccess = await prisma.projectAccess.findMany({
+            where: {
+                userId: session.user.id,
+                project: {
+                    organizationId
+                }
+            },
+            select: { projectId: true }
+        });
+        accessibleProjectIds = new Set(scopedProjectAccess.map((entry) => entry.projectId));
+    }
+    const accessibleProjects = isOrgAdminMember
+        ? organization.projects
+        : organization.projects.filter((project) => accessibleProjectIds?.has(project.id));
 
     // Get limits and usage for this specific organization
     const usage = await getUsageStats(organizationId);
@@ -81,7 +99,7 @@ export default async function DashboardPage() {
     const canCreateChatbotCheck = isAdmin ? { allowed: true } : await canCreateChatbot(organizationId);
 
     // Prepare content for client
-    const allBots = organization.projects.flatMap(p => p.bots);
+    const allBots = accessibleProjects.flatMap(p => p.bots);
     const recentResponses = allBots
         .flatMap(bot => bot.conversations.map(c => ({
             ...c,
@@ -94,7 +112,7 @@ export default async function DashboardPage() {
         .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
         .slice(0, 5);
 
-    const projectsWithCms = organization.projects.map(p => {
+    const projectsWithCms = accessibleProjects.map(p => {
         const sharedCms = p.cmsShares?.find(s => s.connection.status !== 'DISABLED')?.connection || null;
         return {
             id: p.id,

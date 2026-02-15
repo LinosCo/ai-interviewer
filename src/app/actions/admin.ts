@@ -130,8 +130,12 @@ export async function createUser(data: { name: string; email: string; password?:
     if (projectIds.length > 0) {
         const projects = await prisma.project.findMany({
             where: { id: { in: projectIds } },
-            select: { organizationId: true }
+            select: { id: true, organizationId: true }
         });
+
+        const validProjectIds = projects
+            .filter((project) => Boolean(project.organizationId))
+            .map((project) => project.id);
 
         const organizationIds = Array.from(
             new Set(
@@ -163,8 +167,17 @@ export async function createUser(data: { name: string; email: string; password?:
                     joinedAt: new Date()
                 }
             });
+        }
 
-            await syncLegacyProjectAccessForOrganization(organizationId);
+        if (validProjectIds.length > 0) {
+            await prisma.projectAccess.createMany({
+                data: validProjectIds.map((projectId) => ({
+                    userId: user.id,
+                    projectId,
+                    role: 'MEMBER'
+                })),
+                skipDuplicates: true
+            });
         }
     }
 
@@ -190,8 +203,12 @@ export async function updateUser(userId: string, data: { name?: string; email?: 
     if (projectIds) {
         const projects = await prisma.project.findMany({
             where: { id: { in: projectIds } },
-            select: { organizationId: true }
+            select: { id: true, organizationId: true }
         });
+
+        const validProjectIds = projects
+            .filter((project) => Boolean(project.organizationId))
+            .map((project) => project.id);
 
         const organizationIds = Array.from(
             new Set(
@@ -223,8 +240,38 @@ export async function updateUser(userId: string, data: { name?: string; email?: 
                     joinedAt: new Date()
                 }
             });
+        }
 
-            await syncLegacyProjectAccessForOrganization(organizationId);
+        if (validProjectIds.length > 0) {
+            await prisma.projectAccess.deleteMany({
+                where: {
+                    userId,
+                    projectId: { notIn: validProjectIds }
+                }
+            });
+
+            for (const projectId of validProjectIds) {
+                await prisma.projectAccess.upsert({
+                    where: {
+                        userId_projectId: {
+                            userId,
+                            projectId
+                        }
+                    },
+                    update: {
+                        role: 'MEMBER'
+                    },
+                    create: {
+                        userId,
+                        projectId,
+                        role: 'MEMBER'
+                    }
+                });
+            }
+        } else {
+            await prisma.projectAccess.deleteMany({
+                where: { userId }
+            });
         }
     }
 

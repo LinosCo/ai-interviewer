@@ -10,10 +10,9 @@ import { useRouter } from 'next/navigation';
 interface ProjectRenameSectionProps {
     projectId: string;
     projectName: string;
-    isPersonal: boolean;
 }
 
-export function ProjectRenameSection({ projectId, projectName, isPersonal }: ProjectRenameSectionProps) {
+export function ProjectRenameSection({ projectId, projectName }: ProjectRenameSectionProps) {
     const [name, setName] = useState(projectName);
     const [saving, setSaving] = useState(false);
     const router = useRouter();
@@ -52,11 +51,7 @@ export function ProjectRenameSection({ projectId, projectName, isPersonal }: Pro
                     <Pencil className="w-5 h-5 text-amber-600" />
                     <CardTitle>Nome Progetto</CardTitle>
                 </div>
-                <CardDescription>
-                    {isPersonal
-                        ? "Il nome del tuo progetto personale."
-                        : "Modifica il nome di questo progetto."}
-                </CardDescription>
+                <CardDescription>Modifica il nome di questo progetto.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex gap-3">

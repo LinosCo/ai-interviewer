@@ -359,11 +359,6 @@ export default function OrganizationProjectSelector() {
                                                     {project.name}
                                                 </span>
                                             </div>
-                                            {project.isPersonal && (
-                                                <span className="text-[10px] font-semibold bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded uppercase shrink-0">
-                                                    Personale
-                                                </span>
-                                            )}
                                             {isSelected && (
                                                 <Check className="w-4 h-4 text-amber-600 shrink-0" />
                                             )}

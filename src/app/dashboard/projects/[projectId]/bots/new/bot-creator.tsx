@@ -2,6 +2,7 @@
 
 import { createBotAction, generateBotConfigAction, refineTextAction } from '@/app/actions';
 import { useState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 import { RefinableField } from '@/components/refinable-field';
 
@@ -138,11 +139,27 @@ export default function BotCreator({ projectId }: { projectId: string }) {
                         </div>
                     )}
 
-                    <button type="submit" className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">
-                        {aiTopics.length > 0 ? 'Create AI-Designed Bot' : 'Create Bot'}
-                    </button>
+                    <CreateBotSubmitButton hasAiTopics={aiTopics.length > 0} />
                 </form>
             )}
         </div>
+    );
+}
+
+function CreateBotSubmitButton({ hasAiTopics }: { hasAiTopics: boolean }) {
+    const { pending } = useFormStatus();
+
+    return (
+        <button
+            type="submit"
+            disabled={pending}
+            className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            aria-busy={pending}
+        >
+            {pending && <Loader2 className="w-4 h-4 animate-spin" />}
+            {pending
+                ? 'Creating...'
+                : (hasAiTopics ? 'Create AI-Designed Bot' : 'Create Bot')}
+        </button>
     );
 }

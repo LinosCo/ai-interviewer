@@ -277,7 +277,7 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                             <p className="text-[10px] text-gray-500 uppercase font-bold tracking-tight">
                                                 {tool.type === 'tracker' ? 'Monitor Visibilità' : getBotTypeLabel(tool.botType)} •
                                                 <span className="text-gray-400 ml-1 font-normal lowercase">
-                                                    {tool.orgName || 'Nessun Team'} / {tool.projectName || 'P. Personale'}
+                                                    {tool.orgName || 'Nessun Team'} / {tool.projectName || 'Nessun progetto'}
                                                 </span>
                                             </p>
                                         </div>

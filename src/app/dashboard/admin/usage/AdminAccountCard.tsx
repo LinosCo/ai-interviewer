@@ -267,9 +267,6 @@ export function AdminAccountCard({ account }: AdminAccountCardProps) {
                                 <div className="flex items-center gap-2">
                                     <FolderKanban className="w-4 h-4 text-gray-400" />
                                     <span className="font-medium">{project.name}</span>
-                                    {project.isPersonal && (
-                                        <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">Personale</span>
-                                    )}
                                 </div>
                                 <div className="flex items-center gap-3 text-xs text-gray-500">
                                     <span className="flex items-center gap-1">

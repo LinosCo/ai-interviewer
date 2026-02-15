@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { PLANS, PlanType } from '@/config/plans';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 import { checkTrialResourceLimit } from '@/lib/trial-limits';
+import { createVisibilityConfigWithGuard, normalizeBrandName } from '@/lib/visibility/create-config';
 
 export async function POST(request: Request) {
     try {
@@ -89,7 +90,9 @@ export async function POST(request: Request) {
 
         const { projectId } = body;
 
-        if (!brandName || !category) {
+        const normalizedBrandName = typeof brandName === 'string' ? normalizeBrandName(brandName) : '';
+
+        if (!normalizedBrandName || !category) {
             return NextResponse.json(
                 { error: 'brandName and category are required' },
                 { status: 400 }
@@ -126,43 +129,18 @@ export async function POST(request: Request) {
         });
         */
 
-        // Create configuration with prompts and competitors
-        const config = await prisma.visibilityConfig.create({
-            data: {
-                organizationId: finalOrganizationId,
-                brandName,
-                category,
-                description: description || '',
-                websiteUrl: websiteUrl || null,
-                additionalUrls: additionalUrls || null,
-                language: language || 'it',
-                territory: territory || 'IT',
-                isActive: true,
-                projectId: projectId || null,
-                // Schedule first scan for 1 week from now
-                nextScanAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                prompts: {
-                    create: prompts?.map((p: any, index: number) => ({
-                        text: p.text,
-                        enabled: p.enabled ?? true,
-                        orderIndex: index,
-                        generatedByAI: true,
-                        lastEditedAt: new Date(),
-                        referenceUrl: p.referenceUrl || null
-                    })) || []
-                },
-                competitors: {
-                    create: competitors?.map((c: any) => ({
-                        name: c.name,
-                        website: c.website || null,
-                        enabled: c.enabled ?? true
-                    })) || []
-                }
-            },
-            include: {
-                prompts: true,
-                competitors: true
-            }
+        const { config, created } = await createVisibilityConfigWithGuard({
+            organizationId: finalOrganizationId,
+            projectId: projectId || null,
+            brandName: normalizedBrandName,
+            category,
+            description,
+            websiteUrl,
+            additionalUrls,
+            language,
+            territory,
+            prompts,
+            competitors
         });
 
         // Check if ProjectVisibilityConfig table exists to avoid transaction poisoning
@@ -171,7 +149,7 @@ export async function POST(request: Request) {
         `;
         const projectVisibilityConfigExists = tableCheck[0]?.exists || false;
 
-        if (projectId && projectVisibilityConfigExists) {
+        if (created && projectId && projectVisibilityConfigExists) {
             await prisma.projectVisibilityConfig.upsert({
                 where: {
                     projectId_configId: {
@@ -193,9 +171,10 @@ export async function POST(request: Request) {
             configId: config.id,
             config: {
                 ...config,
-                promptCount: config.prompts.length,
-                competitorCount: config.competitors.length,
-                nextScanAt: config.nextScanAt
+                promptCount: Array.isArray(prompts) ? prompts.length : 0,
+                competitorCount: Array.isArray(competitors) ? competitors.length : 0,
+                nextScanAt: config.nextScanAt,
+                deduplicated: !created
             }
         });
 

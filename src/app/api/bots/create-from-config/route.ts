@@ -5,7 +5,11 @@ import { randomBytes } from 'crypto';
 import { scrapeUrl } from '@/lib/scraping';
 import { checkTrialResourceLimit, normalizeBotTypeForTrialLimit } from '@/lib/trial-limits';
 import { ensureAutoInterviewKnowledgeSource } from '@/lib/interview/manual-knowledge-source';
-import { assertProjectAccess, syncLegacyProjectAccessForProject } from '@/lib/domain/workspace';
+import {
+    assertProjectAccess,
+    getDefaultProjectNameForOrganization,
+    syncLegacyProjectAccessForProject
+} from '@/lib/domain/workspace';
 
 function generateSlug(name: string): string {
     const base = name
@@ -75,9 +79,10 @@ export async function POST(req: Request) {
             });
 
             if (!project) {
+                const defaultProjectName = await getDefaultProjectNameForOrganization(organization.id);
                 project = await prisma.project.create({
                     data: {
-                        name: 'Default Project',
+                        name: defaultProjectName,
                         ownerId: user.id,
                         organizationId: organization.id
                     }

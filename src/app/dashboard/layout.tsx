@@ -80,14 +80,27 @@ export default async function DashboardLayout({
 
             if (membership) {
                 organizationId = membership.organizationId;
+                const membershipIsOrgAdmin = ['OWNER', 'ADMIN'].includes(membership.role);
 
                 // Pre-hydrate projects for the active organization
                 const dbProjects = await prisma.project.findMany({
-                    where: { organizationId: organizationId },
+                    where: membershipIsOrgAdmin
+                        ? { organizationId: organizationId }
+                        : {
+                            organizationId: organizationId,
+                            accessList: {
+                                some: { userId: session.user.id }
+                            }
+                        },
                     select: {
                         id: true,
                         name: true,
-                        isPersonal: true
+                        isPersonal: true,
+                        accessList: {
+                            where: { userId: session.user.id },
+                            select: { role: true },
+                            take: 1
+                        }
                     }
                 });
 
@@ -95,7 +108,7 @@ export default async function DashboardLayout({
                     id: p.id,
                     name: p.name,
                     isPersonal: p.isPersonal,
-                    role: ['OWNER', 'ADMIN'].includes(membership.role) ? 'OWNER' : 'MEMBER'
+                    role: membershipIsOrgAdmin || p.accessList[0]?.role === 'OWNER' ? 'OWNER' : 'MEMBER'
                 }));
 
                 // Source of truth for tier is now the Organization

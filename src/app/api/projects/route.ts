@@ -39,20 +39,35 @@ export async function GET(req: Request) {
     const isOrgAdmin = access.isPlatformAdmin || ['OWNER', 'ADMIN'].includes(access.role);
 
     const projects = await prisma.project.findMany({
-      where: { organizationId },
+      where: isOrgAdmin
+        ? { organizationId }
+        : {
+            organizationId,
+            accessList: {
+              some: { userId: session.user.id }
+            }
+          },
       select: {
         id: true,
         name: true,
         isPersonal: true,
-        createdAt: true
+        createdAt: true,
+        accessList: {
+          where: { userId: session.user.id },
+          select: { role: true },
+          take: 1
+        }
       },
       orderBy: [{ createdAt: 'asc' }]
     });
 
     return NextResponse.json({
       projects: projects.map((project) => ({
-        ...project,
-        role: isOrgAdmin ? 'OWNER' : 'MEMBER'
+        id: project.id,
+        name: project.name,
+        isPersonal: project.isPersonal,
+        createdAt: project.createdAt,
+        role: isOrgAdmin || project.accessList[0]?.role === 'OWNER' ? 'OWNER' : 'MEMBER'
       })),
       isOrgAdmin
     });

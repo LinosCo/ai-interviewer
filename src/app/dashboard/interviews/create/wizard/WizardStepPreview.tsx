@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
     Check,
     ChevronDown,
@@ -40,6 +40,7 @@ export default function WizardStepPreview({ config: initialConfig, projectId, on
     const [showSimulator, setShowSimulator] = useState(false);
     const [isRefining, setIsRefining] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const publishInFlightRef = useRef(false);
 
     const updateConfig = (updates: any) => {
         setConfig({ ...config, ...updates });
@@ -132,6 +133,8 @@ export default function WizardStepPreview({ config: initialConfig, projectId, on
     };
 
     const handlePublish = async () => {
+        if (publishInFlightRef.current) return;
+        publishInFlightRef.current = true;
         setIsPublishing(true);
         setError(null);
 
@@ -158,6 +161,7 @@ export default function WizardStepPreview({ config: initialConfig, projectId, on
             console.error(err);
             setError(err.message || 'Errore nella pubblicazione');
         } finally {
+            publishInFlightRef.current = false;
             setIsPublishing(false);
         }
     };

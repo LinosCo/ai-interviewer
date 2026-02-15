@@ -320,12 +320,17 @@ async function getDefaultProjectId(organizationId: string): Promise<string> {
   });
 
   const primary = pickPrimaryMember(activeMembers, 'ADMIN') ?? pickPrimaryMember(activeMembers, 'MEMBER');
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { name: true }
+  });
+  const defaultProjectName = String(organization?.name || '').trim() || 'Workspace';
 
   const created = await mutate(
     `Create default project for organization ${organizationId}`,
     async () => prisma.project.create({
       data: {
-        name: 'Default Project',
+        name: defaultProjectName,
         organizationId,
         ownerId: primary?.userId ?? null,
         isPersonal: false

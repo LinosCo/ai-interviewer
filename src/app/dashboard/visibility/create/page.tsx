@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Sparkles, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { WizardStepBrand } from './wizard/WizardStepBrand';
@@ -106,6 +106,7 @@ export default function CreateVisibilityWizardPage() {
 
     const [projects, setProjects] = useState<Array<{ id: string, name: string }>>([]);
     const [limits, setLimits] = useState({ maxCompetitors: 0, maxPrompts: 0 });
+    const submitInFlightRef = useRef(false);
 
     useEffect(() => {
         const loadConfig = async () => {
@@ -243,6 +244,8 @@ export default function CreateVisibilityWizardPage() {
     };
 
     const handleSave = async () => {
+        if (submitInFlightRef.current) return;
+        submitInFlightRef.current = true;
         setLoading(true);
         try {
             const response = await fetch('/api/visibility/create', {
@@ -266,6 +269,7 @@ export default function CreateVisibilityWizardPage() {
             const errorMessage = error instanceof Error ? error.message : 'Errore nel salvataggio. Riprova.';
             alert(errorMessage);
         } finally {
+            submitInFlightRef.current = false;
             setLoading(false);
         }
     };

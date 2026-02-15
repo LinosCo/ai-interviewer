@@ -26,8 +26,18 @@ export function hasRequiredRole(role: Role | null | undefined, minimumRole: Role
   return ROLE_RANK[role] >= ROLE_RANK[minimumRole];
 }
 
-function toLegacyProjectRole(role: Role): 'OWNER' | 'MEMBER' {
-  return role === 'OWNER' || role === 'ADMIN' ? 'OWNER' : 'MEMBER';
+function normalizeDefaultProjectName(rawName: string | null | undefined): string {
+  const normalized = String(rawName || '').trim().replace(/\s+/g, ' ');
+  return normalized || 'Workspace';
+}
+
+export async function getDefaultProjectNameForOrganization(organizationId: string): Promise<string> {
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { name: true }
+  });
+
+  return normalizeDefaultProjectName(organization?.name);
 }
 
 async function isPlatformAdmin(userId: string): Promise<boolean> {
@@ -129,7 +139,8 @@ export async function assertProjectAccess(
     select: {
       id: true,
       name: true,
-      organizationId: true
+      organizationId: true,
+      ownerId: true
     }
   });
 
@@ -139,6 +150,23 @@ export async function assertProjectAccess(
 
   const organizationId = project.organizationId || await ensureProjectOrganization(project.id);
   const access = await assertOrganizationAccess(userId, organizationId, minimumRole);
+  const canAccessAllProjects = access.isPlatformAdmin || hasRequiredRole(access.role, 'ADMIN');
+
+  if (!canAccessAllProjects && project.ownerId !== userId) {
+    const explicitProjectAccess = await prisma.projectAccess.findUnique({
+      where: {
+        userId_projectId: {
+          userId,
+          projectId: project.id
+        }
+      },
+      select: { id: true }
+    });
+
+    if (!explicitProjectAccess) {
+      throw new WorkspaceError('Project access denied', 403, 'PROJECT_ACCESS_DENIED');
+    }
+  }
 
   return {
     projectId: project.id,
@@ -170,10 +198,11 @@ export async function ensureDefaultProjectForOrganization(organizationId: string
   });
 
   const ownerId = primaryMember?.userId || null;
+  const defaultProjectName = await getDefaultProjectNameForOrganization(organizationId);
 
   return prisma.project.create({
     data: {
-      name: 'Default Project',
+      name: defaultProjectName,
       organizationId,
       ownerId,
       isPersonal: false,
@@ -195,7 +224,7 @@ export async function ensureDefaultProjectForOrganization(organizationId: string
 export async function syncLegacyProjectAccessForProject(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
-    select: { id: true, organizationId: true }
+    select: { id: true, organizationId: true, ownerId: true }
   });
 
   if (!project?.organizationId) return;
@@ -214,40 +243,78 @@ export async function syncLegacyProjectAccessForProject(projectId: string) {
   });
 
   const memberIds = members.map((member) => member.userId);
-  const derivedOwnerId = members.find((member) => member.role === 'OWNER' || member.role === 'ADMIN')?.userId || null;
+  const adminMemberIds = members
+    .filter((member) => member.role === 'OWNER' || member.role === 'ADMIN')
+    .map((member) => member.userId);
+  const adminMemberIdSet = new Set(adminMemberIds);
+  const derivedOwnerId = adminMemberIds[0] || null;
+  const resolvedOwnerId = project.ownerId && memberIds.includes(project.ownerId)
+    ? project.ownerId
+    : derivedOwnerId;
 
   await prisma.$transaction(async (tx) => {
-    if (memberIds.length > 0) {
+    if (memberIds.length === 0) {
+      await tx.projectAccess.deleteMany({ where: { projectId } });
+    } else {
       await tx.projectAccess.deleteMany({
         where: {
           projectId,
           userId: { notIn: memberIds }
         }
       });
-    } else {
-      await tx.projectAccess.deleteMany({ where: { projectId } });
     }
 
-    for (const member of members) {
+    for (const adminMemberId of adminMemberIds) {
       await tx.projectAccess.upsert({
         where: {
           userId_projectId: {
-            userId: member.userId,
+            userId: adminMemberId,
             projectId
           }
         },
-        update: { role: toLegacyProjectRole(member.role) },
+        update: { role: 'OWNER' },
         create: {
-          userId: member.userId,
+          userId: adminMemberId,
           projectId,
-          role: toLegacyProjectRole(member.role)
+          role: 'OWNER'
         }
+      });
+    }
+
+    if (resolvedOwnerId) {
+      await tx.projectAccess.upsert({
+        where: {
+          userId_projectId: {
+            userId: resolvedOwnerId,
+            projectId
+          }
+        },
+        update: { role: 'OWNER' },
+        create: {
+          userId: resolvedOwnerId,
+          projectId,
+          role: 'OWNER'
+        }
+      });
+    }
+
+    const constrainedMemberIds = memberIds.filter(
+      (memberId) => !adminMemberIdSet.has(memberId) && memberId !== resolvedOwnerId
+    );
+    if (constrainedMemberIds.length > 0) {
+      await tx.projectAccess.updateMany({
+        where: {
+          projectId,
+          userId: { in: constrainedMemberIds },
+          role: 'OWNER'
+        },
+        data: { role: 'MEMBER' }
       });
     }
 
     await tx.project.update({
       where: { id: projectId },
-      data: { ownerId: derivedOwnerId }
+      data: { ownerId: resolvedOwnerId }
     });
   });
 }

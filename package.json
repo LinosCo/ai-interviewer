@@ -11,6 +11,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "workspace:repair": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/repair-workspace-consistency.ts",
+    "workspace:normalize-projects": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/normalize-project-defaults.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",

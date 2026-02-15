@@ -12,6 +12,10 @@ import {
 
 const ALLOWED_INVITE_ROLES: Role[] = ['ADMIN', 'MEMBER', 'VIEWER'];
 
+function toProjectAccessRole(role: Role): 'OWNER' | 'MEMBER' {
+  return role === 'OWNER' || role === 'ADMIN' ? 'OWNER' : 'MEMBER';
+}
+
 function toErrorResponse(error: unknown) {
   if (error instanceof WorkspaceError) {
     return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
@@ -34,7 +38,17 @@ export async function GET(
     const memberships = await prisma.membership.findMany({
       where: {
         organizationId: access.organizationId,
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        OR: [
+          { role: { in: ['OWNER', 'ADMIN'] } },
+          {
+            user: {
+              projectAccess: {
+                some: { projectId }
+              }
+            }
+          }
+        ]
       },
       include: {
         user: {
@@ -116,7 +130,22 @@ export async function POST(
       }
     });
 
-    await syncLegacyProjectAccessForOrganization(access.organizationId);
+    await prisma.projectAccess.upsert({
+      where: {
+        userId_projectId: {
+          userId: userToInvite.id,
+          projectId
+        }
+      },
+      update: {
+        role: toProjectAccessRole(role)
+      },
+      create: {
+        userId: userToInvite.id,
+        projectId,
+        role: toProjectAccessRole(role)
+      }
+    });
 
     return NextResponse.json({
       id: membership.id,
@@ -181,7 +210,22 @@ export async function PATCH(
       data: { role: newRole }
     });
 
-    await syncLegacyProjectAccessForOrganization(access.organizationId);
+    await prisma.projectAccess.upsert({
+      where: {
+        userId_projectId: {
+          userId: targetUserId,
+          projectId
+        }
+      },
+      update: {
+        role: toProjectAccessRole(newRole)
+      },
+      create: {
+        userId: targetUserId,
+        projectId,
+        role: toProjectAccessRole(newRole)
+      }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

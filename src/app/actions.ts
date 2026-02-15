@@ -17,6 +17,7 @@ import { transferBotToProject } from './actions/project-tools';
 import {
     assertOrganizationAccess,
     assertProjectAccess,
+    getDefaultProjectNameForOrganization,
     ensureDefaultProjectForOrganization,
     syncLegacyProjectAccessForProject
 } from '@/lib/domain/workspace';
@@ -273,7 +274,7 @@ export async function deleteProjectAction(projectId: string) {
     const finalTransferTarget = fallbackTarget.id === projectId
         ? await prisma.project.create({
             data: {
-                name: 'Default Project (Recovery)',
+                name: `${await getDefaultProjectNameForOrganization(access.organizationId)} (Recovery)`,
                 organizationId: access.organizationId,
                 ownerId: session.user.id,
                 isPersonal: false

@@ -8,6 +8,7 @@ import {
   assertProjectAccess,
   autoFixOrphanToolsForOrganization,
   ensureDefaultProjectForOrganization,
+  getDefaultProjectNameForOrganization,
   syncLegacyProjectAccessForProject
 } from '@/lib/domain/workspace';
 
@@ -147,9 +148,10 @@ export async function DELETE(
       const defaultProject = await ensureDefaultProjectForOrganization(organizationId);
       transferTargetId = defaultProject.id;
       if (transferTargetId === projectId) {
+        const recoveryBaseName = await getDefaultProjectNameForOrganization(organizationId);
         const recoveryProject = await prisma.project.create({
           data: {
-            name: 'Default Project (Recovery)',
+            name: `${recoveryBaseName} (Recovery)`,
             organizationId,
             ownerId: session.user.id,
             isPersonal: false

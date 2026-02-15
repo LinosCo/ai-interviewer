@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { transferProject, createProject } from '@/app/actions/admin';
 import { Icons } from '@/components/ui/business-tuner/Icons';
@@ -41,6 +41,8 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
     const [createOwnerId, setCreateOwnerId] = useState('');
 
     const [isLoading, setIsLoading] = useState(false);
+    const createInFlightRef = useRef(false);
+    const transferInFlightRef = useRef(false);
     const router = useRouter();
 
     const filteredProjects = useMemo(() => projects.filter(project =>
@@ -51,7 +53,8 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
     const orphanProjects = useMemo(() => projects.filter((project) => !project.owner).length, [projects]);
 
     const handleTransfer = async () => {
-        if (!selectedProject || !newOwnerId) return;
+        if (!selectedProject || !newOwnerId || transferInFlightRef.current) return;
+        transferInFlightRef.current = true;
         setIsLoading(true);
         try {
             await transferProject(selectedProject.id, newOwnerId);
@@ -63,12 +66,14 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
             console.error(error);
             alert('Failed to transfer project');
         } finally {
+            transferInFlightRef.current = false;
             setIsLoading(false);
         }
     };
 
     const handleCreate = async () => {
-        if (!createName || !createOwnerId) return;
+        if (!createName || !createOwnerId || createInFlightRef.current) return;
+        createInFlightRef.current = true;
         setIsLoading(true);
         try {
             await createProject(createName, createOwnerId);
@@ -81,6 +86,7 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
             console.error(error);
             alert('Failed to create project');
         } finally {
+            createInFlightRef.current = false;
             setIsLoading(false);
         }
     };

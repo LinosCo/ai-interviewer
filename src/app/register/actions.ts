@@ -76,9 +76,9 @@ export async function registerUser(prevState: string | undefined, formData: Form
                     },
                     projects: {
                         create: {
-                            name: name, // Personal project named after user
+                            name: companyName,
                             ownerId: user.id,
-                            isPersonal: true
+                            isPersonal: false
                         }
                     }
                 },

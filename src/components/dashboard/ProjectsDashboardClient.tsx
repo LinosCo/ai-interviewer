@@ -4,7 +4,6 @@ import { useProject } from '@/contexts/ProjectContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
     LayoutGrid,
     Plus,
@@ -111,11 +110,6 @@ export default function ProjectsDashboardClient() {
                                             <CardTitle className="text-lg font-bold group-hover:text-amber-600 transition-colors">
                                                 {project.name}
                                             </CardTitle>
-                                            {project.isPersonal && (
-                                                <Badge variant="outline" className="text-[9px] uppercase font-black bg-amber-50 text-amber-600 border-amber-100">
-                                                    Personale
-                                                </Badge>
-                                            )}
                                         </div>
                                         <CardDescription className="text-xs flex items-center gap-1 font-medium">
                                             <Calendar className="w-3 h-3" />

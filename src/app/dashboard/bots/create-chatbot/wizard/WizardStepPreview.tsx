@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Bot, MessageSquare, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -15,8 +15,11 @@ export default function WizardStepPreview({ config, projectId, onBack }: WizardS
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const publishInFlightRef = useRef(false);
 
     const handlePublish = async () => {
+        if (publishInFlightRef.current) return;
+        publishInFlightRef.current = true;
         setLoading(true);
         setError('');
 
@@ -57,6 +60,7 @@ export default function WizardStepPreview({ config, projectId, onBack }: WizardS
             console.error('Publish error:', err);
             setError(err.message || 'Si è verificato un errore durante la creazione');
         } finally {
+            publishInFlightRef.current = false;
             setLoading(false);
         }
     };

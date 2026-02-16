@@ -1,4 +1,5 @@
-import type { Prisma, VisibilityConfig } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { VisibilityConfig } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 

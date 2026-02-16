@@ -33,6 +33,14 @@ export function normalizeBrandName(name: string): string {
     return name.trim().replace(/\s+/g, ' ');
 }
 
+function toNullableJsonInput(
+    value: unknown
+): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue | undefined {
+    if (value === undefined) return undefined;
+    if (value === null) return Prisma.JsonNull;
+    return value as Prisma.InputJsonValue;
+}
+
 async function acquireVisibilityNameLock(
     tx: Prisma.TransactionClient,
     organizationId: string,
@@ -84,7 +92,7 @@ export async function createVisibilityConfigWithGuard(
                 category: input.category,
                 description: input.description || '',
                 websiteUrl: input.websiteUrl || null,
-                additionalUrls: input.additionalUrls || null,
+                additionalUrls: toNullableJsonInput(input.additionalUrls),
                 language: input.language || 'it',
                 territory: input.territory || 'IT',
                 isActive: true,

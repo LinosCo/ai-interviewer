@@ -599,20 +599,25 @@ export default function ChatWindow({
 
                             {/* Input Area */}
                             <div className="p-3 border-t bg-white">
-                                <div className="flex gap-2 items-end bg-gray-100 p-2 pr-20 sm:pr-2 rounded-xl border border-transparent focus-within:border-gray-300 focus-within:bg-white transition-all">
-                                    <input
-                                        type="text"
+                                <div className="relative rounded-xl border border-transparent bg-gray-100 p-2 transition-all focus-within:border-gray-300 focus-within:bg-white">
+                                    <textarea
                                         value={inputValue}
                                         onChange={(e) => setInputValue(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSend();
+                                            }
+                                        }}
                                         placeholder="Scrivi un messaggio..."
-                                        className="flex-1 bg-transparent border-none focus:ring-0 p-2 max-h-32 text-sm text-gray-800 placeholder-gray-500"
+                                        className="w-full resize-none bg-transparent border-none focus:ring-0 p-2 pr-12 min-h-[40px] max-h-32 text-sm text-gray-800 placeholder-gray-500"
                                         disabled={isLoading}
+                                        rows={1}
                                     />
                                     <button
                                         onClick={handleSend}
                                         disabled={!inputValue.trim() || isLoading}
-                                        className={`mr-14 sm:mr-0 p-2 rounded-lg transition-all ${inputValue.trim()
+                                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition-all ${inputValue.trim()
                                             ? 'bg-gray-900 text-white shadow-md hover:bg-gray-800'
                                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                             }`}

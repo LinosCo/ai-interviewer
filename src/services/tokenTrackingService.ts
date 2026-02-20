@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType } from '@/config/plans';
-import { TokenCategory } from '@prisma/client';
+import { SubscriptionStatus, TokenCategory } from '@prisma/client';
 import { CreditService } from './creditService';
 import { CreditAction, getCreditCost, getModelCreditMultiplier, TOKEN_TO_CREDIT_RATE } from '@/config/creditCosts';
 
@@ -217,7 +217,14 @@ export class TokenTrackingService {
                 monthlyCreditsLimit: true,
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true,
-                customLimits: true
+                customLimits: true,
+                subscription: {
+                    select: {
+                        status: true,
+                        currentPeriodEnd: true,
+                        trialEndsAt: true
+                    }
+                }
             }
         });
 
@@ -226,6 +233,35 @@ export class TokenTrackingService {
         }
 
         const organization = org as any; // Bypass Prisma selection typing lag
+        const subscription = organization.subscription;
+        const now = new Date();
+        const trialEnd = subscription?.trialEndsAt || subscription?.currentPeriodEnd;
+
+        if (
+            subscription?.status === SubscriptionStatus.TRIALING &&
+            trialEnd &&
+            trialEnd <= now
+        ) {
+            return {
+                allowed: false,
+                reason: 'La tua prova gratuita è terminata. Attiva un piano per continuare.'
+            };
+        }
+
+        if (subscription?.status === SubscriptionStatus.PAST_DUE) {
+            return {
+                allowed: false,
+                reason: 'Il tuo abbonamento è sospeso. Aggiorna il metodo di pagamento.'
+            };
+        }
+
+        if (subscription?.status === SubscriptionStatus.CANCELED) {
+            return {
+                allowed: false,
+                reason: 'Il tuo abbonamento è stato annullato. Attiva un piano per continuare.'
+            };
+        }
+
         const planConfig = PLANS[organization.plan as PlanType] || PLANS[PlanType.FREE];
         const defaultPlanLimit = planConfig.monthlyCredits;
         const hasCustomMonthlyLimit =

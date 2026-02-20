@@ -108,7 +108,7 @@ export const LANDING_PLANS: LandingPlan[] = [
         yearlyPrice: 299,
         showPrice: true,
         features: [
-            'Crediti su misura',
+            '40K crediti/mese',
             'Integrazioni CMS su misura',
             'Automazione sito ed ecommerce',
             'API Access',

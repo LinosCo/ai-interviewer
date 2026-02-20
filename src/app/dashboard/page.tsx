@@ -93,6 +93,7 @@ export default async function DashboardPage() {
     const trialDaysLeft = subscription?.currentPeriodEnd
         ? Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - nowMs) / (1000 * 60 * 60 * 24))
         : 0;
+    const isTrialExpired = status === 'TRIALING' && trialDaysLeft <= 0;
 
     // Permissions based on organization's subscription
     const canCreateInterview = isAdmin ? { allowed: true } : await canPublishBot(organizationId);
@@ -129,10 +130,12 @@ export default async function DashboardPage() {
     return (
         <DashboardClient
             user={user}
+            organizationId={organizationId}
             usage={serializedUsage}
             subscription={subscription}
             status={status}
             trialDaysLeft={trialDaysLeft}
+            isTrialExpired={isTrialExpired}
             isAdmin={isAdmin}
             canCreateInterview={canCreateInterview}
             canCreateChatbotCheck={canCreateChatbotCheck}

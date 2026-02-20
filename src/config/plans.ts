@@ -315,7 +315,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         id: PlanType.BUSINESS,
         name: 'Business',
         description: 'Per aziende',
-        monthlyCredits: 50_000,
+        monthlyCredits: 40_000,
         monthlyPrice: 399,
         yearlyPrice: 3588,
         yearlyMonthlyEquivalent: 299,
@@ -337,7 +337,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             maxProjects: -1
         },
         limits: {
-            monthlyTokenBudget: 50_000,
+            monthlyTokenBudget: 40_000,
             maxInterviewsPerMonth: -1,
             maxChatbots: -1,
             maxChatbotSessionsPerMonth: -1,
@@ -356,7 +356,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             conditionalLogic: true
         },
         featureList: [
-            '50K crediti/mese',
+            '40K crediti/mese',
             'Tutte le funzionalità PRO',
             'White Label',
             'API Access',

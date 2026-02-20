@@ -23,10 +23,15 @@ export function normalizeBotTypeForTrialLimit(botType?: string | null): 'intervi
 export async function isTrialOrganization(organizationId: string): Promise<boolean> {
     const subscription = await prisma.subscription.findUnique({
         where: { organizationId },
-        select: { status: true, tier: true }
+        select: { status: true, tier: true, currentPeriodEnd: true, trialEndsAt: true }
     });
 
     if (!subscription) return false;
+    const now = new Date();
+    const trialEnd = subscription.trialEndsAt || subscription.currentPeriodEnd;
+    const isExpired = trialEnd ? trialEnd <= now : false;
+
+    if (isExpired) return false;
     return subscription.status === SubscriptionStatus.TRIALING || subscription.tier === SubscriptionTier.TRIAL;
 }
 

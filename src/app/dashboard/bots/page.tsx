@@ -14,7 +14,7 @@ export default async function ChatbotsPage() {
     const cookieStore = await cookies();
     const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
 
-    const membership = activeOrgId
+    let membership = activeOrgId
         ? await prisma.membership.findUnique({
             where: {
                 userId_organizationId: {
@@ -32,6 +32,16 @@ export default async function ChatbotsPage() {
                 organization: { include: { subscription: true } }
             }
         });
+
+    // Fallback when org cookie is stale or no longer accessible.
+    if (!membership?.organization && activeOrgId) {
+        membership = await prisma.membership.findFirst({
+            where: { userId: session.user.id },
+            include: {
+                organization: { include: { subscription: true } }
+            }
+        });
+    }
 
     if (!membership?.organization) redirect('/login');
 

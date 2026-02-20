@@ -35,10 +35,12 @@ import { useRouter } from 'next/navigation';
 
 interface DashboardClientProps {
     user: any;
+    organizationId: string;
     usage: any;
     subscription: any;
     status: string;
     trialDaysLeft: number;
+    isTrialExpired: boolean;
     isAdmin: boolean;
     canCreateInterview: { allowed: boolean };
     canCreateChatbotCheck: { allowed: boolean };
@@ -49,10 +51,12 @@ interface DashboardClientProps {
 
 export default function DashboardClient({
     user,
+    organizationId,
     usage,
     subscription,
     status,
     trialDaysLeft,
+    isTrialExpired,
     isAdmin,
     canCreateInterview,
     canCreateChatbotCheck,
@@ -167,7 +171,7 @@ export default function DashboardClient({
     return (
         <div className="space-y-8">
             {/* Subscription & Trial Warnings */}
-            {status === 'TRIALING' && (
+            {status === 'TRIALING' && !isTrialExpired && (
                 <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-amber-500 rounded-full text-white animate-pulse">
@@ -183,6 +187,26 @@ export default function DashboardClient({
                         className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all shadow-md active:scale-95"
                     >
                         Attiva Piano Pro
+                    </Link>
+                </div>
+            )}
+
+            {isTrialExpired && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-500 rounded-full text-white">
+                            <Lock className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-red-900">Prova gratuita terminata</p>
+                            <p className="text-sm text-red-700">Le funzionalità AI sono bloccate fino all&apos;attivazione di un piano.</p>
+                        </div>
+                    </div>
+                    <Link
+                        href={`/api/stripe/checkout?tier=PRO&billing=monthly&organizationId=${organizationId}`}
+                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700"
+                    >
+                        Attiva abbonamento
                     </Link>
                 </div>
             )}

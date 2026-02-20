@@ -15,7 +15,6 @@ export async function registerUser(prevState: string | undefined, formData: Form
     const companyName = (formData.get('companyName') as string)?.trim();
     const vatId = (formData.get('vatId') as string)?.trim();
     const plan = formData.get('plan') as string;
-    const billing = formData.get('billing') as string;
 
     if (!email || !password || !name || !companyName) {
         return 'Tutti i campi obbligatori devono essere compilati.';
@@ -108,17 +107,12 @@ export async function registerUser(prevState: string | undefined, formData: Form
              <p>Piano selezionato: ${plan || 'FREE'}</p>`
         );
 
-        // Keep paid-plan intent for post-verification login.
-        const normalizedPlan = plan?.toUpperCase();
-        const checkoutPath = normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)
-            ? `/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`
-            : undefined;
-
         const verificationEmailResult = await sendAccountVerificationEmail({
             to: email,
             userName: name,
             token: verificationToken,
-            nextPath: checkoutPath
+            // New users should start with the 14-day trial without forced payment redirect.
+            nextPath: undefined
         });
         if (!verificationEmailResult.success) {
             const reason =
@@ -136,10 +130,5 @@ export async function registerUser(prevState: string | undefined, formData: Form
         return 'Registration failed.';
     }
 
-    const normalizedPlan = plan?.toUpperCase();
-    const nextPath = normalizedPlan && ['STARTER', 'PRO', 'BUSINESS'].includes(normalizedPlan)
-        ? `/api/stripe/checkout?tier=${normalizedPlan}${billing ? `&billing=${billing}` : ''}`
-        : '';
-
-    redirect(`/login?verification=sent${nextPath ? `&next=${encodeURIComponent(nextPath)}` : ''}`);
+    redirect('/login?verification=sent');
 }

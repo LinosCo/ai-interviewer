@@ -13,6 +13,7 @@
     "workspace:repair": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/repair-workspace-consistency.ts",
     "workspace:normalize-projects": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/normalize-project-defaults.ts",
     "workspace:normalize-plan-subscriptions": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/normalize-subscription-plan-alignment.ts",
+    "stripe:sync-catalog": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/sync-stripe-catalog-descriptions.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",

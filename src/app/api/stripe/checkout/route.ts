@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getStripeClient, getStripePriceIdForPlan } from '@/lib/stripe';
 import { PLANS, PlanType, PURCHASABLE_PLANS, subscriptionTierToPlanType } from '@/config/plans';
 import { BillingCycle, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
+import Stripe from 'stripe';
 
 const PURCHASABLE_CHECKOUT_PLANS = new Set<PlanType>(PURCHASABLE_PLANS);
 const SUPPORTED_BILLING_PERIODS = new Set(['monthly', 'yearly']);
@@ -25,6 +26,39 @@ function planTierToSubscriptionTier(plan: PlanType): SubscriptionTier {
 function getPlanComparablePrice(plan: PlanType, billingPeriod: 'monthly' | 'yearly'): number {
     const config = PLANS[plan];
     return billingPeriod === 'yearly' ? config.yearlyMonthlyEquivalent : config.monthlyPrice;
+}
+
+function resolveChangeType(params: {
+    targetPlan: PlanType;
+    targetBilling: 'monthly' | 'yearly';
+    currentPlan: PlanType;
+    currentBilling: 'monthly' | 'yearly';
+}): 'upgrade' | 'downgrade' | 'same' {
+    const targetValue = getPlanComparablePrice(params.targetPlan, params.targetBilling);
+    const currentValue = getPlanComparablePrice(params.currentPlan, params.currentBilling);
+    if (targetValue > currentValue) return 'upgrade';
+    if (targetValue < currentValue) return 'downgrade';
+    return 'same';
+}
+
+async function findPrimaryCustomerSubscription(stripe: Stripe, customerId: string, organizationId: string) {
+    const list = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'all',
+        limit: 20
+    });
+
+    const activeLike = list.data.filter((s) =>
+        ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(s.status) &&
+        ((s.metadata?.organizationId && s.metadata.organizationId === organizationId) ||
+            // Backward compatibility: older subscriptions might miss metadata.
+            !s.metadata?.organizationId)
+    );
+    const sorted = [...activeLike].sort((a, b) => (b.created || 0) - (a.created || 0));
+    return {
+        primary: sorted[0] || null,
+        extras: sorted.slice(1)
+    };
 }
 
 // Helper function to create checkout session
@@ -107,16 +141,48 @@ async function createCheckoutSession(
     const stripe = await getStripeClient();
     let customerId = subscription?.stripeCustomerId;
 
+    const currentBillingPeriod: 'monthly' | 'yearly' =
+        (membership?.organization?.billingCycle || BillingCycle.MONTHLY) === BillingCycle.YEARLY
+            ? 'yearly'
+            : 'monthly';
+
+    // Prefer existing customer subscription to avoid creating duplicates.
+    let existingStripeSubscriptionId = subscription?.stripeSubscriptionId || null;
+    if (customerId && !existingStripeSubscriptionId) {
+        const discovered = await findPrimaryCustomerSubscription(stripe, customerId, organizationId);
+        if (discovered.primary) {
+            existingStripeSubscriptionId = discovered.primary.id;
+            if (subscription) {
+                await prisma.subscription.update({
+                    where: { id: subscription.id },
+                    data: { stripeSubscriptionId: discovered.primary.id }
+                });
+            }
+        }
+    }
+
     // If org already has an active Stripe subscription, perform in-place plan/cycle change
-    if (subscription?.stripeSubscriptionId) {
-        const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+    if (existingStripeSubscriptionId) {
+        const stripeSubscription = await stripe.subscriptions.retrieve(existingStripeSubscriptionId);
         const currentItem = stripeSubscription.items.data[0];
 
         if (!currentItem) {
             return { error: 'Subscription Stripe non valida', status: 500 };
         }
 
-        await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        const changeType = resolveChangeType({
+            targetPlan: normalizedTier,
+            targetBilling: normalizedBillingPeriod,
+            currentPlan,
+            currentBilling: currentBillingPeriod
+        });
+
+        // Upgrade: invoice prorated difference now.
+        // Downgrade: keep proration credits for upcoming invoices.
+        const prorationBehavior: Stripe.SubscriptionUpdateParams.ProrationBehavior =
+            changeType === 'upgrade' ? 'always_invoice' : 'create_prorations';
+
+        await stripe.subscriptions.update(existingStripeSubscriptionId, {
             items: [
                 {
                     id: currentItem.id,
@@ -124,16 +190,13 @@ async function createCheckoutSession(
                 }
             ],
             cancel_at_period_end: false,
-            proration_behavior: 'create_prorations',
+            billing_cycle_anchor: 'unchanged',
+            proration_behavior: prorationBehavior,
             metadata: {
                 organizationId,
                 tier: normalizedTier,
                 billingPeriod: normalizedBillingPeriod,
-                changeType:
-                    getPlanComparablePrice(normalizedTier, normalizedBillingPeriod) >=
-                        getPlanComparablePrice(currentPlan, (membership?.organization?.billingCycle || BillingCycle.MONTHLY) === BillingCycle.YEARLY ? 'yearly' : 'monthly')
-                        ? 'upgrade'
-                        : 'downgrade'
+                changeType
             }
         });
 
@@ -162,15 +225,26 @@ async function createCheckoutSession(
                 where: { id: organizationId },
                 data: orgUpdateData
             }),
-            prisma.subscription.update({
-                where: { id: subscription.id },
-                data: {
+            prisma.subscription.upsert({
+                where: { organizationId },
+                update: {
                     tier: planTierToSubscriptionTier(normalizedTier),
                     status: SubscriptionStatus.ACTIVE,
+                    stripeSubscriptionId: existingStripeSubscriptionId,
                     stripePriceId: priceId,
                     stripeCustomerId: typeof stripeSubscription.customer === 'string'
                         ? stripeSubscription.customer
-                        : subscription.stripeCustomerId || null
+                        : (customerId || null)
+                },
+                create: {
+                    organizationId,
+                    tier: planTierToSubscriptionTier(normalizedTier),
+                    status: SubscriptionStatus.ACTIVE,
+                    stripeSubscriptionId: existingStripeSubscriptionId,
+                    stripePriceId: priceId,
+                    stripeCustomerId: typeof stripeSubscription.customer === 'string'
+                        ? stripeSubscription.customer
+                        : (customerId || null)
                 }
             })
         ]);

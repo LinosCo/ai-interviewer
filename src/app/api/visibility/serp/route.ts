@@ -2,8 +2,9 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
-import { PLANS, PlanType } from '@/config/plans';
+import { PLANS, PlanType, subscriptionTierToPlanType } from '@/config/plans';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
+import { SubscriptionStatus } from '@prisma/client';
 
 /**
  * GET - Fetch recent SERP monitoring results
@@ -63,25 +64,12 @@ export async function POST(request: Request) {
             where: { id: session.user.id },
             select: {
                 id: true,
-                plan: true,
                 role: true
             }
         });
 
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-
-        // Use user's plan (admin has unlimited access)
-        const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
-        const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
-
-        // SERP monitoring requires visibility feature (admin bypasses)
-        if (!isAdmin && !plan.features.visibilityTracker) {
-            return NextResponse.json(
-                { error: 'SERP monitoring requires a PRO or higher plan' },
-                { status: 403 }
-            );
         }
 
         // Parse request body
@@ -145,6 +133,37 @@ export async function POST(request: Request) {
         });
         if (membership?.status !== 'ACTIVE') {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
+        const organization = await prisma.organization.findUnique({
+            where: { id: config.organizationId },
+            select: {
+                plan: true,
+                subscription: {
+                    select: {
+                        status: true,
+                        tier: true
+                    }
+                }
+            }
+        });
+
+        // Use organization effective plan (admin bypasses)
+        const isAdmin = user.role === 'ADMIN' || organization?.plan === PlanType.ADMIN;
+        const effectivePlanType =
+            organization?.subscription?.status === SubscriptionStatus.TRIALING
+                ? PlanType.TRIAL
+                : (organization?.subscription?.tier
+                    ? subscriptionTierToPlanType(organization.subscription.tier)
+                    : ((organization?.plan as PlanType) || PlanType.FREE));
+        const plan = PLANS[effectivePlanType] || PLANS[PlanType.FREE];
+
+        // SERP monitoring requires visibility feature (admin bypasses)
+        if (!isAdmin && !plan.features.visibilityTracker) {
+            return NextResponse.json(
+                { error: 'SERP monitoring requires a PRO or higher plan' },
+                { status: 403 }
+            );
         }
 
         // Run scan

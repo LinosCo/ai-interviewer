@@ -82,7 +82,14 @@ export const CreditService = {
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true,
                 creditsResetDate: true,
+                monthlyResetDate: true,
                 customLimits: true
+                ,
+                subscription: {
+                    select: {
+                        currentPeriodEnd: true
+                    }
+                }
             }
         });
 
@@ -292,7 +299,13 @@ export const CreditService = {
                 monthlyCreditsUsed: true,
                 packCreditsAvailable: true,
                 creditsResetDate: true,
-                customLimits: true
+                monthlyResetDate: true,
+                customLimits: true,
+                subscription: {
+                    select: {
+                        currentPeriodEnd: true
+                    }
+                }
             }
         });
 
@@ -333,6 +346,20 @@ export const CreditService = {
                 Number(org.monthlyCreditsLimit)
             );
 
+        let effectiveResetDate = org.creditsResetDate;
+        if (!effectiveResetDate) {
+            effectiveResetDate = org.subscription?.currentPeriodEnd || null;
+        }
+        if (!effectiveResetDate && org.monthlyResetDate) {
+            const nextFromMonthly = new Date(org.monthlyResetDate);
+            nextFromMonthly.setMonth(nextFromMonthly.getMonth() + 1);
+            effectiveResetDate = nextFromMonthly;
+        }
+        if (!effectiveResetDate) {
+            const now = new Date();
+            effectiveResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        }
+
         return {
             monthlyLimit: org.monthlyCreditsLimit,
             monthlyUsed: org.monthlyCreditsUsed,
@@ -341,7 +368,7 @@ export const CreditService = {
             totalAvailable: isUnlimitedCredits ? BigInt(-1) : (totalAvailable > BigInt(0) ? totalAvailable : BigInt(0)),
             usagePercentage,
             warningLevel: getWarningLevel(usagePercentage),
-            resetDate: org.creditsResetDate,
+            resetDate: effectiveResetDate,
             isUnlimited: isUnlimitedCredits
         };
     },

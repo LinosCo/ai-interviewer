@@ -117,7 +117,7 @@ export function CreditsWidget() {
                     <span className="text-xs font-bold text-stone-700">Crediti AI</span>
                 </div>
                 <span className="text-[10px] font-medium text-stone-500 bg-white px-1.5 py-0.5 rounded border border-stone-100">
-                    {credits.formatted.monthlyRemaining}
+                    {credits.formatted.totalAvailable}
                 </span>
             </div>
 
@@ -129,13 +129,12 @@ export function CreditsWidget() {
                 />
             </div>
 
-            {/* Pack credits indicator */}
-            {credits.packAvailable > 0 && (
-                <div className="text-[10px] text-amber-600 mb-1 flex items-center gap-1">
-                    <div className="w-1 h-1 rounded-full bg-amber-500" />
-                    + {credits.formatted.packAvailable} pack extra
-                </div>
-            )}
+            <div className="text-[10px] text-stone-500 mb-1 flex items-center justify-between">
+                <span>Piano: {credits.formatted.monthlyRemaining}</span>
+                <span className={credits.packAvailable > 0 ? 'text-amber-600 font-semibold' : ''}>
+                    Pack: {credits.formatted.packAvailable}
+                </span>
+            </div>
 
             {/* CTA for low credits */}
             {percentage >= 85 ? (

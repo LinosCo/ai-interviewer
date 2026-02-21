@@ -73,6 +73,7 @@ async function createCheckoutSession(
                             subscription: {
                                 select: {
                                     id: true,
+                                    tier: true,
                                     status: true,
                                     stripeCustomerId: true,
                                     stripeSubscriptionId: true

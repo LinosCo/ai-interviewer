@@ -30,7 +30,12 @@ export default async function PlansPage({
                     organizationId: true,
                     organization: {
                         select: {
-                            plan: true
+                            plan: true,
+                            subscription: {
+                                select: {
+                                    status: true
+                                }
+                            }
                         }
                     }
                 }
@@ -41,7 +46,9 @@ export default async function PlansPage({
     const activeMembership = activeOrgId
         ? user?.memberships.find(m => m.organizationId === activeOrgId) || user?.memberships[0]
         : user?.memberships[0];
-    const currentPlan = (activeMembership?.organization.plan as PlanType) || PlanType.FREE;
+    const currentPlan = activeMembership?.organization.subscription?.status === 'TRIALING'
+        ? PlanType.TRIAL
+        : ((activeMembership?.organization.plan as PlanType) || PlanType.FREE);
 
     // Build plans array with current plan info
     const visiblePlanTypes = PURCHASABLE_PLANS.filter(

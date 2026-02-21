@@ -11,6 +11,27 @@ import { getStripeClient } from '@/lib/stripe';
 import { BillingCycle, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
 import PackPurchaseButton from './pack-purchase-button';
 
+function unixTimestampToDate(value: unknown): Date | null {
+    const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return null;
+    const date = new Date(raw * 1000);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getStripePeriodDates(subscription: any) {
+    const currentPeriodStart = unixTimestampToDate(
+        subscription?.current_period_start ??
+        subscription?.items?.data?.[0]?.current_period_start ??
+        subscription?.start_date
+    );
+    const currentPeriodEnd = unixTimestampToDate(
+        subscription?.current_period_end ??
+        subscription?.items?.data?.[0]?.current_period_end
+    );
+    const trialEndsAt = unixTimestampToDate(subscription?.trial_end);
+    return { currentPeriodStart, currentPeriodEnd, trialEndsAt };
+}
+
 async function syncBillingStateFromCheckoutSession(params: {
     sessionId: string;
     userId: string;
@@ -50,6 +71,7 @@ async function syncBillingStateFromCheckoutSession(params: {
     if (!membership) return;
 
     const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const periodDates = getStripePeriodDates(stripeSubscription);
     const planConfig = PLANS[tier] || PLANS[PlanType.FREE];
     const billingCycle = billingPeriod === 'yearly' ? BillingCycle.YEARLY : BillingCycle.MONTHLY;
     const existingOrg = await prisma.organization.findUnique({
@@ -82,11 +104,9 @@ async function syncBillingStateFromCheckoutSession(params: {
                 stripeSubscriptionId: stripeSubscription.id,
                 stripePriceId: stripeSubscription.items.data[0]?.price?.id || null,
                 stripeCustomerId: typeof checkoutSession.customer === 'string' ? checkoutSession.customer : null,
-                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
-                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
-                trialEndsAt: (stripeSubscription as any).trial_end
-                    ? new Date((stripeSubscription as any).trial_end * 1000)
-                    : null
+                ...(periodDates.currentPeriodStart ? { currentPeriodStart: periodDates.currentPeriodStart } : {}),
+                ...(periodDates.currentPeriodEnd ? { currentPeriodEnd: periodDates.currentPeriodEnd } : {}),
+                trialEndsAt: periodDates.trialEndsAt
             },
             create: {
                 organizationId,
@@ -95,11 +115,9 @@ async function syncBillingStateFromCheckoutSession(params: {
                 stripeSubscriptionId: stripeSubscription.id,
                 stripePriceId: stripeSubscription.items.data[0]?.price?.id || null,
                 stripeCustomerId: typeof checkoutSession.customer === 'string' ? checkoutSession.customer : null,
-                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
-                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
-                trialEndsAt: (stripeSubscription as any).trial_end
-                    ? new Date((stripeSubscription as any).trial_end * 1000)
-                    : null
+                ...(periodDates.currentPeriodStart ? { currentPeriodStart: periodDates.currentPeriodStart } : {}),
+                ...(periodDates.currentPeriodEnd ? { currentPeriodEnd: periodDates.currentPeriodEnd } : {}),
+                trialEndsAt: periodDates.trialEndsAt
             }
         })
     ]);

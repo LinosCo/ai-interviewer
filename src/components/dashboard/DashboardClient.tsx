@@ -182,12 +182,20 @@ export default function DashboardClient({
                             <p className="text-sm text-amber-700">Ti rimangono <span className="font-bold">{trialDaysLeft} giorni</span> per testare tutte le funzionalità avanzate.</p>
                         </div>
                     </div>
-                    <Link
-                        href={`/api/stripe/checkout?tier=PRO&billing=monthly&organizationId=${organizationId}`}
-                        className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all shadow-md active:scale-95"
-                    >
-                        Attiva Piano Pro
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/dashboard/billing/plans"
+                            className="px-4 py-2 bg-white text-amber-700 rounded-lg font-bold border border-amber-200 hover:bg-amber-50 transition-all"
+                        >
+                            Vedi altri piani
+                        </Link>
+                        <Link
+                            href={`/api/stripe/checkout?tier=PRO&billing=monthly&organizationId=${organizationId}`}
+                            className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all shadow-md active:scale-95"
+                        >
+                            Attiva Piano Pro
+                        </Link>
+                    </div>
                 </div>
             )}
 
@@ -202,12 +210,20 @@ export default function DashboardClient({
                             <p className="text-sm text-red-700">Le funzionalità AI sono bloccate fino all&apos;attivazione di un piano.</p>
                         </div>
                     </div>
-                    <Link
-                        href={`/api/stripe/checkout?tier=PRO&billing=monthly&organizationId=${organizationId}`}
-                        className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700"
-                    >
-                        Attiva abbonamento
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/dashboard/billing/plans"
+                            className="px-4 py-2 bg-white text-red-700 rounded-lg font-bold border border-red-200 hover:bg-red-50 transition-all"
+                        >
+                            Vedi altri piani
+                        </Link>
+                        <Link
+                            href={`/api/stripe/checkout?tier=PRO&billing=monthly&organizationId=${organizationId}`}
+                            className="px-6 py-2 bg-red-600 text-white rounded-lg font-bold hover:bg-red-700"
+                        >
+                            Attiva Piano Pro
+                        </Link>
+                    </div>
                 </div>
             )}
 

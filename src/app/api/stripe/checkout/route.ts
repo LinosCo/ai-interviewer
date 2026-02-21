@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { getStripeClient, getStripePriceIdForPlan } from '@/lib/stripe';
-import { PLANS, PlanType, PURCHASABLE_PLANS } from '@/config/plans';
+import { PLANS, PlanType, PURCHASABLE_PLANS, subscriptionTierToPlanType } from '@/config/plans';
 import { BillingCycle, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
 
 const PURCHASABLE_CHECKOUT_PLANS = new Set<PlanType>(PURCHASABLE_PLANS);
@@ -93,7 +93,11 @@ async function createCheckoutSession(
 
     const subscription = membership?.organization?.subscription;
     const organizationId = membership?.organizationId;
-    const currentPlan = (membership?.organization?.plan as PlanType) || PlanType.FREE;
+    const currentPlan = subscription?.status === SubscriptionStatus.TRIALING
+        ? PlanType.TRIAL
+        : (subscription?.tier
+            ? subscriptionTierToPlanType(subscription.tier)
+            : ((membership?.organization?.plan as PlanType) || PlanType.FREE));
 
     if (!organizationId) {
         return { error: 'Organizzazione non trovata', status: 404 };

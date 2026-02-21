@@ -8,6 +8,27 @@ import { getStripeClient } from '@/lib/stripe';
 import { CreditService } from '@/services/creditService';
 import { PLANS } from '@/config/plans';
 
+function unixTimestampToDate(value: unknown): Date | null {
+    const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return null;
+    const date = new Date(raw * 1000);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getStripePeriodDates(subscription: any) {
+    const currentPeriodStart = unixTimestampToDate(
+        subscription?.current_period_start ??
+        subscription?.items?.data?.[0]?.current_period_start ??
+        subscription?.start_date
+    );
+    const currentPeriodEnd = unixTimestampToDate(
+        subscription?.current_period_end ??
+        subscription?.items?.data?.[0]?.current_period_end
+    );
+    const trialEndsAt = unixTimestampToDate(subscription?.trial_end);
+    return { currentPeriodStart, currentPeriodEnd, trialEndsAt };
+}
+
 async function resolveStripeWebhookSecret(): Promise<string | null> {
     if (process.env.STRIPE_WEBHOOK_SECRET) {
         return process.env.STRIPE_WEBHOOK_SECRET;
@@ -175,6 +196,7 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session, strip
     }
 
     const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const periodDates = getStripePeriodDates(stripeSubscription);
     const submittedSdiPec = getSubmittedSdiPec(session);
 
     if (submittedSdiPec && typeof session.customer === 'string') {
@@ -204,11 +226,9 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session, strip
                 stripeSubscriptionId: stripeSubscription.id,
                 stripePriceId: stripeSubscription.items.data[0]?.price.id,
                 stripeCustomerId: typeof session.customer === 'string' ? session.customer : undefined,
-                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
-                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
-                trialEndsAt: (stripeSubscription as any).trial_end
-                    ? new Date((stripeSubscription as any).trial_end * 1000)
-                    : null,
+                ...(periodDates.currentPeriodStart ? { currentPeriodStart: periodDates.currentPeriodStart } : {}),
+                ...(periodDates.currentPeriodEnd ? { currentPeriodEnd: periodDates.currentPeriodEnd } : {}),
+                trialEndsAt: periodDates.trialEndsAt,
                 tokensUsedThisMonth: 0,
                 interviewsUsedThisMonth: 0,
                 chatbotSessionsUsedThisMonth: 0,
@@ -222,11 +242,9 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session, strip
                 stripeSubscriptionId: stripeSubscription.id,
                 stripePriceId: stripeSubscription.items.data[0]?.price.id,
                 stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
-                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
-                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
-                trialEndsAt: (stripeSubscription as any).trial_end
-                    ? new Date((stripeSubscription as any).trial_end * 1000)
-                    : null
+                ...(periodDates.currentPeriodStart ? { currentPeriodStart: periodDates.currentPeriodStart } : {}),
+                ...(periodDates.currentPeriodEnd ? { currentPeriodEnd: periodDates.currentPeriodEnd } : {}),
+                trialEndsAt: periodDates.trialEndsAt
             }
         }),
         prisma.organization.update({
@@ -257,6 +275,7 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
     const priceId = stripeSubscription.items.data[0]?.price?.id || null;
     const { planType, billingCycle } = await resolvePlanAndCycleFromPriceId(priceId);
     const orgUpdateData = await buildOrganizationPlanUpdate(subscription.organizationId, planType, billingCycle);
+    const periodDates = getStripePeriodDates(stripeSubscription);
 
     await prisma.$transaction([
         prisma.subscription.update({
@@ -265,8 +284,8 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
                 tier: mapTierToSubscriptionTier(planType),
                 stripePriceId: priceId,
                 status: statusMap[stripeSubscription.status] || SubscriptionStatus.ACTIVE,
-                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
-                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
+                ...(periodDates.currentPeriodStart ? { currentPeriodStart: periodDates.currentPeriodStart } : {}),
+                ...(periodDates.currentPeriodEnd ? { currentPeriodEnd: periodDates.currentPeriodEnd } : {}),
                 cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
                 canceledAt: stripeSubscription.canceled_at
                     ? new Date(stripeSubscription.canceled_at * 1000)

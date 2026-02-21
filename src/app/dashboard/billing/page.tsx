@@ -279,7 +279,7 @@ export default async function BillingPage({
                         <FeatureItem
                             label="Analytics"
                             value={planConfig.features.analytics === 'full' ? 'Completo' : 'Base'}
-                            available={planConfig.features.analytics !== false}
+                            available={true}
                         />
                     </div>
 

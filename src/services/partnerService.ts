@@ -3,7 +3,7 @@
  *
  * Gestisce la logica del programma Partner:
  * - Registrazione come partner
- * - Gestione trial 60 giorni
+ * - Gestione trial 90 giorni (3 mesi)
  * - Tracking organizzazioni clienti attive
  * - Calcolo fee (€0 con 3+ clienti, €29 altrimenti)
  * - White label con 10+ clienti
@@ -80,7 +80,7 @@ export interface TransferResult {
 
 export const PartnerService = {
     /**
-     * Registra un utente come partner (avvia trial 60 giorni)
+     * Registra un utente come partner (avvia trial 90 giorni)
      */
     async registerAsPartner(userId: string): Promise<{ success: boolean; error?: string }> {
         const user = await prisma.user.findUnique({
@@ -407,7 +407,12 @@ export const PartnerService = {
                             where: { role: 'OWNER' },
                             include: {
                                 organization: {
-                                    select: { plan: true }
+                                    select: {
+                                        plan: true,
+                                        subscription: {
+                                            select: { status: true }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -418,7 +423,10 @@ export const PartnerService = {
 
         const activeCount = attributions.filter((attr: any) => {
             const memberships = attr.clientUser?.memberships || [];
-            return memberships.some((m: any) => ['STARTER', 'PRO', 'BUSINESS'].includes(m.organization.plan));
+            return memberships.some((m: any) =>
+                ['STARTER', 'PRO', 'BUSINESS'].includes(m.organization.plan) &&
+                m.organization.subscription?.status === 'ACTIVE'
+            );
         }).length;
 
         await db.user.update({
@@ -445,7 +453,12 @@ export const PartnerService = {
                             where: { role: 'OWNER' },
                             include: {
                                 organization: {
-                                    select: { plan: true }
+                                    select: {
+                                        plan: true,
+                                        subscription: {
+                                            select: { status: true }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -456,7 +469,10 @@ export const PartnerService = {
 
         return attributions.filter((attr: any) => {
             const memberships = attr.clientUser?.memberships || [];
-            return memberships.some((m: any) => ['STARTER', 'PRO', 'BUSINESS'].includes(m.organization.plan));
+            return memberships.some((m: any) =>
+                ['STARTER', 'PRO', 'BUSINESS'].includes(m.organization.plan) &&
+                m.organization.subscription?.status === 'ACTIVE'
+            );
         }).length;
     },
 
@@ -534,6 +550,9 @@ export const PartnerService = {
                                 include: {
                                     organization: {
                                         include: {
+                                            subscription: {
+                                                select: { status: true }
+                                            },
                                             _count: { select: { projects: true } }
                                         }
                                     }
@@ -557,7 +576,7 @@ export const PartnerService = {
             const clientUser = attr.clientUser;
             const org = clientUser?.memberships[0]?.organization;
             const plan = org?.plan || 'FREE';
-            const isActive = ['STARTER', 'PRO', 'BUSINESS'].includes(plan);
+            const isActive = ['STARTER', 'PRO', 'BUSINESS'].includes(plan) && org?.subscription?.status === 'ACTIVE';
 
             return {
                 attributionId: attr.id,
@@ -565,7 +584,7 @@ export const PartnerService = {
                 organizationName: org?.name || 'Sconosciuto',
                 ownerEmail: clientUser?.email || '',
                 plan,
-                subscriptionStatus: org?.subscriptionStatus || null,
+                subscriptionStatus: org?.subscription?.status || null,
                 isActive,
                 attributedAt: attr.attributedAt,
                 firstProjectName: attr.firstProject?.name || null,

@@ -178,12 +178,12 @@ export default function DashboardClient({
                             <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="font-bold text-amber-900">Sei in prova gratuita PRO</p>
+                            <p className="font-bold text-amber-900">Sei in prova gratuita</p>
                             <p className="text-sm text-amber-700">Ti rimangono <span className="font-bold">{trialDaysLeft} giorni</span> per testare tutte le funzionalità avanzate.</p>
                         </div>
                     </div>
                     <Link
-                        href="/dashboard/billing"
+                        href={`/api/stripe/checkout?tier=PRO&billing=monthly&organizationId=${organizationId}`}
                         className="px-6 py-2 bg-amber-500 text-white rounded-lg font-bold hover:bg-amber-600 transition-all shadow-md active:scale-95"
                     >
                         Attiva Piano Pro

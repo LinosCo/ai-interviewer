@@ -29,8 +29,6 @@ interface GlobalConfigState {
     stripePricePackLarge?: string;
     stripePricePartner?: string;
     stripePricePartnerYearly?: string;
-    stripePriceEnterprise?: string;
-    stripePriceEnterpriseYearly?: string;
     smtpHost?: string;
     smtpPort?: number | null;
     smtpSecure?: boolean | null;
@@ -126,8 +124,6 @@ export default function PlatformSettingsPage() {
                         stripePricePackLarge={globalConfig?.stripePricePackLarge}
                         stripePricePartner={globalConfig?.stripePricePartner}
                         stripePricePartnerYearly={globalConfig?.stripePricePartnerYearly}
-                        stripePriceEnterprise={globalConfig?.stripePriceEnterprise}
-                        stripePriceEnterpriseYearly={globalConfig?.stripePriceEnterpriseYearly}
                         smtpHost={globalConfig?.smtpHost}
                         smtpPort={globalConfig?.smtpPort}
                         smtpSecure={globalConfig?.smtpSecure}

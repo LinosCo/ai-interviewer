@@ -225,7 +225,7 @@ export default function CookiePolicyPage() {
                     Per domande su questa Cookie Policy o per esercitare i tuoi diritti in materia di privacy:
                 </p>
                 <ul>
-                    <li><strong>Email:</strong> hello@voler.ai</li>
+                    <li><strong>Email:</strong> businesstuner@voler.ai</li>
                     <li><strong>Oggetto:</strong> &quot;Cookie Policy - Richiesta informazioni&quot;</li>
                 </ul>
 
@@ -243,7 +243,7 @@ export default function CookiePolicyPage() {
                     <strong>Business Tuner by Voler.ai S.r.l.</strong><br />
                     [INDIRIZZO]<br />
                     P.IVA: [P.IVA]<br />
-                    Email: hello@voler.ai
+                    Email: businesstuner@voler.ai
                 </p>
             </div>
         </div>

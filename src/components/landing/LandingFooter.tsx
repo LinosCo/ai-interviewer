@@ -29,7 +29,7 @@ const socialLinks = [
   { icon: Linkedin, href: '#', label: 'LinkedIn' },
   { icon: Twitter, href: '#', label: 'Twitter' },
   { icon: Instagram, href: '#', label: 'Instagram' },
-  { icon: Mail, href: 'mailto:info@businesstuner.it', label: 'Email' },
+  { icon: Mail, href: 'mailto:businesstuner@voler.ai', label: 'Email' },
 ];
 
 export function LandingFooter() {

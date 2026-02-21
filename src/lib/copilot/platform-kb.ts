@@ -1028,7 +1028,7 @@ I pack non scadono e si acquistano da Billing.
         title: 'Contattare il supporto',
         content: `Per assistenza:
 
-**Email**: support@businesstuner.it
+**Email**: businesstuner@voler.ai
 **Orari**: Lun-Ven 9:00-18:00
 
 Quando scrivi, includi:

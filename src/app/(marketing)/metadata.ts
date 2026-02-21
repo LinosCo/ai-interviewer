@@ -5,7 +5,7 @@ export const siteConfig = {
   description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
   url: "https://businesstuner.voler.ai",
   links: {
-    email: "hello@voler.ai",
+    email: "businesstuner@voler.ai",
   },
 };
 

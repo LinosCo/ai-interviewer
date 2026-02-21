@@ -836,6 +836,59 @@ export async function sendPartnerTrialEndingEmail(params: {
 }
 
 /**
+ * Invia notifica trial partner scaduto con invito a richiedere proroga.
+ */
+export async function sendPartnerTrialExpiredEmail(params: {
+    to: string;
+    userName: string;
+    activeClients: number;
+    requiredClients: number;
+}) {
+    const { to, userName, activeClients, requiredClients } = params;
+
+    const content = `
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 60px; height: 60px; background: #FEE2E2; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                <span style="font-size: 28px;">📣</span>
+            </div>
+            <h2 style="color: #1f2937; margin: 0; font-size: 22px;">Il trial Partner è terminato</h2>
+        </div>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Ciao ${userName},
+        </p>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Il tuo periodo di prova Partner è terminato.
+        </p>
+
+        <div style="background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 12px; padding: 20px; margin: 24px 0;">
+            <p style="margin: 0 0 12px 0; color: #9A3412; font-size: 14px; font-weight: 600;">Situazione clienti attiva:</p>
+            <p style="margin: 0; color: #C2410C; font-size: 16px;">
+                <strong>${activeClients}</strong> clienti paganti attivi su <strong>${requiredClients}</strong> richiesti per fee €0/mese
+            </p>
+        </div>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Se desideri una proroga del trial Partner, contatta il team Business Tuner.
+        </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="mailto:businesstuner@voler.ai?subject=Richiesta%20proroga%20trial%20Partner"
+               style="background: #1f2937; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+                Contatta Business Tuner
+            </a>
+        </div>
+    `;
+
+    return sendEmail({
+        to,
+        subject: 'Trial Partner terminato - Richiedi proroga',
+        html: emailWrapper(content)
+    });
+}
+
+/**
  * Invia email di benvenuto dopo registrazione
  */
 export async function sendWelcomeEmail(params: {

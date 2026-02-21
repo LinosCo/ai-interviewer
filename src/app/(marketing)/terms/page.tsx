@@ -53,7 +53,7 @@ export default function TermsPage() {
                 <section>
                     <h2 className="text-2xl font-semibold mb-4 text-gray-900">7. Contatti</h2>
                     <p>
-                        Per informazioni legali o contrattuali: hello@voler.ai
+                        Per informazioni legali o contrattuali: businesstuner@voler.ai
                     </p>
                 </section>
             </div>

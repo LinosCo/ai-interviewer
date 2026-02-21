@@ -18,7 +18,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { packType } = body;
+        const { packType, organizationId } = body;
 
         if (!packType) {
             return NextResponse.json(
@@ -56,15 +56,31 @@ export async function POST(request: Request) {
             );
         }
 
-        // Get user's organization and subscription
-        const membership = await prisma.membership.findFirst({
-            where: { userId: session.user.id },
-            include: {
-                organization: {
-                    include: { subscription: true }
+        // Resolve target organization:
+        // - prefer explicit organizationId from UI
+        // - fallback to first active membership
+        const membership = organizationId
+            ? await prisma.membership.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: session.user.id,
+                        organizationId
+                    }
+                },
+                include: {
+                    organization: {
+                        include: { subscription: true }
+                    }
                 }
-            }
-        });
+            })
+            : await prisma.membership.findFirst({
+                where: { userId: session.user.id },
+                include: {
+                    organization: {
+                        include: { subscription: true }
+                    }
+                }
+            });
 
         if (!membership?.organization) {
             return NextResponse.json(
@@ -73,8 +89,21 @@ export async function POST(request: Request) {
             );
         }
 
+        if (organizationId && membership.organizationId !== organizationId) {
+            return NextResponse.json({ error: 'Accesso negato all’organizzazione' }, { status: 403 });
+        }
+
         const org = membership.organization;
-        let customerId = org.subscription?.stripeCustomerId;
+
+        // Ensure subscription record exists when missing (pack checkout still needs customer reference)
+        let subscription = org.subscription;
+        if (!subscription) {
+            subscription = await prisma.subscription.create({
+                data: { organizationId: org.id }
+            });
+        }
+
+        let customerId = subscription.stripeCustomerId;
 
         // Create Stripe customer if needed
         if (!customerId) {
@@ -88,20 +117,10 @@ export async function POST(request: Request) {
             });
             customerId = customer.id;
 
-            // Update or create subscription with customer ID
-            if (org.subscription) {
-                await prisma.subscription.update({
-                    where: { id: org.subscription.id },
-                    data: { stripeCustomerId: customerId }
-                });
-            } else {
-                await prisma.subscription.create({
-                    data: {
-                        organizationId: org.id,
-                        stripeCustomerId: customerId
-                    }
-                });
-            }
+            await prisma.subscription.update({
+                where: { id: subscription.id },
+                data: { stripeCustomerId: customerId }
+            });
         }
 
         // Create Stripe Checkout session
@@ -116,8 +135,19 @@ export async function POST(request: Request) {
                 }
             ],
             mode: 'payment',
-            success_url: `${baseUrl}/dashboard/billing?pack_success=true&pack=${packType}`,
+            success_url: `${baseUrl}/dashboard/billing?pack_success=true&pack=${packType}&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${baseUrl}/dashboard/billing?pack_cancelled=true`,
+            custom_fields: [
+                {
+                    key: 'billing_sdi_pec',
+                    label: {
+                        type: 'custom',
+                        custom: 'Codice SDI o PEC (Italia)'
+                    },
+                    type: 'text',
+                    optional: true
+                }
+            ],
             metadata: {
                 userId: session.user.id,
                 organizationId: org.id,

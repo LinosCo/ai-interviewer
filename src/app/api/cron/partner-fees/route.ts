@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { PartnerService } from '@/services/partnerService';
 import { PARTNER_THRESHOLDS } from '@/config/plans';
+import { sendPartnerTrialExpiredEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
     try {
@@ -34,10 +35,23 @@ export async function POST(request: Request) {
             // 1. Controlla trial scaduto
             if (partner.partnerStatus === 'trial' && partner.partnerTrialEndDate) {
                 if (now > partner.partnerTrialEndDate) {
+                    const activeClientsAtExpiry = await PartnerService.getActiveClientsCount(partner.id);
+
                     await prisma.user.update({
                         where: { id: partner.id },
                         data: { partnerStatus: 'active' }
                     });
+
+                    if (partner.email && activeClientsAtExpiry < PARTNER_THRESHOLDS.freeThreshold) {
+                        await sendPartnerTrialExpiredEmail({
+                            to: partner.email,
+                            userName: partner.name || 'Partner',
+                            activeClients: activeClientsAtExpiry,
+                            requiredClients: PARTNER_THRESHOLDS.freeThreshold
+                        }).catch((err) => {
+                            console.error('[Cron] Errore invio email fine trial partner:', err);
+                        });
+                    }
                     trialsExpired++;
                 }
             }

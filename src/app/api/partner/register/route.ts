@@ -1,7 +1,7 @@
 /**
  * API Route: /api/partner/register
  *
- * POST: Registra l'utente come partner (avvia trial 60 giorni)
+ * POST: Registra l'utente come partner (avvia trial 90 giorni)
  */
 
 import { NextResponse } from 'next/server';

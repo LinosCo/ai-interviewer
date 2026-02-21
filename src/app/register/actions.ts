@@ -32,7 +32,7 @@ export async function registerUser(prevState: string | undefined, formData: Form
         const hashedPassword = await hash(password, 10);
         const verificationToken = crypto.randomBytes(32).toString('hex');
         const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 ore
-        const partnerTrialCredits = PLANS[PlanType.PARTNER].monthlyCredits;
+        const trialCredits = PLANS[PlanType.TRIAL].monthlyCredits;
 
         // Create user, organization and membership in a transaction
         const transactionResult = await prisma.$transaction(async (tx) => {
@@ -53,8 +53,8 @@ export async function registerUser(prevState: string | undefined, formData: Form
                 data: {
                     name: companyName,
                     vatId: vatId || null,
-                    plan: 'PRO', // Start as PRO for trial
-                    monthlyCreditsLimit: BigInt(partnerTrialCredits),
+                    plan: 'TRIAL',
+                    monthlyCreditsLimit: BigInt(trialCredits),
                     slug: `org-${Math.random().toString(36).substring(2, 10)}`,
                     members: {
                         create: {

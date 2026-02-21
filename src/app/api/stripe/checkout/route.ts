@@ -211,7 +211,7 @@ async function createCheckoutSession(
                 billingPeriod: normalizedBillingPeriod
             }
         },
-        success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true`,
+        success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?canceled=true`,
         allow_promotion_codes: true,
         billing_address_collection: 'required',
@@ -222,6 +222,17 @@ async function createCheckoutSession(
         tax_id_collection: {
             enabled: true
         },
+        custom_fields: [
+            {
+                key: 'billing_sdi_pec',
+                label: {
+                    type: 'custom',
+                    custom: 'Codice SDI o PEC (Italia)'
+                },
+                type: 'text',
+                optional: true
+            }
+        ],
         metadata: {
             organizationId,
             tier: normalizedTier,

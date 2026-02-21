@@ -19,8 +19,7 @@ export const FEATURE_MATRIX = {
                 { key: 'watermark', label: 'Senza watermark', trial: false, starter: false, pro: true, business: true },
                 { key: 'customColor', label: 'Colore primario personalizzato', trial: false, starter: true, pro: true, business: true },
                 { key: 'customLogo', label: 'Logo aziendale', trial: false, starter: false, pro: true, business: true },
-                { key: 'customDomain', label: 'Dominio personalizzato (CNAME)', trial: false, starter: false, pro: false, business: true },
-                { key: 'whiteLabel', label: 'White label completo', trial: false, starter: false, pro: false, business: true }
+                { key: 'customDomain', label: 'Dominio personalizzato (CNAME)', trial: false, starter: false, pro: false, business: true }
             ]
         },
         {
@@ -40,10 +39,8 @@ export const FEATURE_MATRIX = {
         {
             name: 'Export e Integrazioni',
             features: [
-                { key: 'exportPdf', label: 'Export PDF report', trial: false, starter: true, pro: true, business: true },
                 { key: 'exportCsv', label: 'Export CSV dati grezzi', trial: false, starter: false, pro: true, business: true },
                 { key: 'webhooks', label: 'Webhook (notifiche in uscita)', trial: false, starter: false, pro: true, business: true },
-                { key: 'apiAccess', label: 'API REST completa', trial: false, starter: false, pro: false, business: true },
                 { key: 'zapier', label: 'Integrazione Zapier', trial: false, starter: false, pro: false, business: true },
                 { key: 'sso', label: 'SSO (SAML/OIDC)', trial: false, starter: false, pro: false, business: true }
             ]

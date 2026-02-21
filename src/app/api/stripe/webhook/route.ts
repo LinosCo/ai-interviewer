@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
                 const session = event.data.object as Stripe.Checkout.Session;
 
                 if (session.metadata?.type === 'credit_pack') {
-                    await handleCreditPackCheckout(session);
+                    await handleCreditPackCheckout(session, stripe);
                 } else if (session.mode === 'subscription') {
                     await handleSubscriptionCreated(session, stripe);
                 }
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     }
 }
 
-async function handleCreditPackCheckout(session: Stripe.Checkout.Session) {
+async function handleCreditPackCheckout(session: Stripe.Checkout.Session, stripe: Stripe) {
     const { organizationId, packType, credits, userId } = session.metadata || {};
 
     if (!organizationId || !packType || !credits) {
@@ -147,6 +147,15 @@ async function handleCreditPackCheckout(session: Stripe.Checkout.Session) {
     const stripePaymentRef = typeof session.payment_intent === 'string'
         ? session.payment_intent
         : session.id;
+
+    const submittedSdiPec = getSubmittedSdiPec(session);
+    if (submittedSdiPec && typeof session.customer === 'string') {
+        await stripe.customers.update(session.customer, {
+            metadata: {
+                billing_sdi_pec: submittedSdiPec
+            }
+        }).catch(() => null);
+    }
 
     await CreditService.addPackCredits(
         organizationId,
@@ -166,6 +175,15 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session, strip
     }
 
     const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const submittedSdiPec = getSubmittedSdiPec(session);
+
+    if (submittedSdiPec && typeof session.customer === 'string') {
+        await stripe.customers.update(session.customer, {
+            metadata: {
+                billing_sdi_pec: submittedSdiPec
+            }
+        }).catch(() => null);
+    }
 
     const priceId = stripeSubscription.items.data[0]?.price?.id || null;
     const inferredFromPrice = await resolvePlanAndCycleFromPriceId(priceId);
@@ -342,6 +360,16 @@ function mapTierToPlanType(tier: string): PlanType {
     if (t === 'PARTNER') return PlanType.PARTNER;
     if (t === 'ENTERPRISE') return PlanType.ENTERPRISE;
     return PlanType.TRIAL;
+}
+
+function getSubmittedSdiPec(session: Stripe.Checkout.Session): string | null {
+    const fields = (session as any)?.custom_fields;
+    if (!Array.isArray(fields)) return null;
+    const field = fields.find((f: any) => f?.key === 'billing_sdi_pec');
+    const value = field?.text?.value;
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
 }
 
 function normalizeBillingCycle(value: string): BillingCycle {

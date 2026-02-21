@@ -109,9 +109,8 @@ export const LANDING_PLANS: LandingPlan[] = [
         showPrice: true,
         features: [
             '40K crediti/mese',
-            'Integrazioni CMS su misura',
+            'Integrazioni CMS su misura (può prevedere costi aggiuntivi)',
             'Automazione sito ed ecommerce',
-            'API Access',
             'Account manager dedicato',
         ],
         cta: 'Inizia 14 giorni gratis',
@@ -158,7 +157,7 @@ export const PARTNER_PLAN: PartnerPlan = {
     basePrice: 29,
     freeThreshold: 3,
     whiteLabelThreshold: 10,
-    trialDays: 60,
+    trialDays: 90,
     features: [
         '10K crediti/mese',
         'Tutte le funzionalità PRO',
@@ -169,7 +168,7 @@ export const PARTNER_PLAN: PartnerPlan = {
     ],
     benefits: [
         {
-            title: 'Trial 60 giorni',
+            title: 'Trial 3 mesi',
             description: 'Prova gratuita estesa per costruire il tuo portafoglio clienti.'
         },
         {

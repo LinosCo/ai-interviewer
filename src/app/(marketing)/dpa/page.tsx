@@ -9,7 +9,7 @@ export default function DPAPage() {
                     <p className="font-semibold text-blue-900 mb-2">📄 Documento per Clienti Business</p>
                     <p className="text-sm text-blue-800">
                         Questo DPA è applicabile ai clienti con piano PRO o BUSINESS che trattano dati personali tramite Business Tuner.
-                        Se hai bisogno di una versione firmata per conformità GDPR, contattaci a <strong>hello@voler.ai</strong>.
+                        Se hai bisogno di una versione firmata per conformità GDPR, contattaci a <strong>businesstuner@voler.ai</strong>.
                     </p>
                 </div>
 
@@ -181,7 +181,7 @@ export default function DPAPage() {
                     <li><strong>Portabilità:</strong> Export in formato machine-readable (JSON, CSV)</li>
                 </ul>
                 <p>
-                    Per richieste complesse, il Cliente può contattare Voler AI a <strong>hello@voler.ai</strong> e riceverà assistenza entro 72 ore lavorative.
+                    Per richieste complesse, il Cliente può contattare Voler AI a <strong>businesstuner@voler.ai</strong> e riceverà assistenza entro 72 ore lavorative.
                 </p>
 
                 <h3>7.2 Data Protection Impact Assessment (DPIA):</h3>
@@ -258,7 +258,7 @@ export default function DPAPage() {
                 </p>
                 <ul>
                     <li><strong>Email DPO:</strong> dpo@voler.ai</li>
-                    <li><strong>Email generale:</strong> hello@voler.ai</li>
+                    <li><strong>Email generale:</strong> businesstuner@voler.ai</li>
                     <li><strong>Oggetto email:</strong> &quot;DPA - [Nome Cliente] - [Richiesta]&quot;</li>
                 </ul>
 
@@ -266,7 +266,7 @@ export default function DPAPage() {
                     <p className="font-semibold text-green-900 mb-2">✅ Versione firmata del DPA</p>
                     <p className="text-sm text-green-800">
                         I clienti con piano BUSINESS possono richiedere una versione firmata di questo DPA per archivio compliance.
-                        Inviare richiesta a <strong>hello@voler.ai</strong> con oggetto &quot;DPA Signature Request&quot; includendo:
+                        Inviare richiesta a <strong>businesstuner@voler.ai</strong> con oggetto &quot;DPA Signature Request&quot; includendo:
                     </p>
                     <ul className="text-sm text-green-800 mt-2">
                         <li>Ragione sociale e P.IVA del Cliente</li>
@@ -283,7 +283,7 @@ export default function DPAPage() {
                     Via della Tecnologia, 123 - 20100 Milano (MI)<br />
                     P.IVA: IT12345678901<br />
                     REA: MI-1234567<br />
-                    Email: hello@voler.ai | DPO: dpo@voler.ai
+                    Email: businesstuner@voler.ai | DPO: dpo@voler.ai
                 </p>
             </div>
         </div>

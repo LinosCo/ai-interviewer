@@ -144,8 +144,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             '500 crediti/mese',
             'Interview AI base',
             '1 progetto',
-            'Analytics base',
-            'Export PDF (watermark)'
+            'Analytics base'
         ]
     },
 
@@ -249,7 +248,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             'Chatbot illimitati',
             'Progetti illimitati',
             'Analytics completi',
-            'Export PDF/CSV puliti'
+            'Export CSV puliti'
         ]
     },
 
@@ -358,11 +357,8 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         featureList: [
             '40K crediti/mese',
             'Tutte le funzionalità PRO',
-            'White Label',
-            'API Access',
             'CMS Integrations',
-            'Integrazioni CMS su misura',
-            'Progetti illimitati',
+            'Integrazioni CMS su misura (può prevedere costi aggiuntivi)',
             'Automatizza il tuo sito',
             'Supporto prioritario'
         ]
@@ -420,8 +416,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
             'Trasferimento progetti',
             'Dashboard multi-cliente',
             'Report con logo personalizzato',
-            '€0/mese con 3+ clienti',
-            'White Label con 10+ clienti'
+            '€0/mese con 3+ clienti'
         ]
     },
 
@@ -472,8 +467,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         },
         featureList: [
             'Crediti illimitati',
-            'White Label completo',
-            'API Access & Custom Integration',
+            'Custom Integration',
             'Supporto dedicato',
             'SLA garantiti'
         ]
@@ -621,9 +615,7 @@ export const PLAN_ORDER: PlanType[] = [
 export const PURCHASABLE_PLANS: PlanType[] = [
     PlanType.STARTER,
     PlanType.PRO,
-    PlanType.BUSINESS,
-    PlanType.PARTNER,
-    PlanType.ENTERPRISE
+    PlanType.BUSINESS
 ];
 
 // ============================================
@@ -633,7 +625,7 @@ export const PURCHASABLE_PLANS: PlanType[] = [
 export const PARTNER_THRESHOLDS = {
     freeThreshold: 3,      // 3+ clienti = €0/mese
     whiteLabelThreshold: 10, // 10+ clienti = white label
-    trialDays: 60,         // 60 giorni trial gratuito
+    trialDays: 90,         // 90 giorni trial gratuito (3 mesi)
     baseMonthlyFee: 29,    // €29/mese base (< 3 clienti)
     gracePeriodDays: 30    // 30 giorni grace period
 } as const;

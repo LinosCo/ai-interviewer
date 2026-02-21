@@ -9,7 +9,7 @@ export default function PrivacyPage() {
                 </p>
                 <h2 className="text-xl font-semibold mt-8 mb-4">1. Titolare del Trattamento</h2>
                 <p>
-                    Il titolare del trattamento dei dati è Business Tuner. Per qualsiasi domanda relativa alla presente Informativa, puoi contattarci all&apos;indirizzo email hello@voler.ai.
+                    Il titolare del trattamento dei dati è Business Tuner. Per qualsiasi domanda relativa alla presente Informativa, puoi contattarci all&apos;indirizzo email businesstuner@voler.ai.
                 </p>
                 <h2 className="text-xl font-semibold mt-8 mb-4">2. Informazioni che raccogliamo</h2>
                 <p className="mb-4">Raccogliamo le seguenti tipologie di informazioni:</p>

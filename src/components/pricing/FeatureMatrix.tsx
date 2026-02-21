@@ -25,16 +25,9 @@ const FEATURE_CATEGORIES: Array<{ name: string; features: Feature[] }> = [
         features: [
             { key: 'visibilityEnabled', label: 'Brand Monitor', boolean: true, getValue: (p) => p.limits.visibilityEnabled },
             { key: 'aiTipsEnabled', label: 'AI Tips', boolean: true, getValue: (p) => p.limits.aiTipsEnabled },
-            { key: 'whiteLabelEnabled', label: 'White Label', boolean: true, getValue: (p) => p.limits.whiteLabelEnabled },
             { key: 'canTransferProjects', label: 'Trasferimento Progetti', boolean: true, getValue: (p) => p.limits.canTransferProjects }
         ]
     },
-    {
-        name: 'Integrazioni',
-        features: [
-            { key: 'apiAccessEnabled', label: 'API Access', boolean: true, getValue: (p) => p.limits.apiAccessEnabled }
-        ]
-    }
 ];
 
 export function FeatureMatrix() {

@@ -66,7 +66,7 @@ export default function TemplatesPage() {
                     <p className="text-amber-800 mb-8 max-w-xl mx-auto">
                         Inviaci la tua idea di ricerca e il nostro team di esperti preparerà un template personalizzato per te.
                     </p>
-                    <Link href="mailto:hello@voler.ai">
+                    <Link href="mailto:businesstuner@voler.ai">
                         <button className="bg-white text-amber-900 font-bold px-8 py-4 rounded-2xl border border-amber-200 hover:bg-amber-50 transition-colors">
                             Richiedi un template
                         </button>

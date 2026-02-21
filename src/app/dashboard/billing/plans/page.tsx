@@ -5,8 +5,9 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import CheckoutButton from './checkout-button';
+import StripePortalButton from './stripe-portal-button';
 
-const SALES_EMAIL = 'info@businesstuner.it';
+const SALES_EMAIL = 'businesstuner@voler.ai';
 
 export default async function PlansPage({
     searchParams
@@ -43,9 +44,13 @@ export default async function PlansPage({
     const currentPlan = (activeMembership?.organization.plan as PlanType) || PlanType.FREE;
 
     // Build plans array with current plan info
-    const plans = PURCHASABLE_PLANS.map(planType => ({
+    const visiblePlanTypes = PURCHASABLE_PLANS.filter(
+        planType => planType !== PlanType.PARTNER && planType !== PlanType.ENTERPRISE
+    );
+
+    const plans = visiblePlanTypes.map(planType => ({
         ...PLANS[planType],
-        requiresSalesContact: planType === PlanType.BUSINESS || planType === PlanType.ENTERPRISE,
+        requiresSalesContact: planType === PlanType.BUSINESS,
         isCurrent: currentPlan === planType
     }));
 
@@ -57,10 +62,7 @@ export default async function PlansPage({
         { name: 'Brand Monitor', key: 'visibilityTracker' },
         { name: 'AI Tips', key: 'aiTips' },
         { name: 'Copilot Strategico', key: 'copilotStrategico' },
-        { name: 'White Label', key: 'whiteLabel' },
-        { name: 'API Access', key: 'apiAccess' },
         { name: 'CMS Integrations', key: 'cmsIntegrations' },
-        { name: 'Export PDF', key: 'exportPdf' },
         { name: 'Export CSV', key: 'exportCsv' },
         { name: 'Analytics', key: 'analytics' },
     ];
@@ -105,6 +107,21 @@ export default async function PlansPage({
                 </p>
             </div>
 
+            <div className="mb-6 max-w-6xl flex items-center justify-center gap-3">
+                <Link
+                    href="/dashboard/billing/plans?billing=monthly"
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'monthly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
+                >
+                    Mensile
+                </Link>
+                <Link
+                    href="/dashboard/billing/plans?billing=yearly"
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'yearly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
+                >
+                    Annuale
+                </Link>
+            </div>
+
             {/* Plans Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl">
                 {plans.map((plan) => {
@@ -129,7 +146,10 @@ export default async function PlansPage({
                             <div className="mb-4 flex items-baseline gap-1">
                                 {plan.requiresSalesContact ? (
                                     <>
-                                        <span className="text-4xl font-black text-stone-900">Su richiesta</span>
+                                        <span className="text-4xl font-black text-stone-900">
+                                            €{billingPeriod === 'yearly' ? plan.yearlyMonthlyEquivalent : plan.monthlyPrice}
+                                        </span>
+                                        <span className="text-stone-400 text-sm">/mese</span>
                                     </>
                                 ) : (
                                     <>
@@ -167,7 +187,14 @@ export default async function PlansPage({
 
                             {/* Features list */}
                             <ul className="space-y-3 mb-10 flex-grow">
-                                {plan.featureList.map((feature, i) => (
+                                {plan.featureList
+                                    .filter((feature) => {
+                                        const normalized = feature.toLowerCase();
+                                        return !normalized.includes('pdf')
+                                            && !normalized.includes('api')
+                                            && !normalized.includes('white label');
+                                    })
+                                    .map((feature, i) => (
                                     <li key={i} className="flex items-start gap-3 text-sm text-stone-600">
                                         <Icons.Check size={18} className="text-amber-500 shrink-0 mt-0.5" />
                                         <span>{feature}</span>
@@ -202,21 +229,6 @@ export default async function PlansPage({
                         </div>
                     );
                 })}
-            </div>
-
-            <div className="mt-6 max-w-6xl flex items-center justify-center gap-3">
-                <Link
-                    href="/dashboard/billing/plans?billing=monthly"
-                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'monthly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
-                >
-                    Mensile
-                </Link>
-                <Link
-                    href="/dashboard/billing/plans?billing=yearly"
-                    className={`px-4 py-2 rounded-xl text-sm font-bold border ${billingPeriod === 'yearly' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-700 border-stone-200'}`}
-                >
-                    Annuale
-                </Link>
             </div>
 
             {/* Feature Comparison Table */}
@@ -272,29 +284,9 @@ export default async function PlansPage({
                     <h4 className="text-lg font-bold text-stone-900 mb-1">Passa alla fatturazione annuale</h4>
                     <p className="text-stone-600 text-sm">Risparmia fino al 30% su tutti i piani attivando il pagamento annuale.</p>
                 </div>
-                <Link href={`/api/stripe/portal?organizationId=${activeMembership?.organizationId || ''}`}>
-                    <button className="bg-white text-stone-900 font-bold px-8 py-3.5 rounded-xl border border-stone-200 hover:bg-stone-50 transition-all text-sm shadow-sm flex items-center gap-2">
-                        <Icons.Settings2 size={16} /> Gestisci in Stripe
-                    </button>
-                </Link>
+                <StripePortalButton organizationId={activeMembership?.organizationId || ''} />
             </div>
 
-            {/* Partner CTA */}
-            <div className="mt-8 bg-stone-900 rounded-[28px] p-8 flex flex-col md:flex-row items-center justify-between gap-6 max-w-6xl text-white">
-                <div>
-                    <span className="text-amber-400 text-xs font-bold uppercase tracking-widest">Per consulenti</span>
-                    <h4 className="text-lg font-bold mt-2 mb-1">Sei un&apos;agenzia o un consulente?</h4>
-                    <p className="text-stone-400 text-sm">
-                        Il piano Partner ti permette di gestire più clienti, trasferire progetti e guadagnare con Business Tuner.
-                        €29/mese, gratuito con 3+ clienti attivi.
-                    </p>
-                </div>
-                <Link href="/partner">
-                    <button className="bg-amber-500 text-white font-bold px-8 py-3.5 rounded-xl hover:bg-amber-600 transition-all text-sm shadow-sm flex items-center gap-2 whitespace-nowrap">
-                        Scopri Partner <Icons.ArrowRight size={16} />
-                    </button>
-                </Link>
-            </div>
         </div>
     );
 }

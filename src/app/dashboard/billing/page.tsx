@@ -7,10 +7,123 @@ import BillingClient from './billing-client';
 import { UsageDashboard } from '@/components/dashboard/UsageDashboard';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { getStripeClient } from '@/lib/stripe';
+import { BillingCycle, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
+import PackPurchaseButton from './pack-purchase-button';
 
-export default async function BillingPage() {
+async function syncBillingStateFromCheckoutSession(params: {
+    sessionId: string;
+    userId: string;
+}) {
+    const { sessionId, userId } = params;
+
+    let stripe;
+    try {
+        stripe = await getStripeClient();
+    } catch {
+        return;
+    }
+
+    const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
+    const metadata = checkoutSession.metadata || {};
+    const organizationId = metadata.organizationId;
+    const tier = (metadata.tier || '').toUpperCase() as PlanType;
+    const billingPeriod = (metadata.billingPeriod || 'monthly').toLowerCase();
+    const stripeSubscriptionId = typeof checkoutSession.subscription === 'string'
+        ? checkoutSession.subscription
+        : null;
+
+    if (!organizationId || !stripeSubscriptionId || !Object.values(PlanType).includes(tier)) {
+        return;
+    }
+
+    const membership = await prisma.membership.findUnique({
+        where: {
+            userId_organizationId: {
+                userId,
+                organizationId
+            }
+        },
+        select: { organizationId: true }
+    });
+
+    if (!membership) return;
+
+    const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const planConfig = PLANS[tier] || PLANS[PlanType.FREE];
+    const billingCycle = billingPeriod === 'yearly' ? BillingCycle.YEARLY : BillingCycle.MONTHLY;
+    const existingOrg = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { customLimits: true }
+    });
+    const existingCustomLimits =
+        typeof existingOrg?.customLimits === 'object' && existingOrg.customLimits !== null
+            ? (existingOrg.customLimits as Record<string, unknown>)
+            : {};
+
+    await prisma.$transaction([
+        prisma.organization.update({
+            where: { id: organizationId },
+            data: {
+                plan: tier,
+                billingCycle,
+                monthlyCreditsLimit: BigInt(planConfig.monthlyCredits),
+                customLimits: {
+                    ...existingCustomLimits,
+                    monthlyCreditsLimitCustom: false
+                }
+            }
+        }),
+        prisma.subscription.upsert({
+            where: { organizationId },
+            update: {
+                tier: tier as SubscriptionTier,
+                status: SubscriptionStatus.ACTIVE,
+                stripeSubscriptionId: stripeSubscription.id,
+                stripePriceId: stripeSubscription.items.data[0]?.price?.id || null,
+                stripeCustomerId: typeof checkoutSession.customer === 'string' ? checkoutSession.customer : null,
+                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
+                trialEndsAt: (stripeSubscription as any).trial_end
+                    ? new Date((stripeSubscription as any).trial_end * 1000)
+                    : null
+            },
+            create: {
+                organizationId,
+                tier: tier as SubscriptionTier,
+                status: SubscriptionStatus.ACTIVE,
+                stripeSubscriptionId: stripeSubscription.id,
+                stripePriceId: stripeSubscription.items.data[0]?.price?.id || null,
+                stripeCustomerId: typeof checkoutSession.customer === 'string' ? checkoutSession.customer : null,
+                currentPeriodStart: new Date((stripeSubscription as any).current_period_start * 1000),
+                currentPeriodEnd: new Date((stripeSubscription as any).current_period_end * 1000),
+                trialEndsAt: (stripeSubscription as any).trial_end
+                    ? new Date((stripeSubscription as any).trial_end * 1000)
+                    : null
+            }
+        })
+    ]);
+}
+
+export default async function BillingPage({
+    searchParams
+}: {
+    searchParams?: Promise<{ success?: string; session_id?: string; tab?: string; pack_success?: string; pack_cancelled?: string; pack?: string }>
+}) {
     const session = await auth();
     if (!session?.user?.id) return null;
+    const resolvedSearchParams = await searchParams;
+
+    if (resolvedSearchParams?.success === 'true' && resolvedSearchParams?.session_id) {
+        await syncBillingStateFromCheckoutSession({
+            sessionId: resolvedSearchParams.session_id,
+            userId: session.user.id
+        });
+    }
+    const tab = resolvedSearchParams?.tab || '';
+    const packSuccess = resolvedSearchParams?.pack_success === 'true';
+    const packCancelled = resolvedSearchParams?.pack_cancelled === 'true';
+    const purchasedPack = resolvedSearchParams?.pack || '';
 
     const cookieStore = await cookies();
     const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
@@ -43,7 +156,9 @@ export default async function BillingPage() {
     const organization = activeMembership.organization;
     const subscription = organization.subscription;
 
-    const currentPlan = (organization.plan as PlanType) || PlanType.FREE;
+    const currentPlan = subscription?.status === 'TRIALING'
+        ? PlanType.TRIAL
+        : ((organization.plan as PlanType) || PlanType.FREE);
     const planConfig = PLANS[currentPlan] || PLANS[PlanType.FREE];
 
     // Source of truth: organization's configured monthlyCreditsLimit
@@ -62,6 +177,17 @@ export default async function BillingPage() {
                     Gestisci il tuo piano, i crediti e la fatturazione.
                 </p>
             </div>
+
+            {packSuccess && (
+                <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    Acquisto pack completato{purchasedPack ? ` (${purchasedPack})` : ''}. I crediti vengono aggiunti automaticamente al saldo organizzazione.
+                </div>
+            )}
+            {packCancelled && (
+                <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Acquisto pack annullato. Nessun addebito effettuato.
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Current Plan Card */}
@@ -151,9 +277,9 @@ export default async function BillingPage() {
                             available={planConfig.features.copilotStrategico}
                         />
                         <FeatureItem
-                            label="White Label"
-                            value={planConfig.features.whiteLabel === true ? 'Attivo' : planConfig.features.whiteLabel === 'conditional' ? 'Condizionale' : 'Non incluso'}
-                            available={planConfig.features.whiteLabel !== false}
+                            label="Analytics"
+                            value={planConfig.features.analytics === 'full' ? 'Completo' : 'Base'}
+                            available={planConfig.features.analytics !== false}
                         />
                     </div>
 
@@ -194,7 +320,7 @@ export default async function BillingPage() {
                     </div>
 
                     {/* Credit Packs */}
-                    <div className="bg-white/80 backdrop-blur-md rounded-[24px] p-6 border border-white/50 shadow-sm">
+                    <div id="packs" className={`bg-white/80 backdrop-blur-md rounded-[24px] p-6 border shadow-sm ${tab === 'packs' ? 'border-amber-300 ring-2 ring-amber-100' : 'border-white/50'}`}>
                         <div className="flex items-center gap-2 mb-4">
                             <Icons.Sparkles size={20} className="text-amber-500" />
                             <h3 className="font-bold text-stone-900">Pack Crediti</h3>
@@ -220,11 +346,18 @@ export default async function BillingPage() {
                                 </div>
                             ))}
                         </div>
-                        <Link href="/dashboard/billing?tab=packs" className="block mt-4">
-                            <button className="w-full bg-stone-100 text-stone-700 font-bold py-3 rounded-xl hover:bg-stone-200 transition-all text-sm">
-                                Acquista pack
-                            </button>
-                        </Link>
+                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {CREDIT_PACKS.map(pack => (
+                                <PackPurchaseButton
+                                    key={`${pack.id}-buy`}
+                                    packType={pack.id}
+                                    organizationId={activeMembership.organizationId}
+                                    className="w-full bg-stone-100 text-stone-700 font-bold py-3 rounded-xl hover:bg-stone-200 transition-all text-sm disabled:opacity-60"
+                                >
+                                    Acquista {formatCredits(pack.credits)}
+                                </PackPurchaseButton>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>

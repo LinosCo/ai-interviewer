@@ -29,7 +29,8 @@ import {
     Code,
     FileText,
     AlertCircle,
-    Archive
+    Archive,
+    Download
 } from "lucide-react";
 import { showToast } from "@/components/toast";
 import { useProject } from '@/contexts/ProjectContext';
@@ -52,8 +53,12 @@ interface Insight {
     priorityScore: number;
     crossChannelScore: number;
     suggestedActions: Action[];
+    interviewData?: any;
+    chatbotData?: any;
     visibilityData?: any;
     status: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 // Helper: determine if action can be auto-applied (only if explicitly flagged)
@@ -113,6 +118,113 @@ export default function InsightHubPage() {
     const [showArchived, setShowArchived] = useState(false);
     const [updatingInsightId, setUpdatingInsightId] = useState<string | null>(null);
     const [topSources, setTopSources] = useState<any[]>([]);
+
+    const toArraySize = (value: any): number => (Array.isArray(value) ? value.length : 0);
+
+    const escapeCsv = (value: unknown): string => {
+        const raw = value == null ? '' : String(value);
+        const escaped = raw.replace(/"/g, '""');
+        return `"${escaped}"`;
+    };
+
+    const handleExportCsv = () => {
+        if (!insights.length) {
+            showToast('Nessun dato disponibile da esportare', 'error');
+            return;
+        }
+
+        const headers = [
+            'insight_id',
+            'insight_topic',
+            'insight_status',
+            'insight_priority_score',
+            'insight_cross_channel_score',
+            'insight_created_at',
+            'insight_updated_at',
+            'tool_interview_records',
+            'tool_chatbot_records',
+            'tool_visibility_records',
+            'tool_active_channels',
+            'ai_tip_index',
+            'ai_tip_type',
+            'ai_tip_target',
+            'ai_tip_status',
+            'ai_tip_title',
+            'ai_tip_body',
+            'ai_tip_reasoning'
+        ];
+
+        const rows: string[] = [headers.join(',')];
+
+        insights.forEach((insight) => {
+            const interviewCount = toArraySize(insight.interviewData);
+            const chatbotCount = toArraySize(insight.chatbotData);
+            const visibilityCount = toArraySize(insight.visibilityData?.visibilitySummary);
+            const activeChannels = Array.isArray(insight.visibilityData?.activeChannels)
+                ? insight.visibilityData.activeChannels.join('|')
+                : '';
+            const actions = Array.isArray(insight.suggestedActions) ? insight.suggestedActions : [];
+
+            if (actions.length === 0) {
+                rows.push([
+                    escapeCsv(insight.id),
+                    escapeCsv(insight.topicName),
+                    escapeCsv(insight.status),
+                    escapeCsv(insight.priorityScore),
+                    escapeCsv(insight.crossChannelScore),
+                    escapeCsv(insight.createdAt || ''),
+                    escapeCsv(insight.updatedAt || ''),
+                    escapeCsv(interviewCount),
+                    escapeCsv(chatbotCount),
+                    escapeCsv(visibilityCount),
+                    escapeCsv(activeChannels),
+                    escapeCsv(''),
+                    escapeCsv(''),
+                    escapeCsv(''),
+                    escapeCsv(''),
+                    escapeCsv(''),
+                    escapeCsv(''),
+                    escapeCsv('')
+                ].join(','));
+                return;
+            }
+
+            actions.forEach((action, index) => {
+                rows.push([
+                    escapeCsv(insight.id),
+                    escapeCsv(insight.topicName),
+                    escapeCsv(insight.status),
+                    escapeCsv(insight.priorityScore),
+                    escapeCsv(insight.crossChannelScore),
+                    escapeCsv(insight.createdAt || ''),
+                    escapeCsv(insight.updatedAt || ''),
+                    escapeCsv(interviewCount),
+                    escapeCsv(chatbotCount),
+                    escapeCsv(visibilityCount),
+                    escapeCsv(activeChannels),
+                    escapeCsv(index + 1),
+                    escapeCsv(action.type),
+                    escapeCsv(action.target),
+                    escapeCsv(action.status),
+                    escapeCsv(action.title || ''),
+                    escapeCsv(action.body),
+                    escapeCsv(action.reasoning)
+                ].join(','));
+            });
+        });
+
+        const csvContent = rows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `ai_tips_tools_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        showToast('Export CSV completato');
+    };
 
     // Get the project ID for API calls (null if "All Projects" is selected)
     const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
@@ -360,14 +472,24 @@ export default function InsightHubPage() {
                         )}
                     </p>
                 </div>
-                <Button
-                    onClick={handleSync}
-                    disabled={syncing}
-                    className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all hover:scale-105 active:scale-95"
-                >
-                    {syncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    {syncing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        onClick={handleExportCsv}
+                        variant="outline"
+                        className="rounded-full px-6"
+                    >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export CSV
+                    </Button>
+                    <Button
+                        onClick={handleSync}
+                        disabled={syncing}
+                        className="bg-amber-600 hover:bg-amber-700 text-white rounded-full px-8 shadow-lg shadow-amber-200 transition-all hover:scale-105 active:scale-95"
+                    >
+                        {syncing ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                        {syncing ? 'Analisi in corso...' : 'Aggiorna Analisi'}
+                    </Button>
+                </div>
             </div>
 
             {/* Strategic Context Section */}

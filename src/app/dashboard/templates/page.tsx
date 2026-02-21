@@ -66,7 +66,7 @@ export default function DashboardTemplatesPage() {
                 <p className="text-stone-600 mb-6 max-w-lg mx-auto text-sm">
                     Inviaci il tuo obiettivo di ricerca. Un esperto di Business Tuner configurerà per te il bot ottimizzato in meno di 24 ore.
                 </p>
-                <Link href="mailto:hello@voler.ai">
+                <Link href="mailto:businesstuner@voler.ai">
                     <button className="bg-white text-stone-900 font-bold px-8 py-3 rounded-xl border border-stone-200 hover:bg-stone-50 transition-all text-sm shadow-sm">
                         Contatta il supporto
                     </button>

@@ -184,6 +184,9 @@ export default async function BillingPage({
     const monthlyLimit = Number(organization.monthlyCreditsLimit);
     const monthlyUsed = Number(organization.monthlyCreditsUsed);
     const packAvailable = Number(organization.packCreditsAvailable);
+    const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
+    const monthlyRatio = monthlyLimit > 0 ? monthlyUsed / monthlyLimit : 0;
+    const monthlyPercentage = Math.min(100, Math.round(monthlyRatio * 100));
     const isUnlimited = monthlyLimit === -1;
     const creditsResetDate = organization.creditsResetDate;
 
@@ -235,6 +238,7 @@ export default async function BillingPage({
                                 <p className="text-sm text-stone-500 mt-1">Nessun limite di utilizzo</p>
                             </div>
                         ) : (
+                            <>
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="text-center p-3 bg-white rounded-xl">
                                     <p className="text-xs text-stone-400 font-bold uppercase mb-1">Limite Mensile</p>
@@ -249,12 +253,69 @@ export default async function BillingPage({
                                     </p>
                                 </div>
                                 <div className="text-center p-3 bg-white rounded-xl">
-                                    <p className="text-xs text-stone-400 font-bold uppercase mb-1">Pack Extra</p>
-                                    <p className="text-xl font-bold text-amber-600">
-                                        {packAvailable > 0 ? formatMonthlyCredits(packAvailable) : '-'}
+                                    <p className="text-xs text-stone-400 font-bold uppercase mb-1">Rimanenti</p>
+                                    <p className={`text-xl font-bold ${monthlyUsed >= monthlyLimit ? 'text-red-500' : 'text-green-600'}`}>
+                                        {formatMonthlyCredits(monthlyRemaining)}
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Barra avanzamento crediti mensili */}
+                            <div className="mt-3">
+                                <div
+                                    className="h-2 bg-stone-200 rounded-full overflow-hidden"
+                                    role="progressbar"
+                                    aria-valuenow={monthlyPercentage}
+                                    aria-valuemin={0}
+                                    aria-valuemax={100}
+                                    aria-label="Utilizzo crediti mensili"
+                                >
+                                    <div
+                                        className={`h-full transition-all duration-300 ${
+                                            monthlyRatio >= 0.95 ? 'bg-red-500' :
+                                            monthlyRatio >= 0.85 ? 'bg-orange-500' :
+                                            monthlyRatio >= 0.70 ? 'bg-yellow-500' :
+                                            'bg-green-500'
+                                        }`}
+                                        style={{ width: `${monthlyPercentage}%` }}
+                                    />
+                                </div>
+                                <p className="text-xs text-stone-400 mt-1 text-right">
+                                    {monthlyPercentage}% utilizzato
+                                </p>
+                            </div>
+
+                            {/* Sezione Pack Extra — visibile solo se disponibili */}
+                            {packAvailable > 0 && (
+                                <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center">
+                                                <Icons.Sparkles size={14} className="text-amber-600" aria-hidden="true" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">Pack Extra</p>
+                                                <p className="text-[10px] text-amber-600">Usati dopo i crediti mensili · Non scadono</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-2xl font-black text-amber-600">{formatMonthlyCredits(packAvailable)}</p>
+                                    </div>
+                                    <div
+                                        className="h-2 bg-amber-200 rounded-full overflow-hidden"
+                                        role="progressbar"
+                                        aria-valuenow={100}
+                                        aria-valuemin={0}
+                                        aria-valuemax={100}
+                                        aria-label="Pack extra crediti disponibili"
+                                    >
+                                        <div className="h-full w-full bg-amber-500 rounded-full" />
+                                    </div>
+                                    <p className="text-[10px] text-amber-500 mt-1">
+                                        {formatMonthlyCredits(packAvailable)} crediti pack disponibili
+                                    </p>
+                                </div>
+                            )}
+                            </>
                         )}
 
                         {creditsResetDate && !isUnlimited && (

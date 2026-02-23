@@ -76,8 +76,10 @@ export async function POST(req: Request) {
             mockBot,
             mockConversation,
             currentTopic,
-            methodology,
-            effectiveDuration
+            effectiveDuration, // effectiveDurationSeconds (number)
+            undefined, // supervisorInsight (optional)
+            undefined, // interviewPlan (optional)
+            methodology  // manualKnowledgeGuide
         );
 
         // 4. Initialize LLM

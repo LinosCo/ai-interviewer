@@ -48,7 +48,7 @@ export interface InterviewStateLike {
   deepAccepted: boolean | null;
   consentGiven: boolean | null;
   dataCollectionAttempts: number;
-  extensionReturnPhase?: 'SCAN' | 'DEEP' | null;
+  extensionReturnPhase?: 'EXPLORE' | 'DEEPEN' | null;
   extensionReturnTopicIndex?: number | null;
   extensionReturnTurnInTopic?: number | null;
   extensionOfferAttempts?: number;
@@ -142,26 +142,26 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
 
   const intent = await deps.checkUserIntent(lastUserMessage, 'deep_offer');
   if (intent === 'ACCEPT') {
-    const returnPhase = state.extensionReturnPhase || 'DEEP';
+    const returnPhase = state.extensionReturnPhase || 'DEEPEN';
     nextState.deepAccepted = true;
     nextState.extensionOfferAttempts = 0;
     nextState.extensionReturnPhase = null;
     nextState.extensionReturnTopicIndex = null;
     nextState.extensionReturnTurnInTopic = null;
 
-    if (returnPhase === 'SCAN') {
-      nextState.phase = 'SCAN';
+    if (returnPhase === 'EXPLORE') {
+      nextState.phase = 'EXPLORE';
       nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
       nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
       const resumeTopic = botTopics[nextState.topicIndex] || botTopics[0];
       nextTopicId = resumeTopic?.id || botTopics[0]?.id;
       const usedSubGoals = (state.topicSubGoalHistory || {})[resumeTopic.id] || [];
       const availableSubGoals = (resumeTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
-      supervisorInsight = { status: 'SCANNING', nextSubGoal: availableSubGoals[0] || resumeTopic.label };
+      supervisorInsight = { status: 'EXPLORING', nextSubGoal: availableSubGoals[0] || resumeTopic.label };
       return { nextState, supervisorInsight, nextTopicId };
     }
 
-    nextState.phase = 'DEEP';
+    nextState.phase = 'DEEPEN';
     nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
     nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
 

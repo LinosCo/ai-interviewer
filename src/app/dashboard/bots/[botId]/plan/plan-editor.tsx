@@ -37,66 +37,45 @@ export default function InterviewPlanEditor({ botId }: { botId: string }) {
     loadPlan();
   }, [loadPlan]);
 
-  const baseScanTopics = useMemo(() => {
-    const topics = planData?.basePlan?.scan?.topics || [];
+  const baseExploreTopics = useMemo(() => {
+    const topics = planData?.basePlan?.explore?.topics || [];
     return [...topics].sort((a, b) => a.orderIndex - b.orderIndex);
   }, [planData]);
 
-  const mergedScanTopics = useMemo(() => {
-    const topics = planData?.plan?.scan?.topics || [];
+  const mergedExploreTopics = useMemo(() => {
+    const topics = planData?.plan?.explore?.topics || [];
     return [...topics].sort((a, b) => a.orderIndex - b.orderIndex);
   }, [planData]);
 
-  const baseDeepTopics = useMemo(() => {
-    const topics = planData?.basePlan?.deep?.topics || [];
-    return [...topics].sort((a, b) => a.orderIndex - b.orderIndex);
-  }, [planData]);
+  // NOTE: In v2, deepen phase doesn't have per-topic configuration
+  // It only has global settings: maxTurnsPerTopic and fallbackTurns
+  // Removed baseDeepenTopics and mergedDeepenTopics
 
-  const mergedDeepTopics = useMemo(() => {
-    const topics = planData?.plan?.deep?.topics || [];
-    return [...topics].sort((a, b) => a.orderIndex - b.orderIndex);
-  }, [planData]);
-
-  const handleScanOverride = (topicId: string, value: string) => {
+  const handleExploreOverride = (topicId: string, value: string) => {
     const parsed = value === '' ? undefined : Number(value);
     setOverrides(prev => {
-      const nextScanTopics = { ...(prev.scan?.topics || {}) };
+      const nextExploreTopics = { ...(prev.explore?.topics || {}) };
       if (!parsed || Number.isNaN(parsed)) {
-        delete nextScanTopics[topicId];
+        delete nextExploreTopics[topicId];
       } else {
-        nextScanTopics[topicId] = { ...(nextScanTopics[topicId] || {}), maxTurns: parsed };
+        nextExploreTopics[topicId] = { ...(nextExploreTopics[topicId] || {}), maxTurns: parsed };
       }
       return {
         ...prev,
-        scan: { ...(prev.scan || {}), topics: nextScanTopics }
+        explore: { ...(prev.explore || {}), topics: nextExploreTopics }
       };
     });
   };
 
-  const handleDeepOverride = (topicId: string, value: string) => {
-    const parsed = value === '' ? undefined : Number(value);
-    setOverrides(prev => {
-      const nextDeepTopics = { ...(prev.deep?.topics || {}) };
-      if (!parsed || Number.isNaN(parsed)) {
-        delete nextDeepTopics[topicId];
-      } else {
-        nextDeepTopics[topicId] = { ...(nextDeepTopics[topicId] || {}), maxTurns: parsed };
-      }
-      return {
-        ...prev,
-        deep: { ...(prev.deep || {}), topics: nextDeepTopics }
-      };
-    });
-  };
+  // NOTE: Removed handleDeepenOverride - in v2, deepen phase uses global settings only, not per-topic
 
   const handleDeepGlobal = (field: 'maxTurnsPerTopic' | 'fallbackTurns', value: string) => {
     const parsed = value === '' ? undefined : Number(value);
     setOverrides(prev => ({
       ...prev,
-      deep: {
-        ...(prev.deep || {}),
-        [field]: parsed && !Number.isNaN(parsed) ? parsed : undefined,
-        topics: { ...(prev.deep?.topics || {}) }
+      deepen: {
+        ...(prev.deepen || {}),
+        [field]: parsed && !Number.isNaN(parsed) ? parsed : undefined
       }
     }));
   };
@@ -193,9 +172,9 @@ export default function InterviewPlanEditor({ botId }: { botId: string }) {
       <div className="bg-white p-6 rounded shadow">
         <h3 className="text-md font-semibold mb-4">Scan (Panoramica)</h3>
         <div className="space-y-3">
-          {baseScanTopics.map((topic, idx) => {
-            const merged = mergedScanTopics.find(t => t.topicId === topic.topicId);
-            const overrideVal = overrides.scan?.topics?.[topic.topicId]?.maxTurns;
+          {baseExploreTopics.map((topic, idx) => {
+            const merged = mergedExploreTopics.find(t => t.topicId === topic.topicId);
+            const overrideVal = overrides.explore?.topics?.[topic.topicId]?.maxTurns;
             return (
               <div key={topic.topicId} className="border rounded-lg p-4">
                 <div className="flex items-center justify-between">
@@ -212,7 +191,7 @@ export default function InterviewPlanEditor({ botId }: { botId: string }) {
                     type="number"
                     min={1}
                     value={overrideVal ?? ''}
-                    onChange={e => handleScanOverride(topic.topicId, e.target.value)}
+                    onChange={e => handleExploreOverride(topic.topicId, e.target.value)}
                     className="w-24 p-2 border rounded text-sm"
                     placeholder="Auto"
                   />
@@ -232,10 +211,10 @@ export default function InterviewPlanEditor({ botId }: { botId: string }) {
             <input
               type="number"
               min={1}
-              value={overrides.deep?.maxTurnsPerTopic ?? ''}
+              value={overrides.deepen?.maxTurnsPerTopic ?? ''}
               onChange={e => handleDeepGlobal('maxTurnsPerTopic', e.target.value)}
               className="w-full p-2 border rounded text-sm mt-2"
-              placeholder={`${planData.plan.deep.maxTurnsPerTopic}`}
+              placeholder={`${planData.plan.deepen.maxTurnsPerTopic}`}
             />
           </div>
           <div>
@@ -243,44 +222,16 @@ export default function InterviewPlanEditor({ botId }: { botId: string }) {
             <input
               type="number"
               min={1}
-              value={overrides.deep?.fallbackTurns ?? ''}
+              value={overrides.deepen?.fallbackTurns ?? ''}
               onChange={e => handleDeepGlobal('fallbackTurns', e.target.value)}
               className="w-full p-2 border rounded text-sm mt-2"
-              placeholder={`${planData.plan.deep.fallbackTurns}`}
+              placeholder={`${planData.plan.deepen.fallbackTurns}`}
             />
           </div>
         </div>
 
-        <div className="space-y-3">
-          {baseDeepTopics.map((topic, idx) => {
-            const merged = mergedDeepTopics.find(t => t.topicId === topic.topicId);
-            const overrideVal = overrides.deep?.topics?.[topic.topicId]?.maxTurns;
-            return (
-              <div key={topic.topicId} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="font-medium text-gray-900">
-                    {idx + 1}. {topic.label}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Base: {topic.maxTurns} turn • Effettivo: {merged?.maxTurns ?? topic.maxTurns}
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  <label className="text-xs uppercase text-gray-500">Override Max</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={overrideVal ?? ''}
-                    onChange={e => handleDeepOverride(topic.topicId, e.target.value)}
-                    className="w-24 p-2 border rounded text-sm"
-                    placeholder="Auto"
-                  />
-                  <span className="text-xs text-gray-400">Lascia vuoto per usare il calcolo automatico.</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* NOTE: In v2, deepen phase doesn't have per-topic configuration */}
+        {/* It only has global settings (maxTurnsPerTopic and fallbackTurns) shown above */}
       </div>
     </div>
   );

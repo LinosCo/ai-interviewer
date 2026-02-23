@@ -2,7 +2,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { InterviewPlan } from './plan-types';
 
-type RuntimePhase = 'SCAN' | 'DEEP' | 'DEEP_OFFER' | 'DATA_COLLECTION';
+type RuntimePhase = 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION';
 
 export interface RuntimeTopicKnowledge {
     topicId: string;
@@ -323,7 +323,7 @@ export function buildRuntimeKnowledgePromptBlock(params: {
     language: string;
 }): string {
     if (!params.knowledge) return '';
-    if (params.phase !== 'SCAN' && params.phase !== 'DEEP') return '';
+    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') return '';
     const topic = params.knowledge.topics.find((item) => item.topicId === params.targetTopicId) || params.knowledge.topics[0];
     if (!topic) return '';
 
@@ -363,7 +363,7 @@ export function buildManualKnowledgePromptBlock(params: {
     topicSubGoals?: string[];
 }): string {
     if (!params.manualGuide) return '';
-    if (params.phase !== 'SCAN' && params.phase !== 'DEEP') return '';
+    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') return '';
 
     const guideSentences = toSentenceChunks(params.manualGuide);
     if (!guideSentences.length) return '';

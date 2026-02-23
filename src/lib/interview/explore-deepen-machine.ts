@@ -81,7 +81,7 @@ export function handleExplorePhase({
     }
 
     // Determine budget action
-    const action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget);
+    let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget);
 
     console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns}`);
 
@@ -193,8 +193,8 @@ export function handleDeepenPhase({
     const uncoveredTopics = state.uncoveredTopics || [];
     if (uncoveredTopics.length === 0) {
         // All topics covered, move to DATA_COLLECTION
-        nextState.phase = 'DATA_COLLECTION_CONSENT';
-        supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+        nextState.phase = 'DATA_COLLECTION';
+        supervisorInsight = { status: 'DATA_COLLECTION' };
         return { nextState, supervisorInsight };
     }
 
@@ -214,8 +214,8 @@ export function handleDeepenPhase({
             console.log(`➡️ [DEEPEN] Moving to next uncovered: "${botTopics.find(t => t.id === nextTopicId)?.label}"`);
         } else {
             // All uncovered topics deepened
-            nextState.phase = 'DATA_COLLECTION_CONSENT';
-            supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
+            nextState.phase = 'DATA_COLLECTION';
+            supervisorInsight = { status: 'DATA_COLLECTION' };
             console.log(`✅ [DEEPEN] All uncovered topics addressed.`);
             return { nextState, supervisorInsight };
         }

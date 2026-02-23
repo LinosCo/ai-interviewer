@@ -1,6 +1,6 @@
 import type { RuntimeInterviewKnowledge } from './runtime-knowledge';
 
-export type MicroPlannerPhase = 'SCAN' | 'DEEP' | 'DEEP_OFFER' | 'DATA_COLLECTION';
+export type MicroPlannerPhase = 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION';
 export type UserTurnSignal = 'none' | 'clarification' | 'off_topic_question';
 
 export interface MicroPlannerInput {
@@ -259,7 +259,7 @@ function determineQuestionMode(params: {
     if (params.prioritizeCoverage) {
         return 'cover_subgoal';
     }
-    if (params.phase === 'DEEP') {
+    if (params.phase === 'DEEPEN') {
         if (params.signalScore >= 0.34) return 'probe_impact';
         return 'probe_example';
     }
@@ -284,7 +284,7 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput): MicroPlanne
     const remaining = subGoals.filter((goal) => !used.includes(goal));
     const total = Math.max(1, subGoals.length || 1);
     const turnsLeft = Math.max(1, (input.maxTurnsInTopic || 1) - (input.turnInTopic || 0) + 1);
-    const prioritizeCoverage = input.phase === 'SCAN' && remaining.length > 0 && turnsLeft <= remaining.length;
+    const prioritizeCoverage = input.phase === 'EXPLORE' && remaining.length > 0 && turnsLeft <= remaining.length;
 
     const focusSubGoal = remaining[0] || subGoals[0] || input.topicLabel;
     const knowledgeCue = selectKnowledgeCue(input, focusSubGoal);
@@ -326,7 +326,7 @@ export function buildMicroPlannerPromptBlock(params: {
     topicLabel: string;
     decision: MicroPlannerDecision;
 }): string {
-    if (params.phase !== 'SCAN' && params.phase !== 'DEEP') return '';
+    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') return '';
 
     const isItalian = (params.language || '').toLowerCase().startsWith('it');
     const decision = params.decision;

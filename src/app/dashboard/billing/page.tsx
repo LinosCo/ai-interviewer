@@ -185,6 +185,8 @@ export default async function BillingPage({
     const monthlyUsed = Number(organization.monthlyCreditsUsed);
     const packAvailable = Number(organization.packCreditsAvailable);
     const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
+    const monthlyRatio = monthlyLimit > 0 ? monthlyUsed / monthlyLimit : 0;
+    const monthlyPercentage = Math.min(100, Math.round(monthlyRatio * 100));
     const isUnlimited = monthlyLimit === -1;
     const creditsResetDate = organization.creditsResetDate;
 
@@ -263,23 +265,23 @@ export default async function BillingPage({
                                 <div
                                     className="h-2 bg-stone-200 rounded-full overflow-hidden"
                                     role="progressbar"
-                                    aria-valuenow={Math.min(100, Math.round((monthlyUsed / monthlyLimit) * 100))}
+                                    aria-valuenow={monthlyPercentage}
                                     aria-valuemin={0}
                                     aria-valuemax={100}
                                     aria-label="Utilizzo crediti mensili"
                                 >
                                     <div
                                         className={`h-full transition-all duration-300 ${
-                                            monthlyUsed / monthlyLimit >= 0.95 ? 'bg-red-500' :
-                                            monthlyUsed / monthlyLimit >= 0.85 ? 'bg-orange-500' :
-                                            monthlyUsed / monthlyLimit >= 0.70 ? 'bg-yellow-500' :
+                                            monthlyRatio >= 0.95 ? 'bg-red-500' :
+                                            monthlyRatio >= 0.85 ? 'bg-orange-500' :
+                                            monthlyRatio >= 0.70 ? 'bg-yellow-500' :
                                             'bg-green-500'
                                         }`}
-                                        style={{ width: `${Math.min(100, Math.round((monthlyUsed / monthlyLimit) * 100))}%` }}
+                                        style={{ width: `${monthlyPercentage}%` }}
                                     />
                                 </div>
                                 <p className="text-xs text-stone-400 mt-1 text-right">
-                                    {Math.min(100, Math.round((monthlyUsed / monthlyLimit) * 100))}% utilizzato
+                                    {monthlyPercentage}% utilizzato
                                 </p>
                             </div>
 

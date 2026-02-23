@@ -137,15 +137,22 @@ export function CreditsWidget() {
                 <div className="mt-2 pt-2 border-t border-stone-200">
                     <div className="flex justify-between items-center mb-1">
                         <div className="flex items-center gap-1">
-                            <Zap className="w-3 h-3 text-amber-500" />
+                            <Zap className="w-3 h-3 text-amber-500" aria-hidden="true" />
                             <span className="text-[10px] font-bold text-amber-700">Pack Extra</span>
                         </div>
                         <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
                             {credits.formatted.packAvailable}
                         </span>
                     </div>
-                    <div className="h-1.5 bg-amber-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-amber-400 rounded-full" style={{ width: '100%' }} />
+                    <div
+                        className="h-1.5 bg-amber-100 rounded-full overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={100}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label="Pack extra crediti disponibili"
+                    >
+                        <div className="h-full w-full bg-amber-400 rounded-full" />
                     </div>
                     <p className="text-[10px] text-amber-600 mt-0.5">Non scadono mai</p>
                 </div>

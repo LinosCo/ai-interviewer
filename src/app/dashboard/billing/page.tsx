@@ -10,6 +10,7 @@ import { cookies } from 'next/headers';
 import { getStripeClient } from '@/lib/stripe';
 import { BillingCycle, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
 import PackPurchaseButton from './pack-purchase-button';
+import PackSuccessPoller from './pack-success-poller';
 
 function unixTimestampToDate(value: unknown): Date | null {
     const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
@@ -200,9 +201,10 @@ export default async function BillingPage({
             </div>
 
             {packSuccess && (
-                <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                    Acquisto pack completato{purchasedPack ? ` (${purchasedPack})` : ''}. I crediti vengono aggiunti automaticamente al saldo organizzazione.
-                </div>
+                <PackSuccessPoller
+                    initialPackAvailable={packAvailable}
+                    organizationId={activeMembership.organizationId}
+                />
             )}
             {packCancelled && (
                 <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -407,34 +409,26 @@ export default async function BillingPage({
                         <p className="text-sm text-stone-500 mb-4">
                             Acquista crediti extra che non scadono mai.
                         </p>
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {CREDIT_PACKS.map(pack => (
-                                <div key={pack.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-xl">
-                                    <div>
-                                        <p className="font-bold text-stone-900">{pack.name}</p>
+                                <div key={pack.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-xl gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-stone-900 text-sm">{pack.name}</p>
                                         <p className="text-xs text-stone-500">
-                                            {formatCredits(pack.credits)} crediti
+                                            {formatCredits(pack.credits)} crediti · €{pack.pricePerThousand.toFixed(2)}/1K
                                         </p>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-amber-600">€{pack.price}</p>
-                                        <p className="text-[10px] text-stone-400">
-                                            €{pack.pricePerThousand.toFixed(2)}/1K
-                                        </p>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <p className="font-bold text-amber-600 text-sm">€{pack.price}</p>
+                                        <PackPurchaseButton
+                                            packType={pack.id}
+                                            organizationId={activeMembership.organizationId}
+                                            className="bg-amber-500 text-white font-bold py-1.5 px-3 rounded-lg hover:bg-amber-600 transition-all text-xs disabled:opacity-60 whitespace-nowrap"
+                                        >
+                                            Acquista
+                                        </PackPurchaseButton>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            {CREDIT_PACKS.map(pack => (
-                                <PackPurchaseButton
-                                    key={`${pack.id}-buy`}
-                                    packType={pack.id}
-                                    organizationId={activeMembership.organizationId}
-                                    className="w-full bg-stone-100 text-stone-700 font-bold py-3 rounded-xl hover:bg-stone-200 transition-all text-sm disabled:opacity-60"
-                                >
-                                    Acquista {formatCredits(pack.credits)}
-                                </PackPurchaseButton>
                             ))}
                         </div>
                     </div>

@@ -21,6 +21,8 @@ import { buildAdditiveQuestionPrompt, buildQualityCorrectionPrompt } from '@/lib
 import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
 import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
 import { findDuplicateQuestionMatch } from '@/lib/interview/question-dedup';
+import { handleExplorePhase, handleDeepenPhase } from '@/lib/interview/explore-deepen-machine';
+import { computeSignalScore } from '@/lib/interview/signal-score';
 import {
     buildManualKnowledgePromptBlock,
     buildRuntimeInterviewKnowledgeSignature,

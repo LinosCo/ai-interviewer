@@ -30,7 +30,19 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
     const { data: session, status } = useSession();
     const hasInitialOrganizations = Array.isArray(initialData) && initialData.length > 0;
     const [organizations, setOrganizations] = useState<Organization[]>(initialData || []);
-    const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(null);
+    const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(() => {
+        if (!hasInitialOrganizations) return null;
+        // Eagerly resolve from localStorage/cookie so first render shows the org immediately
+        if (typeof window !== 'undefined') {
+            const savedOrgId = localStorage.getItem(SELECTED_ORG_KEY) ||
+                document.cookie.split('; ').find(row => row.startsWith(`${COOKIE_ORG_KEY}=`))?.split('=')[1];
+            if (savedOrgId) {
+                const found = (initialData || []).find(o => o.id === savedOrgId);
+                if (found) return found;
+            }
+        }
+        return initialData![0] ?? null;
+    });
     const [loading, setLoading] = useState(!hasInitialOrganizations);
     const [retryCount, setRetryCount] = useState(0);
     const maxRetries = 3;

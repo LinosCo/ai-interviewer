@@ -12,6 +12,33 @@ const STOPWORDS_IT = new Set([
   'cosa', 'chi', 'dove', 'quando', 'perche', 'cioe'
 ]);
 
+// Gerund suffix only — safe to filter: -ando/-endo are unambiguously verb forms in Italian
+const GERUND_SUFFIX_IT = /(?:ando|endo)$/i;
+
+// High-frequency Italian non-content words (verbs, adverbs, modals) not covered by STOPWORDS_IT.
+// Only list words where ALL occurrences are functional (not domain nouns or adjectives).
+const FUNCTIONAL_WORDS_IT = new Set([
+  // verbs - present tense common forms
+  'cerco', 'cerca', 'cerchi', 'trovo', 'trova', 'voglio', 'vuole', 'vuoi',
+  'posso', 'puoi', 'deve', 'devo', 'dobbiamo', 'vado', 'andiamo', 'viene',
+  'vengo', 'resto', 'rimane', 'rimango', 'sento', 'vedo', 'provo',
+  'compro', 'servo', 'piace', 'manca', 'basta', 'sembra', 'succede',
+  // past participles used as verbs of state (not domain nouns)
+  'stato', 'stata', 'fatto', 'fatta', 'detto', 'detta',
+  // modals / auxiliaries
+  'vorrei', 'dovrei', 'potrei', 'avrei', 'sarei',
+  // adverbs & discourse markers
+  'ancora', 'anche', 'bene', 'male', 'molto', 'poco', 'quasi', 'sempre',
+  'spesso', 'magari', 'forse', 'sicuro', 'proprio', 'tipo', 'tanto',
+  'abbastanza', 'addirittura', 'comunque', 'invece', 'tuttavia', 'quindi',
+  'pero', 'allora', 'certo', 'certa', 'ovvio', 'ovvia',
+  'subito', 'prima', 'dopo', 'ormai', 'appena', 'niente', 'nulla',
+]);
+
+function isItalianFunctionalWord(token: string): boolean {
+  return FUNCTIONAL_WORDS_IT.has(token) || GERUND_SUFFIX_IT.test(token);
+}
+
 const STOPWORDS_EN = new Set([
   'the', 'a', 'an', 'and', 'or', 'to', 'of', 'in', 'on', 'for', 'with', 'without',
   'by', 'at', 'from', 'is', 'are', 'be', 'this', 'that', 'these', 'those',
@@ -62,13 +89,15 @@ export function responseMentionsAnchors(responseText: string, anchorRoots: strin
 export function buildMessageAnchors(text: string, language: string) {
   if (!text) return { anchors: [], anchorRoots: [] };
   const tokens = extractTokens(text);
-  const stopwords = (language || '').toLowerCase().startsWith('it') ? STOPWORDS_IT : STOPWORDS_EN;
+  const isItalian = (language || '').toLowerCase().startsWith('it');
+  const stopwords = isItalian ? STOPWORDS_IT : STOPWORDS_EN;
 
   const anchors: string[] = [];
   for (const token of tokens) {
     const lower = token.toLowerCase();
     if (lower.length < 4) continue;
     if (stopwords.has(lower)) continue;
+    if (isItalian && isItalianFunctionalWord(lower)) continue;
     anchors.push(lower);
   }
 

@@ -1001,6 +1001,7 @@ function buildRuntimeSemanticContextPrompt(params: {
     supervisorInsight?: SupervisorInsight;
     lastUserMessage?: string | null;
     previousAssistantMessage?: string | null;
+    recentBridgeStems?: string[];
 }): string {
     const lastUserMessage = String(params.lastUserMessage || '').trim();
     if (!lastUserMessage) return '';
@@ -1035,6 +1036,14 @@ function buildRuntimeSemanticContextPrompt(params: {
             ? 'Transition: use a clean pivot with a neutral bridge, no forced irrelevant details.'
             : 'Transition: keep natural continuity from the previous turn.';
 
+    const recentStems = (params.recentBridgeStems || []).slice(0, 5);
+    const stemsHintIt = recentStems.length > 0
+        ? `8. NON iniziare con nessuna di queste aperture già usate di recente: ${recentStems.map(s => `"${s}"`).join(', ')}. Usa un incipit diverso e naturale.`
+        : '8. Varia l\'incipit: non usare la stessa apertura del turno precedente.';
+    const stemsHintEn = recentStems.length > 0
+        ? `8. Do NOT start with any of these recently used openings: ${recentStems.map(s => `"${s}"`).join(', ')}. Use a different, natural opening.`
+        : '8. Vary your opening: do not reuse the same opening as the previous turn.';
+
     if ((language || '').toLowerCase().startsWith('it')) {
         return `
 ## RUNTIME SEMANTIC CONTEXT
@@ -1045,14 +1054,14 @@ function buildRuntimeSemanticContextPrompt(params: {
 - Profondità risposta utente: ${responseDepth}
 
 Istruzioni di coerenza:
-1. Inizia con una frase breve che riconosce il segnale utente.
+1. Inizia con una frase breve che riconosce genuinamente il contenuto della risposta utente (non una formula).
 2. Mantieni la nuova domanda semanticamente diversa dalla precedente.
 3. ${depthHintIt[responseDepth]}
 4. ${transitionHintIt}
 5. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
 6. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
 7. Se naturale, preferisci una lente diagnostica (esempio, impatto, priorita o azione) con un vincolo leggero (tempo, segmento, canale o metrica). Se risulta forzato o fuori tema, resta su una domanda semplice.
-8. Non riutilizzare la stessa legatura di apertura usata nei turni recenti: varia l'incipit in modo sobrio.
+${stemsHintIt}
 ${clarificationRequested
                 ? '9. L\'utente sta chiedendo un chiarimento/disambiguazione: chiarisci prima in modo diretto la domanda precedente e poi fai una sola domanda di follow-up coerente.'
                 : ''}
@@ -1068,14 +1077,14 @@ ${clarificationRequested
 - User response depth: ${responseDepth}
 
 Coherence instructions:
-1. Open with one short sentence acknowledging the user signal.
+1. Open with one short sentence that genuinely acknowledges the content of the user's response (not a formula).
 2. Keep the new question semantically distinct from the previous one.
 3. ${depthHintEn[responseDepth]}
 4. ${transitionHintEn}
 5. Avoid rigid templates ("now let's move to") and premature closure cues.
 6. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
 7. If natural, prefer a diagnostic lens (example, impact, priority, or action) with one light constraint (timeframe, segment, channel, or metric). If this feels forced or off-topic, keep a simple focused question.
-8. Do not reuse the same opening bridge used in recent turns: vary the opening naturally.
+${stemsHintEn}
 ${clarificationRequested
             ? '9. The user is asking for clarification/disambiguation: first clarify your previous question directly, then ask one coherent follow-up question.'
             : ''}
@@ -1221,112 +1230,6 @@ function startsWithGenericBridgeOpener(text: string, language: string): boolean 
         ? GENERIC_BRIDGE_OPENERS_IT
         : GENERIC_BRIDGE_OPENERS_EN;
     return patterns.some((pattern) => pattern.test(firstSentence.trim()));
-}
-
-function isLikelyBridgeLead(text: string, language: string): boolean {
-    const source = String(text || '').trim();
-    if (!source) return false;
-    if (startsWithGenericBridgeOpener(source, language)) return true;
-    const parts = source.split(/(?<=[.?!])\s+/).filter(Boolean);
-    const firstSentence = parts[0] || source;
-    const firstWords = firstSentence.split(/\s+/).filter(Boolean).length;
-    if (firstSentence.includes(',') && firstWords <= 18) return true;
-    if (parts.length > 1 && firstWords <= 18) return true;
-    return false;
-}
-
-function replaceBridgeLead(responseText: string, opener: string): string {
-    const source = String(responseText || '').trim();
-    if (!source) return source;
-    const parts = source.split(/(?<=[.?!])\s+/).filter(Boolean);
-    if (parts.length > 1) {
-        const remaining = parts.slice(1).join(' ').trim();
-        if (remaining) return `${opener} ${remaining}`.trim();
-    }
-    const commaIdx = source.indexOf(',');
-    if (commaIdx > 0 && commaIdx < Math.min(source.length, 120)) {
-        const tail = source.slice(commaIdx + 1).trim();
-        if (tail) return `${opener} ${tail}`.trim();
-    }
-    return `${opener} ${source}`.trim();
-}
-
-function hasConcreteBridgeAnchor(text: string, userMessage: string, language: string): boolean {
-    const bridgeRoots = buildMessageAnchors(String(text || ''), language).anchorRoots;
-    const userRoots = buildMessageAnchors(String(userMessage || ''), language).anchorRoots;
-    return hasAnyAnchorOverlap(bridgeRoots, userRoots);
-}
-
-function pickConcreteUserAnchor(userMessage: string, language: string): string {
-    const anchors = buildMessageAnchors(String(userMessage || ''), language).anchors
-        .filter((anchor) => anchor.length >= 4);
-    if (anchors.length > 0) return anchors[0];
-    return sanitizeUserSnippet(String(userMessage || ''), 5);
-}
-
-function applyBridgeVariationIfNeeded(params: {
-    responseText: string;
-    userMessage?: string | null;
-    language: string;
-    recentBridgeStems?: string[];
-}): string {
-    const responseText = String(params.responseText || '').trim();
-    if (!responseText || !responseText.includes('?')) return responseText;
-
-    const currentStem = extractBridgeStem(responseText);
-    if (!currentStem) return responseText;
-
-    const recentStems = new Set((params.recentBridgeStems || []).map(normalizeBridgeStem));
-    if (!recentStems.has(normalizeBridgeStem(currentStem))) return responseText;
-    if (!isLikelyBridgeLead(responseText, params.language)) return responseText;
-
-    const userMessage = String(params.userMessage || '').trim();
-    const hasMeritAnchor = hasConcreteBridgeAnchor(responseText, userMessage, params.language);
-
-    const isItalian = String(params.language || 'en').toLowerCase().startsWith('it');
-    const anchor = pickConcreteUserAnchor(userMessage, params.language);
-    const prefersMeritOpeners = hasMeritAnchor && Boolean(anchor);
-
-    const candidateOpeners = prefersMeritOpeners
-        ? (
-            isItalian
-                ? [
-                    `Riprendendo il passaggio su ${anchor},`,
-                    `Entrando più nel concreto su ${anchor},`,
-                    `Sul nodo che hai evidenziato su ${anchor},`,
-                    `Rimanendo sul tema ${anchor},`
-                ]
-                : [
-                    `Building on your point about ${anchor},`,
-                    `Staying concrete on ${anchor},`,
-                    `On the issue you raised around ${anchor},`,
-                    `Keeping focus on ${anchor},`
-                ]
-        )
-        : isItalian
-        ? [
-            anchor ? `Sul punto che citi su ${anchor},` : 'Sul punto che citi,',
-            anchor ? `Riprendendo ${anchor},` : 'Riprendendo quanto hai detto,',
-            anchor ? `Entrando nel merito su ${anchor},` : 'Entrando nel merito,',
-            anchor ? `Partendo da ${anchor},` : 'Partendo dal tuo ultimo punto,',
-            anchor ? `Restando su ${anchor},` : 'Restando su questo punto,',
-            'Da qui,'
-        ]
-        : [
-            anchor ? `On your point about ${anchor},` : 'On your point,',
-            anchor ? `Building on what you said about ${anchor},` : 'Building on what you shared,',
-            anchor ? `Staying concrete on ${anchor},` : 'Staying concrete,',
-            anchor ? `Starting from ${anchor},` : 'Starting from your last point,',
-            anchor ? `Keeping focus on ${anchor},` : 'Keeping focus on this point,',
-            'From here,'
-        ];
-
-    const opener = candidateOpeners.find((candidate) => {
-        const stem = extractBridgeStem(candidate);
-        return stem && !recentStems.has(normalizeBridgeStem(stem));
-    }) || candidateOpeners[0];
-
-    return replaceBridgeLead(responseText, opener);
 }
 
 function isClarificationSignal(input: string, language: string): boolean {
@@ -3016,7 +2919,8 @@ hard_rules:
                 targetTopicLabel: targetTopic?.label || currentTopic.label,
                 supervisorInsight,
                 lastUserMessage: lastMessage.content,
-                previousAssistantMessage
+                previousAssistantMessage,
+                recentBridgeStems
             });
             if (runtimeSemanticContext) {
                 systemPrompt += `\n\n${runtimeSemanticContext}`;
@@ -3681,15 +3585,6 @@ hard_rules:
             }
         }
 
-        if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
-            responseText = applyBridgeVariationIfNeeded({
-                responseText,
-                userMessage: lastMessage.content,
-                language,
-                recentBridgeStems
-            });
-        }
-
         // ====================================================================
         // FINAL SAFETY NET: Only intervene for critical issues
         // Strategy: ADDITIVE fix (keep original + add question) instead of full regeneration
@@ -3785,15 +3680,6 @@ hard_rules:
                     }
                 }
             }
-        }
-
-        if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
-            responseText = applyBridgeVariationIfNeeded({
-                responseText,
-                userMessage: lastMessage.content,
-                language,
-                recentBridgeStems
-            });
         }
 
         // DEEP_OFFER safety: must be an extension-consent question

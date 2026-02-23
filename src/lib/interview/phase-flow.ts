@@ -8,7 +8,7 @@ export function shouldInterceptTopicPhaseClosure(params: {
     isPrematureContactRequest: boolean;
     hasCompletionTag: boolean;
 }): boolean {
-    const inTopicPhase = params.phase === 'SCAN' || params.phase === 'DEEP';
+    const inTopicPhase = params.phase === 'EXPLORE' || params.phase === 'DEEPEN';
     if (!inTopicPhase) return false;
 
     return (

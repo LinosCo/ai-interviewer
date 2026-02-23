@@ -16,13 +16,14 @@ import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from 
 import { getFieldLabel, getNextMissingCandidateField } from '@/lib/interview/flow-guards';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
-import { evaluateInterviewQuestionQuality } from '@/lib/interview/qualitative-evaluator';
-import { buildAdditiveQuestionPrompt, buildQualityCorrectionPrompt } from '@/lib/interview/quality-pipeline';
+// NOTE: v2 post-processing moved to post-processing-v2.ts - quality gates removed
 import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
 import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
 import { findDuplicateQuestionMatch } from '@/lib/interview/question-dedup';
 import { handleExplorePhase, handleDeepenPhase } from '@/lib/interview/explore-deepen-machine';
 import { computeSignalScore } from '@/lib/interview/signal-score';
+import { buildTurnGuidanceBlock, buildGuardsBlock } from '@/lib/llm/runtime-prompt-blocks';
+import { runPostProcessing } from '@/lib/interview/post-processing-v2';
 import {
     buildManualKnowledgePromptBlock,
     buildRuntimeInterviewKnowledgeSignature,

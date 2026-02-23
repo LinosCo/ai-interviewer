@@ -1989,7 +1989,8 @@ export async function POST(req: Request) {
         }
 
         let forceEarlyClosureFromUser = false;
-        if (lastMessage?.role === 'user' && state.phase !== 'DATA_COLLECTION') {
+        // Skip closure detection in DEEP_OFFER phase - it has its own logic to handle REFUSE vs ACCEPT
+        if (lastMessage?.role === 'user' && state.phase !== 'DATA_COLLECTION' && state.phase !== 'DEEP_OFFER') {
             const closureIntent = await detectExplicitClosureIntent(
                 lastMessage.content,
                 openAIKey,

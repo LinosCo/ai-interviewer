@@ -67,6 +67,14 @@ interface InterestingTopic {
     bestSnippet?: string;
 }
 
+interface TopicBudget {
+    baseTurns: number;
+    minTurns: number;
+    maxTurns: number;
+    turnsUsed: number;
+    bonusTurnsGranted: number;
+}
+
 interface InterviewState {
     phase: Phase;
     topicIndex: number;
@@ -80,6 +88,17 @@ interface InterviewState {
     dataCollectionRefused?: boolean;
     forceConsentQuestion?: boolean;
     interestingTopics?: InterestingTopic[];
+
+    // v2: Elastic turn budget tracking
+    topicBudgets: Record<string, TopicBudget>;
+    turnsUsedTotal: number;
+    turnsBudgetTotal: number;
+    uncoveredTopics: string[];  // Topic IDs with remaining subgoals
+    topicEngagementScores: Record<string, number>;  // Signal scores per topic
+    topicKeyInsights: Record<string, string>;  // Best snippet per topic
+    lastSignalScore: number;  // Last computed signal score (0-1)
+
+    // Legacy DEEP fields (being phased out)
     deepTopicOrder?: string[];             // Ordered topic IDs for DEEP based on value
     deepTurnsByTopic?: Record<string, number>;
     topicSubGoalHistory?: Record<string, string[]>; // Track used sub-goals per topic

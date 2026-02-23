@@ -1,17 +1,15 @@
 export type TransitionMode = 'bridge' | 'clean_pivot';
 
 export type SupervisorStatus =
-  | 'SCANNING'
+  | 'EXPLORING'
+  | 'EXPLORING_DEEP'
   | 'TRANSITION'
-  | 'START_DEEP'
-  | 'START_DEEP_BRIEF'
   | 'DEEPENING'
   | 'DEEP_OFFER_ASK'
   | 'DATA_COLLECTION_CONSENT'
   | 'DATA_COLLECTION'
   | 'COMPLETE_WITHOUT_DATA'
-  | 'FINAL_GOODBYE'
-  | 'CONFIRM_STOP';
+  | 'FINAL_GOODBYE';
 
 export interface SupervisorInsight {
   status: SupervisorStatus;
@@ -27,7 +25,7 @@ export interface SupervisorInsight {
 }
 
 export function createDefaultSupervisorInsight(): SupervisorInsight {
-  return { status: 'SCANNING' };
+  return { status: 'EXPLORING' };
 }
 
 export function createDeepOfferInsight(extensionPreview?: string[]): SupervisorInsight {
@@ -41,7 +39,7 @@ export function createDeepOfferInsight(extensionPreview?: string[]): SupervisorI
     : { status: 'DEEP_OFFER_ASK' };
 }
 
-export type Phase = 'SCAN' | 'DEEP_OFFER' | 'DEEP' | 'DATA_COLLECTION';
+export type Phase = 'EXPLORE' | 'DEEP_OFFER' | 'DEEPEN' | 'DATA_COLLECTION';
 
 export interface InterviewStateLike {
   phase: Phase;

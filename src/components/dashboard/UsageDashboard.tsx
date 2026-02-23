@@ -291,17 +291,33 @@ export function UsageDashboard() {
 
                     {/* Pack Credits */}
                     {credits.packAvailable > 0 && (
-                        <div className="bg-amber-50 rounded-lg p-3 flex items-center justify-between border border-amber-100">
-                            <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
-                                    <Zap className="w-4 h-4 text-amber-600" />
+                        <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                                        <Zap className="w-4 h-4 text-amber-600" aria-hidden="true" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">Pack Extra</p>
+                                        <p className="text-[10px] text-amber-600">Usati dopo i crediti mensili</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-amber-700 font-medium">Pack crediti</p>
-                                    <p className="text-sm font-bold text-amber-900">{credits.formatted.packAvailable}</p>
+                                <div className="text-right">
+                                    <p className="text-xl font-black text-amber-700">{credits.formatted.packAvailable}</p>
+                                    <p className="text-[10px] text-amber-500">disponibili</p>
                                 </div>
                             </div>
-                            <span className="text-xs text-amber-600">Non scadono</span>
+                            <div
+                                className="h-2 bg-amber-200 rounded-full overflow-hidden"
+                                role="progressbar"
+                                aria-valuenow={100}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-label="Pack extra crediti disponibili"
+                            >
+                                <div className="h-full w-full bg-amber-500 rounded-full transition-all duration-500" />
+                            </div>
+                            <p className="text-[10px] text-amber-500 text-right">Non scadono mai</p>
                         </div>
                     )}
 

@@ -277,7 +277,14 @@ export function UsageDashboard() {
                                 <span className="text-slate-400 font-medium"> / {credits.formatted.monthlyLimit}</span>
                             </span>
                         </div>
-                        <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            className="h-3 bg-slate-100 rounded-full overflow-hidden"
+                            role="progressbar"
+                            aria-valuenow={Math.min(credits.percentageUsed, 100)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label="Utilizzo crediti mensili"
+                        >
                             <div
                                 className={`h-full ${progressColor} transition-all duration-500`}
                                 style={{ width: `${Math.min(credits.percentageUsed, 100)}%` }}

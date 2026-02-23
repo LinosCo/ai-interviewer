@@ -122,7 +122,14 @@ export function CreditsWidget() {
             </div>
 
             {/* Progress bar */}
-            <div className="h-1.5 bg-stone-200 rounded-full overflow-hidden mb-2">
+            <div
+                className="h-1.5 bg-stone-200 rounded-full overflow-hidden mb-2"
+                role="progressbar"
+                aria-valuenow={Math.min(percentage, 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Utilizzo crediti mensili"
+            >
                 <div
                     className={`h-full ${getBarColor()} transition-all duration-300`}
                     style={{ width: `${Math.min(percentage, 100)}%` }}

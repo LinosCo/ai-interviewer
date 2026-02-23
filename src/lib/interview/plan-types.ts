@@ -9,14 +9,12 @@ export type InterviewPlan = {
     secondsPerTurn: number;
     topicsSignature: string;
   };
-  scan: {
+  explore: {
     topics: PlanTopic[];
   };
-  deep: {
-    strategy: 'uncovered_subgoals_first';
+  deepen: {
     maxTurnsPerTopic: number;
     fallbackTurns: number;
-    topics: PlanTopic[];
   };
 };
 
@@ -25,17 +23,20 @@ export type PlanTopic = {
   label: string;
   orderIndex: number;
   subGoals: string[];
+  baseTurns: number;
   minTurns: number;
   maxTurns: number;
+  interpretationCues: string[];
+  significanceSignals: string[];
+  probeAngles: string[];
 };
 
 export type InterviewPlanOverrides = {
-  scan?: {
+  explore?: {
     topics?: Record<string, { minTurns?: number; maxTurns?: number }>;
   };
-  deep?: {
+  deepen?: {
     maxTurnsPerTopic?: number;
     fallbackTurns?: number;
-    topics?: Record<string, { maxTurns?: number }>;
   };
 };

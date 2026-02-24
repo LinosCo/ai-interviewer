@@ -14,6 +14,7 @@ import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
 import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
 import { getFieldLabel, getNextMissingCandidateField } from '@/lib/interview/flow-guards';
+import { validateExtractedField } from '@/lib/interview/field-validation';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
 // NOTE: v2 post-processing moved to post-processing-v2.ts - quality gates removed
@@ -2414,7 +2415,6 @@ export async function POST(req: Request) {
                                         const attemptCount = (state.fieldAttemptCounts?.[prioritizedField] || 0) + 1;
 
                                         // Validate with structured feedback
-                                        const { validateExtractedField } = await import('@/lib/interview/field-validation');
                                         const validationResult = validateExtractedField(
                                             prioritizedField,
                                             extraction.value,

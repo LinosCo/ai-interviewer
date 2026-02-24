@@ -1,6 +1,6 @@
 // src/lib/interview/field-validation.ts
 
-import { ValidationResponse, ValidationFailureReason, generateValidationFeedback, ValidationFeedbackContext } from './validation-response';
+import { ValidationResponse, ValidationFailureReason, generateValidationFeedback, ValidationFeedbackContext, determineStrategy } from './validation-response';
 
 export interface FieldExtractionResult extends ValidationResponse {
   fieldName: string;
@@ -52,7 +52,7 @@ export function validateExtractedField(
     };
 
     result.feedback = generateValidationFeedback(result, feedbackContext);
-    result.strategy = attemptNumber === 1 ? 'give_example' : 'skip_field';
+    result.strategy = determineStrategy(result, attemptNumber, 3);
   }
 
   return result;

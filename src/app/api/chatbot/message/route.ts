@@ -14,7 +14,6 @@ import {
     shouldAttemptLeadExtraction,
     shouldCollectOnExit
 } from '@/lib/chatbot/message-guards';
-import { ValidationResponse, generateValidationFeedback, ValidationFeedbackContext } from '@/lib/interview/validation-response';
 import { validateExtractedField, checkSkipIntent } from '@/lib/interview/field-validation';
 
 export const maxDuration = 30;
@@ -506,26 +505,20 @@ Return shouldAsk=true only when it is natural.`,
                             data: { candidateProfile } as any
                         });
 
+                        // Capture the field name BEFORE reassigning nextMissingField
+                        const justExtractedFieldName = nextMissingField.field;
                         nextMissingField = getNextMissingField(candidateFields, candidateProfile, declinedFields);
                         justExtractedField = {
-                            field: nextMissingField?.field || '',
+                            field: justExtractedFieldName,
                             value: extraction.value
                         };
                     } else {
-                        // Field extraction failed - track attempt and store feedback
-                        fieldAttemptCounts[nextMissingField.field] = attemptCount;
-
-                        if (attemptCount >= 2) {
-                            // Auto-skip after 2 failed attempts
-                            candidateProfile[nextMissingField.field] = '__SKIPPED__';
-                            declinedFields.add(nextMissingField.field);
-                            console.log(`⏭️ [CHATBOT] Auto-skipped field after ${attemptCount} attempts: ${nextMissingField.field}`);
-                            nextMissingField = getNextMissingField(candidateFields, candidateProfile, declinedFields);
-                        } else {
-                            // Provide feedback and re-ask
-                            console.log(`⚠️ [CHATBOT] Validation failed for "${nextMissingField.field}": ${validationResult.feedback}`);
-                            // Feedback will be included in next bot response (bot will acknowledge and re-ask with better explanation)
-                        }
+                        // Field extraction failed - provide feedback and re-ask
+                        // TODO: Persist fieldAttemptCounts in database to enable auto-skip after 2 failures.
+                        // Currently fieldAttemptCounts is re-initialized every request, so attempt tracking doesn't persist.
+                        // Once persisted, add back: if (attemptCount >= 2) { auto-skip logic }
+                        console.log(`⚠️ [CHATBOT] Validation failed for "${nextMissingField.field}": ${validationResult.feedback}`);
+                        // Feedback will be included in next bot response (bot will acknowledge and re-ask with better explanation)
                     }
                 }
             }

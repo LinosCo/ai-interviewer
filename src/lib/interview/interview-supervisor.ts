@@ -69,7 +69,7 @@ export interface InterviewStateLike {
 export interface DeepOfferPhaseDeps {
   checkUserIntent: (userMessage: string, context: 'deep_offer') => Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'>;
   isExtensionOfferQuestion: (message: string) => boolean;
-  buildDeepOfferInsight: (sourceState: InterviewStateLike) => SupervisorInsight;
+  buildDeepOfferInsight: (sourceState: InterviewStateLike, validationFeedback?: ValidationResponse) => SupervisorInsight;
   buildDeepPlan: (remainingSec: number) => { deepTopicOrder: string[]; deepTurnsByTopic: Record<string, number> };
   getDeepTopics: (deepOrder?: string[]) => any[];
   getRemainingSubGoals: (topic: any, history?: Record<string, string[]>) => string[];
@@ -134,7 +134,17 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
         if (extensionAttempts >= 2) {
           moveToDataCollection();
         } else {
-          supervisorInsight = deps.buildDeepOfferInsight(state);
+          // Create validation feedback for unclear response
+          const validationFeedback: ValidationResponse = {
+            isValid: false,
+            reason: 'intent_unclear',
+            confidence: 'low',
+            attemptCount: extensionAttempts,
+            maxAttempts: 2,
+            strategy: extensionAttempts === 1 ? 'ask_differently' : 'move_on'
+          };
+
+          supervisorInsight = deps.buildDeepOfferInsight(state, validationFeedback);
           nextState.deepAccepted = false;
           nextState.extensionOfferAttempts = extensionAttempts;
         }

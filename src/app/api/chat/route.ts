@@ -19,6 +19,7 @@ import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterc
 // NOTE: v2 post-processing moved to post-processing-v2.ts - quality gates removed
 import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
 import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
+import type { ValidationResponse } from '@/lib/interview/validation-response';
 import { findDuplicateQuestionMatch } from '@/lib/interview/question-dedup';
 import { handleExplorePhase, handleDeepenPhase } from '@/lib/interview/explore-deepen-machine';
 import { computeSignalScore } from '@/lib/interview/signal-score';
@@ -896,7 +897,7 @@ async function enforceDeepOfferQuestion(params: {
     return language === 'it'
         ? (hintText
             ? `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu, partendo da uno dei punti emersi, ad esempio ${hintText}. Ti va di proseguire ancora per qualche minuto?`
-            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti piu utili emersi. Ti va di proseguire ancora per qualche minuto?`)
+            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti più utili emersi. Ti va di proseguire ancora per qualche minuto?`)
         : (hintText
             ? `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions, starting from one point that emerged, for example ${hintText}. Would you like to continue for a few more minutes?`
             : `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions on one useful point that emerged. Would you like to continue for a few more minutes?`);
@@ -1970,7 +1971,10 @@ export async function POST(req: Request) {
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
-        const buildDeepOfferInsight = (sourceState: InterviewState) => {
+        const buildDeepOfferInsight = (
+            sourceState: InterviewState,
+            validationFeedback?: ValidationResponse
+        ) => {
             const extensionPreview = buildExtensionPreviewHints({
                 botTopics,
                 deepOrder: sourceState.deepTopicOrder,
@@ -1981,7 +1985,7 @@ export async function POST(req: Request) {
                 startIndex: sourceState.topicIndex,
                 maxItems: 2
             });
-            return createDeepOfferInsight(extensionPreview);
+            return createDeepOfferInsight(extensionPreview, validationFeedback);
         };
 
         if (lastMessage?.role === 'user') {

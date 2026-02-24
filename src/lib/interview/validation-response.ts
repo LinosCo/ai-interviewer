@@ -41,14 +41,14 @@ export type ConfidenceLevel = 'high' | 'low' | 'none';
 export interface ValidationResponse {
   isValid: boolean;
   reason?: ValidationFailureReason;
-  confidence: ConfidenceLevel;
-  feedback: string;
-  strategy: ReengagementStrategy;
-  attemptCount: number;
-  maxAttempts: number;
-  shouldSkip: boolean;
+  confidence?: ConfidenceLevel;
+  feedback?: string;
+  strategy?: ReengagementStrategy;
+  attemptCount?: number;
+  maxAttempts?: number;
+  shouldSkip?: boolean;
   extractedValue?: string | null;
-  timestamp: Date;
+  timestamp?: Date;
 }
 
 /**
@@ -56,12 +56,12 @@ export interface ValidationResponse {
  */
 export interface ValidationFeedbackContext {
   language: 'it' | 'en';
-  fieldName: string;
-  fieldType: string;
-  question: string;
+  fieldName?: string;
+  fieldType?: 'email' | 'phone' | 'name' | 'url' | 'text' | 'enum';
+  question?: string;
   userMessage: string;
   attemptNumber: number;
-  maxAttempts: number;
+  maxAttempts?: number;
 }
 
 /**
@@ -193,17 +193,13 @@ export function determineStrategy(
 
   // Attempt 2 and beyond: escalate to skipping
   if (attemptNumber === 2) {
-    // Extraction failures: skip field
     if (
       response.reason === 'field_no_value_extracted' ||
-      response.reason === 'intent_neutral' ||
       response.reason === 'user_skip_requested'
     ) {
       return 'skip_field';
     }
-
-    // Other failures: move on
-    return 'move_on';
+    return 'move_on'; // covers intent_neutral and all other cases
   }
 
   // Default fallback

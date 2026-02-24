@@ -1,3 +1,5 @@
+import { ValidationResponse } from './validation-response';
+
 export type TransitionMode = 'bridge' | 'clean_pivot';
 
 export type SupervisorStatus =
@@ -22,21 +24,26 @@ export interface SupervisorInsight {
   engagingSnippet?: string;
   extensionPreview?: string[];
   stopReason?: string;
+  validationFeedback?: ValidationResponse; // NEW: feedback when validation fails
+  feedbackMessage?: string; // NEW: user-facing message to include in bot response
 }
 
 export function createDefaultSupervisorInsight(): SupervisorInsight {
   return { status: 'EXPLORING' };
 }
 
-export function createDeepOfferInsight(extensionPreview?: string[]): SupervisorInsight {
+export function createDeepOfferInsight(
+  extensionPreview?: string[],
+  validationFeedback?: ValidationResponse
+): SupervisorInsight {
   const cleanPreview = (extensionPreview || [])
     .map(v => String(v || '').trim())
     .filter(Boolean)
     .slice(0, 2);
 
   return cleanPreview.length > 0
-    ? { status: 'DEEP_OFFER_ASK', extensionPreview: cleanPreview }
-    : { status: 'DEEP_OFFER_ASK' };
+    ? { status: 'DEEP_OFFER_ASK', extensionPreview: cleanPreview, validationFeedback, feedbackMessage: validationFeedback?.feedback }
+    : { status: 'DEEP_OFFER_ASK', validationFeedback, feedbackMessage: validationFeedback?.feedback };
 }
 
 export type Phase = 'EXPLORE' | 'DEEP_OFFER' | 'DEEPEN' | 'DATA_COLLECTION';

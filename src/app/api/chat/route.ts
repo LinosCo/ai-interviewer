@@ -2713,10 +2713,19 @@ hard_rules:
         console.log("⏳ [CHAT] Generating response...");
         console.time("LLM");
 
+        // Inject validation feedback into context if present
+        const feedbackContext = supervisorInsight?.feedbackMessage
+            ? `Previous response feedback: "${supervisorInsight.feedbackMessage}"`
+            : '';
+
+        const contextWithFeedback = feedbackContext
+            ? `${systemPrompt}\n\nUSER CONTEXT: ${feedbackContext}`
+            : systemPrompt;
+
         let result: any;
         try {
             result = await Promise.race([
-                trackedGenerateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: systemPrompt, temperature: 0.7 }),
+                trackedGenerateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: contextWithFeedback, temperature: 0.7 }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 45000))
             ]);
         } catch (error: any) {
@@ -2821,6 +2830,13 @@ hard_rules:
                 } catch (e) {
                     console.error('Deep offer regeneration failed:', e);
                 }
+            }
+
+            // Include validation feedback in supervisor-generated context
+            if (supervisorInsight?.feedbackMessage && supervisorInsight?.validationFeedback) {
+                console.log(`ℹ️ [FEEDBACK] Adding validation feedback: ${supervisorInsight.feedbackMessage}`);
+                // The feedback will be passed to the prompt builder to inform the bot response
+                // (implemented in Task 5 - prompt modifications)
             }
 
             // Hard enforcement: never leave DEEP_OFFER with a topic question.

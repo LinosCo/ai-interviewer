@@ -48,7 +48,8 @@ export interface ValidationResponse {
   maxAttempts?: number;
   shouldSkip?: boolean;
   extractedValue?: string | null;
-  timestamp?: Date;
+  /** ISO 8601 timestamp of when the validation was performed */
+  timestamp?: string;
 }
 
 /**
@@ -156,6 +157,11 @@ export function determineStrategy(
   // Valid responses: move forward
   if (response.isValid) {
     return 'move_on';
+  }
+
+  // Guard against invalid input
+  if (attemptNumber < 1) {
+    return 'explain_better'; // Treat as first attempt if invalid
   }
 
   // Beyond max attempts: skip field

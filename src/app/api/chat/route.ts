@@ -2715,11 +2715,11 @@ hard_rules:
 
         // Inject validation feedback into context if present
         const feedbackContext = supervisorInsight?.feedbackMessage
-            ? `Previous response feedback: "${supervisorInsight.feedbackMessage}"`
+            ? `Previous response feedback: "${supervisorInsight.feedbackMessage.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`
             : '';
 
         const contextWithFeedback = feedbackContext
-            ? `${systemPrompt}\n\nUSER CONTEXT: ${feedbackContext}`
+            ? `${systemPrompt}\n\nSUPERVISOR FEEDBACK: ${feedbackContext}`
             : systemPrompt;
 
         let result: any;
@@ -2830,13 +2830,6 @@ hard_rules:
                 } catch (e) {
                     console.error('Deep offer regeneration failed:', e);
                 }
-            }
-
-            // Include validation feedback in supervisor-generated context
-            if (supervisorInsight?.feedbackMessage && supervisorInsight?.validationFeedback) {
-                console.log(`ℹ️ [FEEDBACK] Adding validation feedback: ${supervisorInsight.feedbackMessage}`);
-                // The feedback will be passed to the prompt builder to inform the bot response
-                // (implemented in Task 5 - prompt modifications)
             }
 
             // Hard enforcement: never leave DEEP_OFFER with a topic question.

@@ -133,10 +133,29 @@ export function handleExplorePhase({
             const maxDurationSec = maxDurationMins * 60;
             const remainingSec = maxDurationSec - effectiveSec;
 
-            // Calculate uncovered topics for DEEPEN
+            // Calculate uncovered topics for DEEPEN - ensure ALL topics have budgets initialized
+            const updatedBudgets = { ...state.topicBudgets };
+
+            // Initialize budgets for any topics that don't have them yet
+            for (const topic of botTopics) {
+                if (!updatedBudgets[topic.id]) {
+                    const planTopic = (interviewPlan.explore?.topics || []).find(t => t.topicId === topic.id);
+                    if (planTopic) {
+                        updatedBudgets[topic.id] = {
+                            baseTurns: planTopic.baseTurns,
+                            minTurns: planTopic.minTurns,
+                            maxTurns: planTopic.maxTurns,
+                            turnsUsed: 0,
+                            bonusTurnsGranted: 0
+                        };
+                    }
+                }
+            }
+
+            // Now calculate uncovered topics from the complete budget set
             const uncoveredTopics = botTopics
                 .filter(t => {
-                    const budget = state.topicBudgets[t.id];
+                    const budget = updatedBudgets[t.id];
                     return budget && budget.turnsUsed < budget.baseTurns;
                 })
                 .map(t => t.id)
@@ -145,6 +164,9 @@ export function handleExplorePhase({
                     const scoreB = state.topicEngagementScores[b] || 0;
                     return scoreB - scoreA; // Descending by engagement
                 });
+
+            // Update state with the complete budgets
+            nextState.topicBudgets = updatedBudgets;
 
             nextState.uncoveredTopics = uncoveredTopics;
             nextState.phase = remainingSec <= 0 ? 'DEEP_OFFER' : 'DEEPEN';

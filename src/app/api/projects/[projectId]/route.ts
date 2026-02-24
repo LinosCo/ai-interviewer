@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
@@ -171,6 +172,21 @@ export async function DELETE(
       throw new WorkspaceError('Unable to resolve transfer target project', 500, 'TRANSFER_TARGET_MISSING');
     }
 
+    // Check if ProjectVisibilityConfig table exists (outside transaction)
+    let projectVisibilityConfigExists = false;
+    try {
+      const tableCheck = await prisma.$queryRaw<[{ exists: boolean }]>(Prisma.sql`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables
+          WHERE table_schema = 'public'
+          AND table_name = 'ProjectVisibilityConfig'
+        )
+      `);
+      projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+    } catch (error) {
+      console.warn('[DELETE_PROJECT_ROUTE] Could not check ProjectVisibilityConfig table existence:', error);
+    }
+
     await prisma.$transaction(async (tx) => {
         await tx.bot.updateMany({
           where: { projectId },
@@ -211,7 +227,9 @@ export async function DELETE(
           }
         });
 
-      await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+      if (projectVisibilityConfigExists) {
+        await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+      }
       await tx.projectCMSConnection.deleteMany({ where: { projectId } });
       await tx.projectMCPConnection.deleteMany({ where: { projectId } });
       await tx.projectAccess.deleteMany({ where: { projectId } });

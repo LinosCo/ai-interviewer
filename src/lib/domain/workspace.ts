@@ -1,4 +1,4 @@
-import { Role } from '@prisma/client';
+import { Role, Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { getOrCreateDefaultOrganization } from '@/lib/organizations';
@@ -342,6 +342,21 @@ export async function autoFixToolOrganizationForProject(projectId: string) {
 
   const organizationId = project.organizationId || await ensureProjectOrganization(projectId);
 
+  // Check if ProjectVisibilityConfig table exists (outside transaction)
+  let projectVisibilityConfigExists = false;
+  try {
+    const tableCheck = await prisma.$queryRaw<[{ exists: boolean }]>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'ProjectVisibilityConfig'
+      )
+    `);
+    projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+  } catch (error) {
+    console.warn('[autoFixToolOrganizationForProject] Could not check ProjectVisibilityConfig table existence:', error);
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.mCPConnection.updateMany({
       where: {
@@ -375,14 +390,16 @@ export async function autoFixToolOrganizationForProject(projectId: string) {
       data: { organizationId }
     });
 
-    await tx.projectVisibilityConfig.deleteMany({
-      where: {
-        projectId,
-        config: {
-          organizationId: { not: organizationId }
+    if (projectVisibilityConfigExists) {
+      await tx.projectVisibilityConfig.deleteMany({
+        where: {
+          projectId,
+          config: {
+            organizationId: { not: organizationId }
+          }
         }
-      }
-    });
+      });
+    }
 
     await tx.projectCMSConnection.deleteMany({
       where: {
@@ -501,6 +518,21 @@ export async function moveProjectToOrganization(params: {
     || targetAdmins[0]?.userId
     || null;
 
+  // Check if ProjectVisibilityConfig table exists (outside transaction)
+  let projectVisibilityConfigExists = false;
+  try {
+    const tableCheck = await prisma.$queryRaw<[{ exists: boolean }]>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'ProjectVisibilityConfig'
+      )
+    `);
+    projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+  } catch (error) {
+    console.warn('[moveProjectToOrganization] Could not check ProjectVisibilityConfig table existence:', error);
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.project.update({
       where: { id: projectId },
@@ -532,7 +564,9 @@ export async function moveProjectToOrganization(params: {
       data: { organizationId: targetOrganizationId }
     });
 
-    await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+    if (projectVisibilityConfigExists) {
+      await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+    }
     await tx.projectCMSConnection.deleteMany({ where: { projectId } });
     await tx.projectMCPConnection.deleteMany({ where: { projectId } });
   });

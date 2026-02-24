@@ -2411,13 +2411,32 @@ export async function POST(req: Request) {
                                             language,
                                             { onUsage: collectLlmUsage }
                                         );
-                                        console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}"`);
-                                        if (extraction.value && extraction.confidence !== 'none') {
+                                        const attemptCount = (state.fieldAttemptCounts?.[prioritizedField] || 0) + 1;
+
+                                        // Validate with structured feedback
+                                        const { validateExtractedField } = await import('@/lib/interview/field-validation');
+                                        const validationResult = validateExtractedField(
+                                            prioritizedField,
+                                            extraction.value,
+                                            extraction.confidence,
+                                            attemptCount,
+                                            language as 'it' | 'en'
+                                        );
+
+                                        console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}" feedback="${validationResult.feedback}"`);
+
+                                        if (validationResult.isValid) {
                                             currentProfile = { ...currentProfile, [prioritizedField]: extraction.value };
                                             profileChanged = true;
                                             console.log(`✅ [DATA_COLLECTION] LLM extraction for "${prioritizedField}"`);
                                         } else {
-                                            console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}" (confidence=${extraction.confidence})`);
+                                            console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}": ${validationResult.reason}`);
+
+                                            // Store validation feedback for supervisor/bot to use
+                                            if (!supervisorInsight.validationFeedback) {
+                                                supervisorInsight.validationFeedback = validationResult;
+                                                supervisorInsight.feedbackMessage = validationResult.feedback;
+                                            }
                                         }
                                     }
                                 }

@@ -9,6 +9,8 @@ import {
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { createHash } from 'crypto';
+import type { SiteStructure } from '@/lib/integrations/site-adapter';
+import { SiteDiscoveryService } from '@/lib/integrations/site-discovery.service';
 
 export interface SuggestionInput {
     connectionId: string;
@@ -42,7 +44,19 @@ const ContentSchema = z.object({
     strategyAlignment: z.string().optional().describe('Frase di allineamento a vision/value proposition/strategic plan'),
     evidencePoints: z.array(z.string()).optional().describe('2-4 evidenze numeriche o factuali'),
     targetEntityId: z.string().optional().describe('ID entità target, es. product id WooCommerce'),
-    targetEntitySlug: z.string().optional().describe('Slug entità target, es. product slug WooCommerce')
+    targetEntitySlug: z.string().optional().describe('Slug entità target, es. product slug WooCommerce'),
+    // SEO & Schema.org fields
+    schemaMarkup: z.string().optional().describe('Schema.org JSON-LD completo (es. Article, FAQPage, Product, LocalBusiness)'),
+    seoFields: z.object({
+        focusKeyword: z.string().describe('Keyword principale da targetizzare'),
+        seoTitle: z.string().optional().describe('Titolo SEO ottimizzato (max 60 caratteri)'),
+        ogTitle: z.string().optional().describe('Open Graph title per condivisione social'),
+        ogDescription: z.string().optional().describe('Open Graph description per condivisione social'),
+    }).optional().describe('Campi SEO per Yoast/RankMath e social sharing'),
+    categories: z.array(z.string()).optional().describe('Nomi categorie esistenti del sito da assegnare'),
+    tags: z.array(z.string()).optional().describe('Nomi tag da assegnare al contenuto'),
+    imageAltText: z.string().optional().describe('Alt text per immagine principale del contenuto'),
+    productAttributes: z.record(z.string(), z.string()).optional().describe('Attributi prodotto WooCommerce (es. { "colore": "rosso", "taglia": "L" })'),
 });
 
 export class CMSSuggestionGenerator {
@@ -88,6 +102,17 @@ export class CMSSuggestionGenerator {
             hasSearchConsole: Boolean(connection.searchConsoleConnected)
         });
 
+        // Load site structure if available (non-blocking)
+        let siteStructure: SiteStructure | null = null;
+        const projectId = input.projectId || connection.projectId;
+        if (projectId) {
+            try {
+                siteStructure = await SiteDiscoveryService.getProjectStructure(projectId);
+            } catch (err) {
+                console.warn('Failed to load site structure for content generation:', err);
+            }
+        }
+
         const content = await this.generateContent(
             type,
             signals,
@@ -95,7 +120,8 @@ export class CMSSuggestionGenerator {
             connection.project.organization?.strategicVision,
             connection.project.organization?.valueProposition,
             strategicPlan,
-            capabilities
+            capabilities,
+            siteStructure
         );
 
         const inferredKind = inferContentKind({
@@ -141,6 +167,17 @@ export class CMSSuggestionGenerator {
             return existing.id;
         }
 
+        // Enrich publishRouting with categories/tags from generated content
+        if (content.categories?.length) {
+            publishRouting.wpCategories = content.categories;
+            if (publishRouting.publishChannel === 'WOOCOMMERCE_MCP') {
+                publishRouting.wooProductCategories = content.categories;
+            }
+        }
+        if (content.tags?.length) {
+            publishRouting.wpTags = content.tags;
+        }
+
         const sourceSignalsPayload = {
             ...signals,
             origin: 'cross_channel_insight',
@@ -163,6 +200,9 @@ export class CMSSuggestionGenerator {
             }
         };
 
+        // Build seoData from generated content (stored separately for publishing)
+        const seoData = this.buildSeoData(content);
+
         const suggestion = await prisma.cMSSuggestion.create({
             data: {
                 connectionId,
@@ -176,7 +216,8 @@ export class CMSSuggestionGenerator {
                 reasoning: content.reasoning,
                 sourceSignals: sourceSignalsPayload as any,
                 priorityScore,
-                status: 'PENDING'
+                status: 'PENDING',
+                ...(seoData ? { seoData: seoData as any } : {})
             }
         });
 
@@ -233,7 +274,8 @@ export class CMSSuggestionGenerator {
             hasWooCommerce: boolean;
             hasGoogleAnalytics: boolean;
             hasSearchConsole: boolean;
-        }
+        },
+        siteStructure?: SiteStructure | null
     ): Promise<z.infer<typeof ContentSchema>> {
         const { model } = await getSystemLLM({ preferLatestVisibilityModel: true });
 
@@ -246,6 +288,8 @@ export class CMSSuggestionGenerator {
         };
 
         const signalsSummary = this.formatSignalsForPrompt(signals);
+        const siteContextBlock = this.formatSiteStructureForPrompt(siteStructure);
+        const schemaInstructions = this.getSchemaOrgInstructions(type, capabilities);
 
         const { object } = await generateObject({
             model,
@@ -266,7 +310,7 @@ ${typeInstructions[type]}
 - WooCommerce MCP: ${capabilities?.hasWooCommerce ? 'attivo' : 'non attivo'}
 - Google Analytics: ${capabilities?.hasGoogleAnalytics ? 'attivo' : 'non attivo'}
 - Search Console: ${capabilities?.hasSearchConsole ? 'attivo' : 'non attivo'}
-
+${siteContextBlock}
 === DATI CHE MOTIVANO QUESTO CONTENUTO ===
 ${signalsSummary}
 
@@ -280,12 +324,139 @@ ${signalsSummary}
 7. Compila evidencePoints con 2-4 evidenze sintetiche.
 8. Se il contenuto e per social, aggiungi mediaBrief (descrizione immagine/video).
 9. Se il contenuto e per prodotto, imposta targetSection="products" e quando possibile targetEntityId o targetEntitySlug.
+${schemaInstructions}
+=== SEO & SCHEMA.ORG ===
+10. Genera schemaMarkup con un JSON-LD valido e completo per il tipo di contenuto.
+11. Compila seoFields con focusKeyword (basata sulle query GSC se disponibili), seoTitle (max 60 char), ogTitle e ogDescription.
+12. Se esistono categorie nel sito, usa categories con i NOMI ESATTI delle categorie esistenti. Non inventarne di nuove a meno che non ci sia una corrispondenza.
+13. Suggerisci tags pertinenti (possono essere nuovi o esistenti).
+14. Compila imageAltText con un alt text SEO-friendly per l'immagine principale.
+15. Se il contenuto e per prodotto WooCommerce, compila productAttributes con attributi rilevanti.
 
 Tono: professionale ma accessibile, orientato all'azione e alla lead generation.`,
             temperature: 0.25
         });
 
         return object;
+    }
+
+    /**
+     * Format site structure into a context block for the LLM prompt.
+     * Provides the LLM with awareness of existing pages, posts, categories,
+     * products and GSC-derived keyword opportunities.
+     */
+    private static formatSiteStructureForPrompt(siteStructure?: SiteStructure | null): string {
+        if (!siteStructure) return '';
+
+        const parts: string[] = ['\n=== STRUTTURA SITO ATTUALE ==='];
+
+        if (siteStructure.siteInfo?.name) {
+            parts.push(`Sito: ${siteStructure.siteInfo.name}${siteStructure.siteInfo.url ? ` (${siteStructure.siteInfo.url})` : ''}`);
+            if (siteStructure.siteInfo.language) {
+                parts.push(`Lingua: ${siteStructure.siteInfo.language}`);
+            }
+        }
+
+        if (siteStructure.categories.length > 0) {
+            parts.push(`\nCATEGORIE ESISTENTI (usa questi nomi esatti per "categories"):`);
+            for (const cat of siteStructure.categories.slice(0, 20)) {
+                parts.push(`- ${cat.name} (slug: ${cat.slug}${cat.count ? `, ${cat.count} post` : ''})`);
+            }
+        }
+
+        if (siteStructure.tags.length > 0) {
+            parts.push(`\nTAG ESISTENTI:`);
+            for (const tag of siteStructure.tags.slice(0, 30)) {
+                parts.push(`- ${tag.name}`);
+            }
+        }
+
+        if (siteStructure.pages.length > 0) {
+            parts.push(`\nPAGINE ESISTENTI (${siteStructure.pages.length} totali):`);
+            for (const page of siteStructure.pages.slice(0, 15)) {
+                parts.push(`- "${page.title}" (/${page.slug})`);
+            }
+            if (siteStructure.pages.length > 15) {
+                parts.push(`  ... e altre ${siteStructure.pages.length - 15} pagine`);
+            }
+        }
+
+        if (siteStructure.posts.length > 0) {
+            parts.push(`\nPOST BLOG ESISTENTI (${siteStructure.posts.length} totali):`);
+            for (const post of siteStructure.posts.slice(0, 10)) {
+                parts.push(`- "${post.title}" (/${post.slug})`);
+            }
+            if (siteStructure.posts.length > 10) {
+                parts.push(`  ... e altri ${siteStructure.posts.length - 10} post`);
+            }
+        }
+
+        if (siteStructure.products && siteStructure.products.length > 0) {
+            parts.push(`\nPRODOTTI WOOCOMMERCE (${siteStructure.products.length} totali):`);
+            for (const product of siteStructure.products.slice(0, 15)) {
+                parts.push(`- "${product.name}" (slug: ${product.slug}${product.sku ? `, SKU: ${product.sku}` : ''}${product.price ? `, €${product.price}` : ''})`);
+            }
+            if (siteStructure.products.length > 15) {
+                parts.push(`  ... e altri ${siteStructure.products.length - 15} prodotti`);
+            }
+        }
+
+        if (siteStructure.productCategories && siteStructure.productCategories.length > 0) {
+            parts.push(`\nCATEGORIE PRODOTTO WOOCOMMERCE:`);
+            for (const cat of siteStructure.productCategories.slice(0, 15)) {
+                parts.push(`- ${cat.name} (slug: ${cat.slug})`);
+            }
+        }
+
+        return parts.join('\n');
+    }
+
+    /**
+     * Get schema.org generation instructions based on content type and capabilities.
+     */
+    private static getSchemaOrgInstructions(
+        type: CMSSuggestionType,
+        capabilities?: { hasWooCommerce: boolean }
+    ): string {
+        const schemaExamples: Record<string, string> = {
+            CREATE_FAQ: `Per FAQ, genera schema FAQPage:
+{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"...","acceptedAnswer":{"@type":"Answer","text":"..."}}]}`,
+            CREATE_BLOG_POST: `Per blog post/news, genera schema Article o BlogPosting:
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"...","description":"...","author":{"@type":"Organization","name":"..."},"datePublished":"..."}`,
+            CREATE_PAGE: `Per pagine informative, genera schema WebPage con breadcrumb:
+{"@context":"https://schema.org","@type":"WebPage","name":"...","description":"...","breadcrumb":{"@type":"BreadcrumbList","itemListElement":[...]}}`,
+            MODIFY_CONTENT: `Per modifiche SEO, genera lo schema appropriato per il tipo di contenuto (Article, Product, FAQPage, WebPage).`,
+            ADD_SECTION: `Per nuove sezioni, genera schema WebPage o aggiorna lo schema esistente.`
+        };
+
+        let instructions = `\n=== SCHEMA.ORG SPECIFICO ===\n${schemaExamples[type] || schemaExamples.CREATE_PAGE}`;
+
+        if (capabilities?.hasWooCommerce) {
+            instructions += `\nPer prodotti WooCommerce, genera schema Product:
+{"@context":"https://schema.org","@type":"Product","name":"...","description":"...","sku":"...","offers":{"@type":"Offer","price":"...","priceCurrency":"EUR","availability":"https://schema.org/InStock"},"brand":{"@type":"Brand","name":"..."}}`;
+        }
+
+        return instructions;
+    }
+
+    /**
+     * Extract SEO-related fields from generated content into a separate seoData object
+     * for storage in CMSSuggestion.seoData and later use during publishing.
+     */
+    private static buildSeoData(content: z.infer<typeof ContentSchema>): Record<string, unknown> | null {
+        const hasAnyField = content.schemaMarkup || content.seoFields || content.categories?.length
+            || content.tags?.length || content.imageAltText || content.productAttributes;
+
+        if (!hasAnyField) return null;
+
+        return {
+            ...(content.schemaMarkup ? { schemaMarkup: content.schemaMarkup } : {}),
+            ...(content.seoFields ? { seoFields: content.seoFields } : {}),
+            ...(content.categories?.length ? { categories: content.categories } : {}),
+            ...(content.tags?.length ? { tags: content.tags } : {}),
+            ...(content.imageAltText ? { imageAltText: content.imageAltText } : {}),
+            ...(content.productAttributes ? { productAttributes: content.productAttributes } : {}),
+        };
     }
 
     /**

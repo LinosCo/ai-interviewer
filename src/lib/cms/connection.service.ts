@@ -5,6 +5,8 @@ import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
 import { WORDPRESS_TOOLS } from '@/lib/integrations/mcp/wordpress.adapter';
 import { WOOCOMMERCE_TOOLS } from '@/lib/integrations/mcp/woocommerce.adapter';
 import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
+import { CategoryResolver } from '@/lib/integrations/category-resolver';
+import { N8NDispatcher } from '@/lib/integrations/n8n/dispatcher';
 import {
     defaultPublicationRouting,
     inferContentKind,
@@ -516,6 +518,8 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
         routing: PublicationRouting,
         sourceSignals: Record<string, unknown>
     ) {
+        const seoData = suggestion.seoData as Record<string, unknown> | null;
+
         return {
             btSuggestionId: suggestion.id,
             type: suggestion.type,
@@ -529,7 +533,15 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             publishRouting: routing,
             mediaBrief: sourceSignals.mediaBrief || null,
             strategyAlignment: sourceSignals.strategyAlignment || null,
-            explainability: sourceSignals.explainability || null
+            explainability: sourceSignals.explainability || null,
+            // SEO data for CMS API consumers
+            ...(seoData ? {
+                schemaMarkup: seoData.schemaMarkup || null,
+                seoFields: seoData.seoFields || null,
+                categories: seoData.categories || null,
+                tags: seoData.tags || null,
+                imageAltText: seoData.imageAltText || null,
+            } : {})
         };
     }
 
@@ -613,15 +625,83 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             || kind === 'FAQ_PAGE'
             || kind === 'SCHEMA_PATCH'
             || kind === 'SEO_PATCH';
-        const toolName = isPageKind ? WORDPRESS_TOOLS.CREATE_PAGE : WORDPRESS_TOOLS.CREATE_POST;
+
+        // Determine CREATE vs UPDATE
+        const isUpdate = isPageKind
+            ? typeof routing.wpExistingPageId === 'number'
+            : typeof routing.wpExistingPostId === 'number';
+        const toolName = isUpdate
+            ? (isPageKind ? WORDPRESS_TOOLS.UPDATE_PAGE : WORDPRESS_TOOLS.UPDATE_POST)
+            : (isPageKind ? WORDPRESS_TOOLS.CREATE_PAGE : WORDPRESS_TOOLS.CREATE_POST);
+
+        // Embed schema.org JSON-LD in body if available
+        const seoData = suggestion.seoData as Record<string, unknown> | null;
+        let bodyContent = suggestion.body || '';
+        if (seoData?.schemaMarkup && typeof seoData.schemaMarkup === 'string') {
+            bodyContent += `\n\n<!-- Schema.org JSON-LD -->\n<script type="application/ld+json">\n${seoData.schemaMarkup}\n</script>`;
+        }
 
         const args: Record<string, unknown> = {
             title: suggestion.title,
-            content: suggestion.body,
+            content: bodyContent,
             status: 'draft'
         };
         if (suggestion.slug) args.slug = suggestion.slug;
         if (suggestion.metaDescription) args.excerpt = suggestion.metaDescription;
+
+        // Set ID for UPDATE operations
+        if (isUpdate) {
+            args.id = isPageKind ? routing.wpExistingPageId : routing.wpExistingPostId;
+        }
+
+        // Resolve categories (non-blocking)
+        if (routing.wpCategories?.length && !isPageKind) {
+            try {
+                const resolved = await CategoryResolver.resolveWordPressCategories(
+                    wordPressConnectionId,
+                    routing.wpCategories
+                );
+                if (resolved.length > 0) {
+                    args.categories = resolved.map(r => r.id);
+                }
+            } catch (err) {
+                console.warn('pushToWordPress: Failed to resolve categories:', err);
+            }
+        }
+
+        // Resolve tags (non-blocking)
+        if (routing.wpTags?.length && !isPageKind) {
+            try {
+                const resolved = await CategoryResolver.resolveWordPressTags(
+                    wordPressConnectionId,
+                    routing.wpTags
+                );
+                if (resolved.length > 0) {
+                    args.tags = resolved.map(r => r.id);
+                }
+            } catch (err) {
+                console.warn('pushToWordPress: Failed to resolve tags:', err);
+            }
+        }
+
+        // Meta SEO for Yoast/RankMath (via meta field if supported)
+        if (seoData?.seoFields && typeof seoData.seoFields === 'object') {
+            const seoFields = seoData.seoFields as Record<string, unknown>;
+            const meta: Record<string, unknown> = {};
+            if (seoFields.focusKeyword) {
+                meta._yoast_wpseo_focuskw = seoFields.focusKeyword;
+                meta.rank_math_focus_keyword = seoFields.focusKeyword;
+            }
+            if (seoFields.seoTitle) {
+                meta._yoast_wpseo_title = seoFields.seoTitle;
+            }
+            if (suggestion.metaDescription) {
+                meta._yoast_wpseo_metadesc = suggestion.metaDescription;
+            }
+            if (Object.keys(meta).length > 0) {
+                args.meta = meta;
+            }
+        }
 
         const result = await MCPGatewayService.callTool(wordPressConnectionId, toolName, args);
         if (!result.success || !result.data || result.data.isError) {
@@ -666,7 +746,11 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             return { success: false, error: 'WooCommerce is available only for product content suggestions' };
         }
 
-        const productId = await this.resolveWooProductId(wooConnectionId, routing);
+        // Resolve product ID: explicit routing > slug search
+        const productId = typeof routing.wooProductId === 'number'
+            ? String(routing.wooProductId)
+            : await this.resolveWooProductId(wooConnectionId, routing);
+
         if (!productId) {
             return {
                 success: false,
@@ -674,13 +758,74 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             };
         }
 
+        const seoData = suggestion.seoData as Record<string, unknown> | null;
+
+        // Embed schema.org Product JSON-LD in description
+        let description = suggestion.body || '';
+        if (seoData?.schemaMarkup && typeof seoData.schemaMarkup === 'string') {
+            description += `\n\n<!-- Schema.org Product JSON-LD -->\n<script type="application/ld+json">\n${seoData.schemaMarkup}\n</script>`;
+        }
+
         const args: Record<string, unknown> = {
             id: productId,
-            description: suggestion.body
+            description
         };
         if (suggestion.metaDescription) args.short_description = suggestion.metaDescription;
         if (suggestion.title) args.name = suggestion.title;
         if (suggestion.slug) args.slug = suggestion.slug;
+
+        // Resolve product categories (non-blocking)
+        if (routing.wooProductCategories?.length) {
+            try {
+                const resolved = await CategoryResolver.resolveWooCommerceCategories(
+                    wooConnectionId,
+                    routing.wooProductCategories
+                );
+                if (resolved.length > 0) {
+                    args.categories = resolved.map(r => ({ id: r.id }));
+                }
+            } catch (err) {
+                console.warn('pushToWooCommerce: Failed to resolve product categories:', err);
+            }
+        }
+
+        // Product attributes from seoData (non-blocking)
+        if (seoData?.productAttributes && typeof seoData.productAttributes === 'object') {
+            const attrs = seoData.productAttributes as Record<string, string>;
+            const attrEntries = Object.entries(attrs);
+            if (attrEntries.length > 0) {
+                args.attributes = attrEntries.map(([name, value]) => ({
+                    name,
+                    options: [value],
+                    visible: true,
+                    variation: false
+                }));
+            }
+        }
+
+        // Image alt text (if available, update first image)
+        if (seoData?.imageAltText && typeof seoData.imageAltText === 'string') {
+            args.images = [{ alt: seoData.imageAltText }];
+        }
+
+        // Meta SEO for Yoast/RankMath
+        if (seoData?.seoFields && typeof seoData.seoFields === 'object') {
+            const seoFields = seoData.seoFields as Record<string, unknown>;
+            const meta: Record<string, unknown>[] = [];
+            if (seoFields.focusKeyword) {
+                meta.push({ key: '_yoast_wpseo_focuskw', value: seoFields.focusKeyword });
+                meta.push({ key: 'rank_math_focus_keyword', value: seoFields.focusKeyword });
+            }
+            if (seoFields.seoTitle) {
+                meta.push({ key: '_yoast_wpseo_title', value: seoFields.seoTitle });
+            }
+            if (suggestion.metaDescription) {
+                meta.push({ key: '_yoast_wpseo_metadesc', value: suggestion.metaDescription });
+            }
+            if (meta.length > 0) {
+                args.meta_data = meta;
+            }
+        }
 
         const result = await MCPGatewayService.callTool(
             wooConnectionId,
@@ -829,6 +974,20 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
                     sourceSignals: updatedSignals
                 }
             });
+
+            // Dispatch n8n publication event (non-blocking)
+            if (projectId) {
+                const contentType = effectiveRouting.contentKind === 'PRODUCT_DESCRIPTION' ? 'product' as const
+                    : (effectiveRouting.wpPostType === 'page' ? 'page' as const : 'post' as const);
+                N8NDispatcher.dispatchPublicationEvent(projectId, {
+                    title: suggestion.title,
+                    url: result.previewUrl,
+                    type: contentType,
+                    excerpt: suggestion.metaDescription || undefined,
+                    channel: effectiveRouting.publishChannel,
+                    contentId: result.cmsContentId
+                }).catch(err => console.warn('N8N dispatch failed (non-blocking):', err));
+            }
 
             return {
                 success: true,

@@ -18,8 +18,8 @@ describe('Validation Feedback System', () => {
 
       const feedback = generateValidationFeedback(response, context);
 
-      expect(feedback).toContain('non è del tutto chiara');
-      expect(feedback).toContain('dettagli');
+      expect(feedback).toContain('Non ho capito bene');
+      expect(feedback).toContain('continuare l\'intervista');
     });
 
     it('generates feedback for email_incomplete', () => {
@@ -57,7 +57,7 @@ describe('Validation Feedback System', () => {
 
       const feedback = generateValidationFeedback(response, context);
 
-      expect(feedback).toContain('isn\'t quite clear');
+      expect(feedback).toContain('didn\'t quite understand');
       expect(feedback).toContain('more details');
     });
 

@@ -90,8 +90,8 @@ const FEEDBACK_MESSAGES: Record<ValidationFailureReason, Record<'it' | 'en', str
     en: 'I couldn\'t extract a value from your message. Could you try again?'
   },
   intent_unclear: {
-    it: 'La tua risposta non è del tutto chiara. Puoi fornire più dettagli?',
-    en: 'Your response isn\'t quite clear. Could you provide more details?'
+    it: 'Non ho capito bene. Puoi continuare l\'intervista?',
+    en: 'I didn\'t quite understand. Could you provide more details?'
   },
   intent_neutral: {
     it: 'La tua risposta non sembra dare una risposta diretta. Puoi essere più specifico?',

@@ -171,6 +171,12 @@ export function handleExplorePhase({
             nextState.uncoveredTopics = uncoveredTopics;
             nextState.phase = remainingSec <= 0 ? 'DEEP_OFFER' : 'DEEPEN';
 
+            // Set deepTopicOrder to reorder topics for DEEPEN phase
+            // This ensures topicIndex correctly maps to the intended topic
+            if (nextState.phase === 'DEEPEN') {
+                nextState.deepTopicOrder = uncoveredTopics;
+            }
+
             console.log(`  → EXPLORE complete. Uncovered: ${uncoveredTopics.length} topic(s). Remaining: ${remainingSec}s`);
 
             if (nextState.phase === 'DEEP_OFFER') {

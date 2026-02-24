@@ -3,7 +3,7 @@ import { ChatService } from '@/services/chat-service';
 import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { PromptBuilder } from '@/lib/llm/prompt-builder';
+import { PromptBuilder, addValidationFeedbackToPrompt } from '@/lib/llm/prompt-builder';
 import { LLMService, type InterviewRuntimeModels } from '@/services/llmService';
 import { TopicManager } from '@/lib/llm/topic-manager';
 import { MemoryManager } from '@/lib/memory/memory-manager';
@@ -2732,14 +2732,21 @@ hard_rules:
         console.log("⏳ [CHAT] Generating response...");
         console.time("LLM");
 
-        // Inject validation feedback into context if present
+        // Integrate validation feedback into system prompt
+        const systemPromptWithValidationFeedback = addValidationFeedbackToPrompt(
+          systemPrompt,
+          supervisorInsight?.validationFeedback,
+          language as 'it' | 'en'
+        );
+
+        // Inject additional feedback message if present
         const feedbackContext = supervisorInsight?.feedbackMessage
             ? `Previous response feedback: "${supervisorInsight.feedbackMessage.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`
             : '';
 
         const contextWithFeedback = feedbackContext
-            ? `${systemPrompt}\n\nSUPERVISOR FEEDBACK: ${feedbackContext}`
-            : systemPrompt;
+            ? `${systemPromptWithValidationFeedback}\n\nSUPERVISOR FEEDBACK: ${feedbackContext}`
+            : systemPromptWithValidationFeedback;
 
         let result: any;
         try {

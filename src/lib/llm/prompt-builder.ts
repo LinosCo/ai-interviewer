@@ -3,6 +3,7 @@ import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import type { SupervisorInsight } from '@/lib/interview/interview-supervisor';
 import type { InterviewPlan, PlanTopic } from '@/lib/interview/plan-types';
+import type { ValidationResponse } from '@/lib/interview/validation-response';
 
 const FIELD_LABELS: Record<string, { it: string, en: string }> = {
     name: { it: 'Nome Completo', en: 'Full Name' },
@@ -410,4 +411,30 @@ Brief connection, then ONE exploratory question.
 
         return parts.join('\n\n');
     }
+}
+
+/**
+ * Integrates validation feedback into the system prompt
+ * This function adds feedback context that guides the bot on how to respond
+ * when previous input validation failed.
+ *
+ * @param basePrompt - The base system prompt
+ * @param validationFeedback - Optional validation response with feedback
+ * @param language - Language for feedback section ('it' or 'en')
+ * @returns Enhanced prompt with validation feedback section, or base prompt if no feedback
+ */
+export function addValidationFeedbackToPrompt(
+  basePrompt: string,
+  validationFeedback?: ValidationResponse,
+  language: 'it' | 'en' = 'it'
+): string {
+  if (!validationFeedback || validationFeedback.isValid) {
+    return basePrompt;
+  }
+
+  const feedbackSection = language === 'it'
+    ? `\n\n⚠️ FEEDBACK IMPORTANTE: L'utente ha fornito una risposta che non è stata compresa correttamente.\nMessaggio da comunicare: "${validationFeedback.feedback}"\nStrategia: ${validationFeedback.strategy || 'chiedi di nuovo'}.\n`
+    : `\n\n⚠️ IMPORTANT FEEDBACK: The user provided a response that wasn't understood correctly.\nMessage to communicate: "${validationFeedback.feedback}"\nStrategy: ${validationFeedback.strategy || 'ask again'}.\n`;
+
+  return basePrompt + feedbackSection;
 }

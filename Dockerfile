@@ -8,11 +8,13 @@ WORKDIR /app
 # Install openssl (required by Prisma engine)
 RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies (cached layer - only re-runs if package files change)
+# Install dependencies
+# prisma/ must be copied before npm ci because postinstall runs `prisma generate`
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
 RUN npm ci
 
-# Copy source and build
+# Copy remaining source and build
 COPY . .
 
 ENV NODE_OPTIONS="--max-old-space-size=8192"

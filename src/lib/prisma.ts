@@ -14,9 +14,9 @@ function createPrismaClient(): PrismaClient {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaPg } = require('@prisma/adapter-pg');
 
-  // Strip URL-based SSL params (sslmode, uselibpqcompat) before passing to pg.
-  // pg-connection-string behaviour for these params varies across pg versions;
-  // we configure SSL explicitly in the Pool options below instead.
+  // Strip pg-incompatible URL params before passing to Pool.
+  // uselibpqcompat is a Prisma CLI hint only, not valid at runtime.
+  // sslmode is stripped too — SSL is controlled via Pool options below, not URL params.
   let cleanUrl = connectionString;
   try {
     const url = new URL(connectionString);
@@ -27,16 +27,11 @@ function createPrismaClient(): PrismaClient {
     // keep original if URL is not parseable
   }
 
-  // In production (Railway) we always use SSL with self-signed cert tolerance.
-  // Railway's external proxy requires TLS; rejectUnauthorized:false handles
-  // the self-signed certificate without a full CA chain.
-  // In development we skip SSL to support plain local PostgreSQL instances.
-  const sslConfig =
-    process.env.NODE_ENV === 'production'
-      ? ({ rejectUnauthorized: false } as const)
-      : undefined;
-
-  const pool = new Pool({ connectionString: cleanUrl, ssl: sslConfig });
+  // No explicit SSL config: Railway's internal hostname (postgres.railway.internal)
+  // is on a private network — no SSL or proxy needed.
+  // For external connections (local dev / psql tools), SSL is negotiated by the
+  // client tool directly and does not go through this Pool.
+  const pool = new Pool({ connectionString: cleanUrl });
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({ adapter });

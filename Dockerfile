@@ -22,11 +22,9 @@ ENV NODE_ENV=production
 
 RUN npm run build
 
-# PORT and EXPOSE are intentionally omitted:
-# Railway injects its own PORT env var at runtime (typically 8080).
-# Setting EXPOSE 3000 here would cause Railway to route external traffic
-# to port 3000 while the app binds to PORT=8080 → 502 mismatch.
-# Next.js reads process.env.PORT and binds to whatever Railway assigns.
+# Railway injects PORT=8080 at runtime; EXPOSE must match so Railway
+# routes external traffic to the same port the app listens on.
+EXPOSE 8080
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["npm", "start"]

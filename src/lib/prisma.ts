@@ -2,23 +2,6 @@ import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-function normalizePgConnectionString(rawConnectionString: string): string {
-  try {
-    const url = new URL(rawConnectionString);
-    const sslMode = (url.searchParams.get('sslmode') || '').toLowerCase();
-    const hasLibpqCompat = url.searchParams.has('uselibpqcompat');
-
-    // Avoid pg warning and keep current secure behavior with upcoming pg v9 changes.
-    if (!hasLibpqCompat && ['prefer', 'require', 'verify-ca'].includes(sslMode)) {
-      url.searchParams.set('uselibpqcompat', 'true');
-    }
-
-    return url.toString();
-  } catch {
-    return rawConnectionString;
-  }
-}
-
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
@@ -26,15 +9,34 @@ function createPrismaClient(): PrismaClient {
     throw new Error('Missing DIRECT_URL or DATABASE_URL for Prisma client.');
   }
 
-  // Prisma 7 requires either adapter or accelerateUrl.
-  // We use PostgreSQL driver adapter for Neon/direct DB connections.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Pool } = require('pg');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { PrismaPg } = require('@prisma/adapter-pg');
 
-  const normalizedConnectionString = normalizePgConnectionString(connectionString);
-  const pool = new Pool({ connectionString: normalizedConnectionString });
+  // Strip URL-based SSL params (sslmode, uselibpqcompat) before passing to pg.
+  // pg-connection-string behaviour for these params varies across pg versions;
+  // we configure SSL explicitly in the Pool options below instead.
+  let cleanUrl = connectionString;
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete('sslmode');
+    url.searchParams.delete('uselibpqcompat');
+    cleanUrl = url.toString();
+  } catch {
+    // keep original if URL is not parseable
+  }
+
+  // In production (Railway) we always use SSL with self-signed cert tolerance.
+  // Railway's external proxy requires TLS; rejectUnauthorized:false handles
+  // the self-signed certificate without a full CA chain.
+  // In development we skip SSL to support plain local PostgreSQL instances.
+  const sslConfig =
+    process.env.NODE_ENV === 'production'
+      ? ({ rejectUnauthorized: false } as const)
+      : undefined;
+
+  const pool = new Pool({ connectionString: cleanUrl, ssl: sslConfig });
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({ adapter });

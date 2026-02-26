@@ -411,6 +411,8 @@ export async function POST(req: Request) {
                             shouldAsk: z.boolean(),
                             reason: z.string().optional()
                         }),
+                        schemaName: 'LeadGenDecision',
+                        schemaDescription: 'Decision on whether to ask for lead contact info.',
                         system: `You are a conversion-savvy assistant. Decide if asking for a lead contact field now is appropriate.
 Guidelines:
 - Only ask after you've provided a useful answer or clarified the user's intent.
@@ -418,7 +420,8 @@ Guidelines:
 - Avoid asking on greetings or early exploration.
 - Keep it gentle, one field at a time.
 - If user seems in a hurry or negative, do not ask.
-Return shouldAsk=true only when it is natural.`,
+Return shouldAsk=true only when it is natural.
+OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
                         messages: conversation.messages.slice(-6).map((m: any) => ({
                             role: m.role as any,
                             content: m.content
@@ -598,7 +601,9 @@ NON-NEGOTIABLE RULES
                 result = await generateObject({
                     model: openai('gpt-4o-mini'),
                     schema,
-                    system: systemPrompt,
+                    schemaName: 'ChatbotResponse',
+                    schemaDescription: 'A single response string from the chatbot assistant.',
+                    system: systemPrompt + '\n\nOUTPUT: Reply with JSON {"response": "<your message here>"}.',
                     messages: conversation.messages.slice(-10).map((m: any) => ({
                         role: m.role as any,
                         content: m.content

@@ -148,7 +148,14 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
         }
 
         if (status === 'unauthenticated') {
-            console.log('[BT-DEBUG][OrgCtx] → branch: UNAUTHENTICATED — wiping data!');
+            // If the server pre-hydrated organizations, the server already verified auth.
+            // Don't wipe on transient client-side unauthenticated state (SessionProvider
+            // may briefly report unauthenticated while hydrating the session prop).
+            if (hasInitialOrganizations) {
+                console.log('[BT-DEBUG][OrgCtx] → branch: UNAUTHENTICATED but server provided initialData — skipping wipe');
+                return;
+            }
+            console.log('[BT-DEBUG][OrgCtx] → branch: UNAUTHENTICATED — wiping data');
             setLoading(false);
             setOrganizations([]);
             setCurrentOrganizationState(null);

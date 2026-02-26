@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { showToast } from '@/components/toast';
 
 interface CreditsData {
     monthlyLimit: number;
@@ -135,6 +136,29 @@ export function UsageDashboard() {
     const [credits, setCredits] = useState<CreditsData | null>(null);
     const [usageByTool, setUsageByTool] = useState<UsageByToolData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [portalLoading, setPortalLoading] = useState(false);
+
+    const handleOpenPortal = useCallback(async () => {
+        if (!currentOrganization || portalLoading) return;
+        setPortalLoading(true);
+        try {
+            const res = await fetch(`/api/stripe/portal?organizationId=${currentOrganization.id}`);
+            const data = await res.json();
+            if (data.error === 'STRIPE_NOT_CONFIGURED') {
+                showToast('Il portale di fatturazione non è ancora disponibile.', 'info');
+                return;
+            }
+            if (data.url) {
+                window.location.href = data.url;
+            } else {
+                showToast('Impossibile aprire il portale di fatturazione.', 'error');
+            }
+        } catch {
+            showToast('Errore durante l\'apertura del portale.', 'error');
+        } finally {
+            setPortalLoading(false);
+        }
+    }, [currentOrganization, portalLoading]);
 
     const fetchData = useCallback(async () => {
         if (!currentOrganization) return;
@@ -251,11 +275,15 @@ export function UsageDashboard() {
                         Reset: {formattedResetDate}
                     </p>
                 </div>
-                <Link href="/dashboard/billing">
-                    <Button variant="outline" size="sm" className="rounded-lg font-bold text-xs h-8">
-                        Gestisci
-                    </Button>
-                </Link>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg font-bold text-xs h-8"
+                    onClick={handleOpenPortal}
+                    disabled={portalLoading}
+                >
+                    {portalLoading ? 'Caricamento...' : 'Gestisci'}
+                </Button>
             </div>
 
             {/* Main Credits Display */}

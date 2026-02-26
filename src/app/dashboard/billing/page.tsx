@@ -10,6 +10,7 @@ import { cookies } from 'next/headers';
 import { getStripeClient } from '@/lib/stripe';
 import { BillingCycle, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
 import PackPurchaseButton from './pack-purchase-button';
+import { CreditService } from '@/services/creditService';
 
 function unixTimestampToDate(value: unknown): Date | null {
     const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
@@ -123,6 +124,80 @@ async function syncBillingStateFromCheckoutSession(params: {
     ]);
 }
 
+/**
+ * Sync pack credit purchase from Stripe checkout session.
+ * Called on success redirect (pack_success=true&session_id=xxx).
+ * Idempotent: skips if the payment has already been processed
+ * (checked via OrgCreditPack.stripePaymentId).
+ */
+async function syncPackPurchaseFromCheckout(params: {
+    sessionId: string;
+    userId: string;
+}) {
+    const { sessionId, userId } = params;
+
+    let stripe;
+    try {
+        stripe = await getStripeClient();
+    } catch {
+        console.error('[billing] syncPackPurchase: Stripe not available');
+        return;
+    }
+
+    try {
+        const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
+        const metadata = checkoutSession.metadata || {};
+
+        // Only process credit pack sessions
+        if (metadata.type !== 'credit_pack') return;
+
+        const organizationId = metadata.organizationId;
+        const packType = metadata.packType;
+        const credits = parseInt(metadata.credits || '0', 10);
+
+        if (!organizationId || !packType || credits <= 0) {
+            console.error('[billing] syncPackPurchase: missing metadata', { organizationId, packType, credits });
+            return;
+        }
+
+        // Verify user has access to this organization
+        const membership = await prisma.membership.findUnique({
+            where: {
+                userId_organizationId: { userId, organizationId }
+            },
+            select: { organizationId: true }
+        });
+        if (!membership) return;
+
+        // Derive a unique payment reference for idempotency
+        const paymentRef = typeof checkoutSession.payment_intent === 'string'
+            ? checkoutSession.payment_intent
+            : `cs_${checkoutSession.id}`;
+
+        // Idempotency check: skip if this payment has already been recorded
+        const existingPack = await prisma.orgCreditPack.findFirst({
+            where: { stripePaymentId: paymentRef }
+        });
+        if (existingPack) {
+            // Already processed (e.g. by webhook) — nothing to do
+            return;
+        }
+
+        // Add credits to the organization via the CreditService
+        await CreditService.addPackCredits(
+            organizationId,
+            credits,
+            packType,
+            userId,
+            paymentRef
+        );
+
+        console.log(`[billing] syncPackPurchase: added ${credits} credits (${packType}) to org ${organizationId}`);
+    } catch (error) {
+        console.error('[billing] syncPackPurchase error:', error);
+    }
+}
+
 export default async function BillingPage({
     searchParams
 }: {
@@ -138,6 +213,15 @@ export default async function BillingPage({
             userId: session.user.id
         });
     }
+
+    // Sync pack credits on success redirect (idempotent — safe if webhook already processed)
+    if (resolvedSearchParams?.pack_success === 'true' && resolvedSearchParams?.session_id) {
+        await syncPackPurchaseFromCheckout({
+            sessionId: resolvedSearchParams.session_id,
+            userId: session.user.id
+        });
+    }
+
     const tab = resolvedSearchParams?.tab || '';
     const packSuccess = resolvedSearchParams?.pack_success === 'true';
     const packCancelled = resolvedSearchParams?.pack_cancelled === 'true';
@@ -200,8 +284,9 @@ export default async function BillingPage({
             </div>
 
             {packSuccess && (
-                <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                    Acquisto pack completato{purchasedPack ? ` (${purchasedPack})` : ''}. I crediti vengono aggiunti automaticamente al saldo organizzazione.
+                <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 flex items-center gap-2">
+                    <Icons.Check size={16} className="text-green-600 shrink-0" />
+                    Acquisto pack completato{purchasedPack ? ` (${purchasedPack})` : ''}! I crediti sono stati aggiunti al saldo della tua organizzazione.
                 </div>
             )}
             {packCancelled && (
@@ -400,42 +485,60 @@ export default async function BillingPage({
 
                     {/* Credit Packs */}
                     <div id="packs" className={`bg-white/80 backdrop-blur-md rounded-[24px] p-6 border shadow-sm ${tab === 'packs' ? 'border-amber-300 ring-2 ring-amber-100' : 'border-white/50'}`}>
-                        <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 mb-1">
                             <Icons.Sparkles size={20} className="text-amber-500" />
                             <h3 className="font-bold text-stone-900">Pack Crediti</h3>
                         </div>
-                        <p className="text-sm text-stone-500 mb-4">
-                            Acquista crediti extra che non scadono mai.
+                        <p className="text-xs text-stone-500 mb-4">
+                            Crediti extra che non scadono mai.
                         </p>
                         <div className="space-y-3">
-                            {CREDIT_PACKS.map(pack => (
-                                <div key={pack.id} className="flex items-center justify-between p-3 bg-stone-50 rounded-xl">
-                                    <div>
-                                        <p className="font-bold text-stone-900">{pack.name}</p>
-                                        <p className="text-xs text-stone-500">
-                                            {formatCredits(pack.credits)} crediti
-                                        </p>
+                            {CREDIT_PACKS.map((pack, index) => {
+                                const isPopular = index === 1;
+                                return (
+                                    <div
+                                        key={pack.id}
+                                        className={`relative rounded-2xl p-4 border transition-all ${
+                                            isPopular
+                                                ? 'bg-amber-50 border-amber-200 shadow-sm'
+                                                : 'bg-stone-50 border-stone-100 hover:border-stone-200'
+                                        }`}
+                                    >
+                                        {isPopular && (
+                                            <span className="absolute -top-2.5 right-3 bg-amber-500 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
+                                                Popolare
+                                            </span>
+                                        )}
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div>
+                                                <p className="font-bold text-stone-900 text-sm">{pack.name}</p>
+                                                <p className="text-lg font-black text-stone-900">
+                                                    {formatCredits(pack.credits)} <span className="text-xs font-medium text-stone-400">crediti</span>
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className={`text-xl font-black ${isPopular ? 'text-amber-600' : 'text-stone-900'}`}>
+                                                    €{pack.price}
+                                                </p>
+                                                <p className="text-[10px] text-stone-400 font-medium">
+                                                    €{pack.pricePerThousand.toFixed(2)}/1K crediti
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <PackPurchaseButton
+                                            packType={pack.id}
+                                            organizationId={activeMembership.organizationId}
+                                            className={`w-full font-bold py-2.5 rounded-xl transition-all text-sm disabled:opacity-60 ${
+                                                isPopular
+                                                    ? 'bg-amber-500 text-white hover:bg-amber-600'
+                                                    : 'bg-stone-200 text-stone-700 hover:bg-stone-300'
+                                            }`}
+                                        >
+                                            Acquista
+                                        </PackPurchaseButton>
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-amber-600">€{pack.price}</p>
-                                        <p className="text-[10px] text-stone-400">
-                                            €{pack.pricePerThousand.toFixed(2)}/1K
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            {CREDIT_PACKS.map(pack => (
-                                <PackPurchaseButton
-                                    key={`${pack.id}-buy`}
-                                    packType={pack.id}
-                                    organizationId={activeMembership.organizationId}
-                                    className="w-full bg-stone-100 text-stone-700 font-bold py-3 rounded-xl hover:bg-stone-200 transition-all text-sm disabled:opacity-60"
-                                >
-                                    Acquista {formatCredits(pack.credits)}
-                                </PackPurchaseButton>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

@@ -24,13 +24,8 @@ function LoginForm() {
     const isLoading = isPending || (hasSubmitted && errorMessage === null);
 
     useEffect(() => {
-        // === BT-DEBUG START ===
-        console.log('[BT-DEBUG][Login] useEffect — isPending:', isPending, 'errorMessage:', errorMessage, 'hasSubmitted:', hasSubmitted);
-        // === BT-DEBUG END ===
-
         if (!isPending && errorMessage === null && hasSubmitted) {
             const target = nextPath || '/dashboard';
-            console.log('[BT-DEBUG][Login] → SUCCESS, calling window.location.replace("' + target + '")');
             // Full page reload ensures SessionProvider starts fresh with new auth cookie.
             // Client-side router.replace() would keep stale 'unauthenticated' SessionProvider state.
             window.location.replace(target);

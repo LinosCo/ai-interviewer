@@ -28,10 +28,6 @@ export default async function DashboardLayout({
     let initialOrganizations: any[] = [];
     let initialProjects: any[] = [];
 
-    // === BT-DEBUG START ===
-    console.log('[BT-DEBUG][DashLayout] session:', session ? { userId: session.user?.id, email: session.user?.email } : null);
-    // === BT-DEBUG END ===
-
     if (session?.user?.id) {
         // Hard guard for first-login races: ensure at least one organization exists.
         await getOrCreateDefaultOrganization(session.user.id);
@@ -146,10 +142,6 @@ export default async function DashboardLayout({
             }
         }
     }
-
-    // === BT-DEBUG START ===
-    console.log('[BT-DEBUG][DashLayout] Pre-hydration result — initialOrgs:', initialOrganizations.length, 'initialProjects:', initialProjects.length, 'orgId:', organizationId || 'none');
-    // === BT-DEBUG END ===
 
     return (
         <DashboardProviders initialOrganizations={initialOrganizations} initialProjects={initialProjects}>

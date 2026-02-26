@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useActionState, useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { authenticate } from './actions';
 import Link from 'next/link';
 import { colors, gradients } from '@/lib/design-system';
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/business-tuner/Input';
 import { Card } from '@/components/ui/business-tuner/Card';
 
 function LoginForm() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
     const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -26,11 +25,11 @@ function LoginForm() {
 
     useEffect(() => {
         if (!isPending && errorMessage === null && hasSubmitted) {
-            // Login successful, start navigation and refresh session
-            router.refresh();
-            router.replace(nextPath || '/dashboard');
+            // Full page reload ensures SessionProvider starts fresh with new auth cookie.
+            // Client-side router.replace() would keep stale 'unauthenticated' SessionProvider state.
+            window.location.replace(nextPath || '/dashboard');
         }
-    }, [errorMessage, isPending, router, hasSubmitted, nextPath]);
+    }, [errorMessage, isPending, hasSubmitted, nextPath]);
 
     const handleSubmit = () => {
         setHasSubmitted(true);

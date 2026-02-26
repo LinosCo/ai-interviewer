@@ -34,14 +34,42 @@ const SELECTED_PROJECT_KEY_PREFIX = 'bt_selected_project_id_';
 
 export function ProjectProvider({ children, initialData }: { children: ReactNode, initialData?: Project[] }) {
     const { currentOrganization, loading: orgLoading } = useOrganization();
+    const hasInitialProjects = Array.isArray(initialData) && initialData.length > 0;
     const [projects, setProjects] = useState<Project[]>(initialData || []);
-    const [selectedProject, setSelectedProjectState] = useState<Project | null>(null);
-    const [loading, setLoading] = useState(!initialData);
     const [isOrgAdmin, setIsOrgAdmin] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
-    const maxRetries = 2;
     const canUseAllProjects = (projectsList: Project[], adminStatus: boolean) =>
         adminStatus || projectsList.length > 1;
+
+    // Lazy initializer — resolves selectedProject synchronously from initialData
+    // so the first render already has a project selected (avoids null flash).
+    const [selectedProject, setSelectedProjectState] = useState<Project | null>(() => {
+        if (!hasInitialProjects) return null;
+        if (typeof window === 'undefined') return initialData![0] ?? null;
+
+        // Read the org ID from localStorage/cookie to build the project storage key
+        const orgId = localStorage.getItem('bt_selected_org_id') ||
+            document.cookie.split('; ').find(r => r.startsWith('bt_selected_org_id='))?.split('=')[1];
+
+        if (orgId) {
+            const storageKey = `${SELECTED_PROJECT_KEY_PREFIX}${orgId}`;
+            const savedProjectId = localStorage.getItem(storageKey);
+
+            if (savedProjectId === ALL_PROJECTS_OPTION.id && canUseAllProjects(initialData!, false)) {
+                return ALL_PROJECTS_OPTION;
+            }
+            if (savedProjectId) {
+                const found = initialData!.find(p => p.id === savedProjectId);
+                if (found) return found;
+            }
+        }
+        // Default: "All projects" if available, otherwise first project
+        if (canUseAllProjects(initialData!, false)) return ALL_PROJECTS_OPTION;
+        return initialData![0] ?? null;
+    });
+
+    const [loading, setLoading] = useState(!hasInitialProjects);
+    const [retryCount, setRetryCount] = useState(0);
+    const maxRetries = 2;
 
     const fetchProjects = useCallback(async () => {
         // Don't fetch if organization context is still loading
@@ -132,53 +160,24 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
         }
     }, [currentOrganization, orgLoading, retryCount, projects.length]);
 
+    // Track which organization we've already initialised projects for,
+    // so we only fetch when the user switches orgs (not on every render).
+    const [initializedOrgId, setInitializedOrgId] = useState<string | null>(
+        () => currentOrganization?.id ?? null
+    );
+
     useEffect(() => {
-        // If we have initial data and it matches the current org (implicitly), use it
-        // Note: initialData in ProjectProvider is passed from layout, which fetches based on active org.
-        // We need to be careful: if the user switches orgs client-side, initialData might be stale or from the previous org.
-        // However, ProjectProvider is wrapping the whole dashboard.
-        // Strategy: If initialData is present AND we are in the initial loading state, use it.
-        if (initialData && initialData.length > 0 && projects.length === 0 && currentOrganization) {
-            setProjects(initialData);
-            setLoading(false);
+        if (!currentOrganization?.id) return;
 
-            // Initialize selection logic for initialData
-            const storageKey = `${SELECTED_PROJECT_KEY_PREFIX}${currentOrganization.id}`;
-            const savedProjectId = localStorage.getItem(storageKey);
-            let targetProject = null;
-
-            if (savedProjectId) {
-                if (savedProjectId === ALL_PROJECTS_OPTION.id && canUseAllProjects(initialData, isOrgAdmin)) {
-                    targetProject = ALL_PROJECTS_OPTION;
-                } else {
-                    targetProject = initialData.find(p => p.id === savedProjectId);
-                }
-            }
-            if (!targetProject) {
-                if (canUseAllProjects(initialData, isOrgAdmin)) {
-                    targetProject = ALL_PROJECTS_OPTION;
-                } else if (initialData.length > 0) {
-                    targetProject = initialData[0];
-                }
-            }
-            if (targetProject) {
-                setSelectedProjectState(targetProject);
-            }
+        // Already initialised for this org (either from initialData or a previous fetch)
+        if (initializedOrgId === currentOrganization.id && (projects.length > 0 || hasInitialProjects)) {
             return;
         }
 
-        // Fetch when organization changes
-        if (currentOrganization?.id) {
-            // If we already have projects and they seem to be for a different org (heuristic needed or just fetch)
-            // or if we have no projects, fetch.
-            // Simplest robust way: if we didn't just use initialData, fetch.
-            // We can check if `projects` contains items that don't look right, but checking orgId in project would be better.
-            // For now, let's rely on the fact that if we just set initialData, we returned early.
-            if (!initialData || projects.length === 0) {
-                fetchProjects();
-            }
-        }
-    }, [currentOrganization?.id, orgLoading, retryCount, fetchProjects, initialData, projects.length]);
+        // Org changed — fetch fresh projects
+        setInitializedOrgId(currentOrganization.id);
+        fetchProjects();
+    }, [currentOrganization?.id, initializedOrgId, fetchProjects, projects.length, hasInitialProjects]);
 
     const setSelectedProject = (project: Project | null) => {
         setSelectedProjectState(project);

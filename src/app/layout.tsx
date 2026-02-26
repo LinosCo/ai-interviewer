@@ -3,6 +3,7 @@ import "./globals.css";
 import { ToastContainer } from "@/components/toast";
 import { Providers } from "@/components/Providers";
 import { AnalyticsGate } from "@/components/AnalyticsGate";
+import { auth } from "@/auth";
 
 const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it';
 
@@ -55,18 +56,20 @@ export const metadata: Metadata = {
 
 import { CookieConsent } from "@/components/CookieConsent";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html lang="it" className="light" suppressHydrationWarning>
       <head>
         <meta name="color-scheme" content="light" />
       </head>
       <body className="antialiased">
-        <Providers>
+        <Providers session={session}>
           {children}
           <ToastContainer />
           <CookieConsent />

@@ -17,7 +17,7 @@ RUN npm ci
 # Copy remaining source and build
 COPY . .
 
-ENV NODE_OPTIONS="--max-old-space-size=8192"
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV NODE_ENV=production
 
 RUN npm run build

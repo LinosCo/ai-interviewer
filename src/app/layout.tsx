@@ -63,6 +63,10 @@ export default async function RootLayout({
 }>) {
   const session = await auth();
 
+  // === BT-DEBUG START ===
+  console.log('[BT-DEBUG][RootLayout] session:', session ? { userId: session.user?.id } : null);
+  // === BT-DEBUG END ===
+
   return (
     <html lang="it" className="light" suppressHydrationWarning>
       <head>

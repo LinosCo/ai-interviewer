@@ -29,6 +29,10 @@ const COOKIE_ORG_KEY = 'bt_selected_org_id';
 export function OrganizationProvider({ children, initialData }: { children: ReactNode, initialData?: Organization[] }) {
     const { data: session, status } = useSession();
     const hasInitialOrganizations = Array.isArray(initialData) && initialData.length > 0;
+
+    // === BT-DEBUG START ===
+    console.log('[BT-DEBUG][OrgCtx] Render — status:', status, 'hasInitialOrgs:', hasInitialOrganizations, 'initialData?.length:', initialData?.length, 'session?.user?.id:', session?.user?.id);
+    // === BT-DEBUG END ===
     const [organizations, setOrganizations] = useState<Organization[]>(initialData || []);
     const [currentOrganization, setCurrentOrganizationState] = useState<Organization | null>(() => {
         if (!hasInitialOrganizations) return null;
@@ -134,9 +138,17 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
     }, [maxRetries, retryCount, status, organizations.length, resolvePreferredOrganization]);
 
     useEffect(() => {
-        if (status === 'loading') return;
+        // === BT-DEBUG START ===
+        console.log('[BT-DEBUG][OrgCtx] useEffect fired — status:', status, 'orgs.length:', organizations.length, 'currentOrg:', currentOrganization?.id || null, 'hasInitialOrgs:', hasInitialOrganizations, 'error:', error, 'retryCount:', retryCount);
+        // === BT-DEBUG END ===
+
+        if (status === 'loading') {
+            console.log('[BT-DEBUG][OrgCtx] → branch: status=loading, returning early');
+            return;
+        }
 
         if (status === 'unauthenticated') {
+            console.log('[BT-DEBUG][OrgCtx] → branch: UNAUTHENTICATED — wiping data!');
             setLoading(false);
             setOrganizations([]);
             setCurrentOrganizationState(null);
@@ -146,6 +158,7 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
         if (status === 'authenticated') {
             // Initialize from server-provided organizations
             if (hasInitialOrganizations && organizations.length === 0) {
+                console.log('[BT-DEBUG][OrgCtx] → branch: authenticated, hasInitialOrgs but orgs empty, restoring initialData');
                 setOrganizations(initialData);
                 const targetOrg = resolvePreferredOrganization(initialData);
                 if (targetOrg) {
@@ -155,13 +168,17 @@ export function OrganizationProvider({ children, initialData }: { children: Reac
                 }
                 setLoading(false);
             } else if (organizations.length === 0 && !error) { // Only fetch if no data at all
+                console.log('[BT-DEBUG][OrgCtx] → branch: authenticated, no orgs, fetching...');
                 // Fetch if no data at all
                 fetchOrganizations();
             } else if (organizations.length > 0 && !currentOrganization) {
+                console.log('[BT-DEBUG][OrgCtx] → branch: authenticated, orgs exist but no currentOrg, resolving...');
                 // Ensure selection if data exists but selection fell through
                 const target = resolvePreferredOrganization(organizations);
                 if (target) setCurrentOrganizationState(target);
                 setLoading(false);
+            } else {
+                console.log('[BT-DEBUG][OrgCtx] → branch: authenticated, no action needed (orgs.length:', organizations.length, 'currentOrg:', currentOrganization?.id, ')');
             }
         }
     }, [status, retryCount, fetchOrganizations, initialData, organizations, organizations.length, currentOrganization, error, hasInitialOrganizations, resolvePreferredOrganization]);

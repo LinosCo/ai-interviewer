@@ -35,6 +35,10 @@ const SELECTED_PROJECT_KEY_PREFIX = 'bt_selected_project_id_';
 export function ProjectProvider({ children, initialData }: { children: ReactNode, initialData?: Project[] }) {
     const { currentOrganization, loading: orgLoading } = useOrganization();
     const hasInitialProjects = Array.isArray(initialData) && initialData.length > 0;
+
+    // === BT-DEBUG START ===
+    console.log('[BT-DEBUG][ProjCtx] Render — currentOrg:', currentOrganization?.id || null, 'orgLoading:', orgLoading, 'hasInitialProjects:', hasInitialProjects, 'initialData?.length:', initialData?.length);
+    // === BT-DEBUG END ===
     const [projects, setProjects] = useState<Project[]>(initialData || []);
     const [isOrgAdmin, setIsOrgAdmin] = useState(false);
     const canUseAllProjects = (projectsList: Project[], adminStatus: boolean) =>
@@ -167,14 +171,23 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
     );
 
     useEffect(() => {
-        if (!currentOrganization?.id) return;
+        // === BT-DEBUG START ===
+        console.log('[BT-DEBUG][ProjCtx] useEffect fired — currentOrg:', currentOrganization?.id || null, 'initializedOrgId:', initializedOrgId, 'projects.length:', projects.length, 'selectedProject:', selectedProject?.id || null, 'hasInitialProjects:', hasInitialProjects);
+        // === BT-DEBUG END ===
+
+        if (!currentOrganization?.id) {
+            console.log('[BT-DEBUG][ProjCtx] → no currentOrganization, returning early');
+            return;
+        }
 
         // Already initialised for this org (either from initialData or a previous fetch)
         if (initializedOrgId === currentOrganization.id && (projects.length > 0 || hasInitialProjects)) {
+            console.log('[BT-DEBUG][ProjCtx] → already initialized for this org, skipping fetch');
             return;
         }
 
         // Org changed — fetch fresh projects
+        console.log('[BT-DEBUG][ProjCtx] → org changed or not initialized, fetching projects...');
         setInitializedOrgId(currentOrganization.id);
         fetchProjects();
     }, [currentOrganization?.id, initializedOrgId, fetchProjects, projects.length, hasInitialProjects]);

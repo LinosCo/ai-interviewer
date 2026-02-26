@@ -7,6 +7,18 @@ const nextConfig: NextConfig = {
   experimental: {
     workerThreads: false,
   },
+  // Skip TypeScript type-checking during `next build`.
+  // The TS checker loads the entire project type-graph into a single process
+  // and OOMs on memory-constrained containers. SWC/Turbopack still compiles
+  // TypeScript correctly — this only skips the separate `tsc` validation pass.
+  // Run `tsc --noEmit` in CI instead.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  // Same rationale: run ESLint in CI, not during the build.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;

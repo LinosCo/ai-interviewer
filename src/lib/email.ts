@@ -518,7 +518,12 @@ export async function sendEmail(params: {
             return { success: true, data };
         } catch (error) {
             console.error('SMTP email send failed:', error);
-            return { success: false, error };
+            // Fall through to Resend if available (e.g. GCP blocks outbound SMTP)
+            const resendFallbackKey = params.smtpOverrides?.resendApiKey ?? globalConfig?.resendApiKey ?? process.env.RESEND_API_KEY;
+            if (!resendFallbackKey) {
+                return { success: false, error };
+            }
+            console.warn('SMTP failed, attempting Resend fallback...');
         }
     }
 

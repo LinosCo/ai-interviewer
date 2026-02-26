@@ -286,7 +286,7 @@ export async function POST(req: Request) {
             });
         };
 
-        let modelUsed = 'claude-3-7-sonnet-20250219'; // Use latest sonnet for better tool use
+        let modelUsed = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'; // configurable via env, fallback to broadly-available sonnet
         let result: any;
 
         try {

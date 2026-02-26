@@ -3,7 +3,7 @@ import { ChatService } from '@/services/chat-service';
 import { generateObject, generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { PromptBuilder } from '@/lib/llm/prompt-builder';
+import { PromptBuilder, addValidationFeedbackToPrompt } from '@/lib/llm/prompt-builder';
 import { LLMService, type InterviewRuntimeModels } from '@/services/llmService';
 import { TopicManager } from '@/lib/llm/topic-manager';
 import { MemoryManager } from '@/lib/memory/memory-manager';
@@ -14,13 +14,18 @@ import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
 import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
 import { getFieldLabel, getNextMissingCandidateField } from '@/lib/interview/flow-guards';
+import { validateExtractedField } from '@/lib/interview/field-validation';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { getCompletionGuardAction, shouldInterceptDeepOfferClosure, shouldInterceptTopicPhaseClosure } from '@/lib/interview/phase-flow';
-import { evaluateInterviewQuestionQuality } from '@/lib/interview/qualitative-evaluator';
-import { buildAdditiveQuestionPrompt, buildQualityCorrectionPrompt } from '@/lib/interview/quality-pipeline';
+// NOTE: v2 post-processing moved to post-processing-v2.ts - quality gates removed
 import { extractDeterministicFieldValue, isLikelyNonValueAck, normalizeCandidateFieldIds, responseMentionsCandidateField } from '@/lib/interview/data-collection-guard';
 import { createDeepOfferInsight, createDefaultSupervisorInsight, runDeepOfferPhase, type InterviewStateLike, type Phase, type SupervisorInsight, type TransitionMode } from '@/lib/interview/interview-supervisor';
+import type { ValidationResponse } from '@/lib/interview/validation-response';
 import { findDuplicateQuestionMatch } from '@/lib/interview/question-dedup';
+import { handleExplorePhase, handleDeepenPhase } from '@/lib/interview/explore-deepen-machine';
+import { computeSignalScore } from '@/lib/interview/signal-score';
+import { buildTurnGuidanceBlock, buildGuardsBlock } from '@/lib/llm/runtime-prompt-blocks';
+import { runPostProcessing } from '@/lib/interview/post-processing-v2';
 import {
     buildManualKnowledgePromptBlock,
     buildRuntimeInterviewKnowledgeSignature,
@@ -67,7 +72,15 @@ interface InterestingTopic {
     bestSnippet?: string;
 }
 
-interface InterviewState {
+interface TopicBudget {
+    baseTurns: number;
+    minTurns: number;
+    maxTurns: number;
+    turnsUsed: number;
+    bonusTurnsGranted: number;
+}
+
+export interface InterviewState {
     phase: Phase;
     topicIndex: number;
     turnInTopic: number;
@@ -80,6 +93,17 @@ interface InterviewState {
     dataCollectionRefused?: boolean;
     forceConsentQuestion?: boolean;
     interestingTopics?: InterestingTopic[];
+
+    // v2: Elastic turn budget tracking
+    topicBudgets: Record<string, TopicBudget>;
+    turnsUsedTotal: number;
+    turnsBudgetTotal: number;
+    uncoveredTopics: string[];  // Topic IDs with remaining subgoals
+    topicEngagementScores: Record<string, number>;  // Signal scores per topic
+    topicKeyInsights: Record<string, string>;  // Best snippet per topic
+    lastSignalScore: number;  // Last computed signal score (0-1)
+
+    // Legacy DEEP fields (being phased out)
     deepTopicOrder?: string[];             // Ordered topic IDs for DEEP based on value
     deepTurnsByTopic?: Record<string, number>;
     topicSubGoalHistory?: Record<string, string[]>; // Track used sub-goals per topic
@@ -194,7 +218,7 @@ function shouldUseCriticalModelForTopicTurn(params: {
     userMessage?: string | null;
     language: string;
 }): { useCritical: boolean; reason: string } {
-    if (params.phase !== 'SCAN' && params.phase !== 'DEEP') {
+    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') {
         return { useCritical: false, reason: 'not_topic_phase' };
     }
 
@@ -321,13 +345,12 @@ function buildDeepTopicOrder(
 }
 
 function getScanPlanTurns(plan: InterviewPlan, topicId: string): number {
-    const topic = plan.scan.topics.find(t => t.topicId === topicId);
+    const topic = plan.explore.topics.find(t => t.topicId === topicId);
     return Math.max(1, topic?.maxTurns ?? 1);
 }
 
 function getDeepPlanTurns(plan: InterviewPlan, topicId: string): number {
-    const topic = plan.deep.topics.find(t => t.topicId === topicId);
-    const base = topic?.maxTurns ?? plan.deep.maxTurnsPerTopic;
+    const base = plan.deepen.maxTurnsPerTopic;
     return Math.max(1, base);
 }
 
@@ -363,7 +386,7 @@ function buildDeepPlan(
         // - then add extra turns in priority order, capped by uncovered sub-goals and plan max.
         const availableTurnsRaw = typeof remainingSec === 'number'
             ? Math.floor(Math.max(0, remainingSec) / 45)
-            : ordered.length * (plan.deep.maxTurnsPerTopic || 2);
+            : ordered.length * (plan.deepen.maxTurnsPerTopic || 2);
         const availableTurns = Math.max(ordered.length, availableTurnsRaw);
 
         for (const topicId of ordered) {
@@ -397,7 +420,7 @@ function buildDeepPlan(
         return { deepTopicOrder: ordered, deepTurnsByTopic };
     }
 
-    const fallbackCount = Math.max(1, plan.deep.fallbackTurns || 2);
+    const fallbackCount = Math.max(1, plan.deepen.fallbackTurns || 2);
     const ordered = buildDeepTopicOrder(
         botTopics,
         interestingTopics,
@@ -875,7 +898,7 @@ async function enforceDeepOfferQuestion(params: {
     return language === 'it'
         ? (hintText
             ? `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu, partendo da uno dei punti emersi, ad esempio ${hintText}. Ti va di proseguire ancora per qualche minuto?`
-            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti piu utili emersi. Ti va di proseguire ancora per qualche minuto?`)
+            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti più utili emersi. Ti va di proseguire ancora per qualche minuto?`)
         : (hintText
             ? `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions, starting from one point that emerged, for example ${hintText}. Would you like to continue for a few more minutes?`
             : `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions on one useful point that emerged. Would you like to continue for a few more minutes?`);
@@ -1274,7 +1297,7 @@ function detectUserTurnSignal(params: {
 }): UserTurnSignal {
     const userMessage = String(params.userMessage || '').trim();
     if (!userMessage) return 'none';
-    if (params.phase !== 'SCAN' && params.phase !== 'DEEP') return 'none';
+    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') return 'none';
 
     if (isClarificationSignal(userMessage, params.language)) {
         return 'clarification';
@@ -1832,7 +1855,7 @@ export async function POST(req: Request) {
             totalTimeSec: interviewPlan.meta.totalTimeSec,
             perTopicTimeSec: interviewPlan.meta.perTopicTimeSec,
             secondsPerTurn: interviewPlan.meta.secondsPerTurn,
-            topics: interviewPlan.scan.topics.map(t => ({
+            topics: interviewPlan.explore.topics.map(t => ({
                 topicId: t.topicId,
                 label: t.label,
                 minTurns: t.minTurns,
@@ -1845,7 +1868,7 @@ export async function POST(req: Request) {
         // ====================================================================
         const rawMetadata = (conversation as any).metadata || {};
         const state: InterviewState = {
-            phase: rawMetadata.phase || 'SCAN',
+            phase: rawMetadata.phase || 'EXPLORE',
             topicIndex: rawMetadata.topicIndex ?? 0,
             turnInTopic: rawMetadata.turnInTopic ?? 0,
             deepAccepted: rawMetadata.deepAccepted ?? null,
@@ -1855,6 +1878,17 @@ export async function POST(req: Request) {
             fieldAttemptCounts: rawMetadata.fieldAttemptCounts ?? {},
             closureAttempts: rawMetadata.closureAttempts ?? 0,
             interestingTopics: rawMetadata.interestingTopics ?? [],
+
+            // v2: Elastic turn budget tracking
+            topicBudgets: rawMetadata.topicBudgets ?? {},
+            turnsUsedTotal: rawMetadata.turnsUsedTotal ?? 0,
+            turnsBudgetTotal: rawMetadata.turnsBudgetTotal ?? 0,
+            uncoveredTopics: rawMetadata.uncoveredTopics ?? [],
+            topicEngagementScores: rawMetadata.topicEngagementScores ?? {},
+            topicKeyInsights: rawMetadata.topicKeyInsights ?? {},
+            lastSignalScore: rawMetadata.lastSignalScore ?? 0,
+
+            // Legacy DEEP fields (being phased out)
             deepTopicOrder: rawMetadata.deepTopicOrder ?? [],
             deepTurnsByTopic: rawMetadata.deepTurnsByTopic ?? {},
             topicSubGoalHistory: rawMetadata.topicSubGoalHistory ?? {},
@@ -1870,7 +1904,7 @@ export async function POST(req: Request) {
             runtimeInterviewKnowledgeSignature: rawMetadata.runtimeInterviewKnowledgeSignature ?? null,
         };
 
-        const activeTopics = state.phase === 'DEEP' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
+        const activeTopics = state.phase === 'DEEPEN' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
         const currentTopic = activeTopics[state.topicIndex] || botTopics[0];
         const effectiveSec = Number.isFinite(safeEffectiveDuration)
             ? safeEffectiveDuration
@@ -1895,7 +1929,7 @@ export async function POST(req: Request) {
             runtimeKnowledgeSignature
         );
         const shouldPrepareRuntimeKnowledge =
-            (state.phase === 'SCAN' || state.phase === 'DEEP') &&
+            (state.phase === 'EXPLORE' || state.phase === 'DEEPEN') &&
             !manualInterviewGuide &&
             !hasValidRuntimeKnowledge;
         const runtimeInterviewKnowledgePromise: Promise<RuntimeInterviewKnowledge | null> = shouldPrepareRuntimeKnowledge
@@ -1905,7 +1939,7 @@ export async function POST(req: Request) {
                 language,
                 interviewGoal: bot.researchGoal || '',
                 targetAudience: bot.targetAudience || '',
-                topics: interviewPlan.scan.topics.map((topic) => ({
+                topics: interviewPlan.explore.topics.map((topic) => ({
                     topicId: topic.topicId,
                     topicLabel: topic.label,
                     subGoals: topic.subGoals || []
@@ -1938,7 +1972,10 @@ export async function POST(req: Request) {
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
-        const buildDeepOfferInsight = (sourceState: InterviewState) => {
+        const buildDeepOfferInsight = (
+            sourceState: InterviewState,
+            validationFeedback?: ValidationResponse
+        ) => {
             const extensionPreview = buildExtensionPreviewHints({
                 botTopics,
                 deepOrder: sourceState.deepTopicOrder,
@@ -1949,7 +1986,7 @@ export async function POST(req: Request) {
                 startIndex: sourceState.topicIndex,
                 maxItems: 2
             });
-            return createDeepOfferInsight(extensionPreview);
+            return createDeepOfferInsight(extensionPreview, validationFeedback);
         };
 
         if (lastMessage?.role === 'user') {
@@ -1957,7 +1994,8 @@ export async function POST(req: Request) {
         }
 
         let forceEarlyClosureFromUser = false;
-        if (lastMessage?.role === 'user' && state.phase !== 'DATA_COLLECTION') {
+        // Skip closure detection in DEEP_OFFER phase - it has its own logic to handle REFUSE vs ACCEPT
+        if (lastMessage?.role === 'user' && state.phase !== 'DATA_COLLECTION' && state.phase !== 'DEEP_OFFER') {
             const closureIntent = await detectExplicitClosureIntent(
                 lastMessage.content,
                 openAIKey,
@@ -1999,173 +2037,24 @@ export async function POST(req: Request) {
         // --------------------------------------------------------------------
         if (!forceEarlyClosureFromUser && supervisorInsight.status !== 'COMPLETE_WITHOUT_DATA' && supervisorInsight.status !== 'DATA_COLLECTION_CONSENT') {
 
-            if (state.phase === 'SCAN') {
-                const scanMaxTurns = getScanPlanTurns(interviewPlan, currentTopic.id);
-                const scanPlanTopic = interviewPlan.scan.topics.find(t => t.topicId === currentTopic.id);
-                console.log(`📊 [SCAN] Topic "${currentTopic.label}" turn=${state.turnInTopic} maxTurns=${scanMaxTurns} plan=`, {
-                    minTurns: scanPlanTopic?.minTurns,
-                    maxTurns: scanPlanTopic?.maxTurns
+            if (state.phase === 'EXPLORE') {
+                // v2: Signal-driven elastic exploration
+                const exploreResult = handleExplorePhase({
+                    state,
+                    currentTopic,
+                    botTopics,
+                    lastUserMessage: lastMessage?.role === 'user' ? (lastMessage.content || '') : '',
+                    language,
+                    interviewPlan,
+                    maxDurationMins,
+                    effectiveSec
                 });
-                // Check if we should transition to next topic (use dynamic budget)
-                if (state.turnInTopic >= scanMaxTurns) {
-                    const shouldClarifyBeforeTransition =
-                        lastMessage?.role === 'user' &&
-                        isClarificationSignal(lastMessage.content, language) &&
-                        ((state.clarificationTurnsByTopic || {})[currentTopic.id] || 0) < 1;
 
-                    if (shouldClarifyBeforeTransition) {
-                        const usedSubGoals = (state.topicSubGoalHistory || {})[currentTopic.id] || [];
-                        const availableSubGoals = (currentTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
-                        const clarifySubGoal = availableSubGoals[0] || currentTopic.label;
-                        nextState.clarificationTurnsByTopic = {
-                            ...(state.clarificationTurnsByTopic || {}),
-                            [currentTopic.id]: ((state.clarificationTurnsByTopic || {})[currentTopic.id] || 0) + 1
-                        };
-                        nextState.turnInTopic = state.turnInTopic;
-                        supervisorInsight = { status: 'SCANNING', nextSubGoal: clarifySubGoal };
-                        console.log(`🧩 [SCAN] Clarification detected on "${currentTopic.label}". Adding one clarification turn before transition.`);
-                        // Keep current topic for one extra clarification question.
-                    } else {
-                        // Move to next topic
-                        if (state.topicIndex + 1 < numTopics) {
-                            nextState.topicIndex = state.topicIndex + 1;
-                            nextState.turnInTopic = 0;
-                            nextTopicId = botTopics[nextState.topicIndex].id;
-
-                            console.log(`➡️ [SCAN] Topic transition: ${currentTopic.label} → ${botTopics[nextState.topicIndex].label}`);
-                            const nextTopic = botTopics[nextState.topicIndex];
-                            const nextAvailableSubGoals = getRemainingSubGoals(nextTopic, state.topicSubGoalHistory);
-                            const transitionUserMessage = lastMessage?.role === 'user'
-                                ? String(lastMessage.content || '').slice(0, 300)
-                                : undefined;
-                            const transitionWordCount = transitionUserMessage
-                                ? transitionUserMessage.split(/\s+/).filter(Boolean).length
-                                : 0;
-                            const overlap = hasMeaningfulTopicOverlap({
-                                userMessage: transitionUserMessage,
-                                nextTopic,
-                                language
-                            });
-                            const userTouchesNextTopic = overlap.hasSignal;
-                            const transitionMode = (userTouchesNextTopic && transitionWordCount >= 5) ? 'bridge' : 'clean_pivot';
-                            const transitionSnippetCandidate = transitionUserMessage
-                                ? sanitizeUserSnippet(transitionUserMessage, 7)
-                                : '';
-                            const transitionBridgeSnippet = transitionMode === 'bridge' && isUsableBridgeSnippet(transitionSnippetCandidate, language)
-                                ? transitionSnippetCandidate
-                                : undefined;
-                            console.log(`🧭 [TRANSITION] mode=${transitionMode} userTouchesNextTopic=${userTouchesNextTopic} words=${transitionWordCount} overlaps=${overlap.overlaps.join('|') || '-'}`);
-                            supervisorInsight = {
-                                status: 'TRANSITION',
-                                nextTopic: nextTopic.label,
-                                nextSubGoal: nextAvailableSubGoals[0] || nextTopic.label,
-                                transitionUserMessage,
-                                transitionMode,
-                                transitionBridgeSnippet
-                            };
-                        } else {
-                            // End of SCAN: prepare DEEP and decide whether to offer extension first.
-                            const maxDurationSec = maxDurationMins * 60;
-                            const remainingSec = maxDurationSec - effectiveSec;
-                            console.log("📊 [SCAN] Complete.", `remainingSec: ${remainingSec}`);
-                            const deepPlan = buildDeepPlan(
-                                botTopics,
-                                interviewPlan,
-                                state.topicSubGoalHistory,
-                                state.interestingTopics,
-                                remainingSec,
-                                interviewObjective,
-                                language
-                            );
-                            nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                            nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                            const deepTopics = getDeepTopics(botTopics, nextState.deepTopicOrder);
-                            nextTopicId = deepTopics[0]?.id || botTopics[0].id;
-
-                            if (remainingSec <= 0 && state.deepAccepted !== true) {
-                                nextState.phase = 'DEEP_OFFER';
-                                nextState.deepAccepted = false;
-                                nextState.topicIndex = 0;
-                                nextState.turnInTopic = 0;
-                                nextState.extensionReturnPhase = 'DEEP';
-                                nextState.extensionReturnTopicIndex = 0;
-                                nextState.extensionReturnTurnInTopic = 0;
-                                nextState.extensionOfferAttempts = 0;
-                                supervisorInsight = buildDeepOfferInsight(nextState);
-                                console.log(`🎁 [SCAN→DEEP_OFFER] SCAN complete with no remaining time. Asking extension consent.`);
-                            } else {
-                                nextState.phase = 'DEEP';
-                                nextState.deepAccepted = state.deepAccepted === true ? true : null;
-                                nextState.topicIndex = 0;
-                                nextState.turnInTopic = 0;
-                                const bestSnippet = (state.interestingTopics || []).find(
-                                    (it: InterestingTopic) => it.topicId === deepTopics[0]?.id
-                                )?.bestSnippet || '';
-                                supervisorInsight = { status: 'START_DEEP', engagingSnippet: bestSnippet };
-                                console.log(`✅ [SCAN→DEEP] SCAN complete. Starting DEEP.`);
-                            }
-                        }
-                    }
-                } else {
-                    // Continue SCAN on current topic
-                    nextState.turnInTopic = state.turnInTopic + 1;
-                    console.log(`📊 [SCAN] Increment turn -> ${nextState.turnInTopic}`);
-
-                    // Track engagement for value-based DEEP ordering
-                    if (lastMessage?.role === 'user') {
-                        const engagementScore = computeEngagementScore(lastMessage.content, language);
-                        const snippet = extractSnippet(lastMessage.content);
-
-                        const existingTopics = [...(nextState.interestingTopics || [])];
-                        const existingIndex = existingTopics.findIndex(t => t.topicId === currentTopic.id);
-
-                        if (existingIndex >= 0) {
-                            // Update with running average
-                            const prev = existingTopics[existingIndex];
-                            const averaged = (prev.engagementScore + engagementScore) / 2;
-                            existingTopics[existingIndex] = {
-                                ...prev,
-                                engagementScore: averaged,
-                                bestSnippet: engagementScore >= prev.engagementScore ? snippet : prev.bestSnippet
-                            };
-                        } else {
-                            existingTopics.push({
-                                topicId: currentTopic.id,
-                                topicLabel: currentTopic.label,
-                                engagementScore,
-                                bestSnippet: snippet
-                            });
-                        }
-                        nextState.interestingTopics = existingTopics;
-                        console.log(`📊 [ENGAGEMENT] Topic "${currentTopic.label}" score: ${engagementScore.toFixed(2)}`);
-                    }
-
-                    // Ask TopicManager for next sub-goal
-                    const usedSubGoals = (state.topicSubGoalHistory || {})[currentTopic.id] || [];
-                    const availableSubGoals = (currentTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
-                    let nextSubGoal = '';
-
-                    if (availableSubGoals.length > 0) {
-                        const insight = await TopicManager.generateScanQuestion(
-                            currentTopic,
-                            state.turnInTopic,
-                            openAIKey,
-                            language,
-                            availableSubGoals
-                        );
-                        nextSubGoal = insight.nextSubGoal;
-                        nextState.topicSubGoalHistory = {
-                            ...(state.topicSubGoalHistory || {}),
-                            [currentTopic.id]: [...usedSubGoals, nextSubGoal]
-                        };
-                    } else {
-                        // Sub-goals exhausted: deepen on user's last detail
-                        const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
-                        const deepenVerb = language === 'it' ? 'Approfondisci' : 'Explore further';
-                        nextSubGoal = fallbackSnippet ? `${deepenVerb}: "${fallbackSnippet}"` : `${deepenVerb}: "${currentTopic.label}"`;
-                    }
-
-                    supervisorInsight = { status: 'SCANNING', nextSubGoal };
+                // Merge explore result into nextState
+                Object.assign(nextState, exploreResult.nextState);
+                supervisorInsight = exploreResult.supervisorInsight;
+                if (exploreResult.nextTopicId) {
+                    nextTopicId = exploreResult.nextTopicId;
                 }
             }
 
@@ -2220,198 +2109,24 @@ export async function POST(req: Request) {
             }
 
             // --------------------------------------------------------------------
-            // PHASE: DEEP
+            // PHASE: DEEPEN
             // --------------------------------------------------------------------
-            else if (state.phase === 'DEEP') {
-                if (!state.deepTurnsByTopic || Object.keys(state.deepTurnsByTopic).length === 0) {
-                    const maxDurationSecForPlan = maxDurationMins * 60;
-                    const remainingSecForPlan = maxDurationSecForPlan - effectiveSec;
-                    const deepPlan = buildDeepPlan(
-                        botTopics,
-                        interviewPlan,
-                        state.topicSubGoalHistory,
-                        state.interestingTopics,
-                        remainingSecForPlan,
-                        interviewObjective,
-                        language
-                    );
-                    nextState.deepTopicOrder = deepPlan.deepTopicOrder;
-                    nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
-                }
-                const deepOrder = (nextState.deepTopicOrder && nextState.deepTopicOrder.length > 0)
-                    ? nextState.deepTopicOrder
-                    : state.deepTopicOrder;
-                const deepTurnsMap = (nextState.deepTurnsByTopic && Object.keys(nextState.deepTurnsByTopic).length > 0)
-                    ? nextState.deepTurnsByTopic
-                    : state.deepTurnsByTopic;
-                const deepTopics = getDeepTopics(botTopics, deepOrder);
-                const deepCurrent = deepTopics[state.topicIndex] || currentTopic;
-                const turnsLimit = Math.max(1, (deepTurnsMap || {})[deepCurrent.id] || getDeepPlanTurns(interviewPlan, deepCurrent.id));
-                const deepTotal = deepTopics.length || numTopics;
+            else if (state.phase === 'DEEPEN') {
+                // v2: Residual exploration of uncovered topics
+                const deepenResult = handleDeepenPhase({
+                    state,
+                    currentTopic,
+                    botTopics,
+                    language,
+                    maxDurationMins,
+                    effectiveSec
+                });
 
-                console.log(`📊 [DEEP] Topic ${state.topicIndex + 1}/${deepTotal}, Turn ${state.turnInTopic + 1}/${turnsLimit}`);
-
-                // If time is over during DEEP, offer extra time before continuing
-                const maxDurationSec = maxDurationMins * 60;
-                const remainingSec = maxDurationSec - effectiveSec;
-                let usedClarificationTurnInDeep = false;
-                if (remainingSec <= 0 && state.deepAccepted !== true) {
-                    const shouldClarifyBeforeOffer =
-                        lastMessage?.role === 'user' &&
-                        isClarificationSignal(lastMessage.content, language) &&
-                        ((state.clarificationTurnsByTopic || {})[deepCurrent.id] || 0) < 1;
-
-                    if (shouldClarifyBeforeOffer) {
-                        usedClarificationTurnInDeep = true;
-                        nextState.turnInTopic = state.turnInTopic;
-                        nextState.clarificationTurnsByTopic = {
-                            ...(state.clarificationTurnsByTopic || {}),
-                            [deepCurrent.id]: ((state.clarificationTurnsByTopic || {})[deepCurrent.id] || 0) + 1
-                        };
-                        const usedSubGoals = (state.topicSubGoalHistory || {})[deepCurrent.id] || [];
-                        const lastDeepGoal = (state.deepLastSubGoalByTopic || {})[deepCurrent.id];
-                        const availableSubGoals = (deepCurrent.subGoals || [])
-                            .filter((sg: string) => !usedSubGoals.includes(sg))
-                            .filter((sg: string) => (lastDeepGoal ? sg !== lastDeepGoal : true));
-                        const matchingTopic = (nextState.interestingTopics || state.interestingTopics || []).find(
-                            (it: InterestingTopic) => it.topicId === deepCurrent.id
-                        );
-                        const engagingSnippet = matchingTopic?.bestSnippet || '';
-                        const focusPoint = selectDeepFocusPoint({
-                            topic: deepCurrent,
-                            availableSubGoals: availableSubGoals.length > 0 ? availableSubGoals : (deepCurrent.subGoals || [deepCurrent.label]),
-                            engagingSnippet,
-                            interviewObjective,
-                            lastUserMessage: lastMessage.content,
-                            language
-                        });
-                        supervisorInsight = { status: 'DEEPENING', focusPoint: focusPoint || deepCurrent.label, engagingSnippet };
-                        console.log(`🧩 [DEEP] Clarification detected on "${deepCurrent.label}" at time boundary. Adding one clarification turn before extension offer.`);
-                    } else {
-                        nextState.phase = 'DEEP_OFFER';
-                        nextState.deepAccepted = false;
-                        nextState.extensionReturnPhase = 'DEEP';
-                        nextState.extensionReturnTopicIndex = state.topicIndex;
-                        nextState.extensionReturnTurnInTopic = state.turnInTopic;
-                        nextState.extensionOfferAttempts = 0;
-                        supervisorInsight = buildDeepOfferInsight(state);
-                        console.log(`🎁 [DEEP→DEEP_OFFER] Time limit reached during DEEP. Asking extension consent.`);
-                    }
-                }
-
-                if (nextState.phase === 'DEEP_OFFER') {
-                    // Skip DEEP progression until user responds to offer
-                } else if (usedClarificationTurnInDeep) {
-                    // Keep current DEEP topic/turn for one clarification response.
-                } else if (state.turnInTopic >= turnsLimit) {
-                    // Move to next topic
-                    if (state.topicIndex + 1 < deepTotal) {
-                        nextState.topicIndex = state.topicIndex + 1;
-                        nextState.turnInTopic = 0;
-                        nextTopicId = deepTopics[nextState.topicIndex]?.id || botTopics[nextState.topicIndex]?.id;
-
-                        console.log(`➡️ [DEEP] Topic transition: ${deepCurrent.label} → ${deepTopics[nextState.topicIndex]?.label || botTopics[nextState.topicIndex]?.label}`);
-                        const nextDeepTopic = deepTopics[nextState.topicIndex] || botTopics[nextState.topicIndex];
-                        const nextAvailableSubGoals = nextDeepTopic ? getRemainingSubGoals(nextDeepTopic, nextState.topicSubGoalHistory || state.topicSubGoalHistory) : [];
-                        const nextEngagingSnippet = (nextState.interestingTopics || state.interestingTopics || []).find(
-                            (it: InterestingTopic) => it.topicId === nextDeepTopic?.id
-                        )?.bestSnippet || '';
-                        const nextFocusPoint = nextDeepTopic ? selectDeepFocusPoint({
-                            topic: nextDeepTopic,
-                            availableSubGoals: nextAvailableSubGoals,
-                            engagingSnippet: nextEngagingSnippet,
-                            interviewObjective,
-                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
-                            language
-                        }) : '';
-                        const transitionUserMessage = lastMessage?.role === 'user'
-                            ? String(lastMessage.content || '').slice(0, 300)
-                            : undefined;
-                        const transitionWordCount = transitionUserMessage
-                            ? transitionUserMessage.split(/\s+/).filter(Boolean).length
-                            : 0;
-                        const overlap = hasMeaningfulTopicOverlap({
-                            userMessage: transitionUserMessage,
-                            nextTopic: nextDeepTopic,
-                            language
-                        });
-                        const userTouchesNextTopic = overlap.hasSignal;
-                        const transitionMode = (userTouchesNextTopic && transitionWordCount >= 5) ? 'bridge' : 'clean_pivot';
-                        const transitionSnippetCandidate = transitionUserMessage
-                            ? sanitizeUserSnippet(transitionUserMessage, 7)
-                            : '';
-                        const transitionBridgeSnippet = transitionMode === 'bridge' && isUsableBridgeSnippet(transitionSnippetCandidate, language)
-                            ? transitionSnippetCandidate
-                            : undefined;
-                        console.log(`🧭 [TRANSITION] mode=${transitionMode} userTouchesNextTopic=${userTouchesNextTopic} words=${transitionWordCount} overlaps=${overlap.overlaps.join('|') || '-'}`);
-                        supervisorInsight = {
-                            status: 'TRANSITION',
-                            nextTopic: nextDeepTopic?.label || botTopics[nextState.topicIndex]?.label,
-                            nextSubGoal: nextFocusPoint || nextDeepTopic?.label,
-                            transitionUserMessage,
-                            transitionMode,
-                            transitionBridgeSnippet
-                        };
-                    } else {
-                        // End of DEEP - ALL topics done, move to DATA_COLLECTION
-                        console.log(`✅ [DEEP] All ${deepTotal} topics completed. Moving to DATA_COLLECTION.`);
-                        const maxDurationSec = maxDurationMins * 60;
-                        const remainingSecAfterDeep = maxDurationSec - effectiveSec;
-                        console.log(`✅ [DEEP] Remaining time after DEEP: ${remainingSecAfterDeep}s. Proceeding to DATA_COLLECTION.`);
-
-                        if (shouldCollectData) {
-                            nextState.phase = 'DATA_COLLECTION';
-                            supervisorInsight = { status: 'DATA_COLLECTION_CONSENT' };
-                            nextState.consentGiven = false;
-                        } else {
-                            // Let the AI say goodbye
-                            nextState.phase = 'DATA_COLLECTION';
-                            supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
-                        }
-                    }
-                } else {
-                    // Continue DEEP on current topic
-                    nextState.turnInTopic = state.turnInTopic + 1;
-
-                    // Ask for a DEEP focus point (avoid repetition)
-                    const usedSubGoals = (state.topicSubGoalHistory || {})[deepCurrent.id] || [];
-                    const lastDeepGoal = (state.deepLastSubGoalByTopic || {})[deepCurrent.id];
-                    const availableSubGoals = (deepCurrent.subGoals || [])
-                        .filter((sg: string) => !usedSubGoals.includes(sg))
-                        .filter((sg: string) => (lastDeepGoal ? sg !== lastDeepGoal : true));
-
-                    // Get engaging snippet from SCAN phase for this topic
-                    const matchingTopic = (nextState.interestingTopics || state.interestingTopics || []).find(
-                        (it: InterestingTopic) => it.topicId === deepCurrent.id
-                    );
-                    const engagingSnippet = matchingTopic?.bestSnippet || '';
-
-                    if (availableSubGoals.length === 0) {
-                        const fallbackSnippet = lastMessage?.role === 'user' ? extractSnippet(lastMessage.content) : '';
-                        const deepenVerb = language === 'it' ? 'Approfondisci' : 'Explore further';
-                        const focusPoint = fallbackSnippet ? `${deepenVerb}: "${fallbackSnippet}"` : `${deepenVerb}: "${deepCurrent.label}"`;
-                        supervisorInsight = { status: 'DEEPENING', focusPoint, engagingSnippet };
-                    } else {
-                        const focusPoint = selectDeepFocusPoint({
-                            topic: deepCurrent,
-                            availableSubGoals,
-                            engagingSnippet,
-                            interviewObjective,
-                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
-                            language
-                        });
-                        nextState.topicSubGoalHistory = {
-                            ...(state.topicSubGoalHistory || {}),
-                            [deepCurrent.id]: [...usedSubGoals, focusPoint]
-                        };
-                        nextState.deepLastSubGoalByTopic = {
-                            ...(state.deepLastSubGoalByTopic || {}),
-                            [deepCurrent.id]: focusPoint
-                        };
-                        supervisorInsight = { status: 'DEEPENING', focusPoint, engagingSnippet };
-                    }
-
-                    console.log(`🔍 [DEEP] Continuing topic "${deepCurrent.label}", turn ${nextState.turnInTopic}/${turnsLimit}`);
+                // Merge deepen result into nextState
+                Object.assign(nextState, deepenResult.nextState);
+                supervisorInsight = deepenResult.supervisorInsight;
+                if (deepenResult.nextTopicId) {
+                    nextTopicId = deepenResult.nextTopicId;
                 }
             }
 
@@ -2697,13 +2412,31 @@ export async function POST(req: Request) {
                                             language,
                                             { onUsage: collectLlmUsage }
                                         );
-                                        console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}"`);
-                                        if (extraction.value && extraction.confidence !== 'none') {
+                                        const attemptCount = (state.fieldAttemptCounts?.[prioritizedField] || 0) + 1;
+
+                                        // Validate with structured feedback
+                                        const validationResult = validateExtractedField(
+                                            prioritizedField,
+                                            extraction.value,
+                                            extraction.confidence,
+                                            attemptCount,
+                                            language as 'it' | 'en'
+                                        );
+
+                                        console.log(`🔍 [DATA_COLLECTION] Extraction result for "${prioritizedField}": confidence="${extraction.confidence}" feedback="${validationResult.feedback}"`);
+
+                                        if (validationResult.isValid) {
                                             currentProfile = { ...currentProfile, [prioritizedField]: extraction.value };
                                             profileChanged = true;
                                             console.log(`✅ [DATA_COLLECTION] LLM extraction for "${prioritizedField}"`);
                                         } else {
-                                            console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}" (confidence=${extraction.confidence})`);
+                                            console.log(`⚠️ [DATA_COLLECTION] Could not extract "${prioritizedField}": ${validationResult.reason}`);
+
+                                            // Store validation feedback for supervisor/bot to use
+                                            if (!supervisorInsight.validationFeedback) {
+                                                supervisorInsight.validationFeedback = validationResult;
+                                                supervisorInsight.feedbackMessage = validationResult.feedback;
+                                            }
                                         }
                                     }
                                 }
@@ -2780,7 +2513,7 @@ export async function POST(req: Request) {
         const qualityModel = modelRegistry.quality;
         const dataCollectionModel = modelRegistry.dataCollection;
         console.log("🧠 [MODEL_ROUTING]", modelRegistry.names);
-        const nextActiveTopics = nextState.phase === 'DEEP'
+        const nextActiveTopics = nextState.phase === 'DEEPEN'
             ? getDeepTopics(botTopics, nextState.deepTopicOrder || state.deepTopicOrder)
             : botTopics;
         const targetTopic = nextActiveTopics[nextState.topicIndex] || currentTopic;
@@ -2806,7 +2539,7 @@ export async function POST(req: Request) {
         const recentBridgeStems = collectRecentBridgeStems(canonicalMessages, 14);
         const plannerTopic = targetTopic || currentTopic;
         const plannerTopicId = plannerTopic?.id || currentTopic.id;
-        const plannerMaxTurns = nextState.phase === 'DEEP'
+        const plannerMaxTurns = nextState.phase === 'DEEPEN'
             ? getDeepPlanTurns(interviewPlan, plannerTopicId)
             : getScanPlanTurns(interviewPlan, plannerTopicId);
         const plannerUsedSubGoals = (nextState.topicSubGoalHistory || {})[plannerTopicId] || [];
@@ -2830,11 +2563,11 @@ export async function POST(req: Request) {
         systemPrompt = await PromptBuilder.build(
             bot,
             conversation,
-            targetTopic,
-            methodology,
+            currentTopic,
             effectiveSec,
             supervisorInsight,
-            interviewPlan
+            interviewPlan,
+            manualInterviewGuide || undefined
         );
         const manualKnowledgePrompt = buildManualKnowledgePromptBlock({
             manualGuide: manualInterviewGuide,
@@ -2866,11 +2599,11 @@ export async function POST(req: Request) {
         // Phase-specific injections
 
         // Final reinforcement based on phase - CLEAR STATUS BANNER
-        const shouldShowStatusBanner = (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') &&
-            ['SCANNING', 'DEEPENING', 'TRANSITION', 'START_DEEP', 'START_DEEP_BRIEF'].includes(supervisorInsight?.status);
+        const shouldShowStatusBanner = (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') &&
+            ['EXPLORING', 'DEEPENING', 'TRANSITION', 'START_DEEP', 'START_DEEP_BRIEF'].includes(supervisorInsight?.status);
 
         if (shouldShowStatusBanner) {
-            const bannerTopics = nextState.phase === 'DEEP'
+            const bannerTopics = nextState.phase === 'DEEPEN'
                 ? getDeepTopics(botTopics, nextState.deepTopicOrder || state.deepTopicOrder)
                 : botTopics;
             const bannerTopic = bannerTopics[nextState.topicIndex] || currentTopic;
@@ -2879,7 +2612,7 @@ export async function POST(req: Request) {
             const scanMaxTurns = getScanPlanTurns(interviewPlan, targetTopicId);
             const deepTurns = Math.max(1, (nextState.deepTurnsByTopic || {})[targetTopicId] || getDeepPlanTurns(interviewPlan, targetTopicId));
             const isItalianPrompt = (language || '').toLowerCase().startsWith('it');
-            const turnsInfo = nextState.phase === 'SCAN'
+            const turnsInfo = nextState.phase === 'EXPLORE'
                 ? (isItalianPrompt
                     ? `Turno ${nextState.turnInTopic}/${scanMaxTurns}`
                     : `Turn ${nextState.turnInTopic}/${scanMaxTurns}`)
@@ -2926,7 +2659,7 @@ hard_rules:
                 systemPrompt += `\n\n${runtimeSemanticContext}`;
             }
         }
-        if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
+        if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
             const microPlannerPrompt = buildMicroPlannerPromptBlock({
                 language,
                 phase: nextState.phase,
@@ -2999,10 +2732,26 @@ hard_rules:
         console.log("⏳ [CHAT] Generating response...");
         console.time("LLM");
 
+        // Integrate validation feedback into system prompt
+        const systemPromptWithValidationFeedback = addValidationFeedbackToPrompt(
+          systemPrompt,
+          supervisorInsight?.validationFeedback,
+          language as 'it' | 'en'
+        );
+
+        // Inject additional feedback message if present
+        const feedbackContext = supervisorInsight?.feedbackMessage
+            ? `Previous response feedback: "${supervisorInsight.feedbackMessage.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`
+            : '';
+
+        const contextWithFeedback = feedbackContext
+            ? `${systemPromptWithValidationFeedback}\n\nSUPERVISOR FEEDBACK: ${feedbackContext}`
+            : systemPromptWithValidationFeedback;
+
         let result: any;
         try {
             result = await Promise.race([
-                trackedGenerateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: systemPrompt, temperature: 0.7 }),
+                trackedGenerateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: contextWithFeedback, temperature: 0.7 }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 45000))
             ]);
         } catch (error: any) {
@@ -3125,7 +2874,7 @@ hard_rules:
         // Clarification/scope enforcement on topic phases:
         // if the user asked a clarification or an off-topic question,
         // ensure the assistant acknowledges it explicitly before continuing.
-        if (nonHardSafetyRegenerationsEnabled && !didRegenerate && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && lastMessage?.role === 'user') {
+        if (nonHardSafetyRegenerationsEnabled && !didRegenerate && (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && lastMessage?.role === 'user') {
             if (userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language)) {
                 console.log(`⚠️ [SUPERVISOR] Clarification requested but not handled clearly. Regenerating.`);
                 const enforcedSystem = language === 'it'
@@ -3146,10 +2895,10 @@ hard_rules:
             }
         }
 
-        const isTopicPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
+        const isTopicPhase = nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN';
         if (nonHardSafetyRegenerationsEnabled && isTopicPhase && targetTopic && !didRegenerate) {
             const anchorData = buildTopicAnchors(targetTopic, language);
-            const allowUserAnchors = supervisorInsight?.status === 'SCANNING' || supervisorInsight?.status === 'DEEPENING';
+            const allowUserAnchors = supervisorInsight?.status === 'EXPLORING' || supervisorInsight?.status === 'DEEPENING';
             const userAnchorData = allowUserAnchors && lastMessage?.role === 'user'
                 ? buildMessageAnchors(lastMessage.content, language)
                 : { anchorRoots: [], anchors: [] };
@@ -3166,7 +2915,7 @@ hard_rules:
             }
         }
 
-        if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && !didRegenerate) {
+        if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && !didRegenerate) {
             const assistantHistory = canonicalMessages
                 .filter((m: ClientMessage) => m.role === 'assistant')
                 .map((m: ClientMessage) => String(m.content || ''))
@@ -3272,7 +3021,7 @@ hard_rules:
         });
 
         const PROMO_PATTERNS = /\b(www\.|https?:\/\/|@|email|scrivi a|contatta|offerta|promo|premio|reward|coupon|sconto)\b/i;
-        const isPromoContent = PROMO_PATTERNS.test(responseText) && (nextState.phase === 'SCAN' || nextState.phase === 'DEEP' || nextState.phase === 'DEEP_OFFER');
+        const isPromoContent = PROMO_PATTERNS.test(responseText) && (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN' || nextState.phase === 'DEEP_OFFER');
         if (isPromoContent) {
             console.log(`⚠️ [SUPERVISOR] Promo/CTA detected during active phase. Regenerating.`);
             const enforceTopic = targetTopic?.label || currentTopic.label;
@@ -3394,11 +3143,11 @@ hard_rules:
             flowTelemetry.topicClosureIntercepted = true;
             const maxDurationSec = maxDurationMins * 60;
             const remainingSec = maxDurationSec - effectiveSec;
-            const shouldOfferExtraTime = nextState.phase === 'DEEP' && remainingSec <= 0 && state.deepAccepted !== true;
+            const shouldOfferExtraTime = nextState.phase === 'DEEPEN' && remainingSec <= 0 && state.deepAccepted !== true;
 
             if (shouldOfferExtraTime) {
                 console.log(`⚠️ [SUPERVISOR] Closure attempt while time is over. Switching to extension offer.`);
-                const returnPhase: 'SCAN' | 'DEEP' = state.phase === 'SCAN' ? 'SCAN' : 'DEEP';
+                const returnPhase: 'SCAN' | 'DEEP' = state.phase === 'EXPLORE' ? 'SCAN' : 'DEEP';
                 nextState.phase = 'DEEP_OFFER';
                 nextState.deepAccepted = false;
                 nextState.extensionReturnPhase = returnPhase;
@@ -3453,7 +3202,7 @@ hard_rules:
             }
         }
         // Reset closure attempts when bot generates a valid question (not trying to close)
-        else if ((nextState.phase === 'SCAN' || nextState.phase === 'DEEP') && !isGoodbyeResponse && !hasNoQuestion) {
+        else if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && !isGoodbyeResponse && !hasNoQuestion) {
             nextState.closureAttempts = 0;
         }
         else if (shouldBlockDeepOfferClosure) {
@@ -3480,207 +3229,20 @@ hard_rules:
         // ====================================================================
         // QUALITATIVE GUARDRAILS (naturalness-first, light-touch corrections)
         // ====================================================================
-        const qualityGatePhases = new Set(['SCAN', 'DEEP', 'DEEP_OFFER']);
-        qualityTelemetry.eligible = softQualityGuardsEnabled && qualityGatePhases.has(nextState.phase);
-
-        if (softQualityGuardsEnabled && qualityGatePhases.has(nextState.phase) && lastMessage?.role === 'user' && !/INTERVIEW_COMPLETED/i.test(responseText)) {
-            qualityTelemetry.evaluated = true;
-            const phaseForQuality = nextState.phase as 'SCAN' | 'DEEP' | 'DEEP_OFFER';
-            const qualityTopicLabel = targetTopic?.label || currentTopic?.label || 'current topic';
-            const lastAssistantBeforeCurrent = previousAssistantMessage;
-
-            const qualitative = evaluateInterviewQuestionQuality({
-                phase: phaseForQuality,
-                topicLabel: qualityTopicLabel,
-                userResponse: lastMessage.content,
-                assistantResponse: responseText,
-                previousAssistantResponse: lastAssistantBeforeCurrent,
-                language
-            });
-
-            qualityTelemetry.score = qualitative.score;
-            qualityTelemetry.passed = qualitative.passed;
-            qualityTelemetry.issues = qualitative.issues.slice(0, 8);
-
-            // Log quality issues for monitoring, but don't block
-            if (!qualitative.passed) {
-                console.log(`📊 [QUALITY] Score: ${qualitative.score}%, Issues: ${qualitative.issues.join(', ')}`);
-            }
-
-            // Soft correction only for the two high-impact issues requested by product:
-            // - malformed or repetitive question
-            // - weak semantic linkage / clarification handling (strictly gated)
-            const needsQuestionCountFix = !qualitative.checks.oneQuestion;
-            const needsRepetitionFix = !qualitative.checks.nonRepetitive;
-            const userWordCountForQuality = String(lastMessage.content || '').trim().split(/\s+/).filter(Boolean).length;
-            const clarificationRequestedForQuality = isClarificationSignal(lastMessage.content, language);
-            const needsSemanticLinkFix = !qualitative.checks.referencesUserContext && userWordCountForQuality >= 4;
-            const needsTransitionCoherenceFix =
-                !qualitative.checks.coherentTransition &&
-                userWordCountForQuality >= 8 &&
-                qualitative.score < 80;
-            const needsClarificationFix = clarificationRequestedForQuality && !qualitative.checks.handlesClarificationNaturally;
-            const needsClarificationDirectFix = userTurnSignal === 'clarification' && !isClarificationHandledResponse(responseText, language);
-            const needsScopeBoundaryFix = userTurnSignal === 'off_topic_question' && !isScopeBoundaryHandledResponse(responseText, language);
-            const isTopicQuestionPhase = nextState.phase === 'SCAN' || nextState.phase === 'DEEP';
-
-            if (isTopicQuestionPhase && (
-                needsQuestionCountFix ||
-                needsRepetitionFix ||
-                needsSemanticLinkFix ||
-                needsTransitionCoherenceFix ||
-                needsClarificationFix ||
-                needsClarificationDirectFix ||
-                needsScopeBoundaryFix
-            )) {
-                qualityTelemetry.gateTriggered = true;
-                const enforceTopic = targetTopic?.label || currentTopic.label;
-                const previousAssistant = String(lastAssistantBeforeCurrent || '').slice(0, 180);
-                const userContext = String(lastMessage.content || '').slice(0, 180);
-                const correctionPrompt = buildQualityCorrectionPrompt({
-                    language,
-                    enforceTopic,
-                    userContext,
-                    previousAssistant,
-                    clarifyPreviousQuestion: clarificationRequestedForQuality || userTurnSignal === 'clarification',
-                    scopeBoundaryRequired: userTurnSignal === 'off_topic_question'
-                });
-
-                try {
-                    const retry = await trackedGenerateObject({
-                        model: qualityModel,
-                        schema,
-                        messages: messagesForAI,
-                        system: `${systemPrompt}\n\n${correctionPrompt}`,
-                        temperature: 0.35
-                    });
-                    responseText = retry.object.response?.trim() || responseText;
-                    if ((responseText.match(/\?/g) || []).length !== 1) {
-                        responseText = normalizeSingleQuestion(responseText);
-                    }
-                    qualityTelemetry.regenerated = true;
-                    didRegenerate = true;
-                } catch (e) {
-                    console.error('Qualitative soft correction failed:', e);
-                    qualityTelemetry.fallbackUsed = true;
-                    try {
-                        responseText = await generateQuestionOnly({
-                            model: qualityModel,
-                            language,
-                            topicLabel: enforceTopic,
-                            topicCue: buildNaturalTopicCue(enforceTopic, language),
-                            subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
-                            lastUserMessage: lastMessage?.content || null,
-                            previousAssistantQuestion,
-                            semanticBridgeHint: userBridgeHint,
-                            avoidBridgeStems: recentBridgeStems,
-                            requireAcknowledgment: true,
-                            transitionMode: supervisorInsight?.transitionMode,
-                            onUsage: collectLlmUsage
-                        });
-                    } catch (innerError) {
-                        console.error('Qualitative fallback question generation failed:', innerError);
-                    }
-                }
-            }
-        }
+        // NOTE: Disabled in v2 - quality pipeline removed. ENABLE_SOFT_QUALITY_GUARDS is false anyway.
+        // const qualityGatePhases = new Set(['EXPLORE', 'DEEPEN', 'DEEP_OFFER']);
+        // qualityTelemetry.eligible = softQualityGuardsEnabled && qualityGatePhases.has(nextState.phase);
+        //
+        // if (softQualityGuardsEnabled && qualityGatePhases.has(nextState.phase) && lastMessage?.role === 'user' && !/INTERVIEW_COMPLETED/i.test(responseText)) {
+        //     ... (quality evaluation disabled in v2)
+        // }
 
         // ====================================================================
         // FINAL SAFETY NET: Only intervene for critical issues
-        // Strategy: ADDITIVE fix (keep original + add question) instead of full regeneration
         // ====================================================================
-        if (nextState.phase === 'SCAN' || nextState.phase === 'DEEP') {
-            const hasGoodbyeNow = goodbyePattern.test(responseText);
-            const hasNoQuestionNow = !responseText.includes('?');
-            const hasMultipleQuestionsNow = (responseText.match(/\?/g) || []).length > 1;
-            const hasCompletionNow = /INTERVIEW_COMPLETED/i.test(responseText);
-            const hasPrematureContactNow = contactRequestPattern.test(responseText);
-
-            // Only intervene for critical conversational integrity issues
-            const needsIntervention =
-                hasGoodbyeNow ||
-                hasNoQuestionNow ||
-                hasMultipleQuestionsNow ||
-                hasCompletionNow ||
-                hasPrematureContactNow;
-
-            if (needsIntervention) {
-                flowTelemetry.topicClosureIntercepted = true;
-                const enforceTopic = targetTopic?.label || currentTopic.label;
-                const userContext = lastMessage?.role === 'user' ? lastMessage.content.slice(0, 150) : '';
-
-                console.log(`🛡️ [SAFETY_NET] Issue detected in ${nextState.phase}: goodbye=${hasGoodbyeNow}, noQuestion=${hasNoQuestionNow}, multiQuestion=${hasMultipleQuestionsNow}, completion=${hasCompletionNow}, contact=${hasPrematureContactNow}`);
-
-                // ADDITIVE APPROACH: Ask LLM to add a follow-up question to the existing response
-                const additivePrompt = buildAdditiveQuestionPrompt({
-                    language,
-                    hasMultipleQuestionsNow,
-                    enforceTopic,
-                    userContext
-                });
-
-                try {
-                    // Always regenerate contextually for conversational coherence.
-                    const additiveRetry = await trackedGenerateObject({
-                        model: qualityModel,
-                        schema,
-                        messages: [
-                            ...messagesForAI.slice(0, -1),
-                            { role: 'user' as const, content: lastMessage?.content || '' }
-                        ],
-                        system: `${systemPrompt}\n\n${additivePrompt}`,
-                        temperature: 0.35
-                    });
-                    responseText = additiveRetry.object.response?.trim() || responseText;
-
-                    // If still malformed, ask a fresh contextual single-question turn.
-                    if (!responseText.includes('?')) {
-                        responseText = await generateQuestionOnly({
-                            model: qualityModel,
-                            language,
-                            topicLabel: enforceTopic,
-                            topicCue: buildNaturalTopicCue(enforceTopic, language),
-                            subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
-                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
-                            previousAssistantQuestion,
-                            semanticBridgeHint: userBridgeHint,
-                            avoidBridgeStems: recentBridgeStems,
-                            requireAcknowledgment: true,
-                            transitionMode: supervisorInsight?.transitionMode,
-                            onUsage: collectLlmUsage
-                        });
-                    }
-
-                    // Clean any remaining closure markers
-                    responseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
-
-                } catch (e) {
-                    console.error('Additive fix failed:', e);
-                    try {
-                        responseText = await generateQuestionOnly({
-                            model: qualityModel,
-                            language,
-                            topicLabel: enforceTopic,
-                            topicCue: buildNaturalTopicCue(enforceTopic, language),
-                            subGoal: supervisorInsight?.nextSubGoal || supervisorInsight?.focusPoint || null,
-                            lastUserMessage: lastMessage?.role === 'user' ? lastMessage.content : null,
-                            previousAssistantQuestion,
-                            semanticBridgeHint: userBridgeHint,
-                            avoidBridgeStems: recentBridgeStems,
-                            requireAcknowledgment: true,
-                            transitionMode: supervisorInsight?.transitionMode,
-                            onUsage: collectLlmUsage
-                        });
-                    } catch (innerError) {
-                        console.error('Final contextual fallback failed:', innerError);
-                        const fallbackQuestion = language === 'it'
-                            ? 'Puoi approfondire questo punto?'
-                            : 'Can you elaborate on this?';
-                        responseText = fallbackQuestion;
-                    }
-                }
-            }
-        }
+        // NOTE: Disabled in v2 - safety nets will be re-implemented with proper helper functions.
+        // The buildAdditiveQuestionPrompt function was removed as part of quality pipeline cleanup.
+        // if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') { ... }
 
         // DEEP_OFFER safety: must be an extension-consent question
         if (nextState.phase === 'DEEP_OFFER') {

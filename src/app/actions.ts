@@ -282,6 +282,22 @@ export async function deleteProjectAction(projectId: string) {
         })
         : fallbackTarget;
 
+    // Check if ProjectVisibilityConfig table exists before attempting to delete
+    let projectVisibilityConfigExists = false;
+    try {
+        const tableCheck = await prisma.$queryRaw<[{ exists: boolean }]>(Prisma.sql`
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_name = 'ProjectVisibilityConfig'
+            )
+        `);
+        projectVisibilityConfigExists = tableCheck[0]?.exists || false;
+    } catch (error) {
+        // If query fails, assume table doesn't exist
+        console.warn('[deleteProjectAction] Could not check ProjectVisibilityConfig table existence:', error);
+    }
+
     await prisma.$transaction(async (tx) => {
         await tx.bot.updateMany({
             where: { projectId },
@@ -307,7 +323,10 @@ export async function deleteProjectAction(projectId: string) {
             where: { projectId },
             data: { projectId: finalTransferTarget.id, organizationId: access.organizationId }
         });
-        await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+        // Only delete if table exists (backward compatibility for older schema versions)
+        if (projectVisibilityConfigExists) {
+            await tx.projectVisibilityConfig.deleteMany({ where: { projectId } });
+        }
         await tx.projectCMSConnection.deleteMany({ where: { projectId } });
         await tx.projectMCPConnection.deleteMany({ where: { projectId } });
         await tx.projectAccess.deleteMany({ where: { projectId } });

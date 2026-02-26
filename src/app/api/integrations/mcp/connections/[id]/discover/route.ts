@@ -1,6 +1,6 @@
 /**
  * Discover MCP Tools API
- * POST - Discover available tools from MCP server
+ * POST - Discover available tools from MCP server + site structure
  */
 
 import { NextResponse } from 'next/server';
@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { MCPGatewayService } from '@/lib/integrations/mcp';
+import { SiteDiscoveryService } from '@/lib/integrations/site-discovery.service';
 import { WorkspaceError, assertProjectAccess } from '@/lib/domain/workspace';
 
 function toErrorResponse(error: unknown) {
@@ -31,7 +32,7 @@ export async function POST(
     const { id } = await params;
     const connection = await prisma.mCPConnection.findUnique({
       where: { id },
-      select: { id: true, projectId: true, status: true }
+      select: { id: true, projectId: true, status: true, type: true }
     });
 
     if (!connection) {
@@ -48,6 +49,16 @@ export async function POST(
     }
 
     const result = await MCPGatewayService.discoverTools(id);
+
+    // After tool discovery, also discover site/product structure
+    if (result.success && (connection.type === 'WORDPRESS' || connection.type === 'WOOCOMMERCE')) {
+      try {
+        await SiteDiscoveryService.discoverAndStore('mcp', id);
+      } catch (err) {
+        console.warn('Site structure discovery failed (non-blocking):', err);
+      }
+    }
+
     return NextResponse.json(result);
   } catch (error) {
     return toErrorResponse(error);

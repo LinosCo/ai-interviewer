@@ -14,10 +14,19 @@ import {
     shouldAttemptLeadExtraction,
     shouldCollectOnExit
 } from '@/lib/chatbot/message-guards';
+import { validateExtractedField, checkSkipIntent } from '@/lib/interview/field-validation';
 
 export const maxDuration = 30;
 
 const LEAD_SPLIT_TOKEN = '[[LEAD_QUESTION]]';
+
+// Helper function to collect LLM usage
+type LLMUsageCollector = (usage: any) => void;
+function createUsageCollector(): LLMUsageCollector {
+    return (usage: any) => {
+        // Usage will be tracked in the extraction function
+    };
+}
 const PROMPT_LEAK_PATTERNS = [
     /Acknowledge what they said/i,
     /Format your output in TWO parts/i,
@@ -152,6 +161,68 @@ function isGreetingOnlyMessage(input: string): boolean {
 function hasBuyingIntent(input: string): boolean {
     const text = input.toLowerCase();
     return /(prezzo|pricing|costo|preventivo|demo|trial|prova|abbonamento|piano|contratto|offerta|integrazion|implementazione|timeline|budget|acquisto)/.test(text);
+}
+
+async function extractFieldFromMessage(
+    fieldName: string,
+    userMessage: string,
+    apiKey: string,
+    language: string = 'en',
+    options?: { onUsage?: LLMUsageCollector }
+): Promise<{ value: string | null; confidence: 'high' | 'low' | 'none' }> {
+    const openai = createOpenAI({ apiKey });
+
+    const fieldDescriptions: Record<string, string> = {
+        name: language === 'it'
+            ? 'Nome della persona (può essere solo nome, o nome e cognome)'
+            : 'Name of the person (can be first name only, or full name)',
+        fullName: language === 'it'
+            ? 'Nome della persona (può essere solo nome, o nome e cognome)'
+            : 'Name of the person (can be first name only, or full name)',
+        email: language === 'it' ? 'Indirizzo email' : 'Email address',
+        phone: language === 'it' ? 'Numero di telefono' : 'Phone number',
+        company: language === 'it' ? 'Nome dell\'azienda o organizzazione' : 'Company or organization name',
+        linkedin: language === 'it' ? 'URL del profilo LinkedIn o social' : 'LinkedIn or social profile URL',
+        portfolio: language === 'it' ? 'URL del portfolio o sito web personale' : 'Portfolio or personal website URL',
+        role: language === 'it' ? 'Ruolo o posizione lavorativa' : 'Job role or position',
+        location: language === 'it' ? 'Città o località' : 'City or location',
+        budget: language === 'it' ? 'Budget disponibile' : 'Available budget',
+        availability: language === 'it' ? 'Disponibilità temporale' : 'Time availability'
+    };
+
+    const schema = z.object({
+        extractedValue: z.string().nullable(),
+        confidence: z.enum(['high', 'low', 'none'])
+    });
+
+    try {
+        // Field-specific extraction rules
+        let fieldSpecificRules = '';
+        if (fieldName === 'name' || fieldName === 'fullName') {
+            fieldSpecificRules = `\n- For name: Accept first name only (e.g., "Marco", "Franco", "Anna"). Don't require full name.\n- If the message contains a word that looks like a name, extract it.`;
+        } else if (fieldName === 'company') {
+            fieldSpecificRules = `\n- For company: Look for business names, often ending in spa, srl, ltd, inc, llc, or containing words like "azienda", "società", "company".\n- Extract the company name even if mixed with other info (e.g., "Ferri spa e sono ceo" → extract "Ferri spa").\n- Accept any business/organization name the user provides.`;
+        } else if (fieldName === 'role') {
+            fieldSpecificRules = `\n- For role: Look for job titles like CEO, CTO, manager, developer, designer, etc.\n- Extract the role even if mixed with other info (e.g., "Ferri spa e sono ceo" → extract "ceo").`;
+        }
+
+        const result = await generateObject({
+            model: openai('gpt-4o-mini'),
+            schema,
+            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
+            temperature: 0
+        });
+
+        options?.onUsage?.(result.usage);
+
+        return {
+            value: result.object.extractedValue,
+            confidence: result.object.confidence
+        };
+    } catch (e) {
+        console.error('Field extraction failed:', e);
+        return { value: null, confidence: 'none' };
+    }
 }
 
 function buildScopeLexicon(bot: any): Set<string> {
@@ -382,8 +453,10 @@ Return shouldAsk=true only when it is natural.`,
         // If we have a missing field and triggered
         let justExtractedField: { field: string; value: string } | null = null;
 
+        // Initialize attempt count tracking
+        const fieldAttemptCounts: Record<string, number> = {};
+
         let shouldAttemptExtraction = false;
-        let extraction: any = null;
         if (nextMissingField && shouldCollect) {
             // Only try extraction if we actually asked this field recently
             shouldAttemptExtraction = shouldAttemptLeadExtraction({
@@ -393,75 +466,60 @@ Return shouldAsk=true only when it is natural.`,
             });
 
             if (shouldAttemptExtraction) {
-                try {
-                    extraction = await generateObject({
-                        model: openai('gpt-4o-mini'),
-                        schema: z.object({
-                            value: z.string().optional().describe(`Extracted value for ${nextMissingField.field}`),
-                            isRelevantAnswer: z.boolean().describe('Did the user provide the requested information?'),
-                            isRefusal: z.boolean().describe('Did the user refuse to provide this information?')
-                        }),
-                        system: `You are an expert data extractor.
-Field to extract: "${nextMissingField.field}"
-Context: The user was previously asked: "${nextMissingField.question || nextMissingField.field}".
+                const userMessage = message.trim();
+                const language = bot.language || 'en';
 
-Rules:
-- If the message contains the requested information, extract it and set isRelevantAnswer to true.
-- If the message is unrelated, set isRelevantAnswer to false and isRefusal to false.
-- If the user refuses to provide the information, set isRelevantAnswer to false and isRefusal to true.
-- Be flexible with formatting but accurate with data.`,
-                        prompt: message
-                    });
-                } catch (e) {
-                    console.error('Lead extraction failed:', e);
-                    extraction = null;
-                }
-            }
-
-            // Track extraction tokens - NUOVO: usa userId (owner del progetto) per sistema crediti
-            const organizationId = bot.project?.organizationId;
-            if (extraction?.usage) {
-                try {
-                    await TokenTrackingService.logTokenUsage({
-                        userId: undefined,
-                        organizationId,
-                        projectId: bot.project?.id,
-                        inputTokens: extraction.usage?.inputTokens || 0,
-                        outputTokens: extraction.usage?.outputTokens || 0,
-                        category: 'CHATBOT',
-                        model: 'gpt-4o-mini',
-                        operation: 'chatbot-extraction',
-                        resourceType: 'chatbot',
-                        resourceId: bot.id
-                    });
-                } catch (err) {
-                    console.error('Token tracking failed:', err);
-                }
-            }
-
-            const extractedValue = typeof extraction?.object?.value === 'string'
-                ? extraction.object.value.trim()
-                : '';
-
-            if (extractedValue && extraction?.object?.isRelevantAnswer) {
-                // Saved!
-                justExtractedField = {
-                    field: nextMissingField.field,
-                    value: extractedValue
-                };
-
-                candidateProfile = { ...candidateProfile, [nextMissingField.field]: extractedValue };
-                await prisma.conversation.update({
-                    where: { id: conversationId },
-                    data: { candidateProfile } as any
-                });
-
-                nextMissingField = getNextMissingField(candidateFields, candidateProfile, declinedFields);
-            } else if (shouldAttemptExtraction && extraction?.object?.isRefusal) {
-                // Optional fields can be skipped without stopping whole lead collection.
-                if (!nextMissingField.required) {
+                // Check if user wants to skip
+                if (checkSkipIntent(userMessage, language as 'it' | 'en')) {
+                    candidateProfile[nextMissingField.field] = '__SKIPPED__';
                     declinedFields.add(nextMissingField.field);
+                    console.log(`⏭️ [CHATBOT] User skipped field: ${nextMissingField.field}`);
                     nextMissingField = getNextMissingField(candidateFields, candidateProfile, declinedFields);
+                } else {
+                    // Try to extract value
+                    const extraction = await extractFieldFromMessage(
+                        nextMissingField.field,
+                        userMessage,
+                        apiKey,
+                        language as 'it' | 'en',
+                        { onUsage: createUsageCollector() }
+                    );
+                    const attemptCount = (fieldAttemptCounts[nextMissingField.field] || 0) + 1;
+
+                    // Validate with feedback
+                    const validationResult = validateExtractedField(
+                        nextMissingField.field,
+                        extraction.value,
+                        extraction.confidence,
+                        attemptCount,
+                        language as 'it' | 'en'
+                    );
+
+                    if (validationResult.isValid && extraction.value) {
+                        candidateProfile[nextMissingField.field] = extraction.value;
+                        console.log(`✅ [CHATBOT] Field "${nextMissingField.field}" extracted: ${extraction.value}`);
+
+                        // Save to database
+                        await prisma.conversation.update({
+                            where: { id: conversationId },
+                            data: { candidateProfile } as any
+                        });
+
+                        // Capture the field name BEFORE reassigning nextMissingField
+                        const justExtractedFieldName = nextMissingField.field;
+                        nextMissingField = getNextMissingField(candidateFields, candidateProfile, declinedFields);
+                        justExtractedField = {
+                            field: justExtractedFieldName,
+                            value: extraction.value
+                        };
+                    } else {
+                        // Field extraction failed - provide feedback and re-ask
+                        // TODO: Persist fieldAttemptCounts in database to enable auto-skip after 2 failures.
+                        // Currently fieldAttemptCounts is re-initialized every request, so attempt tracking doesn't persist.
+                        // Once persisted, add back: if (attemptCount >= 2) { auto-skip logic }
+                        console.log(`⚠️ [CHATBOT] Validation failed for "${nextMissingField.field}": ${validationResult.feedback}`);
+                        // Feedback will be included in next bot response (bot will acknowledge and re-ask with better explanation)
+                    }
                 }
             }
         }

@@ -1158,6 +1158,7 @@ model CMSConnection {
   projects                  Project[]              @relation("ProjectToCMS")
   projectShares             ProjectCMSConnection[]
   analytics                 WebsiteAnalytics[]
+  siteStructureCache        SiteStructureCache?
 
   @@index([organizationId])
 }
@@ -1203,6 +1204,7 @@ model CMSSuggestion {
   performanceBefore     Json?
   performanceAfter      Json?
   createdBy             String?
+  seoData               Json?
   connection            CMSConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@index([connectionId, status])
@@ -1319,10 +1321,11 @@ model MCPConnection {
   updatedAt      DateTime               @updatedAt
   createdBy      String
   organizationId String?
-  logs           IntegrationLog[]
-  organization   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project        Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectShares  ProjectMCPConnection[]
+  logs               IntegrationLog[]
+  organization       Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectShares      ProjectMCPConnection[]
+  siteStructureCache SiteStructureCache?
 
   @@unique([projectId, type])
   @@index([projectId, status])
@@ -1373,6 +1376,27 @@ model GoogleAnalyticsData {
 
   @@unique([googleConnectionId, date])
   @@index([googleConnectionId, date])
+}
+
+model SiteStructureCache {
+  id                String          @id @default(cuid())
+  mcpConnectionId   String?         @unique
+  cmsConnectionId   String?         @unique
+  pages             Json            @default("[]")
+  posts             Json            @default("[]")
+  categories        Json            @default("[]")
+  tags              Json            @default("[]")
+  products          Json?
+  productCategories Json?
+  media             Json?
+  siteInfo          Json?
+  discoveredAt      DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  mcpConnection     MCPConnection?  @relation(fields: [mcpConnectionId], references: [id], onDelete: Cascade)
+  cmsConnection     CMSConnection?  @relation(fields: [cmsConnectionId], references: [id], onDelete: Cascade)
+
+  @@index([mcpConnectionId])
+  @@index([cmsConnectionId])
 }
 
 model N8NConnection {

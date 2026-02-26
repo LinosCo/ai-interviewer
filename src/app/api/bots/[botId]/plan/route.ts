@@ -6,13 +6,13 @@ import { getOrCreateInterviewPlan, updateInterviewPlanOverrides } from '@/lib/in
 import { assertProjectAccess } from '@/lib/domain/workspace';
 
 const overridesSchema = z.object({
-  scan: z.object({
+  explore: z.object({
     topics: z.record(z.string(), z.object({
       minTurns: z.number().optional(),
       maxTurns: z.number().optional()
     })).optional()
   }).optional(),
-  deep: z.object({
+  deepen: z.object({
     maxTurnsPerTopic: z.number().optional(),
     fallbackTurns: z.number().optional(),
     topics: z.record(z.string(), z.object({

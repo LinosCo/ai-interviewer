@@ -3,7 +3,7 @@ import type { Bot, TopicBlock } from '@prisma/client';
 import type { InterviewPlan, InterviewPlanOverrides, PlanTopic } from './plan-types';
 
 const SECONDS_PER_TURN = 45;
-const PLAN_LOGIC_VERSION = 'scan-min2-extension-gate-v1';
+const PLAN_LOGIC_VERSION = '2.0';
 
 function buildTopicsSignature(topics: TopicBlock[]) {
   return topics
@@ -16,21 +16,23 @@ export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[]): Intervie
   const perTopicTimeSec = totalTimeSec / Math.max(1, topics.length);
   const timeBasedMax = Math.max(1, Math.floor(perTopicTimeSec / SECONDS_PER_TURN));
 
-  const scanTopics: PlanTopic[] = topics.map(t => {
+  const explorTopics: PlanTopic[] = topics.map(t => {
     const topicMaxTurns = Number(t.maxTurns || timeBasedMax);
-    const minTurns = 2;
-    const computedMax = perTopicTimeSec < 60
-      ? 2
-      : Math.max(2, Math.min(topicMaxTurns, timeBasedMax));
-    const maxTurns = Math.max(minTurns, computedMax);
+    const minTurns = 1;
+    const baseTurns = Math.max(2, Math.floor(perTopicTimeSec / SECONDS_PER_TURN));
+    const maxTurns = baseTurns + 2;
 
     return {
       topicId: t.id,
       label: t.label,
       orderIndex: t.orderIndex,
       subGoals: t.subGoals || [],
+      baseTurns,
       minTurns,
-      maxTurns
+      maxTurns,
+      interpretationCues: [],
+      significanceSignals: [],
+      probeAngles: []
     };
   });
 
@@ -45,47 +47,40 @@ export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[]): Intervie
       secondsPerTurn: SECONDS_PER_TURN,
       topicsSignature: buildTopicsSignature(topics)
     },
-    scan: {
-      topics: scanTopics
+    explore: {
+      topics: explorTopics
     },
-    deep: {
-      strategy: 'uncovered_subgoals_first',
+    deepen: {
       maxTurnsPerTopic: 2,
-      fallbackTurns: 2,
-      topics: scanTopics.map(t => ({
-        ...t,
-        maxTurns: 2
-      }))
+      fallbackTurns: 2
     }
   };
 }
 
 export function sanitizeOverrides(base: InterviewPlan, overrides?: InterviewPlanOverrides | null): InterviewPlanOverrides {
   if (!overrides) return {};
-  const scanTopicIds = new Set(base.scan.topics.map(t => t.topicId));
-  const deepTopicIds = new Set(base.deep.topics.map(t => t.topicId));
+  const exploreTopicIds = new Set(base.explore.topics.map(t => t.topicId));
 
   const sanitized: InterviewPlanOverrides = {
-    scan: {
+    explore: {
       topics: {}
     },
-    deep: {
-      maxTurnsPerTopic: overrides.deep?.maxTurnsPerTopic,
-      fallbackTurns: overrides.deep?.fallbackTurns,
-      topics: {}
+    deepen: {
+      maxTurnsPerTopic: overrides.deepen?.maxTurnsPerTopic,
+      fallbackTurns: overrides.deepen?.fallbackTurns
     }
   };
 
-  if (overrides.scan?.topics) {
-    for (const [topicId, topicOverride] of Object.entries(overrides.scan.topics)) {
-      if (scanTopicIds.has(topicId)) {
+  if (overrides.explore?.topics) {
+    for (const [topicId, topicOverride] of Object.entries(overrides.explore.topics)) {
+      if (exploreTopicIds.has(topicId)) {
         const minTurns = typeof topicOverride.minTurns === 'number'
           ? Math.max(1, Math.floor(topicOverride.minTurns))
           : undefined;
         const maxTurns = typeof topicOverride.maxTurns === 'number'
           ? Math.max(1, Math.floor(topicOverride.maxTurns))
           : undefined;
-        (sanitized.scan as any).topics[topicId] = {
+        (sanitized.explore as any).topics[topicId] = {
           ...(minTurns ? { minTurns } : {}),
           ...(maxTurns ? { maxTurns } : {})
         };
@@ -93,24 +88,11 @@ export function sanitizeOverrides(base: InterviewPlan, overrides?: InterviewPlan
     }
   }
 
-  if (overrides.deep?.topics) {
-    for (const [topicId, topicOverride] of Object.entries(overrides.deep.topics)) {
-      if (deepTopicIds.has(topicId)) {
-        const maxTurns = typeof topicOverride.maxTurns === 'number'
-          ? Math.max(1, Math.floor(topicOverride.maxTurns))
-          : undefined;
-        (sanitized.deep as any).topics[topicId] = {
-          ...(maxTurns ? { maxTurns } : {})
-        };
-      }
-    }
+  if (typeof sanitized.deepen?.maxTurnsPerTopic === 'number') {
+    sanitized.deepen.maxTurnsPerTopic = Math.max(1, Math.floor(sanitized.deepen.maxTurnsPerTopic));
   }
-
-  if (typeof sanitized.deep?.maxTurnsPerTopic === 'number') {
-    sanitized.deep.maxTurnsPerTopic = Math.max(1, Math.floor(sanitized.deep.maxTurnsPerTopic));
-  }
-  if (typeof sanitized.deep?.fallbackTurns === 'number') {
-    sanitized.deep.fallbackTurns = Math.max(1, Math.floor(sanitized.deep.fallbackTurns));
+  if (typeof sanitized.deepen?.fallbackTurns === 'number') {
+    sanitized.deepen.fallbackTurns = Math.max(1, Math.floor(sanitized.deepen.fallbackTurns));
   }
 
   return sanitized;
@@ -120,9 +102,9 @@ export function mergeInterviewPlan(base: InterviewPlan, overrides?: InterviewPla
   const merged: InterviewPlan = JSON.parse(JSON.stringify(base));
   const safeOverrides = sanitizeOverrides(base, overrides);
 
-  if (safeOverrides.scan?.topics) {
-    merged.scan.topics = merged.scan.topics.map(t => {
-      const override = safeOverrides.scan?.topics?.[t.topicId];
+  if (safeOverrides.explore?.topics) {
+    merged.explore.topics = merged.explore.topics.map(t => {
+      const override = safeOverrides.explore?.topics?.[t.topicId];
       if (!override) return t;
       const minTurns = override.minTurns ?? t.minTurns;
       const maxTurns = override.maxTurns ?? t.maxTurns;
@@ -134,23 +116,12 @@ export function mergeInterviewPlan(base: InterviewPlan, overrides?: InterviewPla
     });
   }
 
-  if (safeOverrides.deep) {
-    if (typeof safeOverrides.deep.maxTurnsPerTopic === 'number') {
-      merged.deep.maxTurnsPerTopic = safeOverrides.deep.maxTurnsPerTopic;
+  if (safeOverrides.deepen) {
+    if (typeof safeOverrides.deepen.maxTurnsPerTopic === 'number') {
+      merged.deepen.maxTurnsPerTopic = safeOverrides.deepen.maxTurnsPerTopic;
     }
-    if (typeof safeOverrides.deep.fallbackTurns === 'number') {
-      merged.deep.fallbackTurns = safeOverrides.deep.fallbackTurns;
-    }
-
-    if (safeOverrides.deep.topics) {
-      merged.deep.topics = merged.deep.topics.map(t => {
-        const override = safeOverrides.deep?.topics?.[t.topicId];
-        if (!override) return t;
-        return {
-          ...t,
-          maxTurns: Math.max(1, override.maxTurns ?? t.maxTurns)
-        };
-      });
+    if (typeof safeOverrides.deepen.fallbackTurns === 'number') {
+      merged.deepen.fallbackTurns = safeOverrides.deepen.fallbackTurns;
     }
   }
 
@@ -242,13 +213,12 @@ export async function updateInterviewPlanOverrides(botId: string, overrides: Int
   const basePlan = buildBaseInterviewPlan(bot, bot.topics);
   const existing = await prisma.interviewPlan.findUnique({ where: { botId } });
   const nextOverrides: InterviewPlanOverrides = {
-    scan: {
-      topics: overrides.scan?.topics || {}
+    explore: {
+      topics: overrides.explore?.topics || {}
     },
-    deep: {
-      maxTurnsPerTopic: overrides.deep?.maxTurnsPerTopic,
-      fallbackTurns: overrides.deep?.fallbackTurns,
-      topics: overrides.deep?.topics || {}
+    deepen: {
+      maxTurnsPerTopic: overrides.deepen?.maxTurnsPerTopic,
+      fallbackTurns: overrides.deepen?.fallbackTurns
     }
   };
 

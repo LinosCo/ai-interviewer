@@ -49,6 +49,11 @@ export const WORDPRESS_TOOLS = {
   // Categories
   LIST_CATEGORIES: 'mcp-wp/list-categories',
   GET_CATEGORY: 'mcp-wp/get-category',
+  CREATE_CATEGORY: 'mcp-wp/create-category',
+
+  // Tags
+  LIST_TAGS: 'mcp-wp/list-tags',
+  CREATE_TAG: 'mcp-wp/create-tag',
 
   // Media
   LIST_MEDIA: 'mcp-wp/list-media',

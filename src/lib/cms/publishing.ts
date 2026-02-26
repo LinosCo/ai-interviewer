@@ -32,6 +32,13 @@ export interface PublicationRouting {
     targetEntityType?: 'product';
     targetEntityId?: string;
     targetEntitySlug?: string;
+    // Enhanced publishing fields
+    wpCategories?: string[];
+    wpTags?: string[];
+    wpExistingPostId?: number;
+    wpExistingPageId?: number;
+    wooProductId?: number;
+    wooProductCategories?: string[];
 }
 
 export interface PublishOption {
@@ -181,6 +188,14 @@ export function normalizePublicationRouting(
         ? maybeChannel
         : defaultPublicationRouting(chosenKind, caps, targetSection).publishChannel;
 
+    // Pass through enhanced publishing fields if present
+    const wpCategories = Array.isArray(raw.wpCategories) ? raw.wpCategories as string[] : undefined;
+    const wpTags = Array.isArray(raw.wpTags) ? raw.wpTags as string[] : undefined;
+    const wpExistingPostId = typeof raw.wpExistingPostId === 'number' ? raw.wpExistingPostId : undefined;
+    const wpExistingPageId = typeof raw.wpExistingPageId === 'number' ? raw.wpExistingPageId : undefined;
+    const wooProductId = typeof raw.wooProductId === 'number' ? raw.wooProductId : undefined;
+    const wooProductCategories = Array.isArray(raw.wooProductCategories) ? raw.wooProductCategories as string[] : undefined;
+
     return {
         publishChannel: chosenChannel,
         contentKind: chosenKind,
@@ -189,7 +204,13 @@ export function normalizePublicationRouting(
         targetSection: normalizeString(raw.targetSection) || normalizeString(targetSection) || base.targetSection,
         targetEntityType: normalizeString(raw.targetEntityType) === 'product' ? 'product' : (base.targetEntityType || undefined),
         targetEntityId: normalizeString(raw.targetEntityId),
-        targetEntitySlug: normalizeString(raw.targetEntitySlug)
+        targetEntitySlug: normalizeString(raw.targetEntitySlug),
+        ...(wpCategories?.length ? { wpCategories } : {}),
+        ...(wpTags?.length ? { wpTags } : {}),
+        ...(wpExistingPostId ? { wpExistingPostId } : {}),
+        ...(wpExistingPageId ? { wpExistingPageId } : {}),
+        ...(wooProductId ? { wooProductId } : {}),
+        ...(wooProductCategories?.length ? { wooProductCategories } : {}),
     };
 }
 

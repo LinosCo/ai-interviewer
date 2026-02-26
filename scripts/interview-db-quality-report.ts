@@ -1,7 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import { evaluateInterviewQuestionQuality, type QualitativePhase } from '../src/lib/interview/qualitative-evaluator';
+// NOTE: This script is deprecated in v2 - the quality pipeline has been removed
+// import { evaluateInterviewQuestionQuality, type QualitativePhase } from '../src/lib/interview/qualitative-evaluator';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+
+// Placeholder for deprecated QualitativePhase
+type QualitativePhase = 'SCAN' | 'DEEP' | 'DEEP_OFFER' | 'DATA_COLLECTION';
 
 type CliConfig = {
     limit: number;
@@ -226,27 +230,12 @@ async function main(): Promise<void> {
                 }
 
                 const phase = inferPhaseFromMetadata(msg.metadata, assistantResponse);
-                const result = evaluateInterviewQuestionQuality({
-                    phase,
-                    topicLabel: '',
-                    userResponse,
-                    assistantResponse,
-                    previousAssistantResponse,
-                    language: conv.bot?.language || 'it'
-                });
+                // NOTE: Quality evaluation disabled in v2 - quality pipeline has been removed
+                // const result = evaluateInterviewQuestionQuality({...});
+                const result = { score: 0, passed: false, checks: {}, issues: [] };
                 const qualityGateEligible = phase === 'SCAN' || phase === 'DEEP' || phase === 'DEEP_OFFER';
                 const isTopicPhaseForGate = phase === 'SCAN' || phase === 'DEEP';
-                const qualityGateTrigger =
-                    qualityGateEligible && (
-                    !result.checks.oneQuestion ||
-                    !result.checks.avoidsClosure ||
-                    !result.checks.avoidsPrematureContact ||
-                    (isTopicPhaseForGate && !result.checks.referencesUserContext) ||
-                    (isTopicPhaseForGate && !result.checks.topicalAnchor) ||
-                    (isTopicPhaseForGate && !result.checks.nonRepetitive) ||
-                    (isTopicPhaseForGate && !result.checks.probingWhenUserIsBrief) ||
-                    (phase === 'DEEP_OFFER' && !result.checks.deepOfferIntent)
-                    );
+                const qualityGateTrigger = false; // Disabled in v2
 
                 const row: TurnRow = {
                     conversationId: conv.id,

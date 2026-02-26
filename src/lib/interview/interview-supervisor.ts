@@ -1,17 +1,17 @@
+import { ValidationResponse } from './validation-response';
+
 export type TransitionMode = 'bridge' | 'clean_pivot';
 
 export type SupervisorStatus =
-  | 'SCANNING'
+  | 'EXPLORING'
+  | 'EXPLORING_DEEP'
   | 'TRANSITION'
-  | 'START_DEEP'
-  | 'START_DEEP_BRIEF'
   | 'DEEPENING'
   | 'DEEP_OFFER_ASK'
   | 'DATA_COLLECTION_CONSENT'
   | 'DATA_COLLECTION'
   | 'COMPLETE_WITHOUT_DATA'
-  | 'FINAL_GOODBYE'
-  | 'CONFIRM_STOP';
+  | 'FINAL_GOODBYE';
 
 export interface SupervisorInsight {
   status: SupervisorStatus;
@@ -24,24 +24,29 @@ export interface SupervisorInsight {
   engagingSnippet?: string;
   extensionPreview?: string[];
   stopReason?: string;
+  validationFeedback?: ValidationResponse; // NEW: feedback when validation fails
+  feedbackMessage?: string; // NEW: user-facing message to include in bot response
 }
 
 export function createDefaultSupervisorInsight(): SupervisorInsight {
-  return { status: 'SCANNING' };
+  return { status: 'EXPLORING' };
 }
 
-export function createDeepOfferInsight(extensionPreview?: string[]): SupervisorInsight {
+export function createDeepOfferInsight(
+  extensionPreview?: string[],
+  validationFeedback?: ValidationResponse
+): SupervisorInsight {
   const cleanPreview = (extensionPreview || [])
     .map(v => String(v || '').trim())
     .filter(Boolean)
     .slice(0, 2);
 
   return cleanPreview.length > 0
-    ? { status: 'DEEP_OFFER_ASK', extensionPreview: cleanPreview }
-    : { status: 'DEEP_OFFER_ASK' };
+    ? { status: 'DEEP_OFFER_ASK', extensionPreview: cleanPreview, validationFeedback, feedbackMessage: validationFeedback?.feedback }
+    : { status: 'DEEP_OFFER_ASK', validationFeedback, feedbackMessage: validationFeedback?.feedback };
 }
 
-export type Phase = 'SCAN' | 'DEEP_OFFER' | 'DEEP' | 'DATA_COLLECTION';
+export type Phase = 'EXPLORE' | 'DEEP_OFFER' | 'DEEPEN' | 'DATA_COLLECTION';
 
 export interface InterviewStateLike {
   phase: Phase;
@@ -50,7 +55,7 @@ export interface InterviewStateLike {
   deepAccepted: boolean | null;
   consentGiven: boolean | null;
   dataCollectionAttempts: number;
-  extensionReturnPhase?: 'SCAN' | 'DEEP' | null;
+  extensionReturnPhase?: 'EXPLORE' | 'DEEPEN' | null;
   extensionReturnTopicIndex?: number | null;
   extensionReturnTurnInTopic?: number | null;
   extensionOfferAttempts?: number;
@@ -64,7 +69,7 @@ export interface InterviewStateLike {
 export interface DeepOfferPhaseDeps {
   checkUserIntent: (userMessage: string, context: 'deep_offer') => Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'>;
   isExtensionOfferQuestion: (message: string) => boolean;
-  buildDeepOfferInsight: (sourceState: InterviewStateLike) => SupervisorInsight;
+  buildDeepOfferInsight: (sourceState: InterviewStateLike, validationFeedback?: ValidationResponse) => SupervisorInsight;
   buildDeepPlan: (remainingSec: number) => { deepTopicOrder: string[]; deepTurnsByTopic: Record<string, number> };
   getDeepTopics: (deepOrder?: string[]) => any[];
   getRemainingSubGoals: (topic: any, history?: Record<string, string[]>) => string[];
@@ -129,7 +134,17 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
         if (extensionAttempts >= 2) {
           moveToDataCollection();
         } else {
-          supervisorInsight = deps.buildDeepOfferInsight(state);
+          // Create validation feedback for unclear response
+          const validationFeedback: ValidationResponse = {
+            isValid: false,
+            reason: 'intent_unclear',
+            confidence: 'low',
+            attemptCount: extensionAttempts,
+            maxAttempts: 2,
+            strategy: extensionAttempts === 1 ? 'ask_differently' : 'move_on'
+          };
+
+          supervisorInsight = deps.buildDeepOfferInsight(state, validationFeedback);
           nextState.deepAccepted = false;
           nextState.extensionOfferAttempts = extensionAttempts;
         }
@@ -144,26 +159,26 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
 
   const intent = await deps.checkUserIntent(lastUserMessage, 'deep_offer');
   if (intent === 'ACCEPT') {
-    const returnPhase = state.extensionReturnPhase || 'DEEP';
+    const returnPhase = state.extensionReturnPhase || 'DEEPEN';
     nextState.deepAccepted = true;
     nextState.extensionOfferAttempts = 0;
     nextState.extensionReturnPhase = null;
     nextState.extensionReturnTopicIndex = null;
     nextState.extensionReturnTurnInTopic = null;
 
-    if (returnPhase === 'SCAN') {
-      nextState.phase = 'SCAN';
+    if (returnPhase === 'EXPLORE') {
+      nextState.phase = 'EXPLORE';
       nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
       nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
       const resumeTopic = botTopics[nextState.topicIndex] || botTopics[0];
       nextTopicId = resumeTopic?.id || botTopics[0]?.id;
       const usedSubGoals = (state.topicSubGoalHistory || {})[resumeTopic.id] || [];
       const availableSubGoals = (resumeTopic.subGoals || []).filter((sg: string) => !usedSubGoals.includes(sg));
-      supervisorInsight = { status: 'SCANNING', nextSubGoal: availableSubGoals[0] || resumeTopic.label };
+      supervisorInsight = { status: 'EXPLORING', nextSubGoal: availableSubGoals[0] || resumeTopic.label };
       return { nextState, supervisorInsight, nextTopicId };
     }
 
-    nextState.phase = 'DEEP';
+    nextState.phase = 'DEEPEN';
     nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
     nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
 

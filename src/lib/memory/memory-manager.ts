@@ -155,8 +155,18 @@ export class MemoryManager {
     /**
      * Genera il contesto memoria per il prompt
      */
-    static formatForPrompt(memory: ConversationMemoryData): string {
+    static formatForPrompt(memory: ConversationMemoryData, options?: {
+        language?: string;
+        topicMemories?: Array<{
+            label: string;
+            engagementScore: number;
+            keyInsight?: string;
+            coveredSubGoals: number;
+            totalSubGoals: number;
+        }>;
+    }): string {
         const sections: string[] = [];
+        const isItalian = (options?.language || 'en').toLowerCase().startsWith('it');
 
         // Fatti raccolti
         if (memory.factsCollected.length > 0) {
@@ -165,43 +175,70 @@ export class MemoryManager {
                 .map(f => `• ${f.content}`)
                 .join('\n');
 
-            sections.push(`## INFORMAZIONI GIÀ RACCOLTE
+            sections.push(isItalian ? `## INFORMAZIONI GIÀ RACCOLTE
 ${factsText}
 
-⚠️ NON chiedere nuovamente informazioni su questi temi. Se devi approfondire, parti da quello che già sai.`);
+⚠️ NON chiedere nuovamente informazioni su questi temi. Se devi approfondire, parti da quello che già sai.` : `## FACTS ALREADY COLLECTED
+${factsText}
+
+⚠️ Do NOT ask again about these topics. If you need to deepen, start from what you know.`);
         }
 
-        // Topic esplorati
-        if (memory.topicsExplored.length > 0) {
+        // Topic esplorati + KEY INSIGHTS (NEW)
+        if (memory.topicsExplored.length > 0 || options?.topicMemories) {
+            const topicMemories = options?.topicMemories || [];
             const topicsText = memory.topicsExplored
-                .map(t => `• ${t.topicLabel}: ${t.coverageLevel} (coperti: ${t.subGoalsCovered.join(', ') || 'nessuno'})`)
+                .map((t, idx) => {
+                    const memData = topicMemories.find(m => m.label === t.topicLabel);
+                    const engagementLabel = memData?.engagementScore ? (memData.engagementScore > 0.6 ? 'HIGH' : memData.engagementScore > 0.3 ? 'MEDIUM' : 'LOW') : '';
+                    const coverage = memData ? `${memData.coveredSubGoals}/${memData.totalSubGoals}` : `${t.subGoalsCovered.length}/${t.subGoalsCovered.length}`;
+                    let line = isItalian
+                        ? `• ${t.topicLabel} (${coverage} subgoals${engagementLabel ? `, engagement: ${engagementLabel}` : ''})`
+                        : `• ${t.topicLabel} (${coverage} subgoals${engagementLabel ? `, engagement: ${engagementLabel}` : ''})`;
+                    if (memData?.keyInsight) {
+                        line += isItalian ? `\n  Key insight: "${memData.keyInsight}"` : `\n  Key insight: "${memData.keyInsight}"`;
+                    }
+                    return line;
+                })
                 .join('\n');
 
-            sections.push(`## TOPIC GIÀ DISCUSSI
+            sections.push(isItalian ? `## TOPIC ESPLORATI
+${topicsText}` : `## TOPICS EXPLORED
 ${topicsText}`);
         }
 
         // Segnali fatica
         if (memory.userFatigueScore > 0.5) {
-            sections.push(`## ⚠️ ATTENZIONE: SEGNALI DI FATICA
+            sections.push(isItalian ? `## ⚠️ ATTENZIONE: SEGNALI DI FATICA
 L'utente mostra segni di stanchezza (score: ${memory.userFatigueScore.toFixed(2)}).
 - Fai domande più brevi e dirette
 - Considera di saltare approfondimenti non essenziali
-- Valuta se concludere prima del previsto`);
+- Valuta se concludere prima del previsto` : `## ⚠️ FATIGUE SIGNALS DETECTED
+User shows signs of fatigue (score: ${memory.userFatigueScore.toFixed(2)}).
+- Ask shorter, more direct questions
+- Skip non-essential deepening
+- Consider early closure`);
         }
 
         // Stile comunicativo
         if (memory.detectedTone) {
-            const toneInstructions: Record<string, string> = {
+            const toneInstructions: Record<string, string> = isItalian ? {
                 formal: 'Mantieni un registro formale e professionale.',
                 casual: 'Usa un tono colloquiale e amichevole.',
                 brief: 'L\'utente preferisce risposte brevi. Fai domande concise e dirette.',
                 verbose: 'L\'utente è loquace. Puoi permetterti domande più articolate.'
+            } : {
+                formal: 'Keep a formal and professional register.',
+                casual: 'Use a conversational, friendly tone.',
+                brief: 'User prefers short answers. Ask concise questions.',
+                verbose: 'User is talkative. You can ask more complex questions.'
             };
 
-            sections.push(`## STILE COMUNICATIVO RILEVATO
+            sections.push(isItalian ? `## STILE COMUNICATIVO RILEVATO
 ${toneInstructions[memory.detectedTone] || ''}
-${memory.usesEmoji ? 'L\'utente usa emoji, puoi usarle occasionalmente.' : ''}`);
+${memory.usesEmoji ? 'L\'utente usa emoji, puoi usarle occasionalmente.' : ''}` : `## DETECTED COMMUNICATION STYLE
+${toneInstructions[memory.detectedTone] || ''}
+${memory.usesEmoji ? 'User uses emoji, you can use them occasionally.' : ''}`);
         }
 
         return sections.join('\n\n');

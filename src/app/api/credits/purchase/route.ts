@@ -124,7 +124,14 @@ export async function POST(request: Request) {
         }
 
         // Create Stripe Checkout session
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+        if (!baseUrl) {
+            console.error('[credits/purchase] NEXT_PUBLIC_APP_URL is not set');
+            return NextResponse.json(
+                { error: 'Server misconfigured (missing app URL)' },
+                { status: 500 }
+            );
+        }
 
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: customerId,

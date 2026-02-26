@@ -17,7 +17,11 @@ import {
 export type ItemTransferType = 'ORGANIZATION' | 'PROJECT' | 'BOT' | 'TOOL';
 
 function getBaseUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const url = process.env.NEXT_PUBLIC_APP_URL;
+  if (!url) {
+    throw new Error('NEXT_PUBLIC_APP_URL is not configured');
+  }
+  return url;
 }
 
 async function resolveDefaultOrganizationIdForUser(userId: string): Promise<string | null> {

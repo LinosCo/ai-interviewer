@@ -30,6 +30,12 @@ export default auth(async (req) => {
         return NextResponse.next();
     }
 
+    // Stripe webhooks must bypass auth + rate limiting so signature verification
+    // receives the raw, unmodified request.
+    if (req.nextUrl.pathname.startsWith('/api/stripe/webhook')) {
+        return NextResponse.next();
+    }
+
     // Only rate limit API routes
     if (ratelimit && req.nextUrl.pathname.startsWith('/api')) {
         const identifier = req.auth?.user?.id || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || "127.0.0.1";

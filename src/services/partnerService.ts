@@ -297,7 +297,10 @@ export const PartnerService = {
             }
         });
 
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+        if (!baseUrl) {
+            throw new Error('NEXT_PUBLIC_APP_URL is not configured');
+        }
         const inviteUrl = `${baseUrl}/transfer/accept?token=${token}`;
 
         return {

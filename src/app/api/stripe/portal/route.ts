@@ -100,9 +100,18 @@ export async function GET(req: Request) {
             });
         }
 
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+        if (!appUrl) {
+            console.error('[stripe/portal] NEXT_PUBLIC_APP_URL is not set');
+            return NextResponse.json(
+                { error: 'Server misconfigured (missing app URL)' },
+                { status: 500 }
+            );
+        }
+
         const portalSession = await stripe.billingPortal.sessions.create({
             customer: customerId,
-            return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/dashboard/billing`,
+            return_url: `${appUrl}/dashboard/billing`,
         });
 
         return NextResponse.json({ url: portalSession.url });

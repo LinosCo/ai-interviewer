@@ -249,7 +249,11 @@ async function createCheckoutSession(
             })
         ]);
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+        if (!appUrl) {
+            console.error('[stripe/checkout] NEXT_PUBLIC_APP_URL is not set');
+            return { error: 'Server misconfigured (missing app URL)', status: 500 };
+        }
         return {
             url: `${appUrl}/dashboard/billing?plan_change=success&tier=${normalizedTier}&billing=${normalizedBillingPeriod}`
         };
@@ -274,6 +278,12 @@ async function createCheckoutSession(
         }
     }
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!appUrl) {
+        console.error('[stripe/checkout] NEXT_PUBLIC_APP_URL is not set');
+        return { error: 'Server misconfigured (missing app URL)', status: 500 };
+    }
+
     const checkoutSession = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
@@ -290,8 +300,8 @@ async function createCheckoutSession(
                 billingPeriod: normalizedBillingPeriod
             }
         },
-        success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing?canceled=true`,
+        success_url: `${appUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}/dashboard/billing?canceled=true`,
         allow_promotion_codes: true,
         billing_address_collection: 'required',
         customer_update: {

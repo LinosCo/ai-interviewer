@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
 
             // Only perform update if there are fields to update
             if (Object.keys(globalConfigUpdate).length > 0) {
-                console.log('Updating GlobalConfig with:', globalConfigUpdate);
+                console.log('Updating GlobalConfig fields:', Object.keys(globalConfigUpdate));
                 await prisma.globalConfig.upsert({
                     where: { id: 'default' },
                     update: globalConfigUpdate,

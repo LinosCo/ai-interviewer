@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { BillingCycle, PlanType, SubscriptionStatus, SubscriptionTier } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
@@ -48,10 +47,15 @@ async function resolveStripeWebhookSecret(): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
     const body = await req.text();
-    const signature = (await headers()).get('stripe-signature');
+    const signature = req.headers.get('stripe-signature');
     const webhookSecret = await resolveStripeWebhookSecret();
 
     if (!signature || !webhookSecret) {
+        console.warn('[stripe/webhook] Missing config –', {
+            hasSignature: !!signature,
+            hasSecret: !!webhookSecret,
+            secretSource: process.env.STRIPE_WEBHOOK_SECRET ? 'env' : 'db',
+        });
         return NextResponse.json({ error: 'Missing Stripe webhook configuration' }, { status: 400 });
     }
 

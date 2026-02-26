@@ -492,44 +492,43 @@ export async function sendEmail(params: {
         process.env.EMAIL_FROM ??
         DEFAULT_FROM_EMAIL;
 
-    const smtpHost = params.smtpOverrides?.host ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST;
-    const smtpUser = params.smtpOverrides?.user ?? globalConfig?.smtpUser ?? process.env.SMTP_USER;
-    const smtpPass = params.smtpOverrides?.pass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS;
-    const smtpPort = Number(params.smtpOverrides?.port ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465);
-    const smtpSecure = typeof params.smtpOverrides?.secure === 'boolean'
-        ? params.smtpOverrides.secure
-        : typeof globalConfig?.smtpSecure === 'boolean'
-            ? globalConfig.smtpSecure
-        : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
-
-    if (smtpHost && smtpUser && smtpPass) {
-        try {
-            const data = await sendEmailViaSmtp({
-                host: smtpHost,
-                port: smtpPort,
-                secure: smtpSecure,
-                user: smtpUser,
-                pass: smtpPass,
-                from,
-                to: params.to,
-                subject: params.subject,
-                html: params.html
-            });
-            return { success: true, data };
-        } catch (error) {
-            console.error('SMTP email send failed:', error);
-            // Fall through to Resend if available (e.g. GCP blocks outbound SMTP)
-            const resendFallbackKey = params.smtpOverrides?.resendApiKey ?? globalConfig?.resendApiKey ?? process.env.RESEND_API_KEY;
-            if (!resendFallbackKey) {
-                return { success: false, error };
-            }
-            console.warn('SMTP failed, attempting Resend fallback...');
-        }
-    }
-
+    // Resend takes priority over custom SMTP when configured
     const resendApiKey = params.smtpOverrides?.resendApiKey ?? globalConfig?.resendApiKey ?? process.env.RESEND_API_KEY;
     if (!resend && resendApiKey) {
         resend = new Resend(resendApiKey);
+    }
+
+    if (!resendApiKey) {
+        // No Resend — fall back to custom SMTP
+        const smtpHost = params.smtpOverrides?.host ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST;
+        const smtpUser = params.smtpOverrides?.user ?? globalConfig?.smtpUser ?? process.env.SMTP_USER;
+        const smtpPass = params.smtpOverrides?.pass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS;
+        const smtpPort = Number(params.smtpOverrides?.port ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465);
+        const smtpSecure = typeof params.smtpOverrides?.secure === 'boolean'
+            ? params.smtpOverrides.secure
+            : typeof globalConfig?.smtpSecure === 'boolean'
+                ? globalConfig.smtpSecure
+            : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
+
+        if (smtpHost && smtpUser && smtpPass) {
+            try {
+                const data = await sendEmailViaSmtp({
+                    host: smtpHost,
+                    port: smtpPort,
+                    secure: smtpSecure,
+                    user: smtpUser,
+                    pass: smtpPass,
+                    from,
+                    to: params.to,
+                    subject: params.subject,
+                    html: params.html
+                });
+                return { success: true, data };
+            } catch (error) {
+                console.error('SMTP email send failed:', error);
+                return { success: false, error };
+            }
+        }
     }
     const resendClient = getResendClient();
     if (!resendClient) {

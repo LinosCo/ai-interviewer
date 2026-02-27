@@ -128,6 +128,13 @@ export default function IntegrationsPage() {
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [currentOrgName, setCurrentOrgName] = useState<string>('');
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
+  const [notification, setNotification] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'connections' | 'routing' | 'settings'>('connections');
+
+  const showNotification = useCallback((type: 'error' | 'success', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 4000);
+  }, []);
 
   // Fetch all integrations data
   const fetchData = useCallback(async () => {
@@ -309,7 +316,7 @@ export default function IntegrationsPage() {
       } else {
         const error = await res.json();
         console.error('Failed to get CMS dashboard URL:', error);
-        alert(error.error || 'Impossibile aprire il CMS');
+        showNotification('error', error.error || 'Impossibile aprire il CMS');
       }
     } catch (error) {
       console.error('Error opening CMS dashboard:', error);
@@ -360,6 +367,13 @@ export default function IntegrationsPage() {
 
   return (
     <div className="p-8">
+      {notification && (
+        <div className={`mb-4 px-4 py-3 rounded-2xl text-sm font-medium flex items-center justify-between
+            ${notification.type === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+          <span>{notification.message}</span>
+          <button onClick={() => setNotification(null)} className="ml-4 text-current opacity-60 hover:opacity-100">✕</button>
+        </div>
+      )}
       <IntegrationsGrid
         mcpConnections={mcpConnections}
         googleConnection={googleConnection}

@@ -275,19 +275,19 @@ export default function CreateVisibilityWizardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-6">
+        <div className="min-h-screen bg-stone-50 p-6">
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="mb-8 text-center">
                     <div className="flex items-center justify-center gap-2 mb-4">
-                        <div className="p-3 bg-purple-600 rounded-xl">
+                        <div className="p-3 bg-amber-600 rounded-xl">
                             <Sparkles className="w-6 h-6 text-white" />
                         </div>
                     </div>
-                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                    <h1 className="text-3xl font-bold text-stone-900 mb-2">
                         {isEdit ? 'Modifica Visibility Tracking' : 'Configura Visibility Tracking'}
                     </h1>
-                    <p className="text-gray-600">
+                    <p className="text-stone-600">
                         Monitora come i principali LLM parlano del tuo brand
                     </p>
                 </div>
@@ -299,10 +299,10 @@ export default function CreateVisibilityWizardPage() {
                             <div key={step.id} className="flex items-center flex-1">
                                 <div className="flex flex-col items-center flex-1">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${currentStep > step.id
-                                        ? 'bg-purple-600 border-purple-600'
+                                        ? 'bg-amber-600 border-amber-600'
                                         : currentStep === step.id
-                                            ? 'border-purple-600 bg-white text-purple-600'
-                                            : 'border-gray-300 bg-white text-gray-400'
+                                            ? 'border-amber-600 bg-white text-amber-600'
+                                            : 'border-stone-300 bg-white text-stone-400'
                                         }`}>
                                         {currentStep > step.id ? (
                                             <Check className="w-5 h-5 text-white" />
@@ -311,16 +311,16 @@ export default function CreateVisibilityWizardPage() {
                                         )}
                                     </div>
                                     <div className="mt-2 text-center">
-                                        <div className={`text-sm font-medium ${currentStep >= step.id ? 'text-gray-900' : 'text-gray-400'}`}>
+                                        <div className={`text-sm font-medium ${currentStep >= step.id ? 'text-stone-900' : 'text-stone-400'}`}>
                                             {step.title}
                                         </div>
-                                        <div className="text-xs text-gray-500 hidden md:block">
+                                        <div className="text-xs text-stone-500 hidden md:block">
                                             {step.description}
                                         </div>
                                     </div>
                                 </div>
                                 {index < STEPS.length - 1 && (
-                                    <div className={`h-0.5 flex-1 mx-4 ${currentStep > step.id ? 'bg-purple-600' : 'bg-gray-300'}`} />
+                                    <div className={`h-0.5 flex-1 mx-4 ${currentStep > step.id ? 'bg-amber-600' : 'bg-stone-300'}`} />
                                 )}
                             </div>
                         ))}
@@ -353,7 +353,7 @@ export default function CreateVisibilityWizardPage() {
                     <button
                         onClick={handlePrevious}
                         disabled={currentStep === 1}
-                        className="flex items-center gap-2 px-6 py-3 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center gap-2 px-6 py-3 text-stone-700 bg-white border border-stone-300 rounded-lg hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         <ChevronLeft className="w-5 h-5" />
                         Indietro
@@ -362,7 +362,7 @@ export default function CreateVisibilityWizardPage() {
                     {currentStep < STEPS.length ? (
                         <button
                             onClick={handleNext}
-                            className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                            className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
                         >
                             Avanti
                             <ChevronRight className="w-5 h-5" />

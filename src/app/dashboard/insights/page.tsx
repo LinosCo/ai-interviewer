@@ -635,35 +635,35 @@ export default function InsightHubPage() {
 
             {/* Website Performance Section */}
             {websiteAnalytics && (
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <Globe className="w-5 h-5 text-emerald-600" />
+                <div className="bg-white rounded-2xl border border-stone-100 p-6 shadow-sm">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4 flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-emerald-500" />
                         Performance Sito Web
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <p className="text-2xl font-bold text-gray-900">
+                        <div className="text-center p-4 bg-stone-50 rounded-xl">
+                            <p className="text-2xl font-black text-stone-900">
                                 {Math.round(websiteAnalytics.avgPageviews).toLocaleString()}
                             </p>
-                            <p className="text-sm text-gray-500">Visite/giorno</p>
+                            <p className="text-xs text-stone-500 mt-1">Visite/giorno</p>
                         </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <p className="text-2xl font-bold text-gray-900">
+                        <div className="text-center p-4 bg-stone-50 rounded-xl">
+                            <p className="text-2xl font-black text-stone-900">
                                 {(websiteAnalytics.avgBounceRate * 100).toFixed(0)}%
                             </p>
-                            <p className="text-sm text-gray-500">Bounce Rate</p>
+                            <p className="text-xs text-stone-500 mt-1">Bounce Rate</p>
                         </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <p className="text-2xl font-bold text-gray-900">
+                        <div className="text-center p-4 bg-stone-50 rounded-xl">
+                            <p className="text-2xl font-black text-stone-900">
                                 {websiteAnalytics.searchQueries || 0}
                             </p>
-                            <p className="text-sm text-gray-500">Query tracciate</p>
+                            <p className="text-xs text-stone-500 mt-1">Query tracciate</p>
                         </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <p className="text-2xl font-bold text-gray-900">
+                        <div className="text-center p-4 bg-stone-50 rounded-xl">
+                            <p className="text-2xl font-black text-stone-900">
                                 {websiteAnalytics.lowPerformingPages || 0}
                             </p>
-                            <p className="text-sm text-gray-500">Pagine da ottimizzare</p>
+                            <p className="text-xs text-stone-500 mt-1">Pagine da ottimizzare</p>
                         </div>
                     </div>
                 </div>
@@ -671,14 +671,15 @@ export default function InsightHubPage() {
 
             {/* Top Industry Sources Section */}
             {topSources && topSources.length > 0 && (
-                <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50/30 to-white">
+                <Card className="border-stone-100 bg-white shadow-sm">
                     <CardHeader className="pb-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-indigo-100 rounded-xl">
-                                <Globe className="w-5 h-5 text-indigo-600" />
+                            <div className="p-2.5 bg-amber-50 rounded-xl">
+                                <Globe className="w-5 h-5 text-amber-600" />
                             </div>
                             <div>
-                                <CardTitle className="text-lg font-bold">Fonti Più Rilevanti per il Settore</CardTitle>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-1">Fonti di Settore</p>
+                                <CardTitle className="text-base font-bold text-stone-900">Fonti Più Rilevanti per il Settore</CardTitle>
                                 <CardDescription className="text-xs">
                                     Siti e fonti citati più frequentemente dagli LLM per le tue query monitorate
                                 </CardDescription>
@@ -696,13 +697,13 @@ export default function InsightHubPage() {
                                                 href={source.url}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="font-semibold text-sm hover:underline hover:text-indigo-600 truncate block transition-colors"
+                                                className="font-semibold text-sm hover:underline hover:text-amber-600 truncate block transition-colors"
                                             >
                                                 {source.domain}
                                             </a>
                                             <div className="flex gap-2 mt-1.5 flex-wrap">
                                                 {source.platforms.map((p: string) => (
-                                                    <Badge key={p} variant="outline" className="text-[9px] border-indigo-200 text-indigo-700 bg-indigo-50">
+                                                    <Badge key={p} variant="outline" className="text-[9px] border-stone-200 text-stone-600 bg-stone-50">
                                                         {p}
                                                     </Badge>
                                                 ))}
@@ -731,17 +732,17 @@ export default function InsightHubPage() {
 
             {/* Website LLM Optimization Section - from Brand Monitor */}
             {websiteAnalysis?.websiteUrl && (
-                <Card className="border-purple-200 bg-gradient-to-br from-purple-50/30 to-white">
+                <Card className="border-stone-100 bg-white shadow-sm">
                     <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-purple-100 rounded-xl">
-                                    <Globe className="w-5 h-5 text-purple-600" />
+                                <div className="p-2.5 bg-amber-50 rounded-xl">
+                                    <Globe className="w-5 h-5 text-amber-600" />
                                 </div>
                                 <div>
                                     <CardTitle className="text-lg font-bold">Ottimizzazione Sito per LLM</CardTitle>
                                     <CardDescription className="text-xs">
-                                        {websiteAnalysis.brandName && <span className="font-medium text-purple-600">{websiteAnalysis.brandName}</span>}
+                                        {websiteAnalysis.brandName && <span className="font-medium text-amber-600">{websiteAnalysis.brandName}</span>}
                                         {' - '}Analisi del sito per visibilità su ChatGPT, Claude e Gemini
                                     </CardDescription>
                                 </div>
@@ -751,7 +752,7 @@ export default function InsightHubPage() {
                                 size="sm"
                                 onClick={() => runWebsiteAnalysis(websiteAnalysis.configId)}
                                 disabled={websiteAnalysisLoading}
-                                className="gap-2 border-purple-200 text-purple-700 hover:bg-purple-50"
+                                className="gap-2 border-stone-200 text-stone-600 hover:bg-stone-50"
                             >
                                 <RefreshCw className={`w-4 h-4 ${websiteAnalysisLoading ? 'animate-spin' : ''}`} />
                                 {websiteAnalysisLoading ? 'Analisi...' : 'Aggiorna'}
@@ -792,7 +793,7 @@ export default function InsightHubPage() {
                                 {websiteAnalysis.promptsAddressed && (
                                     <div className="bg-white rounded-xl border p-4">
                                         <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2">
-                                            <Target className="w-4 h-4 text-purple-600" />
+                                            <Target className="w-4 h-4 text-amber-600" />
                                             Copertura Query Monitorate
                                         </h4>
                                         <div className="grid md:grid-cols-2 gap-4">
@@ -842,12 +843,12 @@ export default function InsightHubPage() {
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0">
                                                             <div className={`p-1.5 rounded-lg shrink-0 ${rec.type === 'add_structured_data' ? 'bg-blue-100' :
-                                                                    rec.type === 'improve_value_proposition' ? 'bg-purple-100' :
+                                                                    rec.type === 'improve_value_proposition' ? 'bg-amber-50' :
                                                                         rec.type === 'add_keyword_content' ? 'bg-green-100' :
                                                                             'bg-amber-100'
                                                                 }`}>
                                                                 {rec.type === 'add_structured_data' ? <Code className="w-4 h-4 text-blue-600" /> :
-                                                                    rec.type === 'improve_value_proposition' ? <Target className="w-4 h-4 text-purple-600" /> :
+                                                                    rec.type === 'improve_value_proposition' ? <Target className="w-4 h-4 text-amber-600" /> :
                                                                         rec.type === 'add_keyword_content' ? <FileText className="w-4 h-4 text-green-600" /> :
                                                                             <Sparkles className="w-4 h-4 text-amber-600" />}
                                                             </div>
@@ -877,7 +878,7 @@ export default function InsightHubPage() {
                                                                 <div className="mt-3 flex flex-wrap gap-1">
                                                                     <span className="text-[10px] text-slate-500 mr-1">Query correlate:</span>
                                                                     {rec.relatedPrompts.slice(0, 3).map((p: string, i: number) => (
-                                                                        <span key={i} className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                                                                        <span key={i} className="text-[10px] px-2 py-0.5 bg-stone-100 text-stone-600 rounded">
                                                                             {p}
                                                                         </span>
                                                                     ))}
@@ -900,7 +901,7 @@ export default function InsightHubPage() {
                             </>
                         ) : (
                             <div className="text-center py-8">
-                                <Globe className="w-12 h-12 text-purple-200 mx-auto mb-3" />
+                                <Globe className="w-12 h-12 text-stone-200 mx-auto mb-3" />
                                 <h4 className="font-semibold text-slate-700">Nessuna Analisi Disponibile</h4>
                                 <p className="text-sm text-slate-500 mt-1 mb-4">
                                     Analizza il sito per scoprire come migliorare la visibilità su ChatGPT, Claude e Gemini.
@@ -908,7 +909,7 @@ export default function InsightHubPage() {
                                 <Button
                                     onClick={() => runWebsiteAnalysis(websiteAnalysis.configId)}
                                     disabled={websiteAnalysisLoading}
-                                    className="gap-2 bg-purple-600 hover:bg-purple-700"
+                                    className="gap-2 bg-amber-600 hover:bg-amber-700"
                                 >
                                     <Sparkles className="w-4 h-4" />
                                     {websiteAnalysisLoading ? 'Analisi in corso...' : 'Avvia Analisi Sito'}

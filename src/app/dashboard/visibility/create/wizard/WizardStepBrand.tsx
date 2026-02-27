@@ -49,7 +49,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         <select
                             value={config.projectId || ''}
                             onChange={(e) => setConfig({ ...config, projectId: e.target.value || undefined })}
-                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-amber-500 outline-none transition-all"
                         >
                             <option value="">Nessun Progetto</option>
                             {projects.map(p => (
@@ -70,7 +70,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         value={config.brandName}
                         onChange={(e) => setConfig({ ...config, brandName: e.target.value })}
                         placeholder="Es. Business Tuner"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400"
                     />
                 </div>
 
@@ -83,7 +83,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         value={config.category}
                         onChange={(e) => setConfig({ ...config, category: e.target.value })}
                         placeholder="Es. AI Interview Platform, CRM Software, etc."
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400"
                     />
                 </div>
 
@@ -96,7 +96,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         onChange={(e) => setConfig({ ...config, description: e.target.value })}
                         placeholder="Descrivi brevemente cosa fa il tuo prodotto e quali problemi risolve..."
                         rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400 resize-none"
                     />
                 </div>
 
@@ -109,7 +109,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         value={config.websiteUrl || ''}
                         onChange={(e) => setConfig({ ...config, websiteUrl: e.target.value || undefined })}
                         placeholder="https://www.esempio.it"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400"
                     />
                     <p className="text-xs text-gray-500 mt-1">
                         Opzionale. Inserisci l&apos;URL per ricevere AI Tips di ottimizzazione per LLM e motori di ricerca.
@@ -132,7 +132,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                             <div className="space-y-2 mb-3">
                                 {config.additionalUrls.map((item, index) => (
                                     <div key={index} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
-                                        <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                        <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
                                             {item.label}
                                         </span>
                                         <span className="text-sm text-gray-600 truncate flex-1">
@@ -157,14 +157,14 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                                 value={newLabel}
                                 onChange={(e) => setNewLabel(e.target.value)}
                                 placeholder="Etichetta (es. Pricing)"
-                                className="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400"
                             />
                             <input
                                 type="url"
                                 value={newUrl}
                                 onChange={(e) => setNewUrl(e.target.value)}
                                 placeholder="https://esempio.it/pagina"
-                                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400"
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                         e.preventDefault();
@@ -176,7 +176,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                                 type="button"
                                 onClick={addAdditionalUrl}
                                 disabled={!newUrl.trim() || !newLabel.trim()}
-                                className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                className="px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                                 <Plus className="w-4 h-4" />
                             </button>
@@ -192,7 +192,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         <select
                             value={config.language || 'it'}
                             onChange={(e) => setConfig({ ...config, language: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400"
                         >
                             <option value="it">🇮🇹 Italiano</option>
                             <option value="en">🇬🇧 English</option>
@@ -209,7 +209,7 @@ export function WizardStepBrand({ config, setConfig, projects }: Props) {
                         <select
                             value={config.territory || 'IT'}
                             onChange={(e) => setConfig({ ...config, territory: e.target.value })}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-400"
                         >
                             <option value="IT">🇮🇹 Italia</option>
                             <option value="US">🇺🇸 USA</option>

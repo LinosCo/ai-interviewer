@@ -110,10 +110,10 @@ export default async function VisibilityPage({
                     <VisibilityProjectFilter currentProjectId={projectIdFilter} />
                 </div>
 
-                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-                    <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun brand configurato per questo progetto</h3>
-                    <p className="text-gray-500 mb-6">Configura il monitoraggio della visibilità per questo progetto</p>
+                <div className="bg-white rounded-2xl border border-stone-100 p-12 text-center">
+                    <Building2 className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-stone-900 mb-2">Nessun brand configurato per questo progetto</h3>
+                    <p className="text-stone-500 mb-6">Configura il monitoraggio della visibilità per questo progetto</p>
                     <Link
                         href={`/dashboard/visibility/create?projectId=${projectIdFilter}`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
@@ -209,7 +209,7 @@ export default async function VisibilityPage({
                             <span className="font-medium text-amber-600">{config.brandName}</span>
                         )}
                         {config.project && (
-                            <span className="text-gray-400 ml-2">• {config.project.name}</span>
+                            <span className="text-stone-400 ml-2">• {config.project.name}</span>
                         )}
                     </p>
                 </div>

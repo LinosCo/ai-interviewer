@@ -66,14 +66,31 @@ export async function detectKnowledgeGaps(botId: string, lookbackDays: number = 
                     schema: GapSchema,
                     temperature: 0,
                     prompt: `
-                    Analyze this interaction where the bot failed to answer.
+                    You are a knowledge gap analyst. An AI chatbot failed to answer a user question.
+                    Analyze the interaction and identify the specific knowledge gap.
 
                     Bot Context: ${sanitizeConfig(bot.description) || "Customer Service Bot"}
 
                     User Question: "${sanitize(userQuestion.content)}"
                     Bot Response: "${sanitize(messages[fallbackIndex].content)}"
 
-                    Identify the knowledge gap.
+                    Gap Categories (choose the most fitting):
+                    - PRODUCT_INFO: Missing product specs, features, availability
+                    - PRICING: Missing pricing, plans, discounts, payment info
+                    - PROCESS: Missing how-to, steps, procedures, workflows
+                    - POLICY: Missing return/refund/cancellation/legal policies
+                    - CONTACT: Missing contact details, support channels, hours
+                    - TECHNICAL: Missing technical specs, integration, compatibility
+                    - COMPANY: Missing about-us, team, history, certifications
+                    - OTHER: Does not fit above categories
+
+                    Priority rules:
+                    - HIGH: Direct blocker to purchase or main user goal; asked multiple times
+                    - MEDIUM: Important context the user needs but not an immediate blocker
+                    - LOW: Nice-to-have detail, edge case, or out-of-scope request
+
+                    Generate a clear FAQ question and a draft answer. If the answer is not inferable
+                    from context, describe exactly what information should be added to the knowledge base.
                 `
                 });
 

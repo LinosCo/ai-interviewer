@@ -50,8 +50,8 @@ export class NotificationService {
             // 3. Send push notification if enabled
             // 4. Create in-app notification badge
 
-            for (const member of org.members) {
-                console.log(`  → ${member.user.email}: ${payload.title}`);
+            for (const _member of org.members) {
+                console.log(`  → [user]: ${payload.title}`);
             }
 
         } catch (error) {

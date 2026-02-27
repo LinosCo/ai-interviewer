@@ -105,7 +105,7 @@ export async function aggregateChatbotAnalytics(targetDate: Date = new Date()) {
                 const sampleMessages = sanitizeArray(allUserMessages.slice(0, 100));
 
                 const { object } = await generateObject({
-                    model: openai('gpt-4o'),
+                    model: openai('gpt-4o-mini'),
                     temperature: 0,
                     schema: z.object({
                         clusters: z.array(z.object({

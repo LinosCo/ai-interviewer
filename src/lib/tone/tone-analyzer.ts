@@ -26,7 +26,10 @@ export class ToneAnalyzer {
         this.openai = createOpenAI({ apiKey });
     }
 
-    async analyzeTone(recentMessages: { role: string, content: string }[]): Promise<ToneProfile> {
+    async analyzeTone(
+        recentMessages: { role: string, content: string }[],
+        language: string = 'it'
+    ): Promise<ToneProfile> {
         // Filter only user messages, take last 5 — sanitize before prompt interpolation
         const userMessages = recentMessages
             .filter(m => m.role === 'user')
@@ -38,17 +41,32 @@ export class ToneAnalyzer {
             return this.getDefaultProfile();
         }
 
+        const isItalian = language.toLowerCase().startsWith('it');
+
+        const prompt = isItalian
+            ? `
+                Analizza lo stile comunicativo dell'utente basandoti su questi messaggi recenti:
+
+                "${userMessages}"
+
+                Identifica i tratti stilistici per adattare la risposta dell'AI.
+                Valuta: registro (formale/neutro/colloquiale), verbosità, emotività, uso emoji, complessità linguistica.
+            `
+            : `
+                Analyze the user's communication style based on these recent messages:
+
+                "${userMessages}"
+
+                Identify stylistic traits to adapt the AI's response accordingly.
+                Evaluate: register (formal/neutral/casual), verbosity, emotionality, emoji usage, linguistic complexity.
+            `;
+
         try {
             const result = await generateObject({
                 model: this.openai('gpt-4o-mini'),
                 schema: toneSchema,
-                prompt: `
-                    Analizza lo stile comunicativo dell'utente basandoti su questi messaggi recenti:
-                    
-                    "${userMessages}"
-                    
-                    Identifica i tratti stilistici per adattare la risposta dell'AI.
-                `
+                temperature: 0.1,
+                prompt
             });
 
             return result.object;

@@ -328,6 +328,7 @@ model Project {
   projectTransfersFrom ProjectTransfer[]          @relation("OriginalProject")
   visibilityShares     ProjectVisibilityConfig[]
   visibilityConfigs    VisibilityConfig[]
+  tipRoutingRules      TipRoutingRule[]
 }
 
 model OrgCreditTransaction {
@@ -1174,6 +1175,7 @@ model CMSConnection {
   projectShares             ProjectCMSConnection[]
   analytics                 WebsiteAnalytics[]
   siteStructureCache        SiteStructureCache?
+  tipRoutingRules           TipRoutingRule[]
 
   @@index([organizationId])
 }
@@ -1341,6 +1343,7 @@ model MCPConnection {
   project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectShares      ProjectMCPConnection[]
   siteStructureCache SiteStructureCache?
+  tipRoutingRules    TipRoutingRule[]
 
   @@unique([projectId, type])
   @@index([projectId, status])
@@ -1426,9 +1429,40 @@ model N8NConnection {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   createdBy     String
-  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tipRoutingRules TipRoutingRule[]
 
   @@index([projectId])
+}
+
+model TipRoutingRule {
+  id               String         @id @default(cuid())
+  projectId        String
+  contentKind      String
+  priority         Int            @default(0)
+  enabled          Boolean        @default(true)
+  label            String?
+
+  // Destination — exactly one should be non-null
+  mcpConnectionId  String?
+  cmsConnectionId  String?
+  n8nConnectionId  String?
+
+  // Action
+  mcpTool          String?
+  behavior         String
+  behaviorConfig   Json?
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mcpConnection    MCPConnection? @relation(fields: [mcpConnectionId], references: [id], onDelete: SetNull)
+  cmsConnection    CMSConnection? @relation(fields: [cmsConnectionId], references: [id], onDelete: SetNull)
+  n8nConnection    N8NConnection? @relation(fields: [n8nConnectionId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, contentKind])
+  @@index([projectId, enabled])
 }
 
 model IntegrationLog {

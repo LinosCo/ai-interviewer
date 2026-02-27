@@ -79,57 +79,47 @@ export async function GET(req: Request) {
                                     data: { status: 'processed' }
                                 });
 
-                                // Dispatch generated suggestions to n8n (non-blocking)
+                                // Dispatch generated suggestions to n8n + tip routing (non-blocking)
                                 if (insight.projectId) {
+                                    // Fetch full suggestion objects once — shared by N8N dispatcher and TipRoutingExecutor
+                                    const newSuggestions = await prisma.cMSSuggestion.findMany({
+                                        where: { id: { in: suggestionIds } },
+                                        select: {
+                                            id: true,
+                                            title: true,
+                                            body: true,
+                                            type: true,
+                                            targetSection: true,
+                                            metaDescription: true,
+                                            cmsPreviewUrl: true,
+                                        },
+                                    });
+
+                                    const tipsPayload = newSuggestions.map(s => ({
+                                        id: s.id,
+                                        title: s.title,
+                                        content: s.body,
+                                        contentKind: String(s.type),
+                                        targetChannel: s.targetSection ?? undefined,
+                                        metaDescription: s.metaDescription ?? undefined,
+                                        url: s.cmsPreviewUrl ?? undefined,
+                                    }));
+
                                     try {
-                                        const newSuggestions = await prisma.cMSSuggestion.findMany({
-                                            where: { id: { in: suggestionIds } },
-                                            select: {
-                                                id: true,
-                                                title: true,
-                                                body: true,
-                                                type: true,
-                                                targetSection: true,
-                                                metaDescription: true,
-                                                cmsPreviewUrl: true,
-                                            },
-                                        });
-                                        await N8NDispatcher.dispatchTips(
-                                            insight.projectId,
-                                            newSuggestions.map(s => ({
-                                                id: s.id,
-                                                title: s.title,
-                                                content: s.body,
-                                                contentKind: String(s.type),
-                                                targetChannel: s.targetSection ?? undefined,
-                                                metaDescription: s.metaDescription ?? undefined,
-                                                url: s.cmsPreviewUrl ?? undefined,
-                                            }))
-                                        );
+                                        await N8NDispatcher.dispatchTips(insight.projectId, tipsPayload);
                                     } catch (dispatchErr) {
                                         console.warn(`[CMS Suggestions] N8N dispatch failed for insight ${insight.id}:`, dispatchErr);
                                     }
 
                                     // Run tip routing rules (if configured for this project)
-                                    if (insight.projectId) {
-                                        try {
-                                            const tipsForRouting = newSuggestions.map((s: { id: string; title: string; body: string; type: string; targetSection: string | null; metaDescription: string | null; cmsPreviewUrl: string | null }) => ({
-                                                id: s.id,
-                                                title: s.title,
-                                                content: s.body,
-                                                contentKind: String(s.type),
-                                                targetChannel: s.targetSection ?? undefined,
-                                                metaDescription: s.metaDescription ?? undefined,
-                                                url: s.cmsPreviewUrl ?? undefined,
-                                            }));
-                                            const routingResults = await TipRoutingExecutor.execute(insight.projectId, tipsForRouting);
-                                            const failedRoutes = routingResults.filter(r => !r.success);
-                                            if (failedRoutes.length > 0) {
-                                                console.warn(`[CMS Suggestions] ${failedRoutes.length} routing rule(s) failed for insight ${insight.id}`);
-                                            }
-                                        } catch (routingErr) {
-                                            console.warn(`[CMS Suggestions] TipRoutingExecutor failed for insight ${insight.id}:`, routingErr);
+                                    try {
+                                        const routingResults = await TipRoutingExecutor.execute(insight.projectId, tipsPayload);
+                                        const failedRoutes = routingResults.filter(r => !r.success);
+                                        if (failedRoutes.length > 0) {
+                                            console.warn(`[CMS Suggestions] ${failedRoutes.length} routing rule(s) failed for insight ${insight.id}`);
                                         }
+                                    } catch (routingErr) {
+                                        console.warn(`[CMS Suggestions] TipRoutingExecutor failed for insight ${insight.id}:`, routingErr);
                                     }
                                 }
                             }

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { CMSSuggestionGenerator } from '@/lib/cms/suggestion-generator';
+import { N8NDispatcher } from '@/lib/integrations/n8n/dispatcher';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -70,12 +71,44 @@ export async function GET(req: Request) {
                             const suggestionIds = await CMSSuggestionGenerator.generateFromInsight(insight.id);
                             suggestionsGenerated += suggestionIds.length;
 
-                            // Mark insight as processed (optional)
                             if (suggestionIds.length > 0) {
+                                // Mark insight as processed
                                 await prisma.crossChannelInsight.update({
                                     where: { id: insight.id },
                                     data: { status: 'processed' }
                                 });
+
+                                // Dispatch generated suggestions to n8n (non-blocking)
+                                if (insight.projectId) {
+                                    try {
+                                        const newSuggestions = await prisma.cMSSuggestion.findMany({
+                                            where: { id: { in: suggestionIds } },
+                                            select: {
+                                                id: true,
+                                                title: true,
+                                                body: true,
+                                                type: true,
+                                                targetSection: true,
+                                                metaDescription: true,
+                                                cmsPreviewUrl: true,
+                                            },
+                                        });
+                                        await N8NDispatcher.dispatchTips(
+                                            insight.projectId,
+                                            newSuggestions.map(s => ({
+                                                id: s.id,
+                                                title: s.title,
+                                                content: s.body,
+                                                contentKind: String(s.type),
+                                                targetChannel: s.targetSection ?? undefined,
+                                                metaDescription: s.metaDescription ?? undefined,
+                                                url: s.cmsPreviewUrl ?? undefined,
+                                            }))
+                                        );
+                                    } catch (dispatchErr) {
+                                        console.warn(`[CMS Suggestions] N8N dispatch failed for insight ${insight.id}:`, dispatchErr);
+                                    }
+                                }
                             }
                         } catch (genError: any) {
                             console.error(`[CMS Suggestions] Error generating from insight ${insight.id}:`, genError.message);

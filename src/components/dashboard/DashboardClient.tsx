@@ -285,10 +285,10 @@ export default function DashboardClient({
             {/* Welcome Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-2xl font-bold text-stone-900">
                         Ciao{user.name ? `, ${user.name.split(' ')[0]}` : ''}!
                     </h1>
-                    <p className="text-gray-500 mt-1">
+                    <p className="text-stone-500 mt-1">
                         {isAllProjects
                             ? "Ecco una panoramica di tutti i tuoi progetti."
                             : `Stai visualizzando il progetto: ${selectedProject?.name}`}
@@ -298,7 +298,7 @@ export default function DashboardClient({
                     {!isAllProjects && selectedProject && (
                         <Link
                             href={`/dashboard/projects/${selectedProject.id}/analytics`}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors font-medium text-sm"
+                            className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors font-medium text-sm"
                         >
                             <BarChart3 className="w-4 h-4" />
                             Insight
@@ -306,7 +306,7 @@ export default function DashboardClient({
                     )}
                     <Link
                         href="/dashboard/billing"
-                        className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm flex items-center gap-2"
+                        className="px-4 py-2 bg-white border border-stone-200 text-stone-700 rounded-lg hover:bg-stone-50 transition-colors font-medium text-sm flex items-center gap-2"
                     >
                         <TrendingUp className="w-4 h-4" />
                         Upgrade
@@ -314,22 +314,23 @@ export default function DashboardClient({
                 </div>
             </div>
 
-            {/* Stats Cards Row */}
+            {/* Stats Cards Row — one color per tool type */}
             <div className="grid md:grid-cols-4 gap-4">
-                {/* Interviews Stats */}
+
+                {/* Interviste AI — amber */}
                 <div className="platform-card rounded-xl p-5 relative overflow-hidden group">
                     <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-amber-100 rounded-lg">
                             <MessageSquare className="w-5 h-5 text-amber-600" />
                         </div>
-                        <span className="text-xs font-bold text-gray-400">Interviste Mensili</span>
+                        <span className="text-xs font-bold text-stone-400">Interviste Mensili</span>
                     </div>
                     <div>
                         <div className="flex items-end justify-between mb-2">
-                            <p className="text-2xl font-bold text-gray-900">{usage?.interviews.used || 0}</p>
-                            <p className="text-xs text-gray-500">di {usage?.interviews.limit === -1 ? '∞' : usage?.interviews.limit || 0}</p>
+                            <p className="text-2xl font-bold text-stone-900">{usage?.interviews.used || 0}</p>
+                            <p className="text-xs text-stone-500">di {usage?.interviews.limit === -1 ? '∞' : usage?.interviews.limit || 0}</p>
                         </div>
-                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
                             <div
                                 className={`h-full transition-all duration-500 ${usage && usage.interviews.percentage > 90 ? 'bg-red-500' : 'bg-amber-500'}`}
                                 style={{ width: `${Math.min(usage?.interviews.percentage || 0, 100)}%` }}
@@ -338,20 +339,20 @@ export default function DashboardClient({
                     </div>
                 </div>
 
-                {/* Chatbots Stats */}
+                {/* Chatbot AI — blue */}
                 <div className="platform-card rounded-xl p-5 relative overflow-hidden group">
                     <div className="flex items-center justify-between mb-4">
                         <div className="p-2 bg-blue-100 rounded-lg">
                             <Bot className="w-5 h-5 text-blue-600" />
                         </div>
-                        <span className="text-xs font-bold text-gray-400">Bot Attivi</span>
+                        <span className="text-xs font-bold text-stone-400">Bot Attivi</span>
                     </div>
                     <div>
                         <div className="flex items-end justify-between mb-2">
-                            <p className="text-2xl font-bold text-gray-900">{usage?.activeBots.used || 0}</p>
-                            <p className="text-xs text-gray-500">di {usage?.activeBots.limit === -1 ? '∞' : usage?.activeBots.limit || 0}</p>
+                            <p className="text-2xl font-bold text-stone-900">{usage?.activeBots.used || 0}</p>
+                            <p className="text-xs text-stone-500">di {usage?.activeBots.limit === -1 ? '∞' : usage?.activeBots.limit || 0}</p>
                         </div>
-                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-blue-500 transition-all duration-500"
                                 style={{ width: `${Math.min(usage?.activeBots.percentage || 0, 100)}%` }}
@@ -360,37 +361,37 @@ export default function DashboardClient({
                     </div>
                 </div>
 
-                {/* Tokens Stats */}
+                {/* AI Token Budget — violet (AI resource, shared) */}
                 <div className="platform-card rounded-xl p-5">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                            <Sparkles className="w-5 h-5 text-purple-600" />
+                        <div className="p-2 bg-violet-100 rounded-lg">
+                            <Sparkles className="w-5 h-5 text-violet-600" />
                         </div>
-                        <span className="text-xs font-bold text-gray-400">Token AI (Budget)</span>
+                        <span className="text-xs font-bold text-stone-400">Token AI (Budget)</span>
                     </div>
                     <div>
                         <div className="flex items-end justify-between mb-2">
-                            <p className="text-2xl font-bold text-gray-900">{(usage?.tokens.used || 0) >= 1000 ? `${Math.round(usage!.tokens.used / 1000)}K` : usage?.tokens.used || 0}</p>
-                            <p className="text-xs text-gray-500">di {(usage?.tokens.limit || 0) >= 1000 ? `${Math.round((usage?.tokens.limit || 0) / 1000)}K` : usage?.tokens.limit || 0}</p>
+                            <p className="text-2xl font-bold text-stone-900">{(usage?.tokens.used || 0) >= 1000 ? `${Math.round(usage!.tokens.used / 1000)}K` : usage?.tokens.used || 0}</p>
+                            <p className="text-xs text-stone-500">di {(usage?.tokens.limit || 0) >= 1000 ? `${Math.round((usage?.tokens.limit || 0) / 1000)}K` : usage?.tokens.limit || 0}</p>
                         </div>
-                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="w-full bg-stone-100 h-1.5 rounded-full overflow-hidden">
                             <div
-                                className="h-full bg-purple-500 transition-all duration-500"
+                                className="h-full bg-violet-500 transition-all duration-500"
                                 style={{ width: `${Math.min(usage?.tokens.percentage || 0, 100)}%` }}
                             />
                         </div>
                     </div>
                 </div>
 
-                {/* Buy More Card */}
-                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-5 text-white flex flex-col justify-between">
+                {/* Buy More — slate dark (premium upgrade) */}
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-5 text-white flex flex-col justify-between">
                     <div>
-                        <p className="font-bold text-sm mb-1 text-indigo-100">Hai bisogno di più?</p>
-                        <p className="text-xs text-indigo-100/80">Acquista pacchetti extra senza abbonamento.</p>
+                        <p className="font-bold text-sm mb-1 text-slate-300">Hai bisogno di più?</p>
+                        <p className="text-xs text-slate-400">Acquista pacchetti extra senza abbonamento.</p>
                     </div>
                     <Link
                         href="/dashboard/billing#packages"
-                        className="mt-3 flex items-center justify-center gap-2 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-all"
+                        className="mt-3 flex items-center justify-center gap-2 py-1.5 bg-amber-500 hover:bg-amber-600 rounded-lg text-xs font-bold transition-all"
                     >
                         Compra Pacchetti <ArrowRight className="w-3 h-3" />
                     </Link>
@@ -402,12 +403,12 @@ export default function DashboardClient({
 
                 {/* Quick Actions & Create */}
                 <div className="space-y-4">
-                    <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-gray-400" />
+                    <h2 className="font-semibold text-stone-900 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-stone-400" />
                         Azioni rapide
                     </h2>
 
-                    {/* CMS Dashboard Quick Access */}
+                    {/* CMS Dashboard Quick Access — emerald */}
                     {currentCmsConnection && (
                         <div className="block bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5 relative group cursor-pointer"
                             onClick={() => {
@@ -463,6 +464,7 @@ export default function DashboardClient({
                             </div>
                         </div>
                     )}
+
                     {/* Show all CMS connections when "All Projects" is selected */}
                     {isAllProjects && allCmsConnections.map((conn: any) => (
                         <CMSConnectionCard
@@ -476,7 +478,8 @@ export default function DashboardClient({
                             onDelete={handleDeleteConnection}
                         />
                     ))}
-                    {/* Create Interview */}
+
+                    {/* Create Interview — amber/orange */}
                     {canCreateInterview.allowed ? (
                         <Link
                             href="/dashboard/interviews/create"
@@ -486,7 +489,7 @@ export default function DashboardClient({
                                 <div>
                                     <h3 className="text-xl font-semibold mb-2">Crea nuova intervista</h3>
                                     <p className="text-orange-100 text-sm">
-                                        Genera un'intervista strutturata per HR, Product o Feedback.
+                                        Genera un&apos;intervista strutturata per HR, Product o Feedback.
                                     </p>
                                 </div>
                                 <div className="p-2 bg-white/20 rounded-lg">
@@ -495,26 +498,26 @@ export default function DashboardClient({
                             </div>
                         </Link>
                     ) : (
-                        <div className="block bg-gray-50 rounded-xl p-6 border border-gray-200 relative overflow-hidden">
+                        <div className="block bg-stone-50 rounded-xl p-6 border border-stone-200 relative overflow-hidden">
                             <div className="flex items-start justify-between opacity-50">
                                 <div>
                                     <h3 className="text-xl font-semibold mb-2">Crea Intervista</h3>
-                                    <p className="text-gray-500 text-sm">Limite raggiunto per il tuo piano.</p>
+                                    <p className="text-stone-500 text-sm">Limite raggiunto per il tuo piano.</p>
                                 </div>
                                 <div className="p-2 bg-white/20 rounded-lg">
-                                    <Lock className="w-6 h-6 text-gray-400" />
+                                    <Lock className="w-6 h-6 text-stone-400" />
                                 </div>
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-3 border-t border-gray-100 flex items-center justify-between px-6">
-                                <span className="text-xs font-semibold text-gray-600">Sblocca altre interviste</span>
-                                <Link href="/dashboard/billing" className="text-xs bg-gray-900 text-white px-3 py-1.5 rounded-full hover:bg-gray-800">
+                            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-3 border-t border-stone-100 flex items-center justify-between px-6">
+                                <span className="text-xs font-semibold text-stone-600">Sblocca altre interviste</span>
+                                <Link href="/dashboard/billing" className="text-xs bg-stone-900 text-white px-3 py-1.5 rounded-full hover:bg-stone-800">
                                     Upgrade Piano
                                 </Link>
                             </div>
                         </div>
                     )}
 
-                    {/* Create Chatbot */}
+                    {/* Create Chatbot — blue/cyan */}
                     {canCreateChatbotCheck.allowed ? (
                         <Link
                             href="/dashboard/bots/create-chatbot"
@@ -533,34 +536,34 @@ export default function DashboardClient({
                             </div>
                         </Link>
                     ) : (
-                        <div className="block bg-gray-50 rounded-xl p-6 border border-gray-200 relative overflow-hidden">
+                        <div className="block bg-stone-50 rounded-xl p-6 border border-stone-200 relative overflow-hidden">
                             <div className="flex items-start justify-between opacity-50">
                                 <div>
                                     <h3 className="text-xl font-semibold mb-2">Crea Chatbot AI</h3>
-                                    <p className="text-gray-500 text-sm">Hai raggiunto il limite di Chatbot del tuo piano.</p>
+                                    <p className="text-stone-500 text-sm">Hai raggiunto il limite di Chatbot del tuo piano.</p>
                                 </div>
                                 <div className="p-2 bg-white/20 rounded-lg">
-                                    <Lock className="w-6 h-6 text-gray-400" />
+                                    <Lock className="w-6 h-6 text-stone-400" />
                                 </div>
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-3 border-t border-gray-100 flex items-center justify-between px-6">
-                                <span className="text-xs font-semibold text-gray-600">Sblocca più chatbot</span>
-                                <Link href="/dashboard/billing/plans" className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-full hover:bg-indigo-700">
+                            <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-3 border-t border-stone-100 flex items-center justify-between px-6">
+                                <span className="text-xs font-semibold text-stone-600">Sblocca più chatbot</span>
+                                <Link href="/dashboard/billing/plans" className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-full hover:bg-blue-700">
                                     Upgrade Piano
                                 </Link>
                             </div>
                         </div>
                     )}
 
-                    {/* Brand Monitor (Renamed & Styled) */}
+                    {/* Brand Monitor — violet (analytics, AI visibility) */}
                     <Link
                         href="/dashboard/visibility/brands"
-                        className="block bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5"
+                        className="block bg-gradient-to-r from-violet-500 to-violet-600 rounded-xl p-6 text-white hover:shadow-lg transition-all hover:-translate-y-0.5"
                     >
                         <div className="flex items-start justify-between">
                             <div>
                                 <h3 className="text-xl font-semibold mb-2">Brand Monitor</h3>
-                                <p className="text-purple-100 text-sm">
+                                <p className="text-violet-100 text-sm">
                                     Monitora la visibilità del tuo brand negli LLM e motori di ricerca.
                                 </p>
                             </div>
@@ -572,19 +575,19 @@ export default function DashboardClient({
 
                     <Link
                         href="/dashboard/templates"
-                        className="block platform-card rounded-xl p-4 hover:border-gray-300 transition-colors group"
+                        className="block platform-card rounded-xl p-4 hover:border-stone-300 transition-colors group"
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-gray-50 rounded-lg group-hover:bg-gray-100">
-                                    <Sparkles className="w-4 h-4 text-gray-600" />
+                                <div className="p-2 bg-stone-50 rounded-lg group-hover:bg-stone-100">
+                                    <Sparkles className="w-4 h-4 text-stone-600" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-gray-900 text-sm">Esplora template</h3>
-                                    <p className="text-gray-500 text-xs">Modelli pronti all'uso per ogni settore</p>
+                                    <h3 className="font-semibold text-stone-900 text-sm">Esplora template</h3>
+                                    <p className="text-stone-500 text-xs">Modelli pronti all&apos;uso per ogni settore</p>
                                 </div>
                             </div>
-                            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
+                            <ArrowRight className="w-4 h-4 text-stone-400 group-hover:translate-x-1 transition-transform" />
                         </div>
                     </Link>
 
@@ -599,11 +602,11 @@ export default function DashboardClient({
                                         <LinkIcon className="w-4 h-4 text-emerald-600" />
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 text-sm">Integrazioni</h3>
-                                        <p className="text-gray-500 text-xs">Gestisci connessioni WordPress, WooCommerce e Google</p>
+                                        <h3 className="font-semibold text-stone-900 text-sm">Integrazioni</h3>
+                                        <p className="text-stone-500 text-xs">Gestisci connessioni WordPress, WooCommerce e Google</p>
                                     </div>
                                 </div>
-                                <ArrowRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
+                                <ArrowRight className="w-4 h-4 text-stone-400 group-hover:translate-x-1 transition-transform" />
                             </div>
                         </Link>
                     )}
@@ -611,42 +614,42 @@ export default function DashboardClient({
 
                 {/* Recent Activity List */}
                 <div className="platform-card rounded-xl overflow-hidden flex flex-col">
-                    <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                        <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                            <Bell className="w-4 h-4 text-gray-400" />
+                    <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
+                        <h2 className="font-semibold text-stone-900 flex items-center gap-2">
+                            <Bell className="w-4 h-4 text-stone-400" />
                             Attività recente
                         </h2>
                         {isAllProjects ? (
-                            <Link href="/dashboard/interviews" className="text-sm text-indigo-600 hover:text-indigo-700">
+                            <Link href="/dashboard/interviews" className="text-sm text-amber-600 hover:text-amber-700">
                                 Vedi tutto →
                             </Link>
                         ) : (
-                            <span className="text-xs text-gray-400">Filtrata per progetto</span>
+                            <span className="text-xs text-stone-400">Filtrata per progetto</span>
                         )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto max-h-[400px]">
                         {filteredResponses.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500 h-full flex flex-col items-center justify-center">
-                                <Clock className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                            <div className="p-8 text-center text-stone-500 h-full flex flex-col items-center justify-center">
+                                <Clock className="w-8 h-8 mx-auto mb-2 text-stone-300" />
                                 <p>Nessuna attività recente</p>
                                 <p className="text-sm">Le conversazioni appariranno qui</p>
                             </div>
                         ) : (
-                            <div className="divide-y divide-gray-100">
+                            <div className="divide-y divide-stone-100">
                                 {filteredResponses.map((response: any) => (
                                     <Link
                                         key={response.id}
                                         href={`/dashboard/bots/${response.botId}`}
-                                        className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group"
+                                        className="flex items-center justify-between p-4 hover:bg-stone-50 transition-colors group"
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className={`p-2 rounded-full ${response.type === 'chatbot' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
                                                 {response.type === 'chatbot' ? <Bot className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
                                             </div>
                                             <div>
-                                                <p className="font-medium text-gray-900 text-sm group-hover:text-indigo-600 transition-colors">{response.botName}</p>
-                                                <p className="text-xs text-gray-500">
+                                                <p className="font-medium text-stone-900 text-sm group-hover:text-amber-600 transition-colors">{response.botName}</p>
+                                                <p className="text-xs text-stone-500">
                                                     {new Date(response.completedAt!).toLocaleDateString('it-IT', {
                                                         day: 'numeric',
                                                         month: 'short',

@@ -4,6 +4,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { Message } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { sanitizeTranscript } from '@/lib/llm/prompt-sanitizer';
 
 // In-memory cache to avoid re-extraction
 const extractionCache = new Map<string, Record<string, unknown>>();
@@ -50,7 +51,7 @@ export class CandidateExtractor {
 
         const openai = createOpenAI({ apiKey });
         const extractionModel = openai('gpt-4o');
-        const transcript = messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
+        const transcript = sanitizeTranscript(messages, 8000);
 
         const schema = z.object({
             fullName: z.string().nullable().describe("Full name"),
@@ -79,13 +80,14 @@ export class CandidateExtractor {
             const extractionPromise = generateObject({
                 model: extractionModel,
                 schema,
+                temperature: 0,
                 prompt: `
 You are an expert Lead Qualifier and Profiler.
 Analyze the following interview transcript and extract a structured profile.
 
 **GUIDELINES**:
 1. **Facts First**: Focus on factual data provided by the user.
-2. **Smart Inference**: 
+2. **Smart Inference**:
    - Looking for Location/Role in the context of their stories if not explicitly asked.
    - DO NOT infer name from email. Only extract name if explicitly stated or clearly addressed.
 3. **Be Generous**: If you are 80% sure, extract the data. Don't return null unless truly unknown.

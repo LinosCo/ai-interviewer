@@ -3,6 +3,7 @@ import { startOfDay, endOfDay, subDays } from "date-fns";
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { sanitizeArray, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const openai = createOpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -100,11 +101,12 @@ export async function aggregateChatbotAnalytics(targetDate: Date = new Date()) {
 
             // Only analyze if we have enough data (e.g., > 5 messages) and API Key is set
             if (allUserMessages.length > 5 && process.env.OPENAI_API_KEY) {
-                // Take a sample to avoid token limits
-                const sampleMessages = allUserMessages.slice(0, 100);
+                // Take a sample to avoid token limits, sanitize user content
+                const sampleMessages = sanitizeArray(allUserMessages.slice(0, 100));
 
                 const { object } = await generateObject({
                     model: openai('gpt-4o'),
+                    temperature: 0,
                     schema: z.object({
                         clusters: z.array(z.object({
                             topic: z.string(),
@@ -123,8 +125,8 @@ export async function aggregateChatbotAnalytics(targetDate: Date = new Date()) {
                             negativeCount: z.number()
                         })
                     }),
-                    prompt: `Analyze the following user messages from a chatbot session for a bot named "${bot.name}" (Goal: ${bot.researchGoal || 'General'}).
-                    
+                    prompt: `Analyze the following user messages from a chatbot session for a bot named "${sanitizeConfig(bot.name)}" (Goal: ${sanitizeConfig(bot.researchGoal) || 'General'}).
+
                     Messages:
                     ${JSON.stringify(sampleMessages)}
 

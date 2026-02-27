@@ -193,6 +193,7 @@ model Organization {
   creditPacks            OrgCreditPack[]
   creditTransactions     OrgCreditTransaction[]
   invoices               OrgInvoice[]
+  sentNotifications      SentNotification[]
   platformSettings       PlatformSettings?      @relation(fields: [platformSettingsId], references: [id])
   projects               Project[]
   subscription           Subscription?
@@ -882,6 +883,20 @@ model KnowledgeGap {
 
   @@index([botId])
   @@index([botId, status])
+}
+
+/// Tracks which credit notification emails have been sent to avoid duplicates.
+/// Survives server restarts (unlike the previous in-memory Map approach).
+model SentNotification {
+  id               String   @id @default(cuid())
+  organizationId   String
+  notificationType String   // "warning", "exhausted"
+  period           String   // "YYYY-MM" format
+  sentAt           DateTime @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, notificationType, period])
+  @@index([organizationId])
 }
 
 model FaqSuggestion {

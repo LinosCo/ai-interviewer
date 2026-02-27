@@ -4,7 +4,14 @@
  * Gestisce l'invio di notifiche email basate sull'utilizzo dei crediti.
  * - Invia warning al 85% di utilizzo
  * - Invia alert quando i crediti sono esauriti
- * - Tiene traccia delle notifiche già inviate per evitare spam
+ * - Usa la tabella SentNotification (DB) per tracciare le notifiche già inviate,
+ *   sopravvivendo a restart/deploy del server.
+ *
+ * DESIGN NOTE (Sprint 1 Audit):
+ * Precedentemente usava un in-memory Map<string, Set<string>> che si azzerava
+ * ad ogni restart di Railway, causando invio duplicato di email.
+ * Ora usa una tabella DB con constraint UNIQUE (orgId, type, period) per
+ * garantire idempotenza anche dopo deploy.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -15,9 +22,7 @@ import {
 } from '@/lib/email';
 import { CREDIT_WARNING_THRESHOLDS, formatCredits, getCreditPack } from '@/config/creditPacks';
 
-// Chiavi per tracciare notifiche già inviate (in memory per semplicità)
-// In produzione, usare Redis o un campo nel database
-const notificationsSent = new Map<string, Set<string>>();
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 async function getOrgRecipients(organizationId: string) {
     const members = await prisma.membership.findMany({
@@ -46,6 +51,55 @@ async function getOrgRecipients(organizationId: string) {
         .filter(member => Boolean(member.email));
 }
 
+/**
+ * Check if a notification of the given type has already been sent
+ * for this org in the current period (YYYY-MM).
+ */
+async function hasNotificationBeenSent(
+    organizationId: string,
+    notificationType: string,
+    period: string
+): Promise<boolean> {
+    const existing = await prisma.sentNotification.findUnique({
+        where: {
+            organizationId_notificationType_period: {
+                organizationId,
+                notificationType,
+                period
+            }
+        }
+    });
+    return !!existing;
+}
+
+/**
+ * Mark a notification as sent. Uses upsert for idempotency —
+ * if another process already recorded it, this is a no-op.
+ */
+async function markNotificationSent(
+    organizationId: string,
+    notificationType: string,
+    period: string
+): Promise<void> {
+    await prisma.sentNotification.upsert({
+        where: {
+            organizationId_notificationType_period: {
+                organizationId,
+                notificationType,
+                period
+            }
+        },
+        create: {
+            organizationId,
+            notificationType,
+            period
+        },
+        update: {} // No-op if already exists
+    });
+}
+
+// ── Service ─────────────────────────────────────────────────────────────────
+
 export const CreditNotificationService = {
     /**
      * Verifica e invia notifiche basate sulla percentuale di utilizzo (org-based)
@@ -67,8 +121,7 @@ export const CreditNotificationService = {
         const recipients = await getOrgRecipients(organizationId);
         if (!recipients.length) return;
 
-        const orgNotifications = notificationsSent.get(organizationId) || new Set();
-        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
         // Calcola crediti rimanenti
         const monthlyRemaining = Number(organization.monthlyCreditsLimit) - Number(organization.monthlyCreditsUsed);
@@ -80,8 +133,8 @@ export const CreditNotificationService = {
 
         // Warning al 85% (danger)
         if (percentage >= CREDIT_WARNING_THRESHOLDS.danger && percentage < 100) {
-            const key = `warning_${currentMonth}`;
-            if (!orgNotifications.has(key)) {
+            const alreadySent = await hasNotificationBeenSent(organizationId, 'warning', currentMonth);
+            if (!alreadySent) {
                 await Promise.all(recipients.map(recipient =>
                     sendCreditsWarningEmail({
                         to: recipient.email,
@@ -91,15 +144,14 @@ export const CreditNotificationService = {
                         resetDate: resetDateFormatted
                     })
                 ));
-                orgNotifications.add(key);
-                notificationsSent.set(organizationId, orgNotifications);
+                await markNotificationSent(organizationId, 'warning', currentMonth);
             }
         }
 
         // Alert al 100% (exhausted)
         if (percentage >= 100) {
-            const key = `exhausted_${currentMonth}`;
-            if (!orgNotifications.has(key)) {
+            const alreadySent = await hasNotificationBeenSent(organizationId, 'exhausted', currentMonth);
+            if (!alreadySent) {
                 await Promise.all(recipients.map(recipient =>
                     sendCreditsExhaustedEmail({
                         to: recipient.email,
@@ -107,8 +159,7 @@ export const CreditNotificationService = {
                         resetDate: resetDateFormatted
                     })
                 ));
-                orgNotifications.add(key);
-                notificationsSent.set(organizationId, orgNotifications);
+                await markNotificationSent(organizationId, 'exhausted', currentMonth);
             }
         }
     },
@@ -187,24 +238,56 @@ export const CreditNotificationService = {
     },
 
     /**
-     * Resetta le notifiche inviate per un utente (da chiamare al reset mensile)
+     * Resetta le notifiche inviate per un'organizzazione (da chiamare al reset mensile).
+     * Elimina i record del periodo corrente così le notifiche possono essere ri-inviate
+     * nel nuovo ciclo.
      */
-    resetUserNotifications(userId: string): void {
-        notificationsSent.delete(userId);
+    async resetOrganizationNotifications(organizationId: string): Promise<void> {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        await prisma.sentNotification.deleteMany({
+            where: {
+                organizationId,
+                period: currentMonth
+            }
+        });
     },
 
     /**
-     * Resetta notifiche inviate per organizzazione
+     * Compatibilità legacy user-based
      */
-    resetOrganizationNotifications(organizationId: string): void {
-        notificationsSent.delete(organizationId);
+    async resetUserNotifications(userId: string): Promise<void> {
+        const membership = await prisma.membership.findFirst({
+            where: { userId, status: 'ACTIVE' },
+            select: { organizationId: true }
+        });
+        if (!membership) return;
+        await this.resetOrganizationNotifications(membership.organizationId);
     },
 
     /**
-     * Resetta tutte le notifiche (da chiamare al reset mensile globale)
+     * Resetta tutte le notifiche (da chiamare al reset mensile globale).
+     * Elimina tutti i record del mese corrente.
      */
-    resetAllNotifications(): void {
-        notificationsSent.clear();
+    async resetAllNotifications(): Promise<void> {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        await prisma.sentNotification.deleteMany({
+            where: { period: currentMonth }
+        });
+    },
+
+    /**
+     * Pulizia record vecchi (> 3 mesi).
+     * Opzionale, da chiamare periodicamente per non accumulare dati.
+     */
+    async cleanupOldNotifications(): Promise<number> {
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        const thresholdPeriod = threeMonthsAgo.toISOString().slice(0, 7);
+
+        const result = await prisma.sentNotification.deleteMany({
+            where: { period: { lt: thresholdPeriod } }
+        });
+        return result.count;
     }
 };
 

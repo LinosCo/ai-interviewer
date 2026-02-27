@@ -3,10 +3,24 @@ import { prisma as db } from '@/lib/prisma';
 
 /**
  * Rate Limiter Middleware
- * Enforces plan-based rate limits and message cooldowns
+ * Enforces plan-based rate limits and message cooldowns.
+ *
+ * ARCHITECTURE DECISION (Sprint 1 Audit):
+ * The cooldownStore intentionally uses an in-memory Map, NOT Redis/DB.
+ *
+ * Rationale:
+ * 1. Railway Hobby = single instance → no cross-process sync needed
+ * 2. The cooldown window is 250ms. A DB round-trip (10-50ms) would add
+ *    significant latency to every message, defeating the purpose.
+ * 3. Data loss on restart is harmless: at worst, one un-throttled message
+ *    gets through — no security or billing impact.
+ * 4. The Map self-cleans every 50 requests (entries older than 1 hour).
+ *
+ * When to migrate to Redis:
+ * - If deployment moves to multi-instance (horizontal scaling)
+ * - If the cooldown window increases significantly (>5s)
+ * - If abuse tracking across deploys becomes a requirement
  */
-
-// In-memory store for cooldowns (use Redis in production)
 const cooldownStore = new Map<string, number>();
 let requestCount = 0;
 const CLEANUP_THRESHOLD = 50; // Every 50 requests

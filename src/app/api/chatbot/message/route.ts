@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
 import {
     hasConfiguredScope,
     hasRecentHelpfulAssistantReply,
@@ -209,7 +210,7 @@ async function extractFieldFromMessage(
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
-            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
+            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${sanitize(userMessage)}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
             temperature: 0
         });
 
@@ -407,6 +408,7 @@ export async function POST(req: Request) {
                 try {
                     const smartDecision = await generateObject({
                         model: openai('gpt-4o-mini'),
+                        temperature: 0,
                         schema: z.object({
                             shouldAsk: z.boolean(),
                             reason: z.string().optional()
@@ -500,7 +502,7 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
 
                     if (validationResult.isValid && extraction.value) {
                         candidateProfile[nextMissingField.field] = extraction.value;
-                        console.log(`✅ [CHATBOT] Field "${nextMissingField.field}" extracted: ${extraction.value}`);
+                        console.log(`✅ [CHATBOT] Field "${nextMissingField.field}" extracted successfully`);
 
                         // Save to database
                         await prisma.conversation.update({
@@ -600,6 +602,7 @@ NON-NEGOTIABLE RULES
             try {
                 result = await generateObject({
                     model: openai('gpt-4o-mini'),
+                    temperature: 0,
                     schema,
                     schemaName: 'ChatbotResponse',
                     schemaDescription: 'A single response string from the chatbot assistant.',
@@ -759,14 +762,14 @@ function buildChatbotPrompt(bot: any, session: any): string {
         ? session.pageDescription.replace(/\s+/g, ' ').trim()
         : '';
     const pageContentSnippet = typeof session?.pageContent === 'string'
-        ? session.pageContent.replace(/\s+/g, ' ').trim().slice(0, 1600)
+        ? sanitize(session.pageContent.replace(/\s+/g, ' ').trim(), 1600)
         : '';
     const pageContextSection = shouldUsePageContext
         ? `
 ## PAGE CONTEXT
-Current page title: ${pageTitle || 'N/A'}
+Current page title: ${sanitize(pageTitle, 200) || 'N/A'}
 Current page URL: ${pageUrl || 'N/A'}
-Page description: ${pageDescription || 'N/A'}
+Page description: ${sanitize(pageDescription, 500) || 'N/A'}
 Visible page content snippet: ${pageContentSnippet || 'N/A'}
 `
         : '';

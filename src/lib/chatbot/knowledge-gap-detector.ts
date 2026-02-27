@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const GapSchema = z.object({
     topic: z.string().describe("The main topic of the missing information"),
@@ -63,14 +64,15 @@ export async function detectKnowledgeGaps(botId: string, lookbackDays: number = 
                 const { object: gap } = await generateObject({
                     model: openai("gpt-4o-mini"),
                     schema: GapSchema,
+                    temperature: 0,
                     prompt: `
                     Analyze this interaction where the bot failed to answer.
-                    
-                    Bot Context: ${bot.description || "Customer Service Bot"}
-                    
-                    User Question: "${userQuestion.content}"
-                    Bot Response: "${messages[fallbackIndex].content}"
-                    
+
+                    Bot Context: ${sanitizeConfig(bot.description) || "Customer Service Bot"}
+
+                    User Question: "${sanitize(userQuestion.content)}"
+                    Bot Response: "${sanitize(messages[fallbackIndex].content)}"
+
                     Identify the knowledge gap.
                 `
                 });

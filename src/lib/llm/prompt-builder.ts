@@ -333,7 +333,8 @@ Brief connection, then ONE exploratory question.
     private static buildKnowledgeBlock(
         currentTopic: PlanTopic | null,
         interviewPlan?: InterviewPlan,
-        manualGuide?: string
+        manualGuide?: string,
+        language?: string
     ): string {
         if (!currentTopic) return '';
 
@@ -352,7 +353,7 @@ Brief connection, then ONE exploratory question.
                 return '';
             }
 
-            const isItalian = currentTopic.label.length > 0; // Placeholder; should pass language
+            const isItalian = String(language || 'en').toLowerCase().startsWith('it');
             const parts = [];
 
             if (cues.length > 0) {
@@ -406,7 +407,7 @@ Brief connection, then ONE exploratory question.
         const planTopic = currentTopic && interviewPlan
             ? (interviewPlan.explore?.topics || []).find(t => t.topicId === currentTopic.id)
             : null;
-        const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide);
+        const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language);
         if (knowledge) parts.push(knowledge);
 
         return parts.join('\n\n');

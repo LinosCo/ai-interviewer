@@ -5,10 +5,10 @@ import { NextResponse } from "next/server";
 export const dynamic = 'force-dynamic'; // static by default, must be dynamic for cron?
 
 export async function GET(req: Request) {
-    if (req.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
-        // Vercel protects crons automatically if strictly configured, but good to check signature or secret
-        // For now, allow public trigger or rely on Vercel protection settings
-        // return new NextResponse('Unauthorized', { status: 401 });
+    // Auth: Bearer token obbligatorio per cron job
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {

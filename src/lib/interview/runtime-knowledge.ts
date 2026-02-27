@@ -1,6 +1,7 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import type { InterviewPlan } from './plan-types';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 type RuntimePhase = 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION';
 
@@ -242,14 +243,14 @@ export async function generateRuntimeInterviewKnowledge(params: {
     });
 
     const topicsForPrompt = params.topics
-        .map((t, idx) => `${idx + 1}) ${t.topicId} | ${t.topicLabel} | sub-goals: ${(t.subGoals || []).join(' ; ') || '-'}`)
+        .map((t, idx) => `${idx + 1}) ${t.topicId} | ${sanitizeConfig(t.topicLabel, 200)} | sub-goals: ${(t.subGoals || []).map(g => sanitizeConfig(g, 200)).join(' ; ') || '-'}`)
         .join('\n');
 
     const prompt = [
         `Language: ${params.language}`,
         `Task: Build compact interviewer intelligence notes for a qualitative interview.`,
-        `Interview goal: ${params.interviewGoal || '-'}`,
-        `Target audience: ${params.targetAudience || '-'}`,
+        `Interview goal: ${sanitizeConfig(params.interviewGoal || '-', 500)}`,
+        `Target audience: ${sanitizeConfig(params.targetAudience || '-', 300)}`,
         `Topics:`,
         topicsForPrompt,
         ``,
@@ -327,16 +328,18 @@ export function buildRuntimeKnowledgePromptBlock(params: {
     const topic = params.knowledge.topics.find((item) => item.topicId === params.targetTopicId) || params.knowledge.topics[0];
     if (!topic) return '';
 
-    const cueLine = topic.interpretationCues.slice(0, 2).join(' | ');
-    const signalLine = topic.significanceSignals.slice(0, 2).join(' | ');
-    const probeLine = topic.probeAngles.slice(0, 2).join(' | ');
+    const cueLine = topic.interpretationCues.slice(0, 2).map(c => sanitize(c, 200)).join(' | ');
+    const signalLine = topic.significanceSignals.slice(0, 2).map(s => sanitize(s, 200)).join(' | ');
+    const probeLine = topic.probeAngles.slice(0, 2).map(p => sanitize(p, 200)).join(' | ');
+    const safeSummary = sanitize(params.knowledge.summary, 300);
+    const safeTopicLabel = sanitizeConfig(topic.topicLabel, 200);
     const isItalian = params.language.toLowerCase().startsWith('it');
 
     if (isItalian) {
         return `
 ## RUNTIME TOPIC INTELLIGENCE
-- Sintesi: ${params.knowledge.summary}
-- Topic attivo: "${topic.topicLabel}"
+- Sintesi: ${safeSummary}
+- Topic attivo: "${safeTopicLabel}"
 - Cosa interpretare: ${cueLine}
 - Segnali da approfondire: ${signalLine}
 - Direzioni di probing: ${probeLine}
@@ -346,8 +349,8 @@ Usa questi spunti in modo naturale, senza elencarli all'utente.
 
     return `
 ## RUNTIME TOPIC INTELLIGENCE
-- Summary: ${params.knowledge.summary}
-- Active topic: "${topic.topicLabel}"
+- Summary: ${safeSummary}
+- Active topic: "${safeTopicLabel}"
 - Interpretation cues: ${cueLine}
 - Signals worth deepening: ${signalLine}
 - Probing directions: ${probeLine}
@@ -367,6 +370,8 @@ export function buildManualKnowledgePromptBlock(params: {
 
     const guideSentences = toSentenceChunks(params.manualGuide);
     if (!guideSentences.length) return '';
+
+    const safeTopicLabel = sanitizeConfig(params.topicLabel, 200);
 
     const topicTokens = normalizeText(
         `${params.topicLabel} ${(params.topicSubGoals || []).join(' ')}`
@@ -394,20 +399,21 @@ export function buildManualKnowledgePromptBlock(params: {
     const fallback = guideSentences.slice(0, 2);
     const lines = (selected.length > 0 ? selected : fallback).slice(0, 3);
 
+    const safeLines = lines.map(l => sanitize(l, 300));
     const isItalian = params.language.toLowerCase().startsWith('it');
     if (isItalian) {
         return `
 ## KNOWLEDGE GUIDA INTERVISTA (MANUALE, EDITABILE)
-Per il topic "${params.topicLabel}" tieni presente:
-- ${lines.join('\n- ')}
+Per il topic "${safeTopicLabel}" tieni presente:
+- ${safeLines.join('\n- ')}
 Usa questa guida come prioritaria e applicala in modo naturale.
 `.trim();
     }
 
     return `
 ## INTERVIEW GUIDE KNOWLEDGE (MANUAL, EDITABLE)
-For topic "${params.topicLabel}" keep in mind:
-- ${lines.join('\n- ')}
+For topic "${safeTopicLabel}" keep in mind:
+- ${safeLines.join('\n- ')}
 Treat this guide as primary and apply it naturally.
 `.trim();
 }

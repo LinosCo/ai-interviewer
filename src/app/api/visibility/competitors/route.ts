@@ -9,6 +9,7 @@ import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
+import { sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const CompetitorSuggestionSchema = z.object({
     suggestions: z.array(z.string()).describe("List of competitor names")
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
                 const result = await generateObject({
                     model,
                     schema: CompetitorSuggestionSchema,
-                    prompt: `Generate a list of ${suggestionLimit} main competitors for "${brandName}" in the "${category}" category.
+                    prompt: `Generate a list of ${suggestionLimit} main competitors for "${sanitizeConfig(brandName, 200)}" in the "${sanitizeConfig(category, 200)}" category.
 
 Only include well-known, legitimate competitors that users might compare against.
 Return only the company/product names, without descriptions.`,

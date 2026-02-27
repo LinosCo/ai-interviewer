@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { prisma } from '@/lib/prisma';
 import { Bot, Conversation, TopicBlock, Message } from '@prisma/client';
+import { sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -60,25 +61,35 @@ export async function runInterviewTurn(
     const currentTopic: TopicBlock | undefined = bot.topics[currentTopicIndex];
     const nextTopic: TopicBlock | undefined = bot.topics[currentTopicIndex + 1];
 
-    // 3. Construct System Prompt
+    // 3. Construct System Prompt (sanitize all admin-configured fields)
+    const safeGoal = sanitizeConfig(bot.researchGoal);
+    const safeAudience = sanitizeConfig(bot.targetAudience);
+    const safeTone = sanitizeConfig(bot.tone) || 'Friendly and professional';
+    const safeTopicLabel = currentTopic ? sanitizeConfig(currentTopic.label, 200) : 'Closing';
+    const safeTopicDesc = currentTopic ? sanitizeConfig(currentTopic.description, 500) : 'Wrap up the interview.';
+    const safeSubGoals = currentTopic
+        ? currentTopic.subGoals.map(g => sanitizeConfig(g, 200)).join(', ')
+        : 'Ensure user feels heard and thank them.';
+    const safeNextLabel = nextTopic ? sanitizeConfig(nextTopic.label, 200) : 'Closing';
+
     const systemPrompt = `
 You are an expert qualitative researcher conducting an interview.
-Your goal: ${bot.researchGoal}
-Audience Info: ${bot.targetAudience}
-Tone: ${bot.tone || 'Friendly and professional'}
+Your goal: ${safeGoal}
+Audience Info: ${safeAudience}
+Tone: ${safeTone}
 Language: ${bot.language}
 
 CURRENT STATE:
-Topic: ${currentTopic ? currentTopic.label : 'Closing'}
-Description: ${currentTopic ? currentTopic.description : 'Wrap up the interview.'}
-Sub-Goals to cover: ${currentTopic ? currentTopic.subGoals.join(', ') : 'Ensure user feels heard and thank them.'}
+Topic: ${safeTopicLabel}
+Description: ${safeTopicDesc}
+Sub-Goals to cover: ${safeSubGoals}
 
 INSTRUCTIONS:
 1. Ask ONE question at a time.
 2. Keep questions short and conversational.
 3. If the user answers briefly, probe deeper ("Can you say more about that?").
 4. If the user covers a sub-goal, check it off mentally and move to the next.
-5. When you feel this topic is covered (or max turns reached), transition to the next topic: "${nextTopic ? nextTopic.label : 'Closing'}".
+5. When you feel this topic is covered (or max turns reached), transition to the next topic: "${safeNextLabel}".
 6. Respect privacy. Do not ask for PII unless necessary.
 
 Current Progress: Topic ${currentTopicIndex + 1} of ${bot.topics.length}.

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const generateSchema = z.object({
     goal: z.string().min(5).optional(),
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
                 schema: configSchema,
                 system: `Sei un esperto di Customer Support e Lead Generation Automation. 
                 Il tuo compito è raffinare una configurazione esistente di un Chatbot AI in base al feedback dell'utente.`,
-                prompt: `Configurazione Attuale:\n${JSON.stringify(currentConfig, null, 2)}\n\nRichiesta di Modifica: "${refinementPrompt}"\n\nGenera la configurazione aggiornata. Rispondi in Italiano.`
+                prompt: `Configurazione Attuale:\n${sanitizeConfig(JSON.stringify(currentConfig, null, 2), 3000)}\n\nRichiesta di Modifica: "${sanitize(refinementPrompt, 1000)}"\n\nGenera la configurazione aggiornata. Rispondi in Italiano.`
             });
             return Response.json(result.object);
         }
@@ -93,7 +94,7 @@ export async function POST(req: Request) {
             5. **Tone**: Adatta il tono all'industria (es. Medicale -> Empatico, Tech -> Dinamico).
             6. **Topics**: Identifica 3-5 argomenti principali che il bot deve gestire.
             7. **Boundaries**: Definisci chiaramente cosa il bot può e non può fare.`,
-            prompt: `Obiettivo del Chatbot: "${prompt}"${businessContext ? `\n\nContesto Business: ${businessContext}` : ''}\n\nGenera la configurazione completa. Rispondi in Italiano.`
+            prompt: `Obiettivo del Chatbot: "${sanitize(prompt, 1000)}"${businessContext ? `\n\nContesto Business: ${sanitizeConfig(businessContext, 2000)}` : ''}\n\nGenera la configurazione completa. Rispondi in Italiano.`
         });
 
         return Response.json(result.object);

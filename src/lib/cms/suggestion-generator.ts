@@ -9,6 +9,7 @@ import {
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { createHash } from 'crypto';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 import type { SiteStructure } from '@/lib/integrations/site-adapter';
 import { SiteDiscoveryService } from '@/lib/integrations/site-discovery.service';
 
@@ -297,10 +298,10 @@ export class CMSSuggestionGenerator {
             prompt: `Sei un content strategist esperto in SEO, LLMO e conversione per PMI italiane.
 
 === BRAND ===
-Nome: ${brandName}
-${strategicVision ? `Visione strategica: ${strategicVision}` : ''}
-${valueProposition ? `Value proposition: ${valueProposition}` : ''}
-${strategicPlan ? `Piano strategico copilot: ${strategicPlan}` : ''}
+Nome: ${sanitizeConfig(brandName, 200)}
+${strategicVision ? `Visione strategica: ${sanitizeConfig(strategicVision, 500)}` : ''}
+${valueProposition ? `Value proposition: ${sanitizeConfig(valueProposition, 500)}` : ''}
+${strategicPlan ? `Piano strategico copilot: ${sanitizeConfig(strategicPlan, 1000)}` : ''}
 
 === TIPO DI CONTENUTO ===
 ${typeInstructions[type]}
@@ -351,30 +352,30 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         const parts: string[] = ['\n=== STRUTTURA SITO ATTUALE ==='];
 
         if (siteStructure.siteInfo?.name) {
-            parts.push(`Sito: ${siteStructure.siteInfo.name}${siteStructure.siteInfo.url ? ` (${siteStructure.siteInfo.url})` : ''}`);
+            parts.push(`Sito: ${sanitizeConfig(siteStructure.siteInfo.name, 200)}${siteStructure.siteInfo.url ? ` (${sanitizeConfig(siteStructure.siteInfo.url, 200)})` : ''}`);
             if (siteStructure.siteInfo.language) {
-                parts.push(`Lingua: ${siteStructure.siteInfo.language}`);
+                parts.push(`Lingua: ${sanitizeConfig(siteStructure.siteInfo.language, 20)}`);
             }
         }
 
         if (siteStructure.categories.length > 0) {
             parts.push(`\nCATEGORIE ESISTENTI (usa questi nomi esatti per "categories"):`);
             for (const cat of siteStructure.categories.slice(0, 20)) {
-                parts.push(`- ${cat.name} (slug: ${cat.slug}${cat.count ? `, ${cat.count} post` : ''})`);
+                parts.push(`- ${sanitizeConfig(cat.name, 200)} (slug: ${sanitizeConfig(cat.slug, 100)}${cat.count ? `, ${cat.count} post` : ''})`);
             }
         }
 
         if (siteStructure.tags.length > 0) {
             parts.push(`\nTAG ESISTENTI:`);
             for (const tag of siteStructure.tags.slice(0, 30)) {
-                parts.push(`- ${tag.name}`);
+                parts.push(`- ${sanitizeConfig(tag.name, 200)}`);
             }
         }
 
         if (siteStructure.pages.length > 0) {
             parts.push(`\nPAGINE ESISTENTI (${siteStructure.pages.length} totali):`);
             for (const page of siteStructure.pages.slice(0, 15)) {
-                parts.push(`- "${page.title}" (/${page.slug})`);
+                parts.push(`- "${sanitizeConfig(page.title, 300)}" (/${sanitizeConfig(page.slug, 100)})`);
             }
             if (siteStructure.pages.length > 15) {
                 parts.push(`  ... e altre ${siteStructure.pages.length - 15} pagine`);
@@ -384,7 +385,7 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         if (siteStructure.posts.length > 0) {
             parts.push(`\nPOST BLOG ESISTENTI (${siteStructure.posts.length} totali):`);
             for (const post of siteStructure.posts.slice(0, 10)) {
-                parts.push(`- "${post.title}" (/${post.slug})`);
+                parts.push(`- "${sanitizeConfig(post.title, 300)}" (/${sanitizeConfig(post.slug, 100)})`);
             }
             if (siteStructure.posts.length > 10) {
                 parts.push(`  ... e altri ${siteStructure.posts.length - 10} post`);
@@ -394,7 +395,7 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         if (siteStructure.products && siteStructure.products.length > 0) {
             parts.push(`\nPRODOTTI WOOCOMMERCE (${siteStructure.products.length} totali):`);
             for (const product of siteStructure.products.slice(0, 15)) {
-                parts.push(`- "${product.name}" (slug: ${product.slug}${product.sku ? `, SKU: ${product.sku}` : ''}${product.price ? `, €${product.price}` : ''})`);
+                parts.push(`- "${sanitizeConfig(product.name, 300)}" (slug: ${sanitizeConfig(product.slug, 100)}${product.sku ? `, SKU: ${sanitizeConfig(product.sku, 50)}` : ''}${product.price ? `, €${product.price}` : ''})`);
             }
             if (siteStructure.products.length > 15) {
                 parts.push(`  ... e altri ${siteStructure.products.length - 15} prodotti`);
@@ -404,7 +405,7 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         if (siteStructure.productCategories && siteStructure.productCategories.length > 0) {
             parts.push(`\nCATEGORIE PRODOTTO WOOCOMMERCE:`);
             for (const cat of siteStructure.productCategories.slice(0, 15)) {
-                parts.push(`- ${cat.name} (slug: ${cat.slug})`);
+                parts.push(`- ${sanitizeConfig(cat.name, 200)} (slug: ${sanitizeConfig(cat.slug, 100)})`);
             }
         }
 
@@ -468,14 +469,14 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         if (signals.chatbotQuestions?.length) {
             parts.push('DOMANDE FREQUENTI CHATBOT:');
             for (const q of signals.chatbotQuestions.slice(0, 6)) {
-                parts.push(`- "${q.question}" (${q.count} volte)`);
+                parts.push(`- "${sanitize(q.question, 300)}" (${q.count} volte)`);
             }
         }
 
         if (signals.visibilityGaps?.length) {
             parts.push('GAP DI VISIBILITA:');
             for (const g of signals.visibilityGaps.slice(0, 5)) {
-                parts.push(`- Topic: ${g.topic} | Competitor presenti: ${g.competitors.join(', ')}`);
+                parts.push(`- Topic: ${sanitizeConfig(g.topic, 200)} | Competitor presenti: ${g.competitors.map(c => sanitizeConfig(c, 100)).join(', ')}`);
             }
         }
 
@@ -489,16 +490,16 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         if (signals.searchQueries?.length) {
             parts.push('QUERY SEARCH CONSOLE:');
             for (const q of signals.searchQueries.slice(0, 6)) {
-                parts.push(`- "${q.query}" | Impressioni: ${q.impressions} | Posizione: ${q.position.toFixed(1)} | Click: ${q.clicks}`);
+                parts.push(`- "${sanitize(q.query, 200)}" | Impressioni: ${q.impressions} | Posizione: ${q.position.toFixed(1)} | Click: ${q.clicks}`);
             }
         }
 
         if (signals.interviewFeedback?.length) {
             parts.push('FEEDBACK DALLE INTERVISTE:');
             for (const f of signals.interviewFeedback.slice(0, 4)) {
-                parts.push(`- Topic: ${f.topic} | Sentiment: ${f.sentiment}`);
+                parts.push(`- Topic: ${sanitizeConfig(f.topic, 200)} | Sentiment: ${f.sentiment}`);
                 if (f.quotes.length > 0) {
-                    parts.push(`  Quote: "${f.quotes[0]}"`);
+                    parts.push(`  Quote: "${sanitize(f.quotes[0], 300)}"`);
                 }
             }
         }
@@ -506,12 +507,12 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         if (signals.aiTips?.length) {
             parts.push('AI TIPS CORRELATI:');
             for (const tip of signals.aiTips.slice(0, 5)) {
-                parts.push(`- [${tip.source}] ${tip.title}${typeof tip.priority === 'number' ? ` (priorita ${tip.priority})` : ''}`);
+                parts.push(`- [${sanitizeConfig(tip.source, 50)}] ${sanitize(tip.title, 200)}${typeof tip.priority === 'number' ? ` (priorita ${tip.priority})` : ''}`);
             }
         }
 
         if (signals.strategyAlignment) {
-            parts.push(`ALLINEAMENTO STRATEGICO RICHIESTO: ${signals.strategyAlignment}`);
+            parts.push(`ALLINEAMENTO STRATEGICO RICHIESTO: ${sanitizeConfig(signals.strategyAlignment, 500)}`);
         }
 
         if (signals.channels?.length) {
@@ -519,7 +520,7 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         }
 
         if (signals.validation?.matchTitle) {
-            parts.push(`CONTENUTO SIMILE ESISTENTE: ${signals.validation.matchTitle} (score ${signals.validation.score || 'n/d'})`);
+            parts.push(`CONTENUTO SIMILE ESISTENTE: ${sanitizeConfig(signals.validation.matchTitle, 200)} (score ${signals.validation.score || 'n/d'})`);
         }
 
         return parts.join('\n') || 'Nessun segnale dettagliato disponibile.';

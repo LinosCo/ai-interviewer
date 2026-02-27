@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const UnifiedInsightSchema = z.object({
     insights: z.array(z.object({
@@ -50,10 +51,10 @@ export class CrossChannelSync {
 
         const promptContext = `
         Gaps in Chatbot Knowledge:
-        ${gaps.map(g => `- Topic: ${g.topic} (${g.priority})`).join('\n')}
+        ${gaps.map(g => `- Topic: ${sanitizeConfig(g.topic, 200)} (${g.priority})`).join('\n')}
 
         Visibility Issues (Rank > 3):
-        ${visibilityIssues.map(v => `- Query: "${v.prompt?.text || 'unknown'}" on ${v.platform} ranked #${v.brandPosition}`).join('\n')}
+        ${visibilityIssues.map(v => `- Query: "${sanitize(v.prompt?.text || 'unknown', 300)}" on ${v.platform} ranked #${v.brandPosition}`).join('\n')}
         `;
 
         try {

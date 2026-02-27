@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { LLMService } from '@/services/llmService';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 export async function POST(req: Request) {
     try {
@@ -52,7 +53,7 @@ ${methodology.substring(0, 3000)}
         const result = await generateText({
             model: openai('gpt-4o-mini'),
             system: systemPrompt,
-            prompt: `Testo da raffinare: "${text}"\nContext aggiuntivo: ${context || 'Nessuno'}\n\nRispondi solo con il testo raffinato, senza commenti o virgolette. Rispondi in italiano.`
+            prompt: `Testo da raffinare: "${sanitize(text, 2000)}"\nContext aggiuntivo: ${sanitizeConfig(context, 1000) || 'Nessuno'}\n\nRispondi solo con il testo raffinato, senza commenti o virgolette. Rispondi in italiano.`
         });
 
         return Response.json({ refinedText: result.text.trim() });

@@ -1,6 +1,7 @@
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
 
 export interface ToneProfile {
     register: 'formal' | 'neutral' | 'casual';
@@ -26,11 +27,11 @@ export class ToneAnalyzer {
     }
 
     async analyzeTone(recentMessages: { role: string, content: string }[]): Promise<ToneProfile> {
-        // Filter only user messages, take last 5
+        // Filter only user messages, take last 5 — sanitize before prompt interpolation
         const userMessages = recentMessages
             .filter(m => m.role === 'user')
             .slice(-5)
-            .map(m => m.content)
+            .map(m => sanitize(m.content, 1000))
             .join('\n\n');
 
         if (!userMessages) {

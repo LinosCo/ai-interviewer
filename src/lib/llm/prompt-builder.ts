@@ -4,6 +4,7 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 import type { SupervisorInsight } from '@/lib/interview/interview-supervisor';
 import type { InterviewPlan, PlanTopic } from '@/lib/interview/plan-types';
 import type { ValidationResponse } from '@/lib/interview/validation-response';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const FIELD_LABELS: Record<string, { it: string, en: string }> = {
     name: { it: 'Nome Completo', en: 'Full Name' },
@@ -29,29 +30,36 @@ export class PromptBuilder {
         bot: Bot & { knowledgeSources?: KnowledgeSource[]; rewardConfig?: any }
     ): string {
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
+
+        // Sanitize admin-configured fields before prompt interpolation
+        const safeName = sanitizeConfig(bot.name);
+        const safeGoal = sanitizeConfig(bot.researchGoal);
+        const safeAudience = sanitizeConfig(bot.targetAudience);
+        const safeTone = sanitizeConfig(bot.tone);
+
         const knowledgeText = (bot.knowledgeSources || [])
             .slice(0, 3)
             .map((source) => {
-                const title = String(source.title || 'Untitled');
-                const preview = String(source.content || '')
-                    .replace(/\s+/g, ' ')
-                    .trim()
-                    .slice(0, 260);
+                const title = sanitizeConfig(source.title || 'Untitled', 200);
+                const preview = sanitizeConfig(
+                    String(source.content || '').replace(/\s+/g, ' ').trim(),
+                    260
+                );
                 return `- ${title}: ${preview}${preview.length >= 260 ? '…' : ''}`;
             })
             .join('\n');
 
         return isItalian ? `
 ## IDENTITÀ & REGOLE BASE
-Sei "${bot.name}", una ricerca qualitativa.
+Sei "${safeName}", una ricerca qualitativa.
 Ruolo: Intervistatore esperienza
-Missione: "${bot.researchGoal}"
-Pubblico: "${bot.targetAudience}"
-Tono: "${bot.tone || 'Amichevole, professionale, empatico'}"
+Missione: "${safeGoal}"
+Pubblico: "${safeAudience}"
+Tono: "${safeTone || 'Amichevole, professionale, empatico'}"
 Lingua: Italiano
 
 ## TUA IDENTITÀ
-- Sei "${bot.name}", conducendo una ricerca qualitativa.
+- Sei "${safeName}", conducendo una ricerca qualitativa.
 - La persona con cui parli è l'INTERVISTATO — che condivide esperienza e opinioni.
 - Non assumere il loro ruolo (partecipante, creatore, cliente) a meno che esplicitamente dichiarato.
 - Non dire "Il tuo progetto" a meno che specificamente configurato.
@@ -69,15 +77,15 @@ Lingua: Italiano
 ${knowledgeText}
 `.trim() : `
 ## IDENTITY & BASE RULES
-You are "${bot.name}", conducting qualitative research.
+You are "${safeName}", conducting qualitative research.
 Role: Expert interviewer
-Mission: "${bot.researchGoal}"
-Audience: "${bot.targetAudience}"
-Tone: "${bot.tone || 'Friendly, professional, empathetic'}"
+Mission: "${safeGoal}"
+Audience: "${safeAudience}"
+Tone: "${safeTone || 'Friendly, professional, empathetic'}"
 Language: English
 
 ## YOUR IDENTITY
-- You are "${bot.name}", conducting qualitative research.
+- You are "${safeName}", conducting qualitative research.
 - The person you are talking to is the INTERVIEWEE — someone sharing their experience and opinions.
 - DO NOT assume their role (participant, creator, customer) unless explicitly stated.
 - DO NOT say "Your project" unless specifically configured.
@@ -138,12 +146,11 @@ ${knowledgeText}
                 : `STATUS: ON_TRACK (${remainingMins}m left).`;
         }
 
-        // Topic roadmap
+        // Topic roadmap (labels are admin-configured)
         const topicLines = allTopics.map((t, idx) => {
             const marker = idx === currentTopicIndex ? '→ ' : '  ';
-            return isItalian
-                ? `${marker}${idx + 1}. ${t.label}`
-                : `${marker}${idx + 1}. ${t.label}`;
+            const safeLabel = sanitizeConfig(t.label, 200);
+            return `${marker}${idx + 1}. ${safeLabel}`;
         }).join('\n');
 
         return isItalian ? `
@@ -186,16 +193,17 @@ ${topicLines}
         // EXPLORING / EXPLORING_DEEP
         if (status === 'EXPLORING' || status === 'EXPLORING_DEEP') {
             const bonus = status === 'EXPLORING_DEEP' ? (isItalian ? ' [TURNO BONUS]' : ' [BONUS TURN]') : '';
-            const subGoals = (currentTopic.subGoals || []).filter(Boolean);
+            const subGoals = (currentTopic.subGoals || []).filter(Boolean).map(g => sanitizeConfig(g, 200));
             const subGoalPreview = subGoals.slice(0, 3).join(' | ') || (isItalian ? 'N/A' : 'N/A');
+            const safeTopicLabel = sanitizeConfig(currentTopic.label, 200);
             return isItalian ? `
 ## FASE: ESPLORAZIONE${bonus}
-Topic: "${currentTopic.label}"
+Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
 Metodo: Fai una breve connessione e UNA sola domanda esplorativa. Ascolta segnali di profondità (esempi, impatti, vincoli).
 `.trim() : `
 ## PHASE: EXPLORING${bonus}
-Topic: "${currentTopic.label}"
+Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
 Method: Brief connection, then ONE exploratory question. Listen for depth signals (examples, impact, constraints).
 `.trim();
@@ -205,29 +213,32 @@ Method: Brief connection, then ONE exploratory question. Listen for depth signal
         if (status === 'TRANSITION') {
             const nextIndex = allTopics.findIndex(t => t.id === currentTopic.id) + 1;
             const nextTopic = nextIndex < allTopics.length ? allTopics[nextIndex] : null;
-            const nextLabel = nextTopic?.label || (isItalian ? 'Chiusura' : 'Closure');
+            const safeCurrentLabel = sanitizeConfig(currentTopic.label, 200);
+            const nextLabel = sanitizeConfig(nextTopic?.label, 200) || (isItalian ? 'Chiusura' : 'Closure');
             return isItalian ? `
 ## FASE: TRANSIZIONE
-Stai per spostarti da "${currentTopic.label}" a "${nextLabel}".
+Stai per spostarti da "${safeCurrentLabel}" a "${nextLabel}".
 Fai un ponte breve e naturale, poi UNA domanda di apertura per il nuovo topic.
 `.trim() : `
 ## PHASE: TRANSITION
-Moving from "${currentTopic.label}" to "${nextLabel}".
+Moving from "${safeCurrentLabel}" to "${nextLabel}".
 Brief natural bridge, then ONE opening question for the next topic.
 `.trim();
         }
 
         // DEEPENING
         if (status === 'DEEPENING') {
-            const engagingSnippet = String(supervisorInsight?.engagingSnippet || '').trim();
+            // engagingSnippet originates from conversation analysis — sanitize as user data
+            const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 500).trim();
+            const safeLabel = sanitizeConfig(currentTopic.label, 200);
             return isItalian ? `
 ## FASE: APPROFONDIMENTO
-Topic: "${currentTopic.label}"
+Topic: "${safeLabel}"
 ${engagingSnippet ? `Spunto chiave: "${engagingSnippet}"` : ''}
 Approfondisci i segnali significativi. Una sola domanda focalizzata.
 `.trim() : `
 ## PHASE: DEEPENING
-Topic: "${currentTopic.label}"
+Topic: "${safeLabel}"
 ${engagingSnippet ? `Key insight: "${engagingSnippet}"` : ''}
 Deepen significant signals. One focused question.
 `.trim();
@@ -271,7 +282,7 @@ One question only, no topic questions.
                 const label = FIELD_LABELS[id];
                 return label ? (isItalian ? label.it : label.en) : String(id);
             }).join(', ');
-            const priorityField = String(supervisorInsight?.nextSubGoal || '').trim();
+            const priorityField = sanitize(supervisorInsight?.nextSubGoal || '', 200).trim();
 
             return isItalian ? `
 ## FASE: RACCOLTA DATI
@@ -343,11 +354,11 @@ Brief connection, then ONE exploratory question.
             return manualGuide;
         }
 
-        // Use plan intelligence
+        // Use plan intelligence (LLM-generated content — sanitize as user data)
         if (currentTopic.interpretationCues && currentTopic.significanceSignals && currentTopic.probeAngles) {
-            const cues = currentTopic.interpretationCues.filter(Boolean);
-            const signals = currentTopic.significanceSignals.filter(Boolean);
-            const angles = currentTopic.probeAngles.filter(Boolean);
+            const cues = currentTopic.interpretationCues.filter(Boolean).map(c => sanitize(c, 300));
+            const signals = currentTopic.significanceSignals.filter(Boolean).map(s => sanitize(s, 300));
+            const angles = currentTopic.probeAngles.filter(Boolean).map(a => sanitize(a, 300));
 
             if (cues.length === 0 && signals.length === 0 && angles.length === 0) {
                 return '';
@@ -369,7 +380,7 @@ Brief connection, then ONE exploratory question.
                 parts.push(`${label} ${angles.join(' | ')}`);
             }
 
-            return `\n## KNOWLEDGE - ${currentTopic.label}\n${parts.join('\n')}`;
+            return `\n## KNOWLEDGE - ${sanitizeConfig(currentTopic.label, 200)}\n${parts.join('\n')}`;
         }
 
         return '';
@@ -433,9 +444,13 @@ export function addValidationFeedbackToPrompt(
     return basePrompt;
   }
 
+  // Validation feedback may contain user-influenced content — sanitize
+  const safeFeedback = sanitize(validationFeedback.feedback || '', 500);
+  const safeStrategy = sanitize(validationFeedback.strategy || '', 200);
+
   const feedbackSection = language === 'it'
-    ? `\n\n⚠️ FEEDBACK IMPORTANTE: L'utente ha fornito una risposta che non è stata compresa correttamente.\nMessaggio da comunicare: "${validationFeedback.feedback}"\nStrategia: ${validationFeedback.strategy || 'chiedi di nuovo'}.\n`
-    : `\n\n⚠️ IMPORTANT FEEDBACK: The user provided a response that wasn't understood correctly.\nMessage to communicate: "${validationFeedback.feedback}"\nStrategy: ${validationFeedback.strategy || 'ask again'}.\n`;
+    ? `\n\n⚠️ FEEDBACK IMPORTANTE: L'utente ha fornito una risposta che non è stata compresa correttamente.\nMessaggio da comunicare: "${safeFeedback}"\nStrategia: ${safeStrategy || 'chiedi di nuovo'}.\n`
+    : `\n\n⚠️ IMPORTANT FEEDBACK: The user provided a response that wasn't understood correctly.\nMessage to communicate: "${safeFeedback}"\nStrategy: ${safeStrategy || 'ask again'}.\n`;
 
   return basePrompt + feedbackSection;
 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
 
 export async function POST(req: Request) {
     try {
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
             prompt: `Sei "Business Tuner AI", un esperto stratega di ricerca qualitativa. 
 L'utente vuole lanciare un'indagine con questo obiettivo grezzo:
 
-"${goal}"
+"${sanitize(goal, 1000)}"
 
 Il tuo compito è strutturare un'intervista professionale che trasformi questo obiettivo in insight di valore.
 NON generare domande generiche. Genera OBIETTIVI DI RICERCA che l'AI userà per formulare domande dinamiche.

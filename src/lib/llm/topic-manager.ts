@@ -3,6 +3,7 @@ import { TopicBlock } from '@prisma/client';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 export class TopicManager {
 
@@ -47,10 +48,13 @@ export class TopicManager {
         const subGoals = (availableSubGoals && availableSubGoals.length > 0)
             ? availableSubGoals
             : (topic.subGoals || []);
+        // Sanitize conversation history (end-user content) and admin-configured labels
         const recentHistory = recentMessages
             .slice(-6)
-            .map(m => `${m.role}: ${m.content}`)
+            .map(m => `${m.role}: ${sanitize(m.content, 1000)}`)
             .join('\n');
+        const safeTopicLabel = sanitizeConfig(topic.label, 200);
+        const safeSubGoals = subGoals.map(g => sanitizeConfig(g, 200));
 
         const schema = z.object({
             focusPoint: z.string().describe('A specific sub-goal to explore deeply'),
@@ -58,9 +62,9 @@ export class TopicManager {
         });
 
         const prompt = `
-You are selecting the NEXT deep-dive question for topic: "${topic.label}"
+You are selecting the NEXT deep-dive question for topic: "${safeTopicLabel}"
 
-Available sub-goals for THIS topic: ${subGoals.join(', ')}
+Available sub-goals for THIS topic: ${safeSubGoals.join(', ')}
 
 Recent conversation:
 ${recentHistory}
@@ -68,7 +72,7 @@ ${recentHistory}
 Current turn: ${turnIndex + 1}
 
 RULES:
-1. **TOPIC BOUNDARY**: Focus ONLY on "${topic.label}" sub-goals. Do NOT explore themes from other topics.
+1. **TOPIC BOUNDARY**: Focus ONLY on "${safeTopicLabel}" sub-goals. Do NOT explore themes from other topics.
 2. **NO THEME DRAGGING**: If user mentioned a general concept (like "sustainability"), do NOT apply it to this topic. Each topic gets fresh exploration.
 3. **DIVERSIFICATION**: Pick a sub-goal that has NOT been deeply discussed yet in recent messages.
 4. **SPECIFICITY**: The focusPoint must be a SPECIFIC sub-goal from the list above.
@@ -112,10 +116,11 @@ OUTPUT: Pick ONE specific sub-goal from the list that hasn't been explored yet.
             reason: z.string()
         });
 
+        const safeMessage = sanitize(userMessage, 500);
         const prompt = `
 Evaluate if the user agrees to provide contact details.
 Language: ${language}
-User message: "${userMessage}"
+User message: "${safeMessage}"
 
 CLASSIFY:
 - CONSENT: User agrees ("Yes", "Sure", "Ok", "Va bene", "Certo")

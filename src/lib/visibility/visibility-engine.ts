@@ -4,6 +4,7 @@ import { SerpMonitoringEngine } from './serp-monitoring-engine';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { CrossChannelSyncEngine } from '../insights/sync-engine';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const AnalysisSchema = z.object({
     brandMentioned: z.boolean(),
@@ -280,11 +281,11 @@ export class VisibilityEngine {
                 schema: AnalysisSchema,
                 prompt: `Analyze the following text which represents an LLM's response to a user query.
 
-Product/Brand to track: "${brandName}"
-Competitors: ${JSON.stringify(competitors)}
+Product/Brand to track: "${sanitizeConfig(brandName, 200)}"
+Competitors: ${JSON.stringify(competitors.map(c => sanitizeConfig(c, 100)))}
 
 Determine:
-1. Is "${brandName}" mentioned?
+1. Is "${sanitizeConfig(brandName, 200)}" mentioned?
 2. If yes, what is its position in the list/text (1-based index)?
 3. For each competitor, are they mentioned and at what position?
 4. What is the overall sentiment towards "${brandName}"?
@@ -296,7 +297,7 @@ Determine:
 
 Text to analyze:
 """
-${text.substring(0, 8000)}
+${sanitize(text.substring(0, 8000), 8000)}
 """`,
                 temperature: 0
             });

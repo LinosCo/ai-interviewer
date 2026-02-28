@@ -19,18 +19,17 @@ export default async function TrainingChatPage({ params }: { params: Promise<{ s
   if (!session) notFound()
 
   const bot = session.trainingBot
-  const state = session.supervisorState as {
-    currentTopicIndex?: number
-    topicResults?: import('@/lib/training/training-types').TopicResult[]
-  } | null
+  const rawState = session.supervisorState as Record<string, unknown> | null
+  const currentTopicIndex = typeof rawState?.currentTopicIndex === 'number' ? rawState.currentTopicIndex : 0
+  const topicResults = Array.isArray(rawState?.topicResults) ? rawState.topicResults as import('@/lib/training/training-types').TopicResult[] : []
 
   return (
     <TrainingChat
       sessionId={session.id}
       botName={bot.name}
       topics={bot.topics.map(t => ({ id: t.id, label: t.label }))}
-      currentTopicIndex={state?.currentTopicIndex ?? 0}
-      topicResults={state?.topicResults ?? []}
+      currentTopicIndex={currentTopicIndex}
+      topicResults={topicResults}
       primaryColor={bot.primaryColor ?? '#6366f1'}
       initialMessages={session.messages.map(m => ({
         role: m.role as 'user' | 'assistant',

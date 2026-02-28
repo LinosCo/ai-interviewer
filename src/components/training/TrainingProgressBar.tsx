@@ -36,7 +36,21 @@ export default function TrainingProgressBar({ topics, currentTopicIndex, topicRe
                 : 'border-gray-200 text-gray-400'
             }`}
           >
-            {result ? (statusIcon[result.status] ?? '○') : isCurrent ? '🔄' : '○'}
+            {result ? (
+              <>
+                <span aria-hidden="true">{statusIcon[result.status] ?? '○'}</span>
+                <span className="sr-only">
+                  {result.status === 'PASSED' ? 'Superato' : result.status === 'FAILED' ? 'Non superato' : 'Lacune rilevate'}
+                </span>
+              </>
+            ) : isCurrent ? (
+              <>
+                <span aria-hidden="true">🔄</span>
+                <span className="sr-only">In corso</span>
+              </>
+            ) : (
+              <span aria-hidden="true">○</span>
+            )}
             <span className="hidden sm:inline max-w-[80px] truncate">{topic.label}</span>
             <span className="sm:hidden">{i + 1}</span>
           </div>

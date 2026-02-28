@@ -34,7 +34,7 @@ export default function QuizRenderer({ questions, onSubmit, disabled }: Props) {
           <div className="space-y-2">
             {q.options.map((opt, oi) => (
               <button
-                key={oi}
+                key={`${q.id}-${oi}`}
                 onClick={() => select(qi, oi)}
                 className={`w-full text-left text-sm px-4 py-2 rounded-lg border transition-colors ${
                   selected[qi] === oi

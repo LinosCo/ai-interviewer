@@ -38,6 +38,7 @@ export default function TrainingChat({
   const [sessionComplete, setSessionComplete] = useState(false)
   const [completionData, setCompletionData] = useState<{ overallScore: number; passed: boolean } | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const hasSentFirstMessage = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -56,6 +57,15 @@ export default function TrainingChat({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: messageText, sessionId }),
       })
+
+      if (!res.ok) {
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: 'Si è verificato un errore. Riprova tra un momento.' },
+        ])
+        return
+      }
+
       const data: TrainingChatResponse = await res.json()
 
       setMessages(prev => [...prev, { role: 'assistant', content: data.text, phase: data.phase }])
@@ -78,15 +88,17 @@ export default function TrainingChat({
 
       if (data.sessionComplete) {
         setSessionComplete(true)
-        if (data.overallScore !== undefined && data.passed !== undefined) {
-          setCompletionData({ overallScore: data.overallScore, passed: data.passed })
-        }
+        setCompletionData({
+          overallScore: data.overallScore ?? 0,
+          passed: data.passed ?? false,
+        })
       }
 
       // Advance topic index when a new EXPLAINING phase starts (not on initial load)
-      if (data.phase === 'EXPLAINING' && !data.sessionComplete && messages.length > 0) {
+      if (data.phase === 'EXPLAINING' && !data.sessionComplete && hasSentFirstMessage.current) {
         setCurrentTopicIndex(prev => Math.min(prev + 1, topics.length - 1))
       }
+      hasSentFirstMessage.current = true
     } finally {
       setLoading(false)
     }
@@ -162,6 +174,7 @@ export default function TrainingChat({
       {!pendingQuizzes && (
         <div className="bg-white border-t px-4 py-3 flex gap-2">
           <input
+            aria-label="Messaggio"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {

@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { assertOrganizationAccess, WorkspaceError } from '@/lib/domain/workspace'
 
 const CreateBotSchema = z.object({
   name: z.string().min(1),
@@ -22,6 +23,15 @@ export async function GET(request: Request) {
 
     if (!organizationId) {
       return NextResponse.json({ error: 'organizationId query param is required' }, { status: 400 })
+    }
+
+    try {
+      await assertOrganizationAccess(session.user.id, organizationId, 'VIEWER')
+    } catch (error) {
+      if (error instanceof WorkspaceError) {
+        return NextResponse.json({ error: error.message }, { status: error.status })
+      }
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const bots = await prisma.trainingBot.findMany({
@@ -49,6 +59,15 @@ export async function POST(request: Request) {
 
     const body = await request.json()
     const data = CreateBotSchema.parse(body)
+
+    try {
+      await assertOrganizationAccess(session.user.id, data.organizationId, 'MEMBER')
+    } catch (error) {
+      if (error instanceof WorkspaceError) {
+        return NextResponse.json({ error: error.message }, { status: error.status })
+      }
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     const bot = await prisma.trainingBot.create({ data })
 

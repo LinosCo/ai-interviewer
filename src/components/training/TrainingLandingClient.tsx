@@ -17,6 +17,10 @@ interface Props {
   logoUrl: string
 }
 
+function safeColor(color: string, fallback = '#6366f1'): string {
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback
+}
+
 export default function TrainingLandingClient({
   botId,
   botName,
@@ -100,13 +104,13 @@ export default function TrainingLandingClient({
           <span>Durata stimata: ~{estimatedMinutes} minuti</span>
         </div>
         {error && (
-          <p className="text-sm text-red-600 mb-4">{error}</p>
+          <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>
         )}
         <Button
           onClick={startTraining}
           disabled={loading}
           className="w-full"
-          style={{ backgroundColor: primaryColor }}
+          style={{ backgroundColor: safeColor(primaryColor) }}
         >
           {loading ? 'Avvio...' : 'Inizia la formazione'}
         </Button>

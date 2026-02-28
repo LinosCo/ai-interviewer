@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import type { PlanType } from '@prisma/client'
 
 const Schema = z.object({ botId: z.string() })
 
-const BUSINESS_PLANS = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN']
+const BUSINESS_PLANS: PlanType[] = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN']
 
 export async function POST(req: NextRequest) {
   try {

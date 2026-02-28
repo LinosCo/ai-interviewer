@@ -644,7 +644,6 @@ model TrainingBot {
   updatedAt DateTime @updatedAt
 
   @@index([organizationId])
-  @@index([slug])
 }
 
 model TrainingTopicBlock {
@@ -693,6 +692,7 @@ model TrainingSession {
 
   @@index([trainingBotId])
   @@index([participantId])
+  @@index([trainingBotId, participantId])
 }
 
 model TrainingMessage {

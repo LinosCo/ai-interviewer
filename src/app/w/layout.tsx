@@ -18,7 +18,7 @@ export default function WidgetLayout({
                 <meta name="color-scheme" content="light" />
             </head>
             <body className="antialiased">
-                <Providers>
+                <Providers session={null}>
                     {children}
                 </Providers>
             </body>

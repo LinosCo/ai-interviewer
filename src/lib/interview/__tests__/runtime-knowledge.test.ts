@@ -20,23 +20,25 @@ const BASE_PLAN: InterviewPlan = {
         secondsPerTurn: 45,
         topicsSignature: 'topic-a||topic-b'
     },
-    scan: {
+    explore: {
         topics: [
             {
                 topicId: 'topic-a',
                 label: 'Contesto aziendale',
                 orderIndex: 0,
                 subGoals: ['Settore', 'Mercato geografico'],
+                baseTurns: 2,
                 minTurns: 2,
-                maxTurns: 2
+                maxTurns: 2,
+                interpretationCues: [],
+                significanceSignals: [],
+                probeAngles: []
             }
         ]
     },
-    deep: {
-        strategy: 'uncovered_subgoals_first',
+    deepen: {
         maxTurnsPerTopic: 2,
-        fallbackTurns: 2,
-        topics: []
+        fallbackTurns: 2
     }
 };
 
@@ -77,7 +79,7 @@ describe('runtime-knowledge', () => {
             signature,
             language: 'it',
             interviewGoal: 'Capire uso AI nel business',
-            topics: BASE_PLAN.scan.topics.map((topic) => ({
+            topics: BASE_PLAN.explore.topics.map((topic) => ({
                 topicId: topic.topicId,
                 topicLabel: topic.label,
                 subGoals: topic.subGoals
@@ -101,7 +103,7 @@ describe('runtime-knowledge', () => {
             signature,
             language: 'it',
             interviewGoal: 'Capire uso AI nel business',
-            topics: BASE_PLAN.scan.topics.map((topic) => ({
+            topics: BASE_PLAN.explore.topics.map((topic) => ({
                 topicId: topic.topicId,
                 topicLabel: topic.label,
                 subGoals: topic.subGoals

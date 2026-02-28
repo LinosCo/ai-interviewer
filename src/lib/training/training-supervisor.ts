@@ -107,7 +107,6 @@ export function advanceAfterEvaluation(
         pendingRetryGaps: result.gaps,
         pendingQuizzes: undefined,
         pendingCheckQuestion: undefined,
-        pendingRetryGaps: undefined,
       },
       moveToNextTopic: false,
     }

@@ -26,7 +26,7 @@ export async function DELETE() {
         //    These would become orphaned after deletion, so we delete them explicitly.
         const soleOwnedOrgs = await prisma.organization.findMany({
             where: {
-                memberships: {
+                members: {
                     every: { userId }
                 }
             },

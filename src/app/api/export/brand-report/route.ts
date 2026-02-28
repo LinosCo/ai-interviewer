@@ -97,7 +97,8 @@ export async function GET(request: Request) {
             topLlmoIssues: seoAuditData?.aggregated?.topLlmoIssues ?? [],
         });
 
-        const stream = await renderToStream(element);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stream = await renderToStream(element as any);
 
         // Collect stream into Buffer
         const chunks: Uint8Array[] = [];

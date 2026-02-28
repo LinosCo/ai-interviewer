@@ -80,6 +80,9 @@ export async function POST(req: Request) {
         }
 
         const project = suggestion.connection.project;
+        if (!project) {
+            return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
         const org = project.organization;
 
         if (!org || org.members.length === 0) {

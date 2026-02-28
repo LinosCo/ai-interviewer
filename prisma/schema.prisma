@@ -201,6 +201,7 @@ model Organization {
   tokenUsage             TokenUsage?
   usageLogs              UsageLog[]
   visibilityConfigs      VisibilityConfig[]
+  trainingBots           TrainingBot[]
 }
 
 model Subscription {
@@ -555,7 +556,11 @@ model KnowledgeSource {
   createdAt DateTime @default(now())
   bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
 
+  trainingBotId String?
+  trainingBot   TrainingBot? @relation("TrainingBotKnowledge", fields: [trainingBotId], references: [id])
+
   @@index([botId])
+  @@index([trainingBotId])
 }
 
 model TopicBlock {
@@ -581,6 +586,128 @@ model RewardConfig {
   displayText   String?
   showOnLanding Boolean @default(true)
   bot           Bot     @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  trainingBotId String?      @unique
+  trainingBot   TrainingBot? @relation("TrainingBotReward", fields: [trainingBotId], references: [id])
+}
+
+model TrainingBot {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String?
+  status      BotStatus @default(DRAFT)
+
+  learningGoal   String?
+  targetAudience String?
+  language       String  @default("it")
+  tone           String  @default("professional")
+
+  traineeEducationLevel  TraineeEducationLevel  @default(PROFESSIONAL)
+  traineeCompetenceLevel TraineeCompetenceLevel @default(INTERMEDIATE)
+
+  failureMode        FailureMode @default(PERMISSIVE)
+  passScoreThreshold Int         @default(70)
+  maxRetries         Int         @default(2)
+
+  introMessage    String?
+  maxDurationMins Int     @default(30)
+
+  useWarmup        Boolean @default(false)
+  warmupIcebreaker String?
+
+  collectTraineeData Boolean @default(false)
+  traineeDataFields  Json?
+
+  logoUrl         String?
+  primaryColor    String?
+  backgroundColor String?
+  textColor       String?
+
+  showProgressBar Boolean @default(true)
+  welcomeTitle    String?
+  welcomeSubtitle String?
+
+  modelProvider String  @default("openai")
+  modelName     String  @default("gpt-4o-mini")
+  customApiKey  String?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  topics           TrainingTopicBlock[]
+  sessions         TrainingSession[]
+  rewardConfig     RewardConfig?        @relation("TrainingBotReward")
+  knowledgeSources KnowledgeSource[]    @relation("TrainingBotKnowledge")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([slug])
+}
+
+model TrainingTopicBlock {
+  id            String      @id @default(cuid())
+  trainingBotId String
+  trainingBot   TrainingBot @relation(fields: [trainingBotId], references: [id], onDelete: Cascade)
+
+  orderIndex         Int
+  label              String
+  description        String?
+  learningObjectives String[]
+  preWrittenQuizzes  Json?
+  passScoreOverride  Int?
+  maxRetriesOverride Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([trainingBotId])
+}
+
+model TrainingSession {
+  id            String      @id @default(cuid())
+  trainingBotId String
+  trainingBot   TrainingBot @relation(fields: [trainingBotId], references: [id], onDelete: Cascade)
+
+  participantId String
+  status        TrainingSessionStatus @default(STARTED)
+
+  currentTopicId          String?
+  topicResults            Json    @default("[]")
+  overallScore            Float?
+  passed                  Boolean?
+  detectedCompetenceLevel String?
+
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  durationSeconds Int?
+
+  traineeProfile  Json?
+  supervisorState Json?
+
+  messages TrainingMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([trainingBotId])
+  @@index([participantId])
+}
+
+model TrainingMessage {
+  id                String          @id @default(cuid())
+  trainingSessionId String
+  trainingSession   TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+
+  role     String
+  phase    TrainingPhase
+  content  String
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([trainingSessionId])
 }
 
 model Conversation {

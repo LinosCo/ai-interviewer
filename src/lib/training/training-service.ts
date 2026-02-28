@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { TokenTrackingService } from '@/services/tokenTrackingService'
 import {
   buildExplainingPrompt,
   buildCheckingPrompt,
@@ -19,6 +20,29 @@ import {
 } from './training-supervisor'
 import { evaluateOpenAnswer, evaluateQuizAnswers, computeTopicScore, detectCompetenceLevel } from './training-evaluator'
 import type { TrainingSupervisorState, TrainingChatResponse, QuizQuestion } from './training-types'
+
+async function logTrainingTokens(
+  organizationId: string,
+  modelName: string,
+  usage: { inputTokens: number; outputTokens: number } | undefined,
+  operation: string
+): Promise<void> {
+  if (!usage) return
+  try {
+    await TokenTrackingService.logTokenUsage({
+      organizationId,
+      userId: undefined,
+      inputTokens: usage.inputTokens ?? 0,
+      outputTokens: usage.outputTokens ?? 0,
+      category: 'TRAINING',
+      model: modelName,
+      operation,
+      resourceType: 'training',
+    })
+  } catch (err) {
+    console.error('[Training] Token logging failed:', err)
+  }
+}
 
 function getModel(provider: string, name: string, customKey?: string | null) {
   if (provider === 'anthropic') {
@@ -92,7 +116,9 @@ export async function processTrainingMessage(
             language: bot.language,
           })
 
-      const { text } = await generateText({ model, system: systemPrompt, prompt: userMessage })
+      const explainResult = await generateText({ model, system: systemPrompt, prompt: userMessage })
+      await logTrainingTokens(bot.organizationId, bot.modelName, explainResult.usage, 'training-explain')
+      const { text } = explainResult
       const checkPrompt = buildCheckingPrompt({
         topicLabel: currentTopic.label,
         learningObjectives: currentTopic.learningObjectives,
@@ -101,7 +127,9 @@ export async function processTrainingMessage(
         adaptationDepth: state.adaptationDepth,
         language: bot.language,
       })
-      const { text: checkQuestion } = await generateText({ model, system: checkPrompt, prompt: 'Fai la domanda.' })
+      const checkResult = await generateText({ model, system: checkPrompt, prompt: 'Fai la domanda.' })
+      await logTrainingTokens(bot.organizationId, bot.modelName, checkResult.usage, 'training-check-question')
+      const { text: checkQuestion } = checkResult
       const newState = { ...state, phase: 'CHECKING' as const, pendingCheckQuestion: checkQuestion }
       const combinedText = `${text}\n\n${checkQuestion}`
       await saveStateAndMessage(sessionId, newState, combinedText, state.phase)
@@ -127,7 +155,7 @@ export async function processTrainingMessage(
       if (preWritten && preWritten.length > 0) {
         quizzes = preWritten.slice(0, 3)
       } else {
-        const { object } = await generateObject({
+        const quizResult = await generateObject({
           model,
           schema: z.object({
             questions: z.array(z.object({
@@ -148,7 +176,8 @@ export async function processTrainingMessage(
           }),
           prompt: `Genera 2-3 domande di verifica sul topic "${currentTopic.label}".`,
         })
-        quizzes = object.questions
+        await logTrainingTokens(bot.organizationId, bot.modelName, quizResult.usage, 'training-generate-quiz')
+        quizzes = quizResult.object.questions
       }
 
       const newState: TrainingSupervisorState = {
@@ -221,12 +250,13 @@ export async function processTrainingMessage(
       if (finalState.phase === 'COMPLETE') {
         const overallScore = computeOverallScore(finalState.topicResults)
         const passed = computeSessionPassed(finalState.topicResults, bot.passScoreThreshold)
-        const { text: feedbackText } = await generateText({
+        const feedbackResult = await generateText({
           model,
           system: buildFinalFeedbackPrompt(finalState.topicResults, overallScore, passed, bot.language),
           prompt: 'Genera il messaggio di chiusura.',
         })
-        text = feedbackText
+        await logTrainingTokens(bot.organizationId, bot.modelName, feedbackResult.usage, 'training-final-feedback')
+        text = feedbackResult.text
 
         // Update session as complete
         await prisma.trainingSession.update({

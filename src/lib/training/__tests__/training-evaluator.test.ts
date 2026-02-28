@@ -32,7 +32,13 @@ describe('evaluateQuizAnswers', () => {
 
   it('returns partial score for mixed answers', () => {
     const result = evaluateQuizAnswers(questions, [0, 0, 1]) // 2/3 correct
-    expect(result.score).toBeCloseTo(66.7, 0)
+    expect(result.score).toBe(67)
     expect(result.wrongAnswers).toHaveLength(1)
+  })
+
+  it('returns 100 for empty questions array', () => {
+    const result = evaluateQuizAnswers([], [])
+    expect(result.score).toBe(100)
+    expect(result.wrongAnswers).toHaveLength(0)
   })
 })

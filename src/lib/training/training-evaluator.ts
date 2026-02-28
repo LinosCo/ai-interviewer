@@ -43,14 +43,15 @@ export async function evaluateOpenAnswer(
     return { score: 0, gaps: ['Nessuna risposta fornita'], feedback: 'Non è stata fornita una risposta.' }
   }
 
-  const { object } = await generateObject({
-    model: openai(modelName),
-    schema: z.object({
-      score: z.number().min(0).max(100),
-      gaps: z.array(z.string()),
-      feedback: z.string(),
-    }),
-    prompt: `Valuta questa risposta a una domanda di verifica formativa.
+  try {
+    const { object } = await generateObject({
+      model: openai(modelName),
+      schema: z.object({
+        score: z.number().min(0).max(100),
+        gaps: z.array(z.string()),
+        feedback: z.string(),
+      }),
+      prompt: `Valuta questa risposta a una domanda di verifica formativa.
 
 Domanda: ${question}
 Risposta del trainee: ${answer}
@@ -63,9 +64,16 @@ Valuta:
 - feedback: breve valutazione in italiano (max 2 frasi) per il report del formatore
 
 Sii rigoroso ma equo. Considera la correttezza del concetto, non la forma.`,
-  })
-
-  return object
+    })
+    return object
+  } catch (err) {
+    console.error('[evaluateOpenAnswer] LLM call failed', err)
+    return {
+      score: 0,
+      gaps: ['Errore nella valutazione automatica'],
+      feedback: 'Impossibile elaborare la risposta in questo momento.',
+    }
+  }
 }
 
 /** Infer competence level from message history quality */
@@ -75,9 +83,9 @@ export function detectCompetenceLevel(
   if (answers.length === 0) return 'INTERMEDIATE'
 
   const avgLength = answers.reduce((sum, a) => sum + a.split(' ').length, 0) / answers.length
-  const hasSpecificTerms = answers.some(a => a.length > 100)
+  const hasLongAnswer = answers.some(a => a.length > 100)
 
-  if (avgLength < 10 && !hasSpecificTerms) return 'BEGINNER'
-  if (avgLength > 40 || hasSpecificTerms) return 'ADVANCED'
+  if (avgLength < 10 && !hasLongAnswer) return 'BEGINNER'
+  if (avgLength > 40 || hasLongAnswer) return 'ADVANCED'
   return 'INTERMEDIATE'
 }

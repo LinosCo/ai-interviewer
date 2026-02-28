@@ -52,10 +52,10 @@ import {
 import {
     isExtensionOfferQuestion, generateConsentQuestionOnly, generateFieldQuestionOnly,
     extractLastAssistantQuestion, getUserResponseDepth, buildUserBridgeHint,
-    buildRuntimeSemanticContextPrompt, buildSoftDiagnosticHint,
-    escapeRegexLiteral, replaceLiteralTopicTitle, normalizeSingleQuestion,
+    buildRuntimeSemanticContextPrompt,
+    normalizeSingleQuestion,
     normalizeBridgeStem, extractBridgeStem, collectRecentBridgeStems,
-    startsWithGenericBridgeOpener, isClarificationSignal, isLikelyUserQuestion,
+    startsWithGenericBridgeOpener, isLikelyUserQuestion,
     hasAnyAnchorOverlap, detectUserTurnSignal, isClarificationHandledResponse,
     isScopeBoundaryHandledResponse, buildNaturalTopicCue, getGenericTopicAnchors,
     hasMeaningfulTopicOverlap, isUsableBridgeSnippet,

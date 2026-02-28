@@ -1098,7 +1098,7 @@ Ordine di implementazione suggerito per massimizzare impatto con minimo effort:
 | 🟠 P2 | **J. AI Tips end-to-end** | 15-20h | Utente può implementare suggerimenti direttamente | Sprint 3 | ✅ FATTO |
 | 🟠 P3 | **G. KB semantic search** | 12-16h | Rilevanza risposte KB migliora significativamente | Sprint 6 | ✅ FATTO |
 | 🟡 P3 | **K. Social integration** | 12-16h | Automazione social media completa | Sprint 6 | ✅ FATTO |
-| 🟡 P3 | **O. Split chat/route.ts** | 8-10h | Manutenibilità, cold start ridotti | Sprint 7 | ⏳ Da fare |
+| 🟡 P3 | **O. Split chat/route.ts** | 8-10h | Manutenibilità, cold start ridotti | Sprint 7 | ✅ FATTO |
 | 🟡 P4 | **L. GEO providers** | 8-10h | Copertura monitoring più completa | Sprint 6 | ✅ FATTO |
 | 🟡 P4 | **M. LinkedIn B2B** | 4-6h | Contenuti ottimizzati per target PMI | Sprint 6 | ✅ FATTO |
 | 🟡 P4 | **N. Reporting/Export** | 10-14h | Valore per management PMI | Sprint 6 | ✅ FATTO |
@@ -1112,7 +1112,7 @@ Ordine di implementazione suggerito per massimizzare impatto con minimo effort:
 **Sprint 4 (Week 8-10)**: ✅ COMPLETATO — KB auto-growth cron + n8n dispatchTips wiring
 **Sprint 5 (Week 11-12)**: ✅ COMPLETATO — TipRoutingRule, TipRoutingExecutor, integrations hub 3-tab, palette UI
 **Sprint 6**: ✅ COMPLETATO — KB semantic search (G) + Social integration (K) + GEO trend chart (L) + LinkedIn B2B (M) + Export PDF (N) + DB pool tuning (P) + Feedback loop chatbot+CMS (R)
-**Sprint 7 (prossimo)**: ⏳ Split chat/route.ts (O) + Internazionalizzazione (H) [bassa priorità, 30-40h]
+**Sprint 7**: ✅ COMPLETATO — Split chat/route.ts (O): estratte chat-intent.ts, question-generator.ts, interview-completion.ts. **Sprint 8 (prossimo)**: ⏳ Internazionalizzazione (H) [bassa priorità, 30-40h]
 
 ---
 

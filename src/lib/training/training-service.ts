@@ -20,6 +20,7 @@ import {
 } from './training-supervisor'
 import { evaluateOpenAnswer, evaluateQuizAnswers, computeTopicScore, detectCompetenceLevel } from './training-evaluator'
 import type { TrainingSupervisorState, TrainingChatResponse, QuizQuestion } from './training-types'
+import type { TrainingPhase } from '@prisma/client'
 
 async function logTrainingTokens(
   organizationId: string,
@@ -132,7 +133,7 @@ export async function processTrainingMessage(
       const { text: checkQuestion } = checkResult
       const newState = { ...state, phase: 'CHECKING' as const, pendingCheckQuestion: checkQuestion }
       const combinedText = `${text}\n\n${checkQuestion}`
-      await saveStateAndMessage(sessionId, newState, combinedText, state.phase)
+      await saveStateAndMessage(sessionId, newState, combinedText, state.phase as TrainingPhase)
       response = { text: combinedText, phase: 'CHECKING' }
       break
     }
@@ -317,7 +318,7 @@ async function saveStateAndMessage(
   sessionId: string,
   state: TrainingSupervisorState,
   text: string,
-  phase: string
+  phase: TrainingPhase
 ) {
   await Promise.all([
     prisma.trainingSession.update({
@@ -325,7 +326,7 @@ async function saveStateAndMessage(
       data: { supervisorState: state as any },
     }),
     prisma.trainingMessage.create({
-      data: { trainingSessionId: sessionId, role: 'assistant', phase: phase as any, content: text },
+      data: { trainingSessionId: sessionId, role: 'assistant', phase, content: text },
     }),
   ])
 }

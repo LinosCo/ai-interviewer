@@ -13,7 +13,6 @@ import {
 } from './training-prompts'
 import {
   buildInitialState,
-  getNextPhase,
   advanceAfterEvaluation,
   computeOverallScore,
   computeSessionPassed,
@@ -45,7 +44,7 @@ export async function processTrainingMessage(
 
   const bot = session.trainingBot
   const topics = bot.topics
-  const state: TrainingSupervisorState = (session.supervisorState as TrainingSupervisorState) ?? buildInitialState()
+  const state: TrainingSupervisorState = (session.supervisorState as unknown as TrainingSupervisorState) ?? buildInitialState()
 
   if (state.phase === 'COMPLETE') {
     return { text: 'Il percorso formativo è già completato.', phase: 'COMPLETE', sessionComplete: true }
@@ -79,7 +78,7 @@ export async function processTrainingMessage(
             competenceLevel: state.detectedCompetenceLevel,
             adaptationDepth: state.adaptationDepth,
             kbContent,
-            gaps: state.topicResults.at(-1)?.gaps ?? [],
+            gaps: state.pendingRetryGaps ?? [],
             language: bot.language,
           })
         : buildExplainingPrompt({
@@ -94,9 +93,19 @@ export async function processTrainingMessage(
           })
 
       const { text } = await generateText({ model, system: systemPrompt, prompt: userMessage })
-      const newState = { ...state, phase: 'CHECKING' as const }
-      await saveStateAndMessage(sessionId, newState, text, 'EXPLAINING')
-      response = { text, phase: 'CHECKING' }
+      const checkPrompt = buildCheckingPrompt({
+        topicLabel: currentTopic.label,
+        learningObjectives: currentTopic.learningObjectives,
+        educationLevel: bot.traineeEducationLevel,
+        competenceLevel: state.detectedCompetenceLevel,
+        adaptationDepth: state.adaptationDepth,
+        language: bot.language,
+      })
+      const { text: checkQuestion } = await generateText({ model, system: checkPrompt, prompt: 'Fai la domanda.' })
+      const newState = { ...state, phase: 'CHECKING' as const, pendingCheckQuestion: checkQuestion }
+      const combinedText = `${text}\n\n${checkQuestion}`
+      await saveStateAndMessage(sessionId, newState, combinedText, state.phase)
+      response = { text: combinedText, phase: 'CHECKING' }
       break
     }
 
@@ -177,7 +186,9 @@ export async function processTrainingMessage(
       const finalScore = computeTopicScore(openScore, quizEval.score)
 
       const threshold = currentTopic.passScoreOverride ?? bot.passScoreThreshold
-      const status = finalScore >= threshold ? 'PASSED' : (state.retryCount >= (currentTopic.maxRetriesOverride ?? bot.maxRetries) ? 'FAILED' : 'GAP_DETECTED')
+      const status: 'PASSED' | 'FAILED' | 'GAP_DETECTED' = finalScore >= threshold
+        ? 'PASSED'
+        : (state.retryCount >= (currentTopic.maxRetriesOverride ?? bot.maxRetries) ? 'FAILED' : 'GAP_DETECTED')
 
       const topicResult = {
         topicId: currentTopic.id,
@@ -281,7 +292,7 @@ async function saveStateAndMessage(
   await Promise.all([
     prisma.trainingSession.update({
       where: { id: sessionId },
-      data: { supervisorState: state as any, currentTopicId: undefined },
+      data: { supervisorState: state as any },
     }),
     prisma.trainingMessage.create({
       data: { trainingSessionId: sessionId, role: 'assistant', phase: phase as any, content: text },

@@ -40,6 +40,7 @@ export interface TrainingSupervisorState {
   topicResults: TopicResult[]
   pendingQuizzes?: QuizQuestion[]    // quizzes generated, waiting for answers
   pendingCheckQuestion?: string      // open question asked, waiting for answer
+  pendingRetryGaps?: string[]        // gaps from the failed attempt, used when RETRYING
   dataCollectionPhase?: 'CONSENT' | 'COLLECTING' | 'DONE'
   dataCollected?: Record<string, string>
 }

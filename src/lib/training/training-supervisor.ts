@@ -102,6 +102,7 @@ export function advanceAfterEvaluation(
         phase: 'RETRYING',
         retryCount: state.retryCount + 1,
         adaptationDepth: Math.min(state.adaptationDepth + 1, 2),
+        pendingRetryGaps: result.gaps,
         pendingQuizzes: undefined,
         pendingCheckQuestion: undefined,
       },

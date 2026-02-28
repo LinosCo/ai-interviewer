@@ -958,6 +958,7 @@ model VisibilityConfig {
   projectShares   ProjectVisibilityConfig[]
   serpScans       SerpMonitoringScan[]
   tipActions      TipAction[]
+  brandReports    BrandReport[]
   organization    Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project         Project?                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   prompts         VisibilityPrompt[]
@@ -1060,6 +1061,37 @@ model WebsiteAnalysis {
   visibilityConfig      VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
 
   @@index([configId, completedAt])
+}
+
+/**
+ * BrandReport — consolidated SEO + GEO + SERP + AI tips report.
+ * Generated on demand via /api/visibility/brand-report.
+ * Aggregates WebsiteAnalysisEngine, SEOAuditEngine, VisibilityEngine,
+ * SerpMonitoringEngine and GSC/GA data into a single scored report.
+ */
+model BrandReport {
+  id            String           @id @default(cuid())
+  configId      String
+  status        String           @default("pending")
+  overallScore  Int              @default(0)
+  seoScore      Int              @default(0)
+  llmoScore     Int              @default(0)
+  geoScore      Int              @default(0)
+  serpScore     Int              @default(0)
+  pagesAudited  Int              @default(0)
+  seoAuditData  Json?
+  geoData       Json?
+  serpData      Json?
+  gscInsights   Json?
+  gaInsights    Json?
+  aiTips        Json?
+  generatedAt   DateTime?
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  config        VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
+  @@index([configId, createdAt])
 }
 
 model TipAction {
@@ -1222,6 +1254,7 @@ model CMSSuggestion {
   performanceAfter      Json?
   createdBy             String?
   seoData               Json?
+  userFeedback          String?
   connection            CMSConnection       @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@index([connectionId, status])
@@ -1723,4 +1756,40 @@ enum ConnectionStatus {
   ACTIVE
   ERROR
   DISABLED
+}
+
+enum TraineeEducationLevel {
+  PRIMARY
+  SECONDARY
+  UNIVERSITY
+  PROFESSIONAL
+}
+
+enum TraineeCompetenceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+enum FailureMode {
+  STRICT
+  PERMISSIVE
+}
+
+enum TrainingSessionStatus {
+  STARTED
+  COMPLETED
+  FAILED
+  ABANDONED
+}
+
+enum TrainingPhase {
+  EXPLAINING
+  CHECKING
+  QUIZZING
+  EVALUATING
+  RETRYING
+  DATA_COLLECTION
+  COMPLETE
 }

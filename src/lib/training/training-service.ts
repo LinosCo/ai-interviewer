@@ -24,7 +24,7 @@ import type { TrainingSupervisorState, TrainingChatResponse, QuizQuestion } from
 async function logTrainingTokens(
   organizationId: string,
   modelName: string,
-  usage: { inputTokens: number; outputTokens: number } | undefined,
+  usage: { inputTokens: number | undefined; outputTokens: number | undefined } | undefined,
   operation: string
 ): Promise<void> {
   if (!usage) return

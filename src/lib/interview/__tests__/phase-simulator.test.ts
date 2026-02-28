@@ -9,7 +9,7 @@ import {
 
 function baseState(overrides: Partial<PhaseSimulatorState> = {}): PhaseSimulatorState {
     return {
-        phase: 'DEEP',
+        phase: 'DEEPEN',
         shouldCollectData: true,
         candidateFieldIds: ['fullName', 'email'],
         deepAccepted: null,
@@ -22,42 +22,42 @@ function baseState(overrides: Partial<PhaseSimulatorState> = {}): PhaseSimulator
 }
 
 describe('phase-simulator integration-like sequences', () => {
-    it('starts DEEP when SCAN is completed with remaining time', () => {
-        const scanDone = onScanCompleted(baseState({ phase: 'SCAN', remainingSec: 59 }));
+    it('starts DEEPEN when EXPLORE is completed with remaining time', () => {
+        const scanDone = onScanCompleted(baseState({ phase: 'EXPLORE', remainingSec: 59 }));
         expect(scanDone.action).toBe('START_DEEP');
-        expect(scanDone.state.phase).toBe('DEEP');
+        expect(scanDone.state.phase).toBe('DEEPEN');
         expect(scanDone.state.deepAccepted).toBeNull();
     });
 
-    it('starts DEEP even when SCAN completes with no remaining time (time gate is handled during active phases)', () => {
-        const scanDone = onScanCompleted(baseState({ phase: 'SCAN', remainingSec: 0 }));
+    it('starts DEEPEN even when EXPLORE completes with no remaining time (time gate is handled during active phases)', () => {
+        const scanDone = onScanCompleted(baseState({ phase: 'EXPLORE', remainingSec: 0 }));
         expect(scanDone.action).toBe('START_DEEP');
-        expect(scanDone.state.phase).toBe('DEEP');
+        expect(scanDone.state.phase).toBe('DEEPEN');
     });
 
-    it('moves directly from DEEP completion to DATA_COLLECTION consent', () => {
-        const deepDone = onDeepCompleted(baseState({ phase: 'DEEP', remainingSec: 90 }));
+    it('moves directly from DEEPEN completion to DATA_COLLECTION consent', () => {
+        const deepDone = onDeepCompleted(baseState({ phase: 'DEEPEN', remainingSec: 90 }));
         expect(deepDone.action).toBe('ASK_DATA_CONSENT');
         expect(deepDone.state.phase).toBe('DATA_COLLECTION');
         expect(deepDone.state.consentGiven).toBe(false);
     });
 
-    it('intercepts premature closure attempt in DEEP and keeps topic questioning', () => {
-        const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'DEEP', remainingSec: 150 }));
+    it('intercepts premature closure attempt in DEEPEN and keeps topic questioning', () => {
+        const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'DEEPEN', remainingSec: 150 }));
         expect(closure.action).toBe('ASK_TOPIC_QUESTION');
-        expect(closure.state.phase).toBe('DEEP');
+        expect(closure.state.phase).toBe('DEEPEN');
     });
 
     it('switches to DEEP_OFFER when closure attempt happens with no remaining time', () => {
-        const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'DEEP', remainingSec: 0 }));
+        const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'DEEPEN', remainingSec: 0 }));
         expect(closure.action).toBe('ASK_DEEP_OFFER');
         expect(closure.state.phase).toBe('DEEP_OFFER');
     });
 
-    it('does not switch to DEEP_OFFER when closure attempt happens in SCAN with no remaining time', () => {
-        const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'SCAN', remainingSec: 0 }));
+    it('does not switch to DEEP_OFFER when closure attempt happens in EXPLORE with no remaining time', () => {
+        const closure = onTopicPhaseClosureAttempt(baseState({ phase: 'EXPLORE', remainingSec: 0 }));
         expect(closure.action).toBe('ASK_TOPIC_QUESTION');
-        expect(closure.state.phase).toBe('SCAN');
+        expect(closure.state.phase).toBe('EXPLORE');
     });
 
     it('blocks INTERVIEW_COMPLETED before contact consent', () => {

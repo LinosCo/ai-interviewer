@@ -1,6 +1,6 @@
 import { getCompletionGuardAction, shouldInterceptTopicPhaseClosure } from './phase-flow';
 
-export type InterviewPhase = 'SCAN' | 'DEEP' | 'DEEP_OFFER' | 'DATA_COLLECTION';
+export type InterviewPhase = 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION';
 export type UserIntent = 'ACCEPT' | 'REFUSE' | 'NEUTRAL';
 
 export interface PhaseSimulatorState {
@@ -33,7 +33,7 @@ export function onScanCompleted(state: PhaseSimulatorState): PhaseTransitionResu
     return {
         state: {
             ...state,
-            phase: 'DEEP',
+            phase: 'DEEPEN',
             deepAccepted: state.deepAccepted === true ? true : null
         },
         action: 'START_DEEP'
@@ -75,7 +75,7 @@ export function onTopicPhaseClosureAttempt(state: PhaseSimulatorState): PhaseTra
         return { state, action: 'NO_OP' };
     }
 
-    const shouldOfferExtraTime = state.phase === 'DEEP' && state.remainingSec <= 0 && state.deepAccepted !== true;
+    const shouldOfferExtraTime = state.phase === 'DEEPEN' && state.remainingSec <= 0 && state.deepAccepted !== true;
     if (shouldOfferExtraTime) {
         return {
             state: {
@@ -100,7 +100,7 @@ export function onDeepOfferUserIntent(state: PhaseSimulatorState, intent: UserIn
         return {
             state: {
                 ...state,
-                phase: 'DEEP',
+                phase: 'DEEPEN',
                 deepAccepted: true
             },
             action: 'START_DEEP'

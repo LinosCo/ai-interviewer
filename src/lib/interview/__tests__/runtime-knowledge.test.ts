@@ -90,7 +90,7 @@ describe('runtime-knowledge', () => {
         expect(isRuntimeInterviewKnowledgeValid(knowledge, signature)).toBe(true);
     });
 
-    it('creates prompt block only in SCAN/DEEP phases', () => {
+    it('creates prompt block only in EXPLORE/DEEPEN phases', () => {
         const signature = buildRuntimeInterviewKnowledgeSignature({
             language: 'it',
             researchGoal: 'Capire uso AI nel business',
@@ -110,7 +110,7 @@ describe('runtime-knowledge', () => {
 
         const deepBlock = buildRuntimeKnowledgePromptBlock({
             knowledge,
-            phase: 'DEEP',
+            phase: 'DEEPEN',
             targetTopicId: 'topic-a',
             language: 'it'
         });
@@ -143,7 +143,7 @@ describe('runtime-knowledge', () => {
 
         const block = buildManualKnowledgePromptBlock({
             manualGuide: manual,
-            phase: 'SCAN',
+            phase: 'EXPLORE',
             language: 'it',
             topicLabel: 'Contesto aziendale',
             topicSubGoals: ['Settore', 'Mercato geografico']

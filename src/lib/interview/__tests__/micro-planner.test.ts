@@ -8,7 +8,7 @@ describe('micro-planner', () => {
     it('prioritizes sub-goal coverage when scan turns are tight', () => {
         const decision = buildMicroPlannerDecision({
             language: 'it',
-            phase: 'SCAN',
+            phase: 'EXPLORE',
             topicId: 'topic-1',
             topicLabel: 'Contesto aziendale',
             topicSubGoals: ['Settore', 'Mercato', 'Dimensioni'],
@@ -41,7 +41,7 @@ Follow-up suggeriti:
 
         const decision = buildMicroPlannerDecision({
             language: 'it',
-            phase: 'DEEP',
+            phase: 'DEEPEN',
             topicId: 'topic-1',
             topicLabel: 'Contesto aziendale',
             topicSubGoals: ['Mercato'],
@@ -61,7 +61,7 @@ Follow-up suggeriti:
     it('builds a compact planner prompt block for topic phases', () => {
         const decision = buildMicroPlannerDecision({
             language: 'en',
-            phase: 'SCAN',
+            phase: 'EXPLORE',
             topicId: 'topic-2',
             topicLabel: 'AI usage',
             topicSubGoals: ['Expectations'],
@@ -76,7 +76,7 @@ Follow-up suggeriti:
 
         const block = buildMicroPlannerPromptBlock({
             language: 'en',
-            phase: 'SCAN',
+            phase: 'EXPLORE',
             topicLabel: 'AI usage',
             decision
         });

@@ -22,7 +22,7 @@ export async function completeInterview(
     messages: any[],
     apiKey: string,
     existingProfile: any,
-    options?: { simulationMode?: boolean; onLlmUsage?: LLMUsageCollector }
+    options?: { simulationMode?: boolean; onLlmUsage?: LLMUsageCollector; language?: string }
 ): Promise<void> {
     // Run profile extraction and completion marking in PARALLEL
     // This saves time by not waiting for one before starting the other
@@ -31,7 +31,7 @@ export async function completeInterview(
         (async () => {
             try {
                 const { CandidateExtractor } = await import('@/lib/llm/candidate-extractor');
-                return await CandidateExtractor.extractProfile(messages, apiKey, conversationId, {
+                return await CandidateExtractor.extractProfile(messages, apiKey, conversationId, options?.language, {
                     onUsage: options?.onLlmUsage
                 });
             } catch (e) {

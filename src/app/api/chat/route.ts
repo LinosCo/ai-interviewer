@@ -499,7 +499,7 @@ export async function POST(req: Request) {
                 canonicalMessages,
                 openAIKey,
                 conversation.candidateProfile || {},
-                { simulationMode, onLlmUsage: collectLlmUsage }
+                { simulationMode, onLlmUsage: collectLlmUsage, language }
             );
             await prisma.message.create({
                 data: {
@@ -817,7 +817,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode, onLlmUsage: collectLlmUsage }
+                        { simulationMode, onLlmUsage: collectLlmUsage, language }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                 }
@@ -828,7 +828,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode, onLlmUsage: collectLlmUsage }
+                        { simulationMode, onLlmUsage: collectLlmUsage, language }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                     nextState.dataCollectionRefused = true;
@@ -874,7 +874,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language }
                             );
                             // Set status for AI to say goodbye
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
@@ -939,7 +939,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             nextState.dataCollectionRefused = true;
@@ -988,7 +988,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             haltCollection = true;
@@ -2101,7 +2101,7 @@ hard_rules:
                     canonicalMessages,
                     openAIKey,
                     currentProfileForCompletion || {},
-                    { simulationMode, onLlmUsage: collectLlmUsage }
+                    { simulationMode, onLlmUsage: collectLlmUsage, language }
                 );
                 const finalResponseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
                 await prisma.message.create({

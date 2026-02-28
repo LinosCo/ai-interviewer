@@ -16,6 +16,7 @@ export class CandidateExtractor {
         messages: Message[],
         apiKey: string,
         conversationId?: string,
+        language?: string,
         options?: {
             onUsage?: (payload: {
                 source: string;
@@ -77,6 +78,7 @@ export class CandidateExtractor {
 
         try {
             // Add timeout protection (10 seconds)
+            const outputLanguage = language || 'en';
             const extractionPromise = generateObject({
                 model: extractionModel,
                 schema,
@@ -84,6 +86,8 @@ export class CandidateExtractor {
                 prompt: `
 You are an expert Lead Qualifier and Profiler.
 Analyze the following interview transcript and extract a structured profile.
+Language: ${outputLanguage}
+Write experienceSummary and summaryNote in the above language.
 
 **GUIDELINES**:
 1. **Facts First**: Focus on factual data provided by the user.

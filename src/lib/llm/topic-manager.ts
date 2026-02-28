@@ -63,6 +63,7 @@ export class TopicManager {
 
         const prompt = `
 You are selecting the NEXT deep-dive question for topic: "${safeTopicLabel}"
+Language: ${language}
 
 Available sub-goals for THIS topic: ${safeSubGoals.join(', ')}
 

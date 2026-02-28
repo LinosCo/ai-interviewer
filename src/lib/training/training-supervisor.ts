@@ -30,6 +30,7 @@ export function buildInitialState(): TrainingSupervisorState {
     topicResults: [],
     pendingQuizzes: undefined,
     pendingCheckQuestion: undefined,
+    pendingRetryGaps: undefined,
   }
 }
 
@@ -86,6 +87,7 @@ export function advanceAfterEvaluation(
         adaptationDepth: 0,
         pendingQuizzes: undefined,
         pendingCheckQuestion: undefined,
+        pendingRetryGaps: undefined,
       },
       moveToNextTopic: true,
     }
@@ -105,6 +107,7 @@ export function advanceAfterEvaluation(
         pendingRetryGaps: result.gaps,
         pendingQuizzes: undefined,
         pendingCheckQuestion: undefined,
+        pendingRetryGaps: undefined,
       },
       moveToNextTopic: false,
     }

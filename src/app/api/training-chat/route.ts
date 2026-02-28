@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[training-chat]', err)
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: 'Invalid request', details: err.errors }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request', details: err.issues }, { status: 400 })
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

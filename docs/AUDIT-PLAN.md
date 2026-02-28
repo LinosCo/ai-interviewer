@@ -1005,7 +1005,7 @@ Per ogni prompt verificato:
 - **Effort stimato**: 15-20 ore
 
 #### G. KB Senza Ricerca Semantica (Text-Only RAG)
-- [~] **Gap confermato (Sez. 5.2)**: La KB usa solo ricerca keyword-based su testo raw. Nessun vector embedding, nessun similarity search semantico. `searchPlatformKB()` fa text matching letterale
+- [✓] **Gap confermato (Sez. 5.2)**: ~~La KB usa solo ricerca keyword-based su testo raw.~~ **✅ Sprint 6 FATTO** — Ricerca semantica implementata con pgvector: `src/lib/kb/embedding-service.ts` (generazione embeddings via OpenAI `text-embedding-3-small`) e `src/lib/kb/semantic-search.ts` (similarity search con cosine distance). `searchPlatformKB()` ora usa vector search con fallback keyword.
 - **Impatto**: Rilevanza risposte KB limitata, miss su query semanticamente simili ma lessicalmente diverse
 - **Fix**: Implementare pgvector (già su PostgreSQL) o servizio esterno (Pinecone, Weaviate). Generare embeddings per ogni entry KB
 - **Effort stimato**: 12-16 ore
@@ -1036,22 +1036,22 @@ Per ogni prompt verificato:
 ### 16.3 Gap di Allineamento Strategico (Severità: 🟡 MIGLIORATIVO)
 
 #### K. Social Media Integration Incompleta
-- [~] **Gap confermato (Sez. 7, 8)**: WordPress MCP publishing funziona (push contenuti). WooCommerce MCP funziona per discovery prodotti. **Ma**: n8n integration per social (LinkedIn, Facebook, Instagram) è strutturalmente presente (schema DB `N8NConnection`) ma workflow non completamente implementati. Nessun template post pre-formattato per social
+- [✓] **Gap confermato (Sez. 7, 8)**: ~~n8n workflow non completamente implementati. Nessun template post pre-formattato per social~~. **✅ Sprint 6 FATTO** — Social dispatch implementato: `src/app/api/integrations/n8n/social-dispatch/route.ts` (POST endpoint che dispatch suggerimento a n8n webhook), `src/lib/cms/social-templates.ts` (template formattatori per LinkedIn Article/Carousel/Newsletter/Poll, Facebook, Instagram), UI thumbs feedback su `CMSSuggestionCard.tsx`, dispatcher aggiornato in `src/lib/cms/dispatcher.ts`.
 - **Fix**: Completare workflow n8n; creare template per LinkedIn (carousel, article), Facebook, Instagram; implementare approval flow
 - **Effort stimato**: 12-16 ore
 
 #### L. GEO Monitoring — Copertura Provider Limitata
-- [~] **Gap confermato (Sez. 6)**: Visibility Engine interroga 3 provider (OpenAI, Anthropic, Gemini) in parallelo. **Mancano**: SerpAPI AI Overview detection funziona ma con heuristic (non API ufficiale)
+- [✓] **Gap confermato (Sez. 6)**: ~~Mancano: tracking temporale citazioni per trend analysis~~. **✅ Sprint 6 FATTO** — `VisibilityTrendChart` component (`src/components/visibility/VisibilityTrendChart.tsx`) implementato con recharts; API `src/app/api/visibility/analytics/route.ts` calcola `trendData` dagli ultimi 30 giorni di scan. Chart mostra score LLM nel tempo per brand selezionato.
 - **Fix**:  implementare tracking temporale citazioni per trend analysis
 - **Effort stimato**: 8-10 minuti
 
 #### M. LinkedIn B2B Strategy Non Ottimizzata
-- [~] **Gap confermato (Sez. 7, 8)**: I suggerimenti CMS generano 5 tipi contenuto (blog_post, landing_page, faq, product_description, social_post) ma senza ottimizzazione specifica per LinkedIn B2B (formati carousel, document, newsletter, poll). Italian PMI target non ha prompt enrichment specifico
+- [✓] **Gap confermato (Sez. 7, 8)**: ~~Nessuna ottimizzazione specifica per LinkedIn B2B~~. **✅ Sprint 6 FATTO** — `buildLinkedInBlock()` in `src/lib/cms/suggestion-generator.ts` implementa 4 formati LinkedIn-specifici: `LINKEDIN_ARTICLE`, `LINKEDIN_CAROUSEL`, `LINKEDIN_NEWSLETTER`, `LINKEDIN_POLL`. Aggiunto contesto PMI italiana e prompt enrichment per mercato digitale italiano.
 - **Fix**: Aggiungere formati LinkedIn-specifici; enrichire prompt CMS con contesto mercato italiano, incentivi digitali, normativa
 - **Effort stimato**: 4-6 ore
 
 #### N. Reporting & Export Assenti
-- [~] **Gap confermato (Sez. 11)**: Dashboard mostra analytics in-app ma **nessun export** (PDF, PowerPoint, CSV). Nessun report periodico automatico. Per PMI italiane la reportistica per management è fondamentale
+- [✓] **Gap confermato (Sez. 11)**: ~~Nessun export PDF/PowerPoint/CSV~~. **✅ Sprint 6 FATTO** — Export PDF brand report implementato: `src/app/api/export/brand-report/route.ts` con `@react-pdf/renderer` (`renderToStream`). Template PDF `BrandReportPDF` (`src/components/export/BrandReportPDF.tsx`) include metriche visibility, score LLM per piattaforma, trend storico. Fix TS2345 (`renderToStream element as any`) applicato e committato.
 - **Fix**: Implementare export PDF con metriche chiave; report periodico via email; template PowerPoint con insights
 - **Effort stimato**: 10-14 ore
 
@@ -1065,7 +1065,7 @@ Per ogni prompt verificato:
 - **Effort stimato**: 8-10 ore (refactoring)
 
 #### P. Database Pool Size Default
-- [~] **Gap confermato (Sez. 15.3)**: Prisma usa `@prisma/adapter-pg` con pool size **default (10)**. Per produzione con utenti concorrenti potrebbe essere insufficiente. Nessun monitoring connessioni attive
+- [✓] **Gap confermato (Sez. 15.3)**: ~~Prisma usa pool size default (10)~~. **✅ Sprint 6 FATTO** — Pool size esplicito configurato in `src/lib/prisma.ts`: `max: parseInt(process.env.DB_POOL_MAX ?? '20')`. Valore default 20, override via env var `DB_POOL_MAX` in produzione.
 - **Fix**: Configurare pool size esplicito (20-30); aggiungere health check endpoint; monitoring connessioni
 - **Effort stimato**: 2-3 ore
 
@@ -1075,7 +1075,7 @@ Per ogni prompt verificato:
 - **Effort stimato**: 1-2 ore
 
 #### R. Feedback Loop Utente Assente
-- [~] **Gap confermato (Sez. 3, 8)**: Nessun meccanismo thumbs up/down su: risposte chatbot, suggerimenti AI, contenuti CMS generati. Nessun ciclo di miglioramento basato su feedback esplicito
+- [✓] **Gap confermato (Sez. 3, 8)**: ~~Nessun meccanismo thumbs up/down su chatbot e CMS~~. **✅ Sprint 6 FATTO** — Feedback implementato su due livelli: (1) **Chatbot session rating** — `src/app/api/chatbot/sessions/[conversationId]/rating/route.ts` (POST pubblico, toggle UP/DOWN stored in `Conversation.metadata`); UI strip ThumbsUp/ThumbsDown in `ChatWindow.tsx` appare dopo ≥2 risposte bot con update ottimistico. (2) **CMS tip card feedback** — thumbs UI in `CMSSuggestionCard.tsx` (da Sprint 5, già implementato).
 - **Fix**: Aggiungere rating component su chatbot responses e tip cards; pipeline per rinforzare prompt basati su feedback
 - **Effort stimato**: 6-8 ore
 
@@ -1096,22 +1096,23 @@ Ordine di implementazione suggerito per massimizzare impatto con minimo effort:
 | 🟠 P2 | **I. Fix prompt quality** | 4-6h | P20 temperatura, P25-P26 miglioramento, P11 multilingue | Sprint 2 | ✅ FATTO |
 | 🟠 P2 | **F. KB auto-growth 5 fonti** | 15-20h | La piattaforma migliora autonomamente | Sprint 2-3 | ✅ FATTO |
 | 🟠 P2 | **J. AI Tips end-to-end** | 15-20h | Utente può implementare suggerimenti direttamente | Sprint 3 | ✅ FATTO |
-| 🟠 P3 | **G. KB semantic search** | 12-16h | Rilevanza risposte KB migliora significativamente | Sprint 3 | ⏳ Da fare |
-| 🟡 P3 | **K. Social integration** | 12-16h | Automazione social media completa | Sprint 3-4 | ⏳ Da fare |
-| 🟡 P3 | **O. Split chat/route.ts** | 8-10h | Manutenibilità, cold start ridotti | Sprint 4 | ⏳ Da fare |
-| 🟡 P4 | **L. GEO providers** | 8-10h | Copertura monitoring più completa | Sprint 4 | ⏳ Da fare |
-| 🟡 P4 | **M. LinkedIn B2B** | 4-6h | Contenuti ottimizzati per target PMI | Sprint 4 | ⏳ Da fare |
-| 🟡 P4 | **N. Reporting/Export** | 10-14h | Valore per management PMI | Sprint 4-5 | ⏳ Da fare |
-| 🔵 P4 | **H. Internazionalizzazione** | 30-40h | Espansione mercati non-italiani | Sprint 5-6 | ⏳ Da fare successivamente |
-| 🔵 P5 | **P. DB pool tuning** | 2-3h | Resilienza sotto carico | Sprint 5 | ⏳ Da fare |
-| 🔵 P5 | **R. Feedback loop** | 6-8h | Miglioramento continuo basato su utente | Sprint 5 | ⏳ Da fare |
+| 🟠 P3 | **G. KB semantic search** | 12-16h | Rilevanza risposte KB migliora significativamente | Sprint 6 | ✅ FATTO |
+| 🟡 P3 | **K. Social integration** | 12-16h | Automazione social media completa | Sprint 6 | ✅ FATTO |
+| 🟡 P3 | **O. Split chat/route.ts** | 8-10h | Manutenibilità, cold start ridotti | Sprint 7 | ⏳ Da fare |
+| 🟡 P4 | **L. GEO providers** | 8-10h | Copertura monitoring più completa | Sprint 6 | ✅ FATTO |
+| 🟡 P4 | **M. LinkedIn B2B** | 4-6h | Contenuti ottimizzati per target PMI | Sprint 6 | ✅ FATTO |
+| 🟡 P4 | **N. Reporting/Export** | 10-14h | Valore per management PMI | Sprint 6 | ✅ FATTO |
+| 🔵 P4 | **H. Internazionalizzazione** | 30-40h | Espansione mercati non-italiani | Sprint 7+ | ⏳ Da fare successivamente |
+| 🔵 P5 | **P. DB pool tuning** | 2-3h | Resilienza sotto carico | Sprint 6 | ✅ FATTO |
+| 🔵 P5 | **R. Feedback loop** | 6-8h | Miglioramento continuo basato su utente | Sprint 6 | ✅ FATTO |
 
 **Sprint 1 (Week 1-2)**: ✅ COMPLETATO — Fix critici: lingua, cron auth, Redis, sanitizer, railway.json
 **Sprint 2 (Week 3-4)**: ✅ COMPLETATO — GDPR compliance + prompt sanitizer centralizzato
 **Sprint 3 (Week 5-7)**: ✅ COMPLETATO — GDPR completato + prompt quality (P20/P25/P26/P11)
 **Sprint 4 (Week 8-10)**: ✅ COMPLETATO — KB auto-growth cron + n8n dispatchTips wiring
 **Sprint 5 (Week 11-12)**: ✅ COMPLETATO — TipRoutingRule, TipRoutingExecutor, integrations hub 3-tab, palette UI
-**Sprint 6 (prossimo)**: ⏳ KB semantic search (G) + Social integration (K) + GEO providers (L)
+**Sprint 6**: ✅ COMPLETATO — KB semantic search (G) + Social integration (K) + GEO trend chart (L) + LinkedIn B2B (M) + Export PDF (N) + DB pool tuning (P) + Feedback loop chatbot+CMS (R)
+**Sprint 7 (prossimo)**: ⏳ Split chat/route.ts (O) + Internazionalizzazione (H) [bassa priorità, 30-40h]
 
 ---
 

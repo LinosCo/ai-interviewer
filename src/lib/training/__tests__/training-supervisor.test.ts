@@ -106,6 +106,7 @@ describe('advanceAfterEvaluation', () => {
     expect(newState.retryCount).toBe(1)
     expect(newState.adaptationDepth).toBe(1)
     expect(moveToNextTopic).toBe(false)
+    expect(newState.topicResults).toEqual([]) // failed result must not be committed during retry
   })
 
   it('advances to next topic when failed with no retries left in PERMISSIVE mode', () => {

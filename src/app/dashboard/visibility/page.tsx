@@ -11,7 +11,7 @@ import { VisibilityTrendChart } from "@/components/visibility/VisibilityTrendCha
 import { GapAnalysisSection } from "@/components/visibility/GapAnalysisSection";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Settings, History, Calendar, Newspaper, Plus, Building2 } from "lucide-react";
+import { Settings, History, Calendar, Newspaper, Plus, Building2, Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -223,6 +223,14 @@ export default async function VisibilityPage({
                         </Link>
                     )}
                     <VisibilityProjectFilter currentProjectId={projectIdFilter || config.projectId || undefined} />
+                    {config.websiteUrl && (
+                        <Link href={`/dashboard/visibility/site-analysis?configId=${config.id}`}>
+                            <Button variant="outline" size="sm" className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50">
+                                <Globe className="h-4 w-4" />
+                                Analisi Sito
+                            </Button>
+                        </Link>
+                    )}
                     <Link href={`/dashboard/visibility/create?configId=${config.id}${config.projectId ? `&projectId=${config.projectId}` : ''}`}>
                         <Button variant="outline" size="sm" className="gap-2">
                             <Settings className="h-4 w-4" />

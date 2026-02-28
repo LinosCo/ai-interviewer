@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { indexKnowledgeSource } from '@/lib/kb/semantic-search';
 
 export async function POST(req: Request) {
     try {
@@ -54,6 +55,10 @@ export async function POST(req: Request) {
                 content: text
             }
         });
+
+        // Fire-and-forget embedding generation
+        indexKnowledgeSource(knowledgeSource.id, knowledgeSource.title, knowledgeSource.content)
+            .catch(err => console.error('[upload] embedding failed:', err));
 
         return NextResponse.json(knowledgeSource);
 

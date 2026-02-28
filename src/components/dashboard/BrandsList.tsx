@@ -19,6 +19,8 @@ import { useProject } from '@/contexts/ProjectContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { showToast } from '@/components/toast';
+import { ConfirmDialog, useConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface Brand {
     id: string;
@@ -57,11 +59,16 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
     const [movingId, setMovingId] = useState<string | null>(null);
     const [transferringOrgId, setTransferringOrgId] = useState<string | null>(null);
     const router = useRouter();
+    const brandConfirm = useConfirmDialog();
 
     const handleDeleteBrand = async (brandId: string, brandName: string) => {
-        if (!confirm(`Sei sicuro di voler eliminare il brand "${brandName}"? Questa azione eliminerà anche tutti gli scan e i dati associati.`)) {
-            return;
-        }
+        const ok = await brandConfirm.open({
+            title: 'Elimina brand',
+            description: `Sei sicuro di voler eliminare il brand "${brandName}"? Questa azione eliminerà anche tutti gli scan e i dati associati.`,
+            confirmLabel: 'Elimina',
+            variant: 'destructive',
+        });
+        if (!ok) return;
 
         setDeletingId(brandId);
         try {
@@ -77,16 +84,20 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
             // Remove brand from local state
             setBrands(prev => prev.filter(b => b.id !== brandId));
         } catch (err) {
-            alert(err instanceof Error ? err.message : 'Errore durante l\'eliminazione');
+            showToast(err instanceof Error ? err.message : 'Errore durante l\'eliminazione', 'error');
         } finally {
             setDeletingId(null);
         }
     };
 
     const handleMoveBrand = async (brandId: string, targetProjectId: string | null, targetProjectName: string) => {
-        if (!confirm(`Vuoi spostare questo brand nel progetto "${targetProjectName}"?`)) {
-            return;
-        }
+        const ok = await brandConfirm.open({
+            title: 'Sposta brand',
+            description: `Vuoi spostare questo brand nel progetto "${targetProjectName}"?`,
+            confirmLabel: 'Sposta',
+            variant: 'default',
+        });
+        if (!ok) return;
 
         setMovingId(brandId);
         try {
@@ -113,7 +124,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                 router.refresh();
             }
         } catch (err) {
-            alert(err instanceof Error ? err.message : 'Errore durante lo spostamento');
+            showToast(err instanceof Error ? err.message : 'Errore durante lo spostamento', 'error');
         } finally {
             setMovingId(null);
         }
@@ -162,9 +173,13 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
     }, []);
 
     const handleTransferBrandToOrganization = async (brandId: string, brandName: string, targetOrganizationId: string, targetOrganizationName: string) => {
-        if (!confirm(`Vuoi trasferire il brand "${brandName}" nell'organizzazione "${targetOrganizationName}"? L'associazione ai progetti verrà rimossa.`)) {
-            return;
-        }
+        const ok = await brandConfirm.open({
+            title: 'Trasferisci brand',
+            description: `Vuoi trasferire il brand "${brandName}" nell'organizzazione "${targetOrganizationName}"? L'associazione ai progetti verrà rimossa.`,
+            confirmLabel: 'Trasferisci',
+            variant: 'default',
+        });
+        if (!ok) return;
 
         setTransferringOrgId(brandId);
         try {
@@ -182,7 +197,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
             setBrands(prev => prev.filter(b => b.id !== brandId));
             router.refresh();
         } catch (err) {
-            alert(err instanceof Error ? err.message : 'Errore durante il trasferimento organizzazione');
+            showToast(err instanceof Error ? err.message : 'Errore durante il trasferimento organizzazione', 'error');
         } finally {
             setTransferringOrgId(null);
         }
@@ -194,12 +209,12 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
         return (
             <div className="space-y-8 p-6 max-w-6xl mx-auto">
                 <div className="flex justify-between items-center">
-                    <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
-                    <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-8 w-48 bg-stone-200 rounded animate-pulse" />
+                    <div className="h-10 w-32 bg-stone-200 rounded animate-pulse" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="h-64 bg-gray-100 rounded-xl animate-pulse" />
+                        <div key={i} className="h-64 bg-stone-100 rounded-xl animate-pulse" />
                     ))}
                 </div>
             </div>
@@ -222,8 +237,8 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">Brand Monitor</h1>
-                    <p className="text-gray-500 mt-1">
+                    <h1 className="text-3xl font-bold tracking-tight text-stone-900">Brand Monitor</h1>
+                    <p className="text-stone-500 mt-1">
                         {isAllProjectsSelected
                             ? "Tutti i brand monitorati della tua organizzazione"
                             : `Brand monitorati per il progetto ${selectedProject?.name || ''}`
@@ -239,14 +254,14 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                             ? `/dashboard/visibility/create?projectId=${selectedProject.id}`
                             : "/dashboard/visibility/create"
                         }>
-                            <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
+                            <Button className="bg-violet-600 hover:bg-violet-700 gap-2">
                                 <Plus className="w-4 h-4" />
                                 Nuovo Brand
                             </Button>
                         </Link>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" className="gap-2 border-gray-200 text-gray-400 cursor-not-allowed" disabled>
+                            <Button variant="outline" className="gap-2 border-stone-200 text-stone-400 cursor-not-allowed" disabled>
                                 <Plus className="w-4 h-4" />
                                 Nuovo Brand
                             </Button>
@@ -265,14 +280,14 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
             {brands.length === 0 ? (
                 <Card className="border-dashed border-2">
                     <CardContent className="py-16 text-center">
-                        <Eye className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        <Eye className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-stone-900 mb-2">
                             {isAllProjectsSelected
                                 ? "Nessun brand configurato"
                                 : `Nessun brand per il progetto "${selectedProject?.name}"`
                             }
                         </h3>
-                        <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                        <p className="text-stone-500 mb-6 max-w-md mx-auto">
                             {canAddMore
                                 ? 'Configura il monitoraggio della visibilità per scoprire come i principali LLM parlano del tuo brand.'
                                 : 'Azione bloccata dal piano attuale: il monitoraggio visibilità non è incluso.'
@@ -283,7 +298,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                 ? `/dashboard/visibility/create?projectId=${selectedProject.id}`
                                 : "/dashboard/visibility/create"
                             }>
-                                <Button className="bg-purple-600 hover:bg-purple-700 gap-2">
+                                <Button className="bg-violet-600 hover:bg-violet-700 gap-2">
                                     <Plus className="w-4 h-4" />
                                     Configura il primo brand
                                 </Button>
@@ -311,20 +326,20 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                             <Card key={brand.id} className="hover:shadow-lg transition-all group overflow-hidden">
                                 <CardContent className="p-0">
                                     {/* Header with score */}
-                                    <div className={`p-4 ${score >= 70 ? 'bg-green-50' : score >= 40 ? 'bg-amber-50' : 'bg-gray-50'}`}>
+                                    <div className={`p-4 ${score >= 70 ? 'bg-green-50' : score >= 40 ? 'bg-amber-50' : 'bg-stone-50'}`}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded-lg ${score >= 70 ? 'bg-green-100' : score >= 40 ? 'bg-amber-100' : 'bg-gray-100'}`}>
-                                                    <Eye className={`w-5 h-5 ${score >= 70 ? 'text-green-600' : score >= 40 ? 'text-amber-600' : 'text-gray-400'}`} />
+                                                <div className={`p-2 rounded-lg ${score >= 70 ? 'bg-green-100' : score >= 40 ? 'bg-amber-100' : 'bg-stone-100'}`}>
+                                                    <Eye className={`w-5 h-5 ${score >= 70 ? 'text-green-600' : score >= 40 ? 'text-amber-600' : 'text-stone-400'}`} />
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">
+                                                    <h3 className="font-bold text-stone-900 group-hover:text-violet-600 transition-colors">
                                                         {brand.brandName}
                                                     </h3>
-                                                    <p className="text-xs text-gray-500">{brand.category}</p>
+                                                    <p className="text-xs text-stone-500">{brand.category}</p>
                                                 </div>
                                             </div>
-                                            <Badge className={`text-lg font-bold ${score >= 70 ? 'bg-green-600' : score >= 40 ? 'bg-amber-500' : 'bg-gray-400'}`}>
+                                            <Badge className={`text-lg font-bold ${score >= 70 ? 'bg-green-600' : score >= 40 ? 'bg-amber-500' : 'bg-stone-400'}`}>
                                                 {score}%
                                             </Badge>
                                         </div>
@@ -335,14 +350,14 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                         {/* Project association - only show when viewing all projects */}
                                         {isAllProjectsSelected && brand.project ? (
                                             <div className="flex items-center gap-2 text-sm">
-                                                <Building2 className="w-4 h-4 text-gray-400" />
-                                                <span className="text-gray-600">Progetto:</span>
-                                                <Link href={`/dashboard/projects/${brand.project.id}`} className="text-purple-600 hover:underline font-medium">
+                                                <Building2 className="w-4 h-4 text-stone-400" />
+                                                <span className="text-stone-600">Progetto:</span>
+                                                <Link href={`/dashboard/projects/${brand.project.id}`} className="text-violet-600 hover:underline font-medium">
                                                     {brand.project.name}
                                                 </Link>
                                             </div>
                                         ) : isAllProjectsSelected ? (
-                                            <div className="flex items-center gap-2 text-sm text-gray-400">
+                                            <div className="flex items-center gap-2 text-sm text-stone-400">
                                                 <Building2 className="w-4 h-4" />
                                                 <span>Non associato a un progetto</span>
                                             </div>
@@ -350,19 +365,19 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
 
                                         {/* Stats */}
                                         <div className="grid grid-cols-2 gap-3 text-sm">
-                                            <div className="bg-gray-50 rounded-lg p-2 text-center">
-                                                <p className="text-xs text-gray-500">Prompt</p>
-                                                <p className="font-bold text-gray-900">{brand._count.prompts}</p>
+                                            <div className="bg-stone-50 rounded-lg p-2 text-center">
+                                                <p className="text-xs text-stone-500">Prompt</p>
+                                                <p className="font-bold text-stone-900">{brand._count.prompts}</p>
                                             </div>
-                                            <div className="bg-gray-50 rounded-lg p-2 text-center">
-                                                <p className="text-xs text-gray-500">Competitor</p>
-                                                <p className="font-bold text-gray-900">{brand._count.competitors}</p>
+                                            <div className="bg-stone-50 rounded-lg p-2 text-center">
+                                                <p className="text-xs text-stone-500">Competitor</p>
+                                                <p className="font-bold text-stone-900">{brand._count.competitors}</p>
                                             </div>
                                         </div>
 
                                         {/* Last scan date */}
                                         {latestScan?.completedAt && (
-                                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                                            <div className="flex items-center gap-2 text-xs text-stone-500">
                                                 <Calendar className="w-3 h-3" />
                                                 <span>Ultimo scan: {new Date(latestScan.completedAt).toLocaleDateString('it-IT')}</span>
                                             </div>
@@ -380,7 +395,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="ghost" size="sm" className="gap-1" disabled={deletingId === brand.id}>
                                                         {deletingId === brand.id ? (
-                                                            <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                                                            <div className="w-4 h-4 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" />
                                                         ) : (
                                                             <MoreVertical className="w-4 h-4" />
                                                         )}
@@ -417,7 +432,7 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                                                                         <DropdownMenuItem
                                                                             onClick={() => handleMoveBrand(brand.id, null, 'Nessun progetto')}
                                                                             disabled={movingId === brand.id}
-                                                                            className="text-gray-500"
+                                                                            className="text-stone-500"
                                                                         >
                                                                             Rimuovi da progetto
                                                                         </DropdownMenuItem>
@@ -468,13 +483,13 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                             ? `/dashboard/visibility/create?projectId=${selectedProject.id}`
                             : "/dashboard/visibility/create"
                         }>
-                            <Card className="border-dashed border-2 hover:border-purple-300 hover:bg-purple-50/50 transition-all cursor-pointer h-full min-h-[200px]">
+                            <Card className="border-dashed border-2 hover:border-violet-300 hover:bg-violet-50/50 transition-all cursor-pointer h-full min-h-[200px]">
                                 <CardContent className="h-full flex flex-col items-center justify-center py-8">
-                                    <div className="p-3 bg-purple-100 rounded-full mb-3">
-                                        <Plus className="w-6 h-6 text-purple-600" />
+                                    <div className="p-3 bg-violet-100 rounded-full mb-3">
+                                        <Plus className="w-6 h-6 text-violet-600" />
                                     </div>
-                                    <p className="font-medium text-gray-900">Aggiungi Brand</p>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="font-medium text-stone-900">Aggiungi Brand</p>
+                                    <p className="text-xs text-stone-500 mt-1">
                                         Monitoraggio illimitato
                                     </p>
                                 </CardContent>
@@ -485,11 +500,11 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
             )}
 
             {/* Plan info */}
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-100">
+            <div className="bg-gradient-to-r from-violet-50 to-blue-50 rounded-xl p-6 border border-violet-100">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h3 className="font-semibold text-gray-900">Piano {planType}</h3>
-                        <p className="text-sm text-gray-600">
+                        <h3 className="font-semibold text-stone-900">Piano {planType}</h3>
+                        <p className="text-sm text-stone-600">
                             {hasVisibility
                                 ? 'Brand Monitor illimitato - ogni scansione consuma crediti AI'
                                 : 'Il Brand Monitor non è incluso nel tuo piano'
@@ -506,6 +521,8 @@ export function BrandsList({ hasVisibility, planType }: BrandsListProps) {
                     )}
                 </div>
             </div>
+
+            <ConfirmDialog {...brandConfirm.dialogProps} />
         </div>
     );
 }

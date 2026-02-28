@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { scrapeUrl } from '@/lib/scraping';
+import { indexKnowledgeSource } from '@/lib/kb/semantic-search';
 import { z } from 'zod';
 
 const scrapeSchema = z.object({
@@ -61,6 +62,10 @@ export async function POST(req: Request) {
                 content: `URL: ${scrapedData.url}\n\nTitle: ${scrapedData.title}\n\n${scrapedData.content}`,
             }
         });
+
+        // Fire-and-forget embedding generation (does not block response)
+        indexKnowledgeSource(knowledgeSource.id, knowledgeSource.title, knowledgeSource.content)
+            .catch(err => console.error('[scrape] embedding failed:', err));
 
         return Response.json(knowledgeSource);
 

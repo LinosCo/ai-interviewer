@@ -291,6 +291,7 @@ export class CMSSuggestionGenerator {
         const signalsSummary = this.formatSignalsForPrompt(signals);
         const siteContextBlock = this.formatSiteStructureForPrompt(siteStructure);
         const schemaInstructions = this.getSchemaOrgInstructions(type, capabilities);
+        const linkedInBlock = this.buildLinkedInBlock(signals.channels);
 
         const { object } = await generateObject({
             model,
@@ -325,7 +326,7 @@ ${signalsSummary}
 7. Compila evidencePoints con 2-4 evidenze sintetiche.
 8. Se il contenuto e per social, aggiungi mediaBrief (descrizione immagine/video).
 9. Se il contenuto e per prodotto, imposta targetSection="products" e quando possibile targetEntityId o targetEntitySlug.
-${schemaInstructions}
+${linkedInBlock}${schemaInstructions}
 === SEO & SCHEMA.ORG ===
 10. Genera schemaMarkup con un JSON-LD valido e completo per il tipo di contenuto.
 11. Compila seoFields con focusKeyword (basata sulle query GSC se disponibili), seoTitle (max 60 char), ogTitle e ogDescription.
@@ -410,6 +411,59 @@ Tono: professionale ma accessibile, orientato all'azione e alla lead generation.
         }
 
         return parts.join('\n');
+    }
+
+    /**
+     * Build LinkedIn B2B-specific content instructions block.
+     * Injected into the LLM prompt when channels contain LinkedIn content kinds.
+     */
+    private static buildLinkedInBlock(channels?: string[]): string {
+        if (!channels?.length) return '';
+
+        const hasArticle = channels.includes('LINKEDIN_ARTICLE');
+        const hasCarousel = channels.includes('LINKEDIN_CAROUSEL');
+        const hasNewsletter = channels.includes('LINKEDIN_NEWSLETTER');
+        const hasPoll = channels.includes('LINKEDIN_POLL');
+
+        if (!hasArticle && !hasCarousel && !hasNewsletter && !hasPoll) return '';
+
+        const parts: string[] = ['\n=== FORMATO LINKEDIN B2B ==='];
+        parts.push('Il contenuto è destinato a LinkedIn. Imposta targetSection="social".');
+
+        if (hasArticle) {
+            parts.push(`LINKEDIN_ARTICLE — Articolo long-form (800-1500 parole):
+- Apertura con hook narrativo (problema reale del target B2B)
+- 3-5 sezioni H2 con insight concreti e dati
+- Conclusione con call-to-action verso il sito
+- Tono: thought leadership professionale, prima persona`);
+        }
+        if (hasCarousel) {
+            parts.push(`LINKEDIN_CAROUSEL — Documento PDF a slide (8-12 slide):
+- Slide 1 (hook): titolo provocatorio + promessa di valore
+- Slide 2-3: problema/contesto con dato numerico
+- Slide 4-9: insight actionable, uno per slide, titolo breve + 2-3 bullet
+- Slide 10-11: caso studio o esempio pratico
+- Slide 12 (CTA): link al sito, follow, commento
+- Nel body: struttura ogni slide come "### Slide N: [titolo]\\n[contenuto]"`);
+        }
+        if (hasNewsletter) {
+            parts.push(`LINKEDIN_NEWSLETTER — Newsletter editoriale:
+- Oggetto: max 60 caratteri, curioso e specifico
+- Intro: hook con domanda o dato sorprendente (2-3 righe)
+- Corpo: 3 sezioni con H2, insight pratici per decision maker
+- Sezione "Da non perdere": 2-3 link di valore
+- Footer: CTA per iscriversi alla newsletter o al sito`);
+        }
+        if (hasPoll) {
+            parts.push(`LINKEDIN_POLL — Sondaggio a risposta multipla:
+- Domanda principale: max 140 caratteri, provocatoria o rivelativa
+- 2-4 opzioni di risposta (bilanciate, non leading)
+- Nel body: includi la domanda e le opzioni come lista Markdown
+- Aggiungi 3-5 righe di contesto per stimolare il commento
+- Hashtag: 3-5 hashtag settoriali rilevanti`);
+        }
+
+        return parts.join('\n') + '\n';
     }
 
     /**

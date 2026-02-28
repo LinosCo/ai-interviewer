@@ -9,6 +9,12 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import {
+    formatForChannel,
+    inferChannelConfig,
+    type SocialChannelConfig,
+    type SocialPayload,
+} from './social-templates';
 
 export interface TipPayload {
     id: string;
@@ -103,6 +109,49 @@ export class N8NDispatcher {
                 channel: event.channel,
                 contentId: event.contentId || null
             }
+        };
+
+        await this.sendWebhook(connection.id, connection.webhookUrl, payload);
+    }
+
+    /**
+     * Dispatch a single tip formatted for a specific social channel.
+     *
+     * The payload is enriched with platform-specific formatting (LinkedIn
+     * article, LinkedIn carousel, Facebook post, Instagram caption) before
+     * being sent to the n8n webhook with the `social_content_ready` event.
+     *
+     * @param projectId - The project owning the n8n connection
+     * @param tip       - The raw tip payload (from CMSSuggestion or AI tips)
+     * @param channel   - Target channel config; omit to infer from tip metadata
+     * @param brandName - Optional brand name for post attribution
+     */
+    static async dispatchSocialContent(
+        projectId: string,
+        tip: TipPayload,
+        channel?: SocialChannelConfig,
+        brandName?: string
+    ): Promise<void> {
+        const connection = await this.getActiveConnection(projectId);
+        if (!connection) return;
+
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { name: true }
+        });
+
+        const resolvedChannel = channel ?? inferChannelConfig(tip);
+        const socialPayload: SocialPayload = formatForChannel(
+            tip,
+            resolvedChannel,
+            { brandName: brandName ?? project?.name }
+        );
+
+        const payload: WebhookPayload = {
+            event: 'social_content_ready',
+            timestamp: new Date().toISOString(),
+            project: { id: projectId, name: project?.name ?? 'Unknown' },
+            social: socialPayload,
         };
 
         await this.sendWebhook(connection.id, connection.webhookUrl, payload);

@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { searchKnowledgeSources } from '@/lib/kb/semantic-search';
 import { sanitize } from '@/lib/llm/prompt-sanitizer';
 import {
     hasConfiguredScope,
@@ -338,6 +339,21 @@ export async function POST(req: Request) {
         let nextMissingField = isLeadCollectionEnabled
             ? getNextMissingField(candidateFields, candidateProfile, declinedFields)
             : null;
+
+        // Semantic KB retrieval: when the bot has many KB sources, filter to the
+        // most relevant ones for this specific message rather than stuffing all into the prompt.
+        const KB_SEMANTIC_THRESHOLD = 8; // use semantic search only when KB is large
+        if (Array.isArray(bot.knowledgeSources) && bot.knowledgeSources.length > KB_SEMANTIC_THRESHOLD) {
+            const relevantSources = await searchKnowledgeSources(bot.id, message, 5, 0.25);
+            if (relevantSources.length > 0) {
+                bot.knowledgeSources = relevantSources.map(r => ({
+                    id: r.id,
+                    title: r.title,
+                    content: r.content,
+                    type: r.type,
+                }));
+            }
+        }
 
         const systemPromptBase = buildChatbotPrompt(bot, session);
         const scopeLexicon = buildScopeLexicon(bot);

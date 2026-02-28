@@ -32,6 +32,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import CMSConnectionCard from '@/components/dashboard/CMSConnectionCard';
 import { useRouter } from 'next/navigation';
+import { showToast } from '@/components/toast';
 
 interface DashboardClientProps {
     user: any;
@@ -137,7 +138,7 @@ export default function DashboardClient({
             router.refresh();
         } catch (error) {
             console.error('Error deleting CMS connection:', error);
-            alert('Failed to delete connection. Please try again.');
+            showToast('Connessione non eliminata. Riprova.', 'error');
         }
     };
 
@@ -158,11 +159,11 @@ export default function DashboardClient({
             } else {
                 const error = await res.json();
                 console.error('Failed to get CMS dashboard URL:', error);
-                alert(error.error || 'Impossibile aprire il CMS');
+                showToast(error.error || 'Impossibile aprire il CMS', 'error');
             }
         } catch (error) {
             console.error('Error opening CMS dashboard:', error);
-            alert('Errore durante l\'apertura del CMS');
+            showToast('Errore durante l\'apertura del CMS', 'error');
         } finally {
             setIsOpeningCms(false);
         }

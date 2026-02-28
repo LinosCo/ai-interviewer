@@ -112,10 +112,6 @@ export function ConnectionShareDialog({
   };
 
   const handleDissociate = async (projectId: string) => {
-    if (!confirm('Sei sicuro di voler dissociare questo progetto?')) {
-      return;
-    }
-
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -153,14 +149,14 @@ export function ConnectionShareDialog({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6">
+        <div className="bg-gradient-to-r from-stone-800 to-stone-900 text-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold flex items-center gap-2">
                 <Users className="w-6 h-6" />
                 Gestisci Condivisione
               </h2>
-              <p className="text-indigo-100 mt-1">
+              <p className="text-stone-300 mt-1">
                 {connectionName} ({connectionType})
               </p>
             </div>
@@ -191,21 +187,21 @@ export function ConnectionShareDialog({
           )}
 
           {/* Add New Association */}
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <div className="bg-stone-50 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-stone-900 mb-3 flex items-center gap-2">
               <Plus className="w-5 h-5" />
               Associa Nuovo Progetto
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-stone-700 mb-2">
                   Progetto
                 </label>
                 <select
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   disabled={loading || availableToAssociate.length === 0}
                 >
                   <option value="">Seleziona progetto...</option>
@@ -218,13 +214,13 @@ export function ConnectionShareDialog({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-stone-700 mb-2">
                   Ruolo
                 </label>
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value as any)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   disabled={loading}
                 >
                   <option value="VIEWER">Viewer (Solo lettura)</option>
@@ -237,14 +233,14 @@ export function ConnectionShareDialog({
             <button
               onClick={handleAssociate}
               disabled={loading || !selectedProjectId || availableToAssociate.length === 0}
-              className="mt-3 w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+              className="mt-3 w-full bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Associa Progetto
             </button>
 
             {availableToAssociate.length === 0 && (
-              <p className="text-sm text-gray-500 mt-2 text-center">
+              <p className="text-sm text-stone-500 mt-2 text-center">
                 Tutti i progetti disponibili sono già associati
               </p>
             )}
@@ -252,12 +248,12 @@ export function ConnectionShareDialog({
 
           {/* Associated Projects List */}
           <div>
-            <h3 className="font-semibold text-gray-900 mb-3">
+            <h3 className="font-semibold text-stone-900 mb-3">
               Progetti Associati ({associatedProjects.length})
             </h3>
 
             {associatedProjects.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-stone-500">
                 <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p>Nessun progetto associato</p>
                 <p className="text-sm mt-1">
@@ -273,23 +269,23 @@ export function ConnectionShareDialog({
                     <div
                       key={ap.projectId}
                       className={`border rounded-lg p-4 flex items-center justify-between ${
-                        isCurrent ? 'bg-indigo-50 border-indigo-200' : 'bg-white'
+                        isCurrent ? 'bg-amber-50 border-amber-200' : 'bg-white'
                       }`}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-stone-900">
                             {ap.projectName}
                           </p>
                           {isCurrent && (
-                            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs rounded-full font-medium">
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">
                               Corrente
                             </span>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
-                          <span className="px-2 py-0.5 bg-gray-100 rounded text-xs font-medium">
+                        <div className="flex items-center gap-3 mt-1 text-sm text-stone-600">
+                          <span className="px-2 py-0.5 bg-stone-100 rounded text-xs font-medium">
                             {ap.role}
                           </span>
                           {ap.organization && (
@@ -320,10 +316,10 @@ export function ConnectionShareDialog({
         </div>
 
         {/* Footer */}
-        <div className="border-t bg-gray-50 px-6 py-4 flex justify-end gap-3">
+        <div className="border-t bg-stone-50 px-6 py-4 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+            className="px-4 py-2 text-stone-700 hover:bg-stone-200 rounded-lg transition-colors font-medium"
           >
             Chiudi
           </button>

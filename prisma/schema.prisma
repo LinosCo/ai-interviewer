@@ -548,13 +548,14 @@ model InterviewPlan {
 }
 
 model KnowledgeSource {
-  id        String   @id @default(cuid())
+  id        String                      @id @default(cuid())
   botId     String
   type      String
   title     String?
   content   String
-  createdAt DateTime @default(now())
-  bot       Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  embedding Unsupported("vector(1536)")?
+  createdAt DateTime                    @default(now())
+  bot       Bot                         @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   trainingBotId String?
   trainingBot   TrainingBot? @relation("TrainingBotKnowledge", fields: [trainingBotId], references: [id])

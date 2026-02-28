@@ -26,6 +26,12 @@ export const CONTENT_KINDS = {
   // Social / automation
   SOCIAL_SNIPPET: 'SOCIAL_SNIPPET',
   EMAIL_SNIPPET: 'EMAIL_SNIPPET',
+
+  // LinkedIn B2B (Gap M — Sprint 6)
+  LINKEDIN_ARTICLE: 'LINKEDIN_ARTICLE',
+  LINKEDIN_CAROUSEL: 'LINKEDIN_CAROUSEL',
+  LINKEDIN_NEWSLETTER: 'LINKEDIN_NEWSLETTER',
+  LINKEDIN_POLL: 'LINKEDIN_POLL',
 } as const;
 
 export type ContentKind = typeof CONTENT_KINDS[keyof typeof CONTENT_KINDS];
@@ -43,6 +49,10 @@ export const CONTENT_KIND_LABELS: Record<ContentKind, string> = {
   PRODUCT_FAQ: 'FAQ prodotto',
   SOCIAL_SNIPPET: 'Snippet social',
   EMAIL_SNIPPET: 'Snippet email',
+  LINKEDIN_ARTICLE: 'Articolo LinkedIn',
+  LINKEDIN_CAROUSEL: 'Carousel LinkedIn',
+  LINKEDIN_NEWSLETTER: 'Newsletter LinkedIn',
+  LINKEDIN_POLL: 'Sondaggio LinkedIn',
 };
 
 export const ALL_CONTENT_KINDS = Object.values(CONTENT_KINDS);

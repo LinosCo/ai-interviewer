@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { approveGap, dismissGap } from "./actions";
-import { Loader2, Check, X, AlertTriangle } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
+import { showToast } from '@/components/toast';
+import { ConfirmDialog, useConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface GapCardProps {
     gap: any;
@@ -14,26 +16,35 @@ export default function GapCard({ gap, botId }: GapCardProps) {
     const [editedQ, setEditedQ] = useState(gap.suggestedFaq?.question || "");
     const [editedA, setEditedA] = useState(gap.suggestedFaq?.answer || "");
 
+    const gapConfirm = useConfirmDialog();
+
     const handleApprove = async () => {
         setIsLoading(true);
         try {
             await approveGap(botId, gap.id, editedQ, editedA);
         } catch (error) {
             console.error(error);
-            alert("Failed to approve gap");
+            showToast("Approvazione fallita. Riprova.", 'error');
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleDismiss = async () => {
-        if (!confirm("Dismiss this gap? It won't be suggested again.")) return;
+        const ok = await gapConfirm.open({
+            title: 'Scarta lacuna',
+            description: "Questa lacuna non verrà più suggerita. Continuare?",
+            confirmLabel: 'Scarta',
+            variant: 'destructive',
+        });
+        if (!ok) return;
+
         setIsLoading(true);
         try {
             await dismissGap(botId, gap.id);
         } catch (error) {
             console.error(error);
-            alert("Failed to dismiss gap");
+            showToast("Dismissione fallita. Riprova.", 'error');
         } finally {
             setIsLoading(false);
         }
@@ -95,6 +106,8 @@ export default function GapCard({ gap, botId }: GapCardProps) {
                     Add to Knowledge
                 </button>
             </div>
+
+            <ConfirmDialog {...gapConfirm.dialogProps} />
         </div>
     );
 }

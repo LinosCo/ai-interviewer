@@ -31,7 +31,15 @@ function createPrismaClient(): PrismaClient {
   // is on a private network — no SSL or proxy needed.
   // For external connections (local dev / psql tools), SSL is negotiated by the
   // client tool directly and does not go through this Pool.
-  const pool = new Pool({ connectionString: cleanUrl });
+  const pool = new Pool({
+    connectionString: cleanUrl,
+    // Explicit pool sizing prevents connection surge on serverless (many parallel instances).
+    // Railway PostgreSQL has a finite max_connections — cap the pool to avoid exhausting it.
+    max: parseInt(process.env.DB_POOL_MAX ?? '20'),
+    min: parseInt(process.env.DB_POOL_MIN ?? '2'),
+    idleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT_MS ?? '30000'),
+    connectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT_MS ?? '5000'),
+  });
   const adapter = new PrismaPg(pool);
 
   return new PrismaClient({ adapter });

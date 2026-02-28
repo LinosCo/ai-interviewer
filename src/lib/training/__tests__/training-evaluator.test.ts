@@ -1,4 +1,5 @@
 // src/lib/training/__tests__/training-evaluator.test.ts
+import { describe, it, expect } from 'vitest'
 import { computeTopicScore, evaluateQuizAnswers } from '../training-evaluator'
 import type { QuizQuestion } from '../training-types'
 

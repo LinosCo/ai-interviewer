@@ -1,4 +1,5 @@
 // src/lib/training/__tests__/training-supervisor.test.ts
+import { describe, it, expect } from 'vitest'
 import { getNextPhase, shouldRetry, buildInitialState, advanceAfterEvaluation, computeOverallScore, computeSessionPassed } from '../training-supervisor'
 import type { TrainingSupervisorState, TopicResult } from '../training-types'
 

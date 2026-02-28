@@ -1060,7 +1060,7 @@ Per ogni prompt verificato:
 ### 16.4 Gap Tecnici/Infrastrutturali (Severità: 🔵 DEBITO TECNICO)
 
 #### O. File chat/route.ts — 3511 Righe
-- [~] **Gap confermato (Sez. 15.3)**: Il file principale delle interviste è **3511 righe** — impatta cold start Vercel, manutenibilità, code review. Contiene supervisor, context manager, enforcement, validation, streaming tutto in un file
+- [✓] **Gap confermato (Sez. 15.3)**: ~~Il file principale delle interviste era **2601 righe**~~. **✅ Sprint 7 FATTO** — Estratte 3 librerie focalizzate: `chat-intent.ts` (extractFieldFromMessage, checkUserIntent, detectExplicitClosureIntent), `question-generator.ts` (generateQuestionOnly, generateDeepOfferOnly, enforceDeepOfferQuestion), `interview-completion.ts` (completeInterview). `route.ts` ridotto a **2187 righe** (−414 righe, −16%).
 - **Fix**: Estrarre in moduli: `supervisor.ts`, `context-manager.ts`, `enforcement.ts`, `response-builder.ts`
 - **Effort stimato**: 8-10 ore (refactoring)
 

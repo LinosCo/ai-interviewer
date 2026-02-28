@@ -51,14 +51,12 @@ import {
 } from '@/lib/chat/context-helpers';
 import {
     isExtensionOfferQuestion, generateConsentQuestionOnly, generateFieldQuestionOnly,
-    extractLastAssistantQuestion, getUserResponseDepth, buildUserBridgeHint,
+    extractLastAssistantQuestion, buildUserBridgeHint,
     buildRuntimeSemanticContextPrompt,
     normalizeSingleQuestion,
-    normalizeBridgeStem, extractBridgeStem, collectRecentBridgeStems,
-    startsWithGenericBridgeOpener, isLikelyUserQuestion,
-    hasAnyAnchorOverlap, detectUserTurnSignal, isClarificationHandledResponse,
-    isScopeBoundaryHandledResponse, buildNaturalTopicCue, getGenericTopicAnchors,
-    hasMeaningfulTopicOverlap, isUsableBridgeSnippet,
+    collectRecentBridgeStems,
+    detectUserTurnSignal, isClarificationHandledResponse,
+    isScopeBoundaryHandledResponse, buildNaturalTopicCue,
     type UserTurnSignal,
 } from '@/lib/chat/response-builder';
 import {

@@ -42,6 +42,7 @@ export function DashboardSidebar({
     const primaryItems = [
         { href: '/dashboard/interviews', icon: Icons.MessageSquare, label: 'Interviste AI', visible: true },
         { href: '/dashboard/bots', icon: Icons.Bot, label: 'Chatbot AI', visible: hasChatbot },
+        { href: '/dashboard/training', icon: Icons.GraduationCap, label: 'Formazione', visible: true },
         { href: '/dashboard/visibility', icon: Icons.Search, label: 'Brand Monitor', visible: hasVisibilityTracker },
         { href: '/dashboard/insights', icon: Icons.Layers, label: 'AI Tips', visible: hasAiTips },
     ].filter(item => item.visible);

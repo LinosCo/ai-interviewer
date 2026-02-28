@@ -47,6 +47,9 @@ describe('getNextPhase', () => {
   it('advances QUIZZING → EVALUATING', () => {
     expect(getNextPhase('QUIZZING')).toBe('EVALUATING')
   })
+  it('advances RETRYING → CHECKING', () => {
+    expect(getNextPhase('RETRYING')).toBe('CHECKING')
+  })
 })
 
 describe('advanceAfterEvaluation', () => {
@@ -133,5 +136,22 @@ describe('computeOverallScore', () => {
 
   it('returns 0 for empty results', () => {
     expect(computeOverallScore([])).toBe(0)
+  })
+})
+
+describe('computeSessionPassed', () => {
+  const results: TopicResult[] = [
+    { topicId: '1', topicLabel: 'A', status: 'PASSED', score: 80, openAnswerScore: 80, quizScore: 80, retries: 0, gaps: [], feedback: '' },
+    { topicId: '2', topicLabel: 'B', status: 'PASSED', score: 70, openAnswerScore: 70, quizScore: 70, retries: 0, gaps: [], feedback: '' },
+  ]
+
+  it('returns true when overall score meets threshold', () => {
+    // average of 80+70 = 75, threshold 70 → pass
+    expect(computeSessionPassed(results, 70)).toBe(true)
+  })
+
+  it('returns false when overall score is below threshold', () => {
+    // average of 80+70 = 75, threshold 80 → fail
+    expect(computeSessionPassed(results, 80)).toBe(false)
   })
 })

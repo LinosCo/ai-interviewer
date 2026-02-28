@@ -70,17 +70,16 @@ export function advanceAfterEvaluation(
   const threshold = getPassThreshold(bot, topic)
   const maxRetriesForTopic = getMaxRetries(bot, topic)
 
-  const newState = { ...state, topicResults: [...state.topicResults, result] }
-
   if (result.score >= threshold) {
-    // Passed — advance to next topic or complete
+    // Passed — commit result and advance
+    const withResult = { ...state, topicResults: [...state.topicResults, result] }
     const nextIndex = state.currentTopicIndex + 1
     if (nextIndex >= totalTopics) {
-      return { newState: { ...newState, phase: 'COMPLETE' }, moveToNextTopic: false }
+      return { newState: { ...withResult, phase: 'COMPLETE' }, moveToNextTopic: false }
     }
     return {
       newState: {
-        ...newState,
+        ...withResult,
         currentTopicIndex: nextIndex,
         phase: 'EXPLAINING',
         retryCount: 0,
@@ -96,13 +95,13 @@ export function advanceAfterEvaluation(
   const canRetry = bot.failureMode === 'PERMISSIVE' && state.retryCount < maxRetriesForTopic
 
   if (canRetry) {
+    // Don't commit failed result yet — retry with deeper adaptation
     return {
       newState: {
-        ...newState,
+        ...state,
         phase: 'RETRYING',
         retryCount: state.retryCount + 1,
         adaptationDepth: Math.min(state.adaptationDepth + 1, 2),
-        topicResults: state.topicResults, // don't commit failed result yet
         pendingQuizzes: undefined,
         pendingCheckQuestion: undefined,
       },
@@ -110,14 +109,15 @@ export function advanceAfterEvaluation(
     }
   }
 
-  // No more retries — mark gap and advance
+  // No more retries — commit failed result and advance
+  const withResult = { ...state, topicResults: [...state.topicResults, result] }
   const nextIndex = state.currentTopicIndex + 1
   if (nextIndex >= totalTopics) {
-    return { newState: { ...newState, phase: 'COMPLETE' }, moveToNextTopic: false }
+    return { newState: { ...withResult, phase: 'COMPLETE' }, moveToNextTopic: false }
   }
   return {
     newState: {
-      ...newState,
+      ...withResult,
       currentTopicIndex: nextIndex,
       phase: 'EXPLAINING',
       retryCount: 0,

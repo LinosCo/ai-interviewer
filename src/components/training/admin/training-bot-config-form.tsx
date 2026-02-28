@@ -155,15 +155,16 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
     setError(null)
     setSuccess(false)
 
-    // Validate slug
-    if (!/^[a-z0-9-]+$/.test(slug)) {
+    // Validate slug (trim first so trailing/leading spaces don't cause false failures)
+    const trimmedSlug = slug.trim()
+    if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
       setError('Lo slug può contenere solo lettere minuscole, numeri e trattini.')
       return
     }
 
     const payload = {
       name: name.trim(),
-      slug: slug.trim(),
+      slug: trimmedSlug,
       language,
       tone: tone.trim(),
       introMessage: introMessage.trim() || null,

@@ -5,8 +5,7 @@ import { cookies } from 'next/headers'
 import { subscriptionTierToPlanType, PlanType } from '@/config/plans'
 import Link from 'next/link'
 import { Settings, Users, BarChart2, ChevronRight } from 'lucide-react'
-
-const BUSINESS_PLANS: string[] = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN']
+import { hasTrainingAccess } from '@/lib/training/plan-gate'
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Bozza',
@@ -64,7 +63,7 @@ export default async function TrainingBotOverviewPage({
     ? subscriptionTierToPlanType(membership.organization.subscription.tier)
     : PlanType.TRIAL
 
-  const hasTraining = BUSINESS_PLANS.includes(planType)
+  const hasTraining = hasTrainingAccess(planType)
 
   if (!hasTraining) {
     return (

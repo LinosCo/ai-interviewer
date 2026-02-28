@@ -6,8 +6,7 @@ import { subscriptionTierToPlanType, PlanType } from '@/config/plans'
 import Link from 'next/link'
 import TrainingSessionProfile from '@/components/training/admin/training-session-profile'
 import type { TopicResult } from '@/lib/training/training-types'
-
-const BUSINESS_PLANS: string[] = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN']
+import { hasTrainingAccess } from '@/lib/training/plan-gate'
 
 export default async function TrainingSessionDetailPage({
   params,
@@ -51,7 +50,7 @@ export default async function TrainingSessionDetailPage({
     ? subscriptionTierToPlanType(membership.organization.subscription.tier)
     : PlanType.TRIAL
 
-  const hasTraining = BUSINESS_PLANS.includes(planType)
+  const hasTraining = hasTrainingAccess(planType)
 
   if (!hasTraining) {
     return (
@@ -88,10 +87,10 @@ export default async function TrainingSessionDetailPage({
 
   if (!trainingSession) notFound()
 
-  // Safe JSON extraction for topicResults from supervisorState
-  const rawState = trainingSession.supervisorState as Record<string, unknown> | null
-  const topicResults: TopicResult[] = Array.isArray(rawState?.topicResults)
-    ? (rawState.topicResults as TopicResult[])
+  // Read topicResults from the dedicated column (supervisorState may be empty for completed sessions)
+  const rawTopicResults = trainingSession.topicResults
+  const topicResults: TopicResult[] = Array.isArray(rawTopicResults)
+    ? (rawTopicResults as unknown as TopicResult[])
     : []
 
   // Safe extraction of traineeProfile

@@ -4,8 +4,7 @@ import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { subscriptionTierToPlanType, PlanType } from '@/config/plans'
 import TrainingBotConfigForm from '@/components/training/admin/training-bot-config-form'
-
-const BUSINESS_PLANS: string[] = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN']
+import { hasTrainingAccess } from '@/lib/training/plan-gate'
 
 export default async function NewTrainingBotPage() {
   const session = await auth()
@@ -43,7 +42,7 @@ export default async function NewTrainingBotPage() {
     ? subscriptionTierToPlanType(membership.organization.subscription.tier)
     : PlanType.TRIAL
 
-  const hasTraining = BUSINESS_PLANS.includes(planType)
+  const hasTraining = hasTrainingAccess(planType)
 
   if (!hasTraining) {
     return (

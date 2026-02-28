@@ -5,8 +5,7 @@ import { cookies } from 'next/headers'
 import { subscriptionTierToPlanType, PlanType } from '@/config/plans'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-
-const BUSINESS_PLANS: string[] = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN']
+import { hasTrainingAccess, formatDate } from '@/lib/training/plan-gate'
 
 const sessionStatusLabel: Record<string, string> = {
   STARTED: 'In corso',
@@ -22,15 +21,6 @@ const sessionStatusColors: Record<string, string> = {
   ABANDONED: 'bg-gray-100 text-gray-600',
 }
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat('it-IT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
 
 export default async function TrainingSessionsPage({
   params,
@@ -74,7 +64,7 @@ export default async function TrainingSessionsPage({
     ? subscriptionTierToPlanType(membership.organization.subscription.tier)
     : PlanType.TRIAL
 
-  const hasTraining = BUSINESS_PLANS.includes(planType)
+  const hasTraining = hasTrainingAccess(planType)
 
   if (!hasTraining) {
     return (

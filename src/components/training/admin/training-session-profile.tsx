@@ -1,6 +1,7 @@
 'use client'
 
 import type { TopicResult } from '@/lib/training/training-types'
+import { formatDate } from '@/lib/training/plan-gate'
 
 const statusIcon: Record<string, string> = {
   PASSED: '✅',
@@ -45,16 +46,6 @@ function formatDuration(seconds: number) {
   const secs = seconds % 60
   if (mins === 0) return `${secs}s`
   return `${mins}m ${secs}s`
-}
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat('it-IT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(date))
 }
 
 function ScoreBar({ score }: { score: number }) {

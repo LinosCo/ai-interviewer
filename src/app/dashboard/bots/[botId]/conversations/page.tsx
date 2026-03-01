@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { MessageSquare, Clock, User, CheckCircle, XCircle, PlayCircle } from 'lucide-react';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 export default async function ConversationsListPage({ params }: { params: Promise<{ botId: string }> }) {
     const session = await auth();
@@ -80,13 +81,12 @@ export default async function ConversationsListPage({ params }: { params: Promis
 
             {/* Conversations List */}
             {conversations.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-                    <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Nessuna conversazione</h3>
-                    <p className="text-sm text-gray-500">
-                        Le conversazioni appariranno qui quando gli utenti inizieranno a chattare.
-                    </p>
-                </div>
+                <EmptyState
+                    icon={<MessageSquare className="w-8 h-8" />}
+                    title="Nessuna conversazione"
+                    description="Le conversazioni di questo bot appariranno qui."
+                    className="col-span-full"
+                />
             ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                     <div className="overflow-x-auto w-full">

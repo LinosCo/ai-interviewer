@@ -39,12 +39,14 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
 
     // Check if we are in "full" mode (straight to chat window)
     const isFullMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('full') === 'true';
+    // data-auto-open: embed host requests widget open immediately
+    const autoOpen = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('autoOpen') === 'true';
 
     useEffect(() => {
-        if (isFullMode) {
+        if (isFullMode || autoOpen) {
             setIsOpen(true);
         }
-    }, [isFullMode]);
+    }, [isFullMode, autoOpen]);
 
     useEffect(() => {
         async function fetchBot() {

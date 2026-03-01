@@ -56,6 +56,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
         boundaries: (bot.boundaries as string[]) || [],
         backgroundColor: bot.backgroundColor || '', // Ensure consistent value for hydration
         privacyPolicyUrl: bot.privacyPolicyUrl || '',
+        enablePageContext: bot.enablePageContext ?? false,
     });
     const [isSaving, setIsSaving] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(true); // Toggle for mobile maybe
@@ -107,6 +108,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
                     backgroundColor: config.backgroundColor,
                     logoUrl: config.logoUrl,
                     privacyPolicyUrl: config.privacyPolicyUrl,
+                    enablePageContext: config.enablePageContext,
                     botType: 'chatbot'
                 })
             });
@@ -349,6 +351,25 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
                                                     placeholder="Mi dispiace, ma non ho informazioni su questo. Posso aiutarti con altro?"
                                                     className="w-full rounded-2xl border border-gray-100 bg-gray-50/50 focus:ring-2 focus:ring-blue-500 min-h-[120px] font-medium p-4 outline-none"
                                                 />
+                                            </div>
+
+                                            {/* Page Context Toggle */}
+                                            <div className="flex items-start gap-4 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={config.enablePageContext}
+                                                    onClick={() => setConfig({ ...config, enablePageContext: !config.enablePageContext })}
+                                                    className={`relative mt-0.5 flex-shrink-0 w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${config.enablePageContext ? 'bg-blue-600' : 'bg-gray-200'}`}
+                                                >
+                                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${config.enablePageContext ? 'translate-x-5' : 'translate-x-0'}`} />
+                                                </button>
+                                                <div>
+                                                    <p className="text-sm font-bold text-gray-900">Contesto Pagina</p>
+                                                    <p className="text-xs text-gray-500 font-medium mt-0.5">
+                                                        Il chatbot legge il contenuto della pagina corrente del visitatore e lo usa per risposte più contestuali. Richiede embed via <code className="bg-blue-100 px-1 rounded text-blue-700">chatbot.js</code>.
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
 

@@ -4,6 +4,101 @@ import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
+// ---------------------------------------------------------------------------
+// Optimization B: TTL in-memory cache (15-minute window)
+// Resets on cold start — acceptable for serverless; prevents LLM hammering.
+// ---------------------------------------------------------------------------
+interface SyncResult {
+    insights: any[];
+    healthReport: any;
+}
+const syncCache = new Map<string, { result: SyncResult; ts: number }>();
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+// ---------------------------------------------------------------------------
+// Optimization A: compact summarizers — replace large JSON.stringify blobs
+// Each helper picks only the 3-5 most signal-rich fields and caps strings.
+// ---------------------------------------------------------------------------
+
+/** Truncate a string to `max` chars, appending "…" if cut. */
+function trunc(value: string | null | undefined, max: number): string {
+    const s = (value ?? '').trim();
+    return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+/**
+ * Serialize an array compactly for LLM consumption.
+ * Each element is rendered as a single YAML-ish line so the model can parse
+ * it without the overhead of nested JSON braces/commas.
+ */
+function summarizeWebsite(items: Array<{ title: string; type: string; contentSnippet: string }>): string {
+    if (!items.length) return 'Nessuna fonte';
+    return items.map(s =>
+        `• [${s.type}] ${trunc(s.title, 60)}: ${trunc(s.contentSnippet, 150)}`
+    ).join('\n');
+}
+
+function summarizeChatbot(items: Array<{ gapsCount: number; sentiment: any; clusterCount: number; leads: any }>): string {
+    if (!items.length) return 'Nessun dato chatbot';
+    return items.map((a, i) =>
+        `• Bot ${i + 1}: gap=${a.gapsCount}, cluster=${a.clusterCount}, lead=${a.leads ?? 0}, sentiment=${trunc(String(a.sentiment ?? ''), 40)}`
+    ).join('\n');
+}
+
+function summarizeInterviews(items: Array<{
+    id: string; source: string; themes: any; quotes: string[]; sentiment: any; nps: any;
+}>): string {
+    if (!items.length) return 'Nessuna intervista';
+    return items.map(a => {
+        const themes = Array.isArray(a.themes) ? a.themes.slice(0, 3).join(', ') : trunc(String(a.themes ?? ''), 80);
+        const quote = a.quotes?.[0] ? `"${trunc(a.quotes[0], 130)}"` : '';
+        return `• #${a.id} (${a.source}) | temi: ${themes} | sentiment: ${a.sentiment ?? '?'} | nps: ${a.nps ?? '?'} ${quote ? `| citazione: ${quote}` : ''}`;
+    }).join('\n');
+}
+
+function summarizeVisibility(items: Array<{
+    platform: string; responseText: string; brandMentioned: any; competitors: any;
+}>): string {
+    if (!items.length) return 'Nessun dato visibilità';
+    return items.map(r =>
+        `• ${r.platform}: brand_menzionato=${r.brandMentioned ?? '?'} | "${trunc(r.responseText, 150)}"`
+    ).join('\n');
+}
+
+function summarizeSerp(serp: {
+    totalMentions: number;
+    sentimentBreakdown: { positive: number; negative: number; neutral?: number };
+    topCategories: any[];
+    recentAlerts: any[];
+} | null): string {
+    if (!serp) return 'Nessun dato SERP disponibile';
+    const cats = (serp.topCategories ?? []).slice(0, 3).map((c: any) => String(c)).join(', ');
+    const alerts = (serp.recentAlerts ?? []).slice(0, 2).map((a: any) => trunc(String(a?.title ?? a), 80)).join(' | ');
+    return `menzioni=${serp.totalMentions}, pos=${serp.sentimentBreakdown.positive}, neg=${serp.sentimentBreakdown.negative}` +
+        (cats ? `, categorie: ${cats}` : '') +
+        (alerts ? `, alert: ${alerts}` : '');
+}
+
+function summarizeWebAnalytics(wa: {
+    avgPageviews: number;
+    avgBounceRate: number;
+    topPages: any[];
+    searchQueries: any[];
+    lowPerformingPages: any[];
+} | null): string {
+    if (!wa) return 'Dati non disponibili - CMS non connesso o Google Analytics non configurato';
+    const pages = (wa.topPages as any[]).slice(0, 3).map((p: any) => trunc(String(p?.path ?? p), 50)).join(', ');
+    const queries = (wa.searchQueries as any[]).slice(0, 5).map((q: any) => trunc(String(q?.query ?? q), 40)).join(', ');
+    const bounce = (wa.avgBounceRate * 100).toFixed(1);
+    return `pageview_medi=${Math.round(wa.avgPageviews)}/giorno, bounce=${bounce}%` +
+        (pages ? `, top_pagine: ${pages}` : '') +
+        (queries ? `, query_ricerca: ${queries}` : '');
+}
+
+// ---------------------------------------------------------------------------
+// Zod Schemas (unchanged)
+// ---------------------------------------------------------------------------
+
 const ActionSchema = z.object({
     // Potentially automatable actions (only when required integrations are available)
     // - add_faq: Add FAQ to chatbot knowledge base
@@ -57,7 +152,16 @@ const SyncResultSchema = z.object({
 });
 
 export class CrossChannelSyncEngine {
-    static async sync(organizationId: string, projectId?: string) {
+    static async sync(organizationId: string, projectId?: string): Promise<SyncResult> {
+        // ---------------------------------------------------------------------------
+        // Optimization B: return cached result if still fresh
+        // ---------------------------------------------------------------------------
+        const cacheKey = `${organizationId}::${projectId ?? '__org__'}`;
+        const cached = syncCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+            return cached.result;
+        }
+
         // 0. Fetch strategic context (project-level if available, otherwise org-level)
         let strategicVision: string | null = null;
         let valueProposition: string | null = null;
@@ -129,8 +233,6 @@ export class CrossChannelSyncEngine {
                 }
             });
         }
-
-        // 2-6 ... (skipping for BREVITY in replacement targetContent/content)
 
         // 2. Fetch Interview themes with conversation details for citations
         const analyses = await prisma.conversationAnalysis.findMany({
@@ -364,33 +466,22 @@ ${strategicContextText}
 =============================================================
 
 1️⃣ KNOWLEDGE BASE DEL CHATBOT (cosa risponde il chatbot):
-${JSON.stringify(websiteSummary)}
+${summarizeWebsite(websiteSummary)}
 
 2️⃣ ANALISI CHATBOT (gap, domande frequenti, sentiment):
-${JSON.stringify(chatbotSummary)}
+${summarizeChatbot(chatbotSummary)}
 
 3️⃣ FEEDBACK DALLE INTERVISTE (con ID per citazioni):
-${JSON.stringify(interviewSummary)}
+${summarizeInterviews(interviewSummary)}
 
 4️⃣ REPUTAZIONE SUGLI AI (ChatGPT, Claude, Perplexity):
-${JSON.stringify(visibilitySummary)}
+${summarizeVisibility(visibilitySummary)}
 
 5️⃣ MENZIONI SU GOOGLE/NEWS:
-${serpSummary ? JSON.stringify({
-                totalMentions: serpSummary.totalMentions,
-                sentimentBreakdown: serpSummary.sentimentBreakdown,
-                topCategories: serpSummary.topCategories,
-                recentAlerts: serpSummary.recentAlerts
-            }) : 'Nessun dato SERP disponibile'}
+${summarizeSerp(serpSummary)}
 
 6️⃣ ANALYTICS SITO WEB (Google Analytics + Search Console):
-${websiteAnalytics ? JSON.stringify({
-                avgPageviewsGiornalieri: Math.round(websiteAnalytics.avgPageviews),
-                bounceRateMedio: (websiteAnalytics.avgBounceRate * 100).toFixed(1) + '%',
-                paginePiuVisitate: (websiteAnalytics.topPages as any[]).slice(0, 5),
-                queryDiRicerca: (websiteAnalytics.searchQueries as any[]).slice(0, 10),
-                pagineConAltoBounce: websiteAnalytics.lowPerformingPages
-            }) : 'Dati non disponibili - CMS non connesso o Google Analytics non configurato'}
+${summarizeWebAnalytics(websiteAnalytics)}
 
 =============================================================
 📈 HEALTH REPORT RICHIESTO
@@ -590,9 +681,16 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             savedInsights.push(insight);
         }
 
-        return {
+        const result: SyncResult = {
             insights: savedInsights,
             healthReport: object.healthReport
         };
+
+        // ---------------------------------------------------------------------------
+        // Optimization B: store result in cache before returning
+        // ---------------------------------------------------------------------------
+        syncCache.set(cacheKey, { result, ts: Date.now() });
+
+        return result;
     }
 }

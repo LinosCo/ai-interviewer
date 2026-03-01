@@ -61,7 +61,7 @@ export default function NewProjectPage() {
                     const result = createProjectSchema.safeParse({ name });
                     if (!result.success) {
                         e.preventDefault();
-                        setNameError(result.error.errors[0]?.message ?? 'Nome non valido');
+                        setNameError(result.error.issues[0]?.message ?? 'Nome non valido');
                     } else {
                         setNameError(null);
                     }

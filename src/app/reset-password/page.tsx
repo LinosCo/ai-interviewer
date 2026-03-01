@@ -36,7 +36,7 @@ function ResetPasswordForm() {
         // Client-side validation with zod
         const result = resetPasswordSchema.safeParse({ password, confirmPassword });
         if (!result.success) {
-            const fieldError = result.error.errors[0]?.message;
+            const fieldError = result.error.issues[0]?.message;
             setMessage({ type: 'error', text: fieldError || 'Dati non validi' });
             return;
         }

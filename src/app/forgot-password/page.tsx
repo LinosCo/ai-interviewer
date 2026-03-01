@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
         // Client-side validation
         const result = forgotPasswordSchema.safeParse({ email });
         if (!result.success) {
-            const fieldError = result.error.errors[0]?.message;
+            const fieldError = result.error.issues[0]?.message;
             setMessage({ type: 'error', text: fieldError || 'Email non valida' });
             return;
         }

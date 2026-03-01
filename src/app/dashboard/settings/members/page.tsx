@@ -52,7 +52,7 @@ export default function TeamManagementPage() {
         // Client-side validation
         const validation = inviteMemberSchema.safeParse({ email: inviteEmail });
         if (!validation.success) {
-            setMessage({ type: 'error', text: validation.error.errors[0]?.message ?? 'Email non valida' });
+            setMessage({ type: 'error', text: validation.error.issues[0]?.message ?? 'Email non valida' });
             return;
         }
 

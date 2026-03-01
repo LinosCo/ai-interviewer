@@ -37,6 +37,7 @@ interface PlatformSettingsFormProps {
     smtpFromEmail?: string;
     smtpNotificationEmail?: string;
     publicDemoBotId?: string;
+    resendApiKey?: string;
 }
 
 interface AdminBot {
@@ -74,7 +75,8 @@ export default function PlatformSettingsForm({
     smtpPass = '',
     smtpFromEmail = '',
     smtpNotificationEmail = '',
-    publicDemoBotId = ''
+    publicDemoBotId = '',
+    resendApiKey = ''
 }: PlatformSettingsFormProps) {
     const [knowledge, setKnowledge] = useState(currentKnowledge);
     const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
@@ -112,6 +114,7 @@ export default function PlatformSettingsForm({
     const [smtpFromEmailValue, setSmtpFromEmailValue] = useState(smtpFromEmail);
     const [smtpNotificationEmailValue, setSmtpNotificationEmailValue] = useState(smtpNotificationEmail);
     const [demoBotId, setDemoBotId] = useState(publicDemoBotId);
+    const [resendApiKeyValue, setResendApiKeyValue] = useState(resendApiKey);
     const [availableBots, setAvailableBots] = useState<AdminBot[]>([]);
     const [isLoadingBots, setIsLoadingBots] = useState(false);
     const [isTestingEmail, setIsTestingEmail] = useState(false);
@@ -150,6 +153,7 @@ export default function PlatformSettingsForm({
         setSmtpFromEmailValue(smtpFromEmail || '');
         setSmtpNotificationEmailValue(smtpNotificationEmail || '');
         setDemoBotId(publicDemoBotId || '');
+        setResendApiKeyValue(resendApiKey || '');
     }, [
         platformOpenaiApiKey,
         platformAnthropicApiKey,
@@ -175,7 +179,8 @@ export default function PlatformSettingsForm({
         smtpPass,
         smtpFromEmail,
         smtpNotificationEmail,
-        publicDemoBotId
+        publicDemoBotId,
+        resendApiKey
     ]);
 
     useEffect(() => {
@@ -226,6 +231,7 @@ export default function PlatformSettingsForm({
         smtpFromEmailValue !== smtpFromEmail ||
         smtpNotificationEmailValue !== smtpNotificationEmail ||
         demoBotId !== publicDemoBotId ||
+        resendApiKeyValue !== normalize(resendApiKey) ||
         knowledge !== currentKnowledge ||
         strategicPlan !== currentStrategicPlan
     );
@@ -269,7 +275,8 @@ export default function PlatformSettingsForm({
                     smtpPass: smtpPassValue,
                     smtpFromEmail: smtpFromEmailValue,
                     smtpNotificationEmail: smtpNotificationEmailValue,
-                    publicDemoBotId: demoBotId
+                    publicDemoBotId: demoBotId,
+                    resendApiKey: resendApiKeyValue
                 })
             });
 
@@ -723,6 +730,28 @@ export default function PlatformSettingsForm({
                                     placeholder="price_..."
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
                                 />
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <h3 className="text-md font-semibold text-gray-900 mb-3">Resend (Email API)</h3>
+                            <div className="grid grid-cols-1 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Resend API Key
+                                        {resendApiKey && <span className="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-bold">● Configured</span>}
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={resendApiKeyValue}
+                                        onChange={(e) => setResendApiKeyValue(e.target.value)}
+                                        placeholder={resendApiKey ? "•••••••••••••••• (Enter new to replace)" : "re_..."}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none transition-all placeholder:text-gray-400"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Se configurato, le email vengono inviate tramite Resend API invece di SMTP. Ottieni la tua chiave su <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-amber-600 hover:underline">resend.com</a>.
+                                    </p>
+                                </div>
                             </div>
                         </div>
 

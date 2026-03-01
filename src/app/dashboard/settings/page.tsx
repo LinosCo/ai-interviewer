@@ -37,6 +37,7 @@ interface GlobalConfigState {
     smtpFromEmail?: string;
     smtpNotificationEmail?: string;
     publicDemoBotId?: string;
+    resendApiKey?: string;
 }
 
 export default function PlatformSettingsPage() {
@@ -132,6 +133,7 @@ export default function PlatformSettingsPage() {
                         smtpFromEmail={globalConfig?.smtpFromEmail}
                         smtpNotificationEmail={globalConfig?.smtpNotificationEmail}
                         publicDemoBotId={globalConfig?.publicDemoBotId}
+                        resendApiKey={globalConfig?.resendApiKey}
                     />
                 </div>
             </div>

@@ -27,4 +27,7 @@ RUN npm run build
 EXPOSE 8080
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "start"]
+# Run DB migrations (idempotent) then start the app.
+# This ensures any pending Prisma migrations are applied on every container start,
+# covering the case where a new deploy adds schema changes.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

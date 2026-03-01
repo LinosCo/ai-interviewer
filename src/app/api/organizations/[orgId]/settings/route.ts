@@ -45,7 +45,8 @@ async function getGlobalConfigCompat() {
             smtpPass: config.smtpPass,
             smtpFromEmail: config.smtpFromEmail,
             smtpNotificationEmail: config.smtpNotificationEmail,
-            publicDemoBotId: config.publicDemoBotId
+            publicDemoBotId: config.publicDemoBotId,
+            resendApiKey: config.resendApiKey
         };
     } catch (error) {
         console.error('[settings] getGlobalConfigCompat error:', error);

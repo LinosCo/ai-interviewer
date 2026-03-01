@@ -72,6 +72,7 @@ export function DashboardSidebar({
         { href: '/dashboard/admin/users', icon: Icons.Users, label: 'Utenti' },
         { href: '/dashboard/admin/projects', icon: Icons.FolderKanban, label: 'Progetti' },
         { href: '/dashboard/admin/cms', icon: Icons.Link, label: 'CMS' },
+        { href: '/dashboard/settings', icon: Icons.Settings, label: 'Impostazioni piattaforma' },
     ];
 
     return (

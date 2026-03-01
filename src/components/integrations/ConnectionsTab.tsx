@@ -17,7 +17,7 @@ export function ConnectionsTab({ activeCount, ...gridProps }: ConnectionsTabProp
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.2 }}
-      className="flex-1 overflow-y-auto space-y-6 pt-6 pb-8"
+      className="space-y-6 pt-6 pb-8"
     >
       {/* Active connections header */}
       {activeCount > 0 && (

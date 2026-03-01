@@ -465,7 +465,7 @@ export default function IntegrationsPage() {
       </div>
 
       {/* Tab content area */}
-      <div className="flex-1 overflow-hidden px-8">
+      <div className="flex-1 overflow-y-auto px-8">
         <AnimatePresence mode="wait">
           {activeTab === 'connections' && (
             <ConnectionsTab

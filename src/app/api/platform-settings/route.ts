@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
             smtpPass,
             smtpFromEmail,
             smtpNotificationEmail,
-            publicDemoBotId
+            publicDemoBotId,
+            resendApiKey
         } = body;
 
         const currentUser = await prisma.user.findUnique({
@@ -117,7 +118,8 @@ export async function POST(req: NextRequest) {
             smtpPass,
             smtpFromEmail,
             smtpNotificationEmail,
-            publicDemoBotId
+            publicDemoBotId,
+            resendApiKey
         ].some((value) => value !== undefined);
 
         if (hasGlobalConfigPayload && !canManageGlobalConfig) {
@@ -206,6 +208,7 @@ export async function POST(req: NextRequest) {
             if (smtpNotificationEmail !== undefined) globalConfigUpdate.smtpNotificationEmail = smtpNotificationEmail;
 
             if (publicDemoBotId !== undefined) globalConfigUpdate.publicDemoBotId = publicDemoBotId;
+            if (resendApiKey !== undefined) globalConfigUpdate.resendApiKey = resendApiKey;
 
             // Only perform update if there are fields to update
             if (Object.keys(globalConfigUpdate).length > 0) {

@@ -142,7 +142,7 @@ export function AiRoutingTab({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.2 }}
-      className="flex-1 overflow-y-auto pt-6 pb-8 space-y-6"
+      className="pt-6 pb-8 space-y-6"
     >
       {/* Header row */}
       <div className="flex items-start justify-between gap-4">

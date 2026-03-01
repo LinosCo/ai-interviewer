@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getAdminApiKey, getSystemLLM } from './llm-providers';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
 
 // Known source reputations (Italian + International)
 const SOURCE_REPUTATIONS: Record<string, { score: number; type: string }> = {
@@ -653,8 +654,8 @@ Per ogni risultato, valuta:
 RISULTATI DA ANALIZZARE:
 ${batch.map((r, idx) => `
 [${idx + 1}] Fonte: ${r.sourceDomain} (Reputazione: ${r.sourceReputation}/100)
-Titolo: ${r.title}
-Snippet: ${r.snippet}
+Titolo: ${sanitize(r.title, 200)}
+Snippet: ${sanitize(r.snippet, 500)}
 `).join('\n---\n')}
 
 Restituisci un array di analisi, una per ogni risultato nell'ordine dato.`,

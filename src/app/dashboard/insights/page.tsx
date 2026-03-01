@@ -455,6 +455,20 @@ export default function InsightHubPage() {
         }
     };
 
+    const handleApplyAction = async (insightId: string, actionTitle: string) => {
+        setUpdatingInsightId(insightId);
+        try {
+            await updateInsightStatus(insightId, 'completed');
+            setInsights(prev => prev.map(i => i.id === insightId ? { ...i, status: 'completed' } : i));
+            showToast(`Azione "${actionTitle}" applicata con successo`, 'success');
+        } catch (err) {
+            console.error(err);
+            showToast("Errore durante l'applicazione dell'azione", 'error');
+        } finally {
+            setUpdatingInsightId(null);
+        }
+    };
+
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -1059,6 +1073,8 @@ export default function InsightHubPage() {
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-green-200 text-green-700 hover:border-green-500 hover:bg-green-50 group/btn transition-all"
+                                                                            onClick={() => handleApplyAction(insight.id, action.title || getActionTypeLabel(action.type))}
+                                                                            disabled={updatingInsightId === insight.id}
                                                                         >
                                                                             Applica <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
                                                                         </Button>

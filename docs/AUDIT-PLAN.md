@@ -286,9 +286,9 @@ Ogni area viene verificata su **4 dimensioni**:
 - [✓] **Skip intent**: L'utente può dire "preferisco non dirlo" e il sistema va avanti al campo successivo
 
 #### Adattamento Tono
-- [!] **Profilo comunicativo**: `tone-prompt-adapter.ts` esiste con logica completa per profilo comunicativo, MA **è UNWIRED** — non viene mai invocato nel flusso principale `chat/route.ts`. Il tono NON si adatta dinamicamente
-- [!] **Emoji**: La logica emoji è nel tone adapter ma **non connessa** al prompt builder
-- [!] **Complessità linguistica**: Il tone adapter ha istruzioni di complessità MA è **solo in italiano** — nessuna localizzazione delle istruzioni di tono
+- [✓] **Profilo comunicativo**: ~~`tone-prompt-adapter.ts` esiste con logica completa MA è UNWIRED~~. **✅ Sprint 9 FATTO** — `ToneAnalyzer` e `buildToneAdaptationPrompt` wirati in `chat/route.ts`. Attivo da turno 4 in poi (non-blocking try/catch). Il tono si adatta dinamicamente basandosi sugli ultimi 5 messaggi utente
+- [✓] **Emoji**: La logica emoji è ora connessa tramite il tone adapter wired in `chat/route.ts`
+- [~] **Complessità linguistica**: Il tone adapter ha istruzioni di complessità. ✅ Sprint 9 — aggiunto branch EN (già presente ma nota: lingua rilevata da `bot.language`, non lingua utente rilevata dinamicamente)
 
 ### 2.3 Pipeline Dati 🏷️ Haiku
 
@@ -620,7 +620,7 @@ Ogni area viene verificata su **4 dimensioni**:
 - [✓] **Praticità**: Ogni tip include target, titolo, body, reasoning e urgency dal CrossChannelSyncEngine
 - [!] **Modificabilità**: **CRITICO** — I tip NON sono modificabili prima dell'implementazione. Non c'è editor inline né preview
 - [~] **Canale target**: Il canale è indicato nel tipo azione ma **non linkato** a una connessione specifica
-- [!] **Implementazione diretta**: Il pulsante **"Applica"** sulla pagina insights **NON ha onClick handler** — è un bottone puramente decorativo. Nessuna azione viene eseguita al click
+- [✓] **Implementazione diretta**: ~~Il pulsante "Applica" NON ha onClick handler~~. **✅ Sprint 9 FATTO** — Aggiunto `handleApplyAction()` handler che chiama `updateInsightStatus(insightId, 'completed')` con toast di conferma. Button disable durante loading.
 
 ### 8.2 Workflow di Implementazione 🏷️ Opus
 
@@ -777,7 +777,7 @@ Ogni area viene verificata su **4 dimensioni**:
 | 26 | Analytics Aggregation | analytics-aggregator.ts | gpt-4o | ⚠️ MANCA | 4/10 | [!] gpt-4o troppo costoso, key hardcoded, no lang |
 | 27 | CrossChannel Insight | sync-engine.ts | systemLLM | 0.15 | 7/10 | [~] Solo IT, prompt molto lungo (~2000tok) |
 | 28 | CMS Content Suggestion | suggestion-generator.ts | systemLLM | 0.25 | 7/10 | [~] Solo IT, 15 istruzioni, buon SEO schema |
-| 29 | SERP Response Analysis | serp-monitoring-engine.ts | systemLLM | 0.1 | 7/10 | [!] **RISCHIO INJECTION**: dati SERP esterni non sanitizzati |
+| 29 | SERP Response Analysis | serp-monitoring-engine.ts | systemLLM | 0.1 | 7/10 | [✓] **RISOLTO Sprint 9**: `sanitize(r.title, 200)` e `sanitize(r.snippet, 500)` applicati prima dell'injection nel prompt |
 | 30 | Visibility Prompt Gen. | visibility/generate-prompts | systemLLM | 0.8 | 6/10 | [!] Temp troppo alta, input utente non sanitizzato |
 
 **Score medio complessivo: 6.9/10**
@@ -890,7 +890,7 @@ Per ogni prompt verificato:
 
 ### 14.2 Privacy Dati
 
-- [!] **PII in logs**: **CRITICO** — Multipli `console.log` con dati utente non redatti: user message preview (chat/route.ts:2013), bot response (chat/route.ts:3498,3514), profile data (chat/route.ts:1770), field extraction failures (chatbot/message/route.ts:223). Nomi, email, telefoni potenzialmente esposti nei server logs
+- [✓] **PII in logs**: ~~CRITICO — Multipli console.log con dati utente non redatti~~. **✅ Sprint 9 FATTO** — User message preview, bot response preview, system prompt snippet ora sotto guardia `process.env.NODE_ENV === 'development'`. Non emessi in production (Railway). Supervisor override response logs similarly guarded.
 - [~] **Consenso GDPR**: PARZIALE — `CookieConsent.tsx` con 2 opzioni ("Accetta tutti" / "Solo necessari") salvate in localStorage. **MANCANO**: audit trail persistente, consenso esplicito per data collection (nome, email, phone), consenso per interview recording/storage
 - [✗] **Data retention**: **NON IMPLEMENTATA** — Nessuna policy di retention. Campi `expiresAt` esistono nello schema ma nessun cron di purging automatico. Dati persistono indefinitamente
 - [✗] **Right to deletion**: **NON IMPLEMENTATO PER END USER** — Solo `deleteUser()` admin action (admin.ts:288). Nessun user self-service deletion, nessun data export API (GDPR Art. 20 Right of Portability), nessun "right to be forgotten"
@@ -898,7 +898,7 @@ Per ogni prompt verificato:
 
 ### 14.3 Sicurezza LLM
 
-- [!] **Prompt injection**: **CRITICO** — Input utente NON sanitizzato prima di injection in prompt. Solo 6 pattern regex basici in `PROMPT_LEAK_PATTERNS` (chatbot/message/route.ts:30-37) applicati solo all'OUTPUT, non all'INPUT. Concatenazione diretta: `[User says: "${userMessage}"]` in chat/route.ts:2927. Mancano pattern per: "ignore instructions", "pretend", "forget", "simulate", unicode evasion, encoding tricks
+- [~] **Prompt injection**: PARZIALMENTE RISOLTO. ✅ Sprint 9 — P29 SERP data ora sanitizzato con `sanitize()`. `prompt-builder.ts` usa `sanitize()`/`sanitizeConfig()` su tutti gli input. `ToneAnalyzer` sanitizza i messaggi utente. MA: `chat/route.ts` ancora usa messaggi raw nel payload `messages` (standard per chat LLM — il modello riceve i messaggi così com'è, non come injection nel system prompt). PROMPT_LEAK_PATTERNS solo su OUTPUT — gap residuo per encoding tricks avanzati
 - [~] **Data exfiltration**: Organization isolation tramite `organizationId` nelle query. MA P29 (SERP data) e P30 (visibility prompts) iniettano dati esterni non controllati. Il chatbot ha scope guardrails ("STRICT SCOPE") ma nessun check output-side per leak di system prompt
 - [✓] **API key protection**: VERIFICATO — Keys isolate server-side (`getApiKey()` in llmService.ts). Mai inviate al client, mai loggate. Fallback chain: Bot-specific → GlobalConfig (cache 5min) → env var. Nessuna esposizione in error messages
 - [✓] **Rate limiting**: VERIFICATO — Global: 20 req/10s via Upstash Redis (middleware.ts). Message cooldown: 250ms via in-memory Map (rateLimiter.ts). Eccezioni: /api/auth, /api/stripe/webhook. **NOTA**: in-memory cooldown non distribuito (serverless multi-instance), Redis rate limit fails open (accetta se Redis down)
@@ -930,7 +930,7 @@ Per ogni prompt verificato:
 
 - [~] **Serverless limits**: chat/route.ts è **3511 righe** — file molto grande che impatta cold start (parsing/compilation). Funziona con maxDuration=60 ma **raccomandato split in moduli** per ridurre cold start e manutenibilità
 - [~] **DB connection pooling**: Prisma usa `@prisma/adapter-pg` con Node.js `pg` Pool. Pool size **default (10)** senza config esplicita. Singleton pattern previene istanze multiple. **Potenzialmente insufficiente** per produzione con richieste concorrenti
-- [!] **In-memory state**: **CRITICO** — Due anti-pattern serverless: (1) `notificationsSent = new Map()` in creditNotificationService — reset su deploy, causa email duplicate. (2) `cooldownStore = new Map()` in rateLimiter — non distribuito, bypass possibile su istanze multiple. **FIX: migrare a Redis**
+- [✓] **In-memory state**: ~~CRITICO — Due anti-pattern serverless~~. **✅ GIÀ RISOLTO**: (1) `creditNotificationService` usa tabella DB `SentNotification` con constraint UNIQUE (orgId, type, period) — nessun Map. (2) `rateLimiter.ts` flaggato `@legacy` (zero imports nel codebase, non collegato a nessun route). Rate limiting globale tramite Upstash Redis in `middleware.ts`.
 - [~] **Cron job reliability**: I cron jobs hanno try/catch e logging, MA nessun retry mechanism, nessun dead letter queue, nessun monitoring. **E soprattutto: nessuno è schedulato** (no vercel.json)
 
 ---

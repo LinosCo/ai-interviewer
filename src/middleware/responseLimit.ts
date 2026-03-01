@@ -1,3 +1,8 @@
+/**
+ * @legacy — NOT WIRED. Zero imports in the codebase (verified 2026-03-01).
+ * This middleware was written but never connected to any route or src/middleware.ts.
+ * Safe to delete once confirmed unnecessary. Do NOT use without a refactor + test.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 import { planService } from '@/services/planService';
 

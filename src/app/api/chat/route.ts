@@ -72,6 +72,8 @@ import {
     enforceDeepOfferQuestion,
 } from '@/lib/interview/question-generator';
 import { completeInterview } from '@/lib/interview/interview-completion';
+import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
+import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
 export const maxDuration = 60;
 
 // ============================================================================
@@ -625,7 +627,7 @@ export async function POST(req: Request) {
 
         console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
         console.log(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
-        if (lastMessage?.role === 'user') {
+        if (process.env.NODE_ENV === 'development' && lastMessage?.role === 'user') {
             const userPreview = String(lastMessage.content || '').slice(0, 400);
             console.log("💬 [USER] Preview:", userPreview);
         }
@@ -1262,8 +1264,25 @@ export async function POST(req: Request) {
             systemPrompt += `\n\n${manualKnowledgePrompt || generatedKnowledgePrompt}`;
         }
 
+        // Tone adaptation — active from turn 4 onwards (need enough context to detect style)
+        if (canonicalMessages.length >= 4) {
+            try {
+                const toneAnalyzer = new ToneAnalyzer(openAIKey);
+                const toneProfile = await toneAnalyzer.analyzeTone(canonicalMessages, language);
+                const toneBlock = buildToneAdaptationPrompt(toneProfile, language);
+                if (toneBlock) {
+                    systemPrompt += `\n\n${toneBlock}`;
+                }
+            } catch (toneErr) {
+                // Non-blocking: tone adaptation is best-effort, never fails the main request
+                console.error('[TONE] Analysis failed (non-blocking):', toneErr);
+            }
+        }
+
         console.log("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);
-        console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 1000) + "...");
+        if (process.env.NODE_ENV === 'development') {
+            console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 1000) + "...");
+        }
 
         // Inject intro message at start
         if (introMessage && canonicalMessages.length <= 1) {
@@ -1487,8 +1506,10 @@ hard_rules:
         console.timeEnd("LLM");
         let responseText = result.object.response;
         console.log(`🧠 [LLM_REASONING]: ${result.object.meta_comment || 'N/A'}`);
-        console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
-        console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
+            console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
+        }
 
         // ====================================================================
         // 5.4 TRANSITION / EXTENSION OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
@@ -1844,7 +1865,7 @@ hard_rules:
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing. The response MUST end with a question mark.`;
                 const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
-                console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
+                if (process.env.NODE_ENV === 'development') console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
 
                 // If the override still isn't a proper question, use fallback question-only generation (MAX 1 retry)
                 const stillBad = !responseText.includes('?') || goodbyePattern.test(responseText);
@@ -1863,7 +1884,7 @@ hard_rules:
                             requireAcknowledgment: true,
                             onUsage: collectLlmUsage
                         });
-                        console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
+                        if (process.env.NODE_ENV === 'development') console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
                     } catch (e) {
                         console.error("Question-only generation failed:", e);
                         // Final fallback: simple question

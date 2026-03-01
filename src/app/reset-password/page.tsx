@@ -8,6 +8,8 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Input } from '@/components/ui/business-tuner/Input';
 import { Card } from '@/components/ui/business-tuner/Card';
+import { resetPasswordSchema } from '@/lib/validation/schemas';
+import { PasswordStrength } from '@/components/ui/PasswordStrength';
 
 function ResetPasswordForm() {
     const router = useRouter();
@@ -31,19 +33,11 @@ function ResetPasswordForm() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (password !== confirmPassword) {
-            setMessage({
-                type: 'error',
-                text: 'Le password non corrispondono.',
-            });
-            return;
-        }
-
-        if (password.length < 8) {
-            setMessage({
-                type: 'error',
-                text: 'La password deve essere di almeno 8 caratteri.',
-            });
+        // Client-side validation with zod
+        const result = resetPasswordSchema.safeParse({ password, confirmPassword });
+        if (!result.success) {
+            const fieldError = result.error.errors[0]?.message;
+            setMessage({ type: 'error', text: fieldError || 'Dati non validi' });
             return;
         }
 
@@ -121,6 +115,7 @@ function ResetPasswordForm() {
                                 disabled={isLoading || !token}
                                 icon={<div style={{ width: '18px' }}>🔒</div>}
                             />
+                            <PasswordStrength password={password} />
                         </div>
 
                         <div style={{ marginBottom: '1.5rem' }}>

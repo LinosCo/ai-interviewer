@@ -4,6 +4,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useState, useEffect } from 'react';
 import { Building2, UserPlus, Users, Shield, Trash2, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { inviteMemberSchema } from '@/lib/validation/schemas';
 
 interface Member {
     id: string;
@@ -46,7 +47,14 @@ export default function TeamManagementPage() {
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentOrganization || !inviteEmail) return;
+        if (!currentOrganization) return;
+
+        // Client-side validation
+        const validation = inviteMemberSchema.safeParse({ email: inviteEmail });
+        if (!validation.success) {
+            setMessage({ type: 'error', text: validation.error.errors[0]?.message ?? 'Email non valida' });
+            return;
+        }
 
         setIsInviting(true);
         setMessage(null);

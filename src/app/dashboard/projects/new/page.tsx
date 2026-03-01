@@ -4,7 +4,9 @@ import { createProjectAction } from '@/app/actions';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSearchParams } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
+import { useState } from 'react';
 import { Building2, LayoutGrid, Loader2, Plus } from 'lucide-react';
+import { createProjectSchema } from '@/lib/validation/schemas';
 
 export default function NewProjectPage() {
     const { organizations, currentOrganization } = useOrganization();
@@ -12,6 +14,7 @@ export default function NewProjectPage() {
     const orgIdFromUrl = searchParams.get('orgId');
     const selectedOrg = organizations.find((org) => org.id === (orgIdFromUrl || currentOrganization?.id)) || currentOrganization || organizations[0];
     const isProjectCreationLocked = selectedOrg?.plan === 'TRIAL' || selectedOrg?.plan === 'FREE';
+    const [nameError, setNameError] = useState<string | null>(null);
 
     // Use orgId from URL, or currentOrg from context, or first org available
     const initialOrgId = orgIdFromUrl || currentOrganization?.id || organizations[0]?.id;
@@ -51,7 +54,20 @@ export default function NewProjectPage() {
                 </div>
             </div>
 
-            <form action={createProjectAction} className="space-y-6">
+            <form
+                action={createProjectAction}
+                onSubmit={(e) => {
+                    const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement)?.value ?? '';
+                    const result = createProjectSchema.safeParse({ name });
+                    if (!result.success) {
+                        e.preventDefault();
+                        setNameError(result.error.errors[0]?.message ?? 'Nome non valido');
+                    } else {
+                        setNameError(null);
+                    }
+                }}
+                className="space-y-6"
+            >
                 <div>
                     <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Spazio di lavoro (Team)</label>
                     <div className="relative">
@@ -76,7 +92,11 @@ export default function NewProjectPage() {
                         required
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-amber-500 transition-all text-sm font-medium"
                         placeholder="Es: Ricerca Clienti Q3"
+                        onChange={() => nameError && setNameError(null)}
                     />
+                    {nameError && (
+                        <p className="text-sm text-red-500 mt-1">{nameError}</p>
+                    )}
                 </div>
 
                 <div className="pt-4">

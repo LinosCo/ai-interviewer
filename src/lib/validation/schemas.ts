@@ -53,6 +53,27 @@ export const resetPasswordSchema = z
         path: ['confirmPassword'],
     });
 
+// Register client-side schema (no confirmPassword — field not in form)
+export const registerClientSchema = z.object({
+    name: z
+        .string()
+        .min(2, 'Il nome deve essere di almeno 2 caratteri')
+        .max(100, 'Il nome è troppo lungo'),
+    email: z
+        .string()
+        .min(1, 'Email obbligatoria')
+        .email('Formato email non valido'),
+    companyName: z
+        .string()
+        .min(2, 'La ragione sociale deve essere di almeno 2 caratteri')
+        .max(100, 'La ragione sociale è troppo lunga'),
+    password: z
+        .string()
+        .min(8, 'La password deve essere di almeno 8 caratteri')
+        .regex(/[A-Z]/, 'La password deve contenere almeno una lettera maiuscola')
+        .regex(/[0-9]/, 'La password deve contenere almeno un numero'),
+});
+
 // Dashboard schemas
 export const inviteMemberSchema = z.object({
     email: z
@@ -70,6 +91,7 @@ export const createProjectSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+export type RegisterClientInput = z.infer<typeof registerClientSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

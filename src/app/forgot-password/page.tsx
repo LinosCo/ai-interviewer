@@ -7,6 +7,7 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Input } from '@/components/ui/business-tuner/Input';
 import { Card } from '@/components/ui/business-tuner/Card';
+import { forgotPasswordSchema } from '@/lib/validation/schemas';
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
@@ -15,8 +16,17 @@ export default function ForgotPasswordPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
         setMessage(null);
+
+        // Client-side validation
+        const result = forgotPasswordSchema.safeParse({ email });
+        if (!result.success) {
+            const fieldError = result.error.errors[0]?.message;
+            setMessage({ type: 'error', text: fieldError || 'Email non valida' });
+            return;
+        }
+
+        setIsLoading(true);
 
         try {
             const response = await fetch('/api/auth/forgot-password', {

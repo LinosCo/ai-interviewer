@@ -143,6 +143,7 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
             </div>
 
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="overflow-x-auto w-full">
                 <table className="w-full text-sm text-left">
                     <thead className="border-b bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-600">
                         <tr>
@@ -192,6 +193,7 @@ export default function ProjectsView({ projects, users }: ProjectsViewProps) {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {/* Create Dialog */}

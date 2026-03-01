@@ -283,6 +283,7 @@ export default function CMSPage() {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4">
                         Pagine Più Visitate
                     </h2>
+                    <div className="overflow-x-auto w-full">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="text-left text-stone-400">
@@ -301,6 +302,7 @@ export default function CMSPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
 
@@ -310,6 +312,7 @@ export default function CMSPage() {
                     <h2 className="text-[10px] font-black uppercase tracking-widest text-stone-400 mb-4">
                         Query di Ricerca Principali
                     </h2>
+                    <div className="overflow-x-auto w-full">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="text-left text-stone-400">
@@ -330,6 +333,7 @@ export default function CMSPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
         </div>

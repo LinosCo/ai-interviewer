@@ -242,6 +242,7 @@ export default async function PlansPage({
             <div className="mt-16 max-w-6xl">
                 <h2 className="text-2xl font-bold text-stone-900 mb-8">Confronto funzionalità</h2>
                 <div className="bg-white/80 backdrop-blur-md rounded-[24px] border border-white/50 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto w-full">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-stone-100">
@@ -282,6 +283,7 @@ export default async function PlansPage({
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 

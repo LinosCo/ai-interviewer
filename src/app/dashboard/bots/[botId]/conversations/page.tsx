@@ -89,6 +89,7 @@ export default async function ConversationsListPage({ params }: { params: Promis
                 </div>
             ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto w-full">
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
@@ -168,6 +169,7 @@ export default async function ConversationsListPage({ params }: { params: Promis
                             })}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
         </div>

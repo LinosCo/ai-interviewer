@@ -27,6 +27,7 @@
     "@auth/prisma-adapter": "^2.11.1",
     "@google-analytics/data": "^5.2.1",
     "@google/generative-ai": "^0.24.1",
+    "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^7.4.0",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -4,8 +4,9 @@ import { redirect, notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { subscriptionTierToPlanType, PlanType } from '@/config/plans'
 import Link from 'next/link'
-import { Settings, Users, BarChart2, ChevronRight } from 'lucide-react'
+import { Settings, Users, BarChart2, ChevronRight, Link2, ExternalLink } from 'lucide-react'
 import { hasTrainingAccess } from '@/lib/training/plan-gate'
+import CopyLinkButton from '@/components/training/admin/CopyLinkButton'
 
 const statusLabel: Record<string, string> = {
   DRAFT: 'Bozza',
@@ -134,6 +135,53 @@ export default async function TrainingBotOverviewPage({
           Impostazioni
         </Link>
       </div>
+
+      {/* Share Link */}
+      {(() => {
+        const publicUrl = `${process.env.NEXTAUTH_URL ?? ''}/t/${bot.slug}`
+        const isPublished = bot.status === 'PUBLISHED'
+        return (
+          <div
+            className={`flex items-center gap-3 p-4 rounded-xl border ${
+              isPublished ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+            }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                isPublished ? 'bg-green-100' : 'bg-gray-100'
+              }`}
+            >
+              <Link2
+                className={`w-4 h-4 ${isPublished ? 'text-green-600' : 'text-gray-400'}`}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-500 mb-0.5">Link del percorso</p>
+              {isPublished ? (
+                <p className="text-sm font-medium text-gray-800 truncate">{publicUrl}</p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  Pubblica il bot per abilitare il link
+                </p>
+              )}
+            </div>
+            {isPublished && (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <CopyLinkButton url={publicUrl} />
+                <a
+                  href={`/t/${bot.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all bg-white border border-gray-200 text-gray-700 hover:border-indigo-300 hover:text-indigo-700"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Apri
+                </a>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

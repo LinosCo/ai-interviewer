@@ -27,7 +27,7 @@ RUN npm run build
 EXPOSE 8080
 ENV HOSTNAME="0.0.0.0"
 
-# Run DB migrations (idempotent) then start the app.
-# This ensures any pending Prisma migrations are applied on every container start,
-# covering the case where a new deploy adds schema changes.
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+# Run pre-start repair script (detects migration drift, rolls back phantom-applied
+# migrations, then runs prisma migrate deploy) before starting the app.
+# Uses pg directly to check actual table existence vs _prisma_migrations tracker.
+CMD ["sh", "-c", "node scripts/pre-start.js && npm start"]

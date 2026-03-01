@@ -942,18 +942,18 @@ Per ogni prompt verificato:
 
 ### SOMMARIO AUDIT
 
-| Metrica | Valore al Audit | Valore Attuale (post Sprint 1-5) |
+| Metrica | Valore al Audit | Valore Attuale (post Sprint 1-9) |
 |---------|--------|--------|
 | Verifiche totali eseguite | ~200 | ~200 |
-| Items ✓ (confermati funzionanti) | ~128 | ~137 (+9 gap risolti) |
-| Items ~ (parziali/con caveat) | ~42 | ~33 |
+| Items ✓ (confermati funzionanti) | ~128 | **~151** (+23 sprint 6-9) |
+| Items ~ (parziali/con caveat) | ~42 | ~26 |
 | Items ✗ (non funzionanti/assenti) | ~18 | ~18 (non affrontati) |
-| Items ! (critici/bloccanti) | ~12 | ~3 (residui) |
-| Prompt auditati | 30 (media qualità: 6.9/10) | 30 (media stimata: ~7.5/10) |
-| Cron jobs trovati | 10 (0 schedulati) | 11 (schedulati in vercel.json; Railway cron da configurare) |
-| Vulnerabilità sicurezza | 6 (2 CRITICHE, 2 ALTE, 2 MEDIE) | ~2 (MEDIE residue: chatbot output-side, context overflow) |
-| **Gap critici risolti** | 0/18 | **9/18** (A,B,C,D,E,F,I,J,Q) |
-| **Sprint completati** | 0 | **Sprint 1-5** ✅ |
+| Items ! (critici/bloccanti) | ~12 | **0** (tutti risolti Sprint 9) |
+| Prompt auditati | 30 (media qualità: 6.9/10) | 30 (media stimata: ~7.8/10) |
+| Cron jobs trovati | 10 (0 schedulati) | 11 (6 schedulati vercel.json — 5 ancora mancanti: cms-generate-suggestions, partner-fees, reset-credits, reset-monthly-counters, cms-sync-analytics) |
+| Vulnerabilità sicurezza | 6 (2 CRITICHE, 2 ALTE, 2 MEDIE) | **~1** (MEDIA residua: context window overflow) |
+| **Gap critici risolti** | 0/18 | **17/18** (A,B,C,D,E,F,G,I,J,K,L,M,N,O,P,Q,R — H mancante) |
+| **Sprint completati** | 0 | **Sprint 1-9** ✅ |
 
 ---
 
@@ -1112,7 +1112,10 @@ Ordine di implementazione suggerito per massimizzare impatto con minimo effort:
 **Sprint 4 (Week 8-10)**: ✅ COMPLETATO — KB auto-growth cron + n8n dispatchTips wiring
 **Sprint 5 (Week 11-12)**: ✅ COMPLETATO — TipRoutingRule, TipRoutingExecutor, integrations hub 3-tab, palette UI
 **Sprint 6**: ✅ COMPLETATO — KB semantic search (G) + Social integration (K) + GEO trend chart (L) + LinkedIn B2B (M) + Export PDF (N) + DB pool tuning (P) + Feedback loop chatbot+CMS (R)
-**Sprint 7**: ✅ COMPLETATO — Split chat/route.ts (O): estratte chat-intent.ts, question-generator.ts, interview-completion.ts. **Sprint 8 (prossimo)**: ⏳ Internazionalizzazione (H) [bassa priorità, 30-40h]
+**Sprint 7**: ✅ COMPLETATO — Split chat/route.ts (O): estratte chat-intent.ts, question-generator.ts, interview-completion.ts.
+**Sprint 8**: ✅ COMPLETATO — Chatbot embed data-* options, enablePageContext UI toggle, knowledge-gaps org filter, double cookie fix, route slug conflict ([id] vs [projectId]).
+**Sprint 9**: ✅ COMPLETATO — Tone adapter wiring (active dal turno 4, non-blocking), PII log guards (dev-only), SERP injection fix (P29 sanitize), Applica button fix (insights), cleanup .bak files, 5 middleware @legacy rimossi.
+**Sprint 10 (prossimo)**: ⏳ ABANDONED conversation status, cron scheduling (5 route non schedulate: cms-generate-suggestions, partner-fees, reset-credits, reset-monthly-counters, cms-sync-analytics), KB context window sliding window.
 
 ---
 

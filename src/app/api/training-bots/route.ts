@@ -9,6 +9,23 @@ const CreateBotSchema = z.object({
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
   organizationId: z.string(),
   language: z.string().default('it'),
+  tone: z.string().nullish(),
+  learningGoal: z.string().nullish(),
+  targetAudience: z.string().nullish(),
+  traineeEducationLevel: z.enum(['PRIMARY', 'SECONDARY', 'UNIVERSITY', 'PROFESSIONAL']).optional(),
+  traineeCompetenceLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).optional(),
+  failureMode: z.enum(['STRICT', 'PERMISSIVE']).optional(),
+  primaryColor: z.string().nullish(),
+  logoUrl: z.string().nullish(),
+  introMessage: z.string().nullish(),
+  passScoreThreshold: z.number().int().min(0).max(100).optional(),
+  maxRetries: z.number().int().min(0).optional(),
+  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
+  topics: z.array(z.object({
+    label: z.string().min(1),
+    description: z.string().nullish(),
+    orderIndex: z.number().int().optional(),
+  })).optional(),
 })
 
 export async function GET(request: Request) {
@@ -58,10 +75,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const data = CreateBotSchema.parse(body)
+    const parsed = CreateBotSchema.parse(body)
+    const { topics, ...botFields } = parsed
 
     try {
-      await assertOrganizationAccess(session.user.id, data.organizationId, 'MEMBER')
+      await assertOrganizationAccess(session.user.id, parsed.organizationId, 'MEMBER')
     } catch (error) {
       if (error instanceof WorkspaceError) {
         return NextResponse.json({ error: error.message }, { status: error.status })
@@ -69,7 +87,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const bot = await prisma.trainingBot.create({ data })
+    const bot = await prisma.$transaction(async (tx) => {
+      const created = await tx.trainingBot.create({ data: botFields })
+
+      if (topics && topics.length > 0) {
+        await tx.trainingTopicBlock.createMany({
+          data: topics.map((t, i) => ({
+            label: t.label,
+            description: t.description,
+            orderIndex: t.orderIndex ?? i,
+            trainingBotId: created.id,
+          })),
+        })
+      }
+
+      return created
+    })
 
     return NextResponse.json({ bot }, { status: 201 })
   } catch (err) {

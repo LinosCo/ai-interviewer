@@ -206,8 +206,8 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
       }
 
       if (mode === 'create') {
-        const created = (await res.json()) as { id: string }
-        router.push(`/dashboard/training/${created.id}/settings`)
+        const created = (await res.json()) as { bot: { id: string } }
+        router.push(`/dashboard/training/${created.bot.id}/settings`)
       } else {
         setSuccess(true)
         setTimeout(() => setSuccess(false), 3000)

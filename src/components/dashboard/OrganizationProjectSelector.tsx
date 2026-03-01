@@ -5,6 +5,7 @@ import { useProject, ALL_PROJECTS_OPTION } from '@/contexts/ProjectContext';
 import { Building2, ChevronDown, Folder, LayoutGrid, Search, Plus, Check } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface Organization {
     id: string;
@@ -26,6 +27,8 @@ type DropdownMode = 'org' | 'project' | null;
 export default function OrganizationProjectSelector() {
     const { organizations, currentOrganization, setCurrentOrganization, loading: orgLoading, error: orgError, refetchOrganizations } = useOrganization();
     const { projects, selectedProject, setSelectedProject, loading: projectLoading, isOrgAdmin } = useProject();
+    const router = useRouter();
+    const pathname = usePathname();
 
     const [dropdownMode, setDropdownMode] = useState<DropdownMode>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -74,7 +77,17 @@ export default function OrganizationProjectSelector() {
     const handleProjectSelect = useCallback((project: Project) => {
         setSelectedProject(project);
         closeDropdown();
-    }, [setSelectedProject, closeDropdown]);
+
+        // If we're on a project-specific URL route (e.g. /dashboard/projects/[id]/integrations),
+        // navigate to the same sub-route for the newly selected project so the page data refreshes.
+        if (project.id !== ALL_PROJECTS_OPTION.id) {
+            const projectRouteMatch = pathname?.match(/^(\/dashboard\/projects\/)([^/]+)(\/.*)?$/);
+            if (projectRouteMatch) {
+                const suffix = projectRouteMatch[3] || '';
+                router.push(`/dashboard/projects/${project.id}${suffix}`);
+            }
+        }
+    }, [setSelectedProject, closeDropdown, router, pathname]);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
         const itemsCount = dropdownMode === 'org' ? filteredOrganizations.length : filteredProjects.length;

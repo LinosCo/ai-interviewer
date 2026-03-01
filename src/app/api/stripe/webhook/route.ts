@@ -125,6 +125,11 @@ export async function POST(req: NextRequest) {
                 await handlePaymentFailed(invoice);
                 break;
             }
+            case 'customer.subscription.trial_will_end': {
+                const subscription = event.data.object as Stripe.Subscription;
+                await handleTrialWillEnd(subscription);
+                break;
+            }
             default:
                 break;
         }
@@ -260,7 +265,10 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session, strip
 
 async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription) {
     const subscription = await prisma.subscription.findUnique({
-        where: { stripeSubscriptionId: stripeSubscription.id }
+        where: { stripeSubscriptionId: stripeSubscription.id },
+        include: {
+            organization: { select: { plan: true } }
+        }
     });
 
     if (!subscription) return;
@@ -280,6 +288,19 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
     const { planType, billingCycle } = await resolvePlanAndCycleFromPriceId(priceId);
     const orgUpdateData = await buildOrganizationPlanUpdate(subscription.organizationId, planType, billingCycle);
     const periodDates = getStripePeriodDates(stripeSubscription);
+
+    // Downgrade detection: confronta rank piano vecchio vs nuovo
+    const oldPlanType = subscription.organization.plan as PlanType;
+    const oldRank = PLAN_RANK[oldPlanType] ?? 0;
+    const newRank = PLAN_RANK[planType] ?? 0;
+    const isDowngrade = newRank < oldRank;
+
+    if (isDowngrade) {
+        console.log(
+            `[stripe/webhook] Plan downgrade detected: ${oldPlanType} → ${planType} ` +
+            `for org ${subscription.organizationId}`
+        );
+    }
 
     await prisma.$transaction([
         prisma.subscription.update({
@@ -301,6 +322,11 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
             data: orgUpdateData
         })
     ]);
+
+    // Dopo la transazione: se è un downgrade, applica i limiti del nuovo piano
+    if (isDowngrade) {
+        await enforceDowngradeLimits(subscription.organizationId, planType);
+    }
 }
 
 async function handleSubscriptionCanceled(stripeSubscription: Stripe.Subscription) {
@@ -330,6 +356,29 @@ async function handleSubscriptionCanceled(stripeSubscription: Stripe.Subscriptio
             }
         })
     ]);
+}
+
+async function handleTrialWillEnd(stripeSubscription: Stripe.Subscription) {
+    const subscription = await prisma.subscription.findUnique({
+        where: { stripeSubscriptionId: stripeSubscription.id },
+        select: { id: true, organizationId: true, trialEndsAt: true }
+    });
+
+    if (!subscription) return;
+
+    const trialEndsAt = unixTimestampToDate(stripeSubscription.trial_end);
+
+    // Aggiorna la data di fine trial (può essere già corretta, ma confermiamo)
+    await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { trialEndsAt }
+    });
+
+    console.log(
+        `[stripe/webhook] Trial will end for org ${subscription.organizationId} ` +
+        `at ${trialEndsAt?.toISOString() ?? 'unknown'}`
+    );
+    // TODO: inviare notifica email/in-app all'utente quando il sistema email sarà pronto
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
@@ -373,6 +422,59 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
     if (typeof rawSubscription === 'string') return rawSubscription;
     if (rawSubscription && typeof rawSubscription.id === 'string') return rawSubscription.id;
     return null;
+}
+
+// ─── Downgrade enforcement ───────────────────────────────────────────────────
+
+/** Rank numerico per rilevare downgrade. Più alto = piano superiore. */
+const PLAN_RANK: Record<string, number> = {
+    FREE: 0,
+    TRIAL: 1,
+    STARTER: 2,
+    PRO: 3,
+    PARTNER: 3,
+    BUSINESS: 4,
+    ENTERPRISE: 5,
+    ADMIN: 5,
+};
+
+/**
+ * Se il nuovo piano ha un limite hard di bot pubblicati,
+ * pausa i bot in eccesso (i più vecchi rimangono PAUSED).
+ */
+async function enforceDowngradeLimits(
+    organizationId: string,
+    newPlanType: PlanType
+): Promise<void> {
+    const newPlan = PLANS[newPlanType] || PLANS[PlanType.FREE];
+    const maxBots = newPlan.limits.maxChatbots;
+
+    // -1 = illimitato → nessuna azione necessaria
+    if (maxBots === -1) return;
+
+    const publishedBots = await prisma.bot.findMany({
+        where: {
+            project: { organizationId },
+            status: 'PUBLISHED',
+        },
+        orderBy: { createdAt: 'desc' }, // i più recenti hanno priorità
+        select: { id: true },
+    });
+
+    if (publishedBots.length <= maxBots) return;
+
+    // Pausa i bot in eccesso (i più vecchi, coda della lista ordinata desc)
+    const tosPause = publishedBots.slice(maxBots).map((b) => b.id);
+
+    await prisma.bot.updateMany({
+        where: { id: { in: tosPause } },
+        data: { status: 'PAUSED' },
+    });
+
+    console.log(
+        `[stripe/webhook] Downgrade enforcement: paused ${tosPause.length} bot(s) ` +
+        `for org ${organizationId} (new maxBots: ${maxBots})`
+    );
 }
 
 function mapTierToPlanType(tier: string): PlanType {

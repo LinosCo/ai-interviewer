@@ -140,20 +140,13 @@ export async function POST(req: Request) {
                     id: projectId,
                     organizationId: organization.id
                 },
-                include: {
+                select: {
+                    id: true,
+                    name: true,
+                    strategicVision: true,
+                    valueProposition: true,
                     bots: {
-                        include: {
-                            conversations: {
-                                where: {
-                                    startedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
-                                },
-                                include: {
-                                    analysis: true,
-                                    themeOccurrences: { include: { theme: true } }
-                                },
-                                take: 100
-                            }
-                        }
+                        select: { id: true }
                     }
                 }
             });
@@ -409,7 +402,7 @@ async function buildProjectContext(project: any) {
                         }
                     }
                 },
-                take: 50 // Reduced from 100 to prevent OOM
+                take: 20 // Only most recent 20 conversations needed for context
             }
         }
     });

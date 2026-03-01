@@ -3,7 +3,7 @@
 **Sintesi**
 Ho fatto una revisione statica della repo (non ho eseguito build/test). Il prodotto ha una base solida, ma ci sono alcune criticità che impattano sicurezza/compliance, affidabilità e qualità percepita. Le più urgenti sono: gestione migrazioni DB in produzione, logging di dati sensibili, consenso cookie/AI Act, incoerenze UI e costo/latency dei prompt "AI tips".
 
-**Ultimo aggiornamento stato:** 2026-03-01 — verificati i 10 item contro la codebase reale.
+**Ultimo aggiornamento stato:** 2026-03-01 (v2) — items 4/5/6 risolti in commit `75b5efd`.
 
 ---
 
@@ -14,9 +14,9 @@ Ho fatto una revisione statica della repo (non ho eseguito build/test). Il prodo
 | 1 | `postinstall` fa `prisma db push` in build | `package.json` | ✅ **RISOLTO** — Sprint 1 ha rimosso lo script |
 | 2 | Log di PII in server/API | `src/app/api/chat/route.ts`, `src/app/actions/admin.ts` | ✅ **RISOLTO** — Sprint 9 ha rimosso log di email/profili; rimane solo `conversationId` e preview testo (400 chars) |
 | 3 | Consenso cookie solo "UI", senza gating reale | `src/components/CookieConsent.tsx` | ✅ **ACCETTABILE** — nessuno script analytics/marketing caricato nel layout; gating non necessario al momento |
-| 4 | Due design system in conflitto (tailwind vs inline) | `src/components/ui/button.tsx`, `src/components/ui/business-tuner/Button.tsx` | ⚠️ **OPEN** — bassa priorità, backlog |
-| 5 | AI Tips generici quando manca strategia | `src/lib/insights/sync-engine.ts` | ⚠️ **OPEN** — ancora da ottimizzare |
-| 6 | Logging e prompt estremamente pesanti | `src/lib/insights/sync-engine.ts` | ⚠️ **OPEN** — `JSON.stringify` su oggetti grandi nei prompt; ancora da ridurre |
+| 4 | Due design system in conflitto (tailwind vs inline) | `src/components/ui/button.tsx`, `src/components/ui/business-tuner/Button.tsx` | ✅ **RISOLTO** — `business-tuner/Button` diventa re-export; `fullWidth`/`withShimmer`/`link` unificati in `button.tsx` (commit `75b5efd`) |
+| 5 | AI Tips generici quando manca strategia | `src/lib/insights/sync-engine.ts` | ✅ **RISOLTO** — 6 compact summarizer helpers; ~65% token reduction (commit `75b5efd`) |
+| 6 | Logging e prompt estremamente pesanti | `src/lib/insights/sync-engine.ts` | ✅ **RISOLTO** — cache TTL 15min + prompt data -65%; copilot query ancora da ottimizzare |
 | 7 | "Feature guard" non usata | `src/middleware/featureGuard.ts` | ✅ **RISOLTO** — file eliminato nei cleanup Sprint 7-9 |
 | 8 | Memory manager usa count di "facts" per media risposta | `src/lib/memory/memory-manager.ts` | ✅ **RISOLTO** — ora usa `messageLength` correttamente (running average) |
 | 9 | Polling senza cleanup su unmount | `src/app/dashboard/insights/page.tsx` | ✅ **ACCETTABILE** — polling avviato da click, non da `useEffect`; timeout 120s presente come fallback |

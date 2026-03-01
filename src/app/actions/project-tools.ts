@@ -259,6 +259,30 @@ export async function transferCMSConnectionToProject(connectionId: string, targe
 }
 
 /**
+ * Transfers an N8N Connection to a Project
+ */
+export async function transferN8NConnectionToProject(connectionId: string, targetProjectId: string) {
+  const connection = await prisma.n8NConnection.findUnique({
+    where: { id: connectionId },
+    select: { projectId: true }
+  });
+  if (!connection) throw new WorkspaceError('Connection not found', 404, 'N8N_NOT_FOUND');
+
+  await verifyTransferPermissions(connection.projectId, targetProjectId);
+
+  await prisma.n8NConnection.update({
+    where: { id: connectionId },
+    data: { projectId: targetProjectId }
+  });
+
+  await autoFixToolOrganizationForProject(targetProjectId);
+
+  revalidatePath(`/dashboard/projects/${targetProjectId}/integrations`);
+  revalidatePath('/dashboard');
+  return { success: true };
+}
+
+/**
  * Transfers a Project to another Organization.
  * Immediate move only when actor is ADMIN/OWNER in both source and target organizations.
  * Otherwise, create an approval invite for target organization admins.

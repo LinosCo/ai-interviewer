@@ -4,6 +4,9 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { TokenCategory } from '@prisma/client';
+import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 
 const generateSchema = z.object({
     goal: z.string().min(5).optional(),
@@ -40,6 +43,21 @@ export async function POST(req: Request) {
             return new Response('Unauthorized', { status: 401 });
         }
 
+        // Pre-check: verify organization has credits before calling LLM
+        const creditsCheck = await checkCreditsForAction('chatbot_session_message');
+        if (!creditsCheck.allowed) {
+            return Response.json(
+                {
+                    code: (creditsCheck as any).code || 'ACCESS_DENIED',
+                    error: creditsCheck.error,
+                    creditsNeeded: creditsCheck.creditsNeeded,
+                    creditsAvailable: creditsCheck.creditsAvailable,
+                },
+                { status: (creditsCheck as any).status || 403 }
+            );
+        }
+        const resolvedOrganizationId = creditsCheck.organizationId;
+
         const body = await req.json();
         const validation = generateSchema.safeParse(body);
 
@@ -72,10 +90,25 @@ export async function POST(req: Request) {
             const result = await generateObject({
                 model: openai('gpt-4o'),
                 schema: configSchema,
-                system: `Sei un esperto di Customer Support e Lead Generation Automation. 
+                system: `Sei un esperto di Customer Support e Lead Generation Automation.
                 Il tuo compito è raffinare una configurazione esistente di un Chatbot AI in base al feedback dell'utente.`,
                 prompt: `Configurazione Attuale:\n${sanitizeConfig(JSON.stringify(currentConfig, null, 2), 3000)}\n\nRichiesta di Modifica: "${sanitize(refinementPrompt, 1000)}"\n\nGenera la configurazione aggiornata. Rispondi in Italiano.`
             });
+
+            // Log token usage after successful generation
+            if (resolvedOrganizationId) {
+                TokenTrackingService.logTokenUsage({
+                    organizationId: resolvedOrganizationId,
+                    userId: creditsCheck.userId,
+                    inputTokens: result.usage?.promptTokens ?? 0,
+                    outputTokens: result.usage?.completionTokens ?? 0,
+                    category: TokenCategory.CHATBOT,
+                    model: 'gpt-4o',
+                    operation: 'chatbot-generate-refine',
+                    resourceType: 'chatbot_generate',
+                }).catch(err => console.error('[TokenTracking] chatbot/generate refine usage log failed:', err));
+            }
+
             return Response.json(result.object);
         }
 
@@ -83,9 +116,9 @@ export async function POST(req: Request) {
         const result = await generateObject({
             model: openai('gpt-4o'),
             schema: configSchema,
-            system: `Sei un esperto di Customer Support e Lead Generation Automation. 
+            system: `Sei un esperto di Customer Support e Lead Generation Automation.
             Il tuo compito è configurare un Chatbot AI ottimizzato per l'obiettivo dell'utente.
-            
+
             Linee guida:
             1. **Nome**: Professionale ma accattivante.
             2. **System Prompt**: Deve istruire il bot a essere utile, conciso e orientato alla conversione/risoluzione.
@@ -96,6 +129,20 @@ export async function POST(req: Request) {
             7. **Boundaries**: Definisci chiaramente cosa il bot può e non può fare.`,
             prompt: `Obiettivo del Chatbot: "${sanitize(prompt, 1000)}"${businessContext ? `\n\nContesto Business: ${sanitizeConfig(businessContext, 2000)}` : ''}\n\nGenera la configurazione completa. Rispondi in Italiano.`
         });
+
+        // Log token usage after successful generation
+        if (resolvedOrganizationId) {
+            TokenTrackingService.logTokenUsage({
+                organizationId: resolvedOrganizationId,
+                userId: creditsCheck.userId,
+                inputTokens: result.usage?.promptTokens ?? 0,
+                outputTokens: result.usage?.completionTokens ?? 0,
+                category: TokenCategory.CHATBOT,
+                model: 'gpt-4o',
+                operation: 'chatbot-generate-initial',
+                resourceType: 'chatbot_generate',
+            }).catch(err => console.error('[TokenTracking] chatbot/generate initial usage log failed:', err));
+        }
 
         return Response.json(result.object);
 

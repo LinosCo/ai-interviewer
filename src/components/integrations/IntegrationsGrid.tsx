@@ -5,10 +5,12 @@ import { ConnectionShareDialog } from './ConnectionShareDialog';
 import { ConnectionTransferOrgDialog } from './ConnectionTransferOrgDialog';
 import { useState } from 'react';
 import TransferDialog from '@/components/dashboard/TransferDialog';
+import { showToast } from '@/components/toast';
 import {
   transferMCPConnectionToProject,
   transferGoogleConnectionToProject,
-  transferCMSConnectionToProject
+  transferCMSConnectionToProject,
+  transferN8NConnectionToProject
 } from '@/app/actions/project-tools';
 
 type ConnectionStatus = 'PENDING' | 'TESTING' | 'ACTIVE' | 'ERROR' | 'DISABLED';
@@ -86,6 +88,7 @@ interface IntegrationsGridProps {
   onTestN8N?: (id: string) => Promise<void>;
   onDeleteN8N?: (id: string) => Promise<void>;
   onConfigureN8N?: () => void;
+  onUpdateGoogle?: (id: string, data: { ga4PropertyId?: string; gscSiteUrl?: string }) => Promise<void>;
   projects: Project[];
   organizations?: Organization[];
   currentProjectId: string;
@@ -113,6 +116,7 @@ export function IntegrationsGrid({
   onTestN8N,
   onDeleteN8N,
   onConfigureN8N,
+  onUpdateGoogle,
   projects,
   organizations = [],
   currentProjectId,
@@ -120,9 +124,15 @@ export function IntegrationsGrid({
   currentOrgName = '',
   onRefresh
 }: IntegrationsGridProps) {
-  const [transferItem, setTransferItem] = useState<{ id: string; name: string; type: 'MCP' | 'GOOGLE' | 'CMS' } | null>(null);
+  const [transferItem, setTransferItem] = useState<{ id: string; name: string; type: 'MCP' | 'GOOGLE' | 'CMS' | 'N8N' } | null>(null);
   const [shareConnection, setShareConnection] = useState<{ id: string; name: string; type: 'CMS' | 'MCP' } | null>(null);
   const [transferOrgConnection, setTransferOrgConnection] = useState<{ id: string; name: string; type: 'CMS' | 'MCP' } | null>(null);
+  const [googleEditOpen, setGoogleEditOpen] = useState(false);
+  const [googleEditData, setGoogleEditData] = useState({
+    ga4PropertyId: googleConnection?.ga4PropertyId || '',
+    gscSiteUrl: googleConnection?.gscSiteUrl || '',
+  });
+  const [googleEditSaving, setGoogleEditSaving] = useState(false);
 
   const canRead = ['PRO', 'BUSINESS', 'PARTNER'].includes(userPlan);
   const canWrite = ['BUSINESS', 'PARTNER'].includes(userPlan);
@@ -147,36 +157,108 @@ export function IntegrationsGrid({
       {/* Integration Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Google */}
-        <IntegrationCard
-          id={googleConnection?.id || 'google'}
-          type="GOOGLE"
-          name="Google"
-          description="Analytics + Search Console"
-          status={
-            googleConnection
-              ? googleConnection.ga4Status === 'ACTIVE' && googleConnection.gscStatus === 'ACTIVE'
-                ? 'ACTIVE'
-                : googleConnection.ga4Status === 'ERROR' || googleConnection.gscStatus === 'ERROR'
-                  ? 'ERROR'
-                  : 'PENDING'
-              : 'DISABLED'
-          }
-          lastSyncAt={googleConnection?.ga4LastSyncAt || googleConnection?.gscLastSyncAt}
-          lastError={googleConnection?.ga4LastError || googleConnection?.gscLastError}
-          onTest={
-            googleConnection
-              ? async () => {
-                if (googleConnection.ga4Enabled) await onTestGA4(googleConnection.id);
-                if (googleConnection.gscEnabled) await onTestGSC(googleConnection.id);
-              }
-              : undefined
-          }
-          onConfigure={onConfigureGoogle}
-          onDelete={googleConnection ? () => onDeleteGoogle(googleConnection.id) : undefined}
-          onTransfer={googleConnection ? () => setTransferItem({ id: googleConnection.id, name: 'Google Connection', type: 'GOOGLE' }) : undefined}
-          disabled={!googleConnection}
-          upgradeRequired={!canRead}
-        />
+        <div className="flex flex-col gap-0">
+          <IntegrationCard
+            id={googleConnection?.id || 'google'}
+            type="GOOGLE"
+            name="Google"
+            description="Analytics + Search Console"
+            status={
+              googleConnection
+                ? googleConnection.ga4Status === 'ACTIVE' && googleConnection.gscStatus === 'ACTIVE'
+                  ? 'ACTIVE'
+                  : googleConnection.ga4Status === 'ERROR' || googleConnection.gscStatus === 'ERROR'
+                    ? 'ERROR'
+                    : 'PENDING'
+                : 'DISABLED'
+            }
+            lastSyncAt={googleConnection?.ga4LastSyncAt || googleConnection?.gscLastSyncAt}
+            lastError={googleConnection?.ga4LastError || googleConnection?.gscLastError}
+            onTest={
+              googleConnection
+                ? async () => {
+                  if (googleConnection.ga4Enabled) await onTestGA4(googleConnection.id);
+                  if (googleConnection.gscEnabled) await onTestGSC(googleConnection.id);
+                }
+                : undefined
+            }
+            onConfigure={onConfigureGoogle}
+            onDelete={googleConnection ? () => onDeleteGoogle(googleConnection.id) : undefined}
+            onTransfer={googleConnection ? () => setTransferItem({ id: googleConnection.id, name: 'Google Connection', type: 'GOOGLE' }) : undefined}
+            disabled={!googleConnection}
+            upgradeRequired={!canRead}
+          />
+
+          {/* Inline edit form for GA4 Property ID and GSC Site URL */}
+          {googleConnection && onUpdateGoogle && (
+            <div className="bg-white border border-t-0 border-stone-200 rounded-b-xl px-6 pb-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setGoogleEditOpen(v => !v);
+                  if (!googleEditOpen) {
+                    setGoogleEditData({
+                      ga4PropertyId: googleConnection.ga4PropertyId || '',
+                      gscSiteUrl: googleConnection.gscSiteUrl || '',
+                    });
+                  }
+                }}
+                className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-stone-600 transition-colors pt-3"
+              >
+                <span>{googleEditOpen ? '▲' : '▼'}</span>
+                Modifica Property ID / Site URL
+              </button>
+
+              {googleEditOpen && (
+                <div className="mt-3 space-y-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-stone-600">GA4 Property ID</label>
+                    <input
+                      type="text"
+                      placeholder="es. 123456789"
+                      value={googleEditData.ga4PropertyId}
+                      onChange={(e) => setGoogleEditData(d => ({ ...d, ga4PropertyId: e.target.value }))}
+                      className="w-full px-3 py-1.5 text-sm border border-stone-200 rounded-md focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-100"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-stone-600">GSC Site URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://tuosito.it"
+                      value={googleEditData.gscSiteUrl}
+                      onChange={(e) => setGoogleEditData(d => ({ ...d, gscSiteUrl: e.target.value }))}
+                      className="w-full px-3 py-1.5 text-sm border border-stone-200 rounded-md focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-100"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={googleEditSaving}
+                    onClick={async () => {
+                      setGoogleEditSaving(true);
+                      try {
+                        await onUpdateGoogle(googleConnection.id, {
+                          ga4PropertyId: googleEditData.ga4PropertyId || undefined,
+                          gscSiteUrl: googleEditData.gscSiteUrl || undefined,
+                        });
+                        showToast('Configurazione Google aggiornata', 'success');
+                        setGoogleEditOpen(false);
+                        onRefresh();
+                      } catch {
+                        showToast('Errore durante il salvataggio', 'error');
+                      } finally {
+                        setGoogleEditSaving(false);
+                      }
+                    }}
+                    className="px-4 py-1.5 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                  >
+                    {googleEditSaving ? 'Salvataggio...' : 'Salva'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* WordPress */}
         <IntegrationCard
@@ -251,6 +333,7 @@ export function IntegrationsGrid({
           onTest={n8nConnection && onTestN8N ? () => onTestN8N(n8nConnection.id) : undefined}
           onConfigure={onConfigureN8N}
           onDelete={n8nConnection && onDeleteN8N ? () => onDeleteN8N(n8nConnection.id) : undefined}
+          onTransfer={n8nConnection ? () => setTransferItem({ id: n8nConnection.id, name: n8nConnection.name, type: 'N8N' }) : undefined}
           disabled={!n8nConnection}
           upgradeRequired={!canWrite}
         />
@@ -289,6 +372,7 @@ export function IntegrationsGrid({
             if (transferItem.type === 'MCP') await transferMCPConnectionToProject(transferItem.id, targetId);
             if (transferItem.type === 'GOOGLE') await transferGoogleConnectionToProject(transferItem.id, targetId);
             if (transferItem.type === 'CMS') await transferCMSConnectionToProject(transferItem.id, targetId);
+            if (transferItem.type === 'N8N') await transferN8NConnectionToProject(transferItem.id, targetId);
             onRefresh();
           }}
         />

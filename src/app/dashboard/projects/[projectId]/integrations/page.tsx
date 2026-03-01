@@ -352,6 +352,18 @@ export default function IntegrationsPage() {
     router.push(`/dashboard/projects/${projectId}/integrations/connect/n8n`);
   };
 
+  const handleUpdateGoogle = async (id: string, data: { ga4PropertyId?: string; gscSiteUrl?: string }) => {
+    const res = await fetch(`/api/integrations/google/connections/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Errore durante il salvataggio');
+    }
+  };
+
   if (loading) {
     return (
       <div className="px-8 pt-8 space-y-6">
@@ -477,6 +489,7 @@ export default function IntegrationsPage() {
               onTestN8N={handleTestN8N}
               onDeleteN8N={handleDeleteN8N}
               onConfigureN8N={handleConfigureN8N}
+              onUpdateGoogle={handleUpdateGoogle}
               projects={projects}
               organizations={organizations}
               currentProjectId={projectId}

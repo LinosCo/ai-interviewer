@@ -28,6 +28,7 @@ import {
     regenerateAutoInterviewKnowledgeSource
 } from '@/lib/interview/manual-knowledge-source';
 import { createProjectWithNameGuard, normalizeProjectName } from '@/lib/projects/create-project';
+import { planService } from '@/services/planService';
 
 const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -124,6 +125,17 @@ export async function createBotAction(projectId: string, formData: FormData) {
     if (!project) throw new Error("Project not found");
 
     if (project.organizationId) {
+        // Enforce plan-level maxChatbots limit (API-level enforcement)
+        const currentUser = session.user?.id
+            ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } })
+            : null;
+        if (currentUser?.role !== 'ADMIN') {
+            const botLimitCheck = await planService.checkActiveInterviewsLimit(project.organizationId);
+            if (!botLimitCheck.allowed) {
+                throw new Error('Piano non supporta ulteriori bot. Aggiorna il tuo piano.');
+            }
+        }
+
         const trialLimitCheck = await checkTrialResourceLimit({
             organizationId: project.organizationId,
             resource: 'interview'
@@ -211,6 +223,19 @@ export async function createProjectAction(formData: FormData) {
 
     if (!organizationId) throw new Error("No organization found for project");
     await assertOrganizationAccess(session.user.id, organizationId, 'ADMIN');
+
+    // Enforce plan-level maxProjects limit (API-level enforcement)
+    const currentUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+    if (currentUser?.role !== 'ADMIN') {
+        const orgPlan = await planService.getOrganizationPlan(organizationId);
+        const maxProjects = orgPlan.features.maxProjects;
+        if (maxProjects !== -1) {
+            const projectCount = await prisma.project.count({ where: { organizationId } });
+            if (projectCount >= maxProjects) {
+                throw new Error('Limite progetti raggiunto. Aggiorna il tuo piano.');
+            }
+        }
+    }
 
     const { project, created } = await createProjectWithNameGuard({
         name,

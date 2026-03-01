@@ -4,6 +4,8 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { sanitize } from '@/lib/llm/prompt-sanitizer';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { TokenCategory } from '@prisma/client';
 
 export async function POST(req: Request) {
     try {
@@ -73,7 +75,7 @@ export async function POST(req: Request) {
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema: configSchema,
-            prompt: `Sei "Business Tuner AI", un esperto stratega di ricerca qualitativa. 
+            prompt: `Sei "Business Tuner AI", un esperto stratega di ricerca qualitativa.
 L'utente vuole lanciare un'indagine con questo obiettivo grezzo:
 
 "${sanitize(goal, 1000)}"
@@ -94,6 +96,26 @@ Output richiesto:
 
 Rispondi in italiano.`
         });
+
+        // Track token usage for credit system. This route is public (onboarding),
+        // so session/orgId may not be available. TokenTrackingService handles missing
+        // orgId gracefully by logging to 'unknown' without blocking.
+        try {
+            const session = await auth();
+            const userId = session?.user?.id;
+            await TokenTrackingService.logTokenUsage({
+                organizationId: '' as string, // resolved from userId/membership by service fallback
+                userId,
+                inputTokens: result.usage?.promptTokens ?? 0,
+                outputTokens: result.usage?.completionTokens ?? 0,
+                category: TokenCategory.INTERVIEW,
+                model: 'gpt-4o-mini',
+                operation: 'interview-generate',
+                resourceType: 'interview_generate',
+            });
+        } catch (trackingErr) {
+            console.error('[TokenTracking] bots/generate usage log failed:', trackingErr);
+        }
 
         return Response.json({
             ...result.object,

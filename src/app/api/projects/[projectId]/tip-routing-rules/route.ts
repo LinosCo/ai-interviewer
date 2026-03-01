@@ -2,17 +2,17 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-/** GET /api/projects/[id]/tip-routing-rules */
+/** GET /api/projects/[projectId]/tip-routing-rules */
 export async function GET(
   _req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const session = await auth();
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { id: projectId } = await params;
+    const { projectId } = await params;
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -46,17 +46,17 @@ export async function GET(
   }
 }
 
-/** POST /api/projects/[id]/tip-routing-rules */
+/** POST /api/projects/[projectId]/tip-routing-rules */
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
     const session = await auth();
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { id: projectId } = await params;
+    const { projectId } = await params;
     const body = await req.json();
 
     const user = await prisma.user.findUnique({

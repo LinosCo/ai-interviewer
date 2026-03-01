@@ -2,17 +2,17 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
-/** PATCH /api/projects/[id]/tip-routing-rules/[ruleId] */
+/** PATCH /api/projects/[projectId]/tip-routing-rules/[ruleId] */
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ id: string; ruleId: string }> }
+  { params }: { params: Promise<{ projectId: string; ruleId: string }> }
 ) {
   try {
     const session = await auth();
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { id: projectId, ruleId } = await params;
+    const { projectId, ruleId } = await params;
     const body = await req.json();
 
     const rule = await prisma.tipRoutingRule.findUnique({ where: { id: ruleId } });
@@ -41,17 +41,17 @@ export async function PATCH(
   }
 }
 
-/** DELETE /api/projects/[id]/tip-routing-rules/[ruleId] */
+/** DELETE /api/projects/[projectId]/tip-routing-rules/[ruleId] */
 export async function DELETE(
   _req: Request,
-  { params }: { params: Promise<{ id: string; ruleId: string }> }
+  { params }: { params: Promise<{ projectId: string; ruleId: string }> }
 ) {
   try {
     const session = await auth();
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { id: projectId, ruleId } = await params;
+    const { projectId, ruleId } = await params;
 
     const rule = await prisma.tipRoutingRule.findUnique({ where: { id: ruleId } });
     if (!rule || rule.projectId !== projectId) {

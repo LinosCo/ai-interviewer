@@ -17,7 +17,7 @@ export default function FeaturesPage() {
                     <span className="inline-block text-xs font-semibold text-amber-600 tracking-widest uppercase bg-amber-50 px-3 py-1 rounded-full mb-6 border border-amber-100">
                         Platform Tour
                     </span>
-                    <h1 className="text-5xl md:text-6xl font-bold mb-6 text-stone-900 tracking-tight leading-tight">
+                    <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-6 text-stone-900 tracking-tight leading-tight">
                         Tutto ciò che serve per <br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600">
                             capire i tuoi clienti.
@@ -26,7 +26,7 @@ export default function FeaturesPage() {
                     <p className="text-xl text-stone-600 mb-10 max-w-2xl mx-auto leading-relaxed">
                         Dalla creazione dell&apos;intervista all&apos;analisi dei trend. Business Tuner è la suite completa per la ricerca qualitativa AI.
                     </p>
-                    <div className="flex justify-center gap-4">
+                    <div className="flex flex-col sm:flex-row justify-center gap-4">
                         <Link href="/register">
                             <Button size="lg" withShimmer>
                                 Inizia la prova gratuita

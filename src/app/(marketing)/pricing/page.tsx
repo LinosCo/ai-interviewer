@@ -53,7 +53,7 @@ export default function PricingPage() {
                 <Badge className="mb-6 bg-amber-50 text-amber-700 border-amber-100 px-4 py-1 font-bold text-xs uppercase tracking-widest">
                     Pricing & Plans
                 </Badge>
-                <h1 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tight mb-6">
+                <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight mb-6">
                     Investi nella tua <span className="text-amber-700 italic">Market Intelligence</span>
                 </h1>
                 <p className="text-xl text-slate-500 font-medium leading-relaxed max-w-2xl mx-auto">
@@ -96,7 +96,7 @@ export default function PricingPage() {
 
                         <div className="mb-8">
                             <div className="flex items-baseline gap-1">
-                                <span className="text-5xl font-black text-slate-900 tracking-tighter">
+                                <span className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter">
                                     €{isYearly ? plan.yearlyMonthlyEquivalent : plan.monthlyPrice}
                                 </span>
                                 <span className="text-slate-500 font-bold">/mese</span>

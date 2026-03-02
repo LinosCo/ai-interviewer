@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Sparkles, Loader2, ArrowLeft, BookOpen, Target, Users, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sparkles, ArrowLeft, BookOpen, Target, Users, Zap, Check, Brain, ClipboardCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import TrainingBotConfigForm from '@/components/training/admin/training-bot-config-form';
 
@@ -58,6 +58,14 @@ const QUICK_EXAMPLES = [
   },
 ];
 
+const TRAINING_LOADING_STEPS = [
+  { text: 'Analizzo il tuo obiettivo formativo...', Icon: Target },
+  { text: 'Definisco i moduli del percorso...', Icon: BookOpen },
+  { text: 'Creo verifiche e criteri di valutazione...', Icon: ClipboardCheck },
+  { text: 'Adatto il tono al pubblico target...', Icon: Users },
+  { text: 'Finalizzo la struttura del corso...', Icon: Brain },
+];
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Step 1: AI generation from prompt
 // ──────────────────────────────────────────────────────────────────────────────
@@ -69,7 +77,23 @@ function WizardStepPrompt({
 }) {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentLoadingStep, setCurrentLoadingStep] = useState(0);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!loading) {
+      setCurrentLoadingStep(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentLoadingStep((prev) => (
+        prev < TRAINING_LOADING_STEPS.length - 1 ? prev + 1 : prev
+      ));
+    }, 1300);
+
+    return () => clearInterval(interval);
+  }, [loading]);
 
   async function handleGenerate() {
     if (!prompt.trim()) {
@@ -90,8 +114,8 @@ function WizardStepPrompt({
       }
       const config: TrainingGeneratedConfig = await res.json();
       onGenerated(config);
-    } catch (err: any) {
-      setError(err.message || 'Errore durante la generazione');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Errore durante la generazione');
     } finally {
       setLoading(false);
     }
@@ -144,16 +168,13 @@ function WizardStepPrompt({
             disabled={loading || !prompt.trim()}
             className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 transform transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:translate-y-0 disabled:cursor-not-allowed"
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Creo la struttura del corso...
-              </>
-            ) : (
+            {!loading ? (
               <>
                 <Sparkles className="w-5 h-5" />
                 Genera percorso formativo
               </>
+            ) : (
+              'Preparazione corso in corso...'
             )}
           </button>
 
@@ -193,6 +214,69 @@ function WizardStepPrompt({
           </button>
         ))}
       </div>
+
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm px-4 flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 14 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.98, opacity: 0, y: 10 }}
+              className="w-full max-w-md bg-white rounded-2xl border border-indigo-100 shadow-2xl p-6"
+            >
+              <div className="mb-5 text-center">
+                <div className="relative mx-auto w-16 h-16 mb-4">
+                  <div className="absolute inset-0 rounded-full border-4 border-indigo-100" />
+                  <div className="absolute inset-0 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center text-indigo-600">
+                    <Sparkles className="w-7 h-7" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Creazione corso in corso</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Sto preparando la struttura del percorso formativo.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {TRAINING_LOADING_STEPS.map((step, index) => {
+                  const isCompleted = index < currentLoadingStep;
+                  const isCurrent = index === currentLoadingStep;
+
+                  return (
+                    <div
+                      key={step.text}
+                      className={`flex items-center gap-3 transition-all duration-300 ${
+                        index <= currentLoadingStep ? 'opacity-100' : 'opacity-40'
+                      }`}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-full border flex items-center justify-center ${
+                          isCompleted
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                            : isCurrent
+                              ? 'bg-indigo-50 text-indigo-600 border-indigo-200 animate-pulse'
+                              : 'bg-gray-50 text-gray-300 border-gray-200'
+                        }`}
+                      >
+                        {isCompleted ? <Check className="w-4 h-4" /> : <step.Icon className="w-4 h-4" />}
+                      </div>
+                      <p className={`text-sm ${index <= currentLoadingStep ? 'text-gray-800' : 'text-gray-400'}`}>
+                        {step.text}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

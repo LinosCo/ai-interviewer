@@ -549,13 +549,13 @@ model InterviewPlan {
 
 model KnowledgeSource {
   id        String                      @id @default(cuid())
-  botId     String
+  botId     String?
   type      String
   title     String?
   content   String
   embedding Unsupported("vector(1536)")?
   createdAt DateTime                    @default(now())
-  bot       Bot                         @relation(fields: [botId], references: [id], onDelete: Cascade)
+  bot       Bot?                        @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   trainingBotId String?
   trainingBot   TrainingBot? @relation("TrainingBotKnowledge", fields: [trainingBotId], references: [id])
@@ -659,6 +659,8 @@ model TrainingTopicBlock {
   preWrittenQuizzes  Json?
   passScoreOverride  Int?
   maxRetriesOverride Int?
+  minCheckingTurns   Int     @default(2)
+  maxCheckingTurns   Int     @default(6)
 
   createdAt DateTime @default(now())
 
@@ -1920,5 +1922,7 @@ enum TrainingPhase {
   EVALUATING
   RETRYING
   DATA_COLLECTION
+  DIALOGUING
+  FINAL_QUIZZING
   COMPLETE
 }

@@ -140,11 +140,28 @@ export async function PUT(
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid request', details: err.issues }, { status: 400 })
     }
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') {
+        return NextResponse.json(
+          { error: 'Slug già in uso. Scegli un valore diverso.' },
+          { status: 409 }
+        )
+      }
+      if (err.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Relazione non valida nei dati inviati.' },
+          { status: 400 }
+        )
+      }
+    }
+    if (err instanceof Prisma.PrismaClientValidationError) {
       return NextResponse.json(
-        { error: 'Slug già in uso. Scegli un valore diverso.' },
-        { status: 409 }
+        { error: `Errore validazione database: ${err.message}` },
+        { status: 400 }
       )
+    }
+    if (err instanceof Error) {
+      return NextResponse.json({ error: err.message }, { status: 500 })
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

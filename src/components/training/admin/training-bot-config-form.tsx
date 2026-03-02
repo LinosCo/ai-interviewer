@@ -243,8 +243,10 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
       })
 
       if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string }
-        throw new Error(data.error ?? `Errore ${res.status}`)
+        const cloned = res.clone()
+        const data = (await res.json().catch(() => null)) as { error?: string } | null
+        const fallbackText = await cloned.text().catch(() => '')
+        throw new Error(data?.error ?? fallbackText || `Errore ${res.status}`)
       }
 
       if (mode === 'create') {
@@ -286,9 +288,8 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
             <input
               type="text"
               value={slug}
-              onChange={(e) => setSlug(e.target.value)}
+              onChange={(e) => setSlug(slugify(e.target.value))}
               placeholder="formazione-sicurezza"
-              pattern="^[a-z0-9-]+$"
               className={inputCls}
               required
             />

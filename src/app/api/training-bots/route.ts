@@ -131,6 +131,15 @@ export async function POST(request: Request) {
         )
       }
     }
+    if (err instanceof Prisma.PrismaClientValidationError) {
+      return NextResponse.json(
+        { error: `Errore validazione database: ${err.message}` },
+        { status: 400 }
+      )
+    }
+    if (err instanceof Error) {
+      return NextResponse.json({ error: err.message }, { status: 500 })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -7,6 +7,9 @@ import TrainingBotConfigForm from '@/components/training/admin/training-bot-conf
 import TrainingKnowledgePanel from '@/components/training/admin/TrainingKnowledgePanel'
 import { hasTrainingAccess } from '@/lib/training/plan-gate'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function TrainingBotSettingsPage({
   params,
   searchParams,

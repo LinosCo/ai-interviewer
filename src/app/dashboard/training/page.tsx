@@ -7,6 +7,9 @@ import Link from 'next/link'
 import { Plus, Settings, ChevronRight } from 'lucide-react'
 import { hasTrainingAccess } from '@/lib/training/plan-gate'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function TrainingBotsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/login')

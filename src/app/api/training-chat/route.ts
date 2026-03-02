@@ -21,6 +21,14 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid request', details: err.issues }, { status: 400 })
     }
+    if (err instanceof Error) {
+      if (err.message === 'OPENAI_API_KEY_MISSING' || err.message === 'ANTHROPIC_API_KEY_MISSING') {
+        return NextResponse.json(
+          { error: 'Chiave API mancante nel Global Config (o variabili ambiente).' },
+          { status: 503 }
+        )
+      }
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

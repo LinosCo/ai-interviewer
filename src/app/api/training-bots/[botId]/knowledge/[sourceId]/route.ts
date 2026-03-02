@@ -4,11 +4,24 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { assertOrganizationAccess, WorkspaceError } from '@/lib/domain/workspace'
 
+async function ensureKnowledgeSourceCompatibility() {
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "KnowledgeSource"
+      ADD COLUMN IF NOT EXISTS "trainingBotId" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "KnowledgeSource"
+      ALTER COLUMN "botId" DROP NOT NULL;
+  `)
+}
+
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ botId: string; sourceId: string }> }
 ) {
   try {
+    await ensureKnowledgeSourceCompatibility()
+
     const session = await auth()
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

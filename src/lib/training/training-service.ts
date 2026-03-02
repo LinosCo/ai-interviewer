@@ -5,6 +5,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { TokenTrackingService } from '@/services/tokenTrackingService'
+import { LLMService } from '@/services/llmService'
 import {
   buildExplainingPrompt,
   buildCheckingPrompt,
@@ -48,11 +49,23 @@ async function logTrainingTokens(
   }
 }
 
-function getModel(provider: string, name: string, customKey?: string | null) {
+function getModel(
+  provider: string,
+  name: string,
+  keys: { botOpenAIKey?: string | null; globalOpenAIKey?: string | null; globalAnthropicKey?: string | null }
+) {
   if (provider === 'anthropic') {
-    return createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY ?? '' })(name)
+    const anthropicKey = (keys.globalAnthropicKey || process.env.ANTHROPIC_API_KEY || '').trim()
+    if (!anthropicKey) {
+      throw new Error('ANTHROPIC_API_KEY_MISSING')
+    }
+    return createAnthropic({ apiKey: anthropicKey })(name)
   }
-  return createOpenAI({ apiKey: customKey ?? process.env.OPENAI_API_KEY ?? '' })(name)
+  const openaiKey = (keys.botOpenAIKey || keys.globalOpenAIKey || process.env.OPENAI_API_KEY || '').trim()
+  if (!openaiKey) {
+    throw new Error('OPENAI_API_KEY_MISSING')
+  }
+  return createOpenAI({ apiKey: openaiKey })(name)
 }
 
 export async function processTrainingMessage(
@@ -74,6 +87,8 @@ export async function processTrainingMessage(
   const topics = bot.topics
   const state: TrainingSupervisorState = (session.supervisorState as unknown as TrainingSupervisorState) ?? buildInitialState()
 
+  const globalConfig = await LLMService.getGlobalConfig()
+
   if (state.phase === 'COMPLETE') {
     return { text: 'Il percorso formativo è già completato.', phase: 'COMPLETE', sessionComplete: true }
   }
@@ -83,7 +98,11 @@ export async function processTrainingMessage(
     return { text: 'Percorso completato.', phase: 'COMPLETE', sessionComplete: true }
   }
 
-  const model = getModel(bot.modelProvider, bot.modelName, bot.customApiKey)
+  const model = getModel(bot.modelProvider, bot.modelName, {
+    botOpenAIKey: bot.customApiKey,
+    globalOpenAIKey: globalConfig?.openaiApiKey,
+    globalAnthropicKey: globalConfig?.anthropicApiKey,
+  })
 
   // Aggregate all KB sources with title separators, capped at 12k chars
   const kbContent = bot.knowledgeSources.length > 0

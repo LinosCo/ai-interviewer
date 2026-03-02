@@ -5,6 +5,24 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { assertOrganizationAccess, WorkspaceError } from '@/lib/domain/workspace'
 import { scrapeUrl } from '@/lib/scraping'
+import { Prisma } from '@prisma/client'
+
+async function ensureKnowledgeSourceCompatibility() {
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "KnowledgeSource"
+      ADD COLUMN IF NOT EXISTS "trainingBotId" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "KnowledgeSource"
+      ALTER COLUMN "botId" DROP NOT NULL;
+  `)
+}
+
+function isBotIdNotNullError(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return false
+  if (err.code !== 'P2011') return false
+  return String(err.message).toLowerCase().includes('botid')
+}
 
 async function getBot(botId: string) {
   return prisma.trainingBot.findUnique({
@@ -18,6 +36,8 @@ export async function GET(
   { params }: { params: Promise<{ botId: string }> }
 ) {
   try {
+    await ensureKnowledgeSourceCompatibility()
+
     const session = await auth()
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -64,6 +84,8 @@ export async function POST(
   { params }: { params: Promise<{ botId: string }> }
 ) {
   try {
+    await ensureKnowledgeSourceCompatibility()
+
     const session = await auth()
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -100,15 +122,29 @@ export async function POST(
       type = parsed.type
     }
 
-    const source = await prisma.knowledgeSource.create({
-      data: {
-        trainingBotId: botId,
-        type,
-        title,
-        content,
-        // botId is nullable — training KB sources don't belong to a regular Bot
-      },
-    })
+    let source
+    try {
+      source = await prisma.knowledgeSource.create({
+        data: {
+          trainingBotId: botId,
+          type,
+          title,
+          content,
+          // botId is nullable — training KB sources don't belong to a regular Bot
+        },
+      })
+    } catch (err) {
+      if (!isBotIdNotNullError(err)) throw err
+      await ensureKnowledgeSourceCompatibility()
+      source = await prisma.knowledgeSource.create({
+        data: {
+          trainingBotId: botId,
+          type,
+          title,
+          content,
+        },
+      })
+    }
 
     return NextResponse.json({
       source: {

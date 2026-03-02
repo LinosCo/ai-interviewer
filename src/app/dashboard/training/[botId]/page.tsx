@@ -8,6 +8,9 @@ import { Settings, Users, BarChart2, ChevronRight, Link2, ExternalLink } from 'l
 import { hasTrainingAccess } from '@/lib/training/plan-gate'
 import CopyLinkButton from '@/components/training/admin/CopyLinkButton'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const statusLabel: Record<string, string> = {
   DRAFT: 'Bozza',
   PUBLISHED: 'Pubblicato',
@@ -157,11 +160,12 @@ export default async function TrainingBotOverviewPage({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-500 mb-0.5">Link del percorso</p>
-              {isPublished ? (
-                <p className="text-sm font-medium text-gray-800 truncate">{publicUrl}</p>
-              ) : (
-                <p className="text-sm text-gray-400 italic">
-                  Pubblica il bot per abilitare il link
+              <p className={`text-sm truncate ${isPublished ? 'font-medium text-gray-800' : 'text-gray-500'}`}>
+                {publicUrl}
+              </p>
+              {!isPublished && (
+                <p className="text-xs text-gray-400 italic mt-0.5">
+                  Il link sarà attivo dopo la pubblicazione.
                 </p>
               )}
             </div>

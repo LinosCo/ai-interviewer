@@ -123,21 +123,22 @@ export default function TrainingChat({
   const safeBtn = safeColor(primaryColor)
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
-        <h1 className="font-semibold text-gray-900 text-sm">{botName}</h1>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-4 px-3 sm:px-6">
+      <div className="max-w-5xl mx-auto h-[calc(100vh-2rem)] bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-white border-b px-4 py-3 flex items-center gap-3">
+          <h1 className="font-semibold text-gray-900 text-sm">{botName}</h1>
+        </div>
 
-      {/* Progress bar */}
-      <TrainingProgressBar
-        topics={topics}
-        currentTopicIndex={currentTopicIndex}
-        topicResults={topicResults}
-      />
+        {/* Progress bar */}
+        <TrainingProgressBar
+          topics={topics}
+          currentTopicIndex={currentTopicIndex}
+          topicResults={topicResults}
+        />
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -168,35 +169,36 @@ export default function TrainingChat({
           </div>
         )}
         <div ref={bottomRef} />
-      </div>
-
-      {/* Input area — hidden during quiz */}
-      {!pendingQuizzes && (
-        <div className="bg-white border-t px-4 py-3 flex gap-2">
-          <input
-            aria-label="Messaggio"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage(input)
-              }
-            }}
-            placeholder="Scrivi un messaggio..."
-            className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            disabled={loading}
-          />
-          <button
-            onClick={() => sendMessage(input)}
-            disabled={loading || !input.trim()}
-            className="px-4 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50"
-            style={{ backgroundColor: safeBtn }}
-          >
-            Invia
-          </button>
         </div>
-      )}
+
+        {/* Input area — hidden during quiz */}
+        {!pendingQuizzes && (
+          <div className="bg-white border-t px-4 py-3 flex gap-2">
+            <input
+              aria-label="Messaggio"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendMessage(input)
+                }
+              }}
+              placeholder="Scrivi un messaggio..."
+              className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={loading}
+            />
+            <button
+              onClick={() => sendMessage(input)}
+              disabled={loading || !input.trim()}
+              className="px-4 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50"
+              style={{ backgroundColor: safeBtn }}
+            >
+              Invia
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

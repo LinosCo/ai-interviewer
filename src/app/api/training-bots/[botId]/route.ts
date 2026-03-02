@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { assertOrganizationAccess, WorkspaceError } from '@/lib/domain/workspace'
+import { Prisma } from '@prisma/client'
 
 const UpdateBotSchema = z.object({
   name: z.string().min(1).optional(),
@@ -138,6 +139,12 @@ export async function PUT(
     console.error('[training-bots/[botId] PUT]', err)
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid request', details: err.issues }, { status: 400 })
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Slug già in uso. Scegli un valore diverso.' },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

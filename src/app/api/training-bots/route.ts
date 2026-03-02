@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { assertOrganizationAccess, WorkspaceError } from '@/lib/domain/workspace'
+import { Prisma } from '@prisma/client'
 
 const CreateBotSchema = z.object({
   name: z.string().min(1),
@@ -115,6 +116,20 @@ export async function POST(request: Request) {
     console.error('[training-bots POST]', err)
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid request', details: err.issues }, { status: 400 })
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') {
+        return NextResponse.json(
+          { error: 'Slug già in uso. Scegli un nome o uno slug diverso.' },
+          { status: 409 }
+        )
+      }
+      if (err.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Organizzazione non valida o non trovata.' },
+          { status: 400 }
+        )
+      }
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

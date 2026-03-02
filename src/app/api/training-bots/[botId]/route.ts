@@ -5,6 +5,14 @@ import { z } from 'zod'
 import { assertOrganizationAccess, WorkspaceError } from '@/lib/domain/workspace'
 import { Prisma } from '@prisma/client'
 
+async function ensureTrainingTopicDialogueColumns() {
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "TrainingTopicBlock"
+      ADD COLUMN IF NOT EXISTS "minCheckingTurns" INTEGER NOT NULL DEFAULT 2,
+      ADD COLUMN IF NOT EXISTS "maxCheckingTurns" INTEGER NOT NULL DEFAULT 6;
+  `)
+}
+
 const UpdateBotSchema = z.object({
   name: z.string().min(1).optional(),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/).optional(),
@@ -37,6 +45,8 @@ export async function GET(
   { params }: { params: Promise<{ botId: string }> }
 ) {
   try {
+    await ensureTrainingTopicDialogueColumns()
+
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -78,6 +88,8 @@ export async function PUT(
   { params }: { params: Promise<{ botId: string }> }
 ) {
   try {
+    await ensureTrainingTopicDialogueColumns()
+
     const session = await auth()
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -104,8 +104,8 @@ export default function TrainingChat({
     }
   }
 
-  function handleQuizSubmit(selectedIndexes: number[]) {
-    sendMessage(JSON.stringify(selectedIndexes))
+  function handleQuizSubmit(answers: Array<number | string>) {
+    sendMessage(JSON.stringify(answers))
   }
 
   if (sessionComplete && completionData) {

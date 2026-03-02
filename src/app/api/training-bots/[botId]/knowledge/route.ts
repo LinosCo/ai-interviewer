@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { assertOrganizationAccess, WorkspaceError } from '@/lib/domain/workspace'
+import { scrapeUrl } from '@/lib/scraping'
 
 async function getBot(botId: string) {
   return prisma.trainingBot.findUnique({
@@ -85,18 +86,14 @@ export async function POST(
     let type: string
 
     if (parsed.type === 'url') {
-      const scrapeRes = await fetch(`${process.env.NEXTAUTH_URL}/api/knowledge/scrape`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: parsed.url }),
-      })
-      if (!scrapeRes.ok) {
+      try {
+        const scrapeData = await scrapeUrl(parsed.url)
+        title = scrapeData.title || parsed.url
+        content = `URL: ${scrapeData.url}\n\nTitle: ${scrapeData.title}\n\n${scrapeData.content}`
+        type = 'url'
+      } catch {
         return NextResponse.json({ error: 'Failed to scrape URL' }, { status: 422 })
       }
-      const scrapeData = await scrapeRes.json()
-      title = scrapeData.title ?? parsed.url
-      content = scrapeData.content ?? ''
-      type = 'url'
     } else {
       title = parsed.title
       content = parsed.content

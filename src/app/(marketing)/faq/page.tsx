@@ -18,15 +18,15 @@ const faqs = [
     },
     {
         question: "Quali Credit Pack sono disponibili?",
-        answer: "Sono disponibili tre pack: small (2M), medium (6M), large (15M). I pack non scadono e restano associati alla tua organizzazione."
+        answer: "Sono disponibili tre pack: small (2K crediti, €15), medium (6K crediti, €39), large (15K crediti, €89). I pack non scadono e restano associati alla tua organizzazione."
     },
     {
         question: "Il piano Business è acquistabile online?",
-        answer: "No. Il piano Business è disponibile solo tramite contatto Sales, con configurazione commerciale su misura."
+        answer: "Sì. Il piano Business (€399/mese) è acquistabile direttamente online con prova gratuita di 14 giorni. Per configurazioni enterprise personalizzate puoi anche contattare il team Sales."
     },
     {
         question: "Offrite trial gratuito?",
-        answer: "Puoi iniziare dal piano gratuito e passare in qualsiasi momento a Starter o Pro. Per Business il percorso è sempre commerciale tramite Sales."
+        answer: "Puoi iniziare dal piano gratuito e passare in qualsiasi momento a Starter, Pro o Business con prova gratuita di 14 giorni."
     },
     {
         question: "I dati sono sicuri?",

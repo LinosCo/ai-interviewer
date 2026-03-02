@@ -20,11 +20,14 @@ const CreateBotSchema = z.object({
   introMessage: z.string().nullish(),
   passScoreThreshold: z.number().int().min(0).max(100).optional(),
   maxRetries: z.number().int().min(0).optional(),
-  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
+  status: z.enum(['DRAFT', 'PUBLISHED', 'PAUSED', 'ARCHIVED']).optional(),
   topics: z.array(z.object({
     label: z.string().min(1),
     description: z.string().nullish(),
     orderIndex: z.number().int().optional(),
+    learningObjectives: z.array(z.string()).optional(),
+    minCheckingTurns: z.number().int().min(1).max(12).optional(),
+    maxCheckingTurns: z.number().int().min(1).max(12).optional(),
   })).optional(),
 })
 
@@ -97,6 +100,9 @@ export async function POST(request: Request) {
             description: t.description,
             orderIndex: t.orderIndex ?? i,
             trainingBotId: created.id,
+            learningObjectives: t.learningObjectives ?? [],
+            minCheckingTurns: t.minCheckingTurns ?? 2,
+            maxCheckingTurns: t.maxCheckingTurns ?? 6,
           })),
         })
       }

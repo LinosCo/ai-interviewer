@@ -1727,6 +1727,19 @@ hard_rules:
 
         // Supervisor logic (no hardcoded overrides to respect AI reasoning)
 
+        // Lazy cache: profile may be updated earlier this request — fetch once, reuse everywhere
+        let _freshCandidateProfileCache: Record<string, unknown> | undefined
+        const getFreshCandidateProfile = async (): Promise<Record<string, unknown>> => {
+            if (_freshCandidateProfileCache === undefined) {
+                const r = await prisma.conversation.findUnique({
+                    where: { id: conversationId },
+                    select: { candidateProfile: true },
+                })
+                _freshCandidateProfileCache = (r?.candidateProfile as Record<string, unknown>) ?? {}
+            }
+            return _freshCandidateProfileCache
+        }
+
         // If in DATA_COLLECTION phase, ALWAYS ensure we ask for the specific field
         if (nextState.phase === 'DATA_COLLECTION') {
             if (nextState.dataCollectionRefused || supervisorInsight?.status === 'COMPLETE_WITHOUT_DATA') {
@@ -1747,11 +1760,7 @@ hard_rules:
 
                 // CRITICAL: Re-read profile from DB to get updated values after extraction
                 // The `conversation.candidateProfile` is stale (from start of request)
-                const freshConversation = await prisma.conversation.findUnique({
-                    where: { id: conversationId },
-                    select: { candidateProfile: true }
-                });
-                const currentProfile = (freshConversation?.candidateProfile as any) || {};
+                const currentProfile = await getFreshCandidateProfile();
 
                 // Find first missing field (must match logic in data collection phase)
                 // Consider: already collected, explicitly skipped, or asked too many times
@@ -1963,11 +1972,7 @@ hard_rules:
         if (nextState.phase === 'DATA_COLLECTION' && !nextState.dataCollectionRefused && supervisorInsight?.status !== 'COMPLETE_WITHOUT_DATA') {
             const candidateFields = (bot.candidateDataFields as any[]) || [];
             const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
-            const freshConvForDataGuard = await prisma.conversation.findUnique({
-                where: { id: conversationId },
-                select: { candidateProfile: true }
-            });
-            const currentProfileForDataGuard = (freshConvForDataGuard?.candidateProfile as any) || {};
+            const currentProfileForDataGuard = await getFreshCandidateProfile();
             const missingFieldForDataGuard = getNextMissingCandidateField(
                 candidateFieldIds,
                 currentProfileForDataGuard,
@@ -2069,11 +2074,7 @@ hard_rules:
             // Verify we're actually done - MUST re-read from DB for fresh data
             const candidateFields = (bot.candidateDataFields as any[]) || [];
             const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
-            const freshConvForCompletion = await prisma.conversation.findUnique({
-                where: { id: conversationId },
-                select: { candidateProfile: true }
-            });
-            const currentProfileForCompletion = (freshConvForCompletion?.candidateProfile as any) || {};
+            const currentProfileForCompletion = await getFreshCandidateProfile();
             // A field is considered "done" if: collected, skipped, or asked too many times
             const MAX_FIELD_ATTEMPTS_COMPLETION = 3;
             const missingFieldForCompletion = getNextMissingCandidateField(

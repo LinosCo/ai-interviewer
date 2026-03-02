@@ -19,7 +19,7 @@ export const FEATURE_MATRIX = {
                 { key: 'watermark', label: 'Senza watermark', trial: false, starter: false, pro: true, business: true },
                 { key: 'customColor', label: 'Colore primario personalizzato', trial: false, starter: true, pro: true, business: true },
                 { key: 'customLogo', label: 'Logo aziendale', trial: false, starter: false, pro: true, business: true },
-                { key: 'customDomain', label: 'Dominio personalizzato (CNAME)', trial: false, starter: false, pro: false, business: true }
+                { key: 'customDomain', label: 'Dominio personalizzato (CNAME)', trial: false, starter: false, pro: false, business: true, comingSoon: true }
             ]
         },
         {
@@ -32,7 +32,7 @@ export const FEATURE_MATRIX = {
                 { key: 'keyQuotes', label: 'Citazioni chiave estratte', trial: false, starter: true, pro: true, business: true },
                 { key: 'trends', label: 'Trend nel tempo (storico)', trial: false, starter: false, pro: true, business: true },
                 { key: 'comparison', label: 'Confronto tra interviste', trial: false, starter: false, pro: true, business: true },
-                { key: 'segmentation', label: 'Segmentazione risposte', trial: false, starter: false, pro: false, business: true },
+                { key: 'segmentation', label: 'Segmentazione risposte', trial: false, starter: false, pro: false, business: true, comingSoon: true },
                 { key: 'customDashboards', label: 'Dashboard personalizzabili', trial: false, starter: false, pro: false, business: true }
             ]
         },
@@ -41,8 +41,8 @@ export const FEATURE_MATRIX = {
             features: [
                 { key: 'exportCsv', label: 'Export CSV dati grezzi', trial: false, starter: false, pro: true, business: true },
                 { key: 'webhooks', label: 'Webhook (notifiche in uscita)', trial: false, starter: false, pro: true, business: true },
-                { key: 'zapier', label: 'Integrazione Zapier', trial: false, starter: false, pro: false, business: true },
-                { key: 'sso', label: 'SSO (SAML/OIDC)', trial: false, starter: false, pro: false, business: true }
+                { key: 'zapier', label: 'Integrazione Zapier', trial: false, starter: false, pro: false, business: true, comingSoon: true },
+                { key: 'sso', label: 'SSO (SAML/OIDC)', trial: false, starter: false, pro: false, business: true, comingSoon: true }
             ]
         },
         {

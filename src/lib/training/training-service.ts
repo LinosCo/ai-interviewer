@@ -22,7 +22,7 @@ import {
   computeSessionPassed,
 } from './training-supervisor'
 import { evaluateOpenAnswer, evaluateQuizAnswers, computeTopicScore, detectCompetenceLevel } from './training-evaluator'
-import type { TrainingSupervisorState, TrainingChatResponse, QuizQuestion, ComprehensionEntry } from './training-types'
+import type { TrainingSupervisorState, TrainingChatResponse, TopicResult, QuizQuestion, ComprehensionEntry, DialogueTopicResult } from './training-types'
 import type { TrainingPhase } from '@prisma/client'
 
 async function logTrainingTokens(
@@ -283,6 +283,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
             text: quizIntro,
             phase: 'FINAL_QUIZZING',
             quizPayload: { questions: finalQuizQuestions },
+            topicResult: dialogueResultToTopicResult(dialogueTopicResult, bot.passScoreThreshold),
           }
         } else {
           // Advance to next topic
@@ -292,7 +293,11 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
             : `${tutorResult.text}\n\nGreat! Let's move to the next topic: "${nextTopic?.label}".`
 
           await saveStateAndMessage(sessionId, advancedState, advanceText, 'DIALOGUING' as TrainingPhase)
-          response = { text: advanceText, phase: 'EXPLAINING' }
+          response = {
+            text: advanceText,
+            phase: 'EXPLAINING',
+            topicResult: dialogueResultToTopicResult(dialogueTopicResult, bot.passScoreThreshold),
+          }
         }
       } else {
         // Continue dialogue — update history and turn count
@@ -520,22 +525,25 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
 
       const finalState: TrainingSupervisorState = { ...state, phase: 'COMPLETE' }
 
-      await prisma.trainingSession.update({
-        where: { id: sessionId },
-        data: {
-          status: passed ? 'COMPLETED' : 'FAILED',
-          passed,
-          overallScore,
-          completedAt: new Date(),
-          durationSeconds: Math.round((Date.now() - session.startedAt.getTime()) / 1000),
-          topicResults: state.dialogueTopicResults as any,
-          supervisorState: finalState as any,
-        },
-      })
-
-      await prisma.trainingMessage.create({
-        data: { trainingSessionId: sessionId, role: 'assistant', phase: 'COMPLETE', content: feedbackResult.text },
-      })
+      await prisma.$transaction([
+        prisma.trainingSession.update({
+          where: { id: sessionId },
+          data: {
+            status: passed ? 'COMPLETED' : 'FAILED',
+            passed,
+            overallScore,
+            completedAt: new Date(),
+            durationSeconds: Math.round((Date.now() - session.startedAt.getTime()) / 1000),
+            topicResults: state.dialogueTopicResults.map((r) =>
+              dialogueResultToTopicResult(r, bot.passScoreThreshold, overallScore)
+            ) as any,
+            supervisorState: finalState as any,
+          },
+        }),
+        prisma.trainingMessage.create({
+          data: { trainingSessionId: sessionId, role: 'assistant', phase: 'COMPLETE', content: feedbackResult.text },
+        }),
+      ])
 
       response = {
         text: feedbackResult.text,
@@ -552,6 +560,20 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
   }
 
   return response
+}
+
+function dialogueResultToTopicResult(r: DialogueTopicResult, passThreshold: number, quizScore = 0): TopicResult {
+  return {
+    topicId: r.topicId,
+    topicLabel: r.topicLabel,
+    status: r.finalComprehension >= passThreshold ? 'PASSED' : 'GAP_DETECTED',
+    score: r.finalComprehension,
+    openAnswerScore: 0,
+    quizScore,
+    retries: 0,
+    gaps: r.gaps,
+    feedback: r.understoodConcepts.join(', '),
+  }
 }
 
 function parseQuizAnswers(input: string, count: number): number[] {

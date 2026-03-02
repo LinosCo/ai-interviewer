@@ -474,8 +474,8 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
         // If we have a missing field and triggered
         let justExtractedField: { field: string; value: string } | null = null;
 
-        // Initialize attempt count tracking
-        const fieldAttemptCounts: Record<string, number> = {};
+        // Initialize attempt count tracking — load persisted counts so auto-skip survives request boundaries
+        const fieldAttemptCounts: Record<string, number> = ((metadata.fieldAttemptCounts as Record<string, number>) ?? {});
 
         let shouldAttemptExtraction = false;
         if (nextMissingField && shouldCollect) {
@@ -534,12 +534,16 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
                             value: extraction.value
                         };
                     } else {
-                        // Field extraction failed - provide feedback and re-ask
-                        // TODO: Persist fieldAttemptCounts in database to enable auto-skip after 2 failures.
-                        // Currently fieldAttemptCounts is re-initialized every request, so attempt tracking doesn't persist.
-                        // Once persisted, add back: if (attemptCount >= 2) { auto-skip logic }
-                        console.log(`⚠️ [CHATBOT] Validation failed for "${nextMissingField.field}": ${validationResult.feedback}`);
-                        // Feedback will be included in next bot response (bot will acknowledge and re-ask with better explanation)
+                        // Field extraction failed — persist attempt count and auto-skip after 2 consecutive failures
+                        fieldAttemptCounts[nextMissingField.field] = attemptCount;
+                        console.log(`⚠️ [CHATBOT] Validation failed for "${nextMissingField.field}" (attempt ${attemptCount}): ${validationResult.feedback}`);
+                        if (attemptCount >= 2) {
+                            candidateProfile[nextMissingField.field] = '__SKIPPED__';
+                            declinedFields.add(nextMissingField.field);
+                            delete fieldAttemptCounts[nextMissingField.field];
+                            console.log(`⏭️ [CHATBOT] Auto-skipping "${nextMissingField.field}" after ${attemptCount} failed attempts`);
+                            nextMissingField = getNextMissingField(candidateFields, candidateProfile, declinedFields);
+                        }
                     }
                 }
             }
@@ -678,7 +682,8 @@ NON-NEGOTIABLE RULES
             data: {
                 metadata: {
                     ...(metadata || {}),
-                    leadCapture
+                    leadCapture,
+                    fieldAttemptCounts,
                 }
             } as any
         });

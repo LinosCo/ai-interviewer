@@ -304,7 +304,7 @@ export default function PlatformSettingsForm({
     };
 
     const handleReset = () => {
-        if (confirm('Reset to default methodology knowledge? This will overwrite your current settings.')) {
+        if (confirm('Annullare le modifiche non salvate e ripristinare il valore salvato?')) {
             setKnowledge(currentKnowledge);
         }
     };
@@ -482,7 +482,7 @@ export default function PlatformSettingsForm({
                                 onClick={handleReset}
                                 className="text-xs text-stone-400 hover:text-stone-600 underline"
                             >
-                                Ripristina metodologia predefinita
+                                Annulla modifiche
                             </button>
                         </div>
                     </>

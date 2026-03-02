@@ -32,6 +32,7 @@ interface TopicDraft {
   id?: string
   label: string
   description: string
+  learningObjectives: string  // newline-separated for textarea
   minCheckingTurns: number
   maxCheckingTurns: number
 }
@@ -116,8 +117,9 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
       id: t.id,
       label: t.label,
       description: t.description ?? '',
-      minCheckingTurns: (t as any).minCheckingTurns ?? 2,
-      maxCheckingTurns: (t as any).maxCheckingTurns ?? 6,
+      learningObjectives: (t.learningObjectives ?? []).join('\n'),
+      minCheckingTurns: t.minCheckingTurns ?? 2,
+      maxCheckingTurns: t.maxCheckingTurns ?? 6,
     })) ?? []
   )
 
@@ -141,7 +143,7 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
   }
 
   function addTopic() {
-    setTopics((prev) => [...prev, { label: '', description: '', minCheckingTurns: 2, maxCheckingTurns: 6 }])
+    setTopics((prev) => [...prev, { label: '', description: '', learningObjectives: '', minCheckingTurns: 2, maxCheckingTurns: 6 }])
   }
 
   function removeTopic(idx: number) {
@@ -186,6 +188,10 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
           label: t.label.trim(),
           description: t.description.trim() || null,
           orderIndex: idx,
+          learningObjectives: t.learningObjectives
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean),
           minCheckingTurns: t.minCheckingTurns,
           maxCheckingTurns: t.maxCheckingTurns,
         })),
@@ -447,6 +453,19 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
                   />
                 </Field>
 
+                <Field
+                  label="Obiettivi di apprendimento"
+                  hint="Un obiettivo per riga. Es: Saper applicare le norme di sicurezza sul lavoro"
+                >
+                  <textarea
+                    value={topic.learningObjectives}
+                    onChange={(e) => updateTopic(idx, 'learningObjectives', e.target.value)}
+                    placeholder={"Saper identificare i rischi principali\nConoscere le procedure di emergenza"}
+                    className={textareaCls}
+                    style={{ minHeight: '80px' }}
+                  />
+                </Field>
+
                 {/* Dialogue turns */}
                 <div className="flex items-center gap-4 mt-2">
                   <div className="flex-1">
@@ -531,6 +550,7 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
           <select value={status} onChange={(e) => setStatus(e.target.value as BotStatus)} className={selectCls}>
             <option value="DRAFT">Bozza</option>
             <option value="PUBLISHED">Pubblicato</option>
+            <option value="PAUSED">In pausa</option>
             <option value="ARCHIVED">Archiviato</option>
           </select>
         </Field>

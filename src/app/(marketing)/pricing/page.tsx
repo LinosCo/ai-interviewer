@@ -171,13 +171,13 @@ export default function PricingPage() {
                     {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-5 h-5 fill-amber-400 text-amber-400" />)}
                 </div>
                 <p className="text-2xl font-medium text-slate-700 italic leading-relaxed">
-                    &quot;Voler.ai ha rivoluzionato il modo in cui monitoriamo il nostro brand. I piano Pro è perfetto per un team che vuole dati concreti ogni giorno.&quot;
+                    &quot;Business Tuner ci ha permesso di capire cosa pensano davvero i nostri clienti. Il piano Pro è perfetto per un team che vuole decisioni basate sui dati, non sulle sensazioni.&quot;
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-200" />
+                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 font-bold text-sm">M</div>
                     <div className="text-left">
-                        <p className="font-bold text-slate-900 text-sm">Martina Rossi</p>
-                        <p className="text-slate-500 text-xs">Head of Marketing @ TechFlow</p>
+                        <p className="font-bold text-slate-900 text-sm">Beta tester</p>
+                        <p className="text-slate-500 text-xs">Head of Marketing, PMI italiana</p>
                     </div>
                 </div>
             </div>

@@ -81,6 +81,26 @@ export default function TeamManagementPage() {
         }
     };
 
+    const handleRemoveMember = async (userId: string) => {
+        if (!currentOrganization) return;
+        if (!confirm('Rimuovere questo membro dall\'organizzazione?')) return;
+        try {
+            const res = await fetch(
+                `/api/organizations/${currentOrganization.id}/members?userId=${userId}`,
+                { method: 'DELETE' }
+            );
+            if (res.ok) {
+                setMembers(prev => prev.filter(m => m.user.id !== userId));
+                setMessage({ type: 'success', text: 'Membro rimosso.' });
+            } else {
+                const text = await res.text();
+                setMessage({ type: 'error', text: text || 'Errore durante la rimozione.' });
+            }
+        } catch {
+            setMessage({ type: 'error', text: 'Errore di connessione.' });
+        }
+    };
+
     if (!currentOrganization) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
@@ -201,7 +221,11 @@ export default function TeamManagementPage() {
                                                 {member.role}
                                             </div>
                                             {member.role !== 'OWNER' && (
-                                                <button className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                                                <button
+                                                    onClick={() => handleRemoveMember(member.user.id)}
+                                                    className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Rimuovi membro"
+                                                >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             )}

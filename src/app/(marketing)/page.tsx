@@ -10,6 +10,8 @@ import {
   HowItWorks,
   WhySection,
   UseCasesSection,
+  TrainingBotSection,
+  AutomationSection,
   PricingSection,
   FAQSection,
   CTASection,
@@ -84,7 +86,15 @@ export default function LandingPage() {
         <div className="h-24 section-fade-from-transparent" />
         <UseCasesSection />
 
-        {/* Transition: UseCases → Pricing (white) */}
+        {/* Transition: UseCases → Training (white) */}
+        <TrainingBotSection />
+
+        {/* Transition: Training → Automation (transparent) */}
+        <div className="h-24 section-fade-to-transparent" />
+        <AutomationSection />
+
+        {/* Transition: Automation → Pricing (white) */}
+        <div className="h-24 section-fade-from-transparent" />
         <PricingSection />
         <FAQSection />
 

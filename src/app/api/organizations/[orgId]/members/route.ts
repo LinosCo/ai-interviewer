@@ -119,3 +119,53 @@ export async function POST(
         return new NextResponse('Internal Server Error', { status: 500 });
     }
 }
+
+export async function DELETE(
+    req: Request,
+    { params }: { params: Promise<{ orgId: string }> }
+) {
+    try {
+        const { orgId } = await params;
+        const session = await auth();
+        if (!session?.user?.id) {
+            return new NextResponse('Unauthorized', { status: 401 });
+        }
+
+        const { searchParams } = new URL(req.url);
+        const targetUserId = searchParams.get('userId');
+        if (!targetUserId) {
+            return new NextResponse('userId query param required', { status: 400 });
+        }
+
+        // Only OWNER or ADMIN can remove members
+        const callerMembership = await prisma.membership.findUnique({
+            where: { userId_organizationId: { userId: session.user.id, organizationId: orgId } }
+        });
+        if (!callerMembership || !['OWNER', 'ADMIN'].includes(callerMembership.role)) {
+            return new NextResponse('Only owners and admins can remove members', { status: 403 });
+        }
+
+        // Fetch target membership and guard
+        const targetMembership = await prisma.membership.findUnique({
+            where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } }
+        });
+        if (!targetMembership) {
+            return new NextResponse('Member not found', { status: 404 });
+        }
+        if (targetMembership.role === 'OWNER') {
+            return new NextResponse('Cannot remove the owner', { status: 403 });
+        }
+        if (targetMembership.role === 'ADMIN' && callerMembership.role !== 'OWNER') {
+            return new NextResponse('Only the owner can remove admins', { status: 403 });
+        }
+
+        await prisma.membership.delete({
+            where: { userId_organizationId: { userId: targetUserId, organizationId: orgId } }
+        });
+
+        return new NextResponse(null, { status: 204 });
+    } catch (error) {
+        console.error('Remove Member Error:', error);
+        return new NextResponse('Internal Server Error', { status: 500 });
+    }
+}

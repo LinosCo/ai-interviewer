@@ -61,11 +61,12 @@ export default function FeaturesPage() {
                             ))}
                         </ul>
                     </div>
-                    <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-stone-100 bg-stone-50 aspect-video flex items-center justify-center">
-                        {/* Placeholder for Screenshot */}
-                        <div className="text-stone-400 flex flex-col items-center">
-                            <Icons.Logo size={48} className="mb-4 opacity-50" />
-                            <span className="text-sm font-medium">Screenshot: AI Generation Wizard</span>
+                    <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-stone-100 bg-gradient-to-br from-amber-50 to-orange-50 aspect-video flex items-center justify-center p-8">
+                        <div className="w-full max-w-xs bg-white rounded-xl shadow-lg border border-stone-100 p-4 space-y-3">
+                            <div className="h-3 bg-amber-100 rounded-full w-3/4" />
+                            <div className="h-3 bg-stone-100 rounded-full w-full" />
+                            <div className="h-3 bg-stone-100 rounded-full w-5/6" />
+                            <div className="h-8 bg-amber-400 rounded-lg w-1/2 mt-2" />
                         </div>
                     </div>
                 </div>
@@ -74,11 +75,17 @@ export default function FeaturesPage() {
             {/* Feature Deep Dive 2: Analysis */}
             <section className="py-24 px-6 bg-[#FAFAF8]">
                 <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center md:flex-row-reverse">
-                    <div className="order-2 md:order-1 relative rounded-2xl overflow-hidden shadow-2xl border border-stone-100 bg-stone-50 aspect-video flex items-center justify-center">
-                        {/* Placeholder for Screenshot */}
-                        <div className="text-stone-400 flex flex-col items-center">
-                            <Icons.Dashboard size={48} className="mb-4 opacity-50" />
-                            <span className="text-sm font-medium">Screenshot: Analytics Dashboard</span>
+                    <div className="order-2 md:order-1 relative rounded-2xl overflow-hidden shadow-2xl border border-stone-100 bg-gradient-to-br from-orange-50 to-stone-50 aspect-video flex items-center justify-center p-8">
+                        <div className="w-full max-w-xs bg-white rounded-xl shadow-lg border border-stone-100 p-4 space-y-3">
+                            <div className="flex gap-2 mb-2">
+                                <div className="h-6 w-6 rounded-full bg-green-100" />
+                                <div className="h-3 bg-stone-100 rounded-full flex-1 mt-1.5" />
+                            </div>
+                            <div className="h-16 bg-gradient-to-r from-amber-100 to-orange-100 rounded-lg" />
+                            <div className="flex gap-2">
+                                <div className="h-3 bg-stone-100 rounded-full flex-1" />
+                                <div className="h-3 bg-amber-200 rounded-full w-1/3" />
+                            </div>
                         </div>
                     </div>
                     <div className="order-1 md:order-2">
@@ -126,11 +133,12 @@ export default function FeaturesPage() {
                                         <tr className="bg-stone-50/80">
                                             <td colSpan={5} className="py-3 px-6 font-semibold text-stone-800 text-sm uppercase tracking-wider">{category.name}</td>
                                         </tr>
-                                        {category.features.map((feature: { label: string; new?: boolean; trial?: boolean; starter?: boolean; pro?: boolean; business?: boolean }, featIdx: number) => (
+                                        {category.features.map((feature: { label: string; new?: boolean; comingSoon?: boolean; trial?: boolean; starter?: boolean; pro?: boolean; business?: boolean }, featIdx: number) => (
                                             <tr key={featIdx} className="border-b border-stone-100 hover:bg-stone-50/50 transition-colors">
                                                 <td className="py-4 px-6 text-stone-600 font-medium text-sm flex items-center gap-2">
                                                     {feature.label}
                                                     {feature.new && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold">NEW</span>}
+                                                    {feature.comingSoon && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">Presto</span>}
                                                 </td>
                                                 <td className="py-4 px-6 text-center text-stone-400 bg-stone-50/30">
                                                     {feature.trial ? <Icons.Check size={20} className="mx-auto text-stone-800" /> : <span className="text-stone-300">-</span>}

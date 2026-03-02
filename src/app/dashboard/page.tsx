@@ -68,25 +68,27 @@ export default async function DashboardPage() {
     const isAdmin = user.role === 'ADMIN' || user.plan === 'ADMIN';
     const isOrgAdminMember = isAdmin || ['OWNER', 'ADMIN'].includes(membership.role);
 
-    let accessibleProjectIds: Set<string> | null = null;
-    if (!isOrgAdminMember) {
-        const scopedProjectAccess = await prisma.projectAccess.findMany({
-            where: {
-                userId: session.user.id,
-                project: {
-                    organizationId
-                }
-            },
-            select: { projectId: true }
-        });
-        accessibleProjectIds = new Set(scopedProjectAccess.map((entry) => entry.projectId));
-    }
+    // Fire all independent queries concurrently — none depends on the other
+    const [scopedProjectAccessResult, usage, canCreateInterview, canCreateChatbotCheck] = await Promise.all([
+        !isOrgAdminMember
+            ? prisma.projectAccess.findMany({
+                  where: { userId: session.user.id, project: { organizationId } },
+                  select: { projectId: true }
+              })
+            : Promise.resolve(null),
+        getUsageStats(organizationId),
+        isAdmin ? Promise.resolve({ allowed: true }) : canPublishBot(organizationId),
+        isAdmin ? Promise.resolve({ allowed: true }) : canCreateChatbot(organizationId),
+    ]);
+
+    const accessibleProjectIds = scopedProjectAccessResult
+        ? new Set(scopedProjectAccessResult.map((entry) => entry.projectId))
+        : null;
+
     const accessibleProjects = isOrgAdminMember
         ? organization.projects
         : organization.projects.filter((project) => accessibleProjectIds?.has(project.id));
 
-    // Get limits and usage for this specific organization
-    const usage = await getUsageStats(organizationId);
     const subscription = organization.subscription;
     const status = subscription?.status || 'ACTIVE';
     const nowMs = new Date().getTime();
@@ -94,10 +96,6 @@ export default async function DashboardPage() {
         ? Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - nowMs) / (1000 * 60 * 60 * 24))
         : 0;
     const isTrialExpired = status === 'TRIALING' && trialDaysLeft <= 0;
-
-    // Permissions based on organization's subscription
-    const canCreateInterview = isAdmin ? { allowed: true } : await canPublishBot(organizationId);
-    const canCreateChatbotCheck = isAdmin ? { allowed: true } : await canCreateChatbot(organizationId);
 
     // Prepare content for client
     const allBots = accessibleProjects.flatMap(p => p.bots);

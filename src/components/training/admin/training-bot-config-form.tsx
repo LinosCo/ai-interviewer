@@ -246,7 +246,7 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
         const cloned = res.clone()
         const data = (await res.json().catch(() => null)) as { error?: string } | null
         const fallbackText = await cloned.text().catch(() => '')
-        throw new Error(data?.error ?? fallbackText || `Errore ${res.status}`)
+        throw new Error(data?.error ?? (fallbackText || `Errore ${res.status}`))
       }
 
       if (mode === 'create') {

@@ -244,7 +244,14 @@ export class BrandReportEngine {
      * Creates a "pending" record first so the UI can poll for progress,
      * then runs all async work and updates the record to "completed".
      */
-    static async generate(configId: string): Promise<string> {
+    static async generate(
+        configId: string,
+        options?: {
+            websiteUrl?: string;
+            sitemapUrl?: string;
+            additionalUrls?: Array<{ url: string; label?: string }>;
+        }
+    ): Promise<string> {
         // Load config
         const config = await prisma.visibilityConfig.findUnique({
             where: { id: configId },
@@ -260,7 +267,9 @@ export class BrandReportEngine {
         });
 
         if (!config) throw new Error(`VisibilityConfig ${configId} not found`);
-        if (!config.websiteUrl) throw new Error('No websiteUrl configured for this brand');
+
+        const targetWebsiteUrl = options?.websiteUrl || config.websiteUrl;
+        if (!targetWebsiteUrl) throw new Error('No websiteUrl configured for this brand');
 
         // Create pending record
         const report = await prisma.brandReport.create({
@@ -281,9 +290,11 @@ export class BrandReportEngine {
             ]);
 
             // Crawl site (serial because it's intensive)
-            const crawl = await crawlSite(config.websiteUrl, {
+            const crawl = await crawlSite(targetWebsiteUrl, {
                 gscPages: gscData?.topSearchPages ?? [],
                 maxPages: 30,
+                sitemapUrl: options?.sitemapUrl,
+                manualUrls: (options?.additionalUrls || []).map((item) => item.url),
             });
 
             // Generate AI tips

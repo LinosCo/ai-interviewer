@@ -92,9 +92,14 @@ interface BrandReport {
     generatedAt: string | null;
 }
 
+interface AdditionalUrl {
+    url: string;
+    label: string;
+}
+
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function ScoreRing({ score, label, color }: { score: number; label: string; color: string }) {
+function ScoreRing({ score, label }: { score: number; label: string }) {
     const pct = Math.min(100, Math.max(0, score));
     const bg = pct >= 75 ? 'text-emerald-600' : pct >= 50 ? 'text-amber-500' : 'text-red-500';
     return (
@@ -228,6 +233,7 @@ interface Props {
     configId: string;
     brandName: string;
     websiteUrl: string;
+    initialAdditionalUrls?: AdditionalUrl[];
     initialReport: BrandReport | null;
     initialIsRunning: boolean;
 }
@@ -236,6 +242,7 @@ export function SiteAnalysisClient({
     configId,
     brandName,
     websiteUrl,
+    initialAdditionalUrls = [],
     initialReport,
     initialIsRunning,
 }: Props) {
@@ -245,6 +252,39 @@ export function SiteAnalysisClient({
     const [isExporting, setIsExporting] = useState(false);
     const [tipCategoryFilter, setTipCategoryFilter] = useState<string>('all');
     const [pageSearch, setPageSearch] = useState('');
+    const [setupDone, setSetupDone] = useState<boolean>(!!initialReport || initialIsRunning);
+    const [analysisWebsiteUrl, setAnalysisWebsiteUrl] = useState(websiteUrl);
+    const [analysisSitemapUrl, setAnalysisSitemapUrl] = useState('');
+    const [analysisUrlsText, setAnalysisUrlsText] = useState(
+        initialAdditionalUrls.map((item) => item.url).join('\n')
+    );
+    const [setupError, setSetupError] = useState<string | null>(null);
+
+    function parseAdditionalUrls(text: string): AdditionalUrl[] {
+        const lines = text
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+        const seen = new Set<string>();
+        const parsed: AdditionalUrl[] = [];
+
+        for (const line of lines) {
+            try {
+                const normalized = new URL(line).toString();
+                if (seen.has(normalized)) continue;
+                seen.add(normalized);
+                parsed.push({
+                    url: normalized,
+                    label: `URL manuale ${parsed.length + 1}`,
+                });
+            } catch {
+                // Ignore invalid URLs here; validation happens before submit.
+            }
+        }
+
+        return parsed;
+    }
 
     async function exportPdf() {
         if (!report?.id) return;
@@ -262,16 +302,24 @@ export function SiteAnalysisClient({
         }
     }
 
-    async function triggerReport() {
+    async function triggerReport(options?: {
+        websiteUrl?: string;
+        sitemapUrl?: string;
+        additionalUrls?: AdditionalUrl[];
+    }) {
         setIsRunning(true);
         try {
             const res = await fetch('/api/visibility/brand-report', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ configId }),
+                body: JSON.stringify({
+                    configId,
+                    websiteUrl: options?.websiteUrl,
+                    sitemapUrl: options?.sitemapUrl,
+                    additionalUrls: options?.additionalUrls,
+                }),
             });
             if (!res.ok) throw new Error(await res.text());
-            const data = await res.json();
             // Fetch the completed report
             const getRes = await fetch(`/api/visibility/brand-report?configId=${configId}`);
             if (getRes.ok) {
@@ -304,8 +352,141 @@ export function SiteAnalysisClient({
 
     const tipCategories = [...new Set(tips.map(t => t.category))];
 
+    const handleStartFromSetup = () => {
+        const normalizedWebsite = analysisWebsiteUrl.trim();
+        const normalizedSitemap = analysisSitemapUrl.trim();
+        const parsedAdditionalUrls = parseAdditionalUrls(analysisUrlsText);
+
+        if (!normalizedWebsite) {
+            setSetupError('Inserisci l\'URL principale del sito da analizzare.');
+            return;
+        }
+
+        try {
+            // Validate URL format
+            new URL(normalizedWebsite);
+        } catch {
+            setSetupError('L\'URL principale non è valido.');
+            return;
+        }
+
+        if (normalizedSitemap) {
+            try {
+                new URL(normalizedSitemap);
+            } catch {
+                setSetupError('L\'URL della sitemap non è valido.');
+                return;
+            }
+        }
+
+        const invalidManualLines = analysisUrlsText
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .filter((line) => {
+                try {
+                    new URL(line);
+                    return false;
+                } catch {
+                    return true;
+                }
+            });
+
+        if (invalidManualLines.length > 0) {
+            setSetupError('Sono presenti URL manuali non validi. Correggi e riprova.');
+            return;
+        }
+
+        setSetupError(null);
+        setSetupDone(true);
+        startTransition(() => {
+            triggerReport({
+                websiteUrl: normalizedWebsite,
+                sitemapUrl: normalizedSitemap || undefined,
+                additionalUrls: parsedAdditionalUrls,
+            });
+        });
+    };
+
     return (
         <div className="space-y-6">
+            {!setupDone && (
+                <Card className="border-amber-200 bg-amber-50/30">
+                    <CardHeader>
+                        <CardTitle className="text-lg text-stone-800">Imposta sorgenti analisi</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                                URL Sito Principale
+                            </label>
+                            <input
+                                type="url"
+                                value={analysisWebsiteUrl}
+                                onChange={(e) => setAnalysisWebsiteUrl(e.target.value)}
+                                placeholder="https://www.esempio.it"
+                                className="w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                                Sitemap URL (opzionale)
+                            </label>
+                            <input
+                                type="url"
+                                value={analysisSitemapUrl}
+                                onChange={(e) => setAnalysisSitemapUrl(e.target.value)}
+                                placeholder="https://www.esempio.it/sitemap.xml"
+                                className="w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                                URL Singoli (opzionale, uno per riga)
+                            </label>
+                            <textarea
+                                value={analysisUrlsText}
+                                onChange={(e) => setAnalysisUrlsText(e.target.value)}
+                                placeholder={'https://www.esempio.it/prodotto-a\nhttps://www.esempio.it/faq'}
+                                className="w-full min-h-[120px] rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                            />
+                            <p className="text-xs text-stone-500">
+                                Puoi combinare sitemap e URL manuali: verranno inclusi entrambi nell&apos;audit.
+                            </p>
+                        </div>
+
+                        {setupError && (
+                            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                                {setupError}
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                onClick={handleStartFromSetup}
+                                disabled={isRunning || isPending}
+                                className="bg-amber-500 hover:bg-amber-600 text-white"
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${isRunning || isPending ? 'animate-spin' : ''}`} />
+                                Avvia Analisi
+                            </Button>
+                            {(initialReport || initialIsRunning) && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setSetupDone(true)}
+                                >
+                                    Apri ultimo report
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {setupDone && (
+                <>
             {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
@@ -325,6 +506,14 @@ export function SiteAnalysisClient({
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSetupDone(false)}
+                        className="border-stone-300 text-stone-600 hover:bg-stone-50"
+                    >
+                        Sorgenti
+                    </Button>
                     {report?.status === 'completed' && (
                         <Button
                             onClick={exportPdf}
@@ -338,7 +527,11 @@ export function SiteAnalysisClient({
                         </Button>
                     )}
                     <Button
-                        onClick={() => startTransition(triggerReport)}
+                        onClick={() => startTransition(() => triggerReport({
+                            websiteUrl: analysisWebsiteUrl.trim() || websiteUrl,
+                            sitemapUrl: analysisSitemapUrl.trim() || undefined,
+                            additionalUrls: parseAdditionalUrls(analysisUrlsText),
+                        }))}
                         disabled={isRunning || isPending}
                         className="bg-amber-500 hover:bg-amber-600 text-white"
                         size="sm"
@@ -382,11 +575,11 @@ export function SiteAnalysisClient({
                     <Card className="border-stone-200">
                         <CardContent className="py-5">
                             <div className="flex flex-wrap items-center justify-around gap-6">
-                                <ScoreRing score={report.overallScore} label="Score Globale" color="amber" />
-                                <ScoreRing score={report.seoScore} label="SEO Tecnico" color="blue" />
-                                <ScoreRing score={report.llmoScore} label="LLMO (AI)" color="purple" />
-                                <ScoreRing score={report.geoScore} label="GEO (Menzioni)" color="green" />
-                                <ScoreRing score={report.serpScore} label="SERP Presence" color="orange" />
+                                <ScoreRing score={report.overallScore} label="Score Globale" />
+                                <ScoreRing score={report.seoScore} label="SEO Tecnico" />
+                                <ScoreRing score={report.llmoScore} label="LLMO (AI)" />
+                                <ScoreRing score={report.geoScore} label="GEO (Menzioni)" />
+                                <ScoreRing score={report.serpScore} label="SERP Presence" />
                                 <div className="flex flex-col items-center gap-1">
                                     <span className="text-2xl font-bold text-stone-700">{report.pagesAudited}</span>
                                     <span className="text-xs text-stone-500">Pagine auditate</span>
@@ -653,6 +846,8 @@ export function SiteAnalysisClient({
                             )}
                         </TabsContent>
                     </Tabs>
+                </>
+            )}
                 </>
             )}
         </div>

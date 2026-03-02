@@ -7,7 +7,12 @@ import { BrandReportEngine } from '@/lib/visibility/brand-report-engine';
  * POST /api/visibility/brand-report
  * Trigger a new brand report generation for a VisibilityConfig.
  *
- * Body: { configId: string }
+ * Body: {
+ *   configId: string;
+ *   websiteUrl?: string;
+ *   sitemapUrl?: string;
+ *   additionalUrls?: Array<{ url: string; label?: string }>;
+ * }
  *
  * Returns the reportId immediately (report runs async in the same request,
  * Next.js streaming is not needed here since generation takes ~20-40s).
@@ -20,11 +25,47 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { configId } = body;
+        const { configId, websiteUrl, sitemapUrl, additionalUrls } = body as {
+            configId?: string;
+            websiteUrl?: string;
+            sitemapUrl?: string;
+            additionalUrls?: Array<{ url: string; label?: string }>;
+        };
 
         if (!configId) {
             return NextResponse.json({ error: 'configId is required' }, { status: 400 });
         }
+
+        const normalizeOptionalUrl = (value?: string) => {
+            if (!value?.trim()) return undefined;
+            const parsed = new URL(value.trim());
+            return parsed.toString();
+        };
+
+        let websiteUrlOverride: string | undefined;
+        let sitemapUrlOverride: string | undefined;
+        try {
+            websiteUrlOverride = normalizeOptionalUrl(websiteUrl);
+            sitemapUrlOverride = normalizeOptionalUrl(sitemapUrl);
+        } catch {
+            return NextResponse.json({ error: 'Invalid URL payload' }, { status: 400 });
+        }
+
+        const normalizedAdditionalUrls = Array.isArray(additionalUrls)
+            ? additionalUrls
+                .map((item, index) => {
+                    try {
+                        const normalized = new URL(String(item?.url || '').trim()).toString();
+                        return {
+                            url: normalized,
+                            label: String(item?.label || `URL ${index + 1}`).trim() || `URL ${index + 1}`,
+                        };
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter((item): item is { url: string; label: string } => !!item)
+            : [];
 
         // Verify access
         const config = await prisma.visibilityConfig.findUnique({
@@ -49,7 +90,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
-        if (!config.websiteUrl) {
+        const effectiveWebsiteUrl = websiteUrlOverride || config.websiteUrl;
+
+        if (!effectiveWebsiteUrl) {
             return NextResponse.json(
                 { error: 'No website URL configured for this brand' },
                 { status: 400 }
@@ -67,7 +110,11 @@ export async function POST(request: Request) {
         }
 
         // Generate (blocking — completes before response)
-        const reportId = await BrandReportEngine.generate(configId);
+        const reportId = await BrandReportEngine.generate(configId, {
+            websiteUrl: effectiveWebsiteUrl,
+            sitemapUrl: sitemapUrlOverride,
+            additionalUrls: normalizedAdditionalUrls,
+        });
 
         return NextResponse.json({
             success: true,

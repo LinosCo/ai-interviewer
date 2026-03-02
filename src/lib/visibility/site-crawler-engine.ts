@@ -153,6 +153,49 @@ export async function parseSitemap(baseUrl: string): Promise<{ urls: string[]; s
     return { urls: [], sitemapUrl: null };
 }
 
+async function parseProvidedSitemap(sitemapUrl: string): Promise<{ urls: string[]; sitemapUrl: string | null }> {
+    const xml = await fetchRaw(sitemapUrl);
+    if (!xml) return { urls: [], sitemapUrl: null };
+
+    const $ = cheerio.load(xml, { xmlMode: true });
+
+    const subSitemaps: string[] = [];
+    $('sitemapindex sitemap loc, sitemap loc').each((_, el) => {
+        const loc = $(el).text().trim();
+        if (loc && (loc.endsWith('.xml') || loc.includes('sitemap'))) {
+            subSitemaps.push(loc);
+        }
+    });
+
+    const directUrls: string[] = [];
+    $('urlset url loc').each((_, el) => {
+        const loc = $(el).text().trim();
+        if (loc) directUrls.push(loc);
+    });
+
+    if (subSitemaps.length > 0 && directUrls.length === 0) {
+        const allUrls: string[] = [];
+        for (const sub of subSitemaps.slice(0, 8)) {
+            const subXml = await fetchRaw(sub);
+            if (!subXml) continue;
+            const $sub = cheerio.load(subXml, { xmlMode: true });
+            $sub('urlset url loc').each((_, el) => {
+                const loc = $sub(el).text().trim();
+                if (loc) allUrls.push(loc);
+            });
+            if (allUrls.length >= MAX_SITEMAP_URLS) break;
+        }
+        if (allUrls.length > 0) {
+            return { urls: allUrls.slice(0, MAX_SITEMAP_URLS), sitemapUrl };
+        }
+    }
+
+    return {
+        urls: directUrls.slice(0, MAX_SITEMAP_URLS),
+        sitemapUrl: directUrls.length > 0 ? sitemapUrl : null,
+    };
+}
+
 // ─── LLMO Audit ──────────────────────────────────────────────────────────────
 
 const QUESTION_PREFIXES_IT = ['come', 'cosa', 'perché', 'perche', 'chi', 'dove', 'quando', 'quale', 'quali', 'quanto', 'quanti'];
@@ -398,6 +441,10 @@ export interface CrawlOptions {
     gscPages?: GSCPage[];
     /** Maximum pages to audit (default 30) */
     maxPages?: number;
+    /** Optional explicit sitemap URL to use instead of auto-discovery */
+    sitemapUrl?: string;
+    /** Optional URLs manually selected by the user */
+    manualUrls?: string[];
 }
 
 /**
@@ -412,16 +459,34 @@ export async function crawlSite(
     websiteUrl: string,
     options: CrawlOptions = {}
 ): Promise<SiteCrawlResult> {
-    const { gscPages = [], maxPages = 30 } = options;
+    const { gscPages = [], maxPages = 30, sitemapUrl, manualUrls = [] } = options;
     const normalized = websiteUrl.replace(/\/$/, '');
 
-    // 1. Discover URLs
-    const { urls: discovered, sitemapUrl } = await parseSitemap(normalized);
-    const urlsToAudit = discovered.length > 0
-        ? discovered.slice(0, maxPages)
+    // 1. Discover URLs (custom sitemap > auto sitemap)
+    const sitemapResult = sitemapUrl
+        ? await parseProvidedSitemap(sitemapUrl)
+        : await parseSitemap(normalized);
+
+    const manualNormalized = manualUrls
+        .map((url) => {
+            try {
+                return new URL(url).toString();
+            } catch {
+                return null;
+            }
+        })
+        .filter((url): url is string => !!url);
+
+    const mergedUrls = Array.from(new Set([
+        ...manualNormalized,
+        ...sitemapResult.urls,
+    ]));
+
+    const urlsToAudit = mergedUrls.length > 0
+        ? mergedUrls.slice(0, maxPages)
         : [normalized]; // fallback to homepage only
 
-    const pagesDiscovered = discovered.length || 1;
+    const pagesDiscovered = mergedUrls.length || 1;
 
     // 2. Parallel crawl with concurrency limit
     const pages: PageFullAudit[] = [];
@@ -462,7 +527,7 @@ export async function crawlSite(
         .map(([issue, count]) => ({ issue, count }));
 
     return {
-        sitemapUrl,
+        sitemapUrl: sitemapResult.sitemapUrl,
         pagesDiscovered,
         pagesAudited: pages.length,
         pages,

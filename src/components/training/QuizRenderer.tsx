@@ -2,17 +2,24 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import type { QuizQuestion } from '@/lib/training/training-types'
+import { TRAINING_UI } from './training-ui-tokens'
 
 interface Props {
   questions: QuizQuestion[]
   onSubmit: (answers: Array<number | string>) => void  // number for MC/TF, string for OPEN_ANSWER
   disabled?: boolean
+  brandColor?: string
 }
 
-export default function QuizRenderer({ questions, onSubmit, disabled }: Props) {
+function safeColor(color: string, fallback = '#6366f1'): string {
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback
+}
+
+export default function QuizRenderer({ questions, onSubmit, disabled, brandColor }: Props) {
   const [answers, setAnswers] = useState<Array<number | string | null>>(
     new Array(questions.length).fill(null)
   )
+  const safeBrand = safeColor(brandColor ?? '#6366f1')
 
   const allAnswered = answers.every((a) => a !== null && a !== '')
 
@@ -57,9 +64,10 @@ export default function QuizRenderer({ questions, onSubmit, disabled }: Props) {
                   onClick={() => selectChoice(qi, oi)}
                   className={`w-full text-left text-sm px-4 py-2 rounded-lg border transition-colors ${
                     answers[qi] === oi
-                      ? 'bg-indigo-50 border-indigo-400 text-indigo-800 font-medium'
+                      ? 'text-indigo-800 font-medium'
                       : 'border-gray-200 hover:bg-gray-50 text-gray-700'
                   } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                  style={answers[qi] === oi ? { background: `${safeBrand}14`, borderColor: `${safeBrand}88`, color: safeBrand } : undefined}
                 >
                   {opt}
                 </button>
@@ -68,7 +76,7 @@ export default function QuizRenderer({ questions, onSubmit, disabled }: Props) {
           )}
         </div>
       ))}
-      <Button onClick={handleSubmit} disabled={!allAnswered || disabled} className="w-full">
+      <Button onClick={handleSubmit} disabled={!allAnswered || disabled} className={`w-full ${TRAINING_UI.motion.fast}`}>
         Conferma risposte
       </Button>
     </div>

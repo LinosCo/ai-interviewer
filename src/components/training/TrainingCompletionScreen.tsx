@@ -1,6 +1,7 @@
 'use client'
 import type { TopicResult } from '@/lib/training/training-types'
-import { Button } from '@/components/ui/button'
+import { CheckCircle2, Trophy } from 'lucide-react'
+import { TRAINING_UI } from './training-ui-tokens'
 
 const statusIcon: Record<string, string> = { PASSED: '✅', FAILED: '❌', GAP_DETECTED: '⚠️' }
 const statusLabel: Record<string, string> = { PASSED: 'Superato', FAILED: 'Non superato', GAP_DETECTED: 'Lacune rilevate' }
@@ -14,14 +15,19 @@ interface Props {
 }
 
 export default function TrainingCompletionScreen({ botName, overallScore, passed, topicResults, primaryColor }: Props) {
-  // primaryColor is accepted for future use (e.g. button theming); suppress unused-var lint
-  void primaryColor
+  const brandColor = /^#[0-9a-fA-F]{6}$/.test(primaryColor) ? primaryColor : '#6366f1'
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-8">
+    <div className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full bg-white rounded-[22px] shadow-2xl p-8 border ring-1 ring-black/5">
         <div className="text-center mb-6">
-          <div className="text-5xl mb-3">{passed ? '🎉' : '📚'}</div>
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+              passed ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'
+            }`}
+          >
+            {passed ? <Trophy size={30} /> : <CheckCircle2 size={30} />}
+          </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-1">{botName}</h1>
           <p className="text-gray-500 text-sm">Percorso formativo completato</p>
         </div>
@@ -36,7 +42,7 @@ export default function TrainingCompletionScreen({ botName, overallScore, passed
         </div>
 
         {topicResults.length > 0 && (
-          <div className="space-y-2 mb-6">
+          <div className="space-y-2 mb-6 bg-white rounded-xl border border-stone-100 p-4">
             <p className="text-sm font-medium text-gray-700 mb-3">Riepilogo argomenti</p>
             {topicResults.map(r => (
               <div
@@ -58,12 +64,13 @@ export default function TrainingCompletionScreen({ botName, overallScore, passed
           </div>
         )}
 
-        <Button
-          className="w-full"
+        <button
+          className={`w-full px-4 py-3 rounded-xl text-white font-semibold hover:opacity-90 ${TRAINING_UI.motion.fast} ${TRAINING_UI.ring.focus}`}
+          style={{ background: brandColor }}
           onClick={() => window.location.href = '/'}
         >
-          Torna alla home
-        </Button>
+          {TRAINING_UI.copy.completionCta}
+        </button>
       </div>
     </div>
   )

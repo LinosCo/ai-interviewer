@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Settings, Users, BarChart2, ChevronRight, Link2, ExternalLink } from 'lucide-react'
 import { hasTrainingAccess } from '@/lib/training/plan-gate'
 import CopyLinkButton from '@/components/training/admin/CopyLinkButton'
+import PublishTrainingBotButton from '@/components/training/admin/PublishTrainingBotButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -116,7 +117,7 @@ export default async function TrainingBotOverviewPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-2xl font-bold text-gray-900">{bot.name}</h1>
@@ -130,13 +131,16 @@ export default async function TrainingBotOverviewPage({
             <p className="text-gray-500 text-sm max-w-xl">{bot.learningGoal}</p>
           )}
         </div>
-        <Link
-          href={`/dashboard/training/${botId}/settings`}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg font-medium transition-colors text-sm"
-        >
-          <Settings className="w-4 h-4" />
-          Impostazioni
-        </Link>
+        <div className="flex items-start gap-2">
+          {bot.status !== 'PUBLISHED' && <PublishTrainingBotButton botId={botId} />}
+          <Link
+            href={`/dashboard/training/${botId}/settings`}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-200 hover:border-gray-300 text-gray-700 rounded-lg font-medium transition-colors text-sm"
+          >
+            <Settings className="w-4 h-4" />
+            Impostazioni
+          </Link>
+        </div>
       </div>
 
       {/* Share Link */}

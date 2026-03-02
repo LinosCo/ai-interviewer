@@ -53,8 +53,14 @@ ${ctx.learningObjectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}
 
 ${ctx.kbContent ? `Fonte di conoscenza da usare:\n${ctx.kbContent}` : 'Usa la tua conoscenza generale sull\'argomento.'}
 
-Spiega il concetto in modo chiaro e progressivo. Usa esempi pratici adeguati al livello.
-Alla fine, indica che sei pronto a verificare la comprensione.`
+Stile obbligatorio (molto importante):
+- Modalità micro-learning conversazionale: spiega UNA sola idea per messaggio.
+- Massimo 90 parole totali.
+- Massimo 2 brevi paragrafi.
+- Chiudi SEMPRE con UNA domanda breve per verificare se è chiaro (non quiz formale).
+- Non anticipare tutto il programma del topic in un unico messaggio.
+
+Spiega il primo concetto fondamentale in modo chiaro e progressivo, con un esempio pratico adeguato al livello.`
 }
 
 export function buildCheckingPrompt(ctx: PromptContext): string {
@@ -160,6 +166,12 @@ PRINCIPI DI CONDUZIONE (seguili sempre):
 4. Risposta errata → non correggere direttamente. Usa domanda di ritorno ("Come mai pensi questo?"), esempio pratico, analogia, o prerequisito a monte.
 5. Engagement basso (risposte brevi, monosillabi, "non so") → cambia registro: caso reale, chiedi "ha senso per te?", collega al contesto professionale.
 6. Dopo ${ctx.minCheckingTurns} turni E comprensione adeguata → concludi con un breve riepilogo del topic e segnala il passaggio al prossimo argomento.
+
+FORMATO RISPOSTA OBBLIGATORIO:
+- Mantieni ogni risposta corta: massimo 80 parole.
+- Una singola idea o correzione per turno (no spiegoni).
+- Chiudi con UNA domanda breve e specifica per far proseguire il dialogo.
+- Evita elenchi lunghi e blocchi di testo estesi.
 
 ${latestApproach ? `APPROCCIO SUGGERITO (basato sull'ultimo turno): ${latestApproach}` : ''}`
 }

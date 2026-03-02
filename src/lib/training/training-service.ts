@@ -26,6 +26,68 @@ import { evaluateOpenAnswer, evaluateQuizAnswers, computeTopicScore, detectCompe
 import type { TrainingSupervisorState, TrainingChatResponse, TopicResult, QuizQuestion, ComprehensionEntry, DialogueTopicResult } from './training-types'
 import type { TrainingPhase } from '@prisma/client'
 
+let trainingPhaseEnumEnsured = false
+let trainingTopicColumnsEnsured = false
+let trainingKnowledgeSchemaEnsured = false
+const VALID_TRAINING_PHASES: TrainingPhase[] = [
+  'EXPLAINING',
+  'CHECKING',
+  'QUIZZING',
+  'EVALUATING',
+  'RETRYING',
+  'DATA_COLLECTION',
+  'DIALOGUING',
+  'FINAL_QUIZZING',
+  'COMPLETE',
+]
+
+async function ensureTrainingPhaseEnumCompatibility() {
+  if (trainingPhaseEnumEnsured) return
+
+  for (const phase of VALID_TRAINING_PHASES) {
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        ALTER TYPE "TrainingPhase" ADD VALUE IF NOT EXISTS '${phase}';
+      EXCEPTION
+        WHEN duplicate_object THEN NULL;
+      END $$;
+    `)
+  }
+
+  trainingPhaseEnumEnsured = true
+}
+
+async function ensureTrainingTopicDialogueColumns() {
+  if (trainingTopicColumnsEnsured) return
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "TrainingTopicBlock"
+      ADD COLUMN IF NOT EXISTS "minCheckingTurns" INTEGER NOT NULL DEFAULT 2,
+      ADD COLUMN IF NOT EXISTS "maxCheckingTurns" INTEGER NOT NULL DEFAULT 6;
+  `)
+  trainingTopicColumnsEnsured = true
+}
+
+async function ensureTrainingKnowledgeSchemaCompatibility() {
+  if (trainingKnowledgeSchemaEnsured) return
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "KnowledgeSource"
+      ADD COLUMN IF NOT EXISTS "trainingBotId" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "KnowledgeSource"
+      ALTER COLUMN "botId" DROP NOT NULL;
+  `)
+  trainingKnowledgeSchemaEnsured = true
+}
+
+function normalizeTrainingPhase(value: string | null | undefined): TrainingPhase {
+  if (value && VALID_TRAINING_PHASES.includes(value as TrainingPhase)) {
+    return value as TrainingPhase
+  }
+  return 'EXPLAINING'
+}
+
 async function logTrainingTokens(
   organizationId: string,
   modelName: string,
@@ -72,6 +134,10 @@ export async function processTrainingMessage(
   sessionId: string,
   userMessage: string
 ): Promise<TrainingChatResponse> {
+  await ensureTrainingPhaseEnumCompatibility()
+  await ensureTrainingTopicDialogueColumns()
+  await ensureTrainingKnowledgeSchemaCompatibility()
+
   // 1. Load session + bot
   const session = await prisma.trainingSession.findUniqueOrThrow({
     where: { id: sessionId },
@@ -114,7 +180,12 @@ export async function processTrainingMessage(
 
   // 2. Save user message
   await prisma.trainingMessage.create({
-    data: { trainingSessionId: sessionId, role: 'user', phase: state.phase, content: userMessage },
+    data: {
+      trainingSessionId: sessionId,
+      role: 'user',
+      phase: normalizeTrainingPhase(state.phase),
+      content: userMessage,
+    },
   })
 
   // 3. Handle phase
@@ -146,7 +217,12 @@ export async function processTrainingMessage(
             language: bot.language,
           })
 
-      const explainResult = await generateText({ model, system: systemPrompt, prompt: userMessage })
+      const explainResult = await generateText({
+        model,
+        system: systemPrompt,
+        prompt: userMessage,
+        maxOutputTokens: 260,
+      })
       await logTrainingTokens(bot.organizationId, bot.modelName, explainResult.usage, 'training-explain')
 
       // Transition to DIALOGUING (replaces old CHECKING flow)
@@ -204,7 +280,7 @@ export async function processTrainingMessage(
 
       // Run tutor response and silent comprehension evaluation in parallel
       const [tutorResult, evalResult] = await Promise.all([
-        generateText({ model, system: dialogueSystemPrompt, prompt: userMessage }),
+        generateText({ model, system: dialogueSystemPrompt, prompt: userMessage, maxOutputTokens: 220 }),
         generateObject({
           model,
           schema: z.object({ evaluation: evaluationSchema }),
@@ -617,7 +693,12 @@ async function saveStateAndMessage(
       data: { supervisorState: state as any },
     }),
     prisma.trainingMessage.create({
-      data: { trainingSessionId: sessionId, role: 'assistant', phase, content: text },
+      data: {
+        trainingSessionId: sessionId,
+        role: 'assistant',
+        phase: normalizeTrainingPhase(phase),
+        content: text,
+      },
     }),
   ])
 }

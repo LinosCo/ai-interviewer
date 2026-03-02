@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { processTrainingMessage } from '@/lib/training/training-service'
+import { Prisma } from '@prisma/client'
 
 const RequestSchema = z.object({
   message: z.string().min(1),
@@ -20,6 +21,14 @@ export async function POST(req: NextRequest) {
     console.error('[training-chat]', err)
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid request', details: err.issues }, { status: 400 })
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2007') {
+        return NextResponse.json(
+          { error: 'Schema DB training non aggiornato (enum/valori non compatibili).' },
+          { status: 503 }
+        )
+      }
     }
     if (err instanceof Error) {
       if (err.message === 'OPENAI_API_KEY_MISSING' || err.message === 'ANTHROPIC_API_KEY_MISSING') {

@@ -25,6 +25,8 @@ const UpdateBotSchema = z.object({
     label: z.string().min(1),
     description: z.string().nullish(),
     orderIndex: z.number().int().optional(),
+    minCheckingTurns: z.number().int().min(1).max(12).optional(),
+    maxCheckingTurns: z.number().int().min(1).max(12).optional(),
   })).optional(),
 })
 
@@ -119,6 +121,8 @@ export async function PUT(
               description: t.description,
               orderIndex: t.orderIndex ?? i,
               trainingBotId: botId,
+              minCheckingTurns: t.minCheckingTurns ?? 2,
+              maxCheckingTurns: t.maxCheckingTurns ?? 6,
             })),
           })
         }

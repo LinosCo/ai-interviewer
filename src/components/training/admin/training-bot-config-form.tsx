@@ -32,6 +32,8 @@ interface TopicDraft {
   id?: string
   label: string
   description: string
+  minCheckingTurns: number
+  maxCheckingTurns: number
 }
 
 function slugify(name: string) {
@@ -114,6 +116,8 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
       id: t.id,
       label: t.label,
       description: t.description ?? '',
+      minCheckingTurns: (t as any).minCheckingTurns ?? 2,
+      maxCheckingTurns: (t as any).maxCheckingTurns ?? 6,
     })) ?? []
   )
 
@@ -137,7 +141,7 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
   }
 
   function addTopic() {
-    setTopics((prev) => [...prev, { label: '', description: '' }])
+    setTopics((prev) => [...prev, { label: '', description: '', minCheckingTurns: 2, maxCheckingTurns: 6 }])
   }
 
   function removeTopic(idx: number) {
@@ -182,6 +186,8 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
           label: t.label.trim(),
           description: t.description.trim() || null,
           orderIndex: idx,
+          minCheckingTurns: t.minCheckingTurns,
+          maxCheckingTurns: t.maxCheckingTurns,
         })),
       primaryColor: primaryColor || null,
       logoUrl: logoUrl.trim() || null,
@@ -440,6 +446,44 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
                     style={{ minHeight: '60px' }}
                   />
                 </Field>
+
+                {/* Dialogue turns */}
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 mb-1 block">Turni minimi di dialogo</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={4}
+                      value={topic.minCheckingTurns}
+                      onChange={(e) =>
+                        setTopics((prev) =>
+                          prev.map((t, i) =>
+                            i === idx ? { ...t, minCheckingTurns: parseInt(e.target.value) || 2 } : t
+                          )
+                        )
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 mb-1 block">Turni massimi</label>
+                    <input
+                      type="number"
+                      min={3}
+                      max={12}
+                      value={topic.maxCheckingTurns}
+                      onChange={(e) =>
+                        setTopics((prev) =>
+                          prev.map((t, i) =>
+                            i === idx ? { ...t, maxCheckingTurns: parseInt(e.target.value) || 6 } : t
+                          )
+                        )
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>

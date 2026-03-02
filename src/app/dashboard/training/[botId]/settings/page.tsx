@@ -4,14 +4,19 @@ import { redirect, notFound } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { subscriptionTierToPlanType, PlanType } from '@/config/plans'
 import TrainingBotConfigForm from '@/components/training/admin/training-bot-config-form'
+import TrainingKnowledgePanel from '@/components/training/admin/TrainingKnowledgePanel'
 import { hasTrainingAccess } from '@/lib/training/plan-gate'
 
 export default async function TrainingBotSettingsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ botId: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { botId } = await params
+  const { tab } = await searchParams
+  const activeTab = tab === 'knowledge' ? 'knowledge' : 'config'
 
   const session = await auth()
   if (!session?.user?.id) redirect('/login')
@@ -85,7 +90,37 @@ export default async function TrainingBotSettingsPage({
         <p className="text-gray-500 mt-1">Modifica la configurazione del percorso formativo.</p>
       </div>
 
-      <TrainingBotConfigForm mode="edit" bot={bot} />
+      {/* Tab nav */}
+      <div className="flex gap-1 border-b border-gray-200">
+        {[
+          { key: 'config', label: 'Configurazione' },
+          { key: 'knowledge', label: 'Conoscenza' },
+        ].map(({ key, label }) => (
+          <a
+            key={key}
+            href={`?tab=${key}`}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === key
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </a>
+        ))}
+      </div>
+
+      {activeTab === 'config' && <TrainingBotConfigForm mode="edit" bot={bot} />}
+
+      {activeTab === 'knowledge' && (
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h3 className="text-base font-semibold text-gray-900 mb-1">Knowledge Base</h3>
+          <p className="text-sm text-gray-500 mb-5">
+            Carica i materiali del corso. Il tutor AI li userà come riferimento durante le lezioni.
+          </p>
+          <TrainingKnowledgePanel botId={bot.id} />
+        </div>
+      )}
     </div>
   )
 }

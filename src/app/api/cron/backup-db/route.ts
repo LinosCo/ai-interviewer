@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         // 2. Connessione diretta al DB via pg
         const pool = new Pool({
             connectionString: databaseUrl,
-            ssl: databaseUrl.includes('sslmode=require') || databaseUrl.includes('neon.tech')
+            ssl: databaseUrl.includes('sslmode=require')
                 ? { rejectUnauthorized: false }
                 : undefined,
             max: 3,

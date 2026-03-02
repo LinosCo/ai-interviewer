@@ -126,14 +126,8 @@ export default function DPAPage() {
                     <tbody>
                         <tr>
                             <td>Hosting & Database</td>
-                            <td>Neon (via AWS)</td>
-                            <td>Archiviazione database PostgreSQL</td>
-                            <td>EU (eu-central-1)</td>
-                        </tr>
-                        <tr>
-                            <td>Application Hosting</td>
-                            <td>Vercel</td>
-                            <td>Hosting Next.js application</td>
+                            <td>Railway (via GCP)</td>
+                            <td>Archiviazione database PostgreSQL e hosting applicazione</td>
                             <td>EU</td>
                         </tr>
                         <tr>

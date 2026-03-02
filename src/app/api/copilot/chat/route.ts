@@ -275,7 +275,7 @@ export async function POST(req: Request) {
                 tools: toolSet,
                 ...(toolSet ? { maxSteps: 3 } : {}), // Reduced steps to prevent long execution
                 temperature: 0.3,
-                abortSignal: AbortSignal.timeout(45000) // 45s Timeout to leave buffer for Vercel 60s limit
+                abortSignal: AbortSignal.timeout(45000) // 45s timeout
             });
         };
 

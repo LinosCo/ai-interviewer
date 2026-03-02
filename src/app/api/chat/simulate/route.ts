@@ -108,7 +108,7 @@ export async function POST(req: Request) {
         // We track if topic transition happens to return it to client
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
 
-        // Fix: Vercel AI SDK throws if messages is empty
+        // Fix: AI SDK throws if messages is empty
         if (messagesForAI.length === 0) {
             messagesForAI.push({ role: 'user', content: "I am ready to start." });
         }

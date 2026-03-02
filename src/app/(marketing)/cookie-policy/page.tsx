@@ -162,14 +162,6 @@ export default function CookiePolicyPage() {
 
                 <h2>6. Cookie di terze parti</h2>
 
-                <h3>Vercel Analytics (Opzionale)</h3>
-                <p>
-                    Il nostro sito è ospitato su Vercel. Potrebbero essere impostati cookie di performance per monitorare uptime e performance.
-                </p>
-                <p className="text-sm">
-                    <strong>Privacy Policy Vercel:</strong> <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">https://vercel.com/legal/privacy-policy</a>
-                </p>
-
                 <h3>Stripe (Pagamenti)</h3>
                 <p>
                     Durante il processo di pagamento, Stripe può impostare cookie per prevenire frodi e garantire la sicurezza.

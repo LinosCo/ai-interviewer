@@ -191,20 +191,21 @@ describe('advanceDialogueTopic', () => {
   }
 
   it('advances to next topic in EXPLAINING phase when more topics remain', () => {
-    const newState = advanceDialogueTopic(baseDialogueState, dialogueResult, 3)
+    const { newState, isFinalQuiz } = advanceDialogueTopic(baseDialogueState, dialogueResult, 3)
     expect(newState.currentTopicIndex).toBe(1)
     expect(newState.phase).toBe('EXPLAINING')
     expect(newState.dialogueTurns).toBe(0)
-    expect(newState.comprehensionHistory).toEqual([])
     expect(newState.dialogueTopicResults).toHaveLength(1)
     expect(newState.dialogueTopicResults[0].topicId).toBe('t1')
+    expect(isFinalQuiz).toBe(false)
   })
 
   it('transitions to FINAL_QUIZZING on last topic', () => {
-    const newState = advanceDialogueTopic(baseDialogueState, dialogueResult, 1)
+    const { newState, isFinalQuiz } = advanceDialogueTopic(baseDialogueState, dialogueResult, 1)
     expect(newState.phase).toBe('FINAL_QUIZZING')
     expect(newState.currentTopicIndex).toBe(0) // stays on last topic index
     expect(newState.dialogueTopicResults).toHaveLength(1)
+    expect(isFinalQuiz).toBe(true)
   })
 
   it('accumulates multiple dialogue topic results', () => {
@@ -215,7 +216,7 @@ describe('advanceDialogueTopic', () => {
         { topicId: 't0', topicLabel: 'Topic 0', finalComprehension: 90, gaps: [], understoodConcepts: ['c0'], turnsUsed: 3 },
       ],
     }
-    const newState = advanceDialogueTopic(stateWithPrior, { ...dialogueResult, topicId: 't1' }, 3)
+    const { newState } = advanceDialogueTopic(stateWithPrior, { ...dialogueResult, topicId: 't1' }, 3)
     expect(newState.dialogueTopicResults).toHaveLength(2)
     expect(newState.currentTopicIndex).toBe(2)
   })

@@ -158,30 +158,36 @@ export function advanceDialogueTopic(
   state: TrainingSupervisorState,
   result: DialogueTopicResult,
   totalTopics: number
-): TrainingSupervisorState {
+): { newState: TrainingSupervisorState; isFinalQuiz: boolean } {
   const updatedResults = [...state.dialogueTopicResults, result]
   const nextIndex = state.currentTopicIndex + 1
 
   if (nextIndex >= totalTopics) {
     // All dialogue topics done — move to final quiz
     return {
-      ...state,
-      phase: 'FINAL_QUIZZING',
-      dialogueTopicResults: updatedResults,
-      dialogueTurns: 0,
-      comprehensionHistory: [],
+      newState: {
+        ...state,
+        phase: 'FINAL_QUIZZING',
+        dialogueTopicResults: updatedResults,
+        dialogueTurns: 0,
+        comprehensionHistory: state.comprehensionHistory,
+      },
+      isFinalQuiz: true,
     }
   }
 
   // More topics remain — advance to next
   return {
-    ...state,
-    currentTopicIndex: nextIndex,
-    phase: 'EXPLAINING',
-    dialogueTurns: 0,
-    comprehensionHistory: [],
-    dialogueTopicResults: updatedResults,
-    adaptationDepth: 0,
-    retryCount: 0,
+    newState: {
+      ...state,
+      currentTopicIndex: nextIndex,
+      phase: 'EXPLAINING',
+      dialogueTurns: 0,
+      comprehensionHistory: state.comprehensionHistory,
+      dialogueTopicResults: updatedResults,
+      adaptationDepth: 0,
+      retryCount: 0,
+    },
+    isFinalQuiz: false,
   }
 }

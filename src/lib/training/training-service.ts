@@ -11,15 +11,18 @@ import {
   buildQuizzingSystemPrompt,
   buildRetryingPrompt,
   buildFinalFeedbackPrompt,
+  buildDialoguePrompt,
+  buildFinalQuizSystemPrompt,
 } from './training-prompts'
 import {
   buildInitialState,
   advanceAfterEvaluation,
+  advanceDialogueTopic,
   computeOverallScore,
   computeSessionPassed,
 } from './training-supervisor'
 import { evaluateOpenAnswer, evaluateQuizAnswers, computeTopicScore, detectCompetenceLevel } from './training-evaluator'
-import type { TrainingSupervisorState, TrainingChatResponse, QuizQuestion } from './training-types'
+import type { TrainingSupervisorState, TrainingChatResponse, QuizQuestion, ComprehensionEntry } from './training-types'
 import type { TrainingPhase } from '@prisma/client'
 
 async function logTrainingTokens(
@@ -81,7 +84,14 @@ export async function processTrainingMessage(
   }
 
   const model = getModel(bot.modelProvider, bot.modelName, bot.customApiKey)
-  const kbContent = bot.knowledgeSources[0]?.content ?? undefined
+
+  // Aggregate all KB sources with title separators, capped at 12k chars
+  const kbContent = bot.knowledgeSources.length > 0
+    ? bot.knowledgeSources
+        .map((s) => `## ${s.title ?? 'Fonte'}\n${s.content}`)
+        .join('\n\n---\n\n')
+        .slice(0, 12_000)
+    : undefined
 
   // 2. Save user message
   await prisma.trainingMessage.create({
@@ -119,27 +129,186 @@ export async function processTrainingMessage(
 
       const explainResult = await generateText({ model, system: systemPrompt, prompt: userMessage })
       await logTrainingTokens(bot.organizationId, bot.modelName, explainResult.usage, 'training-explain')
-      const { text } = explainResult
-      const checkPrompt = buildCheckingPrompt({
-        topicLabel: currentTopic.label,
-        learningObjectives: currentTopic.learningObjectives,
-        educationLevel: bot.traineeEducationLevel,
-        competenceLevel: state.detectedCompetenceLevel,
-        adaptationDepth: state.adaptationDepth,
-        language: bot.language,
-      })
-      const checkResult = await generateText({ model, system: checkPrompt, prompt: 'Fai la domanda.' })
-      await logTrainingTokens(bot.organizationId, bot.modelName, checkResult.usage, 'training-check-question')
-      const { text: checkQuestion } = checkResult
-      const newState = { ...state, phase: 'CHECKING' as const, pendingCheckQuestion: checkQuestion }
-      const combinedText = `${text}\n\n${checkQuestion}`
-      await saveStateAndMessage(sessionId, newState, combinedText, state.phase as TrainingPhase)
-      response = { text: combinedText, phase: 'CHECKING' }
+
+      // Transition to DIALOGUING (replaces old CHECKING flow)
+      const newState: TrainingSupervisorState = {
+        ...state,
+        phase: 'DIALOGUING' as const,
+        dialogueTurns: 0,
+      }
+      await saveStateAndMessage(sessionId, newState, explainResult.text, state.phase as TrainingPhase)
+      response = { text: explainResult.text, phase: 'DIALOGUING' }
       break
     }
 
+    case 'DIALOGUING': {
+      const minTurns = currentTopic.minCheckingTurns ?? 2
+      const maxTurns = currentTopic.maxCheckingTurns ?? 6
+      const newTurnCount = (state.dialogueTurns ?? 0) + 1
+
+      // Build conversation history from DB messages for the current topic's EXPLAINING/DIALOGUING phase
+      const recentMessages = session.messages
+        .filter((m) => m.phase === 'EXPLAINING' || m.phase === 'DIALOGUING')
+        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
+      const currentTopicHistory = (state.comprehensionHistory ?? []).filter(
+        (e) => e.topicIndex === state.currentTopicIndex
+      )
+
+      // Build dialogue system prompt
+      const dialogueSystemPrompt = buildDialoguePrompt(
+        {
+          topicLabel: currentTopic.label,
+          topicDescription: currentTopic.description ?? undefined,
+          learningObjectives: currentTopic.learningObjectives,
+          educationLevel: bot.traineeEducationLevel,
+          competenceLevel: state.detectedCompetenceLevel,
+          adaptationDepth: state.adaptationDepth,
+          kbContent,
+          language: bot.language,
+          dialogueTurns: newTurnCount,
+          minCheckingTurns: minTurns,
+          maxCheckingTurns: maxTurns,
+        },
+        recentMessages,
+        currentTopicHistory
+      )
+
+      const evaluationSchema = z.object({
+        comprehensionLevel: z.number().min(0).max(100),
+        engagementLevel: z.enum(['high', 'medium', 'low']),
+        gaps: z.array(z.string()),
+        understoodConcepts: z.array(z.string()),
+        readyToProgress: z.boolean(),
+        suggestedApproach: z.enum(['deepen', 'clarify', 'example', 'simpler', 'prerequisite', 'summarize']),
+      })
+
+      // Run tutor response and silent comprehension evaluation in parallel
+      const [tutorResult, evalResult] = await Promise.all([
+        generateText({ model, system: dialogueSystemPrompt, prompt: userMessage }),
+        generateObject({
+          model,
+          schema: z.object({ evaluation: evaluationSchema }),
+          system: `Sei un valutatore silenzioso. Analizza la risposta dello studente e valuta comprensione ed engagement.
+Topic: "${currentTopic.label}" | Obiettivi: ${currentTopic.learningObjectives.join('; ')}
+Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? 'nessuno'}`,
+          prompt: `Risposta studente: "${userMessage}"\nValuta senza rispondere allo studente.`,
+        }),
+      ])
+
+      await Promise.all([
+        logTrainingTokens(bot.organizationId, bot.modelName, tutorResult.usage, 'training-dialogue'),
+        logTrainingTokens(bot.organizationId, bot.modelName, evalResult.usage, 'training-eval'),
+      ])
+
+      const eval_ = evalResult.object.evaluation
+
+      const newEntry: ComprehensionEntry = {
+        topicIndex: state.currentTopicIndex,
+        turn: newTurnCount,
+        comprehensionLevel: eval_.comprehensionLevel,
+        engagementLevel: eval_.engagementLevel,
+        gaps: eval_.gaps,
+        understoodConcepts: eval_.understoodConcepts,
+        suggestedApproach: eval_.suggestedApproach,
+      }
+
+      // Determine if we should advance to next topic
+      const shouldAdvance =
+        (eval_.readyToProgress && newTurnCount >= minTurns) || newTurnCount >= maxTurns
+
+      if (shouldAdvance) {
+        // Compute final comprehension as average across this topic's turns
+        const thisTopicEntries = [...currentTopicHistory, newEntry]
+        const avgComp = Math.round(
+          thisTopicEntries.reduce((sum, e) => sum + e.comprehensionLevel, 0) / thisTopicEntries.length
+        )
+        const allGaps = [...new Set(thisTopicEntries.flatMap((e) => e.gaps))]
+        const allUnderstood = [...new Set(thisTopicEntries.flatMap((e) => e.understoodConcepts))]
+
+        const dialogueTopicResult = {
+          topicId: currentTopic.id,
+          topicLabel: currentTopic.label,
+          finalComprehension: avgComp,
+          gaps: allGaps,
+          understoodConcepts: allUnderstood,
+          turnsUsed: newTurnCount,
+        }
+
+        const stateWithHistory: TrainingSupervisorState = {
+          ...state,
+          comprehensionHistory: [...(state.comprehensionHistory ?? []), newEntry],
+          dialogueTurns: newTurnCount,
+        }
+
+        const { newState: advancedState, isFinalQuiz } = advanceDialogueTopic(
+          stateWithHistory,
+          dialogueTopicResult,
+          topics.length
+        )
+
+        if (isFinalQuiz) {
+          // Generate final quiz weighted by dialogue gaps
+          const allTopicLabels = topics.map((t) => t.label)
+          const quizResult = await generateObject({
+            model,
+            schema: z.object({
+              questions: z.array(z.object({
+                id: z.string(),
+                type: z.enum(['MULTIPLE_CHOICE', 'TRUE_FALSE', 'OPEN_ANSWER']),
+                question: z.string(),
+                options: z.array(z.string()).optional(),
+                correctIndex: z.number().optional(),
+                expectedKeyPoints: z.array(z.string()).optional(),
+              })).min(3).max(12),
+            }),
+            system: buildFinalQuizSystemPrompt(
+              allTopicLabels,
+              advancedState.dialogueTopicResults,
+              bot.language
+            ),
+            prompt: `Genera il quiz finale. Copri tutti i ${topics.length} topic.`,
+          })
+          await logTrainingTokens(bot.organizationId, bot.modelName, quizResult.usage, 'training-final-quiz-gen')
+
+          const finalQuizQuestions = quizResult.object.questions as QuizQuestion[]
+          const finalState = { ...advancedState, finalQuizQuestions }
+
+          const quizIntro = bot.language === 'it'
+            ? `Ottimo! Hai completato tutti gli argomenti del percorso. Ora verificheremo la tua comprensione con un quiz finale:`
+            : `Great! You've completed all topics. Let's verify your understanding with a final quiz:`
+
+          await saveStateAndMessage(sessionId, finalState, quizIntro, 'DIALOGUING' as TrainingPhase)
+          response = {
+            text: quizIntro,
+            phase: 'FINAL_QUIZZING',
+            quizPayload: { questions: finalQuizQuestions },
+          }
+        } else {
+          // Advance to next topic
+          const nextTopic = topics[advancedState.currentTopicIndex]
+          const advanceText = bot.language === 'it'
+            ? `${tutorResult.text}\n\nBene! Passiamo al prossimo argomento: "${nextTopic?.label}".`
+            : `${tutorResult.text}\n\nGreat! Let's move to the next topic: "${nextTopic?.label}".`
+
+          await saveStateAndMessage(sessionId, advancedState, advanceText, 'DIALOGUING' as TrainingPhase)
+          response = { text: advanceText, phase: 'EXPLAINING' }
+        }
+      } else {
+        // Continue dialogue — update history and turn count
+        const continuedState: TrainingSupervisorState = {
+          ...state,
+          dialogueTurns: newTurnCount,
+          comprehensionHistory: [...(state.comprehensionHistory ?? []), newEntry],
+        }
+        await saveStateAndMessage(sessionId, continuedState, tutorResult.text, 'DIALOGUING' as TrainingPhase)
+        response = { text: tutorResult.text, phase: 'DIALOGUING' }
+      }
+      break
+    }
+
+    // Keep CHECKING/QUIZZING/EVALUATING for backward compatibility with old sessions
     case 'CHECKING': {
-      // User answered open question — generate quiz
       const checkQuestion = state.pendingCheckQuestion ?? '(domanda aperta)'
       const openEval = await evaluateOpenAnswer(
         checkQuestion,
@@ -149,7 +318,6 @@ export async function processTrainingMessage(
         bot.modelName
       )
 
-      // Generate quizzes
       const preWritten = currentTopic.preWrittenQuizzes as QuizQuestion[] | null
       let quizzes: QuizQuestion[]
 
@@ -185,10 +353,8 @@ export async function processTrainingMessage(
         ...state,
         phase: 'QUIZZING',
         pendingQuizzes: quizzes,
-        // store open eval for later scoring
         topicResults: [
           ...state.topicResults,
-          // temp partial result (will be replaced after quiz)
           { topicId: currentTopic.id, topicLabel: currentTopic.label, status: 'GAP_DETECTED',
             score: openEval.score, openAnswerScore: openEval.score, quizScore: 0,
             retries: state.retryCount, gaps: openEval.gaps, feedback: openEval.feedback },
@@ -205,12 +371,10 @@ export async function processTrainingMessage(
     }
 
     case 'QUIZZING': {
-      // Parse selected indexes from userMessage (format: "0,1,1" or JSON array)
       const quizzes = state.pendingQuizzes ?? []
       const selectedIndexes = parseQuizAnswers(userMessage, quizzes.length)
       const quizEval = evaluateQuizAnswers(quizzes, selectedIndexes)
 
-      // Get stored open answer score from temp result
       const tempResult = state.topicResults.at(-1)
       const openScore = tempResult?.openAnswerScore ?? 0
       const finalScore = computeTopicScore(openScore, quizEval.score)
@@ -232,7 +396,6 @@ export async function processTrainingMessage(
         feedback: tempResult?.feedback ?? '',
       }
 
-      // Remove temp result, add final
       const resultsWithoutTemp = state.topicResults.slice(0, -1)
       const stateWithResult = { ...state, topicResults: resultsWithoutTemp }
 
@@ -241,12 +404,10 @@ export async function processTrainingMessage(
 
       const { newState, moveToNextTopic } = advanceAfterEvaluation(stateWithResult, topicResult, botConfig, topicConfig, topics.length)
 
-      // Detect competence from all user answers
       const userAnswers = session.messages.filter(m => m.role === 'user').map(m => m.content)
       const detectedLevel = detectCompetenceLevel(userAnswers)
       const finalState = { ...newState, detectedCompetenceLevel: detectedLevel }
 
-      // Generate response text
       let text: string
       if (finalState.phase === 'COMPLETE') {
         const overallScore = computeOverallScore(finalState.topicResults)
@@ -259,7 +420,6 @@ export async function processTrainingMessage(
         await logTrainingTokens(bot.organizationId, bot.modelName, feedbackResult.usage, 'training-final-feedback')
         text = feedbackResult.text
 
-        // Update session as complete
         await prisma.trainingSession.update({
           where: { id: sessionId },
           data: {
@@ -296,6 +456,97 @@ export async function processTrainingMessage(
       break
     }
 
+    case 'FINAL_QUIZZING': {
+      const questions = state.finalQuizQuestions ?? []
+      if (questions.length === 0) {
+        response = { text: 'Quiz finale non disponibile.', phase: 'FINAL_QUIZZING' }
+        break
+      }
+
+      // Parse mixed answers (number for MC/TF, string for open answers)
+      let answers: Array<number | string> = []
+      try {
+        const parsed = JSON.parse(userMessage)
+        if (Array.isArray(parsed)) answers = parsed
+      } catch {
+        answers = new Array(questions.length).fill(0)
+      }
+
+      let totalScore = 0
+      const allGaps: string[] = []
+
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i]
+        const answer = answers[i]
+
+        if (q.type === 'OPEN_ANSWER') {
+          const result = await evaluateOpenAnswer(
+            q.question,
+            String(answer ?? ''),
+            currentTopic?.learningObjectives ?? [],
+            state.detectedCompetenceLevel,
+            bot.modelName
+          )
+          totalScore += result.score
+          allGaps.push(...result.gaps)
+        } else {
+          const correct = typeof answer === 'number' && answer === q.correctIndex
+          totalScore += correct ? 100 : 0
+          if (!correct && q.question) {
+            allGaps.push(`Risposta errata: "${q.question}"`)
+          }
+        }
+      }
+
+      const overallScore = Math.round(totalScore / Math.max(questions.length, 1))
+      const passed = overallScore >= bot.passScoreThreshold
+
+      const feedbackResult = await generateText({
+        model,
+        system: buildFinalFeedbackPrompt(
+          state.dialogueTopicResults.map((r) => ({
+            topicLabel: r.topicLabel,
+            status: r.finalComprehension >= bot.passScoreThreshold ? 'PASSED' : 'GAP_DETECTED',
+            score: r.finalComprehension,
+            gaps: r.gaps,
+          })),
+          overallScore,
+          passed,
+          bot.language
+        ),
+        prompt: 'Genera il messaggio di chiusura.',
+      })
+      await logTrainingTokens(bot.organizationId, bot.modelName, feedbackResult.usage, 'training-final-feedback')
+
+      const finalState: TrainingSupervisorState = { ...state, phase: 'COMPLETE' }
+
+      await prisma.trainingSession.update({
+        where: { id: sessionId },
+        data: {
+          status: passed ? 'COMPLETED' : 'FAILED',
+          passed,
+          overallScore,
+          completedAt: new Date(),
+          durationSeconds: Math.round((Date.now() - session.startedAt.getTime()) / 1000),
+          topicResults: state.dialogueTopicResults as any,
+          supervisorState: finalState as any,
+        },
+      })
+
+      await prisma.trainingMessage.create({
+        data: { trainingSessionId: sessionId, role: 'assistant', phase: 'COMPLETE', content: feedbackResult.text },
+      })
+
+      response = {
+        text: feedbackResult.text,
+        phase: 'COMPLETE',
+        sessionComplete: true,
+        overallScore,
+        passed,
+      }
+      break
+    }
+
     default:
       response = { text: 'Stato non riconosciuto.', phase: state.phase }
   }
@@ -308,7 +559,6 @@ function parseQuizAnswers(input: string, count: number): number[] {
     const parsed = JSON.parse(input)
     if (Array.isArray(parsed)) return parsed.map(Number)
   } catch {}
-  // fallback: comma-separated "0,1,1"
   const parts = input.split(',').map(s => parseInt(s.trim(), 10))
   if (parts.length === count && parts.every(n => !isNaN(n))) return parts
   return new Array(count).fill(0)

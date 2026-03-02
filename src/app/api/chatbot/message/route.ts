@@ -302,6 +302,13 @@ export async function POST(req: Request) {
         const session = conversation.chatbotSession;
         if (!session) return Response.json({ error: 'Session not found' }, { status: 404 });
 
+        // Verify the request comes from the session that owns this conversation
+        const requestSessionId = req.headers.get('x-session-id') ||
+            new URL(req.url).searchParams.get('sessionId');
+        if (!requestSessionId || session.sessionId !== requestSessionId) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const creditsCheck = await checkCreditsForAction(
             'chatbot_session_message',
             undefined,

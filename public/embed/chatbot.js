@@ -164,6 +164,8 @@
 
   // Communication
   window.addEventListener('message', (event) => {
+    const expectedOrigin = new URL(widgetUrl).origin;
+    if (event.origin !== expectedOrigin) return;
     let data = event.data;
     if (typeof data === 'string') {
       try {
@@ -201,7 +203,7 @@
         iframe.contentWindow.postMessage({
           type: 'bt-widget-page-context',
           pageContext: buildPageContext()
-        }, '*');
+        }, new URL(widgetUrl).origin);
       }
     }
   });

@@ -213,6 +213,12 @@ export async function POST(req: Request) {
         const conversation = await ChatService.loadConversation(conversationId, botId);
         console.log(`⏱️ [TIMING] Data load: ${Date.now() - loadStart}ms`);
         const bot = conversation.bot;
+        if (bot.status !== 'PUBLISHED') {
+            return Response.json({
+                text: "Mi dispiace, questa intervista non è al momento disponibile.",
+                isCompleted: false
+            }, { status: 200 });
+        }
         const language = bot.language || 'en';
         const interviewObjective = String((bot as any).researchGoal || '').trim();
         const shouldCollectData = (bot as any).collectCandidateData;
@@ -501,7 +507,7 @@ export async function POST(req: Request) {
                 canonicalMessages,
                 openAIKey,
                 conversation.candidateProfile || {},
-                { simulationMode, onLlmUsage: collectLlmUsage, language }
+                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
             );
             await prisma.message.create({
                 data: {
@@ -819,7 +825,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode, onLlmUsage: collectLlmUsage, language }
+                        { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                 }
@@ -830,7 +836,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode, onLlmUsage: collectLlmUsage, language }
+                        { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                     nextState.dataCollectionRefused = true;
@@ -876,7 +882,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage, language }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                             );
                             // Set status for AI to say goodbye
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
@@ -941,7 +947,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage, language }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             nextState.dataCollectionRefused = true;
@@ -990,7 +996,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage, language }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             haltCollection = true;
@@ -2123,7 +2129,7 @@ hard_rules:
                     canonicalMessages,
                     openAIKey,
                     currentProfileForCompletion || {},
-                    { simulationMode, onLlmUsage: collectLlmUsage, language }
+                    { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                 );
                 const finalResponseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
                 await prisma.message.create({

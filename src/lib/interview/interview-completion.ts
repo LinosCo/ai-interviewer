@@ -22,7 +22,7 @@ export async function completeInterview(
     messages: any[],
     apiKey: string,
     existingProfile: any,
-    options?: { simulationMode?: boolean; onLlmUsage?: LLMUsageCollector; language?: string }
+    options?: { simulationMode?: boolean; onLlmUsage?: LLMUsageCollector; language?: string; effectiveDuration?: number | null }
 ): Promise<void> {
     // Run profile extraction and completion marking in PARALLEL
     // This saves time by not waiting for one before starting the other
@@ -44,14 +44,22 @@ export async function completeInterview(
         options?.simulationMode
             ? prisma.conversation.update({
                 where: { id: conversationId },
-                data: { status: 'COMPLETED', completedAt: new Date() }
+                data: { status: 'COMPLETED', completedAt: new Date(), durationSeconds: options?.effectiveDuration ?? null }
             })
             : ChatService.completeInterview(conversationId)
     ]);
 
+    // Write durationSeconds for the non-simulation path (ChatService.completeInterview does not set it)
+    if (!options?.simulationMode && options?.effectiveDuration != null) {
+        await prisma.conversation.update({
+            where: { id: conversationId },
+            data: { durationSeconds: options.effectiveDuration }
+        });
+    }
+
     // Save extracted profile if available
     if (extractedProfile) {
-        const mergedProfile = { ...extractedProfile, ...existingProfile };
+        const mergedProfile = { ...existingProfile, ...extractedProfile };
         await prisma.conversation.update({
             where: { id: conversationId },
             data: { candidateProfile: mergedProfile }

@@ -160,6 +160,10 @@ export default async function InterviewPage({ params }: { params: Promise<{ slug
             }
         }
 
+        if (bot.status !== 'PUBLISHED') {
+            throw new Error('Interview non disponibile');
+        }
+
         // Initialize with the first topic
         const firstTopic = bot.topics[0];
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 export async function PATCH(
     req: NextRequest,
@@ -12,6 +13,10 @@ export async function PATCH(
     if (!session?.user?.id) return new NextResponse("Unauthorized", { status: 401 });
 
     try {
+        const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { projectId: true } });
+        if (!bot) return new NextResponse('Not found', { status: 404 });
+        await assertProjectAccess(session.user.id, bot.projectId, 'MEMBER');
+
         const body = await req.json();
         const { status, question, answer } = body;
         // status: 'approved' | 'dismissed'

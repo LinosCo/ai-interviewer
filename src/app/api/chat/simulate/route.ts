@@ -1,3 +1,4 @@
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -17,6 +18,9 @@ interface MockTopic extends TopicBlock {
 }
 
 export async function POST(req: Request) {
+    const session = await auth();
+    if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+
     try {
         const body = await req.json();
         const { messages, config, currentTopicIndex = 0, effectiveDuration = 0 } = body;

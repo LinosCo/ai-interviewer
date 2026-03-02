@@ -893,6 +893,58 @@ export async function sendPartnerTrialExpiredEmail(params: {
 }
 
 /**
+ * Invia notifica pagamento fallito agli admin dell'organizzazione (invoice.payment_failed)
+ */
+export async function sendPaymentFailedEmail(to: string, userName: string) {
+    const content = `
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 60px; height: 60px; background: #FEE2E2; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+                <span style="font-size: 28px;">❌</span>
+            </div>
+            <h2 style="color: #1f2937; margin: 0; font-size: 22px;">Pagamento non riuscito</h2>
+        </div>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Ciao ${userName},
+        </p>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Il pagamento per la tua sottoscrizione a Business Tuner non è andato a buon fine.
+            Il tuo account è stato impostato in stato <strong style="color: #DC2626;">scaduto</strong>.
+        </p>
+
+        <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; padding: 20px; margin: 24px 0;">
+            <p style="margin: 0; color: #991B1B; font-size: 14px;">
+                Per mantenere l'accesso a tutte le funzionalità, aggiorna il metodo di pagamento
+                e verifica che i fondi siano disponibili.
+            </p>
+        </div>
+
+        <p style="color: #4b5563; font-size: 16px; margin: 20px 0;">
+            Se il problema persiste, contatta il tuo istituto bancario o aggiorna la carta di credito
+            nella sezione Fatturazione della dashboard.
+        </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="${baseUrl}/dashboard/billing"
+               style="background: #DC2626; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; margin: 0 8px;">
+                Aggiorna pagamento
+            </a>
+            <a href="${baseUrl}/dashboard/billing/plans"
+               style="background: #1f2937; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; margin: 0 8px;">
+                Gestisci piano
+            </a>
+        </div>
+    `;
+
+    return sendEmail({
+        to,
+        subject: '❌ Pagamento non riuscito - Azione richiesta - Business Tuner',
+        html: emailWrapper(content)
+    });
+}
+
+/**
  * Invia email di benvenuto dopo registrazione
  */
 export async function sendWelcomeEmail(params: {

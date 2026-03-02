@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
 import { CreditService } from '@/services/creditService';
 import { PLANS } from '@/config/plans';
+import { sendPaymentFailedEmail } from '@/lib/email';
 
 function unixTimestampToDate(value: unknown): Date | null {
     const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Webhook persistence failed' }, { status: 500 });
     }
 
+    // FIX 1: Handler errors after persist → log + return 200 (prevents Stripe infinite retries)
     try {
         switch (event.type) {
             case 'checkout.session.completed': {
@@ -130,6 +132,12 @@ export async function POST(req: NextRequest) {
                 await handleTrialWillEnd(subscription);
                 break;
             }
+            // FIX 2: Handle payment_intent.payment_failed to revoke optimistically-granted credits
+            case 'payment_intent.payment_failed': {
+                const paymentIntent = event.data.object as Stripe.PaymentIntent;
+                await handlePaymentIntentFailed(paymentIntent);
+                break;
+            }
             default:
                 break;
         }
@@ -144,7 +152,9 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ received: true });
     } catch (error: any) {
-        console.error('Webhook handler error:', error);
+        // Event is already persisted (idempotency recorded). Log the error but
+        // return 200 so Stripe does NOT retry infinitely.
+        console.error('[Stripe webhook] Handler error after persist:', error);
 
         await prisma.stripeWebhookEvent.update({
             where: { eventId: event.id },
@@ -153,10 +163,9 @@ export async function POST(req: NextRequest) {
             }
         }).catch(() => null);
 
-        return NextResponse.json(
-            { error: 'Webhook handler failed' },
-            { status: 500 }
-        );
+        // Return 200 — the event was received and persisted; handler failure is
+        // a business-logic error we must investigate, not a reason to retry.
+        return NextResponse.json({ received: true, handlerError: true });
     }
 }
 
@@ -411,6 +420,55 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         where: { stripeSubscriptionId },
         data: { status: SubscriptionStatus.PAST_DUE }
     });
+
+    // FIX 3: Send payment failure email to org owners/admins
+    const subscription = await prisma.subscription.findFirst({
+        where: { stripeSubscriptionId },
+        include: {
+            organization: {
+                include: {
+                    members: {
+                        where: { role: { in: ['OWNER', 'ADMIN'] } },
+                        include: { user: true }
+                    }
+                }
+            }
+        }
+    });
+    if (subscription) {
+        for (const member of subscription.organization.members) {
+            if (member.user.email) {
+                try {
+                    await sendPaymentFailedEmail(member.user.email, member.user.name || 'there');
+                } catch (e) {
+                    console.error('[Email] Failed to send payment failure notification', e);
+                }
+            }
+        }
+    }
+}
+
+// FIX 2: Handler for payment_intent.payment_failed — revokes optimistically-granted credits
+async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
+    // Find OrgCreditPack by stripePaymentId to potentially revoke credits
+    const creditPack = await prisma.orgCreditPack.findFirst({
+        where: { stripePaymentId: paymentIntent.id },
+        include: { organization: { include: { members: { include: { user: true } } } } }
+    });
+    if (creditPack) {
+        // Revoke the credits that were optimistically granted
+        await prisma.$transaction([
+            prisma.orgCreditPack.update({
+                where: { id: creditPack.id },
+                data: { creditsRemaining: BigInt(0) }
+            }),
+            prisma.organization.update({
+                where: { id: creditPack.organizationId },
+                data: { packCreditsAvailable: { decrement: creditPack.creditsRemaining } }
+            })
+        ]);
+        console.log(`[Stripe] Revoked credits for failed payment ${paymentIntent.id}`);
+    }
 }
 
 function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {

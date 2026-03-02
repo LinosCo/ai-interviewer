@@ -93,12 +93,18 @@ export async function startInterviewAction(botId: string) {
     // Generate anonymous participant ID or use session if present (but session is admin usually)
     const participantId = `anon_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
+    const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { status: true, topics: { orderBy: { orderIndex: 'asc' }, take: 1, select: { id: true } } } });
+    if (!bot || bot.status !== 'PUBLISHED') {
+        return { error: 'Interview non disponibile' };
+    }
+
     const conversation = await prisma.conversation.create({
         data: {
             botId,
             participantId,
             status: 'STARTED',
             startedAt: new Date(),
+            currentTopicId: bot.topics[0]?.id || null,
         }
     });
 

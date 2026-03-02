@@ -70,6 +70,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
         if (typeof window === 'undefined' || window.parent === window) return;
 
         const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
             const data = event.data;
             if (data?.type !== 'bt-widget-page-context' || !data.pageContext) return;
 
@@ -83,7 +84,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
         };
 
         window.addEventListener('message', handleMessage);
-        window.parent.postMessage({ type: 'bt-widget-get-context' }, '*');
+        window.parent.postMessage({ type: 'bt-widget-get-context' }, document.referrer ? new URL(document.referrer).origin : '*');
 
         return () => {
             window.removeEventListener('message', handleMessage);
@@ -98,7 +99,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
             window.parent.postMessage({
                 type: 'bt-widget-resize',
                 isOpen
-            }, '*');
+            }, document.referrer ? new URL(document.referrer).origin : '*');
         };
 
         // Send immediately and repeat briefly to avoid missed first handshake.

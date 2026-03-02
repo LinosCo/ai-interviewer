@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AnalyticsEngine } from '@/lib/analytics/AnalyticsEngine';
 import { auth } from '@/auth';
+import { assertProjectAccess } from '@/lib/domain/workspace';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,11 +15,12 @@ export async function GET(
     try {
         // Basic auth check
         const session = await auth();
-        if (!session?.user) {
+        if (!session?.user?.id) {
             return new NextResponse('Unauthorized', { status: 401 });
         }
 
         const projectId = params.projectId;
+        await assertProjectAccess(session.user.id, projectId, 'VIEWER');
         if (!projectId) {
             return new NextResponse('Project ID required', { status: 400 });
         }

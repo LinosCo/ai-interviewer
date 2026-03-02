@@ -8,11 +8,11 @@ import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { TokenCategory } from '@prisma/client';
 
 export async function POST(req: Request) {
-    try {
-        console.log('--- GENERATE API CALLED ---');
+    const session = await auth();
+    if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-        // Allow public generation for onboarding flow
-        // const session = await auth(); 
+    try {
+        console.log('--- GENERATE API CALLED ---'); 
 
         let goal;
         try {
@@ -106,8 +106,8 @@ Rispondi in italiano.`
             await TokenTrackingService.logTokenUsage({
                 organizationId: '' as string, // resolved from userId/membership by service fallback
                 userId,
-                inputTokens: result.usage?.promptTokens ?? 0,
-                outputTokens: result.usage?.completionTokens ?? 0,
+                inputTokens: result.usage?.inputTokens ?? 0,
+                outputTokens: result.usage?.outputTokens ?? 0,
                 category: TokenCategory.INTERVIEW,
                 model: 'gpt-4o-mini',
                 operation: 'interview-generate',

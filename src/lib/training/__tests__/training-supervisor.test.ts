@@ -1,7 +1,7 @@
 // src/lib/training/__tests__/training-supervisor.test.ts
 import { describe, it, expect } from 'vitest'
-import { getNextPhase, shouldRetry, buildInitialState, advanceAfterEvaluation, computeOverallScore, computeSessionPassed } from '../training-supervisor'
-import type { TrainingSupervisorState, TopicResult } from '../training-types'
+import { getNextPhase, shouldRetry, buildInitialState, advanceAfterEvaluation, computeOverallScore, computeSessionPassed, advanceDialogueTopic } from '../training-supervisor'
+import type { TrainingSupervisorState, TopicResult, DialogueTopicResult } from '../training-types'
 
 const mockTopic = {
   id: 't1',
@@ -24,6 +24,13 @@ describe('buildInitialState', () => {
     expect(state.adaptationDepth).toBe(0)
     expect(state.retryCount).toBe(0)
     expect(state.topicResults).toEqual([])
+  })
+
+  it('initializes dialogue fields to empty defaults', () => {
+    const state = buildInitialState()
+    expect(state.dialogueTurns).toBe(0)
+    expect(state.comprehensionHistory).toEqual([])
+    expect(state.dialogueTopicResults).toEqual([])
   })
 })
 
@@ -61,6 +68,9 @@ describe('advanceAfterEvaluation', () => {
     detectedCompetenceLevel: 'INTERMEDIATE',
     adaptationDepth: 0,
     topicResults: [],
+    dialogueTurns: 0,
+    comprehensionHistory: [],
+    dialogueTopicResults: [],
   }
 
   const passedResult: TopicResult = {
@@ -155,5 +165,58 @@ describe('computeSessionPassed', () => {
   it('returns false when overall score is below threshold', () => {
     // average of 80+70 = 75, threshold 80 → fail
     expect(computeSessionPassed(results, 80)).toBe(false)
+  })
+})
+
+describe('advanceDialogueTopic', () => {
+  const dialogueResult: DialogueTopicResult = {
+    topicId: 't1',
+    topicLabel: 'Topic 1',
+    finalComprehension: 75,
+    gaps: ['gap1'],
+    understoodConcepts: ['concept1'],
+    turnsUsed: 4,
+  }
+
+  const baseDialogueState: TrainingSupervisorState = {
+    currentTopicIndex: 0,
+    phase: 'DIALOGUING',
+    retryCount: 0,
+    detectedCompetenceLevel: 'INTERMEDIATE',
+    adaptationDepth: 0,
+    topicResults: [],
+    dialogueTurns: 4,
+    comprehensionHistory: [],
+    dialogueTopicResults: [],
+  }
+
+  it('advances to next topic in EXPLAINING phase when more topics remain', () => {
+    const newState = advanceDialogueTopic(baseDialogueState, dialogueResult, 3)
+    expect(newState.currentTopicIndex).toBe(1)
+    expect(newState.phase).toBe('EXPLAINING')
+    expect(newState.dialogueTurns).toBe(0)
+    expect(newState.comprehensionHistory).toEqual([])
+    expect(newState.dialogueTopicResults).toHaveLength(1)
+    expect(newState.dialogueTopicResults[0].topicId).toBe('t1')
+  })
+
+  it('transitions to FINAL_QUIZZING on last topic', () => {
+    const newState = advanceDialogueTopic(baseDialogueState, dialogueResult, 1)
+    expect(newState.phase).toBe('FINAL_QUIZZING')
+    expect(newState.currentTopicIndex).toBe(0) // stays on last topic index
+    expect(newState.dialogueTopicResults).toHaveLength(1)
+  })
+
+  it('accumulates multiple dialogue topic results', () => {
+    const stateWithPrior: TrainingSupervisorState = {
+      ...baseDialogueState,
+      currentTopicIndex: 1,
+      dialogueTopicResults: [
+        { topicId: 't0', topicLabel: 'Topic 0', finalComprehension: 90, gaps: [], understoodConcepts: ['c0'], turnsUsed: 3 },
+      ],
+    }
+    const newState = advanceDialogueTopic(stateWithPrior, { ...dialogueResult, topicId: 't1' }, 3)
+    expect(newState.dialogueTopicResults).toHaveLength(2)
+    expect(newState.currentTopicIndex).toBe(2)
   })
 })

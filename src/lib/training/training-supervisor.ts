@@ -4,6 +4,7 @@ import type {
   TrainingPhaseType,
   TopicResult,
   DetectedCompetenceLevel,
+  DialogueTopicResult,
 } from './training-types'
 
 interface BotConfig {
@@ -28,6 +29,9 @@ export function buildInitialState(): TrainingSupervisorState {
     detectedCompetenceLevel: 'INTERMEDIATE',
     adaptationDepth: 0,
     topicResults: [],
+    dialogueTurns: 0,
+    comprehensionHistory: [],
+    dialogueTopicResults: [],
     pendingQuizzes: undefined,
     pendingCheckQuestion: undefined,
     pendingRetryGaps: undefined,
@@ -143,4 +147,41 @@ export function computeSessionPassed(
   threshold: number
 ): boolean {
   return computeOverallScore(topicResults) >= threshold
+}
+
+/**
+ * Advance state after completing a DIALOGUING topic.
+ * Appends the topic result and either moves to the next topic (EXPLAINING)
+ * or transitions to FINAL_QUIZZING when all topics are done.
+ */
+export function advanceDialogueTopic(
+  state: TrainingSupervisorState,
+  result: DialogueTopicResult,
+  totalTopics: number
+): TrainingSupervisorState {
+  const updatedResults = [...state.dialogueTopicResults, result]
+  const nextIndex = state.currentTopicIndex + 1
+
+  if (nextIndex >= totalTopics) {
+    // All dialogue topics done — move to final quiz
+    return {
+      ...state,
+      phase: 'FINAL_QUIZZING',
+      dialogueTopicResults: updatedResults,
+      dialogueTurns: 0,
+      comprehensionHistory: [],
+    }
+  }
+
+  // More topics remain — advance to next
+  return {
+    ...state,
+    currentTopicIndex: nextIndex,
+    phase: 'EXPLAINING',
+    dialogueTurns: 0,
+    comprehensionHistory: [],
+    dialogueTopicResults: updatedResults,
+    adaptationDepth: 0,
+    retryCount: 0,
+  }
 }

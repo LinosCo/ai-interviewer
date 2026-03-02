@@ -81,6 +81,7 @@ export default async function TrainingBotSettingsPage({
     where: { id: botId, organizationId: orgId },
     include: {
       topics: { orderBy: { orderIndex: 'asc' } },
+      rewardConfig: true,
     },
   })
 

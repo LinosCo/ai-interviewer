@@ -70,6 +70,7 @@ export interface TrainingSupervisorState {
   pendingCheckQuestion?: string
   pendingRetryGaps?: string[]
   dataCollectionPhase?: 'CONSENT' | 'COLLECTING' | 'DONE'
+  dataCollectionStep?: number
   dataCollected?: Record<string, string>
 }
 

@@ -3,7 +3,6 @@ import type {
   TrainingSupervisorState,
   TrainingPhaseType,
   TopicResult,
-  DetectedCompetenceLevel,
   DialogueTopicResult,
 } from './training-types'
 
@@ -21,10 +20,11 @@ interface TopicConfig {
   maxRetriesOverride?: number | null
 }
 
-export function buildInitialState(): TrainingSupervisorState {
+export function buildInitialState(options?: { collectTraineeData?: boolean }): TrainingSupervisorState {
+  const collectTraineeData = options?.collectTraineeData === true
   return {
     currentTopicIndex: 0,
-    phase: 'EXPLAINING',
+    phase: collectTraineeData ? 'DATA_COLLECTION' : 'EXPLAINING',
     retryCount: 0,
     detectedCompetenceLevel: 'INTERMEDIATE',
     adaptationDepth: 0,
@@ -35,6 +35,9 @@ export function buildInitialState(): TrainingSupervisorState {
     pendingQuizzes: undefined,
     pendingCheckQuestion: undefined,
     pendingRetryGaps: undefined,
+    dataCollectionPhase: collectTraineeData ? 'COLLECTING' : 'DONE',
+    dataCollectionStep: collectTraineeData ? 0 : undefined,
+    dataCollected: collectTraineeData ? {} : undefined,
   }
 }
 

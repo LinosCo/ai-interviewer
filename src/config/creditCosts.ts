@@ -26,6 +26,9 @@ export const CREDIT_COSTS = {
     copilot_message: 20,          // singola interazione
     copilot_analysis: 35,         // analisi approfondita
 
+    // Formazione AI
+    training_session_message: 3,  // singolo messaggio training
+
     // Export
     export_pdf_simple: 5,         // export senza AI
     export_pdf_analysis: 30,      // export con analisi AI
@@ -48,9 +51,10 @@ export const ACTION_TO_TOOL: Record<CreditAction, string> = {
     chatbot_session_complete: 'chatbot',
     visibility_query: 'visibility',
     visibility_report: 'visibility',
-    ai_tip_generation: 'tips',
+    ai_tip_generation: 'ai_tips',
     copilot_message: 'copilot',
     copilot_analysis: 'copilot',
+    training_session_message: 'training',
     export_pdf_simple: 'export',
     export_pdf_analysis: 'export',
     export_csv: 'export'

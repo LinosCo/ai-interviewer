@@ -15,6 +15,7 @@ export interface TrainingGeneratedConfig {
   targetAudience: string;
   tone: string;
   introMessage: string;
+  maxDurationMins: number;
   traineeEducationLevel: 'PRIMARY' | 'SECONDARY' | 'UNIVERSITY' | 'PROFESSIONAL';
   traineeCompetenceLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT';
   passScoreThreshold: number;

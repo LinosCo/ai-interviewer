@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import type {
   TrainingBot,
   TrainingTopicBlock,
+  RewardConfig,
   TraineeEducationLevel,
   TraineeCompetenceLevel,
   FailureMode,
@@ -14,6 +15,7 @@ import type {
 
 type BotWithTopics = TrainingBot & {
   topics: TrainingTopicBlock[]
+  rewardConfig?: RewardConfig | null
 }
 
 interface InitialValues {
@@ -22,6 +24,9 @@ interface InitialValues {
   targetAudience?: string
   tone?: string
   introMessage?: string
+  maxDurationMins?: number
+  collectTraineeData?: boolean
+  traineeDataFields?: string[]
   traineeEducationLevel?: TraineeEducationLevel
   traineeCompetenceLevel?: TraineeCompetenceLevel
   passScoreThreshold?: number
@@ -132,6 +137,26 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
     bot?.passScoreThreshold ?? initialValues?.passScoreThreshold ?? 70
   )
   const [maxRetries, setMaxRetries] = useState(bot?.maxRetries ?? 1)
+  const [maxDurationMins, setMaxDurationMins] = useState(
+    bot?.maxDurationMins ?? initialValues?.maxDurationMins ?? 30
+  )
+  const [collectTraineeData, setCollectTraineeData] = useState(
+    bot?.collectTraineeData ?? initialValues?.collectTraineeData ?? true
+  )
+  const [rewardEnabled, setRewardEnabled] = useState(Boolean(bot?.rewardConfig?.enabled))
+  const [rewardDisplayText, setRewardDisplayText] = useState(
+    bot?.rewardConfig?.displayText ?? 'Certificato di completamento'
+  )
+  const [traineeDataFieldsText, setTraineeDataFieldsText] = useState(() => {
+    const fromBot = Array.isArray(bot?.traineeDataFields) ? (bot?.traineeDataFields as unknown[]) : null
+    const fromInitial = initialValues?.traineeDataFields ?? null
+    const questions = (fromBot ?? fromInitial ?? [
+      'Qual è il tuo ruolo e in quale contesto userai questo argomento?',
+      'Che livello senti di avere oggi su questo tema? (base, intermedio, avanzato)',
+      'Quale risultato pratico vuoi ottenere entro fine lezione?',
+    ]).filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+    return questions.join('\n')
+  })
 
   // Topics — seeded from bot (edit), initialValues (AI-generated create), or empty
   const [topics, setTopics] = useState<TopicDraft[]>(
@@ -211,6 +236,20 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
       failureMode,
       passScoreThreshold: Number(passScoreThreshold),
       maxRetries: Number(maxRetries),
+      maxDurationMins: Math.min(180, Math.max(10, Number(maxDurationMins) || 30)),
+      collectTraineeData,
+      traineeDataFields: collectTraineeData
+        ? traineeDataFieldsText
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 5)
+        : [],
+      rewardConfig: {
+        enabled: rewardEnabled,
+        displayText: rewardDisplayText.trim() || 'Certificato di completamento',
+        showOnLanding: false,
+      },
       topics: topics
         .filter((t) => t.label.trim())
         .map((t, idx) => ({
@@ -358,7 +397,7 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
       {/* 3. Profilo Trainee */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <SectionTitle>Profilo Trainee</SectionTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <Field label="Livello di istruzione">
             <select
               value={traineeEducationLevel}
@@ -383,6 +422,34 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
               <option value="ADVANCED">Avanzato</option>
               <option value="EXPERT">Esperto</option>
             </select>
+          </Field>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-800">Onboarding iniziale</p>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={collectTraineeData}
+                onChange={(e) => setCollectTraineeData(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Abilitato
+            </label>
+          </div>
+
+          <Field
+            label="Domande iniziali (una per riga)"
+            hint="2-5 domande brevi per calibrare livello, contesto ed esempi pratici."
+          >
+            <textarea
+              value={traineeDataFieldsText}
+              onChange={(e) => setTraineeDataFieldsText(e.target.value)}
+              className={textareaCls}
+              style={{ minHeight: '95px' }}
+              disabled={!collectTraineeData}
+            />
           </Field>
         </div>
       </div>
@@ -420,6 +487,17 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
               onChange={(e) => setMaxRetries(Number(e.target.value))}
               min={0}
               max={5}
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Durata lezione (minuti)" hint="10–180">
+            <input
+              type="number"
+              value={maxDurationMins}
+              onChange={(e) => setMaxDurationMins(parseInt(e.target.value, 10) || 30)}
+              min={10}
+              max={180}
               className={inputCls}
             />
           </Field>
@@ -572,6 +650,38 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
               onChange={(e) => setLogoUrl(e.target.value)}
               placeholder="https://..."
               className={inputCls}
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* 7. Reward certificato */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Certificato</SectionTitle>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Emetti certificato a fine percorso</p>
+              <p className="text-xs text-gray-500 mt-0.5">Mostra il certificato nella schermata di completamento.</p>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={rewardEnabled}
+                onChange={(e) => setRewardEnabled(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Attivo
+            </label>
+          </div>
+
+          <Field label="Titolo certificato" hint="Es. Certificato di completamento">
+            <input
+              type="text"
+              value={rewardDisplayText}
+              onChange={(e) => setRewardDisplayText(e.target.value)}
+              className={inputCls}
+              disabled={!rewardEnabled}
             />
           </Field>
         </div>

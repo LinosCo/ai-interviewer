@@ -7,15 +7,31 @@ const statusIcon: Record<string, string> = { PASSED: '✅', FAILED: '❌', GAP_D
 const statusLabel: Record<string, string> = { PASSED: 'Superato', FAILED: 'Non superato', GAP_DETECTED: 'Lacune rilevate' }
 
 interface Props {
+  sessionId: string
   botName: string
   overallScore: number
   passed: boolean
   topicResults: TopicResult[]
   primaryColor: string
+  rewardConfig?: {
+    enabled: boolean
+    type?: string
+    payload?: string
+    displayText?: string | null
+  } | null
 }
 
-export default function TrainingCompletionScreen({ botName, overallScore, passed, topicResults, primaryColor }: Props) {
+export default function TrainingCompletionScreen({
+  sessionId,
+  botName,
+  overallScore,
+  passed,
+  topicResults,
+  primaryColor,
+  rewardConfig,
+}: Props) {
   const brandColor = /^#[0-9a-fA-F]{6}$/.test(primaryColor) ? primaryColor : '#6366f1'
+  const canShowCertificate = Boolean(rewardConfig?.enabled && passed)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-50 to-white flex items-center justify-center p-4">
@@ -64,13 +80,23 @@ export default function TrainingCompletionScreen({ botName, overallScore, passed
           </div>
         )}
 
-        <button
-          className={`w-full px-4 py-3 rounded-xl text-white font-semibold hover:opacity-90 ${TRAINING_UI.motion.fast} ${TRAINING_UI.ring.focus}`}
-          style={{ background: brandColor }}
-          onClick={() => window.location.href = '/'}
-        >
-          {TRAINING_UI.copy.completionCta}
-        </button>
+        <div className="space-y-3">
+          {canShowCertificate && (
+            <button
+              className={`w-full px-4 py-3 rounded-xl text-white font-semibold hover:opacity-90 ${TRAINING_UI.motion.fast} ${TRAINING_UI.ring.focus}`}
+              style={{ background: brandColor }}
+              onClick={() => window.open(`/t/certificate/${sessionId}`, '_blank')}
+            >
+              {rewardConfig?.displayText?.trim() || 'Scarica certificato'}
+            </button>
+          )}
+          <button
+            className="w-full px-4 py-3 rounded-xl text-gray-700 font-semibold hover:bg-gray-100 border border-gray-200"
+            onClick={() => window.location.href = '/'}
+          >
+            {TRAINING_UI.copy.completionCta}
+          </button>
+        </div>
       </div>
     </div>
   )

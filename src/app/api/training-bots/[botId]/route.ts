@@ -13,6 +13,49 @@ async function ensureTrainingTopicDialogueColumns() {
   `)
 }
 
+async function ensureTrainingRewardSchemaCompatibility() {
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "RewardConfig"
+      ADD COLUMN IF NOT EXISTS "trainingBotId" TEXT;
+  `)
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "RewardConfig"
+      ALTER COLUMN "botId" DROP NOT NULL;
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "RewardConfig_trainingBotId_key"
+    ON "RewardConfig"("trainingBotId");
+  `)
+}
+
+async function upsertTrainingRewardConfig(
+  db: Prisma.TransactionClient | typeof prisma,
+  trainingBotId: string,
+  rewardConfig?: { enabled: boolean; displayText?: string | null; showOnLanding?: boolean }
+) {
+  if (!rewardConfig) return
+  const displayText = (rewardConfig.displayText ?? 'Certificato di completamento').trim() || 'Certificato di completamento'
+  const rewardConfigId = `trw_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`
+  await db.$executeRawUnsafe(
+    `
+      INSERT INTO "RewardConfig" ("id","trainingBotId","enabled","type","payload","displayText","showOnLanding")
+      VALUES ($1, $2, $3, 'certificate', 'training-certificate', $4, $5)
+      ON CONFLICT ("trainingBotId")
+      DO UPDATE SET
+        "enabled" = EXCLUDED."enabled",
+        "type" = 'certificate',
+        "payload" = 'training-certificate',
+        "displayText" = EXCLUDED."displayText",
+        "showOnLanding" = EXCLUDED."showOnLanding";
+    `,
+    rewardConfigId,
+    trainingBotId,
+    rewardConfig.enabled,
+    displayText,
+    rewardConfig.showOnLanding ?? false
+  )
+}
+
 const UpdateBotSchema = z.object({
   name: z.string().min(1).optional(),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/).optional(),
@@ -29,6 +72,14 @@ const UpdateBotSchema = z.object({
   introMessage: z.string().nullish().transform(v => v ?? undefined),
   passScoreThreshold: z.number().int().min(0).max(100).optional(),
   maxRetries: z.number().int().min(0).optional(),
+  maxDurationMins: z.number().int().min(10).max(180).optional(),
+  collectTraineeData: z.boolean().optional(),
+  traineeDataFields: z.array(z.string().min(1)).max(5).optional(),
+  rewardConfig: z.object({
+    enabled: z.boolean(),
+    displayText: z.string().nullish(),
+    showOnLanding: z.boolean().optional(),
+  }).optional(),
   topics: z.array(z.object({
     id: z.string().optional(),
     label: z.string().min(1),
@@ -46,6 +97,7 @@ export async function GET(
 ) {
   try {
     await ensureTrainingTopicDialogueColumns()
+    await ensureTrainingRewardSchemaCompatibility()
 
     const session = await auth()
     if (!session?.user?.id) {
@@ -89,6 +141,7 @@ export async function PUT(
 ) {
   try {
     await ensureTrainingTopicDialogueColumns()
+    await ensureTrainingRewardSchemaCompatibility()
 
     const session = await auth()
     if (!session?.user?.id) {
@@ -117,13 +170,15 @@ export async function PUT(
 
     const body = await request.json()
     const parsed = UpdateBotSchema.parse(body)
-    const { topics, ...botFields } = parsed
+    const { topics, rewardConfig, ...botFields } = parsed
 
     const bot = await prisma.$transaction(async (tx) => {
       const updated = await tx.trainingBot.update({
         where: { id: botId },
         data: botFields,
       })
+
+      await upsertTrainingRewardConfig(tx, botId, rewardConfig)
 
       if (topics !== undefined) {
         await tx.trainingTopicBlock.deleteMany({ where: { trainingBotId: botId } })

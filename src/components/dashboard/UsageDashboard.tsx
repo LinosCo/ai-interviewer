@@ -63,18 +63,22 @@ interface UsageByToolData {
 const toolIcons: Record<string, typeof Zap> = {
     interview: MessageSquare,
     chatbot: Bot,
-    visibility: Eye,
+    training: MessageSquare,
+    brand_monitor: Eye,
     ai_tips: Lightbulb,
     copilot: Compass,
+    automation: Compass,
     export: FileDown
 };
 
 const toolColors: Record<string, string> = {
     interview: 'bg-blue-500',
     chatbot: 'bg-purple-500',
-    visibility: 'bg-green-500',
+    training: 'bg-indigo-500',
+    brand_monitor: 'bg-green-500',
     ai_tips: 'bg-amber-500',
     copilot: 'bg-rose-500',
+    automation: 'bg-cyan-500',
     export: 'bg-slate-500'
 };
 
@@ -94,9 +98,10 @@ const formatResetDate = (dateStr: string | null): string => {
 };
 
 const getProgressColor = (percentageUsed: number): string => {
-    if (percentageUsed >= 95) return 'bg-red-500';
-    if (percentageUsed >= 85) return 'bg-orange-500';
-    if (percentageUsed >= 70) return 'bg-yellow-500';
+    const percentageRemaining = Math.max(0, 100 - percentageUsed);
+    if (percentageRemaining <= 5) return 'bg-red-500';
+    if (percentageRemaining <= 15) return 'bg-orange-500';
+    if (percentageRemaining <= 30) return 'bg-yellow-500';
     return 'bg-green-500';
 };
 
@@ -194,7 +199,7 @@ export function UsageDashboard() {
     // Memoized computed values
     const progressColor = useMemo(
         () => credits ? getProgressColor(credits.percentageUsed) : 'bg-green-500',
-        [credits?.percentageUsed]
+        [credits]
     );
 
     const formattedResetDate = useMemo(
@@ -296,31 +301,31 @@ export function UsageDashboard() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {/* Credits Progress */}
+                    {/* Credits Progress (remaining credits) */}
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-medium text-slate-700">Crediti mensili</span>
                             <span className="text-sm font-bold text-slate-900">
-                                {credits.formatted.monthlyUsed}
+                                {credits.formatted.monthlyRemaining}
                                 <span className="text-slate-400 font-medium"> / {credits.formatted.monthlyLimit}</span>
                             </span>
                         </div>
                         <div
                             className="h-3 bg-slate-100 rounded-full overflow-hidden"
                             role="progressbar"
-                            aria-valuenow={Math.min(credits.percentageUsed, 100)}
+                            aria-valuenow={Math.max(0, 100 - Math.min(credits.percentageUsed, 100))}
                             aria-valuemin={0}
                             aria-valuemax={100}
-                            aria-label="Utilizzo crediti mensili"
+                            aria-label="Crediti mensili disponibili"
                         >
                             <div
                                 className={`h-full ${progressColor} transition-all duration-500`}
-                                style={{ width: `${Math.min(credits.percentageUsed, 100)}%` }}
+                                style={{ width: `${Math.max(0, 100 - Math.min(credits.percentageUsed, 100))}%` }}
                             />
                         </div>
                         <div className="flex justify-between text-xs text-slate-500">
-                            <span>{credits.percentageUsed}% utilizzato</span>
-                            <span>{credits.formatted.monthlyRemaining} disponibili</span>
+                            <span>{credits.formatted.monthlyUsed} utilizzati</span>
+                            <span>{Math.max(0, 100 - credits.percentageUsed)}% disponibili</span>
                         </div>
                     </div>
 
@@ -342,17 +347,12 @@ export function UsageDashboard() {
                                     <p className="text-[10px] text-amber-500">disponibili</p>
                                 </div>
                             </div>
-                            <div
-                                className="h-2 bg-amber-200 rounded-full overflow-hidden"
-                                role="progressbar"
-                                aria-valuenow={100}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                                aria-label="Pack extra crediti disponibili"
-                            >
-                                <div className="h-full w-full bg-amber-500 rounded-full transition-all duration-500" />
+                            <div className="flex items-center justify-between rounded-lg bg-amber-100/70 border border-amber-200 px-3 py-2">
+                                <p className="text-[11px] font-semibold text-amber-700">
+                                    Disponibili per quando finiscono i mensili
+                                </p>
+                                <p className="text-[10px] text-amber-600">Non scadono mai</p>
                             </div>
-                            <p className="text-[10px] text-amber-500 text-right">Non scadono mai</p>
                         </div>
                     )}
 

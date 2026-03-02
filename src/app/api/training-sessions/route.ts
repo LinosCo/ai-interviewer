@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import type { PlanType } from '@prisma/client'
+import { buildInitialState } from '@/lib/training/training-supervisor'
 
 const Schema = z.object({ botId: z.string() })
 
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest) {
       where: { id: botId, status: 'PUBLISHED' },
       select: {
         id: true,
+        collectTraineeData: true,
         organization: { select: { plan: true } },
       },
     })
@@ -32,6 +34,7 @@ export async function POST(req: NextRequest) {
       data: {
         trainingBotId: botId,
         participantId: `anon-${crypto.randomUUID()}`,
+        supervisorState: buildInitialState({ collectTraineeData: bot.collectTraineeData }) as any,
       },
     })
 

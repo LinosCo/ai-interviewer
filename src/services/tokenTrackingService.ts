@@ -25,7 +25,7 @@ export class TokenTrackingService {
         VISIBILITY: 'visibility_query',
         SUGGESTION: 'ai_tip_generation',
         COPILOT: 'copilot_message',
-        TRAINING: 'chatbot_session_message', // Training LLM calls billed same rate as chatbot
+        TRAINING: 'training_session_message',
         SYSTEM: 'interview_question' // Default
     };
 

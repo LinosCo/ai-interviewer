@@ -42,13 +42,19 @@ export default function QuizRenderer({ questions, onSubmit, disabled, brandColor
     onSubmit(answers as Array<number | string>)
   }
 
+  function getChoiceOptions(q: QuizQuestion): string[] {
+    if (Array.isArray(q.options) && q.options.length > 0) return q.options
+    if (q.type === 'TRUE_FALSE') return ['Vero', 'Falso']
+    return []
+  }
+
   return (
     <div className="space-y-4 my-4">
       {questions.map((q, qi) => (
         <div key={q.id} className="bg-white border border-gray-200 rounded-xl p-4">
           <p className="text-sm font-medium text-gray-800 mb-3">{qi + 1}. {q.question}</p>
 
-          {q.type === 'OPEN_ANSWER' ? (
+          {q.type === 'OPEN_ANSWER' || (q.type === 'MULTIPLE_CHOICE' && getChoiceOptions(q).length === 0) ? (
             <textarea
               className="w-full text-sm px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:border-indigo-400 resize-none min-h-[80px] text-gray-700 placeholder:text-gray-400"
               placeholder="Scrivi la tua risposta..."
@@ -58,7 +64,7 @@ export default function QuizRenderer({ questions, onSubmit, disabled, brandColor
             />
           ) : (
             <div className="space-y-2">
-              {(q.options ?? []).map((opt, oi) => (
+              {getChoiceOptions(q).map((opt, oi) => (
                 <button
                   key={`${q.id}-${oi}`}
                   onClick={() => selectChoice(qi, oi)}

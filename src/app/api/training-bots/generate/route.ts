@@ -51,6 +51,7 @@ export async function POST(req: Request) {
             targetAudience: z.string().describe('Descrizione precisa del pubblico destinatario (ruolo, livello, contesto)'),
             tone: z.string().describe('Tono suggerito per il trainer AI (es: professionale, empatico, diretto, incoraggiante)'),
             introMessage: z.string().describe('Messaggio di benvenuto che motivi il trainee. Deve presentare il percorso e terminare invitando a iniziare.'),
+            maxDurationMins: z.number().min(10).max(180).describe('Durata consigliata della lezione in minuti (10-180)'),
             traineeEducationLevel: z.enum(['PRIMARY', 'SECONDARY', 'UNIVERSITY', 'PROFESSIONAL']).describe('Livello di istruzione stimato del target'),
             traineeCompetenceLevel: z.enum(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']).describe('Livello di competenza stimato sul tema'),
             passScoreThreshold: z.number().min(50).max(95).describe('Soglia di superamento consigliata (%)'),
@@ -79,6 +80,7 @@ Linee guida:
 3. **Engagement**: Il messaggio introduttivo deve motivare il trainee a partecipare attivamente.
 4. **Adattabilità**: Stima il livello del pubblico in base al contesto descritto.
 5. **Dialogo ottimale**: Calibra i turni di dialogo in base alla complessità di ogni modulo.
+6. **Durata realistica**: Proponi una durata totale della lezione coerente con il numero di moduli e la profondità richiesta.
 
 Output atteso:
 - Struttura chiara e professionale

@@ -8,7 +8,6 @@ import { TokenTrackingService } from '@/services/tokenTrackingService'
 import { LLMService } from '@/services/llmService'
 import {
   buildExplainingPrompt,
-  buildCheckingPrompt,
   buildQuizzingSystemPrompt,
   buildRetryingPrompt,
   buildFinalFeedbackPrompt,
@@ -130,6 +129,115 @@ function getModel(
   return createOpenAI({ apiKey: openaiKey })(name)
 }
 
+function stripTopicTransitionFromTutorText(text: string): string {
+  if (!text) return ''
+  return text
+    .replace(/\b(?:bene|ottimo|perfetto)[^.!?]{0,80}passiamo al prossimo argomento[^.!?]*[.!?]?/gi, '')
+    .replace(/\b(?:great|perfect)[^.!?]{0,80}let'?s move to the next topic[^.!?]*[.!?]?/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function normalizeFinalQuizQuestions(rawQuestions: QuizQuestion[], language = 'it'): QuizQuestion[] {
+  const tfFallback = language === 'it' ? ['Vero', 'Falso'] : ['True', 'False']
+  const openFallbackPoint =
+    language === 'it'
+      ? 'Risposta coerente con i concetti chiave del topic.'
+      : 'Answer aligned with the topic key concepts.'
+
+  const normalized = rawQuestions
+    .map((q, index) => {
+      const id = (q.id || `q${index + 1}`).trim() || `q${index + 1}`
+      const question = (q.question || '').trim()
+      if (!question) return null
+
+      if (q.type === 'OPEN_ANSWER') {
+        const expectedKeyPoints = Array.isArray(q.expectedKeyPoints) && q.expectedKeyPoints.length > 0
+          ? q.expectedKeyPoints
+          : [openFallbackPoint]
+        return { id, type: 'OPEN_ANSWER', question, expectedKeyPoints } satisfies QuizQuestion
+      }
+
+      if (q.type === 'TRUE_FALSE') {
+        const options = Array.isArray(q.options) && q.options.length >= 2 ? q.options.slice(0, 2) : tfFallback
+        const correctIndex =
+          typeof q.correctIndex === 'number' && q.correctIndex >= 0 && q.correctIndex < options.length
+            ? q.correctIndex
+            : 0
+        return { id, type: 'TRUE_FALSE', question, options, correctIndex } satisfies QuizQuestion
+      }
+
+      const options = Array.isArray(q.options)
+        ? q.options.map((opt) => String(opt).trim()).filter(Boolean)
+        : []
+      if (options.length < 2) {
+        return {
+          id,
+          type: 'OPEN_ANSWER',
+          question,
+          expectedKeyPoints: Array.isArray(q.expectedKeyPoints) && q.expectedKeyPoints.length > 0
+            ? q.expectedKeyPoints
+            : [openFallbackPoint],
+        } satisfies QuizQuestion
+      }
+      const correctIndex =
+        typeof q.correctIndex === 'number' && q.correctIndex >= 0 && q.correctIndex < options.length
+          ? q.correctIndex
+          : 0
+      return { id, type: 'MULTIPLE_CHOICE', question, options, correctIndex } satisfies QuizQuestion
+    })
+    .filter((q): q is QuizQuestion => q !== null)
+
+  if (normalized.length > 0) return normalized
+
+  return [{
+    id: 'q1',
+    type: 'OPEN_ANSWER',
+    question: language === 'it'
+      ? 'Riassumi in 4-5 righe i concetti principali appresi durante il percorso.'
+      : 'Summarize in 4-5 lines the main concepts learned during the training.',
+    expectedKeyPoints: [openFallbackPoint],
+  }]
+}
+
+const DEFAULT_CALIBRATION_QUESTIONS_IT = [
+  'Per personalizzare la lezione: qual è il tuo ruolo e in quale contesto userai questo argomento?',
+  'Che livello senti di avere oggi su questo tema? (base, intermedio, avanzato) + un esempio rapido.',
+  'Quale risultato pratico vuoi ottenere entro fine lezione? Così userò esempi pertinenti.',
+]
+
+function getCalibrationQuestions(bot: { collectTraineeData: boolean; traineeDataFields: unknown }): string[] {
+  if (!bot.collectTraineeData) return []
+  if (Array.isArray(bot.traineeDataFields)) {
+    const custom = bot.traineeDataFields
+      .map((q) => (typeof q === 'string' ? q.trim() : ''))
+      .filter(Boolean)
+      .slice(0, 5)
+    if (custom.length > 0) return custom
+  }
+  return DEFAULT_CALIBRATION_QUESTIONS_IT
+}
+
+function inferCompetenceFromCollectedAnswers(collected: Record<string, string>): 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' {
+  const text = Object.values(collected).join(' ').toLowerCase()
+  if (/\b(base|principiante|beginner|zero|nessuna esperienza|novizio)\b/.test(text)) return 'BEGINNER'
+  if (/\b(avanzat|expert|esperto|senior|molta esperienza)\b/.test(text)) return 'ADVANCED'
+  return 'INTERMEDIATE'
+}
+
+function buildLearnerProfileSummary(collected?: Record<string, string>): string | undefined {
+  if (!collected) return undefined
+  const role = collected.roleContext?.trim()
+  const level = collected.selfLevel?.trim()
+  const goal = collected.practicalGoal?.trim()
+  const parts = [
+    role ? `Ruolo/contesto: ${role}` : '',
+    level ? `Autovalutazione livello: ${level}` : '',
+    goal ? `Obiettivo pratico: ${goal}` : '',
+  ].filter(Boolean)
+  return parts.length > 0 ? parts.join('\n') : undefined
+}
+
 export async function processTrainingMessage(
   sessionId: string,
   userMessage: string
@@ -152,6 +260,11 @@ export async function processTrainingMessage(
   const bot = session.trainingBot
   const topics = bot.topics
   const state: TrainingSupervisorState = (session.supervisorState as unknown as TrainingSupervisorState) ?? buildInitialState()
+  const calibrationQuestions = getCalibrationQuestions({
+    collectTraineeData: bot.collectTraineeData,
+    traineeDataFields: bot.traineeDataFields,
+  })
+  const learnerProfile = buildLearnerProfileSummary(state.dataCollected)
 
   const globalConfig = await LLMService.getGlobalConfig()
 
@@ -192,6 +305,61 @@ export async function processTrainingMessage(
   let response: TrainingChatResponse
 
   switch (state.phase) {
+    case 'DATA_COLLECTION': {
+      if (calibrationQuestions.length === 0) {
+        const nextState: TrainingSupervisorState = {
+          ...state,
+          phase: 'EXPLAINING',
+          dataCollectionPhase: 'DONE',
+          dataCollectionStep: undefined,
+          dataCollected: undefined,
+        }
+        await saveStateAndMessage(sessionId, nextState, bot.language === 'it' ? 'Iniziamo dal primo argomento.' : 'Let us start with the first topic.', 'DATA_COLLECTION')
+        response = { text: bot.language === 'it' ? 'Iniziamo dal primo argomento.' : 'Let us start with the first topic.', phase: 'EXPLAINING' }
+        break
+      }
+
+      const currentStep = Math.max(0, Math.min(state.dataCollectionStep ?? 0, calibrationQuestions.length - 1))
+      const collected = { ...(state.dataCollected ?? {}) }
+
+      if (currentStep === 0) collected.roleContext = userMessage.trim()
+      if (currentStep === 1) collected.selfLevel = userMessage.trim()
+      if (currentStep === 2) collected.practicalGoal = userMessage.trim()
+
+      if (currentStep < calibrationQuestions.length - 1) {
+        const nextState: TrainingSupervisorState = {
+          ...state,
+          phase: 'DATA_COLLECTION',
+          dataCollectionPhase: 'COLLECTING',
+          dataCollectionStep: currentStep + 1,
+          dataCollected: collected,
+        }
+        const nextQuestion = calibrationQuestions[currentStep + 1]
+        await saveStateAndMessage(sessionId, nextState, nextQuestion, 'DATA_COLLECTION')
+        response = { text: nextQuestion, phase: 'DATA_COLLECTION' }
+        break
+      }
+
+      const detectedLevel = inferCompetenceFromCollectedAnswers(collected)
+      const transitionText = bot.language === 'it'
+        ? 'Perfetto, ora ho contesto e obiettivo pratico. Iniziamo con il primo argomento.'
+        : 'Great, I now have enough context and practical goals. Let us start with the first topic.'
+
+      const nextState: TrainingSupervisorState = {
+        ...state,
+        phase: 'EXPLAINING',
+        detectedCompetenceLevel: detectedLevel,
+        adaptationDepth: detectedLevel === 'BEGINNER' ? 1 : 0,
+        dataCollectionPhase: 'DONE',
+        dataCollectionStep: calibrationQuestions.length,
+        dataCollected: collected,
+      }
+
+      await saveStateAndMessage(sessionId, nextState, transitionText, 'DATA_COLLECTION')
+      response = { text: transitionText, phase: 'EXPLAINING' }
+      break
+    }
+
     case 'EXPLAINING':
     case 'RETRYING': {
       const systemPrompt = state.phase === 'RETRYING'
@@ -205,6 +373,7 @@ export async function processTrainingMessage(
             kbContent,
             gaps: state.pendingRetryGaps ?? [],
             language: bot.language,
+            learnerProfile,
           })
         : buildExplainingPrompt({
             topicLabel: currentTopic.label,
@@ -215,13 +384,14 @@ export async function processTrainingMessage(
             adaptationDepth: state.adaptationDepth,
             kbContent,
             language: bot.language,
+            learnerProfile,
           })
 
       const explainResult = await generateText({
         model,
         system: systemPrompt,
         prompt: userMessage,
-        maxOutputTokens: 260,
+        maxOutputTokens: 180,
       })
       await logTrainingTokens(bot.organizationId, bot.modelName, explainResult.usage, 'training-explain')
 
@@ -264,6 +434,7 @@ export async function processTrainingMessage(
           dialogueTurns: newTurnCount,
           minCheckingTurns: minTurns,
           maxCheckingTurns: maxTurns,
+          learnerProfile,
         },
         recentMessages,
         currentTopicHistory
@@ -280,7 +451,7 @@ export async function processTrainingMessage(
 
       // Run tutor response and silent comprehension evaluation in parallel
       const [tutorResult, evalResult] = await Promise.all([
-        generateText({ model, system: dialogueSystemPrompt, prompt: userMessage, maxOutputTokens: 220 }),
+        generateText({ model, system: dialogueSystemPrompt, prompt: userMessage, maxOutputTokens: 140 }),
         generateObject({
           model,
           schema: z.object({ evaluation: evaluationSchema }),
@@ -366,7 +537,10 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
           })
           await logTrainingTokens(bot.organizationId, bot.modelName, quizResult.usage, 'training-final-quiz-gen')
 
-          const finalQuizQuestions = quizResult.object.questions as QuizQuestion[]
+          const finalQuizQuestions = normalizeFinalQuizQuestions(
+            quizResult.object.questions as QuizQuestion[],
+            bot.language
+          )
           const finalState = { ...advancedState, finalQuizQuestions }
 
           const quizIntro = bot.language === 'it'
@@ -383,9 +557,14 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
         } else {
           // Advance to next topic
           const nextTopic = topics[advancedState.currentTopicIndex]
+          const understoodHint = eval_.understoodConcepts.at(0)
           const advanceText = bot.language === 'it'
-            ? `${tutorResult.text}\n\nBene! Passiamo al prossimo argomento: "${nextTopic?.label}".`
-            : `${tutorResult.text}\n\nGreat! Let's move to the next topic: "${nextTopic?.label}".`
+            ? (understoodHint
+                ? `Ottimo, hai centrato: ${understoodHint}. Passiamo al prossimo argomento: "${nextTopic?.label}".`
+                : `Ottimo. Passiamo al prossimo argomento: "${nextTopic?.label}".`)
+            : (understoodHint
+                ? `Great, you got this point: ${understoodHint}. Let's move to the next topic: "${nextTopic?.label}".`
+                : `Great. Let's move to the next topic: "${nextTopic?.label}".`)
 
           await saveStateAndMessage(sessionId, advancedState, advanceText, 'DIALOGUING' as TrainingPhase)
           response = {
@@ -401,8 +580,9 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
           dialogueTurns: newTurnCount,
           comprehensionHistory: [...(state.comprehensionHistory ?? []), newEntry],
         }
-        await saveStateAndMessage(sessionId, continuedState, tutorResult.text, 'DIALOGUING' as TrainingPhase)
-        response = { text: tutorResult.text, phase: 'DIALOGUING' }
+        const cleanedTutorText = stripTopicTransitionFromTutorText(tutorResult.text)
+        await saveStateAndMessage(sessionId, continuedState, cleanedTutorText, 'DIALOGUING' as TrainingPhase)
+        response = { text: cleanedTutorText, phase: 'DIALOGUING' }
       }
       break
     }

@@ -31,6 +31,7 @@ interface PromptContext {
   kbContent?: string
   gaps?: string[]
   language?: string
+  learnerProfile?: string
 }
 
 export function buildExplainingPrompt(ctx: PromptContext): string {
@@ -52,13 +53,15 @@ Obiettivi di apprendimento (cosa il trainee deve capire):
 ${ctx.learningObjectives.map((o, i) => `${i + 1}. ${o}`).join('\n')}
 
 ${ctx.kbContent ? `Fonte di conoscenza da usare:\n${ctx.kbContent}` : 'Usa la tua conoscenza generale sull\'argomento.'}
+${ctx.learnerProfile ? `\nProfilo raccolto in onboarding:\n${ctx.learnerProfile}` : ''}
 
 Stile obbligatorio (molto importante):
 - Modalità micro-learning conversazionale: spiega UNA sola idea per messaggio.
-- Massimo 90 parole totali.
+- Massimo 65 parole totali.
 - Massimo 2 brevi paragrafi.
 - Chiudi SEMPRE con UNA domanda breve per verificare se è chiaro (non quiz formale).
 - Non anticipare tutto il programma del topic in un unico messaggio.
+- Evita preamboli generici (es. "Mi fa piacere che tu sia qui", "Parliamo di...").
 
 Spiega il primo concetto fondamentale in modo chiaro e progressivo, con un esempio pratico adeguato al livello.`
 }
@@ -103,6 +106,7 @@ export function buildRetryingPrompt(ctx: PromptContext): string {
 
 Il trainee ha avuto difficoltà con: "${ctx.topicLabel}"
 Lacune specifiche rilevate: ${(ctx.gaps ?? []).join('; ') || 'comprensione generale insufficiente'}
+${ctx.learnerProfile ? `\nProfilo raccolto in onboarding:\n${ctx.learnerProfile}` : ''}
 
 Adattamento attivo: ${depthInstructions[ctx.adaptationDepth] ?? depthInstructions[2]}
 
@@ -128,6 +132,7 @@ interface DialoguePromptContext {
   dialogueTurns: number
   minCheckingTurns: number
   maxCheckingTurns: number
+  learnerProfile?: string
 }
 
 export function buildDialoguePrompt(
@@ -155,6 +160,7 @@ TURNO: ${ctx.dialogueTurns}/${ctx.maxCheckingTurns} (minimo per avanzare: ${ctx.
 
 KNOWLEDGE BASE:
 ${ctx.kbContent ?? "Usa conoscenza generale sull'argomento."}
+${ctx.learnerProfile ? `\nPROFILO STUDENTE (ONBOARDING):\n${ctx.learnerProfile}` : ''}
 
 CRONOLOGIA COMPRENSIONE (turni precedenti):
 ${historyLines.length > 0 ? historyLines.join('\n') : '  Primo turno — nessuna storia disponibile.'}
@@ -168,10 +174,12 @@ PRINCIPI DI CONDUZIONE (seguili sempre):
 6. Dopo ${ctx.minCheckingTurns} turni E comprensione adeguata → concludi con un breve riepilogo del topic e segnala il passaggio al prossimo argomento.
 
 FORMATO RISPOSTA OBBLIGATORIO:
-- Mantieni ogni risposta corta: massimo 80 parole.
+- Mantieni ogni risposta corta: massimo 60 parole.
 - Una singola idea o correzione per turno (no spiegoni).
 - Chiudi con UNA domanda breve e specifica per far proseguire il dialogo.
 - Evita elenchi lunghi e blocchi di testo estesi.
+- Non riaprire il topic da zero a ogni turno.
+- Non annunciare mai il passaggio al prossimo topic (lo gestisce il sistema).
 
 ${latestApproach ? `APPROCCIO SUGGERITO (basato sull'ultimo turno): ${latestApproach}` : ''}`
 }

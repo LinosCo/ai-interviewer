@@ -524,6 +524,7 @@ export const CreditService = {
             ai_tip_generation: 'ai_tips',
             copilot_message: 'copilot',
             copilot_analysis: 'copilot',
+            training_session_message: 'training',
             export_pdf_simple: 'export',
             export_pdf_analysis: 'export',
             export_csv: 'export'

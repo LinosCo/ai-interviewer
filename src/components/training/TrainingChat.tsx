@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Bot, Clock3, SendHorizonal } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Icons } from '@/components/ui/business-tuner/Icons'
 import TrainingProgressBar from './TrainingProgressBar'
 import QuizRenderer from './QuizRenderer'
 import TrainingCompletionScreen from './TrainingCompletionScreen'
@@ -18,6 +19,13 @@ interface Props {
   currentTopicIndex: number
   topicResults: TopicResult[]
   primaryColor: string
+  logoUrl?: string
+  rewardConfig?: {
+    enabled: boolean
+    type?: string
+    payload?: string
+    displayText?: string | null
+  } | null
   initialMessages: Message[]
   introMessage: string
 }
@@ -28,7 +36,8 @@ function safeColor(color: string, fallback = '#6366f1'): string {
 
 export default function TrainingChat({
   sessionId, botName, topics, currentTopicIndex: initialTopicIndex,
-  topicResults: initialResults, primaryColor, initialMessages, introMessage,
+  topicResults: initialResults, primaryColor, logoUrl, initialMessages, introMessage,
+  rewardConfig,
 }: Props) {
   const [messages, setMessages] = useState<Message[]>(
     initialMessages.length > 0 ? initialMessages : [{ role: 'assistant', content: introMessage }]
@@ -42,11 +51,17 @@ export default function TrainingChat({
   const [completionData, setCompletionData] = useState<{ overallScore: number; passed: boolean } | null>(null)
   const [elapsedMinutes, setElapsedMinutes] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const hasSentFirstMessage = useRef(false)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (pendingQuizzes || loading) return
+    inputRef.current?.focus()
+  }, [loading, pendingQuizzes])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -112,6 +127,8 @@ export default function TrainingChat({
       hasSentFirstMessage.current = true
     } finally {
       setLoading(false)
+      // Keep input focused across turns so user can keep typing without extra clicks
+      requestAnimationFrame(() => inputRef.current?.focus())
     }
   }
 
@@ -122,16 +139,21 @@ export default function TrainingChat({
   if (sessionComplete && completionData) {
     return (
       <TrainingCompletionScreen
+        sessionId={sessionId}
         botName={botName}
         overallScore={completionData.overallScore}
         passed={completionData.passed}
         topicResults={topicResults}
         primaryColor={primaryColor}
+        rewardConfig={rewardConfig}
       />
     )
   }
 
   const safeBtn = safeColor(primaryColor)
+  const latestUserMessage = [...messages].reverse().find(m => m.role === 'user')
+  const latestAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant')
+  const topicResultMap = Object.fromEntries(topicResults.map(r => [r.topicId, r]))
 
   return (
     <div className="min-h-screen flex flex-col font-sans relative overflow-x-hidden bg-gradient-to-b from-stone-50 via-white to-stone-50">
@@ -167,30 +189,71 @@ export default function TrainingChat({
           brandColor={safeBtn}
         />
 
+        {/* Topic list restored for constant visibility */}
+        {topics.length > 0 && (
+          <div className="px-1 pt-3">
+            <div className="rounded-xl border border-stone-200 bg-white/85 backdrop-blur-sm p-2.5 flex flex-wrap gap-2">
+              {topics.map((topic, idx) => {
+                const isCurrent = idx === currentTopicIndex
+                const result = topicResultMap[topic.id]
+                const isDone = Boolean(result)
+                return (
+                  <div
+                    key={topic.id}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
+                      isCurrent
+                        ? 'text-white border-transparent'
+                        : isDone
+                          ? 'bg-stone-100 text-stone-700 border-stone-200'
+                          : 'bg-white text-stone-500 border-stone-200'
+                    }`}
+                    style={isCurrent ? { background: safeBtn } : undefined}
+                    title={topic.label}
+                  >
+                    <span className="opacity-90">{idx + 1}.</span>
+                    <span className="max-w-[150px] truncate">{topic.label}</span>
+                    {result?.status === 'PASSED' && <span aria-hidden="true">✓</span>}
+                    {result?.status === 'FAILED' && <span aria-hidden="true">✕</span>}
+                    {result?.status === 'GAP_DETECTED' && <span aria-hidden="true">!</span>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-1 py-4 space-y-4">
-          <AnimatePresence initial={false}>
-            {messages.map((m, i) => (
+          <AnimatePresence initial={false} mode="wait">
+            {latestAssistantMessage && (
               <motion.div
-                key={`${i}-${m.role}-${m.content.slice(0, 24)}`}
-                initial={{ opacity: 0, y: 8, scale: 0.99 }}
+                key={`assistant-${latestAssistantMessage.content.slice(0, 60)}`}
+                initial={{ opacity: 0, y: 12, scale: 0.99 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className="flex justify-start"
               >
-                <div
-                className={`max-w-[86%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap shadow-sm border ${
-                  m.role === 'user'
-                    ? 'text-white border-transparent rounded-tr-md'
-                    : 'bg-white border-stone-200 text-gray-800 rounded-tl-md'
-                }`}
-                style={m.role === 'user' ? { background: safeBtn } : undefined}
-              >
-                {m.content}
+                <div className="max-w-[92%] rounded-2xl rounded-tl-md px-5 py-4 text-[15px] leading-relaxed shadow-md border border-stone-200 bg-white text-gray-900">
+                  {latestAssistantMessage.content}
                 </div>
               </motion.div>
-            ))}
+            )}
           </AnimatePresence>
+
+          {latestUserMessage && !loading && (
+            <motion.div
+              key={`user-${latestUserMessage.content.slice(0, 60)}`}
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="flex justify-end pt-1"
+            >
+              <div className="max-w-[82%] rounded-2xl rounded-tr-md px-4 py-3 text-sm whitespace-pre-wrap shadow-sm border text-white border-transparent" style={{ background: safeBtn }}>
+                <p className="text-[10px] uppercase tracking-wider opacity-80 mb-1 font-semibold">La tua risposta</p>
+                {latestUserMessage.content}
+              </div>
+            </motion.div>
+          )}
 
           {pendingQuizzes && pendingQuizzes.length > 0 && (
             <QuizRenderer
@@ -213,7 +276,11 @@ export default function TrainingChat({
                   className="relative w-20 h-20 rounded-full bg-white shadow-xl border-2 flex items-center justify-center"
                   style={{ borderColor: `${safeBtn}44` }}
                 >
-                  <Bot size={30} style={{ color: safeBtn }} />
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={botName} className="w-10 h-10 object-contain" />
+                  ) : (
+                    <Icons.Logo size={30} style={{ color: safeBtn }} />
+                  )}
                 </div>
               </div>
             </div>
@@ -231,6 +298,7 @@ export default function TrainingChat({
             />
             <div className="relative bg-white rounded-[18px] shadow-2xl flex items-end overflow-hidden ring-1 ring-black/5">
               <textarea
+                ref={inputRef}
                 aria-label="Messaggio"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -244,6 +312,7 @@ export default function TrainingChat({
                 className={`w-full resize-none border-none bg-transparent px-4 py-4 pr-16 text-base text-gray-900 placeholder-gray-400 ${TRAINING_UI.ring.focus}`}
                 disabled={loading}
                 placeholder={TRAINING_UI.copy.chatPlaceholder}
+                autoFocus
               />
               <div className="pb-2 pr-2">
                 <button

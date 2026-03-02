@@ -16,16 +16,36 @@ type BotWithTopics = TrainingBot & {
   topics: TrainingTopicBlock[]
 }
 
+interface InitialValues {
+  name?: string
+  learningGoal?: string
+  targetAudience?: string
+  tone?: string
+  introMessage?: string
+  traineeEducationLevel?: TraineeEducationLevel
+  traineeCompetenceLevel?: TraineeCompetenceLevel
+  passScoreThreshold?: number
+  topics?: Array<{
+    label: string
+    description: string
+    learningObjectives: string[]
+    minCheckingTurns: number
+    maxCheckingTurns: number
+  }>
+}
+
 type Props =
   | {
       mode: 'create'
       organizationId: string
       bot?: never
+      initialValues?: InitialValues
     }
   | {
       mode: 'edit'
       bot: BotWithTopics
       organizationId?: never
+      initialValues?: never
     }
 
 interface TopicDraft {
@@ -84,34 +104,36 @@ const selectCls =
 const textareaCls =
   'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-y min-h-[80px]'
 
-export default function TrainingBotConfigForm({ mode, bot, organizationId }: Props) {
+export default function TrainingBotConfigForm({ mode, bot, organizationId, initialValues }: Props) {
   const router = useRouter()
 
-  // Identity
-  const [name, setName] = useState(bot?.name ?? '')
-  const [slug, setSlug] = useState(bot?.slug ?? '')
+  // Identity — seeded from bot (edit) or initialValues (create after AI gen) or defaults
+  const [name, setName] = useState(bot?.name ?? initialValues?.name ?? '')
+  const [slug, setSlug] = useState(bot?.slug ?? (initialValues?.name ? slugify(initialValues.name) : ''))
   const [language, setLanguage] = useState(bot?.language ?? 'it')
-  const [tone, setTone] = useState(bot?.tone ?? 'professional')
-  const [introMessage, setIntroMessage] = useState(bot?.introMessage ?? '')
+  const [tone, setTone] = useState(bot?.tone ?? initialValues?.tone ?? 'professional')
+  const [introMessage, setIntroMessage] = useState(bot?.introMessage ?? initialValues?.introMessage ?? '')
 
   // Obiettivo formativo
-  const [learningGoal, setLearningGoal] = useState(bot?.learningGoal ?? '')
-  const [targetAudience, setTargetAudience] = useState(bot?.targetAudience ?? '')
+  const [learningGoal, setLearningGoal] = useState(bot?.learningGoal ?? initialValues?.learningGoal ?? '')
+  const [targetAudience, setTargetAudience] = useState(bot?.targetAudience ?? initialValues?.targetAudience ?? '')
 
   // Profilo Trainee
   const [traineeEducationLevel, setTraineeEducationLevel] = useState<TraineeEducationLevel>(
-    bot?.traineeEducationLevel ?? 'PROFESSIONAL'
+    bot?.traineeEducationLevel ?? initialValues?.traineeEducationLevel ?? 'PROFESSIONAL'
   )
   const [traineeCompetenceLevel, setTraineeCompetenceLevel] = useState<TraineeCompetenceLevel>(
-    bot?.traineeCompetenceLevel ?? 'INTERMEDIATE'
+    bot?.traineeCompetenceLevel ?? initialValues?.traineeCompetenceLevel ?? 'INTERMEDIATE'
   )
 
   // Valutazione
   const [failureMode, setFailureMode] = useState<FailureMode>(bot?.failureMode ?? 'PERMISSIVE')
-  const [passScoreThreshold, setPassScoreThreshold] = useState(bot?.passScoreThreshold ?? 70)
+  const [passScoreThreshold, setPassScoreThreshold] = useState(
+    bot?.passScoreThreshold ?? initialValues?.passScoreThreshold ?? 70
+  )
   const [maxRetries, setMaxRetries] = useState(bot?.maxRetries ?? 1)
 
-  // Topics
+  // Topics — seeded from bot (edit), initialValues (AI-generated create), or empty
   const [topics, setTopics] = useState<TopicDraft[]>(
     bot?.topics.map((t) => ({
       id: t.id,
@@ -120,7 +142,15 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId }: Pro
       learningObjectives: (t.learningObjectives ?? []).join('\n'),
       minCheckingTurns: t.minCheckingTurns ?? 2,
       maxCheckingTurns: t.maxCheckingTurns ?? 6,
-    })) ?? []
+    })) ??
+    initialValues?.topics?.map((t) => ({
+      label: t.label,
+      description: t.description,
+      learningObjectives: t.learningObjectives.join('\n'),
+      minCheckingTurns: t.minCheckingTurns,
+      maxCheckingTurns: t.maxCheckingTurns,
+    })) ??
+    []
   )
 
   // Branding

@@ -11,10 +11,12 @@
  *
  * Strategy:
  *   1. Connect to the DB and check whether each critical table actually exists.
- *   2. For any missing table, find the migration responsible and mark it as
- *      "rolled-back" via `prisma migrate resolve --rolled-back <name>`.
+ *   2. Also check whether critical COLUMNS exist on existing tables
+ *      (catches ALTER TABLE migrations that added columns to existing tables).
+ *   3. For any missing table or column, find the responsible migration and
+ *      mark it as "rolled-back" via `prisma migrate resolve --rolled-back`.
  *      This removes the "applied" record so `migrate deploy` will re-run it.
- *   3. Run `prisma migrate deploy` to apply all pending/rolled-back migrations.
+ *   4. Run `prisma migrate deploy` to apply all pending/rolled-back migrations.
  */
 
 const { execSync } = require('child_process');
@@ -36,6 +38,14 @@ const TABLE_MIGRATION_MAP = {
     StripeWebhookEvent:   '20260206_add_stripe_webhook_event',
 };
 
+// Map: "TableName.columnName" -> migration that adds that column to an existing table.
+// Add new entries whenever a migration ALTER TABLE adds columns (not creates a new table).
+const COLUMN_MIGRATION_MAP = {
+    'TrainingTopicBlock.minCheckingTurns': '20260301_training_dialogue_kb',
+    'TrainingTopicBlock.maxCheckingTurns': '20260301_training_dialogue_kb',
+    'KnowledgeSource.trainingBotId':       '20260301_training_dialogue_kb',
+};
+
 async function tableExists(client, tableName) {
     const res = await client.query(
         `SELECT EXISTS (
@@ -44,6 +54,19 @@ async function tableExists(client, tableName) {
             AND table_name = $1
         ) AS exists`,
         [tableName]
+    );
+    return res.rows[0].exists === true;
+}
+
+async function columnExists(client, tableName, columnName) {
+    const res = await client.query(
+        `SELECT EXISTS (
+            SELECT FROM information_schema.columns
+            WHERE table_schema = 'public'
+            AND table_name   = $1
+            AND column_name  = $2
+        ) AS exists`,
+        [tableName, columnName]
     );
     return res.rows[0].exists === true;
 }
@@ -88,6 +111,7 @@ async function main() {
         // Track which migrations need to be rolled back (de-dup by migration name)
         const migrationsToRollback = new Set();
 
+        // --- 1. Table-level drift check ---
         for (const [table, migration] of Object.entries(TABLE_MIGRATION_MAP)) {
             const exists = await tableExists(client, table);
             if (!exists) {
@@ -100,6 +124,33 @@ async function main() {
                 }
             } else {
                 console.log(`[pre-start] ✓ Table "${table}" exists.`);
+            }
+        }
+
+        // --- 2. Column-level drift check ---
+        // Catches ALTER TABLE migrations that are marked "applied" but never ran
+        // (e.g., failed mid-transaction, or DB restored from an older snapshot).
+        for (const [tableCol, migration] of Object.entries(COLUMN_MIGRATION_MAP)) {
+            const [tableName, colName] = tableCol.split('.');
+
+            // Only check column if the table itself exists
+            const tblExists = await tableExists(client, tableName);
+            if (!tblExists) {
+                // Table missing is already handled above; skip column check
+                continue;
+            }
+
+            const colExists = await columnExists(client, tableName, colName);
+            if (!colExists) {
+                const applied = await migrationIsApplied(client, migration);
+                if (applied) {
+                    console.log(`[pre-start] ⚠️  Column "${tableName}.${colName}" missing but migration "${migration}" marked applied — will roll back.`);
+                } else {
+                    console.log(`[pre-start] Column "${tableName}.${colName}" missing, migration "${migration}" not yet applied — will be applied by migrate deploy.`);
+                }
+                migrationsToRollback.add(migration);
+            } else {
+                console.log(`[pre-start] ✓ Column "${tableName}.${colName}" exists.`);
             }
         }
 

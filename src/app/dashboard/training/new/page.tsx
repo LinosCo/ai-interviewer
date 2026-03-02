@@ -1,17 +1,17 @@
-import { auth } from '@/auth'
-import { prisma } from '@/lib/prisma'
-import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { subscriptionTierToPlanType, PlanType } from '@/config/plans'
-import TrainingBotConfigForm from '@/components/training/admin/training-bot-config-form'
-import { hasTrainingAccess } from '@/lib/training/plan-gate'
+import { auth } from '@/auth';
+import { prisma } from '@/lib/prisma';
+import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { subscriptionTierToPlanType, PlanType } from '@/config/plans';
+import { hasTrainingAccess } from '@/lib/training/plan-gate';
+import NewTrainingBotWizard from './NewTrainingBotWizard';
 
 export default async function NewTrainingBotPage() {
-  const session = await auth()
-  if (!session?.user?.id) redirect('/login')
+  const session = await auth();
+  if (!session?.user?.id) redirect('/login');
 
-  const cookieStore = await cookies()
-  const activeOrgId = cookieStore.get('bt_selected_org_id')?.value
+  const cookieStore = await cookies();
+  const activeOrgId = cookieStore.get('bt_selected_org_id')?.value;
 
   let membership = activeOrgId
     ? await prisma.membership.findUnique({
@@ -26,25 +26,23 @@ export default async function NewTrainingBotPage() {
     : await prisma.membership.findFirst({
         where: { userId: session.user.id },
         include: { organization: { include: { subscription: true } } },
-      })
+      });
 
   if (!membership?.organization && activeOrgId) {
     membership = await prisma.membership.findFirst({
       where: { userId: session.user.id },
       include: { organization: { include: { subscription: true } } },
-    })
+    });
   }
 
-  if (!membership?.organization) redirect('/login')
+  if (!membership?.organization) redirect('/login');
 
-  const orgId = membership.organization.id
+  const orgId = membership.organization.id;
   const planType = membership.organization.subscription
     ? subscriptionTierToPlanType(membership.organization.subscription.tier)
-    : PlanType.TRIAL
+    : PlanType.TRIAL;
 
-  const hasTraining = hasTrainingAccess(planType)
-
-  if (!hasTraining) {
+  if (!hasTrainingAccess(planType)) {
     return (
       <div className="p-6 flex flex-col items-center justify-center min-h-[400px] text-center">
         <div className="text-4xl mb-4">🎓</div>
@@ -60,19 +58,8 @@ export default async function NewTrainingBotPage() {
           Aggiorna Piano →
         </a>
       </div>
-    )
+    );
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Crea Nuovo Percorso Formativo</h1>
-        <p className="text-gray-500 mt-1">
-          Configura il tuo bot di formazione AI per addestrare il tuo team.
-        </p>
-      </div>
-
-      <TrainingBotConfigForm mode="create" organizationId={orgId} />
-    </div>
-  )
+  return <NewTrainingBotWizard organizationId={orgId} />;
 }

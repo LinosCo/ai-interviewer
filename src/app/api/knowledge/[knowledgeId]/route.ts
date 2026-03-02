@@ -43,7 +43,7 @@ export async function GET(req: Request, { params }: Params) {
             }
         });
 
-        if (!source || !source.bot.project.organization || source.bot.project.organization.members.length === 0) {
+        if (!source || !source.bot?.project.organization || source.bot.project.organization.members.length === 0) {
             return new Response('Not found or unauthorized', { status: 404 });
         }
 
@@ -92,7 +92,7 @@ export async function DELETE(req: Request, { params }: Params) {
             }
         });
 
-        if (!source || !source.bot.project.organization || source.bot.project.organization.members.length === 0) {
+        if (!source || !source.bot?.project.organization || source.bot.project.organization.members.length === 0) {
             return new Response('Unauthorized', { status: 404 });
         }
 

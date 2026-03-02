@@ -95,7 +95,7 @@ export async function startInterviewAction(botId: string) {
 
     const bot = await prisma.bot.findUnique({ where: { id: botId }, select: { status: true, topics: { orderBy: { orderIndex: 'asc' }, take: 1, select: { id: true } } } });
     if (!bot || bot.status !== 'PUBLISHED') {
-        return { error: 'Interview non disponibile' };
+        redirect('/');
     }
 
     const conversation = await prisma.conversation.create({

@@ -318,8 +318,8 @@ export class CrossChannelSyncEngine {
                 websiteAnalytics = {
                     avgPageviews: recentAnalytics.reduce((sum, a) => sum + a.pageviews, 0) / recentAnalytics.length,
                     avgBounceRate: recentAnalytics.reduce((sum, a) => sum + a.bounceRate, 0) / recentAnalytics.length,
-                    topPages: recentAnalytics[0]?.topPages || [],
-                    searchQueries: recentAnalytics[0]?.topSearchQueries || [],
+                    topPages: (recentAnalytics[0]?.topPages || []) as any[],
+                    searchQueries: (recentAnalytics[0]?.topSearchQueries || []) as any[],
                     lowPerformingPages: (recentAnalytics[0]?.topPages as any[] || [])
                         .filter((p: any) => p.bounceRate > 0.7)
                         .slice(0, 5)
@@ -392,7 +392,7 @@ export class CrossChannelSyncEngine {
         });
 
         const websiteSummary = limitArray(knowledgeSources, 8).map(s => ({
-            title: s.title,
+            title: s.title || '',
             type: s.type,
             contentSnippet: truncate(s.content || '', 220)
         }));

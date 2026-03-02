@@ -92,7 +92,7 @@ export async function uploadToS3(
             ...headers,
             Authorization: authorizationHeader,
         },
-        body: data,
+        body: data as unknown as BodyInit,
     });
 
     if (!response.ok) {

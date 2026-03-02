@@ -58,7 +58,7 @@ const BACKUP_TABLES = [
 
 const RETENTION_DAYS = 7; // conserva backup degli ultimi 7 giorni
 
-async function exportTable(pool: Pool, tableName: string): Promise<{ count: number; rows: unknown[] }> {
+async function exportTable(pool: { query(text: string): Promise<{ rows: any[]; rowCount: number | null }> }, tableName: string): Promise<{ count: number; rows: unknown[] }> {
     try {
         const result = await pool.query(`SELECT * FROM "${tableName}" LIMIT 100000`);
         return { count: result.rowCount ?? 0, rows: result.rows };

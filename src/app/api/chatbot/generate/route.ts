@@ -100,8 +100,8 @@ export async function POST(req: Request) {
                 TokenTrackingService.logTokenUsage({
                     organizationId: resolvedOrganizationId,
                     userId: creditsCheck.userId,
-                    inputTokens: result.usage?.promptTokens ?? 0,
-                    outputTokens: result.usage?.completionTokens ?? 0,
+                    inputTokens: result.usage?.inputTokens ?? 0,
+                    outputTokens: result.usage?.outputTokens ?? 0,
                     category: TokenCategory.CHATBOT,
                     model: 'gpt-4o',
                     operation: 'chatbot-generate-refine',
@@ -135,8 +135,8 @@ export async function POST(req: Request) {
             TokenTrackingService.logTokenUsage({
                 organizationId: resolvedOrganizationId,
                 userId: creditsCheck.userId,
-                inputTokens: result.usage?.promptTokens ?? 0,
-                outputTokens: result.usage?.completionTokens ?? 0,
+                inputTokens: result.usage?.inputTokens ?? 0,
+                outputTokens: result.usage?.outputTokens ?? 0,
                 category: TokenCategory.CHATBOT,
                 model: 'gpt-4o',
                 operation: 'chatbot-generate-initial',

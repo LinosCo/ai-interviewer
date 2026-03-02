@@ -151,9 +151,20 @@ export default function TrainingChat({
   }
 
   const safeBtn = safeColor(primaryColor)
-  const latestUserMessage = [...messages].reverse().find(m => m.role === 'user')
-  const latestAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant')
-  const topicResultMap = Object.fromEntries(topicResults.map(r => [r.topicId, r]))
+  const latestAssistantIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === 'assistant') return i
+    }
+    return -1
+  })()
+  const currentAssistantMessage = latestAssistantIndex >= 0 ? messages[latestAssistantIndex] : null
+  const previousUserMessage = (() => {
+    if (latestAssistantIndex <= 0) return null
+    for (let i = latestAssistantIndex - 1; i >= 0; i--) {
+      if (messages[i]?.role === 'user') return messages[i]
+    }
+    return null
+  })()
 
   return (
     <div className="min-h-screen flex flex-col font-sans relative overflow-x-hidden bg-gradient-to-b from-stone-50 via-white to-stone-50">
@@ -189,60 +200,10 @@ export default function TrainingChat({
           brandColor={safeBtn}
         />
 
-        {/* Topic list restored for constant visibility */}
-        {topics.length > 0 && (
-          <div className="px-1 pt-3">
-            <div className="rounded-xl border border-stone-200 bg-white/85 backdrop-blur-sm p-2.5 flex flex-wrap gap-2">
-              {topics.map((topic, idx) => {
-                const isCurrent = idx === currentTopicIndex
-                const result = topicResultMap[topic.id]
-                const isDone = Boolean(result)
-                return (
-                  <div
-                    key={topic.id}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
-                      isCurrent
-                        ? 'text-white border-transparent'
-                        : isDone
-                          ? 'bg-stone-100 text-stone-700 border-stone-200'
-                          : 'bg-white text-stone-500 border-stone-200'
-                    }`}
-                    style={isCurrent ? { background: safeBtn } : undefined}
-                    title={topic.label}
-                  >
-                    <span className="opacity-90">{idx + 1}.</span>
-                    <span className="max-w-[150px] truncate">{topic.label}</span>
-                    {result?.status === 'PASSED' && <span aria-hidden="true">✓</span>}
-                    {result?.status === 'FAILED' && <span aria-hidden="true">✕</span>}
-                    {result?.status === 'GAP_DETECTED' && <span aria-hidden="true">!</span>}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
         <div className="flex-1 overflow-y-auto px-1 py-4 space-y-4">
-          <AnimatePresence initial={false} mode="wait">
-            {latestAssistantMessage && (
-              <motion.div
-                key={`assistant-${latestAssistantMessage.content.slice(0, 60)}`}
-                initial={{ opacity: 0, y: 12, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.25, ease: 'easeOut' }}
-                className="flex justify-start"
-              >
-                <div className="max-w-[92%] rounded-2xl rounded-tl-md px-5 py-4 text-[15px] leading-relaxed shadow-md border border-stone-200 bg-white text-gray-900">
-                  {latestAssistantMessage.content}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {latestUserMessage && !loading && (
+          {previousUserMessage && !loading && (
             <motion.div
-              key={`user-${latestUserMessage.content.slice(0, 60)}`}
+              key={`user-${previousUserMessage.content.slice(0, 60)}`}
               initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
@@ -250,10 +211,27 @@ export default function TrainingChat({
             >
               <div className="max-w-[82%] rounded-2xl rounded-tr-md px-4 py-3 text-sm whitespace-pre-wrap shadow-sm border text-white border-transparent" style={{ background: safeBtn }}>
                 <p className="text-[10px] uppercase tracking-wider opacity-80 mb-1 font-semibold">La tua risposta</p>
-                {latestUserMessage.content}
+                {previousUserMessage.content}
               </div>
             </motion.div>
           )}
+
+          <AnimatePresence initial={false} mode="wait">
+            {currentAssistantMessage && (
+              <motion.div
+                key={`assistant-${currentAssistantMessage.content.slice(0, 60)}`}
+                initial={{ opacity: 0, y: 12, scale: 0.99 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className="flex justify-start"
+              >
+                <div className="max-w-[92%] rounded-2xl rounded-tl-md px-5 py-4 text-[15px] leading-relaxed shadow-md border border-stone-200 bg-white text-gray-900">
+                  {currentAssistantMessage.content}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {pendingQuizzes && pendingQuizzes.length > 0 && (
             <QuizRenderer

@@ -4,6 +4,8 @@ import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
 import type { QuizQuestion, EvaluationResult, QuizEvaluationResult } from './training-types'
 
+type EvaluatorModel = Parameters<typeof generateObject>[0]['model']
+
 /** Weighted score: 40% open answer + 60% quiz */
 export function computeTopicScore(openAnswerScore: number, quizScore: number): number {
   return Math.round(openAnswerScore * 0.4 + quizScore * 0.6)
@@ -37,15 +39,16 @@ export async function evaluateOpenAnswer(
   answer: string,
   learningObjectives: string[],
   competenceLevel: string,
-  modelName = 'gpt-4o-mini'
+  modelOrName: EvaluatorModel | string = 'gpt-4o-mini'
 ): Promise<EvaluationResult> {
   if (!answer || answer.trim().length < 5) {
     return { score: 0, gaps: ['Nessuna risposta fornita'], feedback: 'Non è stata fornita una risposta.' }
   }
 
   try {
+    const model = typeof modelOrName === 'string' ? openai(modelOrName) : modelOrName
     const { object } = await generateObject({
-      model: openai(modelName),
+      model,
       schema: z.object({
         score: z.number().min(0).max(100),
         gaps: z.array(z.string()),

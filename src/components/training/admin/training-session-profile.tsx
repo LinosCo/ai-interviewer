@@ -60,6 +60,20 @@ function ScoreBar({ score }: { score: number }) {
   )
 }
 
+function dedupeGaps(gaps: string[]) {
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const gap of gaps) {
+    const clean = String(gap || '').trim()
+    if (!clean) continue
+    const key = clean.toLowerCase().replace(/\s+/g, ' ')
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(clean)
+  }
+  return unique
+}
+
 export default function TrainingSessionProfile({ session, configuredCompetenceLevel }: Props) {
   return (
     <div className="space-y-6">
@@ -133,6 +147,10 @@ export default function TrainingSessionProfile({ session, configuredCompetenceLe
           <div className="space-y-4">
             {session.topicResults.map((topic, idx) => (
               <div key={topic.topicId ?? idx} className="border border-gray-100 rounded-lg p-4">
+                {(() => {
+                  const uniqueGaps = dedupeGaps(topic.gaps)
+                  return (
+                    <>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-lg" role="img" aria-label={topic.status}>
@@ -152,14 +170,14 @@ export default function TrainingSessionProfile({ session, configuredCompetenceLe
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Risposta aperta</span>
+                      <span>Dialogo guidato</span>
                       <span>{Math.round(topic.openAnswerScore)}%</span>
                     </div>
                     <ScoreBar score={topic.openAnswerScore} />
                   </div>
                   <div>
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
-                      <span>Quiz</span>
+                      <span>Verifica finale</span>
                       <span>{Math.round(topic.quizScore)}%</span>
                     </div>
                     <ScoreBar score={topic.quizScore} />
@@ -172,11 +190,11 @@ export default function TrainingSessionProfile({ session, configuredCompetenceLe
                 )}
 
                 {/* Gaps */}
-                {topic.gaps.length > 0 && (
+                {uniqueGaps.length > 0 && (
                   <div className="mt-2">
                     <p className="text-xs font-medium text-amber-700 mb-1">Lacune rilevate:</p>
                     <ul className="space-y-1">
-                      {topic.gaps.map((gap, gapIdx) => (
+                      {uniqueGaps.map((gap, gapIdx) => (
                         <li key={gapIdx} className="text-xs text-gray-600 flex items-start gap-1.5">
                           <span className="text-amber-500 mt-0.5 flex-shrink-0">•</span>
                           {gap}
@@ -185,6 +203,9 @@ export default function TrainingSessionProfile({ session, configuredCompetenceLe
                     </ul>
                   </div>
                 )}
+                    </>
+                  )
+                })()}
               </div>
             ))}
           </div>

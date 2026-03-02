@@ -595,7 +595,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
         userMessage,
         currentTopic.learningObjectives,
         state.detectedCompetenceLevel,
-        bot.modelName
+        model
       )
 
       const preWritten = currentTopic.preWrittenQuizzes as QuizQuestion[] | null
@@ -765,7 +765,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
             String(answer ?? ''),
             currentTopic?.learningObjectives ?? [],
             state.detectedCompetenceLevel,
-            bot.modelName
+            model
           )
           totalScore += result.score
           allGaps.push(...result.gaps)
@@ -810,7 +810,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
             completedAt: new Date(),
             durationSeconds: Math.round((Date.now() - session.startedAt.getTime()) / 1000),
             topicResults: state.dialogueTopicResults.map((r) =>
-              dialogueResultToTopicResult(r, bot.passScoreThreshold, overallScore)
+              dialogueResultToTopicResult(r, bot.passScoreThreshold)
             ) as any,
             supervisorState: finalState as any,
           },
@@ -837,14 +837,19 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
   return response
 }
 
-function dialogueResultToTopicResult(r: DialogueTopicResult, passThreshold: number, quizScore = 0): TopicResult {
+function dialogueResultToTopicResult(r: DialogueTopicResult, passThreshold: number, quizScore?: number): TopicResult {
+  const normalizedQuizScore =
+    typeof quizScore === 'number' && Number.isFinite(quizScore)
+      ? Math.max(0, Math.min(100, Math.round(quizScore)))
+      : Math.max(0, Math.min(100, Math.round(r.finalComprehension)))
+
   return {
     topicId: r.topicId,
     topicLabel: r.topicLabel,
     status: r.finalComprehension >= passThreshold ? 'PASSED' : 'GAP_DETECTED',
-    score: r.finalComprehension,
-    openAnswerScore: 0,
-    quizScore,
+    score: Math.max(0, Math.min(100, Math.round(r.finalComprehension))),
+    openAnswerScore: Math.max(0, Math.min(100, Math.round(r.finalComprehension))),
+    quizScore: normalizedQuizScore,
     retries: 0,
     gaps: r.gaps,
     feedback: r.understoodConcepts.join(', '),

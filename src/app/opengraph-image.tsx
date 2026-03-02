@@ -4,7 +4,7 @@ import { ImageResponse } from 'next/og';
 export const runtime = 'edge';
 
 // Image metadata
-const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || 'Voler AI';
+const BRAND_NAME = 'Business Tuner';
 
 export const alt = `${BRAND_NAME} - Ascolta il mercato. Decidi meglio.`;
 export const size = {
@@ -104,7 +104,7 @@ export default function Image() {
                         display: 'flex',
                     }}
                 >
-                    Interviste AI per raccogliere feedback qualitativi da clienti e stakeholder
+                    Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI
                 </div>
             </div>
         ),

@@ -151,7 +151,7 @@ export async function getStripeClientSafe(): Promise<Stripe | null> {
 
     const config = await getStripeConfig();
     if (!config || !config.secretKey) {
-        console.warn('[Stripe] Not configured – set STRIPE_SECRET_KEY in env or via Admin dashboard.');
+        console.warn('[Stripe] Not configured – configure it in Admin → Platform Settings, or set STRIPE_SECRET_KEY as a fallback env var.');
         return null;
     }
 
@@ -170,7 +170,7 @@ export async function getStripeClientSafe(): Promise<Stripe | null> {
 export async function getStripeClient(): Promise<Stripe> {
     const client = await getStripeClientSafe();
     if (!client) {
-        throw new Error('Stripe is not configured. Please set env vars or configure in dashboard.');
+        throw new Error('Stripe is not configured. Configure it in Admin → Platform Settings, or set STRIPE_SECRET_KEY as a fallback env var.');
     }
     return client;
 }

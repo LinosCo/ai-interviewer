@@ -40,4 +40,15 @@ describe('buildCILContextBlock', () => {
         }
         expect(buildCILContextBlock(empty, null, 'avanzato')).toBe('')
     })
+
+    it('includes anchoredHypothesis in the thread output when present', () => {
+        const withHypothesis: CILAnalysis = {
+            ...baseAnalysis,
+            openThreads: [
+                { description: 'used obbligato twice', sourceTopicId: 't1', strength: 'high', turnIndex: 3, anchoredHypothesis: 'autonomia vs controllo' }
+            ]
+        }
+        const block = buildCILContextBlock(withHypothesis, null, 'avanzato')
+        expect(block).toContain('→ autonomia vs controllo')
+    })
 })

@@ -597,7 +597,7 @@ export function buildCILContextBlock(
     const lra = analysis.lastResponseAnalysis;
     const hasMaterial = highThreads.length > 0 || themes.length > 0 ||
         lra.activeHypotheses.length > 0 || lra.contradictionFlags.length > 0 ||
-        lra.interruptedThoughts.length > 0;
+        lra.interruptedThoughts.length > 0 || lra.emotionalCues.length > 0;
 
     if (!hasMaterial) return '';
 
@@ -607,10 +607,10 @@ export function buildCILContextBlock(
         lines.push('\nOpen threads:');
         for (const t of highThreads) {
             const hyp = t.anchoredHypothesis ? ` → ${t.anchoredHypothesis}` : '';
-            lines.push(`• [FORTE] "${t.description}"${hyp}`);
+            lines.push(`• [HIGH] "${t.description}"${hyp}`);
         }
         for (const t of mediumThreads) {
-            lines.push(`• [MEDIO] "${t.description}"`);
+            lines.push(`• [MEDIUM] "${t.description}"`);
         }
     }
 
@@ -619,11 +619,11 @@ export function buildCILContextBlock(
     }
 
     const signals = [
-        ...lra.activeHypotheses.map(h => `Hypothesis taking shape: ${h}`),
-        ...lra.contradictionFlags.map(f => `Contradiction: ${f}`),
-        ...lra.emotionalCues,
-        ...lra.interruptedThoughts.map(t => `Interrupted: ${t}`)
-    ].slice(0, 4);
+        ...lra.activeHypotheses.map(h => `Hypothesis taking shape: ${sanitize(h, 200)}`),
+        ...lra.contradictionFlags.map(f => `Contradiction: ${sanitize(f, 200)}`),
+        ...lra.emotionalCues.map(c => sanitize(c, 200)),
+        ...lra.interruptedThoughts.map(t => `Interrupted: ${sanitize(t, 200)}`)
+    ].filter(Boolean).slice(0, 4);
 
     if (signals.length > 0) {
         lines.push('\nLast response — signals:');

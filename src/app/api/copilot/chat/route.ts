@@ -41,6 +41,11 @@ function isConnectionError(error: unknown): boolean {
     );
 }
 
+function isAnthropicModelNotFound(error: unknown): boolean {
+    const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
+    return message.includes('not_found_error') || message.includes('model:');
+}
+
 export async function POST(req: Request) {
     try {
         const session = await auth();
@@ -283,12 +288,37 @@ export async function POST(req: Request) {
             });
         };
 
-        let modelUsed = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022'; // configurable via env, fallback to broadly-available sonnet
+        // Sonnet 4.6 is the preferred strategic copilot model.
+        const anthropicModelCandidates = [
+            (process.env.ANTHROPIC_MODEL || '').trim(),
+            'claude-4.6-sonnet',
+            'claude-sonnet-4-6',
+            'claude-3-5-sonnet-20241022',
+        ].filter(Boolean);
+
+        let modelUsed = anthropicModelCandidates[0] || 'claude-4.6-sonnet';
         let result: any;
 
         try {
             if (anthropicApiKey) {
-                result = await runLLM('anthropic', modelUsed);
+                let lastAnthropicError: unknown = null;
+                for (const candidate of anthropicModelCandidates) {
+                    try {
+                        modelUsed = candidate;
+                        result = await runLLM('anthropic', candidate);
+                        lastAnthropicError = null;
+                        break;
+                    } catch (error) {
+                        lastAnthropicError = error;
+                        if (!isAnthropicModelNotFound(error)) {
+                            throw error;
+                        }
+                    }
+                }
+
+                if (lastAnthropicError) {
+                    throw lastAnthropicError;
+                }
             } else {
                 modelUsed = 'gpt-4o';
                 result = await runLLM('openai', modelUsed);

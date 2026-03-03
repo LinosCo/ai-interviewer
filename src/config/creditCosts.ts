@@ -39,6 +39,11 @@ export type CreditAction = keyof typeof CREDIT_COSTS;
 type PricingModelKey = keyof typeof MODEL_PRICING;
 
 export const TOKEN_TO_CREDIT_RATE = 0.0005;
+export const TARGET_TOKEN_COST_MARGIN = 4;
+// Worst-case selling price per credit (large pack: €89 / 15,000 credits).
+export const MIN_REVENUE_PER_CREDIT_EUR = 89 / 15000;
+// Safety conversion (treat 1 USD token cost as 1 EUR cost for conservative billing).
+export const USD_TO_EUR_SAFETY_RATE = 1;
 
 /**
  * Mappa azione -> tool per tracking
@@ -75,6 +80,8 @@ function resolvePricingModel(modelName: string): PricingModelKey | null {
         { prefix: 'gpt-4o-mini', model: LLMModel.GPT4O_MINI },
         { prefix: 'claude-3-5-haiku', model: LLMModel.CLAUDE_HAIKU },
         { prefix: 'claude-sonnet-4', model: LLMModel.CLAUDE_SONNET },
+        { prefix: 'claude-sonnet-4-6', model: LLMModel.CLAUDE_SONNET },
+        { prefix: 'claude-4.6-sonnet', model: LLMModel.CLAUDE_SONNET },
         { prefix: 'gemini-2.0-flash', model: LLMModel.GEMINI_FLASH },
         { prefix: 'gemini-1.5-flash-8b', model: LLMModel.GEMINI_FLASH_LITE }
     ];
@@ -84,6 +91,26 @@ function resolvePricingModel(modelName: string): PricingModelKey | null {
             return alias.model;
         }
     }
+
+    return null;
+}
+
+function getModelPricing(modelName: string): { input: number; output: number } | null {
+    const pricingModel = resolvePricingModel(modelName);
+    if (pricingModel) {
+        return MODEL_PRICING[pricingModel];
+    }
+
+    const normalized = String(modelName || '').toLowerCase().trim();
+    if (!normalized) return null;
+
+    // Conservative fallbacks for generic model names.
+    if (normalized.includes('sonnet')) return MODEL_PRICING[LLMModel.CLAUDE_SONNET];
+    if (normalized.includes('haiku')) return MODEL_PRICING[LLMModel.CLAUDE_HAIKU];
+    if (normalized.includes('gpt-4o-mini')) return MODEL_PRICING[LLMModel.GPT4O_MINI];
+    if (normalized.includes('gpt-4o')) return MODEL_PRICING[LLMModel.CLAUDE_SONNET];
+    if (normalized.includes('gemini') && normalized.includes('8b')) return MODEL_PRICING[LLMModel.GEMINI_FLASH_LITE];
+    if (normalized.includes('gemini') && normalized.includes('flash')) return MODEL_PRICING[LLMModel.GEMINI_FLASH];
 
     return null;
 }
@@ -108,6 +135,40 @@ export function getModelCreditMultiplier(modelName: string): number {
     }
 
     return 1.5;
+}
+
+export function estimateTokenCostEur(
+    inputTokens: number,
+    outputTokens: number,
+    modelName: string
+): number {
+    const pricing = getModelPricing(modelName);
+    if (!pricing) return 0;
+
+    const safeInput = Math.max(0, Number(inputTokens) || 0);
+    const safeOutput = Math.max(0, Number(outputTokens) || 0);
+    const costUsd =
+        (safeInput / 1_000_000) * pricing.input +
+        (safeOutput / 1_000_000) * pricing.output;
+
+    return costUsd * USD_TO_EUR_SAFETY_RATE;
+}
+
+export function getMinCreditsForMargin(
+    inputTokens: number,
+    outputTokens: number,
+    modelName: string,
+    targetMargin: number = TARGET_TOKEN_COST_MARGIN
+): number {
+    if (targetMargin <= 0 || MIN_REVENUE_PER_CREDIT_EUR <= 0) return 0;
+
+    const tokenCostEur = estimateTokenCostEur(inputTokens, outputTokens, modelName);
+    if (tokenCostEur <= 0) return 0;
+
+    return Math.max(
+        1,
+        Math.ceil((tokenCostEur * targetMargin) / MIN_REVENUE_PER_CREDIT_EUR)
+    );
 }
 
 /**

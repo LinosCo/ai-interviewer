@@ -2,7 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { PLANS, PlanType } from '@/config/plans';
 import { SubscriptionStatus, TokenCategory } from '@prisma/client';
 import { CreditService } from './creditService';
-import { CreditAction, getCreditCost, getModelCreditMultiplier, TOKEN_TO_CREDIT_RATE } from '@/config/creditCosts';
+import {
+    CreditAction,
+    getCreditCost,
+    getModelCreditMultiplier,
+    getMinCreditsForMargin,
+    TOKEN_TO_CREDIT_RATE
+} from '@/config/creditCosts';
 
 /**
  * TokenTrackingService
@@ -119,7 +125,12 @@ export class TokenTrackingService {
         const modelMultiplier = getModelCreditMultiplier(model);
         const modelAdjustedBaseCost = Math.max(1, Math.ceil(baseCost * modelMultiplier));
         const tokenBasedCost = Math.max(1, Math.ceil(totalTokens * TOKEN_TO_CREDIT_RATE * modelMultiplier));
-        const creditsToConsume = Math.max(modelAdjustedBaseCost, tokenBasedCost);
+        const marginFloorCost = getMinCreditsForMargin(
+            inputTokens,
+            outputTokens,
+            model
+        );
+        const creditsToConsume = Math.max(modelAdjustedBaseCost, tokenBasedCost, marginFloorCost);
 
         // 3. Consuma i crediti dall'organizzazione
         const creditResult = await CreditService.consumeCredits(organizationId, action, {

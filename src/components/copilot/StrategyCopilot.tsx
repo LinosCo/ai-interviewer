@@ -275,12 +275,6 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                                 </div>
                             )}
 
-                            {isLoading && (
-                                <div className="mt-3 bg-white/10 rounded-lg px-3 py-2 text-xs flex items-center gap-2" title={loadingTitle}>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    {loadingTitle}
-                                </div>
-                            )}
                         </div>
 
                         {/* Messages */}
@@ -326,14 +320,9 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                             {isLoading && (
                                 <div className="flex justify-start">
                                     <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-md px-4 py-3" title={loadingTitle}>
-                                        <div className="mb-2 flex items-center gap-2 text-xs text-stone-500">
+                                        <div className="flex items-center gap-2 text-xs text-stone-500">
                                             <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
                                             <span>{loadingTitle}</span>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" />
-                                            <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                                            <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                                         </div>
                                     </div>
                                 </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, ToggleLeft, ToggleRight, Zap, Pencil } from 'lucide-react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, Zap, Pencil, FlaskConical, Loader2 } from 'lucide-react';
 import { CONTENT_KIND_LABELS, ALL_CONTENT_KINDS, type ContentKind } from '@/lib/cms/content-kinds';
 import { ROUTING_TIP_CATEGORY_LABELS } from '@/lib/cms/tip-routing-taxonomy';
 
@@ -52,6 +52,29 @@ interface RoutingHistoryItem {
   latestAt: string | null;
 }
 
+interface SentContentHistoryItem {
+  id: string;
+  title: string;
+  contentKind: string;
+  category: string | null;
+  status: 'PUSHED' | 'PUBLISHED';
+  cmsContentId: string | null;
+  previewUrl: string | null;
+  sentAt: string;
+}
+
+interface ActionHistoryItem {
+  id: string;
+  at: string;
+  action: string;
+  success: boolean;
+  errorMessage: string | null;
+  durationMs: number;
+  ruleId: string | null;
+  contentKind: string | null;
+  destination: 'mcp' | 'cms' | 'n8n' | null;
+}
+
 type DestinationType = 'mcp' | 'cms' | 'n8n';
 
 interface DestinationOption {
@@ -85,6 +108,10 @@ export function AiRoutingTab({
   const [saving, setSaving] = useState(false);
   const [coverage, setCoverage] = useState<RoutingCoverageItem[]>([]);
   const [historyByKind, setHistoryByKind] = useState<RoutingHistoryItem[]>([]);
+  const [sentContentHistory, setSentContentHistory] = useState<SentContentHistoryItem[]>([]);
+  const [actionHistory, setActionHistory] = useState<ActionHistoryItem[]>([]);
+  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
+  const [testFeedbackByRule, setTestFeedbackByRule] = useState<Record<string, { success: boolean; message: string }>>({});
   const formRef = useRef<HTMLDivElement | null>(null);
 
   // All active connections for destination picker
@@ -138,9 +165,13 @@ export function AiRoutingTab({
         const overviewData = await overviewRes.json();
         setCoverage(overviewData.coverage || []);
         setHistoryByKind(overviewData.historyByContentKind || []);
+        setSentContentHistory(overviewData.sentContentHistory || []);
+        setActionHistory(overviewData.actionHistory || []);
       } else {
         setCoverage([]);
         setHistoryByKind([]);
+        setSentContentHistory([]);
+        setActionHistory([]);
       }
     } finally {
       setLoading(false);
@@ -263,6 +294,33 @@ export function AiRoutingTab({
   };
 
   const canSave = Boolean(formData.contentKind && formData.selectedConnectionId && formData.destinationType);
+
+  const handleTestRule = async (rule: TipRoutingRule) => {
+    setTestingRuleId(rule.id);
+    setTestFeedbackByRule((prev) => {
+      const next = { ...prev };
+      delete next[rule.id];
+      return next;
+    });
+    try {
+      const res = await fetch(`/api/projects/${projectId}/tip-routing-rules/${rule.id}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => null);
+      const message = data?.result?.error || data?.error || (res.ok ? 'Test completato con successo' : 'Test fallito');
+      setTestFeedbackByRule((prev) => ({
+        ...prev,
+        [rule.id]: {
+          success: res.ok && Boolean(data?.success),
+          message,
+        },
+      }));
+      await fetchRules();
+    } finally {
+      setTestingRuleId(null);
+    }
+  };
 
   return (
     <motion.div
@@ -537,6 +595,98 @@ export function AiRoutingTab({
         </div>
       )}
 
+      {!loading && sentContentHistory.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            Storico contenuti inviati
+          </p>
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Titolo</th>
+                  <th className="px-4 py-3">Tipologia</th>
+                  <th className="px-4 py-3">Stato</th>
+                  <th className="px-4 py-3">Data invio</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sentContentHistory.map((item) => (
+                  <tr key={item.id} className="border-t border-gray-100">
+                    <td className="px-4 py-3 text-gray-800 font-medium max-w-[360px] truncate">
+                      {item.previewUrl ? (
+                        <a className="text-blue-600 hover:underline" href={item.previewUrl} target="_blank" rel="noreferrer">
+                          {item.title}
+                        </a>
+                      ) : item.title}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {CONTENT_KIND_LABELS[item.contentKind as ContentKind] || item.contentKind}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        item.status === 'PUBLISHED' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
+                      }`}>
+                        {item.status === 'PUBLISHED' ? 'Pubblicato' : 'Inviato'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {new Date(item.sentAt).toLocaleString('it-IT')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!loading && actionHistory.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            Storico azioni eseguite
+          </p>
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Azione</th>
+                  <th className="px-4 py-3">Esito</th>
+                  <th className="px-4 py-3">Durata</th>
+                  <th className="px-4 py-3">Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actionHistory.map((item) => (
+                  <tr key={item.id} className="border-t border-gray-100">
+                    <td className="px-4 py-3 text-xs text-gray-700">
+                      <span className="font-semibold">{item.action}</span>
+                      {item.contentKind && (
+                        <span className="text-gray-500 ml-1">
+                          · {CONTENT_KIND_LABELS[item.contentKind as ContentKind] || item.contentKind}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        item.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                      }`}>
+                        {item.success ? 'OK' : 'Errore'}
+                      </span>
+                      {!item.success && item.errorMessage && (
+                        <p className="text-xs text-red-600 mt-1 max-w-[320px] truncate">{item.errorMessage}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{item.durationMs} ms</td>
+                    <td className="px-4 py-3 text-gray-600">{new Date(item.at).toLocaleString('it-IT')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {!loading && rules.length > 0 && (
         <div className="space-y-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -566,6 +716,16 @@ export function AiRoutingTab({
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
+                  onClick={() => handleTestRule(rule)}
+                  disabled={testingRuleId === rule.id}
+                  className="p-1 rounded-lg text-gray-300 hover:text-amber-500 transition-colors disabled:opacity-50"
+                  title="Testa matching routing"
+                >
+                  {testingRuleId === rule.id
+                    ? <Loader2 size={16} className="animate-spin" />
+                    : <FlaskConical size={16} />}
+                </button>
+                <button
                   onClick={() => handleOpenEdit(rule)}
                   className="p-1 rounded-lg text-gray-300 hover:text-blue-500 transition-colors"
                   title="Modifica regola"
@@ -587,6 +747,18 @@ export function AiRoutingTab({
                   <Trash2 size={16} />
                 </button>
               </div>
+            </div>
+          ))}
+          {Object.entries(testFeedbackByRule).map(([ruleId, feedback]) => (
+            <div
+              key={ruleId}
+              className={`px-4 py-2 rounded-xl text-sm ${
+                feedback.success
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                  : 'bg-red-50 text-red-700 border border-red-100'
+              }`}
+            >
+              Regola {ruleId.slice(-6)}: {feedback.message}
             </div>
           ))}
         </div>

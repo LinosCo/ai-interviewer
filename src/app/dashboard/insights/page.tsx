@@ -348,7 +348,12 @@ export default function InsightHubPage() {
 
             // Fetch website analytics if CMS is connected
             try {
-                const analyticsRes = await fetch('/api/cms/analytics?range=7d');
+                const analyticsQuery = new URLSearchParams({ range: '7d' });
+                if (projectId) {
+                    analyticsQuery.set('projectId', projectId);
+                }
+
+                const analyticsRes = await fetch(`/api/cms/analytics?${analyticsQuery.toString()}`);
                 if (analyticsRes.ok) {
                     const analyticsData = await analyticsRes.json();
                     if (analyticsData.summary) {

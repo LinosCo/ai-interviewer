@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { IntegrationsGrid } from '@/components/integrations';
 import { AnimatePresence } from 'framer-motion';
 import { ConnectionsTab } from '@/components/integrations/ConnectionsTab';
 import { AiRoutingTab } from '@/components/integrations/AiRoutingTab';
@@ -327,6 +326,10 @@ export default function IntegrationsPage() {
   };
 
   const handleConfigureCMS = () => {
+    if (cmsConnection?.id) {
+      router.push(`/dashboard/cms/${cmsConnection.id}/settings`);
+      return;
+    }
     router.push(`/dashboard/projects/${projectId}/integrations/connect/cms`);
   };
 

@@ -71,9 +71,34 @@ export async function GET(
 
     const rules = await prisma.tipRoutingRule.findMany({
       where: { projectId, enabled: true },
-      select: { contentKind: true },
+      select: {
+        contentKind: true,
+        mcpTool: true,
+        mcpConnectionId: true,
+        cmsConnectionId: true,
+        n8nConnectionId: true,
+        mcpConnection: { select: { status: true } },
+        cmsConnection: { select: { status: true } },
+        n8nConnection: { select: { status: true } },
+      },
     });
     const enabledKinds = new Set(rules.map((r) => r.contentKind));
+    const operationalKinds = new Set(
+      rules
+        .filter((r) => {
+          if (r.mcpConnectionId) {
+            return r.mcpConnection?.status === 'ACTIVE' && Boolean(r.mcpTool);
+          }
+          if (r.cmsConnectionId) {
+            return r.cmsConnection?.status === 'ACTIVE';
+          }
+          if (r.n8nConnectionId) {
+            return r.n8nConnection?.status === 'ACTIVE';
+          }
+          return false;
+        })
+        .map((r) => r.contentKind)
+    );
 
     const sharedCmsLinks = await prisma.projectCMSConnection.findMany({
       where: { projectId },
@@ -93,6 +118,17 @@ export async function GET(
       where: { projectId },
       select: { id: true },
     });
+    const directMcpIds = await prisma.mCPConnection.findMany({
+      where: { projectId },
+      select: { id: true },
+    });
+    const sharedMcpLinks = await prisma.projectMCPConnection.findMany({
+      where: { projectId },
+      select: { connectionId: true },
+    });
+    const mcpConnectionIds = Array.from(
+      new Set([...directMcpIds.map((c) => c.id), ...sharedMcpLinks.map((c) => c.connectionId)])
+    );
     const sharedConfigLinks = await prisma.projectVisibilityConfig.findMany({
       where: { projectId },
       select: { configId: true },
@@ -155,7 +191,7 @@ export async function GET(
 
     const coverage = (Object.keys(CATEGORY_TO_CONTENT_KINDS) as RoutingTipCategory[]).map((category) => {
       const kinds = CATEGORY_TO_CONTENT_KINDS[category];
-      const coveredKinds = kinds.filter((kind) => enabledKinds.has(kind));
+      const coveredKinds = kinds.filter((kind) => operationalKinds.has(kind));
       return {
         category,
         label: ROUTING_TIP_CATEGORY_LABELS[category],
@@ -227,10 +263,110 @@ export async function GET(
       historyByContentKind = Array.from(buckets.values()).sort((a, b) => b.total - a.total);
     }
 
+    const sentSuggestions = connectionIds.length > 0
+      ? await prisma.cMSSuggestion.findMany({
+        where: {
+          connectionId: { in: connectionIds },
+          status: { in: ['PUSHED', 'PUBLISHED'] },
+        },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          status: true,
+          cmsContentId: true,
+          cmsPreviewUrl: true,
+          sourceSignals: true,
+          pushedAt: true,
+          publishedAt: true,
+          updatedAt: true,
+        },
+        orderBy: [{ pushedAt: 'desc' }, { updatedAt: 'desc' }],
+        take: 30,
+      })
+      : [];
+
+    const sentContentHistory = sentSuggestions.map((suggestion) => {
+      const contentKind = getSuggestionContentKind({
+        type: suggestion.type,
+        sourceSignals: suggestion.sourceSignals,
+      });
+      return {
+        id: suggestion.id,
+        title: suggestion.title,
+        contentKind,
+        category: mapContentKindToCategory(contentKind),
+        status: suggestion.status,
+        cmsContentId: suggestion.cmsContentId,
+        previewUrl: suggestion.cmsPreviewUrl,
+        sentAt: (suggestion.publishedAt || suggestion.pushedAt || suggestion.updatedAt).toISOString(),
+      };
+    });
+
+    const logCandidates = await prisma.integrationLog.findMany({
+      where: {
+        OR: [
+          ...(mcpConnectionIds.length ? [{ mcpConnectionId: { in: mcpConnectionIds } }] : []),
+          ...(connectionIds.length ? [{ cmsConnectionId: { in: connectionIds } }] : []),
+          { action: { startsWith: 'tip_routing.' } },
+        ],
+      },
+      select: {
+        id: true,
+        action: true,
+        arguments: true,
+        result: true,
+        success: true,
+        errorMessage: true,
+        durationMs: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 400,
+    });
+
+    const actionHistory = logCandidates
+      .filter((log) => {
+        const args = (log.arguments || {}) as JsonObject;
+        const argProjectId = typeof args.projectId === 'string' ? args.projectId : null;
+        if (argProjectId && argProjectId === projectId) return true;
+        if (log.action.startsWith('tip_routing.') && !argProjectId) return true;
+        return false;
+      })
+      .slice(0, 40)
+      .map((log) => {
+        const args = (log.arguments || {}) as JsonObject;
+        const result = (log.result || {}) as JsonObject;
+        const contentKind = typeof args.contentKind === 'string' ? args.contentKind : null;
+        const destination = typeof result.destination === 'string'
+          ? result.destination
+          : (() => {
+            if (log.action.includes('.mcp')) return 'mcp';
+            if (log.action.includes('.cms')) return 'cms';
+            if (log.action.includes('.n8n')) return 'n8n';
+            return null;
+          })();
+
+        return {
+          id: log.id,
+          at: log.createdAt.toISOString(),
+          action: log.action,
+          success: log.success,
+          errorMessage: log.errorMessage,
+          durationMs: log.durationMs,
+          ruleId: typeof args.ruleId === 'string' ? args.ruleId : null,
+          contentKind,
+          destination,
+        };
+      });
+
     return NextResponse.json({
       coverage,
       historyByContentKind,
+      sentContentHistory,
+      actionHistory,
       enabledContentKinds: Array.from(enabledKinds.values()),
+      operationalContentKinds: Array.from(operationalKinds.values()),
     });
   } catch (err) {
     console.error('tip-routing-overview GET error:', err);

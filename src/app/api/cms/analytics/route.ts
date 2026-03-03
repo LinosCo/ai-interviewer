@@ -7,6 +7,33 @@ import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
  * GET /api/cms/analytics?range=7d|30d|90d&projectId=xxx
  * Get aggregated website analytics for a project with CMS.
  */
+
+function buildEmptyAnalyticsResponse(startDate: Date, endDate: Date, reason?: string) {
+    return {
+        enabled: false,
+        reason: reason || 'CMS integration is not enabled for this project',
+        period: {
+            start: startDate.toISOString(),
+            end: endDate.toISOString()
+        },
+        summary: {
+            pageviews: 0,
+            uniqueVisitors: 0,
+            avgSessionDuration: 0,
+            bounceRate: 0,
+            searchImpressions: 0,
+            searchClicks: 0,
+            avgPosition: 0
+        },
+        trends: {
+            pageviews: [],
+            visitors: []
+        },
+        topPages: [],
+        topSearchQueries: []
+    };
+}
+
 export async function GET(request: Request) {
     try {
         const session = await auth();
@@ -20,67 +47,7 @@ export async function GET(request: Request) {
         const projectId = url.searchParams.get('projectId');
         const range = url.searchParams.get('range') || '30d';
 
-        const activeOrgId = await resolveActiveOrganizationIdForUser(userId);
-
-        // Verify user access and load org projects with CMS connections
-        const user = await prisma.user.findUnique({
-            where: { email: userEmail },
-            include: {
-                memberships: {
-                    include: {
-                        organization: {
-                            include: {
-                                projects: { include: { cmsConnection: true } }
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        if (!user || user.memberships.length === 0) {
-            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
-        }
-
-        // Pick project:
-        // - requested projectId when provided
-        // - otherwise first project with CMS in active organization
-        // - fallback to first project with CMS in any user organization
-        let targetProjectId = projectId;
-        if (!targetProjectId) {
-            const activeMembership = activeOrgId
-                ? user.memberships.find((m) => m.organizationId === activeOrgId)
-                : undefined;
-
-            const activeOrgProject = activeMembership?.organization.projects.find((p) => p.cmsConnection);
-            if (activeOrgProject) {
-                targetProjectId = activeOrgProject.id;
-            } else {
-                for (const membership of user.memberships) {
-                    const project = membership.organization.projects.find((p) => p.cmsConnection);
-                    if (project) {
-                        targetProjectId = project.id;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Find CMS connection for target project
-        let cmsConnection = null;
-        for (const membership of user.memberships) {
-            const project = membership.organization.projects.find(p => p.id === targetProjectId);
-            if (project?.cmsConnection) {
-                cmsConnection = project.cmsConnection;
-                break;
-            }
-        }
-
-        if (!cmsConnection) {
-            return NextResponse.json({ error: 'CMS integration not enabled for this project' }, { status: 400 });
-        }
-
-        // Calculate date range
+        // Calculate date range early so we can always return a valid payload
         const endDate = new Date();
         const startDate = new Date();
         switch (range) {
@@ -92,6 +59,91 @@ export async function GET(request: Request) {
                 break;
             default: // 30d
                 startDate.setDate(endDate.getDate() - 30);
+        }
+
+        const activeOrgId = await resolveActiveOrganizationIdForUser(userId);
+
+        // Verify user access and load org projects with CMS connections (direct + shared)
+        const user = await prisma.user.findUnique({
+            where: { email: userEmail },
+            include: {
+                memberships: {
+                    include: {
+                        organization: {
+                            include: {
+                                projects: {
+                                    include: {
+                                        cmsConnection: true,
+                                        newCmsConnection: true,
+                                        cmsShares: {
+                                            include: {
+                                                connection: true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!user || user.memberships.length === 0) {
+            return NextResponse.json({ error: 'No organization found' }, { status: 404 });
+        }
+
+        type MembershipProject = (typeof user.memberships)[number]['organization']['projects'][number];
+        type ResolvedConnection = NonNullable<
+            MembershipProject['newCmsConnection']
+            | MembershipProject['cmsConnection']
+            | MembershipProject['cmsShares'][number]['connection']
+        >;
+
+        const resolveProjectConnection = (project: MembershipProject): ResolvedConnection | null => {
+            const directConnection = project.newCmsConnection || project.cmsConnection;
+            if (directConnection && directConnection.status !== 'DISABLED') {
+                return directConnection;
+            }
+            return project.cmsShares.find((share) => share.connection.status !== 'DISABLED')?.connection || null;
+        };
+
+        // Pick project:
+        // - requested projectId when provided
+        // - otherwise first project with CMS in active organization
+        // - fallback to first project with CMS in any user organization
+        let targetProjectId = projectId;
+        if (!targetProjectId) {
+            const activeMembership = activeOrgId
+                ? user.memberships.find((m) => m.organizationId === activeOrgId)
+                : undefined;
+
+            const activeOrgProject = activeMembership?.organization.projects.find((p) => resolveProjectConnection(p));
+            if (activeOrgProject) {
+                targetProjectId = activeOrgProject.id;
+            } else {
+                for (const membership of user.memberships) {
+                    const project = membership.organization.projects.find((p) => resolveProjectConnection(p));
+                    if (project) {
+                        targetProjectId = project.id;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Find CMS connection (direct or shared) for target project
+        let cmsConnection: ResolvedConnection | null = null;
+        for (const membership of user.memberships) {
+            const project = membership.organization.projects.find(p => p.id === targetProjectId);
+            if (project) {
+                cmsConnection = resolveProjectConnection(project);
+                break;
+            }
+        }
+
+        if (!cmsConnection) {
+            return NextResponse.json(buildEmptyAnalyticsResponse(startDate, endDate));
         }
 
         // Get analytics data
@@ -169,10 +221,11 @@ export async function GET(request: Request) {
 
         // Get top pages from the most recent analytics record
         const latestAnalytics = analytics[analytics.length - 1];
-        const topPages = (latestAnalytics?.topPages as any[]) || [];
-        const topSearchQueries = (latestAnalytics?.topSearchQueries as any[]) || [];
+        const topPages = Array.isArray(latestAnalytics?.topPages) ? latestAnalytics.topPages : [];
+        const topSearchQueries = Array.isArray(latestAnalytics?.topSearchQueries) ? latestAnalytics.topSearchQueries : [];
 
         return NextResponse.json({
+            enabled: true,
             period: {
                 start: startDate.toISOString(),
                 end: endDate.toISOString()
@@ -183,7 +236,7 @@ export async function GET(request: Request) {
             topSearchQueries: topSearchQueries.slice(0, 10)
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Error getting CMS analytics:', error);
         return NextResponse.json(
             { error: 'Failed to get analytics' },

@@ -27,6 +27,13 @@ export interface TipPayload {
     url?: string;
 }
 
+export interface DispatchResult {
+    attempted: boolean;
+    success: boolean;
+    connectionId?: string;
+    error?: string;
+}
+
 export interface PublicationEvent {
     title: string;
     url?: string;
@@ -54,8 +61,21 @@ export class N8NDispatcher {
     ): Promise<void> {
         if (!tips.length) return;
 
+        await this.dispatchTipsWithResult(projectId, tips);
+    }
+
+    static async dispatchTipsWithResult(
+        projectId: string,
+        tips: TipPayload[]
+    ): Promise<DispatchResult> {
+        if (!tips.length) {
+            return { attempted: false, success: false, error: 'No tips to dispatch' };
+        }
+
         const connection = await this.getActiveConnection(projectId);
-        if (!connection || !connection.triggerOnTips) return;
+        if (!connection || !connection.triggerOnTips) {
+            return { attempted: false, success: false, error: 'No active n8n connection for project' };
+        }
 
         const project = await prisma.project.findUnique({
             where: { id: projectId },
@@ -78,7 +98,12 @@ export class N8NDispatcher {
             }))
         };
 
-        await this.sendWebhook(connection.id, connection.webhookUrl, payload);
+        const webhookResult = await this.sendWebhook(connection.id, connection.webhookUrl, payload);
+        return {
+            ...webhookResult,
+            attempted: true,
+            connectionId: connection.id
+        };
     }
 
     /**
@@ -179,7 +204,7 @@ export class N8NDispatcher {
         connectionId: string,
         webhookUrl: string,
         payload: WebhookPayload
-    ): Promise<void> {
+    ): Promise<DispatchResult> {
         try {
             const response = await fetch(webhookUrl, {
                 method: 'POST',
@@ -192,7 +217,12 @@ export class N8NDispatcher {
                 const errorText = `HTTP ${response.status}: ${response.statusText}`;
                 console.warn(`N8NDispatcher: Webhook failed for ${connectionId}: ${errorText}`);
                 await this.updateConnectionStatus(connectionId, errorText);
-                return;
+                return {
+                    attempted: true,
+                    success: false,
+                    connectionId,
+                    error: errorText
+                };
             }
 
             // Success: update lastTriggerAt, clear lastError
@@ -203,10 +233,22 @@ export class N8NDispatcher {
                     lastError: null
                 }
             });
+
+            return {
+                attempted: true,
+                success: true,
+                connectionId
+            };
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : 'Unknown error';
             console.warn(`N8NDispatcher: Webhook error for ${connectionId}:`, errorMsg);
             await this.updateConnectionStatus(connectionId, errorMsg);
+            return {
+                attempted: true,
+                success: false,
+                connectionId,
+                error: errorMsg
+            };
         }
     }
 

@@ -4,6 +4,7 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 import type { SupervisorInsight } from '@/lib/interview/interview-supervisor';
 import type { InterviewPlan, PlanTopic } from '@/lib/interview/plan-types';
 import type { ValidationResponse } from '@/lib/interview/validation-response';
+import type { CILAnalysis, CILState } from '@/lib/interview/cil/types';
 import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const FIELD_LABELS: Record<string, { it: string, en: string }> = {
@@ -577,4 +578,61 @@ export function addValidationFeedbackToPrompt(
     : `\n\n⚠️ IMPORTANT FEEDBACK: The user provided a response that wasn't understood correctly.\nMessage to communicate: "${safeFeedback}"\nStrategy: ${safeStrategy || 'ask again'}.\n`;
 
   return basePrompt + feedbackSection;
+}
+
+/**
+ * Build CIL context block (Block 6.5) — avanzato only.
+ * Returns empty string for other tiers or when nothing meaningful to show.
+ */
+export function buildCILContextBlock(
+    analysis: CILAnalysis,
+    cilState: CILState | null,
+    interviewerQuality: string
+): string {
+    if (interviewerQuality !== 'avanzato') return '';
+
+    const highThreads = analysis.openThreads.filter(t => t.strength === 'high');
+    const mediumThreads = analysis.openThreads.filter(t => t.strength === 'medium');
+    const themes = analysis.emergingThemes;
+    const lra = analysis.lastResponseAnalysis;
+    const hasMaterial = highThreads.length > 0 || themes.length > 0 ||
+        lra.activeHypotheses.length > 0 || lra.contradictionFlags.length > 0 ||
+        lra.interruptedThoughts.length > 0;
+
+    if (!hasMaterial) return '';
+
+    const lines: string[] = ['=== CONVERSATIONAL INTELLIGENCE ==='];
+
+    if (highThreads.length > 0 || mediumThreads.length > 0) {
+        lines.push('\nOpen threads:');
+        for (const t of highThreads) {
+            const hyp = t.anchoredHypothesis ? ` → ${t.anchoredHypothesis}` : '';
+            lines.push(`• [FORTE] "${t.description}"${hyp}`);
+        }
+        for (const t of mediumThreads) {
+            lines.push(`• [MEDIO] "${t.description}"`);
+        }
+    }
+
+    if (themes.length > 0) {
+        lines.push(`\nEmerging themes: ${themes.join(' · ')}`);
+    }
+
+    const signals = [
+        ...lra.activeHypotheses.map(h => `Hypothesis taking shape: ${h}`),
+        ...lra.contradictionFlags.map(f => `Contradiction: ${f}`),
+        ...lra.emotionalCues,
+        ...lra.interruptedThoughts.map(t => `Interrupted: ${t}`)
+    ].slice(0, 4);
+
+    if (signals.length > 0) {
+        lines.push('\nLast response — signals:');
+        for (const s of signals) lines.push(`• ${s}`);
+    }
+
+    lines.push(`\nSuggested move: ${analysis.suggestedMove}`);
+    lines.push('(You are free to ignore this if the conversation suggests a better direction)');
+    lines.push('===');
+
+    return lines.join('\n');
 }

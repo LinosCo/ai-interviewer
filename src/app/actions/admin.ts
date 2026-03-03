@@ -17,7 +17,7 @@ import { createProjectWithNameGuard } from '@/lib/projects/create-project';
 
 export async function getUsers() {
     await requireAdmin();
-    return await prisma.user.findMany({
+    const users = await prisma.user.findMany({
         orderBy: { createdAt: 'desc' },
         include: {
             projectAccess: {
@@ -32,6 +32,27 @@ export async function getUsers() {
             }
         }
     });
+
+    const identifiers = users.map((user) => user.email.toLowerCase());
+    const pendingTokens = await prisma.verificationToken.findMany({
+        where: {
+            identifier: { in: identifiers },
+            expires: { gt: new Date() }
+        },
+        orderBy: { expires: 'desc' }
+    });
+
+    const tokenByIdentifier = new Map<string, Date>();
+    for (const token of pendingTokens) {
+        if (!tokenByIdentifier.has(token.identifier)) {
+            tokenByIdentifier.set(token.identifier, token.expires);
+        }
+    }
+
+    return users.map((user) => ({
+        ...user,
+        verificationPendingUntil: tokenByIdentifier.get(user.email.toLowerCase()) || null
+    }));
 }
 
 export async function getProjects() {
@@ -292,6 +313,38 @@ export async function deleteUser(userId: string) {
     console.log(`Delete User Attempt: userId=${userId}`);
     await prisma.user.delete({ where: { id: userId } });
     console.log(`Delete User Success: userId=${userId}`);
+    revalidatePath('/dashboard/admin/users');
+}
+
+export async function forceActivateUser(userId: string) {
+    await requireAdmin();
+
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, emailVerified: true }
+    });
+
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    await prisma.$transaction(async (tx) => {
+        if (!user.emailVerified) {
+            await tx.user.update({
+                where: { id: userId },
+                data: { emailVerified: new Date() }
+            });
+        }
+
+        await tx.verificationToken.deleteMany({
+            where: {
+                identifier: {
+                    in: [user.email, user.email.toLowerCase()]
+                }
+            }
+        });
+    });
+
     revalidatePath('/dashboard/admin/users');
 }
 

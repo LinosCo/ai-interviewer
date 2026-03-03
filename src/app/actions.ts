@@ -449,6 +449,11 @@ export async function updateBotAction(botId: string, formData: FormData) {
         const cilParsed = parseInt(raw, 10);
         (data as any).cilBonusTurnCapOverride = raw === '' ? null : (isNaN(cilParsed) ? null : cilParsed);
     }
+    // CIL cap override is only meaningful for avanzato tier
+    if ((data as any).cilBonusTurnCapOverride !== undefined &&
+        (data as any).interviewerQuality !== 'avanzato') {
+        (data as any).cilBonusTurnCapOverride = null;
+    }
 
     if (formData.has('openaiApiKey')) data.openaiApiKey = encryptIfNeeded(getStr('openaiApiKey')) || null;
     if (formData.has('anthropicApiKey')) data.anthropicApiKey = encryptIfNeeded(getStr('anthropicApiKey')) || null;

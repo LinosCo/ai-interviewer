@@ -156,7 +156,7 @@ export default function BotConfigForm({ bot, canUseBranding = false, organizatio
                                     type="radio"
                                     name="interviewerQuality"
                                     value={tier.value}
-                                    defaultChecked={selected}
+                                    checked={selected}
                                     disabled={tier.locked}
                                     onChange={() => setInterviewerQuality(tier.value)}
                                     className="sr-only"

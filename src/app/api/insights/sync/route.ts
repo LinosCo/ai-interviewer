@@ -2,6 +2,11 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { CrossChannelSyncEngine } from '@/lib/insights/sync-engine';
+import {
+    enrichInsightsWithActionMetadata,
+    loadTipHistoryByContentKind
+} from '@/lib/insights/action-history';
+import { loadSiteAnalysisInsights } from '@/lib/insights/site-analysis-insights';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 import {
     WorkspaceError,
@@ -44,12 +49,22 @@ export async function POST(request: Request) {
         }
 
         const result = await CrossChannelSyncEngine.sync(orgId, projectId || undefined);
+        const siteInsights = await loadSiteAnalysisInsights({
+            organizationId: orgId,
+            projectId: projectId || undefined
+        });
+        const tipHistoryByContentKind = await loadTipHistoryByContentKind(projectId || undefined);
+        const enrichedInsights = enrichInsightsWithActionMetadata(
+            [...result.insights, ...siteInsights].sort((a: any, b: any) => (b.priorityScore || 0) - (a.priorityScore || 0)),
+            tipHistoryByContentKind
+        );
 
         return NextResponse.json({
             success: true,
-            count: result.insights.length,
-            insights: result.insights,
-            healthReport: result.healthReport
+            count: enrichedInsights.length,
+            insights: enrichedInsights,
+            healthReport: result.healthReport,
+            tipHistoryByContentKind
         });
 
     } catch (error) {
@@ -99,8 +114,20 @@ export async function GET(request: Request) {
             },
             orderBy: { priorityScore: 'desc' }
         });
+        const siteInsights = await loadSiteAnalysisInsights({
+            organizationId: orgId,
+            projectId: projectId || undefined
+        });
+        const tipHistoryByContentKind = await loadTipHistoryByContentKind(projectId || undefined);
+        const enrichedInsights = enrichInsightsWithActionMetadata(
+            [...insights, ...siteInsights].sort((a: any, b: any) => (b.priorityScore || 0) - (a.priorityScore || 0)),
+            tipHistoryByContentKind
+        );
 
-        return NextResponse.json({ insights });
+        return NextResponse.json({
+            insights: enrichedInsights,
+            tipHistoryByContentKind
+        });
 
     } catch (error) {
         console.error('Fetch error:', error);

@@ -3,6 +3,10 @@ import { z } from 'zod';
 import Sitemapper from 'sitemapper';
 import { scrapeUrl } from '@/lib/scraping';
 import { assertOrganizationAccess, assertProjectAccess } from '@/lib/domain/workspace';
+import { CMSSuggestionGenerator } from '@/lib/cms/suggestion-generator';
+import { TipRoutingExecutor } from '@/lib/cms/tip-routing-executor';
+import { N8NDispatcher } from '@/lib/integrations/n8n/dispatcher';
+import { buildInsightActionMetadata } from '@/lib/insights/action-metadata';
 
 type ToolContext = {
     userId: string;
@@ -733,6 +737,199 @@ export function createScrapeWebSourceTool(context: ToolContext) {
             } catch (error: any) {
                 console.error('[Copilot Tool] Error scraping web source:', error);
                 return { error: 'Failed to scrape URL', details: error.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
+const strategicTipActionSchema = z.object({
+    type: z.enum([
+        'add_faq',
+        'add_interview_topic',
+        'add_visibility_prompt',
+        'create_content',
+        'modify_content',
+        'respond_to_press',
+        'monitor_competitor',
+        'strategic_recommendation',
+        'pricing_change',
+        'product_improvement',
+        'marketing_campaign'
+    ]),
+    target: z.enum([
+        'chatbot',
+        'interview',
+        'visibility',
+        'website',
+        'pr',
+        'serp',
+        'strategy',
+        'product',
+        'marketing'
+    ]),
+    title: z.string().min(3).max(160),
+    body: z.string().min(10).max(5000),
+    reasoning: z.string().min(6).max(2000),
+    strategicAlignment: z.string().min(6).max(1200).optional(),
+    coordination: z.string().min(6).max(1200).optional(),
+    evidence: z.array(z.object({
+        sourceType: z.enum(['interview', 'chatbot', 'visibility', 'serp', 'analytics', 'kb', 'strategy', 'site_analysis']),
+        sourceRef: z.string().min(2).max(120),
+        detail: z.string().min(6).max(500)
+    })).max(4).optional()
+});
+
+export function createStrategicTipCreationTool(context: ToolContext) {
+    return {
+        description: 'Create a new AI Tip in Insights and optionally generate implementable CMS content drafts with routing automation.',
+        inputSchema: z.object({
+            projectId: z.string().optional().describe('Project ID. If omitted, uses selected project in Copilot context.'),
+            topicName: z.string().min(5).max(180).describe('Strategic AI tip title shown in Insights.'),
+            reasoning: z.string().min(10).max(4000).describe('Strategic rationale and evidence behind the tip.'),
+            priorityScore: z.number().min(0).max(100).optional().default(70),
+            actions: z.array(strategicTipActionSchema).min(1).max(6),
+            autoCreateContentDrafts: z.boolean().optional().default(true).describe('Generate CMS suggestions from content-related actions.'),
+            autoDispatchRouting: z.boolean().optional().default(false).describe('If true, run n8n dispatch and tip routing rules after draft generation.')
+        }),
+        execute: async ({
+            projectId,
+            topicName,
+            reasoning,
+            priorityScore,
+            actions,
+            autoCreateContentDrafts,
+            autoDispatchRouting
+        }: {
+            projectId?: string;
+            topicName: string;
+            reasoning: string;
+            priorityScore?: number;
+            actions: Array<{
+                type: string;
+                target: string;
+                title: string;
+                body: string;
+                reasoning: string;
+                strategicAlignment?: string;
+                coordination?: string;
+                evidence?: Array<{
+                    sourceType: string;
+                    sourceRef: string;
+                    detail: string;
+                }>;
+            }>;
+            autoCreateContentDrafts?: boolean;
+            autoDispatchRouting?: boolean;
+        }) => {
+            try {
+                const scopedProjectIds = await resolveAccessibleProjectIds(context, projectId);
+                const targetProjectId = (projectId || context.projectId || scopedProjectIds[0] || null) as string | null;
+                if (!targetProjectId) {
+                    return { error: 'No accessible project selected. Pass a valid projectId.' };
+                }
+                if (!scopedProjectIds.includes(targetProjectId)) {
+                    return { error: 'Project is not accessible for current user/context.' };
+                }
+
+                const enrichedActions = actions.map((action) => ({
+                    ...action,
+                    reasoning: action.reasoning || reasoning,
+                    strategicAlignment: action.strategicAlignment || reasoning,
+                    coordination: action.coordination || 'Coordinare questa azione con gli altri canali del piano editoriale.',
+                    evidence: Array.isArray(action.evidence) && action.evidence.length > 0
+                        ? action.evidence
+                        : [{
+                            sourceType: 'strategy',
+                            sourceRef: 'copilot:user_request',
+                            detail: 'Tip creato da richiesta esplicita del team su base strategica del progetto.'
+                        }],
+                    workflowStatus: 'draft',
+                    ...buildInsightActionMetadata(action)
+                }));
+
+                const insight = await prisma.crossChannelInsight.create({
+                    data: {
+                        organizationId: context.organizationId,
+                        projectId: targetProjectId,
+                        topicName,
+                        crossChannelScore: 85,
+                        priorityScore: Number(priorityScore ?? 70),
+                        status: 'new',
+                        interviewData: [],
+                        chatbotData: [],
+                        visibilityData: {
+                            source: 'copilot_strategic',
+                            createdBy: context.userId,
+                            createdAt: new Date().toISOString(),
+                            globalReasoning: reasoning
+                        } as any,
+                        suggestedActions: enrichedActions as any
+                    }
+                });
+
+                let suggestionIds: string[] = [];
+                if (autoCreateContentDrafts) {
+                    suggestionIds = await CMSSuggestionGenerator.generateFromInsight(insight.id);
+                }
+
+                const routing = { dispatchedToN8N: false, routedRules: 0, routingFailures: 0 };
+                if (autoDispatchRouting && suggestionIds.length > 0) {
+                    const suggestions = await prisma.cMSSuggestion.findMany({
+                        where: { id: { in: suggestionIds } },
+                        select: {
+                            id: true,
+                            title: true,
+                            body: true,
+                            type: true,
+                            targetSection: true,
+                            metaDescription: true,
+                            cmsPreviewUrl: true,
+                        },
+                    });
+                    const tipsPayload = suggestions.map((s) => ({
+                        id: s.id,
+                        title: s.title,
+                        content: s.body,
+                        contentKind: String(s.type),
+                        targetChannel: s.targetSection ?? undefined,
+                        metaDescription: s.metaDescription ?? undefined,
+                        url: s.cmsPreviewUrl ?? undefined,
+                    }));
+
+                    try {
+                        await N8NDispatcher.dispatchTips(targetProjectId, tipsPayload);
+                        routing.dispatchedToN8N = true;
+                    } catch (err) {
+                        console.warn('[Copilot Tool] dispatchTips failed:', err);
+                    }
+
+                    try {
+                        const results = await TipRoutingExecutor.execute(targetProjectId, tipsPayload);
+                        routing.routedRules = results.length;
+                        routing.routingFailures = results.filter((r) => !r.success).length;
+                    } catch (err) {
+                        console.warn('[Copilot Tool] TipRoutingExecutor failed:', err);
+                    }
+                }
+
+                return {
+                    success: true,
+                    insight: {
+                        id: insight.id,
+                        projectId: insight.projectId,
+                        topicName: insight.topicName,
+                        priorityScore: insight.priorityScore,
+                        actionsCount: enrichedActions.length
+                    },
+                    automations: {
+                        contentDraftsCreated: suggestionIds.length,
+                        suggestionIds,
+                        ...routing
+                    }
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] createStrategicTip error:', error);
+                return { error: 'Failed to create AI tip from Copilot', details: error?.message || 'Unknown error' };
             }
         }
     };

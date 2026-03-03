@@ -30,6 +30,9 @@ interface InitialValues {
   traineeEducationLevel?: TraineeEducationLevel
   traineeCompetenceLevel?: TraineeCompetenceLevel
   passScoreThreshold?: number
+  modelProvider?: string
+  modelName?: string
+  customApiKey?: string
   topics?: Array<{
     label: string
     description: string
@@ -147,6 +150,9 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
   const [rewardDisplayText, setRewardDisplayText] = useState(
     bot?.rewardConfig?.displayText ?? 'Certificato di completamento'
   )
+  const [modelProvider, setModelProvider] = useState((bot?.modelProvider ?? initialValues?.modelProvider ?? 'openai').toLowerCase())
+  const [modelName, setModelName] = useState(bot?.modelName ?? initialValues?.modelName ?? 'gpt-4o-mini')
+  const [customApiKey, setCustomApiKey] = useState(bot?.customApiKey ?? initialValues?.customApiKey ?? '')
   const [traineeDataFieldsText, setTraineeDataFieldsText] = useState(() => {
     const fromBot = Array.isArray(bot?.traineeDataFields) ? (bot?.traineeDataFields as unknown[]) : null
     const fromInitial = initialValues?.traineeDataFields ?? null
@@ -237,6 +243,9 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
       passScoreThreshold: Number(passScoreThreshold),
       maxRetries: Number(maxRetries),
       maxDurationMins: Math.min(180, Math.max(10, Number(maxDurationMins) || 30)),
+      modelProvider,
+      modelName: modelName.trim() || (modelProvider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o-mini'),
+      customApiKey: customApiKey.trim() || null,
       collectTraineeData,
       traineeDataFields: collectTraineeData
         ? traineeDataFieldsText
@@ -505,6 +514,64 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
       </div>
 
       {/* 5. Argomenti */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Modello AI Tutor</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Provider">
+            <select
+              value={modelProvider}
+              onChange={(e) => {
+                const provider = e.target.value
+                setModelProvider(provider)
+                setModelName(provider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o-mini')
+              }}
+              className={selectCls}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </Field>
+
+          <Field label="Modello">
+            <select
+              value={modelName}
+              onChange={(e) => setModelName(e.target.value)}
+              className={selectCls}
+            >
+              {modelProvider === 'anthropic' ? (
+                <>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                </>
+              ) : (
+                <>
+                  <option value="gpt-4o-mini">GPT-4o mini</option>
+                  <option value="gpt-4.1-mini">GPT-4.1 mini</option>
+                  <option value="gpt-4.1">GPT-4.1</option>
+                </>
+              )}
+            </select>
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Field
+              label="API key custom (opzionale)"
+              hint="Se vuoto, il sistema usa la Global Config. Impostala solo se vuoi un key/model routing dedicato al formatore."
+            >
+              <input
+                type="password"
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+                placeholder={modelProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+                className={inputCls}
+                autoComplete="off"
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Argomenti */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <SectionTitle>Argomenti</SectionTitle>

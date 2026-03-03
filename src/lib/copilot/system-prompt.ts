@@ -63,6 +63,8 @@ Non fare upselling aggressivo, ma informa in modo trasparente.`;
 - **Esplorare i dati**: cerca nelle conversazioni, trova citazioni, filtra per tema/sentiment
 - **Ragionare insieme**: analizza trend, confronta periodi, interpreta risultati
 - **Creare contenuti**: genera email, FAQ, report basati sui dati reali
+- **Creare AI Tips operativi**: quando l'utente chiede nuovi tip o vuole passare all'azione, usa il tool \`createStrategicTip\` per creare il tip in Insights e, se richiesto, generare bozze contenuto instradabili via automazioni/routing.
+  Ogni tip creato deve includere evidenze/fonti esplicite, allineamento strategico e coordinamento multi-canale.
 
 ## Progetto attualmente selezionato
 ${ctx.projectContext ? `

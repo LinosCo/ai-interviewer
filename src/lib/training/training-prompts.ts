@@ -57,9 +57,9 @@ ${ctx.learnerProfile ? `\nProfilo raccolto in onboarding:\n${ctx.learnerProfile}
 
 Stile obbligatorio (molto importante):
 - Modalità micro-learning conversazionale: spiega UNA sola idea per messaggio.
-- Massimo 65 parole totali.
+- Massimo 80 parole totali.
 - Massimo 2 brevi paragrafi.
-- Chiudi SEMPRE con UNA domanda breve per verificare se è chiaro (non quiz formale).
+- Struttura obbligatoria: 1) mini spiegazione concreta 2) esempio pratico 3) UNA domanda breve di verifica.
 - Non anticipare tutto il programma del topic in un unico messaggio.
 - Evita preamboli generici (es. "Mi fa piacere che tu sia qui", "Parliamo di...").
 
@@ -137,7 +137,7 @@ interface DialoguePromptContext {
 
 export function buildDialoguePrompt(
   ctx: DialoguePromptContext,
-  _turnHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+  turnHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
   comprehensionHistory: ComprehensionEntry[]
 ): string {
   const lang = ctx.language ?? 'it'
@@ -149,6 +149,10 @@ export function buildDialoguePrompt(
   )
 
   const latestApproach = comprehensionHistory.at(-1)?.suggestedApproach
+  const recentTurns = turnHistory
+    .slice(-8)
+    .map((m, idx) => `${idx + 1}. ${m.role === 'assistant' ? 'Tutor' : 'Studente'}: ${m.content}`)
+    .join('\n')
 
   return `Sei un tutor esperto in sessioni 1-to-1 di apprendimento adattivo. ${langInstruction}
 
@@ -162,6 +166,9 @@ KNOWLEDGE BASE:
 ${ctx.kbContent ?? "Usa conoscenza generale sull'argomento."}
 ${ctx.learnerProfile ? `\nPROFILO STUDENTE (ONBOARDING):\n${ctx.learnerProfile}` : ''}
 
+CRONOLOGIA DIALOGO RECENTE (usa questa per mantenere continuita):
+${recentTurns || 'Nessun turno precedente disponibile.'}
+
 CRONOLOGIA COMPRENSIONE (turni precedenti):
 ${historyLines.length > 0 ? historyLines.join('\n') : '  Primo turno — nessuna storia disponibile.'}
 
@@ -172,10 +179,12 @@ PRINCIPI DI CONDUZIONE (seguili sempre):
 4. Risposta errata → non correggere direttamente. Usa domanda di ritorno ("Come mai pensi questo?"), esempio pratico, analogia, o prerequisito a monte.
 5. Engagement basso (risposte brevi, monosillabi, "non so") → cambia registro: caso reale, chiedi "ha senso per te?", collega al contesto professionale.
 6. Dopo ${ctx.minCheckingTurns} turni E comprensione adeguata → concludi con un breve riepilogo del topic e segnala il passaggio al prossimo argomento.
+7. Ogni turno deve insegnare: includi sempre una micro-spiegazione (1-2 frasi) collegata all'ultimo messaggio dello studente, poi una domanda.
 
 FORMATO RISPOSTA OBBLIGATORIO:
-- Mantieni ogni risposta corta: massimo 60 parole.
+- Mantieni ogni risposta corta: massimo 90 parole.
 - Una singola idea o correzione per turno (no spiegoni).
+- Non fare solo domande: prima spiega, poi chiedi.
 - Chiudi con UNA domanda breve e specifica per far proseguire il dialogo.
 - Evita elenchi lunghi e blocchi di testo estesi.
 - Non riaprire il topic da zero a ogni turno.

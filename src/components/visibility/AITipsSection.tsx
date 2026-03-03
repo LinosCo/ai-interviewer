@@ -201,6 +201,7 @@ export function AITipsSection({ configId, websiteUrl }: AITipsSectionProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     configId,
+                    tipKey,
                     tipTitle: rec.title,
                     tipType: rec.type,
                     action

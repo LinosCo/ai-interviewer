@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +12,9 @@ import {
     MessageSquare,
     Eye,
     ArrowRight,
-    ChevronRight,
     ChevronDown,
     ChevronUp,
     CheckCircle2,
-    XCircle,
-    Info,
     TrendingUp,
     TrendingDown,
     Globe,
@@ -29,13 +27,16 @@ import {
     Code,
     FileText,
     AlertCircle,
-    Archive,
-    Download
+    Download,
+    Star,
+    Lock
 } from "lucide-react";
 import { showToast } from "@/components/toast";
 import { useProject } from '@/contexts/ProjectContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { updateInsightStatus } from './actions';
+import { CONTENT_KIND_LABELS, type ContentKind } from '@/lib/cms/content-kinds';
+import { ROUTING_TIP_CATEGORY_LABELS } from '@/lib/cms/tip-routing-taxonomy';
 
 interface Action {
     type: string;
@@ -45,6 +46,24 @@ interface Action {
     reasoning: string;
     status: 'pending' | 'approved' | 'rejected';
     autoApply?: boolean;
+    contentKind?: string | null;
+    category?: string | null;
+    executionClass?: 'routing_ready' | 'digital_manual' | 'non_digital' | string | null;
+    businessCategory?: string | null;
+    workflowStatus?: string;
+    strategicAlignment?: string;
+    coordination?: string;
+    evidence?: Array<{
+        sourceType: string;
+        sourceRef: string;
+        detail: string;
+    }>;
+    lifecycleHistory?: {
+        draftReady: number;
+        sent: number;
+        discarded: number;
+        total: number;
+    } | null;
 }
 
 interface Insight {
@@ -57,8 +76,26 @@ interface Insight {
     chatbotData?: any;
     visibilityData?: any;
     status: string;
+    projectId?: string | null;
     createdAt?: string;
     updatedAt?: string;
+    source?: string;
+    isVirtual?: boolean;
+}
+
+interface TipHistoryItem {
+    contentKind: string;
+    category: string | null;
+    draftReady: number;
+    sent: number;
+    discarded: number;
+    total: number;
+    latestAt: string | null;
+}
+
+interface RoutingConnectionState {
+    hasConnection: boolean;
+    loading: boolean;
 }
 
 // Helper: determine if action can be auto-applied (only if explicitly flagged)
@@ -100,7 +137,15 @@ const getTargetLabel = (target: string): string => {
     return labels[target] || target;
 };
 
+const getExecutionClassLabel = (executionClass?: string | null): string => {
+    if (executionClass === 'routing_ready') return 'Routing pronto';
+    if (executionClass === 'digital_manual') return 'Digitale manuale';
+    if (executionClass === 'non_digital') return 'Non digitale';
+    return 'Da classificare';
+};
+
 export default function InsightHubPage() {
+    const router = useRouter();
     const { selectedProject, isAllProjectsSelected } = useProject();
     const { currentOrganization } = useOrganization();
     const [insights, setInsights] = useState<Insight[]>([]);
@@ -115,9 +160,13 @@ export default function InsightHubPage() {
     const [websiteAnalysis, setWebsiteAnalysis] = useState<any>(null);
     const [websiteAnalysisLoading, setWebsiteAnalysisLoading] = useState(false);
     const [expandedWebsiteRec, setExpandedWebsiteRec] = useState<number | null>(null);
-    const [showArchived, setShowArchived] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<'active' | 'starred' | 'completed' | 'archived' | 'all'>('active');
+    const [tipTypeFilter, setTipTypeFilter] = useState<string>('all');
     const [updatingInsightId, setUpdatingInsightId] = useState<string | null>(null);
+    const [openingSuggestionKey, setOpeningSuggestionKey] = useState<string | null>(null);
     const [topSources, setTopSources] = useState<any[]>([]);
+    const [tipHistoryByContentKind, setTipHistoryByContentKind] = useState<TipHistoryItem[]>([]);
+    const [routingConnectionsByProject, setRoutingConnectionsByProject] = useState<Record<string, RoutingConnectionState>>({});
 
     const toArraySize = (value: any): number => (Array.isArray(value) ? value.length : 0);
 
@@ -229,6 +278,53 @@ export default function InsightHubPage() {
     // Get the project ID for API calls (null if "All Projects" is selected)
     const projectId = selectedProject && !isAllProjectsSelected ? selectedProject.id : null;
     const organizationId = currentOrganization?.id || null;
+    const organizationPlan = (currentOrganization?.plan || 'FREE').toUpperCase();
+    const hasRoutingPremium = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(organizationPlan);
+
+    const checkProjectHasRoutingConnection = useCallback(async (targetProjectId: string): Promise<boolean> => {
+        try {
+            const [cmsRes, mcpRes, n8nRes] = await Promise.all([
+                fetch(`/api/cms/connection?projectId=${targetProjectId}`),
+                fetch(`/api/integrations/mcp/connections?projectId=${targetProjectId}`),
+                fetch(`/api/integrations/n8n/connections?projectId=${targetProjectId}`)
+            ]);
+
+            const [cmsData, mcpData, n8nData] = await Promise.all([
+                cmsRes.ok ? cmsRes.json().catch(() => null) : null,
+                mcpRes.ok ? mcpRes.json().catch(() => null) : null,
+                n8nRes.ok ? n8nRes.json().catch(() => null) : null
+            ]);
+
+            const hasCms = Boolean(cmsData?.enabled && cmsData?.connection);
+            const mcpConnections = Array.isArray(mcpData?.connections) ? mcpData.connections : [];
+            const hasMcp = mcpConnections.some((connection: { status?: string | null }) =>
+                Boolean(connection?.status && connection.status !== 'DISABLED')
+            );
+            const hasN8n = Boolean(
+                n8nData?.connection
+                && typeof n8nData.connection.status === 'string'
+                && n8nData.connection.status !== 'DISABLED'
+            );
+
+            return hasCms || hasMcp || hasN8n;
+        } catch (err) {
+            console.error('Routing connection check error:', err);
+            return false;
+        }
+    }, []);
+
+    const openRoutingConnections = (targetProjectId?: string | null) => {
+        if (!targetProjectId) {
+            showToast('Seleziona un progetto per configurare AI Routing', 'error');
+            router.push('/dashboard/projects');
+            return;
+        }
+        router.push(`/dashboard/projects/${targetProjectId}/integrations`);
+    };
+
+    const openRoutingUpgrade = () => {
+        router.push('/dashboard/billing/plans');
+    };
 
     const fetchInsights = async () => {
         try {
@@ -239,6 +335,7 @@ export default function InsightHubPage() {
             if (res.ok) {
                 const data = await res.json();
                 setInsights(data.insights);
+                setTipHistoryByContentKind(Array.isArray(data.tipHistoryByContentKind) ? data.tipHistoryByContentKind : []);
 
                 // Find health report record
                 const hr = data.insights.find((i: any) => i.topicName === "Health Report: Brand & Sito");
@@ -382,11 +479,69 @@ export default function InsightHubPage() {
         setHealthReport(null);
         setWebsiteAnalysis(null);
         setTopSources([]);
+        setTipHistoryByContentKind([]);
         fetchInsights();
         fetchStrategy();
         fetchWebsiteAnalysis();
         fetchTopSources();
     }, [projectId, organizationId]);
+
+    useEffect(() => {
+        setRoutingConnectionsByProject({});
+    }, [organizationId]);
+
+    useEffect(() => {
+        if (!hasRoutingPremium) {
+            setRoutingConnectionsByProject((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+            return;
+        }
+
+        const projectIds = Array.from(
+            new Set(
+                [
+                    projectId,
+                    ...insights.map((insight) => insight.projectId || null)
+                ].filter((id): id is string => typeof id === 'string' && id.length > 0)
+            )
+        );
+
+        if (projectIds.length === 0) return;
+
+        const pendingProjectIds = projectIds.filter((id) => !routingConnectionsByProject[id]);
+        if (pendingProjectIds.length === 0) return;
+
+        setRoutingConnectionsByProject((prev) => {
+            const next = { ...prev };
+            pendingProjectIds.forEach((id) => {
+                next[id] = { hasConnection: false, loading: true };
+            });
+            return next;
+        });
+
+        let cancelled = false;
+        (async () => {
+            const results = await Promise.all(
+                pendingProjectIds.map(async (id) => ({
+                    id,
+                    hasConnection: await checkProjectHasRoutingConnection(id)
+                }))
+            );
+
+            if (cancelled) return;
+
+            setRoutingConnectionsByProject((prev) => {
+                const next = { ...prev };
+                results.forEach((entry) => {
+                    next[entry.id] = { hasConnection: entry.hasConnection, loading: false };
+                });
+                return next;
+            });
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [checkProjectHasRoutingConnection, hasRoutingPremium, insights, projectId, routingConnectionsByProject]);
 
     const handleSync = async () => {
         setSyncing(true);
@@ -442,7 +597,7 @@ export default function InsightHubPage() {
         return normalized;
     };
 
-    const handleInsightStatus = async (insightId: string, status: 'completed' | 'archived') => {
+    const handleInsightStatus = async (insightId: string, status: 'new' | 'starred' | 'completed' | 'archived') => {
         setUpdatingInsightId(insightId);
         try {
             await updateInsightStatus(insightId, status);
@@ -454,6 +609,15 @@ export default function InsightHubPage() {
             setUpdatingInsightId(null);
         }
     };
+
+    const tipTypeOptions = Array.from(
+        new Set(
+            insights
+                .filter(i => i.topicName !== "Health Report: Brand & Sito")
+                .flatMap(i => (Array.isArray(i.suggestedActions) ? i.suggestedActions : []).map(a => a.type))
+                .filter(Boolean)
+        )
+    ).sort();
 
     const handleApplyAction = async (insightId: string, actionTitle: string) => {
         setUpdatingInsightId(insightId);
@@ -468,6 +632,75 @@ export default function InsightHubPage() {
             setUpdatingInsightId(null);
         }
     };
+
+    const handleOpenSuggestionManager = async (insight: Insight, action: Action, actionKey: string) => {
+        setOpeningSuggestionKey(actionKey);
+        try {
+            if (insight.isVirtual && !organizationId) {
+                showToast('Organizzazione non trovata per questo tip', 'error');
+                return;
+            }
+            const payload = insight.isVirtual
+                ? {
+                    actionTitle: action.title || getActionTypeLabel(action.type),
+                    virtualTip: {
+                        organizationId: organizationId as string,
+                        projectId: insight.projectId || projectId || null,
+                        topicName: insight.topicName,
+                        source: insight.source || 'site_analysis',
+                        action: {
+                            type: action.type,
+                            target: action.target,
+                            title: action.title,
+                            body: action.body,
+                            reasoning: action.reasoning,
+                            strategicAlignment: action.strategicAlignment,
+                            coordination: action.coordination,
+                            evidence: action.evidence,
+                            executionClass: action.executionClass,
+                            contentKind: action.contentKind,
+                            category: action.category,
+                            businessCategory: action.businessCategory,
+                            workflowStatus: action.workflowStatus,
+                            autoApply: action.autoApply
+                        }
+                    }
+                }
+                : {
+                    insightId: insight.id,
+                    actionTitle: action.title || getActionTypeLabel(action.type)
+                };
+            const res = await fetch('/api/insights/suggestions/prepare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                showToast(data?.error || 'Impossibile aprire la gestione del tip', 'error');
+                return;
+            }
+            if (typeof data?.url === 'string' && data.url) {
+                router.push(data.url);
+                return;
+            }
+            showToast('Bozza preparata ma link non disponibile', 'error');
+        } catch (err) {
+            console.error(err);
+            showToast('Errore di rete durante apertura tip', 'error');
+        } finally {
+            setOpeningSuggestionKey(null);
+        }
+    };
+
+    const selectedProjectRoutingState = projectId ? routingConnectionsByProject[projectId] : null;
+    const showRoutingConnectionInvite = Boolean(
+        hasRoutingPremium
+        && projectId
+        && selectedProjectRoutingState
+        && !selectedProjectRoutingState.loading
+        && !selectedProjectRoutingState.hasConnection
+    );
 
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto">
@@ -505,6 +738,72 @@ export default function InsightHubPage() {
                     </Button>
                 </div>
             </div>
+
+            {showRoutingConnectionInvite && (
+                <Card className="border-amber-200 bg-amber-50/60">
+                    <CardContent className="py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-semibold text-amber-900">
+                                AI Routing non ancora configurato per questo progetto
+                            </p>
+                            <p className="text-xs text-amber-800/90 mt-1">
+                                Collega almeno una destinazione (CMS, WordPress/WooCommerce o n8n) per inviare i tip in modo operativo.
+                            </p>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={() => openRoutingConnections(projectId)}
+                            className="bg-amber-600 hover:bg-amber-700 text-white rounded-full"
+                        >
+                            Configura connessione
+                        </Button>
+                    </CardContent>
+                </Card>
+            )}
+
+            {tipHistoryByContentKind.length > 0 && (
+                <Card className="border-slate-200">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                            Storico AI Tips per tipologia
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        <div className="overflow-x-auto rounded-xl border border-slate-100">
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500">
+                                        <th className="px-4 py-2">Tipologia</th>
+                                        <th className="px-4 py-2">Categoria</th>
+                                        <th className="px-4 py-2">Bozza</th>
+                                        <th className="px-4 py-2">Inviate</th>
+                                        <th className="px-4 py-2">Scartate</th>
+                                        <th className="px-4 py-2">Totale</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {tipHistoryByContentKind.slice(0, 8).map((item) => (
+                                        <tr key={item.contentKind} className="border-t border-slate-100">
+                                            <td className="px-4 py-2 font-medium text-slate-800">
+                                                {CONTENT_KIND_LABELS[item.contentKind as ContentKind] || item.contentKind}
+                                            </td>
+                                            <td className="px-4 py-2 text-xs text-slate-500">
+                                                {item.category
+                                                    ? ROUTING_TIP_CATEGORY_LABELS[item.category as keyof typeof ROUTING_TIP_CATEGORY_LABELS] || item.category
+                                                    : 'N/D'}
+                                            </td>
+                                            <td className="px-4 py-2 text-slate-600">{item.draftReady}</td>
+                                            <td className="px-4 py-2 text-slate-600">{item.sent}</td>
+                                            <td className="px-4 py-2 text-slate-600">{item.discarded}</td>
+                                            <td className="px-4 py-2 font-semibold text-slate-800">{item.total}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Strategic Context Section */}
             <Card className="border-amber-100 bg-amber-50/20">
@@ -940,18 +1239,36 @@ export default function InsightHubPage() {
                         <Zap className="w-5 h-5 text-amber-600 fill-amber-600" />
                         <h3 className="text-xl font-bold text-slate-900">Cosa Migliorare</h3>
                     </div>
-                    <div className="flex items-center gap-4 text-xs">
+                    <div className="flex items-center gap-3 text-xs flex-wrap">
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 rounded-full bg-slate-400"></div>
                             <span className="text-slate-500 font-medium">Manuale</span>
                         </div>
-                        <button
-                            onClick={() => setShowArchived(!showArchived)}
-                            className="flex items-center gap-1.5 text-slate-500 font-medium hover:text-slate-700"
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as 'active' | 'starred' | 'completed' | 'archived' | 'all')}
+                            className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600"
+                            aria-label="Filtra per stato"
                         >
-                            <Archive className="w-3.5 h-3.5" />
-                            {showArchived ? 'Nascondi archiviati' : 'Mostra archiviati'}
-                        </button>
+                            <option value="active">Stato: Attivi</option>
+                            <option value="starred">Stato: Prioritari</option>
+                            <option value="completed">Stato: Completati</option>
+                            <option value="archived">Stato: Archiviati</option>
+                            <option value="all">Stato: Tutti</option>
+                        </select>
+                        <select
+                            value={tipTypeFilter}
+                            onChange={(e) => setTipTypeFilter(e.target.value)}
+                            className="h-8 rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600"
+                            aria-label="Filtra per tipologia"
+                        >
+                            <option value="all">Tipologia: Tutte</option>
+                            {tipTypeOptions.map((type) => (
+                                <option key={type} value={type}>
+                                    {getActionTypeLabel(type)}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 
@@ -966,8 +1283,16 @@ export default function InsightHubPage() {
                         .filter(i => i.topicName !== "Health Report: Brand & Sito")
                         .filter(i => {
                             const status = normalizeInsightStatus(i.status);
-                            if (showArchived) return true;
-                            return status !== 'archived' && status !== 'completed';
+                            if (statusFilter === 'active') return status !== 'archived' && status !== 'completed';
+                            if (statusFilter === 'starred') return status === 'starred';
+                            if (statusFilter === 'completed') return status === 'completed';
+                            if (statusFilter === 'archived') return status === 'archived';
+                            return true;
+                        })
+                        .filter(i => {
+                            if (tipTypeFilter === 'all') return true;
+                            return Array.isArray(i.suggestedActions)
+                                && i.suggestedActions.some((action) => action.type === tipTypeFilter);
                         });
 
                     if (filtered.length === 0) {
@@ -979,7 +1304,7 @@ export default function InsightHubPage() {
                                     </div>
                                     <h3 className="text-xl font-bold text-slate-900">Suggerimenti in arrivo</h3>
                                     <p className="text-sm text-slate-500 max-w-sm mt-2">
-                                        Stiamo analizzando feedback, domande dei clienti e reputazione online. Clicca su "Aggiorna Analisi" per generare i primi suggerimenti.
+                                        Nessun tip per i filtri selezionati oppure analisi ancora in corso. Clicca su "Aggiorna Analisi" per rigenerare i suggerimenti.
                                     </p>
                                 </CardContent>
                             </Card>
@@ -1003,7 +1328,20 @@ export default function InsightHubPage() {
                                                         <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-100 font-bold">
                                                             CC Score: {insight.crossChannelScore}%
                                                         </Badge>
-                                                        <Badge variant="outline" className="text-[9px] uppercase font-bold">
+                                                        {insight.source === 'site_analysis' && (
+                                                            <Badge variant="outline" className="text-[9px] uppercase font-bold !border-indigo-200 !bg-indigo-50 !text-indigo-700">
+                                                                Site Analysis
+                                                            </Badge>
+                                                        )}
+                                                        <Badge variant="outline" className={`text-[9px] uppercase font-bold ${
+                                                            status === 'starred'
+                                                                ? '!border-yellow-300 !bg-yellow-50 !text-yellow-700'
+                                                                : status === 'completed'
+                                                                    ? '!border-emerald-200 !bg-emerald-50 !text-emerald-700'
+                                                                    : status === 'archived'
+                                                                        ? '!border-slate-300 !bg-slate-100 !text-slate-600'
+                                                                        : '!border-slate-300 !bg-white !text-slate-700'
+                                                        }`}>
                                                             {status}
                                                         </Badge>
                                                     </div>
@@ -1020,6 +1358,20 @@ export default function InsightHubPage() {
                                                     </CardDescription>
                                                 </div>
                                                 <div className="text-right">
+                                                    {!insight.isVirtual && (
+                                                        <button
+                                                            onClick={() => handleInsightStatus(insight.id, status === 'starred' ? 'new' : 'starred')}
+                                                            disabled={updatingInsightId === insight.id}
+                                                            className={`ml-auto mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${
+                                                                status === 'starred'
+                                                                    ? 'border-yellow-300 bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+                                                                    : 'border-slate-200 bg-white text-slate-400 hover:text-yellow-600 hover:border-yellow-200'
+                                                            }`}
+                                                            title={status === 'starred' ? 'Rimuovi priorità' : 'Segna prioritario'}
+                                                        >
+                                                            <Star className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                     <div className="text-3xl font-black text-slate-900">
                                                         {insight.priorityScore}
                                                     </div>
@@ -1037,6 +1389,33 @@ export default function InsightHubPage() {
                                                 <div className="grid gap-4">
                                                     {insight.suggestedActions.map((action: Action, idx: number) => {
                                                         const canApply = canBeAutoApplied(action);
+                                                        const actionKey = `${insight.id}:${idx}`;
+                                                        const canManageTip = (
+                                                            action.executionClass === 'routing_ready'
+                                                            || action.executionClass === 'digital_manual'
+                                                            || action.type === 'create_content'
+                                                            || action.type === 'modify_content'
+                                                        );
+                                                        const routingProjectId = insight.projectId || projectId || null;
+                                                        const routingConnectionState = routingProjectId
+                                                            ? routingConnectionsByProject[routingProjectId]
+                                                            : null;
+                                                        const routingConnectionLoading = Boolean(
+                                                            canManageTip
+                                                            && hasRoutingPremium
+                                                            && routingProjectId
+                                                            && (!routingConnectionState || routingConnectionState.loading)
+                                                        );
+                                                        const requiresUpgradeForRouting = canManageTip && !hasRoutingPremium;
+                                                        const requiresProjectSelection = canManageTip && hasRoutingPremium && !routingProjectId;
+                                                        const requiresRoutingConnection = Boolean(
+                                                            canManageTip
+                                                            && hasRoutingPremium
+                                                            && routingProjectId
+                                                            && routingConnectionState
+                                                            && !routingConnectionState.loading
+                                                            && !routingConnectionState.hasConnection
+                                                        );
                                                         return (
                                                             <div key={idx} className={`flex flex-col md:flex-row md:items-start justify-between gap-4 p-5 rounded-2xl border group/action hover:shadow-lg transition-all duration-300 ${canApply ? 'bg-slate-50 border-slate-100 hover:bg-white hover:border-green-300' : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-300'}`}>
                                                                 <div className="flex-1 space-y-2">
@@ -1053,6 +1432,22 @@ export default function InsightHubPage() {
                                                                         <Badge variant="outline" className={`text-[9px] uppercase font-bold ${canApply ? '!border-green-300 !bg-green-100 !text-green-800' : '!border-slate-300 !bg-slate-100 !text-slate-700'}`}>
                                                                             {getActionTypeLabel(action.type)}
                                                                         </Badge>
+                                                                        {action.contentKind && (
+                                                                            <Badge variant="outline" className="text-[9px] uppercase font-bold !border-blue-200 !bg-blue-50 !text-blue-700">
+                                                                                {CONTENT_KIND_LABELS[action.contentKind as ContentKind] || action.contentKind}
+                                                                            </Badge>
+                                                                        )}
+                                                                        {action.executionClass && (
+                                                                            <Badge variant="outline" className={`text-[9px] uppercase font-bold ${
+                                                                                action.executionClass === 'routing_ready'
+                                                                                    ? '!border-emerald-200 !bg-emerald-50 !text-emerald-700'
+                                                                                    : action.executionClass === 'non_digital'
+                                                                                        ? '!border-purple-200 !bg-purple-50 !text-purple-700'
+                                                                                        : '!border-slate-300 !bg-slate-100 !text-slate-700'
+                                                                            }`}>
+                                                                                {getExecutionClassLabel(action.executionClass)}
+                                                                            </Badge>
+                                                                        )}
                                                                     </div>
                                                                     <p className="text-sm font-extrabold text-slate-800">
                                                                         {action.title || getActionTypeLabel(action.type)}
@@ -1066,15 +1461,101 @@ export default function InsightHubPage() {
                                                                             {action.reasoning}
                                                                         </p>
                                                                     </div>
+                                                                    {action.strategicAlignment && (
+                                                                        <div className="pt-1 text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-1">
+                                                                            <span className="font-semibold">Allineamento strategico:</span> {action.strategicAlignment}
+                                                                        </div>
+                                                                    )}
+                                                                    {Array.isArray(action.evidence) && action.evidence.length > 0 && (
+                                                                        <div className="pt-1 space-y-1">
+                                                                            <p className="text-[11px] font-semibold text-slate-600">Evidenze e fonti</p>
+                                                                            {action.evidence.slice(0, 3).map((ev, evIdx) => (
+                                                                                <div key={`${ev.sourceRef}-${evIdx}`} className="text-[11px] text-slate-600 bg-slate-100 rounded-lg px-2 py-1">
+                                                                                    <span className="font-semibold">{ev.sourceType}</span> · {ev.sourceRef}: {ev.detail}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                    {action.coordination && (
+                                                                        <div className="pt-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1">
+                                                                            <span className="font-semibold">Coordinamento multicanale:</span> {action.coordination}
+                                                                        </div>
+                                                                    )}
+                                                                    {action.lifecycleHistory && (
+                                                                        <div className="pt-1 text-[11px] text-slate-500 font-medium">
+                                                                            Storico tipologia: bozze {action.lifecycleHistory.draftReady} · inviate {action.lifecycleHistory.sent} · scartate {action.lifecycleHistory.discarded}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                                {canApply && (
+                                                                {(canApply || canManageTip) && (
                                                                     <div className="flex items-center gap-2 md:pt-1">
+                                                                        {canManageTip && (
+                                                                            <>
+                                                                                {requiresUpgradeForRouting ? (
+                                                                                    <div className="flex flex-col items-end gap-1">
+                                                                                        <Button
+                                                                                            variant="outline"
+                                                                                            size="sm"
+                                                                                            className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-slate-300 text-slate-500"
+                                                                                            disabled
+                                                                                        >
+                                                                                            <Lock className="h-3.5 w-3.5" />
+                                                                                            Routing AI
+                                                                                        </Button>
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={openRoutingUpgrade}
+                                                                                            className="text-[11px] font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2"
+                                                                                        >
+                                                                                            Upgrade Business
+                                                                                        </button>
+                                                                                    </div>
+                                                                                ) : routingConnectionLoading ? (
+                                                                                    <Button
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        className="h-9 px-4 rounded-full font-bold text-xs border-slate-300 text-slate-500"
+                                                                                        disabled
+                                                                                    >
+                                                                                        Verifico...
+                                                                                    </Button>
+                                                                                ) : requiresProjectSelection ? (
+                                                                                    <Button
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-amber-200 text-amber-700 hover:border-amber-500 hover:bg-amber-50 transition-all"
+                                                                                        onClick={() => router.push('/dashboard/projects')}
+                                                                                    >
+                                                                                        Seleziona progetto
+                                                                                    </Button>
+                                                                                ) : requiresRoutingConnection ? (
+                                                                                    <Button
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-amber-200 text-amber-700 hover:border-amber-500 hover:bg-amber-50 transition-all"
+                                                                                        onClick={() => openRoutingConnections(routingProjectId)}
+                                                                                    >
+                                                                                        Configura connessione
+                                                                                    </Button>
+                                                                                ) : (
+                                                                                    <Button
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-blue-200 text-blue-700 hover:border-blue-500 hover:bg-blue-50 transition-all"
+                                                                                        onClick={() => handleOpenSuggestionManager(insight, action, actionKey)}
+                                                                                        disabled={Boolean(openingSuggestionKey) || updatingInsightId === insight.id}
+                                                                                    >
+                                                                                        {openingSuggestionKey === actionKey ? 'Apro...' : 'Scopri'}
+                                                                                    </Button>
+                                                                                )}
+                                                                            </>
+                                                                        )}
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-green-200 text-green-700 hover:border-green-500 hover:bg-green-50 group/btn transition-all"
                                                                             onClick={() => handleApplyAction(insight.id, action.title || getActionTypeLabel(action.type))}
-                                                                            disabled={updatingInsightId === insight.id}
+                                                                            disabled={updatingInsightId === insight.id || insight.isVirtual}
                                                                         >
                                                                             Applica <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
                                                                         </Button>
@@ -1085,26 +1566,46 @@ export default function InsightHubPage() {
                                                     })}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleInsightStatus(insight.id, 'archived')}
-                                                    disabled={updatingInsightId === insight.id}
-                                                    className="h-8 px-3 rounded-full text-xs"
-                                                >
-                                                    Archivia
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleInsightStatus(insight.id, 'completed')}
-                                                    disabled={updatingInsightId === insight.id}
-                                                    className="h-8 px-3 rounded-full text-xs"
-                                                >
-                                                    Segna completato
-                                                </Button>
-                                            </div>
+                                            {!insight.isVirtual ? (
+                                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                                                    {(status === 'completed' || status === 'archived') ? (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleInsightStatus(insight.id, 'new')}
+                                                            disabled={updatingInsightId === insight.id}
+                                                            className="h-8 px-3 rounded-full text-xs"
+                                                        >
+                                                            Riapri
+                                                        </Button>
+                                                    ) : (
+                                                        <>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleInsightStatus(insight.id, 'archived')}
+                                                                disabled={updatingInsightId === insight.id}
+                                                                className="h-8 px-3 rounded-full text-xs"
+                                                            >
+                                                                Archivia
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleInsightStatus(insight.id, 'completed')}
+                                                                disabled={updatingInsightId === insight.id}
+                                                                className="h-8 px-3 rounded-full text-xs"
+                                                            >
+                                                                Segna completato
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+                                                    Tip importato dalla Site Analysis (sola lettura in questa vista).
+                                                </div>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 );

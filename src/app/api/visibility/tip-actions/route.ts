@@ -104,11 +104,11 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { configId, tipTitle, tipType, action, notes } = body;
+        const { configId, tipTitle, tipType, tipKey: rawTipKey, action, notes } = body;
 
-        if (!configId || !tipTitle || !tipType || !action) {
+        if (!configId || !action || (!rawTipKey && (!tipTitle || !tipType))) {
             return NextResponse.json(
-                { error: 'configId, tipTitle, tipType, and action required' },
+                { error: 'configId, action and (tipKey or tipTitle+tipType) required' },
                 { status: 400 }
             );
         }
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
         }
 
-        const tipKey = generateTipKey(tipTitle, tipType);
+        const tipKey = rawTipKey || generateTipKey(tipTitle, tipType);
 
         let status: string;
         let completedAt: Date | null = null;
@@ -165,8 +165,8 @@ export async function POST(req: NextRequest) {
             create: {
                 configId,
                 tipKey,
-                tipTitle,
-                tipType,
+                tipTitle: tipTitle || tipKey,
+                tipType: tipType || 'legacy',
                 status,
                 completedAt,
                 dismissedAt,

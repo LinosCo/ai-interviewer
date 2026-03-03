@@ -73,6 +73,9 @@ const UpdateBotSchema = z.object({
   passScoreThreshold: z.number().int().min(0).max(100).optional(),
   maxRetries: z.number().int().min(0).optional(),
   maxDurationMins: z.number().int().min(10).max(180).optional(),
+  modelProvider: z.enum(['openai', 'anthropic']).optional(),
+  modelName: z.string().min(1).max(120).optional(),
+  customApiKey: z.string().nullish().transform(v => v ?? undefined),
   collectTraineeData: z.boolean().optional(),
   traineeDataFields: z.array(z.string().min(1)).max(5).optional(),
   rewardConfig: z.object({

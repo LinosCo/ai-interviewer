@@ -3,6 +3,8 @@ import { generateText, generateObject } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
+import fs from 'node:fs'
+import path from 'node:path'
 import { prisma } from '@/lib/prisma'
 import { TokenTrackingService } from '@/services/tokenTrackingService'
 import { LLMService } from '@/services/llmService'
@@ -28,6 +30,8 @@ import type { TrainingPhase } from '@prisma/client'
 let trainingPhaseEnumEnsured = false
 let trainingTopicColumnsEnsured = false
 let trainingKnowledgeSchemaEnsured = false
+const methodologyByOrgCache = new Map<string, { value: string; expiresAt: number }>()
+const METHODOLOGY_CACHE_TTL_MS = 5 * 60 * 1000
 const VALID_TRAINING_PHASES: TrainingPhase[] = [
   'EXPLAINING',
   'CHECKING',
@@ -39,6 +43,44 @@ const VALID_TRAINING_PHASES: TrainingPhase[] = [
   'FINAL_QUIZZING',
   'COMPLETE',
 ]
+
+function readTrainingMethodologyFromFile(): string {
+  try {
+    return fs.readFileSync(path.join(process.cwd(), 'knowledge', 'training-methodology.md'), 'utf-8').trim()
+  } catch {
+    return ''
+  }
+}
+
+async function getTrainingGlobalMethodology(organizationId: string): Promise<string> {
+  const now = Date.now()
+  const cached = methodologyByOrgCache.get(organizationId)
+  if (cached && cached.expiresAt > now) {
+    return cached.value
+  }
+
+  let value = ''
+  try {
+    const settings = await prisma.platformSettings.findUnique({
+      where: { organizationId },
+      select: { methodologyKnowledge: true },
+    })
+    value = String(settings?.methodologyKnowledge || '').trim()
+  } catch {
+    value = ''
+  }
+
+  if (!value) {
+    value = readTrainingMethodologyFromFile()
+  }
+
+  methodologyByOrgCache.set(organizationId, {
+    value,
+    expiresAt: now + METHODOLOGY_CACHE_TTL_MS,
+  })
+
+  return value
+}
 
 async function ensureTrainingPhaseEnumCompatibility() {
   if (trainingPhaseEnumEnsured) return
@@ -283,12 +325,19 @@ export async function processTrainingMessage(
     globalAnthropicKey: globalConfig?.anthropicApiKey,
   })
 
-  // Aggregate all KB sources with title separators, capped at 12k chars
-  const kbContent = bot.knowledgeSources.length > 0
-    ? bot.knowledgeSources
-        .map((s) => `## ${s.title ?? 'Fonte'}\n${s.content}`)
-        .join('\n\n---\n\n')
-        .slice(0, 12_000)
+  const globalMethodology = await getTrainingGlobalMethodology(bot.organizationId)
+  const botKnowledge = bot.knowledgeSources.length > 0
+    ? bot.knowledgeSources.map((s) => `## ${s.title ?? 'Fonte'}\n${s.content}`).join('\n\n---\n\n')
+    : ''
+
+  // Global didactic framework is always included first, then bot-specific materials.
+  const kbChunks = [
+    globalMethodology ? `## Framework didattico globale\n${globalMethodology}` : '',
+    botKnowledge,
+  ].filter(Boolean)
+
+  const kbContent = kbChunks.length > 0
+    ? kbChunks.join('\n\n---\n\n').slice(0, 16_000)
     : undefined
 
   // 2. Save user message
@@ -411,10 +460,11 @@ export async function processTrainingMessage(
       const maxTurns = currentTopic.maxCheckingTurns ?? 6
       const newTurnCount = (state.dialogueTurns ?? 0) + 1
 
-      // Build conversation history from DB messages for the current topic's EXPLAINING/DIALOGUING phase
+      // Keep a compact rolling history so the tutor can stay coherent without overloading context.
       const recentMessages = session.messages
         .filter((m) => m.phase === 'EXPLAINING' || m.phase === 'DIALOGUING')
         .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+        .slice(-12)
 
       const currentTopicHistory = (state.comprehensionHistory ?? []).filter(
         (e) => e.topicIndex === state.currentTopicIndex

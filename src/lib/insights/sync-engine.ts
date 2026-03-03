@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { getSystemLLM } from '@/lib/visibility/llm-providers';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
+import { CONTENT_KIND_LABELS, type ContentKind } from '@/lib/cms/content-kinds';
+import { buildInsightActionMetadata } from '@/lib/insights/action-metadata';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
@@ -118,7 +120,14 @@ const ActionSchema = z.object({
     target: z.enum(['chatbot', 'interview', 'visibility', 'website', 'pr', 'serp', 'strategy', 'product', 'marketing']),
     title: z.string().describe('Titolo breve e chiaro dell\'azione suggerita'),
     body: z.string().describe('Descrizione dettagliata dell\'azione da compiere'),
-    reasoning: z.string().describe('Spiegazione del perché questa azione è importante basata sui dati raccolti')
+    reasoning: z.string().describe('Spiegazione del perché questa azione è importante basata sui dati raccolti'),
+    strategicAlignment: z.string().describe('Come questa azione supporta visione strategica e value proposition'),
+    evidence: z.array(z.object({
+        sourceType: z.enum(['interview', 'chatbot', 'visibility', 'serp', 'analytics', 'kb', 'strategy', 'site_analysis']),
+        sourceRef: z.string().describe('Riferimento sintetico della fonte: es. interview#12ab, gsc:query=..., llm:ChatGPT'),
+        detail: z.string().describe('Evidenza concreta con numeri o pattern osservato')
+    })).min(1).max(4),
+    coordination: z.string().optional().describe('Come coordinare questa azione con altri canali (sito/social/interviste/PR)')
 });
 
 const InsightSchema = z.object({
@@ -337,6 +346,19 @@ export class CrossChannelSyncEngine {
             }
         })) > 0;
         const canAutoPublishToCms = Boolean(cmsConnection && ['ACTIVE', 'PARTIAL'].includes(cmsConnection.status));
+        const enabledRoutingKinds = projectId
+            ? new Set(
+                (await prisma.tipRoutingRule.findMany({
+                    where: { projectId, enabled: true },
+                    select: { contentKind: true }
+                })).map((rule) => rule.contentKind as ContentKind)
+            )
+            : new Set<ContentKind>();
+        const routingKindsSummary = enabledRoutingKinds.size > 0
+            ? Array.from(enabledRoutingKinds)
+                .map(kind => `${CONTENT_KIND_LABELS[kind] || kind} (${kind})`)
+                .join(', ')
+            : 'Nessuna regola di routing attiva';
 
         // 6. Summarize data for LLM with compact identifiers for citations
         const truncate = (value: string, max: number) => (value || '').slice(0, max);
@@ -428,6 +450,39 @@ export class CrossChannelSyncEngine {
             return null;
         };
 
+        const sourceEvidenceCatalog = [
+            'INTERVISTE:',
+            interviewSummary.length > 0
+                ? interviewSummary.slice(0, 6).map((i) =>
+                    `- interview#${i.id}: ${i.source}; temi=${Array.isArray(i.themes) ? i.themes.slice(0, 2).join(', ') : String(i.themes || '')}; quote=${(i.quotes || []).slice(0, 1).join(' | ')}`
+                ).join('\n')
+                : '- nessuna intervista',
+            'CHATBOT:',
+            chatbotSummary.length > 0
+                ? chatbotSummary.slice(0, 6).map((c, idx) =>
+                    `- chatbot#${idx + 1}: gaps=${c.gapsCount}; cluster=${c.clusterCount}; leads=${c.leads ?? 0}; sentiment=${String(c.sentiment ?? 'n/d')}`
+                ).join('\n')
+                : '- nessun dato chatbot',
+            'VISIBILITA LLM:',
+            visibilitySummary.length > 0
+                ? visibilitySummary.slice(0, 6).map((v, idx) =>
+                    `- llm#${idx + 1}:${v.platform}; brandMentioned=${String(v.brandMentioned)}; excerpt=${trunc(v.responseText || '', 90)}`
+                ).join('\n')
+                : '- nessun dato visibilita',
+            'SERP:',
+            serpSummary
+                ? `- serp: mentioni=${serpSummary.totalMentions}; positive=${serpSummary.sentimentBreakdown.positive}; negative=${serpSummary.sentimentBreakdown.negative}`
+                : '- nessun dato serp',
+            'ANALYTICS:',
+            websiteAnalytics
+                ? `- analytics: pageviews_medi=${Math.round(websiteAnalytics.avgPageviews || 0)}; bounce=${((websiteAnalytics.avgBounceRate || 0) * 100).toFixed(1)}%; top_queries=${((websiteAnalytics.searchQueries || []) as any[]).slice(0, 3).map((q: any) => String(q?.query || q)).join(', ')}`
+                : '- analytics non disponibili',
+            'KNOWLEDGE BASE:',
+            websiteSummary.length > 0
+                ? websiteSummary.slice(0, 6).map((k) => `- kb:${k.type}:${trunc(k.title, 50)}`).join('\n')
+                : '- nessuna fonte kb',
+        ].join('\n');
+
         // 7. Query LLM for Unified Evaluation
         const { model } = await getSystemLLM();
 
@@ -482,6 +537,11 @@ ${summarizeSerp(serpSummary)}
 
 6️⃣ ANALYTICS SITO WEB (Google Analytics + Search Console):
 ${summarizeWebAnalytics(websiteAnalytics)}
+
+=============================================================
+📚 CATALOGO FONTI PER EVIDENZE (usa questi riferimenti nei tips)
+=============================================================
+${sourceEvidenceCatalog}
 
 =============================================================
 📈 HEALTH REPORT RICHIESTO
@@ -542,14 +602,28 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
    30-49: Ottimizzazione
    0-29: Nice-to-have
 
-6. MAX 5-7 INSIGHTS:
-   Genera solo i suggerimenti più impattanti e rilevanti.
+6. NUMERO INSIGHTS:
+   Con strategia definita genera 6-10 insights, ognuno con almeno 1 azione implementabile.
+   Se i dati sono pochi, genera meno ma non sotto 3.
 
 7. STRATEGIA MANCANTE:
    Se non c'è visione o value proposition definite, genera SOLO 1-2 suggerimenti per costruirle e fermati.
 
 8. CONTENUTI:
-   Per create_content/modify_content cita una KB o una query GSC rilevante. Se il contenuto esiste già, proponi un aggiornamento mirato (non un nuovo contenuto).`,
+   Per create_content/modify_content cita una KB o una query GSC rilevante. Se il contenuto esiste già, proponi un aggiornamento mirato (non un nuovo contenuto).
+
+9. AUTOMAZIONI E ROUTING:
+   Preferisci azioni già instradabili sulla piattaforma.
+   Routing disponibile nel progetto: ${routingKindsSummary}.
+   Quando proponi create_content/modify_content, specifica un output concreto pronto da trasformare in bozza (es. titolo pagina/articolo + struttura + CTA).
+
+10. EVIDENZE STRUTTURATE OBBLIGATORIE:
+   Ogni action deve compilare il campo evidence con almeno 2 fonti quando possibile (minimo 1 solo se davvero c'e scarsita dati).
+   Ogni evidenza deve avere sourceType, sourceRef e detail con dati concreti.
+
+11. COERENZA STRATEGICA E MULTI-CANALE:
+   Per insights con priorita >= 70, genera almeno 2 azioni coordinate su canali diversi (es. sito + social, sito + interviste, sito + PR).
+   Usa il campo coordination per spiegare la sequenza operativa tra canali.`,
             temperature: 0.15
         });
 
@@ -592,6 +666,62 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
         };
 
         const savedInsights: any[] = [];
+        const buildFallbackEvidence = () => {
+            const evidences: Array<{ sourceType: string; sourceRef: string; detail: string }> = [];
+
+            if (interviewSummary[0]) {
+                evidences.push({
+                    sourceType: 'interview',
+                    sourceRef: `interview#${interviewSummary[0].id}`,
+                    detail: `Tema principale: ${Array.isArray(interviewSummary[0].themes) ? interviewSummary[0].themes.slice(0, 1).join(', ') : 'n/d'}`
+                });
+            }
+            if (chatbotSummary[0]) {
+                evidences.push({
+                    sourceType: 'chatbot',
+                    sourceRef: 'chatbot:analytics',
+                    detail: `Gap=${chatbotSummary[0].gapsCount}, cluster=${chatbotSummary[0].clusterCount}, leads=${chatbotSummary[0].leads ?? 0}`
+                });
+            }
+            if (visibilitySummary[0]) {
+                evidences.push({
+                    sourceType: 'visibility',
+                    sourceRef: `llm:${visibilitySummary[0].platform}`,
+                    detail: `Brand mentioned=${String(visibilitySummary[0].brandMentioned)}`
+                });
+            }
+            if (serpSummary) {
+                evidences.push({
+                    sourceType: 'serp',
+                    sourceRef: 'serp:summary',
+                    detail: `Menzioni=${serpSummary.totalMentions}, positive=${serpSummary.sentimentBreakdown.positive}, negative=${serpSummary.sentimentBreakdown.negative}`
+                });
+            }
+            if (websiteAnalytics) {
+                evidences.push({
+                    sourceType: 'analytics',
+                    sourceRef: 'ga4+gsc:7d',
+                    detail: `Pageviews medie=${Math.round(websiteAnalytics.avgPageviews || 0)}, bounce=${((websiteAnalytics.avgBounceRate || 0) * 100).toFixed(1)}%`
+                });
+            }
+            if (websiteSummary[0]) {
+                evidences.push({
+                    sourceType: 'kb',
+                    sourceRef: `kb:${websiteSummary[0].type}`,
+                    detail: `Contenuto correlato: ${trunc(websiteSummary[0].title || 'fonte', 70)}`
+                });
+            }
+
+            if (evidences.length === 0) {
+                evidences.push({
+                    sourceType: 'strategy',
+                    sourceRef: 'strategic_context',
+                    detail: 'Evidenza minima disponibile: usare allineamento strategico e validare con nuovi dati.'
+                });
+            }
+            return evidences.slice(0, 3);
+        };
+
         const visibilityPayload = {
             visibilitySummary,
             websiteAnalytics: websiteAnalytics || null,
@@ -627,6 +757,9 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                     title: "Analisi Efficacia Brand & Sito",
                     body: `Soddisfazione Chatbot: ${object.healthReport.chatbotSatisfaction.score}%. Efficacia Sito: ${object.healthReport.websiteEffectiveness.score}%. Visibilità Brand: ${object.healthReport.brandVisibility.score}%.${serpSummary ? ` Menzioni Google: ${serpSummary.totalMentions} (${serpSummary.sentimentBreakdown.positive} positive, ${serpSummary.sentimentBreakdown.negative} negative).` : ''}`,
                     reasoning: object.healthReport.websiteEffectiveness.feedbackSummary,
+                    strategicAlignment: strategicVision || valueProposition || 'Allineare comunicazione e posizionamento ai bisogni reali emersi.',
+                    evidence: buildFallbackEvidence(),
+                    coordination: 'Usare questo health report come base per prioritizzare azioni sito, chatbot e visibilita nel prossimo sprint.',
                     autoApply: false
                 }
             ]
@@ -639,31 +772,57 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             seenTopics.add(rawInsight.topicName);
 
             const preparedActions = (rawInsight.suggestedActions || []).flatMap((action: any) => {
+                const metadata = buildInsightActionMetadata(action);
                 const match = findContentMatch(action.title || '', action.body || '');
                 if (action.type === 'add_faq' && match) {
                     return [];
                 }
                 if (action.type === 'create_content' && match) {
+                    const normalizedEvidence = Array.isArray(action.evidence) && action.evidence.length > 0
+                        ? action.evidence.slice(0, 4)
+                        : buildFallbackEvidence();
                     return [{
                         ...action,
                         type: 'modify_content',
                         target: 'website',
                         title: `Aggiorna contenuto esistente: ${match.title}`,
                         body: `${action.body}\n\nNota: contenuto simile già presente ("${match.title}"). Trasforma il suggerimento in un aggiornamento mirato di quel contenuto.`,
-                        validation: { status: 'duplicate', matchTitle: match.title, score: match.score }
+                        validation: { status: 'duplicate', matchTitle: match.title, score: match.score },
+                        evidence: normalizedEvidence,
+                        strategicAlignment: action.strategicAlignment || strategicVision || valueProposition || 'Allineamento con direzione strategica del progetto.',
+                        coordination: action.coordination || 'Dopo l\'aggiornamento pagina, sincronizzare snippet social o FAQ correlate.',
+                        workflowStatus: 'draft',
+                        ...metadata
                     }];
                 }
+                const normalizedEvidence = Array.isArray(action.evidence) && action.evidence.length > 0
+                    ? action.evidence.slice(0, 4)
+                    : buildFallbackEvidence();
+                const hasRoutingRule =
+                    Boolean(metadata.contentKind) &&
+                    (projectId ? enabledRoutingKinds.has(metadata.contentKind as ContentKind) : true);
                 const canAutoApply =
                     (action.type === 'add_faq' && hasChatbotInScope) ||
-                    ((action.type === 'create_content' || action.type === 'modify_content') && canAutoPublishToCms);
+                    (Boolean(metadata.contentKind) && canAutoPublishToCms && hasRoutingRule);
 
                 return [{
                     ...action,
+                    workflowStatus: 'draft',
                     autoApply: canAutoApply,
+                    evidence: normalizedEvidence,
+                    strategicAlignment: action.strategicAlignment || strategicVision || valueProposition || 'Allineamento con obiettivi strategici del brand.',
+                    coordination: action.coordination || (
+                        action.target === 'website'
+                            ? 'Coordinare con canali social/intervista per amplificazione e validazione dei messaggi.'
+                            : 'Coordinare con aggiornamenti sito per mantenere coerenza del messaggio.'
+                    ),
+                    ...metadata,
                     ...(match ? { validation: { status: 'overlap', matchTitle: match.title, score: match.score } } : {}),
                     automationRequirements: {
                         hasChatbotInScope,
-                        canAutoPublishToCms
+                        canAutoPublishToCms,
+                        hasRoutingRule,
+                        routedContentKind: metadata.contentKind
                     }
                 }];
             });

@@ -19,7 +19,8 @@ import {
     createVisibilityInsightsTool,
     createExternalAnalyticsTool,
     createKnowledgeBaseTool,
-    createScrapeWebSourceTool
+    createScrapeWebSourceTool,
+    createStrategicTipCreationTool
 } from '@/lib/copilot/chat-tools';
 
 export const maxDuration = 60;
@@ -258,6 +259,9 @@ export async function POST(req: Request) {
             },
             scrapeWebSource: {
                 ...createScrapeWebSourceTool(toolContext),
+            },
+            createStrategicTip: {
+                ...createStrategicTipCreationTool(toolContext),
             }
         };
 

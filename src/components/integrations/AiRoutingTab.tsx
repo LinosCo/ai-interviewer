@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
 import { CONTENT_KIND_LABELS, ALL_CONTENT_KINDS, type ContentKind } from '@/lib/cms/content-kinds';
+import { ROUTING_TIP_CATEGORY_LABELS } from '@/lib/cms/tip-routing-taxonomy';
 
 interface TipRoutingRule {
   id: string;
@@ -32,6 +33,25 @@ interface AiRoutingTabProps {
   n8nConnection: Connection | null;
 }
 
+interface RoutingCoverageItem {
+  category: string;
+  label: string;
+  tipCount: number;
+  mappedContentKinds: string[];
+  coveredKinds: string[];
+  isCovered: boolean;
+}
+
+interface RoutingHistoryItem {
+  contentKind: string;
+  category: string | null;
+  draftReady: number;
+  sent: number;
+  discarded: number;
+  total: number;
+  latestAt: string | null;
+}
+
 const DEFAULT_FORM = {
   contentKind: '' as ContentKind | '',
   behavior: 'create_post',
@@ -52,6 +72,8 @@ export function AiRoutingTab({
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
+  const [coverage, setCoverage] = useState<RoutingCoverageItem[]>([]);
+  const [historyByKind, setHistoryByKind] = useState<RoutingHistoryItem[]>([]);
 
   // All active connections for destination picker
   const availableDestinations = [
@@ -68,9 +90,20 @@ export function AiRoutingTab({
 
   const fetchRules = useCallback(async () => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/tip-routing-rules`);
-      const data = await res.json();
-      setRules(data.rules || []);
+      const [rulesRes, overviewRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/tip-routing-rules`),
+        fetch(`/api/projects/${projectId}/tip-routing-overview`),
+      ]);
+      const rulesData = await rulesRes.json();
+      setRules(rulesData.rules || []);
+      if (overviewRes.ok) {
+        const overviewData = await overviewRes.json();
+        setCoverage(overviewData.coverage || []);
+        setHistoryByKind(overviewData.historyByContentKind || []);
+      } else {
+        setCoverage([]);
+        setHistoryByKind([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -86,11 +119,13 @@ export function AiRoutingTab({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: !rule.enabled }),
     });
+    await fetchRules();
   };
 
   const handleDelete = async (ruleId: string) => {
     setRules(prev => prev.filter(r => r.id !== ruleId));
     await fetch(`/api/projects/${projectId}/tip-routing-rules/${ruleId}`, { method: 'DELETE' });
+    await fetchRules();
   };
 
   const handleSave = async () => {
@@ -117,8 +152,8 @@ export function AiRoutingTab({
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        const data = await res.json();
-        setRules(prev => [...prev, data.rule]);
+        await res.json();
+        await fetchRules();
         setShowForm(false);
         setFormData(DEFAULT_FORM);
       }
@@ -185,6 +220,88 @@ export function AiRoutingTab({
       )}
 
       {/* Rules list */}
+      {!loading && coverage.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            Copertura AI Tips per categoria
+          </p>
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Categoria</th>
+                  <th className="px-4 py-3">Tips</th>
+                  <th className="px-4 py-3">Copertura routing</th>
+                  <th className="px-4 py-3">Tipologie collegate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coverage.map(item => (
+                  <tr key={item.category} className="border-t border-gray-100">
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {ROUTING_TIP_CATEGORY_LABELS[item.category as keyof typeof ROUTING_TIP_CATEGORY_LABELS] || item.label}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{item.tipCount}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        item.isCovered ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {item.isCovered ? 'Coperta' : 'Da configurare'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {item.mappedContentKinds
+                        .map((kind) => CONTENT_KIND_LABELS[kind as ContentKind] || kind)
+                        .join(' · ')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!loading && historyByKind.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            Storico tip per tipologia
+          </p>
+          <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left text-[11px] uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Tipologia</th>
+                  <th className="px-4 py-3">Categoria</th>
+                  <th className="px-4 py-3">Bozza</th>
+                  <th className="px-4 py-3">Inviate</th>
+                  <th className="px-4 py-3">Scartate</th>
+                  <th className="px-4 py-3">Totale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historyByKind.map(item => (
+                  <tr key={item.contentKind} className="border-t border-gray-100">
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {CONTENT_KIND_LABELS[item.contentKind as ContentKind] || item.contentKind}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {item.category
+                        ? (ROUTING_TIP_CATEGORY_LABELS[item.category as keyof typeof ROUTING_TIP_CATEGORY_LABELS] || item.category)
+                        : 'N/D'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{item.draftReady}</td>
+                    <td className="px-4 py-3 text-gray-600">{item.sent}</td>
+                    <td className="px-4 py-3 text-gray-600">{item.discarded}</td>
+                    <td className="px-4 py-3 text-gray-800 font-semibold">{item.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {!loading && rules.length > 0 && (
         <div className="space-y-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">

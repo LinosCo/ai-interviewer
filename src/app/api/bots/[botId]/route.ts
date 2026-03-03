@@ -83,6 +83,7 @@ const updateSchema = z.object({
     privacyPolicyUrl: z.string().optional(),
     botType: z.string().optional(), // Added to accept botType from client
     interviewerQuality: z.enum(['quantitativo', 'intermedio', 'avanzato']).optional(),
+    cilBonusTurnCapOverride: z.number().int().min(0).max(10).nullable().optional(),
 
     // Landing Page Fields
     landingTitle: z.string().optional(),

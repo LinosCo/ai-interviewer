@@ -21,6 +21,7 @@ export default function BotConfigForm({ bot, canUseBranding = false, organizatio
     const updateAction = updateBotAction.bind(null, bot.id);
     const [provider, setProvider] = useState(bot.modelProvider || 'openai');
     const [isRecruiting, setIsRecruiting] = useState(bot.collectCandidateData ?? false);
+    const [interviewerQuality, setInterviewerQuality] = useState<string>((bot as any).interviewerQuality || 'quantitativo');
     const isBusinessPlan = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(organizationPlan);
 
     // Wrapper to ignore return type compatibility issues with form action
@@ -139,8 +140,7 @@ export default function BotConfigForm({ bot, canUseBranding = false, organizatio
                             locked: !isBusinessPlan,
                         },
                     ].map((tier) => {
-                        const currentTier = (bot as any).interviewerQuality || 'quantitativo';
-                        const selected = currentTier === tier.value;
+                        const selected = interviewerQuality === tier.value;
                         return (
                             <label
                                 key={tier.value}
@@ -158,6 +158,7 @@ export default function BotConfigForm({ bot, canUseBranding = false, organizatio
                                     value={tier.value}
                                     defaultChecked={selected}
                                     disabled={tier.locked}
+                                    onChange={() => setInterviewerQuality(tier.value)}
                                     className="sr-only"
                                 />
                                 <div className="flex items-center gap-2 font-semibold text-sm">
@@ -178,6 +179,27 @@ export default function BotConfigForm({ bot, canUseBranding = false, organizatio
                         Intermedio e Avanzato richiedono il piano Business.{' '}
                         <a href="/dashboard/billing" className="text-indigo-600 underline">Upgrade →</a>
                     </p>
+                )}
+                {interviewerQuality === 'avanzato' && (
+                    <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                        <label htmlFor="cilBonusTurnCapOverride" className="block text-sm font-medium mb-1">
+                            CIL Bonus Turn Cap
+                            <span className="text-gray-500 text-xs ml-2">(lascia vuoto per formula automatica)</span>
+                        </label>
+                        <input
+                            id="cilBonusTurnCapOverride"
+                            name="cilBonusTurnCapOverride"
+                            type="number"
+                            min={0}
+                            max={10}
+                            defaultValue={(bot as any).cilBonusTurnCapOverride ?? ''}
+                            placeholder="Auto"
+                            className="w-32 border p-2 rounded text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Numero massimo di turni bonus che il CIL può aggiungere per topic. Automatico = calcolato su tempo e topic rimanenti (consigliato).
+                        </p>
+                    </div>
                 )}
             </section>
 

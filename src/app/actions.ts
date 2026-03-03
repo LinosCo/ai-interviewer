@@ -444,6 +444,10 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (formData.has('modelProvider')) data.modelProvider = getStr('modelProvider');
     if (formData.has('modelName')) data.modelName = getStr('modelName');
     if (formData.has('interviewerQuality')) (data as any).interviewerQuality = getStr('interviewerQuality');
+    if (formData.has('cilBonusTurnCapOverride')) {
+        const raw = formData.get('cilBonusTurnCapOverride') as string;
+        (data as any).cilBonusTurnCapOverride = raw === '' ? null : parseInt(raw, 10) || null;
+    }
 
     if (formData.has('openaiApiKey')) data.openaiApiKey = encryptIfNeeded(getStr('openaiApiKey')) || null;
     if (formData.has('anthropicApiKey')) data.anthropicApiKey = encryptIfNeeded(getStr('anthropicApiKey')) || null;

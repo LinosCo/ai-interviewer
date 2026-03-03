@@ -13,6 +13,7 @@ import { decryptIfNeeded, encryptIfNeeded } from '@/lib/encryption'
 import fs from 'fs';
 import path from 'path';
 import { User, Prisma } from '@prisma/client';
+import { getConfigValue } from '@/lib/config';
 import { transferBotToProject } from './actions/project-tools';
 import {
     assertOrganizationAccess,
@@ -81,8 +82,8 @@ async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
             select: { openaiApiKey: true }
         });
         if (globalConfig?.openaiApiKey) return decryptIfNeeded(globalConfig.openaiApiKey);
-        // Never expose env key directly - should be set in DB encrypted
-        return process.env.OPENAI_API_KEY;
+        // Fall back to centralised config (dev env var fallback)
+        return await getConfigValue('openaiApiKey');
     }
 
     // 4. Regular User Logic: No fallback to Global/Env allowed

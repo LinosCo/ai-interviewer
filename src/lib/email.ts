@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import net from 'node:net';
 import tls from 'node:tls';
 import { prisma } from '@/lib/prisma';
+import { getConfigValue } from '@/lib/config';
 
 // Lazy initialization to prevent build errors when API key is not set
 let resend: Resend | null = null;
@@ -207,16 +208,28 @@ export async function testEmailProviderConnection(overrides?: {
         }
     }).catch(() => null);
 
-    const smtpHost = overrides?.smtpHost ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST ?? null;
-    const smtpUser = overrides?.smtpUser ?? globalConfig?.smtpUser ?? process.env.SMTP_USER ?? null;
-    const smtpPass = overrides?.smtpPass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS ?? null;
-    const smtpPortRaw = overrides?.smtpPort ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465;
+    // Resolve SMTP config from centralised store (DB-first, dev env fallback).
+    // Use allSettled so a missing key in production doesn't zero out all SMTP config.
+    const smtpResults = await Promise.allSettled([
+        getConfigValue('smtpHost'),
+        getConfigValue('smtpUser'),
+        getConfigValue('smtpPass'),
+        getConfigValue('smtpPort'),
+        getConfigValue('smtpSecure'),
+    ]);
+    const [smtpHostConfig, smtpUserConfig, smtpPassConfig, smtpPortConfig, smtpSecureConfig] =
+        smtpResults.map((r) => (r.status === 'fulfilled' ? r.value : null));
+
+    const smtpHost = overrides?.smtpHost ?? globalConfig?.smtpHost ?? smtpHostConfig ?? null;
+    const smtpUser = overrides?.smtpUser ?? globalConfig?.smtpUser ?? smtpUserConfig ?? null;
+    const smtpPass = overrides?.smtpPass ?? globalConfig?.smtpPass ?? smtpPassConfig ?? null;
+    const smtpPortRaw = overrides?.smtpPort ?? globalConfig?.smtpPort ?? smtpPortConfig ?? 465;
     const smtpPort = Number(smtpPortRaw);
     const smtpSecure = typeof (overrides?.smtpSecure) === 'boolean'
         ? Boolean(overrides?.smtpSecure)
         : typeof globalConfig?.smtpSecure === 'boolean'
             ? globalConfig.smtpSecure
-            : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
+            : (smtpSecureConfig ? smtpSecureConfig === 'true' : smtpPort === 465);
 
     if (smtpHost && smtpUser && smtpPass) {
         try {
@@ -485,6 +498,18 @@ export async function sendEmail(params: {
         }
     }).catch(() => null);
 
+    // Resolve SMTP config from centralised store (DB-first, dev env fallback).
+    // Use allSettled so a missing key in production doesn't zero out all SMTP config.
+    const smtpResults = await Promise.allSettled([
+        getConfigValue('smtpHost'),
+        getConfigValue('smtpUser'),
+        getConfigValue('smtpPass'),
+        getConfigValue('smtpPort'),
+        getConfigValue('smtpSecure'),
+    ]);
+    const [smtpHostConfig, smtpUserConfig, smtpPassConfig, smtpPortConfig, smtpSecureConfig] =
+        smtpResults.map((r) => (r.status === 'fulfilled' ? r.value : null));
+
     const from =
         params.from ??
         params.smtpOverrides?.fromEmail ??
@@ -493,15 +518,15 @@ export async function sendEmail(params: {
         DEFAULT_FROM_EMAIL;
 
     const resendApiKey = params.smtpOverrides?.resendApiKey ?? globalConfig?.resendApiKey ?? process.env.RESEND_API_KEY;
-    const smtpHost = params.smtpOverrides?.host ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST;
-    const smtpUser = params.smtpOverrides?.user ?? globalConfig?.smtpUser ?? process.env.SMTP_USER;
-    const smtpPass = params.smtpOverrides?.pass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS;
-    const smtpPort = Number(params.smtpOverrides?.port ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465);
+    const smtpHost = params.smtpOverrides?.host ?? globalConfig?.smtpHost ?? smtpHostConfig;
+    const smtpUser = params.smtpOverrides?.user ?? globalConfig?.smtpUser ?? smtpUserConfig;
+    const smtpPass = params.smtpOverrides?.pass ?? globalConfig?.smtpPass ?? smtpPassConfig;
+    const smtpPort = Number(params.smtpOverrides?.port ?? globalConfig?.smtpPort ?? smtpPortConfig ?? 465);
     const smtpSecure = typeof params.smtpOverrides?.secure === 'boolean'
         ? params.smtpOverrides.secure
         : typeof globalConfig?.smtpSecure === 'boolean'
             ? globalConfig.smtpSecure
-            : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
+            : (smtpSecureConfig ? smtpSecureConfig === 'true' : smtpPort === 465);
 
     if (!resend && resendApiKey) {
         resend = new Resend(resendApiKey);

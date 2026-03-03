@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { getConfigValue } from '@/lib/config'
 import { TokenTrackingService } from '@/services/tokenTrackingService'
 import { LLMService } from '@/services/llmService'
 import { getDefaultTrainingMethodologyKnowledge, getTrainingMethodologyKnowledgeByOrg } from '@/lib/training/training-methodology-kb'
@@ -146,13 +147,13 @@ function getModel(
   keys: { botOpenAIKey?: string | null; globalOpenAIKey?: string | null; globalAnthropicKey?: string | null }
 ) {
   if (provider === 'anthropic') {
-    const anthropicKey = (keys.globalAnthropicKey || process.env.ANTHROPIC_API_KEY || '').trim()
+    const anthropicKey = (keys.globalAnthropicKey || '').trim()
     if (!anthropicKey) {
       throw new Error('ANTHROPIC_API_KEY_MISSING')
     }
     return createAnthropic({ apiKey: anthropicKey })(name)
   }
-  const openaiKey = (keys.botOpenAIKey || keys.globalOpenAIKey || process.env.OPENAI_API_KEY || '').trim()
+  const openaiKey = (keys.botOpenAIKey || keys.globalOpenAIKey || '').trim()
   if (!openaiKey) {
     throw new Error('OPENAI_API_KEY_MISSING')
   }
@@ -307,10 +308,14 @@ export async function processTrainingMessage(
     return { text: 'Percorso completato.', phase: 'COMPLETE', sessionComplete: true }
   }
 
+  const [openaiConfigKey, anthropicConfigKey] = await Promise.all([
+    getConfigValue('openaiApiKey'),
+    getConfigValue('anthropicApiKey'),
+  ])
   const model = getModel(bot.modelProvider, bot.modelName, {
     botOpenAIKey: bot.customApiKey,
-    globalOpenAIKey: globalConfig?.openaiApiKey,
-    globalAnthropicKey: globalConfig?.anthropicApiKey,
+    globalOpenAIKey: globalConfig?.openaiApiKey || openaiConfigKey,
+    globalAnthropicKey: globalConfig?.anthropicApiKey || anthropicConfigKey,
   })
 
   const globalMethodology = await getTrainingGlobalMethodology(bot.organizationId)

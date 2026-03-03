@@ -8,6 +8,7 @@ import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
 import { canAccessProjectData } from '@/lib/copilot/permissions';
 import { searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { PlanType } from '@/config/plans';
+import { getConfigValue } from '@/lib/config';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
@@ -187,16 +188,8 @@ export async function POST(req: Request) {
         const kbContext = kbResults.slice(0, 2).map(r => `[${r.title}]: ${r.content}`).join('\n\n');
 
         // 6. Get API key (Anthropic for Claude 4.5 Opus)
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: {
-                anthropicApiKey: true,
-                openaiApiKey: true
-            }
-        });
-
-        const anthropicApiKey = globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
-        const openaiApiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
+        const anthropicApiKey = await getConfigValue('anthropicApiKey') || '';
+        const openaiApiKey = await getConfigValue('openaiApiKey') || '';
 
         if (!anthropicApiKey && !openaiApiKey) {
             return NextResponse.json({

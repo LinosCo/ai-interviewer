@@ -5,6 +5,7 @@ import { generateObject } from 'ai';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
+import { getConfigValue } from '@/lib/config';
 
 export async function generateConversationInsightAction(conversationId: string) {
     // 1. Fetch Data
@@ -25,14 +26,10 @@ export async function generateConversationInsightAction(conversationId: string) 
         return;
     }
 
-    // 2. Resolve Key (Use Bot key or fallback)
+    // 2. Resolve Key (Use Bot key or centralised config)
     let apiKey = conversation.bot.openaiApiKey;
     if (!apiKey) {
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: "default" },
-            select: { openaiApiKey: true }
-        });
-        apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || null;
+        apiKey = await getConfigValue('openaiApiKey');
     }
 
     if (!apiKey) {

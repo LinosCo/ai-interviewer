@@ -4,6 +4,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { Bot } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import { getConfigValue } from '@/lib/config';
 
 export type ModelProvider = 'openai' | 'anthropic';
 export type InterviewModelRole = 'primary' | 'critical' | 'quality' | 'dataCollection';
@@ -117,12 +118,12 @@ export class LLMService {
         if (provider === 'openai' && bot.openaiApiKey) return bot.openaiApiKey;
         if (provider === 'anthropic' && bot.anthropicApiKey) return bot.anthropicApiKey;
 
-        // 2. Global / Env key (Admin managed) - now with cache
+        // 2. Global config key (Admin managed via DB) - use centralised config
         const globalConfig = await this.getGlobalConfig();
         if (provider === 'openai') {
-            return globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || null;
+            return globalConfig?.openaiApiKey || await getConfigValue('openaiApiKey');
         } else {
-            return globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || null;
+            return globalConfig?.anthropicApiKey || await getConfigValue('anthropicApiKey');
         }
     }
 

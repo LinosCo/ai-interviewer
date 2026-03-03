@@ -3,6 +3,7 @@ import { decryptIfNeeded } from '@/lib/encryption';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { getConfigValue } from '@/lib/config';
 
 export type InterviewAlertSeverity = 'critical' | 'warning' | 'info';
 
@@ -489,7 +490,7 @@ async function generateInterviewQualityAiReview(params: {
     } catch (error) {
         console.error('Unable to decrypt global OpenAI API key for interview quality dashboard:', error);
     }
-    const apiKey = globalOpenAiKey || process.env.OPENAI_API_KEY;
+    const apiKey = globalOpenAiKey || await getConfigValue('openaiApiKey');
 
     if (!apiKey) {
         return {

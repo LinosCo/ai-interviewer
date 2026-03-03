@@ -10,6 +10,7 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { getConfigValue } from '@/lib/config';
 import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
 import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
@@ -466,7 +467,7 @@ export async function POST(req: Request) {
             // Update progress
             ChatService.updateProgress(conversationId, safeEffectiveDuration),
             // Get API key
-            LLMService.getApiKey(bot, 'openai').then(key => key || process.env.OPENAI_API_KEY || ''),
+            LLMService.getApiKey(bot, 'openai').then(async key => key || await getConfigValue('openaiApiKey') || ''),
             // Pre-fetch routed models (primary + critical paths)
             LLMService.getInterviewRuntimeModels(bot)
         ]);

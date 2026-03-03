@@ -4,10 +4,7 @@ import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { sanitizeArray, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
-
-const openai = createOpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+import { getConfigValue } from '@/lib/config';
 
 export async function aggregateChatbotAnalytics(targetDate: Date = new Date()) {
     // Process "yesterday" by default if today is passed, or process the specific date
@@ -100,7 +97,9 @@ export async function aggregateChatbotAnalytics(targetDate: Date = new Date()) {
             ).filter(msg => msg.length > 5); // Filter too short messages
 
             // Only analyze if we have enough data (e.g., > 5 messages) and API Key is set
-            if (allUserMessages.length > 5 && process.env.OPENAI_API_KEY) {
+            const openaiKey = await getConfigValue('openaiApiKey');
+            if (allUserMessages.length > 5 && openaiKey) {
+                const openai = createOpenAI({ apiKey: openaiKey });
                 // Take a sample to avoid token limits, sanitize user content
                 const sampleMessages = sanitizeArray(allUserMessages.slice(0, 100));
 

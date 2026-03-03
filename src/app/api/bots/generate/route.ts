@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { sanitize } from '@/lib/llm/prompt-sanitizer';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { TokenCategory } from '@prisma/client';
+import { getConfigValue } from '@/lib/config';
 
 export async function POST(req: Request) {
     const session = await auth();
@@ -29,21 +30,9 @@ export async function POST(req: Request) {
             return new Response('Invalid goal', { status: 400 });
         }
 
-        // Get API key from default config or env
+        // Get API key from centralised config (DB-first, env fallback in dev)
         console.log('Fetching API Key...');
-        let apiKey;
-        try {
-            const globalConfig = await prisma.globalConfig.findUnique({
-                where: { id: 'default' },
-                select: { openaiApiKey: true }
-            });
-            apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
-            console.log('API Key source:', globalConfig?.openaiApiKey ? 'DB' : (process.env.OPENAI_API_KEY ? 'ENV' : 'NONE'));
-        } catch (dbError) {
-            console.error('DB Config Fetch Error:', dbError);
-            // Fallback to Env if DB fails
-            apiKey = process.env.OPENAI_API_KEY;
-        }
+        const apiKey = await getConfigValue('openaiApiKey');
 
         if (!apiKey) {
             console.error('CRITICAL: No API Key found in DB or ENV');

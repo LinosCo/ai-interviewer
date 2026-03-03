@@ -41,19 +41,19 @@ export async function getLLMProvider(provider: 'openai' | 'anthropic' | 'gemini'
     const adminKey = await getAdminApiKey(provider.toUpperCase() as any);
 
     if (provider === 'openai') {
-        const apiKey = adminKey || process.env.OPENAI_API_KEY;
+        const apiKey = adminKey;
         if (!apiKey) throw new Error('OpenAI API key missing');
         return createOpenAI({ apiKey });
     }
 
     if (provider === 'anthropic') {
-        const apiKey = adminKey || process.env.ANTHROPIC_API_KEY;
+        const apiKey = adminKey;
         if (!apiKey) throw new Error('Anthropic API key missing');
         return createAnthropic({ apiKey });
     }
 
     if (provider === 'gemini') {
-        const apiKey = adminKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        const apiKey = adminKey;
         if (!apiKey) throw new Error('Gemini API key missing');
         return createGoogleGenerativeAI({ apiKey });
     }
@@ -152,7 +152,7 @@ async function getLatestVisibilityModel(provider: LLMProvider): Promise<string> 
 
     try {
         if (provider === 'openai') {
-            const apiKey = (await getAdminApiKey('OPENAI')) || process.env.OPENAI_API_KEY;
+            const apiKey = await getAdminApiKey('OPENAI');
             if (!apiKey) return VISIBILITY_PROVIDERS.openai.model;
             const models = await listModelsOpenAI(apiKey);
             const latest = pickLatestOpenAIModel(models);
@@ -163,7 +163,7 @@ async function getLatestVisibilityModel(provider: LLMProvider): Promise<string> 
         }
 
         if (provider === 'anthropic') {
-            const apiKey = (await getAdminApiKey('ANTHROPIC')) || process.env.ANTHROPIC_API_KEY;
+            const apiKey = await getAdminApiKey('ANTHROPIC');
             if (!apiKey) return VISIBILITY_PROVIDERS.anthropic.model;
             const models = await listModelsAnthropic(apiKey);
             const latest = pickLatestAnthropicModel(models);
@@ -174,7 +174,7 @@ async function getLatestVisibilityModel(provider: LLMProvider): Promise<string> 
         }
 
         if (provider === 'gemini') {
-            const apiKey = (await getAdminApiKey('GEMINI')) || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+            const apiKey = await getAdminApiKey('GEMINI');
             if (!apiKey) return VISIBILITY_PROVIDERS.gemini.model;
             const models = await listModelsGemini(apiKey);
             const latest = pickLatestGeminiModel(models);
@@ -323,8 +323,7 @@ Target market: ${territory}`;
                 if (!config.configured) return null;
 
                 // Use native Google SDK to avoid AI SDK v3 compatibility issues
-                const adminKey = await getAdminApiKey('GEMINI');
-                const apiKey = adminKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+                const apiKey = await getAdminApiKey('GEMINI');
                 if (!apiKey) return null;
 
                 const genAI = new GoogleGenerativeAI(apiKey);
@@ -399,15 +398,15 @@ export async function checkProviderConfiguration(provider: 'openai' | 'anthropic
             case 'openai': {
                 const adminKey = await getAdminApiKey('OPENAI');
                 return {
-                    configured: !!(adminKey || process.env.OPENAI_API_KEY),
-                    source: adminKey ? 'admin' : (process.env.OPENAI_API_KEY ? 'env' : 'none')
+                    configured: !!adminKey,
+                    source: adminKey ? 'admin' : 'none'
                 };
             }
             case 'anthropic': {
                 const adminKey = await getAdminApiKey('ANTHROPIC');
                 return {
-                    configured: !!(adminKey || process.env.ANTHROPIC_API_KEY),
-                    source: adminKey ? 'admin' : (process.env.ANTHROPIC_API_KEY ? 'env' : 'none')
+                    configured: !!adminKey,
+                    source: adminKey ? 'admin' : 'none'
                 };
             }
             case 'gemini': {
@@ -415,13 +414,10 @@ export async function checkProviderConfiguration(provider: 'openai' | 'anthropic
                 if (adminKey) {
                     return { configured: true, source: 'admin' };
                 }
-                if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-                    return { configured: true, source: 'env' };
-                }
                 return {
                     configured: false,
                     source: 'none',
-                    error: 'No API key found. Configure in admin settings or set GOOGLE_GENERATIVE_AI_API_KEY env var.'
+                    error: 'No API key found. Configure in admin settings.'
                 };
             }
 

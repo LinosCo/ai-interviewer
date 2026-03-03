@@ -6,6 +6,7 @@ import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { searchKnowledgeSources } from '@/lib/kb/semantic-search';
 import { sanitize } from '@/lib/llm/prompt-sanitizer';
+import { getConfigValue } from '@/lib/config';
 import {
     hasConfiguredScope,
     hasRecentHelpfulAssistantReply,
@@ -372,7 +373,7 @@ export async function POST(req: Request) {
             select: { openaiApiKey: true }
         });
 
-        const apiKey = bot.openaiApiKey || globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
+        const apiKey = bot.openaiApiKey || globalConfig?.openaiApiKey || await getConfigValue('openaiApiKey') || '';
 
         if (!apiKey) {
             return Response.json({

@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { LLMService } from '@/services/llmService';
 import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
+import { getConfigValue } from '@/lib/config';
 
 export async function POST(req: Request) {
     try {
@@ -16,12 +17,8 @@ export async function POST(req: Request) {
             return new Response('Missing fieldType or text', { status: 400 });
         }
 
-        // Get API key
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: { openaiApiKey: true }
-        });
-        const apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
+        // Get API key from centralised config (DB-first, env fallback in dev)
+        const apiKey = await getConfigValue('openaiApiKey');
 
         if (!apiKey) {
             return Response.json({

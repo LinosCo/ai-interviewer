@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, ToggleLeft, ToggleRight, Zap } from 'lucide-react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, Zap, Pencil } from 'lucide-react';
 import { CONTENT_KIND_LABELS, ALL_CONTENT_KINDS, type ContentKind } from '@/lib/cms/content-kinds';
 import { ROUTING_TIP_CATEGORY_LABELS } from '@/lib/cms/tip-routing-taxonomy';
 
@@ -52,13 +52,22 @@ interface RoutingHistoryItem {
   latestAt: string | null;
 }
 
+type DestinationType = 'mcp' | 'cms' | 'n8n';
+
+interface DestinationOption {
+  id: string;
+  name: string;
+  destType: DestinationType;
+  badge: string;
+}
+
 const DEFAULT_FORM = {
   contentKind: '' as ContentKind | '',
   behavior: 'create_post',
   mcpTool: '',
   label: '',
   selectedConnectionId: '',
-  destinationType: '' as 'mcp' | 'cms' | 'n8n' | '',
+  destinationType: '' as DestinationType | '',
 };
 
 export function AiRoutingTab({
@@ -71,12 +80,15 @@ export function AiRoutingTab({
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(DEFAULT_FORM);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [coverage, setCoverage] = useState<RoutingCoverageItem[]>([]);
   const [historyByKind, setHistoryByKind] = useState<RoutingHistoryItem[]>([]);
+  const formRef = useRef<HTMLDivElement | null>(null);
 
   // All active connections for destination picker
-  const availableDestinations = [
+  const availableDestinations = useMemo<DestinationOption[]>(() => ([
     ...mcpConnections
       .filter(c => c.status === 'ACTIVE')
       .map(c => ({ id: c.id, name: c.name, destType: 'mcp' as const, badge: c.type || 'MCP' })),
@@ -86,7 +98,33 @@ export function AiRoutingTab({
     ...(n8nConnection?.status === 'ACTIVE'
       ? [{ id: n8nConnection.id, name: n8nConnection.name, destType: 'n8n' as const, badge: 'n8n' }]
       : []),
-  ];
+  ]), [mcpConnections, cmsConnection, n8nConnection]);
+
+  const activeEditingRule = editingRuleId
+    ? rules.find((rule) => rule.id === editingRuleId) || null
+    : null;
+
+  const formDestinations = useMemo<DestinationOption[]>(() => {
+    const items = [...availableDestinations];
+    if (!activeEditingRule || !formData.selectedConnectionId || formData.destinationType === '') {
+      return items;
+    }
+    const exists = items.some((dest) => dest.id === formData.selectedConnectionId);
+    if (exists) return items;
+
+    const inferredName = activeEditingRule.mcpConnection?.name
+      || activeEditingRule.cmsConnection?.name
+      || activeEditingRule.n8nConnection?.name
+      || 'Destinazione corrente';
+
+    items.push({
+      id: formData.selectedConnectionId,
+      name: inferredName,
+      destType: formData.destinationType as DestinationType,
+      badge: 'non attiva',
+    });
+    return items;
+  }, [availableDestinations, activeEditingRule, formData.selectedConnectionId, formData.destinationType]);
 
   const fetchRules = useCallback(async () => {
     try {
@@ -128,9 +166,58 @@ export function AiRoutingTab({
     await fetchRules();
   };
 
+  const revealForm = () => {
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const handleOpenCreate = () => {
+    setEditingRuleId(null);
+    setFormData(DEFAULT_FORM);
+    setFormError(null);
+    setShowForm(true);
+    revealForm();
+  };
+
+  const handleOpenEdit = (rule: TipRoutingRule) => {
+    const destinationType: DestinationType | '' = rule.mcpConnection
+      ? 'mcp'
+      : rule.cmsConnection
+        ? 'cms'
+        : rule.n8nConnection
+          ? 'n8n'
+          : '';
+    const selectedConnectionId = rule.mcpConnection?.id
+      || rule.cmsConnection?.id
+      || rule.n8nConnection?.id
+      || '';
+
+    setEditingRuleId(rule.id);
+    setFormData({
+      contentKind: rule.contentKind as ContentKind,
+      behavior: rule.behavior || 'create_post',
+      mcpTool: rule.mcpTool || '',
+      label: rule.label || '',
+      selectedConnectionId,
+      destinationType,
+    });
+    setFormError(null);
+    setShowForm(true);
+    revealForm();
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingRuleId(null);
+    setFormError(null);
+    setFormData(DEFAULT_FORM);
+  };
+
   const handleSave = async () => {
     if (!formData.contentKind || !formData.selectedConnectionId || !formData.destinationType) return;
     setSaving(true);
+    setFormError(null);
     try {
       const body: Record<string, unknown> = {
         contentKind: formData.contentKind,
@@ -146,17 +233,23 @@ export function AiRoutingTab({
         body.n8nConnectionId = formData.selectedConnectionId;
       }
 
-      const res = await fetch(`/api/projects/${projectId}/tip-routing-rules`, {
-        method: 'POST',
+      const isEditing = Boolean(editingRuleId);
+      const endpoint = isEditing
+        ? `/api/projects/${projectId}/tip-routing-rules/${editingRuleId}`
+        : `/api/projects/${projectId}/tip-routing-rules`;
+      const res = await fetch(endpoint, {
+        method: isEditing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       if (res.ok) {
         await res.json();
         await fetchRules();
-        setShowForm(false);
-        setFormData(DEFAULT_FORM);
+        handleCloseForm();
+        return;
       }
+      const data = await res.json().catch(() => null);
+      setFormError(data?.error || 'Salvataggio non riuscito');
     } finally {
       setSaving(false);
     }
@@ -169,7 +262,7 @@ export function AiRoutingTab({
     return '—';
   };
 
-  const canSave = Boolean(formData.contentKind && formData.selectedConnectionId);
+  const canSave = Boolean(formData.contentKind && formData.selectedConnectionId && formData.destinationType);
 
   return (
     <motion.div
@@ -191,7 +284,7 @@ export function AiRoutingTab({
         </div>
         {!showForm && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={handleOpenCreate}
             className="flex items-center gap-2 bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-full shadow-md shadow-blue-200 hover:scale-105 active:scale-95 transition-all whitespace-nowrap flex-shrink-0"
           >
             <Plus size={15} />
@@ -199,6 +292,148 @@ export function AiRoutingTab({
           </button>
         )}
       </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold text-slate-700">
+          Suggerimento operativo
+        </p>
+        <p className="text-xs text-slate-600 mt-1">
+          Per velocizzare: chiedi al Strategy Copilot di creare o aggiornare le regole AI Routing, mappare le tipologie contenuto e verificare le connessioni esterne passo passo.
+        </p>
+      </div>
+
+      {/* Add/Edit rule form */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            ref={formRef}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="p-8 bg-white border border-blue-100 rounded-[2.5rem] shadow-sm space-y-5"
+          >
+            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+              {editingRuleId ? 'Modifica regola' : 'Nuova regola'}
+            </p>
+
+            {/* Content kind */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
+                Tipo di contenuto AI
+              </label>
+              <select
+                value={formData.contentKind}
+                onChange={e => setFormData(prev => ({ ...prev, contentKind: e.target.value as ContentKind }))}
+                className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seleziona tipo…</option>
+                {ALL_CONTENT_KINDS.map(kind => (
+                  <option key={kind} value={kind}>
+                    {CONTENT_KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Destination */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
+                Destinazione
+              </label>
+              {formDestinations.length === 0 ? (
+                <p className="text-sm text-amber-600 bg-amber-50 rounded-2xl px-4 py-3 border border-amber-100">
+                  Nessuna integrazione attiva. Configura prima una connessione nel tab Connessioni.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {formDestinations.map(dest => (
+                    <label
+                      key={dest.id}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-colors
+                        ${formData.selectedConnectionId === dest.id
+                          ? 'border-blue-200 bg-blue-50/50'
+                          : 'border-gray-100 hover:border-gray-200'}`}
+                    >
+                      <input
+                        type="radio"
+                        name="destination"
+                        value={dest.id}
+                        checked={formData.selectedConnectionId === dest.id}
+                        onChange={() => setFormData(prev => ({
+                          ...prev,
+                          selectedConnectionId: dest.id,
+                          destinationType: dest.destType,
+                        }))}
+                        className="accent-blue-600"
+                      />
+                      <span className="text-sm font-medium text-gray-700">{dest.name}</span>
+                      <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
+                        {dest.badge}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* MCP tool — only for MCP destinations */}
+            {formData.destinationType === 'mcp' && (
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
+                  Nome tool MCP
+                </label>
+                <input
+                  type="text"
+                  placeholder="es. wordpress_create_post"
+                  value={formData.mcpTool}
+                  onChange={e => setFormData(prev => ({ ...prev, mcpTool: e.target.value }))}
+                  className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Il nome esatto del tool esposto dal server MCP (visible in Configura → Strumenti disponibili).
+                </p>
+              </div>
+            )}
+
+            {/* Optional label */}
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
+                Etichetta <span className="text-gray-300 font-normal normal-case">(opzionale)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="es. Blog WordPress produzione"
+                value={formData.label}
+                onChange={e => setFormData(prev => ({ ...prev, label: e.target.value }))}
+                className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {formError && (
+              <div className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                {formError}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                onClick={handleSave}
+                disabled={saving || !canSave}
+                className="bg-blue-600 text-white text-sm font-semibold px-6 py-2.5 rounded-full shadow-md shadow-blue-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed"
+              >
+                {saving ? 'Salvataggio…' : editingRuleId ? 'Salva modifiche' : 'Salva regola'}
+              </button>
+              <button
+                onClick={handleCloseForm}
+                className="text-sm text-gray-400 hover:text-gray-600 px-4 py-2.5 transition-colors"
+              >
+                Annulla
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Empty state */}
       {!loading && rules.length === 0 && !showForm && (
@@ -211,7 +446,7 @@ export function AiRoutingTab({
             Crea regole per distribuire automaticamente i tip AI verso WordPress, il tuo CMS o n8n.
           </p>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={handleOpenCreate}
             className="text-sm font-semibold text-blue-600 hover:underline"
           >
             Crea la prima regola →
@@ -331,6 +566,13 @@ export function AiRoutingTab({
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
+                  onClick={() => handleOpenEdit(rule)}
+                  className="p-1 rounded-lg text-gray-300 hover:text-blue-500 transition-colors"
+                  title="Modifica regola"
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
                   onClick={() => handleToggle(rule)}
                   className={`p-1 rounded-lg transition-colors ${rule.enabled ? 'text-emerald-500 hover:text-emerald-600' : 'text-gray-300 hover:text-gray-400'}`}
                   title={rule.enabled ? 'Disabilita' : 'Abilita'}
@@ -350,131 +592,6 @@ export function AiRoutingTab({
         </div>
       )}
 
-      {/* Add rule form */}
-      <AnimatePresence>
-        {showForm && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="p-8 bg-white border border-blue-100 rounded-[2.5rem] shadow-sm space-y-5"
-          >
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-              Nuova regola
-            </p>
-
-            {/* Content kind */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
-                Tipo di contenuto AI
-              </label>
-              <select
-                value={formData.contentKind}
-                onChange={e => setFormData(prev => ({ ...prev, contentKind: e.target.value as ContentKind }))}
-                className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Seleziona tipo…</option>
-                {ALL_CONTENT_KINDS.map(kind => (
-                  <option key={kind} value={kind}>
-                    {CONTENT_KIND_LABELS[kind]}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Destination */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
-                Destinazione
-              </label>
-              {availableDestinations.length === 0 ? (
-                <p className="text-sm text-amber-600 bg-amber-50 rounded-2xl px-4 py-3 border border-amber-100">
-                  Nessuna integrazione attiva. Configura prima una connessione nel tab Connessioni.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {availableDestinations.map(dest => (
-                    <label
-                      key={dest.id}
-                      className={`flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-colors
-                        ${formData.selectedConnectionId === dest.id
-                          ? 'border-blue-200 bg-blue-50/50'
-                          : 'border-gray-100 hover:border-gray-200'}`}
-                    >
-                      <input
-                        type="radio"
-                        name="destination"
-                        value={dest.id}
-                        checked={formData.selectedConnectionId === dest.id}
-                        onChange={() => setFormData(prev => ({
-                          ...prev,
-                          selectedConnectionId: dest.id,
-                          destinationType: dest.destType,
-                        }))}
-                        className="accent-blue-600"
-                      />
-                      <span className="text-sm font-medium text-gray-700">{dest.name}</span>
-                      <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
-                        {dest.badge}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* MCP tool — only for MCP destinations */}
-            {formData.destinationType === 'mcp' && (
-              <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
-                  Nome tool MCP
-                </label>
-                <input
-                  type="text"
-                  placeholder="es. wordpress_create_post"
-                  value={formData.mcpTool}
-                  onChange={e => setFormData(prev => ({ ...prev, mcpTool: e.target.value }))}
-                  className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Il nome esatto del tool esposto dal server MCP (visible in Configura → Strumenti disponibili).
-                </p>
-              </div>
-            )}
-
-            {/* Optional label */}
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">
-                Etichetta <span className="text-gray-300 font-normal normal-case">(opzionale)</span>
-              </label>
-              <input
-                type="text"
-                placeholder="es. Blog WordPress produzione"
-                value={formData.label}
-                onChange={e => setFormData(prev => ({ ...prev, label: e.target.value }))}
-                className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                onClick={handleSave}
-                disabled={saving || !canSave}
-                className="bg-blue-600 text-white text-sm font-semibold px-6 py-2.5 rounded-full shadow-md shadow-blue-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Salvataggio…' : 'Salva regola'}
-              </button>
-              <button
-                onClick={() => { setShowForm(false); setFormData(DEFAULT_FORM); }}
-                className="text-sm text-gray-400 hover:text-gray-600 px-4 py-2.5 transition-colors"
-              >
-                Annulla
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

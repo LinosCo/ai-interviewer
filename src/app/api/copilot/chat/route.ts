@@ -1,26 +1,31 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { generateObject, generateText } from 'ai';
+import { generateText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
 import { canAccessProjectData } from '@/lib/copilot/permissions';
 import { searchPlatformKB } from '@/lib/copilot/platform-kb';
-import { PLANS, PlanType, isUnlimited } from '@/config/plans';
+import { PlanType } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
+import { getDefaultStrategicMarketingKnowledge, getStrategicMarketingKnowledgeByOrg } from '@/lib/marketing/strategic-kb';
 import {
+    createPlatformHelpSearchTool,
     createProjectTranscriptsTool,
     createChatbotConversationsTool,
     createProjectIntegrationsTool,
     createVisibilityInsightsTool,
+    createProjectAiTipsTool,
     createExternalAnalyticsTool,
+    createStrategicKnowledgeTool,
     createKnowledgeBaseTool,
     createScrapeWebSourceTool,
-    createStrategicTipCreationTool
+    createStrategicTipCreationTool,
+    createTipRoutingManagerTool,
+    createProjectConnectionsOpsTool
 } from '@/lib/copilot/chat-tools';
 
 export const maxDuration = 60;
@@ -124,10 +129,12 @@ export async function POST(req: Request) {
             }, { status: creditsCheck.status || 403 });
         }
 
-        // 3. Get organization's strategic plan from platform settings
+        // 3. Get organization's strategic context from platform settings
         const platformSettings = await prisma.platformSettings.findUnique({
             where: { organizationId: organization.id }
         });
+        const marketingKnowledge = await getStrategicMarketingKnowledgeByOrg(organization.id);
+        const strategicMarketingKnowledge = marketingKnowledge.knowledge || getDefaultStrategicMarketingKnowledge() || null;
         const strategicPlan = platformSettings?.strategicPlan || null;
 
         // 4. Determine if user can access project data
@@ -187,18 +194,13 @@ export async function POST(req: Request) {
             tier,
             hasProjectAccess,
             projectContext,
+            strategicMarketingKnowledge,
             strategicPlan
         });
 
         if (kbContext) {
             systemPrompt += `\n\n## Informazioni dalla Knowledge Base\n${kbContext}`;
         }
-
-        const schema = z.object({
-            response: z.string().describe('La risposta completa per l\'utente in markdown'),
-            usedKnowledgeBase: z.boolean().describe('Se la risposta usa informazioni dalla knowledge base'),
-            suggestedFollowUp: z.string().optional().describe('Domanda di follow-up suggerita (opzionale)')
-        });
 
         const inputMessages = [
             ...history.slice(-10).map((m: any) => ({
@@ -208,28 +210,6 @@ export async function POST(req: Request) {
             { role: 'user' as const, content: message }
         ];
 
-        const runWithAnthropic = (apiKey: string, model: string) => {
-            const anthropic = createAnthropic({ apiKey });
-            return generateObject({
-                model: anthropic(model),
-                schema,
-                system: systemPrompt,
-                messages: inputMessages,
-                temperature: 0.3
-            });
-        };
-
-        const runWithOpenAI = (apiKey: string, model: string) => {
-            const openai = createOpenAI({ apiKey });
-            return generateObject({
-                model: openai(model),
-                schema,
-                system: systemPrompt,
-                messages: inputMessages,
-                temperature: 0.3
-            });
-        };
-
         // 8. Generate response (Anthropic primary, OpenAI fallback on network failures)
 
         const toolContext = {
@@ -238,7 +218,16 @@ export async function POST(req: Request) {
             projectId: projectId || null
         };
 
-        const tools = {
+        const supportTools = {
+            searchPlatformHelp: {
+                ...createPlatformHelpSearchTool(),
+            },
+            getStrategicKnowledge: {
+                ...createStrategicKnowledgeTool(toolContext),
+            }
+        };
+
+        const projectTools = {
             getProjectTranscripts: {
                 ...createProjectTranscriptsTool(toolContext),
             },
@@ -251,6 +240,9 @@ export async function POST(req: Request) {
             getVisibilityInsights: {
                 ...createVisibilityInsightsTool(toolContext),
             },
+            getProjectAiTips: {
+                ...createProjectAiTipsTool(toolContext),
+            },
             getExternalAnalytics: {
                 ...createExternalAnalyticsTool(toolContext),
             },
@@ -262,6 +254,12 @@ export async function POST(req: Request) {
             },
             createStrategicTip: {
                 ...createStrategicTipCreationTool(toolContext),
+            },
+            manageTipRouting: {
+                ...createTipRoutingManagerTool(toolContext),
+            },
+            manageProjectConnections: {
+                ...createProjectConnectionsOpsTool(toolContext),
             }
         };
 
@@ -270,14 +268,16 @@ export async function POST(req: Request) {
                 ? createAnthropic({ apiKey: anthropicApiKey })(model)
                 : createOpenAI({ apiKey: openaiApiKey })(model);
 
-            const toolSet = hasProjectAccess ? (tools as any) : undefined;
+            const toolSet = hasProjectAccess
+                ? ({ ...supportTools, ...projectTools } as any)
+                : (supportTools as any);
 
             return generateText({
                 model: llm as any,
                 system: systemPrompt + "\n\nCRITICAL: Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
                 messages: inputMessages,
                 tools: toolSet,
-                ...(toolSet ? { maxSteps: 3 } : {}), // Reduced steps to prevent long execution
+                ...(toolSet ? { maxSteps: 4 } : {}),
                 temperature: 0.3,
                 abortSignal: AbortSignal.timeout(45000) // 45s timeout
             });

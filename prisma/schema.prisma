@@ -110,13 +110,15 @@ model PasswordResetToken {
 }
 
 model PlatformSettings {
-  id                   String        @id @default(cuid())
-  methodologyKnowledge String
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-  strategicPlan        String?
-  organizationId       String?       @unique
-  organization         Organization?
+  id                           String        @id @default(cuid())
+  methodologyKnowledge         String
+  trainingMethodologyKnowledge String?
+  strategicMarketingKnowledge  String?
+  createdAt                    DateTime      @default(now())
+  updatedAt                    DateTime      @updatedAt
+  strategicPlan                String?
+  organizationId               String?       @unique
+  organization                 Organization?
 }
 
 model GlobalConfig {
@@ -548,14 +550,14 @@ model InterviewPlan {
 }
 
 model KnowledgeSource {
-  id        String                      @id @default(cuid())
+  id        String                       @id @default(cuid())
   botId     String?
   type      String
   title     String?
   content   String
   embedding Unsupported("vector(1536)")?
-  createdAt DateTime                    @default(now())
-  bot       Bot?                        @relation(fields: [botId], references: [id], onDelete: Cascade)
+  createdAt DateTime                     @default(now())
+  bot       Bot?                         @relation(fields: [botId], references: [id], onDelete: Cascade)
 
   trainingBotId String?
   trainingBot   TrainingBot? @relation("TrainingBotKnowledge", fields: [trainingBotId], references: [id])
@@ -659,8 +661,8 @@ model TrainingTopicBlock {
   preWrittenQuizzes  Json?
   passScoreOverride  Int?
   maxRetriesOverride Int?
-  minCheckingTurns   Int     @default(2)
-  maxCheckingTurns   Int     @default(6)
+  minCheckingTurns   Int      @default(2)
+  maxCheckingTurns   Int      @default(6)
 
   createdAt DateTime @default(now())
 
@@ -676,7 +678,7 @@ model TrainingSession {
   status        TrainingSessionStatus @default(STARTED)
 
   currentTopicId          String?
-  topicResults            Json    @default("[]")
+  topicResults            Json     @default("[]")
   overallScore            Float?
   passed                  Boolean?
   detectedCompetenceLevel String?
@@ -1019,11 +1021,11 @@ model KnowledgeGap {
 /// Tracks which credit notification emails have been sent to avoid duplicates.
 /// Survives server restarts (unlike the previous in-memory Map approach).
 model SentNotification {
-  id               String   @id @default(cuid())
+  id               String       @id @default(cuid())
   organizationId   String
-  notificationType String   // "warning", "exhausted"
-  period           String   // "YYYY-MM" format
-  sentAt           DateTime @default(now())
+  notificationType String // "warning", "exhausted"
+  period           String // "YYYY-MM" format
+  sentAt           DateTime     @default(now())
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, notificationType, period])
@@ -1200,26 +1202,26 @@ model WebsiteAnalysis {
  * SerpMonitoringEngine and GSC/GA data into a single scored report.
  */
 model BrandReport {
-  id            String           @id @default(cuid())
-  configId      String
-  status        String           @default("pending")
-  overallScore  Int              @default(0)
-  seoScore      Int              @default(0)
-  llmoScore     Int              @default(0)
-  geoScore      Int              @default(0)
-  serpScore     Int              @default(0)
-  pagesAudited  Int              @default(0)
-  seoAuditData  Json?
-  geoData       Json?
-  serpData      Json?
-  gscInsights   Json?
-  gaInsights    Json?
-  aiTips        Json?
-  generatedAt   DateTime?
-  errorMessage  String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  config        VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  id           String           @id @default(cuid())
+  configId     String
+  status       String           @default("pending")
+  overallScore Int              @default(0)
+  seoScore     Int              @default(0)
+  llmoScore    Int              @default(0)
+  geoScore     Int              @default(0)
+  serpScore    Int              @default(0)
+  pagesAudited Int              @default(0)
+  seoAuditData Json?
+  geoData      Json?
+  serpData     Json?
+  gscInsights  Json?
+  gaInsights   Json?
+  aiTips       Json?
+  generatedAt  DateTime?
+  errorMessage String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  config       VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
 
   @@index([configId, createdAt])
 }
@@ -1484,23 +1486,23 @@ model PartnerClientAttribution {
 }
 
 model MCPConnection {
-  id             String                 @id @default(cuid())
-  projectId      String
-  type           MCPConnectionType
-  name           String
-  endpoint       String
-  credentials    String
-  status         ConnectionStatus       @default(PENDING)
-  lastPingAt     DateTime?
-  lastSyncAt     DateTime?
-  lastError      String?
-  availableTools String[]
-  serverVersion  String?
-  serverName     String?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  createdBy      String
-  organizationId String?
+  id                 String                 @id @default(cuid())
+  projectId          String
+  type               MCPConnectionType
+  name               String
+  endpoint           String
+  credentials        String
+  status             ConnectionStatus       @default(PENDING)
+  lastPingAt         DateTime?
+  lastSyncAt         DateTime?
+  lastError          String?
+  availableTools     String[]
+  serverVersion      String?
+  serverName         String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  createdBy          String
+  organizationId     String?
   logs               IntegrationLog[]
   organization       Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project            Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1560,38 +1562,38 @@ model GoogleAnalyticsData {
 }
 
 model SiteStructureCache {
-  id                String          @id @default(cuid())
-  mcpConnectionId   String?         @unique
-  cmsConnectionId   String?         @unique
-  pages             Json            @default("[]")
-  posts             Json            @default("[]")
-  categories        Json            @default("[]")
-  tags              Json            @default("[]")
+  id                String         @id @default(cuid())
+  mcpConnectionId   String?        @unique
+  cmsConnectionId   String?        @unique
+  pages             Json           @default("[]")
+  posts             Json           @default("[]")
+  categories        Json           @default("[]")
+  tags              Json           @default("[]")
   products          Json?
   productCategories Json?
   media             Json?
   siteInfo          Json?
-  discoveredAt      DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  mcpConnection     MCPConnection?  @relation(fields: [mcpConnectionId], references: [id], onDelete: Cascade)
-  cmsConnection     CMSConnection?  @relation(fields: [cmsConnectionId], references: [id], onDelete: Cascade)
+  discoveredAt      DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  mcpConnection     MCPConnection? @relation(fields: [mcpConnectionId], references: [id], onDelete: Cascade)
+  cmsConnection     CMSConnection? @relation(fields: [cmsConnectionId], references: [id], onDelete: Cascade)
 
   @@index([mcpConnectionId])
   @@index([cmsConnectionId])
 }
 
 model N8NConnection {
-  id            String           @id @default(cuid())
-  projectId     String           @unique
-  name          String           @default("n8n Automation")
-  webhookUrl    String
-  status        ConnectionStatus @default(PENDING)
-  lastTriggerAt DateTime?
-  lastError     String?
-  triggerOnTips Boolean          @default(true)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  createdBy     String
+  id              String           @id @default(cuid())
+  projectId       String           @unique
+  name            String           @default("n8n Automation")
+  webhookUrl      String
+  status          ConnectionStatus @default(PENDING)
+  lastTriggerAt   DateTime?
+  lastError       String?
+  triggerOnTips   Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdBy       String
   project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tipRoutingRules TipRoutingRule[]
 
@@ -1599,30 +1601,30 @@ model N8NConnection {
 }
 
 model TipRoutingRule {
-  id               String         @id @default(cuid())
-  projectId        String
-  contentKind      String
-  priority         Int            @default(0)
-  enabled          Boolean        @default(true)
-  label            String?
+  id          String  @id @default(cuid())
+  projectId   String
+  contentKind String
+  priority    Int     @default(0)
+  enabled     Boolean @default(true)
+  label       String?
 
   // Destination — exactly one should be non-null
-  mcpConnectionId  String?
-  cmsConnectionId  String?
-  n8nConnectionId  String?
+  mcpConnectionId String?
+  cmsConnectionId String?
+  n8nConnectionId String?
 
   // Action
-  mcpTool          String?
-  behavior         String
-  behaviorConfig   Json?
+  mcpTool        String?
+  behavior       String
+  behaviorConfig Json?
 
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  mcpConnection    MCPConnection? @relation(fields: [mcpConnectionId], references: [id], onDelete: SetNull)
-  cmsConnection    CMSConnection? @relation(fields: [cmsConnectionId], references: [id], onDelete: SetNull)
-  n8nConnection    N8NConnection? @relation(fields: [n8nConnectionId], references: [id], onDelete: SetNull)
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mcpConnection MCPConnection? @relation(fields: [mcpConnectionId], references: [id], onDelete: SetNull)
+  cmsConnection CMSConnection? @relation(fields: [cmsConnectionId], references: [id], onDelete: SetNull)
+  n8nConnection N8NConnection? @relation(fields: [n8nConnectionId], references: [id], onDelete: SetNull)
 
   @@index([projectId, contentKind])
   @@index([projectId, enabled])

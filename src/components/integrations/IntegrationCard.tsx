@@ -12,6 +12,12 @@ import {
   ArrowLeftRight,
   Users,
   Building2,
+  Search,
+  FileText,
+  ShoppingCart,
+  Rocket,
+  GitBranch,
+  type LucideIcon,
 } from 'lucide-react';
 import { ConfirmDialog, useConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -75,29 +81,35 @@ const STATUS_CONFIG: Record<ConnectionStatus, {
   },
 };
 
-const TYPE_CONFIG: Record<string, {
-  icon: string;
-  gradient: string;
+const TYPE_CONFIG: Record<IntegrationCardProps['type'], {
+  icon: LucideIcon;
+  iconClassName: string;
+  containerClassName: string;
 }> = {
   WORDPRESS: {
-    icon: '📝',
-    gradient: 'from-blue-500 to-blue-600',
+    icon: FileText,
+    iconClassName: 'text-stone-700',
+    containerClassName: 'bg-stone-100 border border-stone-200',
   },
   WOOCOMMERCE: {
-    icon: '🛒',
-    gradient: 'from-violet-500 to-violet-600',
+    icon: ShoppingCart,
+    iconClassName: 'text-stone-700',
+    containerClassName: 'bg-stone-100 border border-stone-200',
   },
   GOOGLE: {
-    icon: '🔍',
-    gradient: 'from-red-500 to-yellow-500',
+    icon: Search,
+    iconClassName: 'text-stone-700',
+    containerClassName: 'bg-stone-100 border border-stone-200',
   },
   CMS_VOLER: {
-    icon: '🚀',
-    gradient: 'from-amber-500 to-orange-600',
+    icon: Rocket,
+    iconClassName: 'text-stone-700',
+    containerClassName: 'bg-stone-100 border border-stone-200',
   },
   N8N: {
-    icon: '⚡',
-    gradient: 'from-green-500 to-teal-600',
+    icon: GitBranch,
+    iconClassName: 'text-stone-700',
+    containerClassName: 'bg-stone-100 border border-stone-200',
   },
 };
 
@@ -128,6 +140,7 @@ export function IntegrationCard({
   const statusConfig = STATUS_CONFIG[status];
   const typeConfig = TYPE_CONFIG[type];
   const StatusIcon = statusConfig.icon;
+  const TypeIcon = typeConfig.icon;
 
   const handleTest = async () => {
     if (!onTest || isTesting) return;
@@ -168,6 +181,7 @@ export function IntegrationCard({
 
   return (
     <div
+      data-connection-id={id}
       className={`bg-white rounded-xl border border-stone-200 p-6 transition-all ${disabled ? 'opacity-60' : 'hover:border-stone-300'
         }`}
     >
@@ -175,14 +189,14 @@ export function IntegrationCard({
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div
-            className={`w-12 h-12 rounded-xl bg-gradient-to-br ${typeConfig.gradient} flex items-center justify-center text-2xl`}
+            className={`w-12 h-12 rounded-xl flex items-center justify-center ${typeConfig.containerClassName}`}
           >
-            {typeConfig.icon}
+            <TypeIcon className={`w-5 h-5 ${typeConfig.iconClassName}`} />
           </div>
-          <div>
-            <h3 className="font-semibold text-stone-900">{name}</h3>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-stone-900 truncate">{name}</h3>
             {description && (
-              <p className="text-sm text-stone-500">{description}</p>
+              <p className="text-sm text-stone-500 break-words">{description}</p>
             )}
           </div>
         </div>
@@ -234,12 +248,12 @@ export function IntegrationCard({
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {onOpenDashboard && (
               <button
                 onClick={handleOpenDashboard}
                 disabled={isOpeningDashboard}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors whitespace-nowrap"
               >
                 <ExternalLink className={`w-4 h-4 ${isOpeningDashboard ? 'animate-pulse' : ''}`} />
                 {isOpeningDashboard ? 'Apertura...' : 'Apri Dashboard'}
@@ -250,7 +264,7 @@ export function IntegrationCard({
               <button
                 onClick={handleTest}
                 disabled={isTesting}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 disabled:opacity-50 transition-colors whitespace-nowrap"
               >
                 <RefreshCw className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
                 {isTesting ? 'Test...' : 'Testa'}
@@ -260,7 +274,7 @@ export function IntegrationCard({
             {onConfigure && (
               <button
                 onClick={onConfigure}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-stone-700 bg-stone-100 rounded-lg hover:bg-stone-200 transition-colors whitespace-nowrap"
               >
                 <Settings className="w-4 h-4" />
                 Configura
@@ -270,7 +284,7 @@ export function IntegrationCard({
             {onManageSharing && (
               <button
                 onClick={onManageSharing}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors whitespace-nowrap"
                 title="Gestisci condivisione progetti"
               >
                 <Users className="w-4 h-4" />
@@ -281,7 +295,7 @@ export function IntegrationCard({
             {onTransferOrg && (
               <button
                 onClick={onTransferOrg}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
+                className="inline-flex items-center justify-center px-2.5 py-2 text-sm font-medium text-orange-600 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
                 title="Trasferisci ad altra organizzazione"
               >
                 <Building2 className="w-4 h-4" />
@@ -291,7 +305,7 @@ export function IntegrationCard({
             {onTransfer && (
               <button
                 onClick={onTransfer}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                className="inline-flex items-center justify-center px-2.5 py-2 text-sm font-medium text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
                 title="Trasferisci in un altro progetto"
               >
                 <ArrowLeftRight className="w-4 h-4" />
@@ -302,7 +316,7 @@ export function IntegrationCard({
               <button
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors ml-auto"
+                className="inline-flex items-center justify-center px-2.5 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors sm:ml-auto"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

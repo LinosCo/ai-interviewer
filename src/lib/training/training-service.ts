@@ -3,11 +3,10 @@ import { generateText, generateObject } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
-import fs from 'node:fs'
-import path from 'node:path'
 import { prisma } from '@/lib/prisma'
 import { TokenTrackingService } from '@/services/tokenTrackingService'
 import { LLMService } from '@/services/llmService'
+import { getDefaultTrainingMethodologyKnowledge, getTrainingMethodologyKnowledgeByOrg } from '@/lib/training/training-methodology-kb'
 import {
   buildExplainingPrompt,
   buildQuizzingSystemPrompt,
@@ -44,14 +43,6 @@ const VALID_TRAINING_PHASES: TrainingPhase[] = [
   'COMPLETE',
 ]
 
-function readTrainingMethodologyFromFile(): string {
-  try {
-    return fs.readFileSync(path.join(process.cwd(), 'knowledge', 'training-methodology.md'), 'utf-8').trim()
-  } catch {
-    return ''
-  }
-}
-
 async function getTrainingGlobalMethodology(organizationId: string): Promise<string> {
   const now = Date.now()
   const cached = methodologyByOrgCache.get(organizationId)
@@ -61,17 +52,14 @@ async function getTrainingGlobalMethodology(organizationId: string): Promise<str
 
   let value = ''
   try {
-    const settings = await prisma.platformSettings.findUnique({
-      where: { organizationId },
-      select: { methodologyKnowledge: true },
-    })
-    value = String(settings?.methodologyKnowledge || '').trim()
+    const row = await getTrainingMethodologyKnowledgeByOrg(organizationId)
+    value = String(row.knowledge || '').trim()
   } catch {
     value = ''
   }
 
   if (!value) {
-    value = readTrainingMethodologyFromFile()
+    value = getDefaultTrainingMethodologyKnowledge()
   }
 
   methodologyByOrgCache.set(organizationId, {

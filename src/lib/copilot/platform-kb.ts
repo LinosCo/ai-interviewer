@@ -840,6 +840,103 @@ Clicca sull'icona del Copilot nella sidebar o usa la scorciatoia da tastiera.
         category: 'copilot',
         keywords: ['visibility setup', 'brand monitor', 'ai tips', 'prompt monitoring', 'ga4', 'gsc', 'routing']
     },
+    {
+        id: 'cop-11',
+        title: 'Setup connessioni: cosa fa BT e cosa fare sul tool esterno',
+        content: `Quando configuri una connessione, separa sempre i due lati.
+
+**Lato Business Tuner (operabile dal Copilot):**
+1. Verifica stato connessioni del progetto
+2. Crea o aggiorna connessione (WordPress/Woo, Google, n8n, CMS condiviso)
+3. Esegui test tecnico della connessione
+4. Verifica che lo stato finale sia ACTIVE
+5. Configura regole AI Routing per tipologia contenuto
+
+**Lato tool esterno (passo-passo):**
+- WordPress:
+  1) Crea Application Password in Utenti > Profilo
+  2) Verifica endpoint /wp-json/mcp/v1 raggiungibile
+  3) Controlla permessi utente per creazione/modifica contenuti
+- WooCommerce:
+  1) Genera REST API key (read/write)
+  2) Verifica endpoint store e permessi prodotti
+- Google:
+  1) Service Account con accesso a GA4 e GSC
+  2) API abilitate in Google Cloud
+  3) Property ID GA4 e URL proprieta GSC corretti
+- n8n:
+  1) Crea workflow con nodo Webhook
+  2) Usa webhook URL pubblico
+  3) Esegui test ricezione payload
+
+**Formato risposta consigliato del Copilot:**
+1. "Fatto in BT"
+2. "Da fare fuori da BT"
+3. "Check finale di funzionamento"`,
+        category: 'copilot',
+        keywords: ['connessione', 'setup esterno', 'passo passo', 'wordpress', 'woocommerce', 'google', 'ga4', 'gsc', 'n8n', 'webhook', 'impostalo tu']
+    },
+    {
+        id: 'cop-12',
+        title: 'Mappa tipologie contenuto AI e routing operativo',
+        content: `Le tipologie contenuto guidano sia i suggerimenti sia le automazioni.
+
+**Core content kinds (esempi):**
+- BLOG_POST / BLOG_UPDATE: articoli e aggiornamenti editoriali
+- NEW_PAGE / PAGE_UPDATE: pagine istituzionali e landing
+- NEW_FAQ: FAQ informative da knowledge gap o query ricorrenti
+- SCHEMA_ORG: patch structured data (Schema.org)
+- META_DESCRIPTION / ALT_DESCRIPTION: ottimizzazioni SEO on-page
+- PRODUCT_DESCRIPTION / PRODUCT_FAQ: contenuti e-commerce
+- SOCIAL_SNIPPET / EMAIL_SNIPPET: attivazioni canali social/email
+- LINKEDIN_*: output specifici per canale LinkedIn
+
+**Scelta canale consigliata:**
+- WordPress MCP: blog, pagine, FAQ, aggiornamenti SEO
+- WooCommerce MCP: schede prodotto e FAQ prodotto
+- CMS custom: publishing centralizzato enterprise/custom
+- n8n: orchestrazione multicanale (social, CRM, newsletter, alert)
+
+**Regola pratica:**
+Per ogni AI Tip: assegna 1 content kind, 1 destinazione primaria, 1 stato (bozza/inviato/scartato/completato) e 1 owner.`,
+        category: 'copilot',
+        keywords: ['content kind', 'tipologia contenuti', 'routing', 'blog_post', 'new_faq', 'schema_org', 'wordpress mcp', 'n8n', 'linkedin']
+    },
+    {
+        id: 'cop-13',
+        title: 'Template workflow n8n per AI Tips',
+        content: `Workflow minimo consigliato in n8n per AI Tips:
+
+1. **Webhook Trigger**
+- riceve eventi (ai_tips_generated, social_content_ready, content_published)
+
+2. **Switch / IF by event**
+- ramo AI tips
+- ramo social ready
+- ramo published
+
+3. **Normalize payload**
+- mappa campi: project, tip id, title, content, contentKind, hashtags, url
+
+4. **Policy layer**
+- filtri per contentKind, priorita, brand/progetto
+- blocca contenuti non allineati o incompleti
+
+5. **Delivery nodes**
+- LinkedIn / Email / Slack / CRM / CMS endpoint
+
+6. **Observability**
+- log esito
+- gestione errori
+- retry con backoff
+
+**Best practice:**
+- Mantieni idempotenza (usa tip id come chiave)
+- Aggiungi deduplica per evitare doppi invii
+- Salva outcome (sent/failed) per audit e storico`,
+        category: 'copilot',
+        keywords: ['n8n workflow', 'webhook', 'ai tips generated', 'social_content_ready', 'retry', 'idempotenza', 'deduplica']
+    },
 
     // Account & Billing
     {

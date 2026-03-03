@@ -390,6 +390,7 @@ export default function IntegrationsPage() {
     { id: 'routing' as const, label: 'AI Routing' },
     { id: 'settings' as const, label: 'Impostazioni' },
   ] as const;
+  const hasBusinessTier = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(userPlan);
 
   // Compute number of active connections for the tab badge
   const activeCount = [
@@ -432,6 +433,26 @@ export default function IntegrationsPage() {
           <p className="text-sm text-gray-400 mt-1">
             Connetti i tuoi strumenti e configura il routing automatico dei contenuti AI.
           </p>
+        </div>
+
+        <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-blue-900">
+              Configurazione assistita con Strategy Copilot
+            </p>
+            <p className="text-xs text-blue-800/90 mt-1">
+              Usa il Copilot (icona con scintille in basso a destra) per impostare connessioni, testarle e preparare AI Tips instradabili.
+            </p>
+          </div>
+          {!hasBusinessTier && (
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/billing/plans')}
+              className="h-9 px-4 rounded-full text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+            >
+              Passa a Business
+            </button>
+          )}
         </div>
 
         {/* Tab bar */}

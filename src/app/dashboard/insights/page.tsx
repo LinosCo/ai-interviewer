@@ -739,6 +739,40 @@ export default function InsightHubPage() {
                 </div>
             </div>
 
+            <Card className="border-blue-100 bg-blue-50/50">
+                <CardContent className="py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <p className="text-sm font-semibold text-blue-900">
+                            Dall&apos;insight all&apos;esecuzione, con supporto Copilot
+                        </p>
+                        <p className="text-xs text-blue-800/90 mt-1">
+                            Usa il Strategy Copilot per trasformare i tip in bozze operative, creare regole AI Routing e configurare le connessioni ai tool esterni.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {projectId && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openRoutingConnections(projectId)}
+                                className="rounded-full border-blue-200 text-blue-700 hover:bg-blue-100"
+                            >
+                                Apri integrazioni
+                            </Button>
+                        )}
+                        {!hasRoutingPremium && (
+                            <Button
+                                size="sm"
+                                onClick={openRoutingUpgrade}
+                                className="rounded-full bg-amber-600 hover:bg-amber-700 text-white"
+                            >
+                                Upgrade Business
+                            </Button>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+
             {showRoutingConnectionInvite && (
                 <Card className="border-amber-200 bg-amber-50/60">
                     <CardContent className="py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">

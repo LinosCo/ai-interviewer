@@ -7,6 +7,8 @@ import { showToast } from '@/components/toast';
 interface PlatformSettingsFormProps {
     organizationId: string;
     currentKnowledge: string;
+    currentTrainingKnowledge: string;
+    currentMarketingKnowledge: string;
     currentStrategicPlan: string;
 
     platformOpenaiApiKey: string;
@@ -49,6 +51,8 @@ interface AdminBot {
 export default function PlatformSettingsForm({
     organizationId,
     currentKnowledge,
+    currentTrainingKnowledge,
+    currentMarketingKnowledge,
     currentStrategicPlan,
     platformOpenaiApiKey,
     platformAnthropicApiKey,
@@ -78,8 +82,13 @@ export default function PlatformSettingsForm({
     publicDemoBotId = '',
     resendApiKey = ''
 }: PlatformSettingsFormProps) {
-    const [knowledge, setKnowledge] = useState(currentKnowledge);
-    const [isKnowledgeOpen, setIsKnowledgeOpen] = useState(false);
+    const [interviewKnowledge, setInterviewKnowledge] = useState(currentKnowledge);
+    const [isInterviewKnowledgeOpen, setIsInterviewKnowledgeOpen] = useState(false);
+    const [trainingKnowledge, setTrainingKnowledge] = useState(currentTrainingKnowledge);
+    const [isTrainingKnowledgeOpen, setIsTrainingKnowledgeOpen] = useState(false);
+    const [marketingKnowledge, setMarketingKnowledge] = useState(currentMarketingKnowledge);
+    const [isMarketingKnowledgeOpen, setIsMarketingKnowledgeOpen] = useState(false);
+    const [isRegeneratingMarketingKnowledge, setIsRegeneratingMarketingKnowledge] = useState(false);
     const [strategicPlan, setStrategicPlan] = useState(currentStrategicPlan);
     const [isStrategicPlanOpen, setIsStrategicPlanOpen] = useState(false);
     // Don't pre-fill value in input for security/ux, use placeholder. Only set if user types.
@@ -126,6 +135,9 @@ export default function PlatformSettingsForm({
     const [sendTestEmailError, setSendTestEmailError] = useState<string | null>(null);
 
     useEffect(() => {
+        setInterviewKnowledge(currentKnowledge || '');
+        setTrainingKnowledge(currentTrainingKnowledge || '');
+        setMarketingKnowledge(currentMarketingKnowledge || '');
         setOpenaiKey(platformOpenaiApiKey || '');
         setAnthropicKey(platformAnthropicApiKey || '');
         setGeminiKey(platformGeminiApiKey || '');
@@ -180,7 +192,10 @@ export default function PlatformSettingsForm({
         smtpFromEmail,
         smtpNotificationEmail,
         publicDemoBotId,
-        resendApiKey
+        resendApiKey,
+        currentKnowledge,
+        currentTrainingKnowledge,
+        currentMarketingKnowledge
     ]);
 
     useEffect(() => {
@@ -232,7 +247,9 @@ export default function PlatformSettingsForm({
         smtpNotificationEmailValue !== smtpNotificationEmail ||
         demoBotId !== publicDemoBotId ||
         resendApiKeyValue !== normalize(resendApiKey) ||
-        knowledge !== currentKnowledge ||
+        interviewKnowledge !== currentKnowledge ||
+        trainingKnowledge !== currentTrainingKnowledge ||
+        marketingKnowledge !== currentMarketingKnowledge ||
         strategicPlan !== currentStrategicPlan
     );
 
@@ -247,7 +264,9 @@ export default function PlatformSettingsForm({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     organizationId,
-                    methodologyKnowledge: knowledge,
+                    methodologyKnowledge: interviewKnowledge,
+                    trainingMethodologyKnowledge: trainingKnowledge,
+                    strategicMarketingKnowledge: marketingKnowledge,
                     strategicPlan: strategicPlan,
                     platformOpenaiApiKey: openaiKey,
                     platformAnthropicApiKey: anthropicKey,
@@ -303,9 +322,48 @@ export default function PlatformSettingsForm({
         }
     };
 
-    const handleReset = () => {
+    const handleResetInterviewKnowledge = () => {
         if (confirm('Annullare le modifiche non salvate e ripristinare il valore salvato?')) {
-            setKnowledge(currentKnowledge);
+            setInterviewKnowledge(currentKnowledge);
+        }
+    };
+
+    const handleResetTrainingKnowledge = () => {
+        if (confirm('Annullare le modifiche non salvate e ripristinare il valore salvato?')) {
+            setTrainingKnowledge(currentTrainingKnowledge);
+        }
+    };
+
+    const handleResetMarketingKnowledge = () => {
+        if (confirm('Annullare le modifiche non salvate e ripristinare il valore salvato?')) {
+            setMarketingKnowledge(currentMarketingKnowledge);
+        }
+    };
+
+    const handleRegenerateMarketingKnowledge = async () => {
+        setIsRegeneratingMarketingKnowledge(true);
+        try {
+            const response = await fetch('/api/platform-settings/regenerate-marketing-kb', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    organizationId
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data?.error || 'Rigenerazione KB marketing fallita');
+            }
+
+            setMarketingKnowledge(String(data?.knowledge || ''));
+            setIsMarketingKnowledgeOpen(true);
+            showToast('KB marketing rigenerata con successo.');
+        } catch (error) {
+            console.error('Error regenerating strategic marketing KB:', error);
+            showToast('Errore durante la rigenerazione della KB marketing.', 'error');
+        } finally {
+            setIsRegeneratingMarketingKnowledge(false);
         }
     };
 
@@ -451,14 +509,14 @@ export default function PlatformSettingsForm({
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-xl font-semibold">Metodologia interviste</h2>
                     <button
-                        onClick={() => setIsKnowledgeOpen(!isKnowledgeOpen)}
+                        onClick={() => setIsInterviewKnowledgeOpen(!isInterviewKnowledgeOpen)}
                         className="text-sm text-amber-600 font-bold hover:underline"
                     >
-                        {isKnowledgeOpen ? 'Nascondi editor' : 'Modifica metodologia'}
+                        {isInterviewKnowledgeOpen ? 'Nascondi editor' : 'Modifica metodologia'}
                     </button>
                 </div>
 
-                {!isKnowledgeOpen ? (
+                {!isInterviewKnowledgeOpen ? (
                     <div className="p-4 bg-stone-50 rounded-lg border border-stone-100">
                         <p className="text-sm text-stone-500 italic">
                             La metodologia di intervista definisce come l&apos;AI si comporta durante le conversazioni.
@@ -468,18 +526,121 @@ export default function PlatformSettingsForm({
                 ) : (
                     <>
                         <p className="text-sm text-gray-600 mb-4">
-                            Questa base di conoscenza è inclusa automaticamente in tutti i prompt dei chatbot.
-                            Personalizzala per adattarla alla metodologia di intervista della tua organizzazione.
+                            Questa base di conoscenza è usata dai bot di intervista.
+                            Rimane separata sia dalla metodologia formazione sia dalla KB marketing del Copilot.
                         </p>
                         <textarea
-                            value={knowledge}
-                            onChange={(e) => setKnowledge(e.target.value)}
+                            value={interviewKnowledge}
+                            onChange={(e) => setInterviewKnowledge(e.target.value)}
                             className="w-full h-96 border border-gray-300 rounded-lg px-4 py-3 font-mono text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
                             placeholder="Inserisci la metodologia di intervista..."
                         />
                         <div className="mt-4 flex justify-start">
                             <button
-                                onClick={handleReset}
+                                onClick={handleResetInterviewKnowledge}
+                                className="text-xs text-stone-400 hover:text-stone-600 underline"
+                            >
+                                Annulla modifiche
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* Training Methodology Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold">Metodologia formazione</h2>
+                    <button
+                        onClick={() => setIsTrainingKnowledgeOpen(!isTrainingKnowledgeOpen)}
+                        className="text-sm text-amber-600 font-bold hover:underline"
+                    >
+                        {isTrainingKnowledgeOpen ? 'Nascondi editor' : 'Modifica metodologia'}
+                    </button>
+                </div>
+
+                {!isTrainingKnowledgeOpen ? (
+                    <div className="p-4 bg-stone-50 rounded-lg border border-stone-100">
+                        <p className="text-sm text-stone-500 italic">
+                            Questa metodologia guida esclusivamente i bot di formazione nel percorso didattico.
+                            Clicca su &quot;Modifica metodologia&quot; per visualizzare e cambiare il testo.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Questa base definisce lo stile didattico dei bot training (spiegazioni, verifiche, progressione e feedback).
+                            Rimane separata dalla metodologia interviste.
+                        </p>
+                        <textarea
+                            value={trainingKnowledge}
+                            onChange={(e) => setTrainingKnowledge(e.target.value)}
+                            className="w-full h-96 border border-gray-300 rounded-lg px-4 py-3 font-mono text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                            placeholder="Inserisci la metodologia di formazione..."
+                        />
+                        <div className="mt-4 flex justify-start">
+                            <button
+                                onClick={handleResetTrainingKnowledge}
+                                className="text-xs text-stone-400 hover:text-stone-600 underline"
+                            >
+                                Annulla modifiche
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* Strategic Marketing KB Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-xl font-semibold">KB Marketing Strategico</h2>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Usata dal Copilot per SEO, GEO/LLMO, trend digitali e business development
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleRegenerateMarketingKnowledge}
+                            disabled={isRegeneratingMarketingKnowledge}
+                            className="text-sm rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+                        >
+                            {isRegeneratingMarketingKnowledge ? 'Rigenerazione...' : 'Rigenera automaticamente'}
+                        </button>
+                        <button
+                            onClick={() => setIsMarketingKnowledgeOpen(!isMarketingKnowledgeOpen)}
+                            className="text-sm text-amber-600 font-bold hover:underline"
+                        >
+                            {isMarketingKnowledgeOpen ? 'Nascondi editor' : 'Modifica KB'}
+                        </button>
+                    </div>
+                </div>
+
+                {!isMarketingKnowledgeOpen ? (
+                    <div className="p-4 bg-stone-50 rounded-lg border border-stone-100">
+                        <p className="text-sm text-stone-500 italic">
+                            Questa KB guida il Copilot nelle decisioni strategiche e operative di marketing.
+                            Puoi modificarla manualmente o rigenerarla automaticamente dai dati disponibili.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Il Copilot userà questa base per proporre azioni coerenti con il business, con focus su SEO, GEO,
+                            contenuti multi-canale e opportunità di crescita.
+                        </p>
+                        <textarea
+                            value={marketingKnowledge}
+                            onChange={(e) => setMarketingKnowledge(e.target.value)}
+                            className="w-full h-96 border border-gray-300 rounded-lg px-4 py-3 font-mono text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                            placeholder="Inserisci la knowledge base di marketing strategico..."
+                        />
+                        <p className="mt-3 text-xs text-gray-500">
+                            La rigenerazione automatica utilizza crediti dell&apos;organizzazione in base ai token consumati.
+                        </p>
+                        <div className="mt-3 flex justify-start">
+                            <button
+                                onClick={handleResetMarketingKnowledge}
                                 className="text-xs text-stone-400 hover:text-stone-600 underline"
                             >
                                 Annulla modifiche

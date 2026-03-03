@@ -1075,6 +1075,7 @@ model VisibilityConfig {
   id              String                    @id @default(cuid())
   organizationId  String
   brandName       String
+  brandAliases    String[]                  @default([])
   category        String
   description     String?
   language        String                    @default("it")

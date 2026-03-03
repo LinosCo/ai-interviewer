@@ -15,6 +15,7 @@ export interface AdditionalUrl {
 
 export interface VisibilityConfig {
     brandName: string;
+    brandAliases: string[];
     category: string;
     description: string;
     websiteUrl?: string;
@@ -40,6 +41,7 @@ export interface VisibilityConfig {
 interface VisibilityConfigApiResponse {
     config?: {
         brandName?: string;
+        brandAliases?: string[] | null;
         category?: string;
         description?: string;
         websiteUrl?: string | null;
@@ -93,6 +95,7 @@ export default function CreateVisibilityWizardPage() {
 
     const [config, setConfig] = useState<VisibilityConfig>({
         brandName: '',
+        brandAliases: [],
         category: '',
         description: '',
         websiteUrl: undefined,
@@ -139,6 +142,9 @@ export default function CreateVisibilityWizardPage() {
                     } else if (data?.config) {
                         setConfig({
                             brandName: data.config.brandName || '',
+                            brandAliases: Array.isArray(data.config.brandAliases)
+                                ? data.config.brandAliases.map((alias) => String(alias || '').trim()).filter(Boolean)
+                                : [],
                             category: data.config.category || '',
                             description: data.config.description || '',
                             websiteUrl: data.config.websiteUrl || undefined,

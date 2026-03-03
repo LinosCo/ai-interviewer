@@ -282,11 +282,21 @@ export default function InsightHubPage() {
     const hasRoutingPremium = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(organizationPlan);
 
     const checkProjectHasRoutingConnection = useCallback(async (targetProjectId: string): Promise<boolean> => {
+        const fetchWithTimeout = async (url: string, timeoutMs = 8000) => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { signal: controller.signal });
+            } finally {
+                clearTimeout(timeout);
+            }
+        };
+
         try {
             const [cmsRes, mcpRes, n8nRes] = await Promise.all([
-                fetch(`/api/cms/connection?projectId=${targetProjectId}`),
-                fetch(`/api/integrations/mcp/connections?projectId=${targetProjectId}`),
-                fetch(`/api/integrations/n8n/connections?projectId=${targetProjectId}`)
+                fetchWithTimeout(`/api/cms/connection?projectId=${targetProjectId}`),
+                fetchWithTimeout(`/api/integrations/mcp/connections?projectId=${targetProjectId}`),
+                fetchWithTimeout(`/api/integrations/n8n/connections?projectId=${targetProjectId}`)
             ]);
 
             const [cmsData, mcpData, n8nData] = await Promise.all([
@@ -546,7 +556,7 @@ export default function InsightHubPage() {
         return () => {
             cancelled = true;
         };
-    }, [checkProjectHasRoutingConnection, hasRoutingPremium, insights, projectId, routingConnectionsByProject]);
+    }, [checkProjectHasRoutingConnection, hasRoutingPremium, insights, projectId]);
 
     const handleSync = async () => {
         setSyncing(true);
@@ -1584,7 +1594,7 @@ export default function InsightHubPage() {
                                                                                         onClick={() => handleOpenSuggestionManager(insight, action, actionKey)}
                                                                                         disabled={Boolean(openingSuggestionKey) || updatingInsightId === insight.id}
                                                                                     >
-                                                                                        {openingSuggestionKey === actionKey ? 'Apro...' : 'Scopri'}
+                                                                                        {openingSuggestionKey === actionKey ? 'Apro...' : 'Modifica'}
                                                                                     </Button>
                                                                                 )}
                                                                             </>
@@ -1593,10 +1603,17 @@ export default function InsightHubPage() {
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="h-9 px-4 rounded-full font-bold text-xs gap-2 border-green-200 text-green-700 hover:border-green-500 hover:bg-green-50 group/btn transition-all"
-                                                                            onClick={() => handleApplyAction(insight.id, action.title || getActionTypeLabel(action.type))}
-                                                                            disabled={updatingInsightId === insight.id || insight.isVirtual}
+                                                                            onClick={() => {
+                                                                                if (insight.isVirtual) {
+                                                                                    handleOpenSuggestionManager(insight, action, actionKey);
+                                                                                    return;
+                                                                                }
+                                                                                handleApplyAction(insight.id, action.title || getActionTypeLabel(action.type));
+                                                                            }}
+                                                                            disabled={updatingInsightId === insight.id || openingSuggestionKey === actionKey}
+                                                                            title={insight.isVirtual ? 'Apri la scheda tip per invio/modifica' : undefined}
                                                                         >
-                                                                            Applica <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
+                                                                            {insight.isVirtual ? 'Apri tip' : 'Applica'} <ArrowRight className="h-3.5 w-3.5 group-hover/btn:translate-x-1 transition-transform" />
                                                                         </Button>
                                                                     </div>
                                                                 )}

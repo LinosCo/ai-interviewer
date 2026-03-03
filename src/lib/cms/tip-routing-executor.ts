@@ -14,6 +14,8 @@ import { prisma } from '@/lib/prisma';
 import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
 import { N8NDispatcher, type TipPayload } from '@/lib/integrations/n8n/dispatcher';
 import type { TipRoutingRule } from '@prisma/client';
+import { CMSConnectionService } from '@/lib/cms/connection.service';
+import { type CMSSuggestionType } from '@prisma/client';
 
 interface TipInput {
   id: string;
@@ -42,6 +44,14 @@ type RuleWithConnections = TipRoutingRule & {
 };
 
 export class TipRoutingExecutor {
+  private static mapContentKindToSuggestionType(contentKind: string): CMSSuggestionType {
+    const kind = String(contentKind || '').toUpperCase();
+    if (kind === 'NEW_FAQ') return 'CREATE_FAQ';
+    if (kind === 'BLOG_POST' || kind === 'BLOG_UPDATE') return 'CREATE_BLOG_POST';
+    if (kind === 'NEW_PAGE') return 'CREATE_PAGE';
+    return 'MODIFY_CONTENT';
+  }
+
   private static toPayload(tips: TipInput[]): TipPayload[] {
     return tips.map((t) => ({
       id: t.id,
@@ -131,12 +141,51 @@ export class TipRoutingExecutor {
             throw new Error(call.error || `MCP tool ${rule.mcpTool} returned an error`);
           }
         }
+      } else if (destination === 'cms') {
+        if (rule.cmsConnection?.status !== 'ACTIVE' || !rule.cmsConnectionId) {
+          throw new Error('CMS connection is not active');
+        }
+
+        for (const tip of tips) {
+          const existingSuggestion = await prisma.cMSSuggestion.findUnique({
+            where: { id: tip.id },
+            select: { id: true, connectionId: true, status: true },
+          });
+
+          let suggestionId = tip.id;
+          if (!existingSuggestion || existingSuggestion.connectionId !== rule.cmsConnectionId) {
+            const created = await prisma.cMSSuggestion.create({
+              data: {
+                connectionId: rule.cmsConnectionId,
+                type: this.mapContentKindToSuggestionType(tip.contentKind),
+                title: tip.title,
+                body: tip.content,
+                reasoning: `Routing automatico ${source === 'manual_test' ? 'test' : 'cron'} da regola ${rule.id}`,
+                sourceSignals: {
+                  projectId,
+                  routedBy: 'tip_routing',
+                  routingRuleId: rule.id,
+                  publishRouting: {
+                    contentKind: tip.contentKind,
+                  },
+                },
+                targetSection: tip.targetChannel || null,
+                metaDescription: tip.metaDescription || null,
+                status: 'PENDING',
+                createdBy: source === 'manual_test' ? 'routing_test' : 'routing_executor',
+              },
+            });
+            suggestionId = created.id;
+          }
+
+          const push = await CMSConnectionService.pushSuggestion(suggestionId);
+          if (!push.success) {
+            throw new Error(push.error || 'CMS push failed');
+          }
+        }
       } else {
-        const connectionStatus = destination === 'cms'
-          ? rule.cmsConnection?.status
-          : rule.n8nConnection?.status;
-        if (connectionStatus !== 'ACTIVE') {
-          throw new Error(`${destination.toUpperCase()} connection is not active`);
+        if (rule.n8nConnection?.status !== 'ACTIVE') {
+          throw new Error('N8N connection is not active');
         }
 
         const dispatch = await N8NDispatcher.dispatchTipsWithResult(projectId, this.toPayload(tips));

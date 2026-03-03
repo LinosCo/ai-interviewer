@@ -5,6 +5,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import { CrossChannelSyncEngine } from '../insights/sync-engine';
 import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
+import { findAnyNameMentionPosition, findNameMentionPosition, namesLikelySame } from './name-matching';
 
 const AnalysisSchema = z.object({
     brandMentioned: z.boolean(),
@@ -15,6 +16,10 @@ const AnalysisSchema = z.object({
         .describe("Map of competitor names to their positions (number or null)"),
     sentiment: z.enum(['positive', 'neutral', 'negative']).nullable(),
     sourcesCited: z.array(z.string()).describe("List of sources/links cited if any")
+});
+
+const AutoCompetitorSuggestionSchema = z.object({
+    suggestions: z.array(z.string()).describe('Potential competitor names extracted from responses')
 });
 
 export class VisibilityEngine {
@@ -115,6 +120,7 @@ export class VisibilityEngine {
                     const analysis = await this.analyzeResponse(
                         llmResult.text,
                         config.brandName,
+                        config.brandAliases || [],
                         config.competitors.map(c => c.name)
                     );
                     const normalizedSources = this.normalizeSources(analysis.sourcesCited || []);
@@ -160,7 +166,8 @@ export class VisibilityEngine {
                                 config.competitors.map(c => c.name),
                                 queryToUse,
                                 config.language,
-                                config.territory
+                                config.territory,
+                                config.brandAliases || []
                             );
                         } else {
                             // First scan: try to find a working variant
@@ -169,7 +176,8 @@ export class VisibilityEngine {
                                 config.competitors.map(c => c.name),
                                 prompt.text,
                                 config.language,
-                                config.territory
+                                config.territory,
+                                config.brandAliases || []
                             );
 
                             // If found with a variant, save it for future scans
@@ -248,6 +256,31 @@ export class VisibilityEngine {
             });
             console.log(`[visibility] Scan ${scan.id} marked as completed with score ${totalScore}`);
 
+            // 5.b Generate auto competitor suggestions (non-blocking)
+            try {
+                const autoCompetitorSuggestions = await this.generateAutoCompetitorSuggestions({
+                    brandName: config.brandName,
+                    category: config.category,
+                    description: config.description || '',
+                    existingCompetitors: config.competitors.map((c) => c.name),
+                    responses: validResponses.map((r) => r.responseText).filter(Boolean)
+                });
+
+                await prisma.visibilityScanMetric.create({
+                    data: {
+                        scanId: scan.id,
+                        metricType: 'auto_competitor_suggestions',
+                        value: autoCompetitorSuggestions.length,
+                        dimensions: {
+                            suggestions: autoCompetitorSuggestions,
+                            generatedAt: new Date().toISOString()
+                        } as any
+                    }
+                });
+            } catch (metricError) {
+                console.error('[visibility] Auto competitor suggestions failed:', metricError);
+            }
+
             // 6. Trigger Cross-Channel Sync
             try {
                 await CrossChannelSyncEngine.sync(config.organizationId);
@@ -271,7 +304,7 @@ export class VisibilityEngine {
     /**
      * Analyze LLM response to extract visibility metrics
      */
-    private static async analyzeResponse(text: string, brandName: string, competitors: string[]) {
+    private static async analyzeResponse(text: string, brandName: string, brandAliases: string[], competitors: string[]) {
         try {
             console.log(`[visibility] Analyzing response for brand "${brandName}"...`);
             const { model, provider } = await getSystemLLM({ preferLatestVisibilityModel: true });
@@ -282,6 +315,7 @@ export class VisibilityEngine {
                 prompt: `Analyze the following text which represents an LLM's response to a user query.
 
 Product/Brand to track: "${sanitizeConfig(brandName, 200)}"
+Known brand variants/aliases: ${JSON.stringify((brandAliases || []).map((v) => sanitizeConfig(v, 100)))}
 Competitors: ${JSON.stringify(competitors.map(c => sanitizeConfig(c, 100)))}
 
 Determine:
@@ -303,20 +337,90 @@ ${sanitize(text.substring(0, 8000), 8000)}
             });
 
             console.log(`[visibility] Analysis complete: brandMentioned=${object.brandMentioned}, position=${object.brandPosition}`);
+            const brandMatch = findAnyNameMentionPosition(text, [brandName, ...(brandAliases || [])]);
+            const mergedBrandMentioned = Boolean(object.brandMentioned || brandMatch.mentioned);
+            const mergedBrandPosition = object.brandPosition ?? brandMatch.position ?? null;
+
+            const normalizedCompetitorPositions = this.normalizeCompetitorPositions(object.competitorPositions as any);
+            for (const competitor of competitors) {
+                if (normalizedCompetitorPositions[competitor] == null) {
+                    const competitorMatch = findNameMentionPosition(text, competitor);
+                    if (competitorMatch.mentioned) {
+                        normalizedCompetitorPositions[competitor] = competitorMatch.position;
+                    }
+                }
+            }
+
             return {
                 ...object,
-                competitorPositions: this.normalizeCompetitorPositions(object.competitorPositions as any)
+                brandMentioned: mergedBrandMentioned,
+                brandPosition: mergedBrandPosition,
+                competitorPositions: normalizedCompetitorPositions
             };
         } catch (error) {
             console.error('[visibility] Analysis failed:', error);
-            // Fallback default
+            const fallbackBrandMatch = findAnyNameMentionPosition(text, [brandName, ...(brandAliases || [])]);
+            const fallbackCompetitorPositions: Record<string, number | null> = {};
+            for (const competitor of competitors) {
+                const competitorMatch = findNameMentionPosition(text, competitor);
+                fallbackCompetitorPositions[competitor] = competitorMatch.mentioned ? competitorMatch.position : null;
+            }
             return {
-                brandMentioned: false,
-                brandPosition: null, // Ensure explicit null
-                competitorPositions: {},
+                brandMentioned: fallbackBrandMatch.mentioned,
+                brandPosition: fallbackBrandMatch.position ?? null,
+                competitorPositions: fallbackCompetitorPositions,
                 sentiment: null, // Ensure explicit null
                 sourcesCited: []
             };
         }
+    }
+
+    private static async generateAutoCompetitorSuggestions(input: {
+        brandName: string;
+        category: string;
+        description: string;
+        existingCompetitors: string[];
+        responses: string[];
+    }): Promise<string[]> {
+        if (!input.responses.length) return [];
+
+        const sampleResponses = input.responses
+            .slice(0, 8)
+            .map((r, idx) => `Response ${idx + 1}:\n${sanitize(r.slice(0, 1200), 1200)}`)
+            .join('\n\n');
+
+        const { model } = await getSystemLLM({ preferLatestVisibilityModel: true });
+        const { object } = await generateObject({
+            model,
+            schema: AutoCompetitorSuggestionSchema,
+            temperature: 0.2,
+            prompt: `Identify likely direct competitors mentioned or implied in these Brand Monitor responses.
+
+Brand: "${sanitizeConfig(input.brandName, 200)}"
+Category: "${sanitizeConfig(input.category, 200)}"
+Description: "${sanitizeConfig(input.description || '', 500)}"
+Already tracked competitors: ${JSON.stringify(input.existingCompetitors.map((c) => sanitizeConfig(c, 100)))}
+
+Rules:
+- Return only concrete competitor brand/product names
+- Exclude the brand itself and near-duplicates/typos of it
+- Exclude competitors already tracked
+- Max 8 items, ordered by relevance/frequency
+- Output only the names
+
+Responses:
+${sampleResponses}`
+        });
+
+        const deduped: string[] = [];
+        for (const rawName of object.suggestions || []) {
+            const name = String(rawName || '').trim();
+            if (!name) continue;
+            if (namesLikelySame(name, input.brandName)) continue;
+            if (input.existingCompetitors.some((c) => namesLikelySame(c, name))) continue;
+            if (deduped.some((c) => namesLikelySame(c, name))) continue;
+            deduped.push(name);
+        }
+        return deduped.slice(0, 8);
     }
 }

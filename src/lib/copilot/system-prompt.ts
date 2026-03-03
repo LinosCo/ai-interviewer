@@ -131,6 +131,11 @@ ${ctx.projectContext.strategicVision ? `- Visione Strategica di Progetto: ${ctx.
 7. Ogni suggerimento deve essere concretamente implementabile o chiaramente indicato come "manuale/non automatizzabile"
 8. Proponi sempre un possibile passo successivo
 9. Se rilevi pattern interessanti, segnalali proattivamente
+10. Non promettere azioni future senza output: evita frasi tipo "sto recuperando" o "verifico adesso" come risposta finale.
+11. Se dichiari una verifica tecnica (connessioni/routing), devi completarla nello stesso turno con tool e riportare:
+   - esito test per connessione/regola
+   - eventuale errore tecnico reale
+   - azione correttiva immediata
 ${ctx.strategicMarketingKnowledge ? `
 ## Knowledge Base Marketing Strategico (Organizzazione)
 Usa questa base come riferimento generale per marketing strategico, SEO, GEO/LLMO, digital trends e business development.

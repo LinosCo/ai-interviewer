@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisibilityProjectFilter } from "./VisibilityProjectFilter";
 import { cookies } from "next/headers";
+import { AutoCompetitorSuggestions } from "./AutoCompetitorSuggestions";
 
 export default async function VisibilityPage({
     searchParams
@@ -61,7 +62,11 @@ export default async function VisibilityPage({
                     }
                     : {})
             },
-            include: { prompts: true, project: { select: { id: true, name: true } } }
+            include: {
+                prompts: true,
+                competitors: { where: { enabled: true }, select: { name: true } },
+                project: { select: { id: true, name: true } }
+            }
         });
     } catch (error: any) {
         if (error?.code !== 'P2021') throw error;
@@ -73,7 +78,11 @@ export default async function VisibilityPage({
                     ? { projectId: projectIdFilter }
                     : {})
             },
-            include: { prompts: true, project: { select: { id: true, name: true } } }
+            include: {
+                prompts: true,
+                competitors: { where: { enabled: true }, select: { name: true } },
+                project: { select: { id: true, name: true } }
+            }
         });
     }
 
@@ -142,6 +151,7 @@ export default async function VisibilityPage({
         ? await prisma.visibilityScan.findUnique({
             where: { id: selectedScanId },
             include: {
+                metrics: true,
                 responses: {
                     include: { prompt: true }
                 }
@@ -151,11 +161,22 @@ export default async function VisibilityPage({
             where: { configId: config.id, status: 'completed' },
             orderBy: { completedAt: 'desc' },
             include: {
+                metrics: true,
                 responses: {
                     include: { prompt: true }
                 }
             }
         });
+
+    const autoCompetitorSuggestions = (() => {
+        if (!activeScan?.metrics?.length) return [];
+        const metric = activeScan.metrics
+            .filter((m) => m.metricType === 'auto_competitor_suggestions')
+            .sort((a, b) => b.id.localeCompare(a.id))[0];
+        const raw = (metric?.dimensions as any)?.suggestions;
+        if (!Array.isArray(raw)) return [];
+        return raw.map((item) => String(item || '').trim()).filter(Boolean);
+    })();
 
     const totalScans = await prisma.visibilityScan.count({
         where: { configId: config.id, status: 'completed' }
@@ -240,6 +261,14 @@ export default async function VisibilityPage({
                     <ScanForm configId={config.id} />
                 </div>
             </div>
+
+            {autoCompetitorSuggestions.length > 0 && (
+                <AutoCompetitorSuggestions
+                    configId={config.id}
+                    suggestions={autoCompetitorSuggestions}
+                    existingCompetitors={(config.competitors || []).map((c) => c.name)}
+                />
+            )}
 
             <Tabs defaultValue="llm" className="space-y-6">
                 <TabsList className="bg-stone-100">

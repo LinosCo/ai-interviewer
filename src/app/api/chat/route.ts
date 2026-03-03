@@ -223,6 +223,7 @@ export async function POST(req: Request) {
         const language = bot.language || 'en';
         const interviewObjective = String((bot as any).researchGoal || '').trim();
         const shouldCollectData = (bot as any).collectCandidateData;
+        console.log('[DEBUG chat/route] shouldCollectData:', shouldCollectData, typeof shouldCollectData, 'candidateDataFields:', (bot as any).candidateDataFields);
         const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
         const interviewProject = (bot as any).project || {};
         const interviewOrganizationId: string | null =
@@ -759,8 +760,8 @@ export async function POST(req: Request) {
                         checkUserIntent: async (userMessage: string, context: 'deep_offer') =>
                             checkUserIntent(userMessage, openAIKey, language, context, { onUsage: collectLlmUsage }),
                         isExtensionOfferQuestion: (message: string) => isExtensionOfferQuestion(message, language),
-                        buildDeepOfferInsight: (sourceState: InterviewStateLike) =>
-                            buildDeepOfferInsight(sourceState as InterviewState),
+                        buildDeepOfferInsight: (sourceState: InterviewStateLike, validationFeedback?: ValidationResponse) =>
+                            buildDeepOfferInsight(sourceState as InterviewState, validationFeedback),
                         buildDeepPlan: (remainingSec: number) =>
                             buildDeepPlan(
                                 botTopics,

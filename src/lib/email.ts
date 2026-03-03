@@ -10,12 +10,32 @@ const DEFAULT_FROM_EMAIL = 'Business Tuner <businesstuner@voler.ai>';
 const DEFAULT_NOTIFICATION_EMAIL = 'businesstuner@voler.ai';
 
 function getAppBaseUrl() {
-    return (
+    const candidates = [
         process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.AUTH_URL ||
-        process.env.NEXTAUTH_URL ||
-        'https://app.voler.ai'
-    );
+        null,
+        process.env.AUTH_URL || null,
+        process.env.NEXTAUTH_URL || null,
+        'https://businesstuner.voler.ai',
+    ];
+
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        const normalized = candidate.trim();
+        if (!normalized) continue;
+        try {
+            const parsed = new URL(normalized);
+            const host = parsed.hostname.toLowerCase();
+            const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+            if (process.env.NODE_ENV === 'production' && isLocalHost) {
+                continue;
+            }
+            return normalized.replace(/\/+$/, '');
+        } catch {
+            // Ignore malformed URL candidates.
+        }
+    }
+
+    return 'https://businesstuner.voler.ai';
 }
 
 function getResendClient() {

@@ -26,14 +26,24 @@ export class CMSSessionService {
     }
   }
 
-  private static getJwtSecretFromConnection(storedApiKey: string): string {
+  private static getJwtSecretCandidates(connection: {
+    apiKey: string;
+    webhookSecret?: string | null;
+  }): string[] {
+    const candidates: string[] = [];
+
     const explicitSecret = process.env.CMS_JWT_SECRET?.trim();
-    if (explicitSecret) return explicitSecret;
+    if (explicitSecret) candidates.push(explicitSecret);
 
-    const connectionApiKey = this.decodeConnectionApiKey(storedApiKey).trim();
-    if (connectionApiKey) return connectionApiKey;
+    const webhookSecret = connection.webhookSecret
+      ? this.decodeConnectionApiKey(connection.webhookSecret).trim()
+      : '';
+    if (webhookSecret) candidates.push(webhookSecret);
 
-    throw new Error('CMS JWT secret is not configured');
+    const connectionApiKey = this.decodeConnectionApiKey(connection.apiKey).trim();
+    if (connectionApiKey) candidates.push(connectionApiKey);
+
+    return Array.from(new Set(candidates));
   }
 
   /**
@@ -81,7 +91,10 @@ export class CMSSessionService {
       throw new Error('CMS connection is disabled');
     }
 
-    const jwtSecret = this.getJwtSecretFromConnection(connection.apiKey);
+    const jwtSecrets = this.getJwtSecretCandidates(connection);
+    if (jwtSecrets.length === 0) {
+      throw new Error('CMS JWT secret is not configured');
+    }
 
     const payload: Omit<CMSSessionPayload, 'iat' | 'exp'> = {
       userId,
@@ -92,7 +105,7 @@ export class CMSSessionService {
       permissions: 'full'
     };
 
-    return jwt.sign(payload, jwtSecret, {
+    return jwt.sign(payload, jwtSecrets[0], {
       expiresIn: '24h',
       issuer: this.ISSUER,
       audience: connection.cmsApiUrl
@@ -114,7 +127,8 @@ export class CMSSessionService {
         select: {
           id: true,
           status: true,
-          apiKey: true
+          apiKey: true,
+          webhookSecret: true
         }
       });
 
@@ -122,11 +136,26 @@ export class CMSSessionService {
         return { valid: false, error: 'CMS connection disabled' };
       }
 
-      const jwtSecret = this.getJwtSecretFromConnection(connection.apiKey);
+      const jwtSecrets = this.getJwtSecretCandidates(connection);
+      if (jwtSecrets.length === 0) {
+        return { valid: false, error: 'CMS JWT secret not configured' };
+      }
 
-      const payload = jwt.verify(token, jwtSecret, {
-        issuer: this.ISSUER
-      }) as CMSSessionPayload;
+      let payload: CMSSessionPayload | null = null;
+      for (const secret of jwtSecrets) {
+        try {
+          payload = jwt.verify(token, secret, {
+            issuer: this.ISSUER
+          }) as CMSSessionPayload;
+          break;
+        } catch {
+          // Try next candidate (compat: env/webhook/api).
+        }
+      }
+
+      if (!payload) {
+        return { valid: false, error: 'Invalid token' };
+      }
 
       // Verifica che il token sia per la connessione corretta
       if (payload.connectionId !== expectedConnectionId) {

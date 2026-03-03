@@ -14,6 +14,7 @@ export interface TopicBudget {
     maxTurns: number;
     turnsUsed: number;
     bonusTurnsGranted: number;
+    cilBonusApplied?: number;   // tracks CIL bonus turns used on this topic
 }
 
 // ============================================================================ 

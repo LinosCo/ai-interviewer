@@ -634,6 +634,7 @@ export async function POST(req: Request) {
                     subGoals: topic.subGoals || []
                 })),
                 timeoutMs: 1200,
+                interviewerQuality: (bot as any).interviewerQuality || 'quantitativo',
                 onUsage: collectLlmUsage
             })
             : Promise.resolve(hasValidRuntimeKnowledge ? state.runtimeInterviewKnowledge || null : null);

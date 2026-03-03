@@ -8,9 +8,15 @@ type RuntimePhase = 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION';
 export interface RuntimeTopicKnowledge {
     topicId: string;
     topicLabel: string;
+    // Existing — all tiers
     interpretationCues: string[];
     significanceSignals: string[];
     probeAngles: string[];
+    // New — avanzato only (optional so existing code doesn't break)
+    hypotheses?: string[];         // Testable patterns: "Potrebbe esserci tensione tra X e Y"
+    narrativeThreads?: string[];   // Typical story arcs for this topic/audience
+    contradictionFlags?: string[]; // "Se afferma X ma anche Y → approfondire"
+    emotionalSignals?: string[];   // Engagement vs defence cues
 }
 
 export interface RuntimeInterviewKnowledge {
@@ -214,6 +220,7 @@ export async function generateRuntimeInterviewKnowledge(params: {
     targetAudience?: string;
     topics: RuntimeKnowledgeTopicInput[];
     timeoutMs?: number;
+    interviewerQuality?: string | null;
     onUsage?: (payload: {
         source: string;
         model?: string | null;
@@ -233,20 +240,44 @@ export async function generateRuntimeInterviewKnowledge(params: {
 
     if (!params.topics.length) return fallback;
 
+    const isAvanzato = params.interviewerQuality === 'avanzato';
+
+    // Base schema (all tiers)
+    const baseTopicSchema = z.object({
+        topicId: z.string().min(1),
+        topicLabel: z.string().min(1),
+        interpretationCues: z.array(z.string().min(4).max(140)).min(1).max(3),
+        significanceSignals: z.array(z.string().min(4).max(140)).min(1).max(3),
+        probeAngles: z.array(z.string().min(4).max(140)).min(1).max(3),
+    });
+
+    // Extended schema for avanzato
+    const avanzatoTopicSchema = baseTopicSchema.extend({
+        hypotheses: z.array(z.string().min(4).max(140)).min(1).max(3),
+        narrativeThreads: z.array(z.string().min(4).max(140)).min(1).max(2),
+        contradictionFlags: z.array(z.string().min(4).max(140)).min(1).max(3),
+        emotionalSignals: z.array(z.string().min(4).max(140)).min(1).max(3),
+    });
+
+    const topicSchema = isAvanzato ? avanzatoTopicSchema : baseTopicSchema;
+
     const schema = z.object({
         summary: z.string().min(12).max(280),
-        topics: z.array(z.object({
-            topicId: z.string().min(1),
-            topicLabel: z.string().min(1),
-            interpretationCues: z.array(z.string().min(4).max(140)).min(1).max(3),
-            significanceSignals: z.array(z.string().min(4).max(140)).min(1).max(3),
-            probeAngles: z.array(z.string().min(4).max(140)).min(1).max(3)
-        })).min(1)
+        topics: z.array(topicSchema).min(1)
     });
 
     const topicsForPrompt = params.topics
         .map((t, idx) => `${idx + 1}) ${t.topicId} | ${sanitizeConfig(t.topicLabel, 200)} | sub-goals: ${(t.subGoals || []).map(g => sanitizeConfig(g, 200)).join(' ; ') || '-'}`)
         .join('\n');
+
+    const avanzatoInstructions = isAvanzato ? `
+
+For each topic also provide (avanzato qualitative mode):
+4) hypotheses -> 1-3 testable patterns to watch for during the conversation (e.g. "Potrebbe esserci tensione tra autonomia e controllo esterno")
+5) narrativeThreads -> 1-2 typical story arcs for this audience on this topic (e.g. "Partono dal sintomo tecnico, poi rivelano un problema organizzativo")
+6) contradictionFlags -> 1-3 pairs of statements that, if both said, signal unexplored tension (e.g. "Afferma indipendenza ma descrive ogni decisione come richiesta dall'alto")
+7) emotionalSignals -> 1-3 cues distinguishing genuine engagement from defensive deflection (e.g. "Entusiasmo su processi = area di valore; minimizzazione su impatti = zona sensibile")
+` : '';
 
     const prompt = [
         `Language: ${params.language}`,
@@ -263,7 +294,8 @@ export async function generateRuntimeInterviewKnowledge(params: {
         `  2) significanceSignals -> signs that deserve deeper probing`,
         `  3) probeAngles -> follow-up directions with concrete business framing`,
         `- Max 3 short bullets per list.`,
-        `- Do NOT include markdown, numbering, or commentary outside JSON.`
+        `- Do NOT include markdown, numbering, or commentary outside JSON.`,
+        avanzatoInstructions
     ].join('\n');
 
     try {
@@ -285,25 +317,40 @@ export async function generateRuntimeInterviewKnowledge(params: {
 
         const byId = new Map<string, RuntimeTopicKnowledge>();
         for (const item of result.object.topics || []) {
-            byId.set(item.topicId, {
+            const baseEntry: RuntimeTopicKnowledge = {
                 topicId: item.topicId,
                 topicLabel: normalizeText(item.topicLabel).slice(0, 80) || item.topicId,
                 interpretationCues: cleanItems(item.interpretationCues, []),
                 significanceSignals: cleanItems(item.significanceSignals, []),
                 probeAngles: cleanItems(item.probeAngles, [])
-            });
+            };
+            if (isAvanzato) {
+                const avanzatoItem = item as z.infer<typeof avanzatoTopicSchema>;
+                baseEntry.hypotheses = cleanItems(avanzatoItem.hypotheses, []);
+                baseEntry.narrativeThreads = cleanItems(avanzatoItem.narrativeThreads, []);
+                baseEntry.contradictionFlags = cleanItems(avanzatoItem.contradictionFlags, []);
+                baseEntry.emotionalSignals = cleanItems(avanzatoItem.emotionalSignals, []);
+            }
+            byId.set(item.topicId, baseEntry);
         }
 
         const mergedTopics = params.topics.map((topic) => {
             const generated = byId.get(topic.topicId);
             if (!generated) return buildFallbackTopicKnowledge(topic, params.language);
-            return {
+            const merged: RuntimeTopicKnowledge = {
                 topicId: topic.topicId,
                 topicLabel: generated.topicLabel || topic.topicLabel,
                 interpretationCues: cleanItems(generated.interpretationCues, buildFallbackTopicKnowledge(topic, params.language).interpretationCues),
                 significanceSignals: cleanItems(generated.significanceSignals, buildFallbackTopicKnowledge(topic, params.language).significanceSignals),
                 probeAngles: cleanItems(generated.probeAngles, buildFallbackTopicKnowledge(topic, params.language).probeAngles)
             };
+            if (isAvanzato) {
+                merged.hypotheses = (generated as any).hypotheses;
+                merged.narrativeThreads = (generated as any).narrativeThreads;
+                merged.contradictionFlags = (generated as any).contradictionFlags;
+                merged.emotionalSignals = (generated as any).emotionalSignals;
+            }
+            return merged;
         });
 
         return {

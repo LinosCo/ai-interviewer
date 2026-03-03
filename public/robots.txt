@@ -1,7 +1,0 @@
-# Business Tuner - robots.txt
-User-agent: *
-Allow: /
-Disallow: /api/
-Disallow: /dashboard/
-
-Sitemap: https://businesstuner.voler.ai/sitemap.xml

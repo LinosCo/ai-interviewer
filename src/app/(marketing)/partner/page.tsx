@@ -18,9 +18,106 @@ import {
 import { PARTNER_PLAN } from '@/config/landingPricing';
 import { FluidBackground } from '@/components/landing/FluidBackground';
 
+const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it').replace(/\/+$/, '');
+const PARTNER_FAQS = [
+    {
+        q: 'Cos\'e il Programma Partner in termini pratici?',
+        a: 'E un modello per erogare consulenza e servizi con una regia unica: ascolti stakeholder, raccogli segnali di mercato, definisci priorita e trasformi le decisioni in azioni operative tracciabili.'
+    },
+    {
+        q: 'Per quali profili e pensato?',
+        a: 'Per agenzie, consulenti strategici, business advisor e team che seguono PMI o aziende strutturate. Funziona sia quando fai delivery digitale diretta sia quando coordini partner esterni.'
+    },
+    {
+        q: 'Qual e la logica di lavoro consigliata con ogni cliente?',
+        a: 'Parti con un perimetro chiaro, attivi ascolto e monitoraggio, usi il Copilot per ordinare le priorita e chiudi ogni ciclo con un piano operativo. In questo modo il cliente vede un metodo continuativo, non attivita isolate.'
+    },
+    {
+        q: 'Che ruolo ha il Copilot nel rapporto consulente-cliente?',
+        a: 'Il Copilot aiuta a sintetizzare insight, evidenziare priorita e proporre prossime azioni. Tu resti la guida strategica: il Copilot accelera analisi e decisioni, non sostituisce il giudizio consulenziale.'
+    },
+    {
+        q: 'Come aumenta il valore percepito del servizio?',
+        a: 'Perche il cliente vede una catena completa: dati raccolti, decisioni motivate, piano d\'azione e avanzamento monitorato. Questo rende la consulenza piu concreta, misurabile e facile da difendere in fase di rinnovo.'
+    },
+    {
+        q: 'Se non gestisco l\'operativita digitale, posso comunque usarlo con efficacia?',
+        a: 'Sì. Puoi gestire discovery, strategia, governance e controllo risultati, mentre l\'execution resta al team del cliente o a una seconda agenzia. In pratica diventi il centro di coordinamento decisionale.'
+    },
+    {
+        q: 'Come collaborano consulente, cliente e team operativo?',
+        a: 'Il partner definisce obiettivi e priorita, il cliente valida direzione e timing, il team operativo esegue. Tutti lavorano su un contesto condiviso, riducendo incomprensioni e dispersione.'
+    },
+    {
+        q: 'Qual e il primo use case da attivare per creare fiducia velocemente?',
+        a: 'Di solito funziona partire da ascolto stakeholder + monitoraggio brand su un tema specifico. In poche settimane ottieni segnali utili, una priorita chiara e un piano azionabile da presentare al cliente.'
+    },
+    {
+        q: 'Come supporta meeting periodici e report direzionali?',
+        a: 'Ti aiuta a portare ai meeting una narrativa ordinata: cosa e successo, cosa conta davvero, cosa fare adesso. Questo migliora la qualita delle decisioni e la percezione di controllo del cliente.'
+    },
+    {
+        q: 'Cosa si intende per "cliente attivo"?',
+        a: 'Un cliente attivo e un utente a cui hai trasferito almeno un progetto e che ha un abbonamento pagante (Starter, Pro o Business). I clienti in trial o con piano Free non contano per le soglie.'
+    },
+    {
+        q: 'Cosa succede se perdo clienti e scendo sotto la soglia?',
+        a: `Hai un grace period di 30 giorni per riacquistare clienti. Se non raggiungi la soglia, la fee mensile di ${PARTNER_PLAN.basePrice}EUR si riattiva automaticamente.`
+    },
+    {
+        q: 'Come funziona il White Label?',
+        a: `Con ${PARTNER_PLAN.whiteLabelThreshold}+ clienti attivi, puoi personalizzare la piattaforma con il tuo logo e branding. I tuoi clienti vedranno il tuo brand invece di Business Tuner.`
+    },
+    {
+        q: 'Posso passare da un piano normale a Partner?',
+        a: 'Sì, puoi richiedere di diventare Partner in qualsiasi momento. Il trial di 60 giorni partirà dalla data di attivazione del piano Partner.'
+    }
+];
+
+const partnerJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+        {
+            '@type': 'Service',
+            '@id': `${siteUrl}/partner#service`,
+            serviceType: 'Programma Partner Marketing Intelligence',
+            provider: {
+                '@type': 'Organization',
+                name: 'Business Tuner',
+                url: siteUrl,
+            },
+            areaServed: 'IT',
+            audience: {
+                '@type': 'Audience',
+                audienceType: 'Agenzie, consulenti strategici, business advisor',
+            },
+            description:
+                'Modello partner per gestire clienti con ascolto stakeholder, Copilot strategico e operativita tracciabile.',
+            url: `${siteUrl}/partner`,
+        },
+        {
+            '@type': 'FAQPage',
+            '@id': `${siteUrl}/partner#faq`,
+            mainEntity: PARTNER_FAQS.map((faq) => ({
+                '@type': 'Question',
+                name: faq.q,
+                acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: faq.a,
+                },
+            })),
+        },
+    ],
+};
+
 export default function PartnerPage() {
     return (
         <main className="relative min-h-screen overflow-x-hidden">
+            <script
+                id="partner-jsonld"
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(partnerJsonLd) }}
+            />
             <FluidBackground />
 
             {/* Hero Section */}
@@ -316,60 +413,7 @@ export default function PartnerPage() {
                     </motion.div>
 
                     <div className="space-y-4">
-                        {[
-                            {
-                                q: 'Cos\'e il Programma Partner in termini pratici?',
-                                a: 'E un modello per erogare consulenza e servizi con una regia unica: ascolti stakeholder, raccogli segnali di mercato, definisci priorita e trasformi le decisioni in azioni operative tracciabili.'
-                            },
-                            {
-                                q: 'Per quali profili e pensato?',
-                                a: 'Per agenzie, consulenti strategici, business advisor e team che seguono PMI o aziende strutturate. Funziona sia quando fai delivery digitale diretta sia quando coordini partner esterni.'
-                            },
-                            {
-                                q: 'Qual e la logica di lavoro consigliata con ogni cliente?',
-                                a: 'Parti con un perimetro chiaro, attivi ascolto e monitoraggio, usi il Copilot per ordinare le priorita e chiudi ogni ciclo con un piano operativo. In questo modo il cliente vede un metodo continuativo, non attivita isolate.'
-                            },
-                            {
-                                q: 'Che ruolo ha il Copilot nel rapporto consulente-cliente?',
-                                a: 'Il Copilot aiuta a sintetizzare insight, evidenziare priorita e proporre prossime azioni. Tu resti la guida strategica: il Copilot accelera analisi e decisioni, non sostituisce il giudizio consulenziale.'
-                            },
-                            {
-                                q: 'Come aumenta il valore percepito del servizio?',
-                                a: 'Perche il cliente vede una catena completa: dati raccolti, decisioni motivate, piano d\'azione e avanzamento monitorato. Questo rende la consulenza piu concreta, misurabile e facile da difendere in fase di rinnovo.'
-                            },
-                            {
-                                q: 'Se non gestisco l\'operativita digitale, posso comunque usarlo con efficacia?',
-                                a: 'Sì. Puoi gestire discovery, strategia, governance e controllo risultati, mentre l\'execution resta al team del cliente o a una seconda agenzia. In pratica diventi il centro di coordinamento decisionale.'
-                            },
-                            {
-                                q: 'Come collaborano consulente, cliente e team operativo?',
-                                a: 'Il partner definisce obiettivi e priorita, il cliente valida direzione e timing, il team operativo esegue. Tutti lavorano su un contesto condiviso, riducendo incomprensioni e dispersione.'
-                            },
-                            {
-                                q: 'Qual e il primo use case da attivare per creare fiducia velocemente?',
-                                a: 'Di solito funziona partire da ascolto stakeholder + monitoraggio brand su un tema specifico. In poche settimane ottieni segnali utili, una priorita chiara e un piano azionabile da presentare al cliente.'
-                            },
-                            {
-                                q: 'Come supporta meeting periodici e report direzionali?',
-                                a: 'Ti aiuta a portare ai meeting una narrativa ordinata: cosa e successo, cosa conta davvero, cosa fare adesso. Questo migliora la qualita delle decisioni e la percezione di controllo del cliente.'
-                            },
-                            {
-                                q: 'Cosa si intende per "cliente attivo"?',
-                                a: 'Un cliente attivo e un utente a cui hai trasferito almeno un progetto e che ha un abbonamento pagante (Starter, Pro o Business). I clienti in trial o con piano Free non contano per le soglie.'
-                            },
-                            {
-                                q: 'Cosa succede se perdo clienti e scendo sotto la soglia?',
-                                a: `Hai un grace period di 30 giorni per riacquistare clienti. Se non raggiungi la soglia, la fee mensile di ${PARTNER_PLAN.basePrice}EUR si riattiva automaticamente.`
-                            },
-                            {
-                                q: 'Come funziona il White Label?',
-                                a: `Con ${PARTNER_PLAN.whiteLabelThreshold}+ clienti attivi, puoi personalizzare la piattaforma con il tuo logo e branding. I tuoi clienti vedranno il tuo brand invece di Business Tuner.`
-                            },
-                            {
-                                q: 'Posso passare da un piano normale a Partner?',
-                                a: 'Sì, puoi richiedere di diventare Partner in qualsiasi momento. Il trial di 60 giorni partirà dalla data di attivazione del piano Partner.'
-                            }
-                        ].map((faq, index) => (
+                        {PARTNER_FAQS.map((faq, index) => (
                             <motion.div
                                 key={index}
                                 initial={{ opacity: 0, y: 20 }}

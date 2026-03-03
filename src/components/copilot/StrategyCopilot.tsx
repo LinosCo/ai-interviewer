@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Send, X, Lightbulb, MessageSquare, ChevronDown, AlertCircle } from 'lucide-react';
+import { Sparkles, Send, X, Lightbulb, MessageSquare, AlertCircle, Loader2 } from 'lucide-react';
 import { useProject } from '@/contexts/ProjectContext';
 import ReactMarkdown from 'react-markdown';
 
@@ -16,7 +16,6 @@ interface Message {
 
 interface StrategyCopilotProps {
     userTier: string;
-    organizationId: string;
 }
 
 const QUICK_ACTIONS = [
@@ -30,21 +29,94 @@ const QUICK_ACTIONS_PRO = [
     { label: 'Ci sono knowledge gaps?', icon: Lightbulb, category: 'data' },
 ];
 
-export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotProps) {
+const BASE_LOADING_STAGES = [
+    'Analizzo la richiesta...',
+    'Raccolgo dati dai sistemi...',
+    'Organizzo i risultati...',
+];
+
+function buildLoadingStages(prompt: string): string[] {
+    const normalized = prompt.toLowerCase();
+
+    if (
+        normalized.includes('connession') ||
+        normalized.includes('routing') ||
+        normalized.includes('mcp') ||
+        normalized.includes('wordpress') ||
+        normalized.includes('woocommerce') ||
+        normalized.includes('n8n')
+    ) {
+        return [
+            'Verifico connessioni e routing...',
+            'Controllo stato e test tecnici...',
+            'Preparo il riepilogo operativo...',
+        ];
+    }
+
+    if (
+        normalized.includes('tema') ||
+        normalized.includes('conversaz') ||
+        normalized.includes('insight') ||
+        normalized.includes('intervist')
+    ) {
+        return [
+            'Analizzo conversazioni e insight...',
+            'Cerco pattern ricorrenti...',
+            'Preparo le priorita suggerite...',
+        ];
+    }
+
+    if (
+        normalized.includes('credit') ||
+        normalized.includes('utilizzo') ||
+        normalized.includes('piano') ||
+        normalized.includes('billing')
+    ) {
+        return [
+            'Recupero stato piano e crediti...',
+            'Verifico i dettagli di utilizzo...',
+            'Preparo il riepilogo...',
+        ];
+    }
+
+    return BASE_LOADING_STAGES;
+}
+
+export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [loadingTitle, setLoadingTitle] = useState(BASE_LOADING_STAGES[0]);
     const [error, setError] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const loadingStageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { selectedProject } = useProject();
     const hasProjectAccess = ['PRO', 'BUSINESS', 'ENTERPRISE', 'ADMIN', 'PARTNER'].includes(userTier.toUpperCase());
+
+    const clearLoadingTimers = () => {
+        if (loadingStageTimerRef.current) {
+            clearInterval(loadingStageTimerRef.current);
+            loadingStageTimerRef.current = null;
+        }
+        if (requestTimeoutRef.current) {
+            clearTimeout(requestTimeoutRef.current);
+            requestTimeoutRef.current = null;
+        }
+    };
 
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
+
+    useEffect(() => {
+        return () => {
+            clearLoadingTimers();
+        };
+    }, []);
 
     // Welcome message
     useEffect(() => {
@@ -63,14 +135,15 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
     }, [isOpen, messages.length, hasProjectAccess, selectedProject]);
 
     const sendMessage = async (content: string) => {
-        if (!content.trim() || isLoading) return;
+        const trimmedContent = content.trim();
+        if (!trimmedContent || isLoading) return;
 
         setError(null);
 
         const userMessage: Message = {
             id: `user-${Date.now()}`,
             role: 'user',
-            content: content.trim(),
+            content: trimmedContent,
             timestamp: new Date()
         };
 
@@ -78,12 +151,25 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
         setInput('');
         setIsLoading(true);
 
+        const loadingStages = buildLoadingStages(trimmedContent);
+        setLoadingTitle(loadingStages[0]);
+        let stageIndex = 0;
+        clearLoadingTimers();
+        loadingStageTimerRef.current = setInterval(() => {
+            stageIndex = Math.min(stageIndex + 1, loadingStages.length - 1);
+            setLoadingTitle(loadingStages[stageIndex]);
+        }, 3500);
+
+        const controller = new AbortController();
+        requestTimeoutRef.current = setTimeout(() => controller.abort(), 65000);
+
         try {
             const res = await fetch('/api/copilot/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
                 body: JSON.stringify({
-                    message: content,
+                    message: trimmedContent,
                     history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
                     projectId: selectedProject?.id !== '__ALL__' ? selectedProject?.id : null
                 })
@@ -106,16 +192,24 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
                 timestamp: new Date(),
                 toolsUsed: data.toolsUsed
             }]);
-        } catch (err: any) {
-            setError(err.message || 'Si e verificato un errore. Riprova.');
+        } catch (err: unknown) {
+            const isAbort = err instanceof DOMException && err.name === 'AbortError';
+            const fallbackError = err instanceof Error ? err.message : 'Si e verificato un errore. Riprova.';
+            const errorMessage = isAbort
+                ? 'La richiesta sta richiedendo troppo tempo. Riprova con una domanda piu specifica.'
+                : fallbackError;
+
+            setError(errorMessage);
             setMessages(prev => [...prev, {
                 id: `error-${Date.now()}`,
                 role: 'assistant',
-                content: `Mi dispiace, c'e stato un problema: ${err.message}. Riprova tra poco.`,
+                content: `Mi dispiace, c'e stato un problema: ${errorMessage}. Riprova tra poco.`,
                 timestamp: new Date()
             }]);
         } finally {
+            clearLoadingTimers();
             setIsLoading(false);
+            setLoadingTitle(BASE_LOADING_STAGES[0]);
         }
     };
 
@@ -180,6 +274,13 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
                                     Vista multi-progetto attiva: il Copilot userà tutti i progetti a cui hai accesso
                                 </div>
                             )}
+
+                            {isLoading && (
+                                <div className="mt-3 bg-white/10 rounded-lg px-3 py-2 text-xs flex items-center gap-2" title={loadingTitle}>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    {loadingTitle}
+                                </div>
+                            )}
                         </div>
 
                         {/* Messages */}
@@ -224,7 +325,11 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
 
                             {isLoading && (
                                 <div className="flex justify-start">
-                                    <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-md px-4 py-3">
+                                    <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-md px-4 py-3" title={loadingTitle}>
+                                        <div className="mb-2 flex items-center gap-2 text-xs text-stone-500">
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                                            <span>{loadingTitle}</span>
+                                        </div>
                                         <div className="flex gap-1">
                                             <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" />
                                             <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -274,6 +379,11 @@ export function StrategyCopilot({ userTier, organizationId }: StrategyCopilotPro
                                     <Send className="w-4 h-4" />
                                 </button>
                             </div>
+                            {error && (
+                                <p className="mt-2 text-xs text-red-600" role="alert">
+                                    {error}
+                                </p>
+                            )}
                         </div>
                     </motion.div>
                 )}

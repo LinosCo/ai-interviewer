@@ -35,9 +35,11 @@ const SELECTED_PROJECT_KEY_PREFIX = 'bt_selected_project_id_';
 export function ProjectProvider({ children, initialData }: { children: ReactNode, initialData?: Project[] }) {
     const { currentOrganization, loading: orgLoading } = useOrganization();
     const hasInitialProjects = Array.isArray(initialData) && initialData.length > 0;
+    const currentOrganizationIsAdmin =
+        currentOrganization?.role === 'OWNER' || currentOrganization?.role === 'ADMIN';
 
     const [projects, setProjects] = useState<Project[]>(initialData || []);
-    const [isOrgAdmin, setIsOrgAdmin] = useState(false);
+    const [isOrgAdmin, setIsOrgAdmin] = useState(currentOrganizationIsAdmin);
     const canUseAllProjects = (projectsList: Project[], adminStatus: boolean) =>
         adminStatus || projectsList.length > 1;
 
@@ -55,7 +57,7 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
             const storageKey = `${SELECTED_PROJECT_KEY_PREFIX}${orgId}`;
             const savedProjectId = localStorage.getItem(storageKey);
 
-            if (savedProjectId === ALL_PROJECTS_OPTION.id && canUseAllProjects(initialData!, false)) {
+            if (savedProjectId === ALL_PROJECTS_OPTION.id && canUseAllProjects(initialData!, currentOrganizationIsAdmin)) {
                 return ALL_PROJECTS_OPTION;
             }
             if (savedProjectId) {
@@ -64,7 +66,7 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
             }
         }
         // Default: "All projects" if available, otherwise first project
-        if (canUseAllProjects(initialData!, false)) return ALL_PROJECTS_OPTION;
+        if (canUseAllProjects(initialData!, currentOrganizationIsAdmin)) return ALL_PROJECTS_OPTION;
         return initialData![0] ?? null;
     });
 
@@ -107,7 +109,7 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
                     throw new Error('Invalid projects payload');
                 }
                 const projectsList = data.projects || [];
-                const adminStatus = data.isOrgAdmin || false;
+                const adminStatus = Boolean(data.isOrgAdmin || currentOrganizationIsAdmin);
 
                 setProjects(projectsList);
                 setIsOrgAdmin(adminStatus);
@@ -159,7 +161,11 @@ export function ProjectProvider({ children, initialData }: { children: ReactNode
                 setLoading(false);
             }
         }
-    }, [currentOrganization, orgLoading, retryCount, projects.length]);
+    }, [currentOrganization, currentOrganizationIsAdmin, orgLoading, retryCount, projects.length]);
+
+    useEffect(() => {
+        setIsOrgAdmin(currentOrganizationIsAdmin);
+    }, [currentOrganizationIsAdmin]);
 
     // Track which organization we've already initialised projects for,
     // so we only fetch when the user switches orgs (not on every render).

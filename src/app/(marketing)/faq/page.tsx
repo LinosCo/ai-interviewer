@@ -37,10 +37,41 @@ const faqs = [
         answer: "Sì. Le integrazioni disponibili dipendono dal piano. Per esigenze enterprise e integrazioni su misura, il piano Business viene definito con il team Sales."
     }
 ];
+const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it').replace(/\/+$/, '');
+const faqPageJsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+        {
+            '@type': 'FAQPage',
+            '@id': `${siteUrl}/faq#faq`,
+            mainEntity: faqs.map((faq) => ({
+                '@type': 'Question',
+                name: faq.question,
+                acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: faq.answer,
+                },
+            })),
+        },
+        {
+            '@type': 'WebPage',
+            '@id': `${siteUrl}/faq#webpage`,
+            url: `${siteUrl}/faq`,
+            name: 'FAQ | Business Tuner',
+            description: 'Domande frequenti su modello crediti, piani e gestione billing di Business Tuner.',
+            inLanguage: 'it-IT',
+        },
+    ],
+};
 
 export default function FAQPage() {
     return (
         <div className="min-h-screen relative overflow-x-hidden">
+            <script
+                id="faq-jsonld"
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(faqPageJsonLd) }}
+            />
             <FluidBackground />
 
             <main className="relative">

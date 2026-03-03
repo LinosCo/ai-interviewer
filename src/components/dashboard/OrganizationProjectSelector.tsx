@@ -47,7 +47,12 @@ export default function OrganizationProjectSelector() {
         org.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const showAllProjectsOption = isOrgAdmin || projects.length > 1;
+    const canManageOrganizationProjects =
+        isOrgAdmin ||
+        currentOrganization?.role === 'OWNER' ||
+        currentOrganization?.role === 'ADMIN';
+
+    const showAllProjectsOption = canManageOrganizationProjects || projects.length > 1;
     const filteredProjects = [
         ...(showAllProjectsOption ? [ALL_PROJECTS_OPTION] : []),
         ...projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -379,7 +384,7 @@ export default function OrganizationProjectSelector() {
                                 })
                             )}
 
-                            {isOrgAdmin && (
+                            {canManageOrganizationProjects && (
                                 <div className="border-t border-gray-100 mt-1 pt-1">
                                     <Link
                                         href={`/dashboard/projects/new?orgId=${currentOrganization.id}`}

@@ -13,15 +13,8 @@ export default function WidgetLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="it" className="light" suppressHydrationWarning>
-            <head>
-                <meta name="color-scheme" content="light" />
-            </head>
-            <body className="antialiased">
-                <Providers session={null}>
-                    {children}
-                </Providers>
-            </body>
-        </html>
+        <Providers session={null}>
+            {children}
+        </Providers>
     );
 }

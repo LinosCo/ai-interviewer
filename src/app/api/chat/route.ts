@@ -1264,6 +1264,16 @@ export async function POST(req: Request) {
             ? getDeepPlanTurns(interviewPlan, plannerTopicId)
             : getScanPlanTurns(interviewPlan, plannerTopicId);
         const plannerUsedSubGoals = (nextState.topicSubGoalHistory || {})[plannerTopicId] || [];
+
+        // Await CIL and apply budget stealing BEFORE building micro-planner so that
+        // plannerMaxTurns already reflects any bonus turns granted by CIL.
+        const cilAnalysis = await cilPromise;
+
+        if (cilAnalysis?.budgetSignal && isAvanzato) {
+            const cap = computeCILBonusCap(nextState, (bot as any).cilBonusTurnCapOverride ?? null);
+            nextState = applyCILBudgetSignal(nextState, cilAnalysis.budgetSignal, cap);
+        }
+
         const microPlannerDecision = buildMicroPlannerDecision({
             language,
             phase: nextState.phase,
@@ -1415,14 +1425,6 @@ hard_rules:
                 coverage: microPlannerDecision.topicCoverage,
                 knowledgeSource: microPlannerDecision.knowledgeSource
             });
-        }
-
-        // Await CIL and apply budget stealing (before prompt finalization)
-        const cilAnalysis = await cilPromise;
-
-        if (cilAnalysis?.budgetSignal && isAvanzato) {
-            const cap = computeCILBonusCap(nextState, (bot as any).cilBonusTurnCapOverride ?? null);
-            nextState = applyCILBudgetSignal(nextState, cilAnalysis.budgetSignal, cap);
         }
 
         // Block 6.5 — CIL context (avanzato only)
@@ -2200,6 +2202,14 @@ hard_rules:
                     }
                 });
                 await flushInterviewTokenUsage('completed_response');
+                // Persist CIL state before completion return
+                if (cilAnalysis && isAvanzato) {
+                    nextState.cilState = mergeCILState(
+                        state.cilState ?? EMPTY_CIL_STATE,
+                        cilAnalysis,
+                        canonicalMessages.length
+                    );
+                }
                 return Response.json({
                     text: finalResponseText,
                     currentTopicId: nextTopicId,

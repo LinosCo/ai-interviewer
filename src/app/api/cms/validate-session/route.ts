@@ -3,6 +3,15 @@ import { CMSSessionService } from '@/lib/cms/session.service';
 import { NextResponse } from 'next/server';
 import { decrypt } from '@/lib/cms/encryption';
 
+function decodeStoredCredential(storedValue: string): string {
+  try {
+    return decrypt(storedValue);
+  } catch {
+    // Backward compatibility: legacy/plain-text values or key-rotation mismatch.
+    return storedValue;
+  }
+}
+
 // CORS headers for cross-origin requests from CMS
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,8 +66,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verifica API key (decrypt e confronta)
-    const storedApiKey = decrypt(connection.apiKey);
+    // Verifica API key (decrypt con fallback per record legacy/plain-text)
+    const storedApiKey = decodeStoredCredential(connection.apiKey);
 
     if (apiKey !== storedApiKey) {
       return NextResponse.json(

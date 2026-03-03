@@ -78,6 +78,55 @@ export class CMSConnectionService {
         return this.INTERNAL_LANDING_CMS_API_URLS.has(url);
     }
 
+    private static decodeApiKey(storedApiKey: string): string {
+        try {
+            return decrypt(storedApiKey);
+        } catch {
+            // Backward compatibility for legacy/plain-text keys.
+            return storedApiKey;
+        }
+    }
+
+    private static buildCmsAuthHeaders(
+        storedApiKey: string,
+        includeJsonContentType: boolean = false
+    ): Record<string, string> {
+        const apiKey = this.decodeApiKey(storedApiKey).trim();
+        const headers: Record<string, string> = {
+            'X-BT-API-Key': apiKey,
+            // Compatibility fallback for CMS implementations using Bearer auth.
+            'Authorization': `Bearer ${apiKey}`,
+        };
+        if (includeJsonContentType) {
+            headers['Content-Type'] = 'application/json';
+        }
+        return headers;
+    }
+
+    private static async extractErrorDetails(response: Response): Promise<string | null> {
+        try {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const data = await response.json();
+                if (typeof data?.message === 'string' && data.message.trim().length > 0) {
+                    return data.message.trim().slice(0, 240);
+                }
+                if (typeof data?.error === 'string' && data.error.trim().length > 0) {
+                    return data.error.trim().slice(0, 240);
+                }
+                if (data && typeof data === 'object') {
+                    return JSON.stringify(data).slice(0, 240);
+                }
+                return null;
+            }
+
+            const text = (await response.text()).trim();
+            return text.length > 0 ? text.slice(0, 240) : null;
+        } catch {
+            return null;
+        }
+    }
+
     /**
      * Create a new CMS connection for an organization.
      * Returns the credentials that should be shown only once.
@@ -196,10 +245,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
 
             const response = await fetch(`${connection.cmsApiUrl}/status`, {
                 method: 'GET',
-                headers: {
-                    'X-BT-API-Key': decrypt(connection.apiKey),
-                    'Content-Type': 'application/json',
-                },
+                headers: this.buildCmsAuthHeaders(connection.apiKey, true),
                 signal: controller.signal
             });
 
@@ -207,24 +253,47 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             const responseTime = Date.now() - startTime;
 
             if (response.status === 401) {
-                await this.updateConnectionStatus(connectionId, 'ERROR', 'API key non valida');
+                const details = await this.extractErrorDetails(response);
+                const authMessage = details
+                    ? `API key non valida: ${details}`
+                    : 'API key non valida';
+                await this.updateConnectionStatus(connectionId, 'ERROR', authMessage);
                 return {
                     success: false,
                     status: 'auth_failed',
-                    message: 'API key non riconosciuta dal CMS'
+                    message: details
+                        ? `API key non riconosciuta dal CMS: ${details}`
+                        : 'API key non riconosciuta dal CMS'
                 };
             }
 
             if (!response.ok) {
-                await this.updateConnectionStatus(connectionId, 'ERROR', `HTTP ${response.status}`);
+                const details = await this.extractErrorDetails(response);
+                const statusMessage = details
+                    ? `HTTP ${response.status}: ${details}`
+                    : `HTTP ${response.status}`;
+                await this.updateConnectionStatus(connectionId, 'ERROR', statusMessage);
                 return {
                     success: false,
                     status: 'error',
-                    message: `CMS ha risposto con errore ${response.status}`
+                    message: details
+                        ? `CMS ha risposto con errore ${response.status}: ${details}`
+                        : `CMS ha risposto con errore ${response.status}`
                 };
             }
 
-            const data = await response.json();
+            let data: any;
+            try {
+                data = await response.json();
+            } catch {
+                const parseError = 'Risposta /status non valida: atteso JSON';
+                await this.updateConnectionStatus(connectionId, 'ERROR', parseError);
+                return {
+                    success: false,
+                    status: 'error',
+                    message: parseError
+                };
+            }
 
             // Additional validation of the response body to avoid false positives
             if (data.status === 'error' || data.success === false) {
@@ -553,10 +622,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
         const payload = this.buildCmsPayload(suggestion, routing, sourceSignals);
         const response = await fetch(`${suggestion.connection.cmsApiUrl}/suggestions`, {
             method: 'POST',
-            headers: {
-                'X-BT-API-Key': decrypt(suggestion.connection.apiKey),
-                'Content-Type': 'application/json',
-            },
+            headers: this.buildCmsAuthHeaders(suggestion.connection.apiKey, true),
             body: JSON.stringify(payload)
         });
 

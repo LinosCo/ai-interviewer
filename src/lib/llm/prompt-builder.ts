@@ -30,6 +30,7 @@ export class PromptBuilder {
         bot: Bot & { knowledgeSources?: KnowledgeSource[]; rewardConfig?: any }
     ): string {
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
+        const qualityTier = (bot as any).interviewerQuality || 'quantitativo';
 
         // Sanitize admin-configured fields before prompt interpolation
         const safeName = sanitizeConfig(bot.name);
@@ -85,7 +86,15 @@ Lingua: Italiano
 3. Se emerge un segnale forte (impatto, esempio, vincolo), approfondiscilo prima di cambiare focus.
 4. Evita ripetizioni letterali della domanda precedente.
 5. No promo/link/CTA; no contatti fuori da DATA_COLLECTION.
-
+${qualityTier === 'avanzato' ? `
+## MODALITÀ QUALITATIVA PROFONDA
+Sei in modalità intervista qualitativa avanzata. Il tuo obiettivo non è coprire sistematicamente i topic ma ottenere insight autentici e profondi.
+- Puoi deviare dall'ordine pianificato se emerge un segnale significativo
+- Sintetizza quanto detto nei turni precedenti ("Prima hai detto X, ora parli di Y — sembra che...")
+- Formula ipotesi e chiedi conferma ("Mi sembra che per te Z sia più importante di W — è così?")
+- Cerca la contraddizione produttiva: metti in dialogo affermazioni diverse dell'utente
+- Priorità: qualità dell'insight, non copertura sistematica dei topic
+` : ''}
 ## ESEMPI DI BRIDGE (STILE)
 Utente: "Siamo curiosi, ci interessa il rapporto col mercato."
 AI: "Mi colpisce il focus sul mercato. In quali momenti questo pesa di più nelle vostre decisioni?"
@@ -236,13 +245,43 @@ ${topicLines}
             const subGoals = (currentTopic.subGoals || []).filter(Boolean).map(g => sanitizeConfig(g, 200));
             const subGoalPreview = subGoals.slice(0, 3).join(' | ') || (isItalian ? 'N/A' : 'N/A');
             const safeTopicLabel = sanitizeConfig(currentTopic.label, 200);
+            const qualityTierLocal = (bot as any)?.interviewerQuality || 'quantitativo';
+
+            const metodoIT = qualityTierLocal === 'avanzato'
+                ? `Metodo: Ascolta prima, poi rispondi in modo autentico. Non fare echo letterale.
+- Sintetizza in modo originale ciò che l'utente ha detto (non ripetere le sue parole)
+- Se rilevante, collega a qualcosa detto in turni precedenti ("Prima hai accennato a... — c'è un filo comune?")
+- Formula un'ipotesi e testala con la domanda ("Sembra che... — è così?")
+- Puoi deviare dal sub-goal pianificato per inseguire un segnale significativo
+Obiettivo: qualità dell'insight, non copertura sistematica.`
+                : qualityTierLocal === 'intermedio'
+                ? `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto. Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
+Se emerge un segnale forte (impatto concreto, dettaglio inatteso, contraddizione), approfondiscilo prima di passare al sub-goal successivo.
+Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.`
+                : `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto (es. riprendi un dettaglio concreto o un'emozione espressa). Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
+Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.
+Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contraddizioni.`;
+
+            const methodEN = qualityTierLocal === 'avanzato'
+                ? `Method: Listen first, then respond authentically. Do not echo the user's words back literally.
+- Synthesize what the user said in your own words
+- If relevant, connect to something said in previous turns ("You mentioned earlier... — is there a connection?")
+- Form a hypothesis and test it with your question ("It seems like... — is that right?")
+- You may deviate from the planned sub-goal to follow a significant signal
+Goal: quality of insight, not systematic coverage.`
+                : qualityTierLocal === 'intermedio'
+                ? `Method: Open with a genuine, specific acknowledgment of what the user just said. Then ask ONE exploratory question focused on the sub-goal.
+If a strong signal emerges (concrete impact, unexpected detail, contradiction), deepen it before moving to the next sub-goal.
+Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.`
+                : `Method: Open with a genuine, specific acknowledgment of what the user just said (e.g. reflect a concrete detail or emotion they expressed). Then ask ONE exploratory question focused on the sub-goal.
+Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.
+Listen for depth signals: concrete examples, lived impacts, constraints, contradictions.`;
+
             return isItalian ? `
 ## FASE: ESPLORAZIONE${bonus}
 Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
-Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto (es. riprendi un dettaglio concreto o un'emozione espressa). Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
-Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.
-Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contraddizioni.
+${metodoIT}
 
 ## REGOLE BASE
 - Una sola domanda per turno.
@@ -252,9 +291,7 @@ Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contr
 ## PHASE: EXPLORING${bonus}
 Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
-Method: Open with a genuine, specific acknowledgment of what the user just said (e.g. reflect a concrete detail or emotion they expressed). Then ask ONE exploratory question focused on the sub-goal.
-Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.
-Listen for depth signals: concrete examples, lived impacts, constraints, contradictions.
+${methodEN}
 
 ## BASE RULES
 - One question per turn.
@@ -285,6 +322,30 @@ Brief natural bridge, then ONE opening question for the next topic.
             // engagingSnippet originates from conversation analysis — sanitize as user data
             const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 500).trim();
             const safeLabel = sanitizeConfig(currentTopic.label, 200);
+            const qualityTierDeep = (bot as any)?.interviewerQuality || 'quantitativo';
+
+            if (qualityTierDeep === 'avanzato') {
+                return isItalian ? `
+## FASE: APPROFONDIMENTO (QUALITATIVO)
+Topic: "${safeLabel}"
+${engagingSnippet ? `Spunto chiave: "${engagingSnippet}"` : ''}
+Sei in modalità qualitativa. Non seguire uno script.
+- Collega questo momento a quanto emerso in precedenza nella conversazione
+- Formula un'ipotesi e chiedi conferma ("Mi sembra che tu stia dicendo che... — è così?")
+- Cerca la contraddizione produttiva: metti in dialogo affermazioni diverse dell'utente
+- Una sola domanda, ma la più incisiva e rivelante possibile
+`.trim() : `
+## PHASE: DEEPENING (QUALITATIVE)
+Topic: "${safeLabel}"
+${engagingSnippet ? `Key insight: "${engagingSnippet}"` : ''}
+You are in qualitative mode. Do not follow a script.
+- Connect this moment to what emerged earlier in the conversation
+- Form a hypothesis and ask for confirmation ("It seems like you're saying that... — is that right?")
+- Look for productive contradictions: put the user's different statements in dialogue
+- One question only, but make it the most incisive and revealing possible
+`.trim();
+            }
+
             return isItalian ? `
 ## FASE: APPROFONDIMENTO
 Topic: "${safeLabel}"

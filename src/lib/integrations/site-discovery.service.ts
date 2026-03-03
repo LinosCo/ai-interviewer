@@ -6,6 +6,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { MCPGatewayService } from '@/lib/integrations/mcp';
+import { decrypt } from '@/lib/cms/encryption';
 import { WORDPRESS_TOOLS } from '@/lib/integrations/mcp/wordpress.adapter';
 import { WOOCOMMERCE_TOOLS } from '@/lib/integrations/mcp/woocommerce.adapter';
 import type {
@@ -24,6 +25,15 @@ import type {
 const CACHE_TTL_HOURS = 24;
 
 type ConnectionType = 'mcp' | 'cms';
+
+function decodeStoredApiKey(storedApiKey: string): string {
+  try {
+    return decrypt(storedApiKey);
+  } catch {
+    // Backward compatibility for legacy/plain-text keys.
+    return storedApiKey;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // MCP result parsing helpers
@@ -423,6 +433,7 @@ class VolerCMSSiteAdapter implements SiteAdapter {
         method: 'GET',
         headers: {
           'X-BT-API-Key': this.apiKey,
+          'Authorization': `Bearer ${this.apiKey}`,
           'Accept': 'application/json',
         },
       });
@@ -555,7 +566,7 @@ export class SiteDiscoveryService {
       if (!connection || (connection.status !== 'ACTIVE' && connection.status !== 'PARTIAL')) {
         return null;
       }
-      return new VolerCMSSiteAdapter(connection.cmsApiUrl, connection.apiKey);
+      return new VolerCMSSiteAdapter(connection.cmsApiUrl, decodeStoredApiKey(connection.apiKey));
     }
 
     return null;

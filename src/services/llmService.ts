@@ -50,7 +50,39 @@ export class LLMService {
         if (provider === 'anthropic') {
             return bot.modelName || 'claude-3-5-sonnet-20241022';
         }
-        return bot.modelName || 'gpt-4o-mini';
+        return bot.modelName || 'gpt-4.1-mini';
+    }
+
+    /**
+     * Maps quality tier to model names (and optional cross-provider override).
+     * Called in getInterviewRuntimeModels after base names are resolved.
+     *
+     * Tier → model rationale:
+     *  - quantitativo: gpt-4.1-mini primary + gpt-4.1 critical — fast/cheap mass interviews, smarter supervisor
+     *  - intermedio:   gpt-4.1 all roles — flagship OpenAI, good signal detection
+     *  - avanzato:     claude-sonnet-4-5-20250929 — genuine superiority for cross-turn synthesis + qualitative reasoning
+     */
+    private static applyQualityTierOverride(
+        names: InterviewModelNames,
+        qualityTier: string
+    ): { names: InterviewModelNames; overrideProvider?: ModelProvider } {
+        if (qualityTier === 'quantitativo') {
+            // Upgrade legacy gpt-4o-mini → gpt-4.1-mini; legacy gpt-4o → gpt-4.1
+            const primary = names.primary === 'gpt-4o-mini' ? 'gpt-4.1-mini' : names.primary;
+            const critical = names.critical === 'gpt-4o' ? 'gpt-4.1' : names.critical;
+            return { names: { ...names, primary, critical, quality: critical, dataCollection: critical } };
+        }
+        if (qualityTier === 'intermedio') {
+            return { names: { primary: 'gpt-4.1', critical: 'gpt-4.1', quality: 'gpt-4.1', dataCollection: 'gpt-4.1' } };
+        }
+        if (qualityTier === 'avanzato') {
+            const claudeModel = 'claude-sonnet-4-5-20250929';
+            return {
+                names: { primary: claudeModel, critical: claudeModel, quality: claudeModel, dataCollection: claudeModel },
+                overrideProvider: 'anthropic'
+            };
+        }
+        return { names };
     }
 
     private static getOpenAICriticalFallback(baseModelName: string): string {
@@ -129,31 +161,50 @@ export class LLMService {
 
     static async getInterviewRuntimeModels(bot: Bot): Promise<InterviewRuntimeModels> {
         const provider = (bot.modelProvider as ModelProvider) || 'openai';
-        const apiKey = await this.getApiKey(bot, provider);
         const baseModelName = this.getDefaultModelName(provider, bot);
-        const names = this.resolveModelNames(provider, baseModelName);
+        const baseNames = this.resolveModelNames(provider, baseModelName);
 
-        if (!apiKey) {
-            throw new Error(`API key missing for provider: ${provider}`);
+        // Apply quality tier override (may switch provider to Anthropic for 'avanzato')
+        const qualityTier = (bot as any).interviewerQuality || 'quantitativo';
+        const { names: tieredNames, overrideProvider } = this.applyQualityTierOverride(baseNames, qualityTier);
+
+        // Determine effective provider and API key
+        const effectiveProvider = overrideProvider || provider;
+        const apiKey = await this.getApiKey(bot, effectiveProvider);
+
+        // Fallback: if avanzato requests Anthropic but no key is configured → use gpt-4.1 (intermedio level)
+        const finalNames = (qualityTier === 'avanzato' && !apiKey)
+            ? { primary: 'gpt-4.1', critical: 'gpt-4.1', quality: 'gpt-4.1', dataCollection: 'gpt-4.1' }
+            : tieredNames;
+
+        const resolvedProvider = (qualityTier === 'avanzato' && !apiKey) ? provider : effectiveProvider;
+        const resolvedApiKey = (qualityTier === 'avanzato' && !apiKey)
+            ? await this.getApiKey(bot, provider)
+            : apiKey;
+
+        if (!resolvedApiKey) {
+            throw new Error(`API key missing for provider: ${resolvedProvider}`);
         }
 
-        if (provider === 'anthropic') {
-            const anthropic = createAnthropic({ apiKey });
+        console.log(`🧠 [MODEL_ROUTING] tier=${qualityTier} provider=${resolvedProvider} primary=${finalNames.primary} critical=${finalNames.critical}`);
+
+        if (resolvedProvider === 'anthropic') {
+            const anthropic = createAnthropic({ apiKey: resolvedApiKey });
             return {
-                primary: anthropic(names.primary),
-                critical: anthropic(names.critical),
-                quality: anthropic(names.quality),
-                dataCollection: anthropic(names.dataCollection),
-                names
+                primary: anthropic(finalNames.primary),
+                critical: anthropic(finalNames.critical),
+                quality: anthropic(finalNames.quality),
+                dataCollection: anthropic(finalNames.dataCollection),
+                names: finalNames
             };
         } else {
-            const openai = createOpenAI({ apiKey });
+            const openai = createOpenAI({ apiKey: resolvedApiKey });
             return {
-                primary: openai(names.primary),
-                critical: openai(names.critical),
-                quality: openai(names.quality),
-                dataCollection: openai(names.dataCollection),
-                names
+                primary: openai(finalNames.primary),
+                critical: openai(finalNames.critical),
+                quality: openai(finalNames.quality),
+                dataCollection: openai(finalNames.dataCollection),
+                names: finalNames
             };
         }
     }

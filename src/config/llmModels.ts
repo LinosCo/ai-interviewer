@@ -17,9 +17,16 @@ export enum LLMModel {
     // OpenAI
     GPT4O_MINI = 'gpt-4o-mini',
 
+    // OpenAI — GPT-4.1 family (tier-based billing aliases)
+    // Billing prices are calibrated to yield ~1x / ~2x / ~3x multipliers relative to
+    // gpt-4o-mini, reflecting interviewer quality tiers (not raw API market prices).
+    GPT41_MINI = 'gpt-4.1-mini',     // Quantitativo tier — 1× baseline
+    GPT41 = 'gpt-4.1',               // Intermedio tier  — 2× baseline
+
     // Anthropic
     CLAUDE_HAIKU = 'claude-3-5-haiku-latest',
     CLAUDE_SONNET = 'claude-sonnet-4-20250514',
+    CLAUDE_SONNET_45 = 'claude-sonnet-4-5', // Avanzato tier — 3× baseline (billing alias)
 
     // Google
     GEMINI_FLASH = 'gemini-2.0-flash',
@@ -103,10 +110,16 @@ export const MODEL_ASSIGNMENTS: Record<LLMTask, ModelConfig> = {
 };
 
 // Pricing per 1M tokens (in USD)
+// NOTE: GPT41_MINI, GPT41, and CLAUDE_SONNET_45 use *billing tier prices*
+// (calibrated to 1×/2×/3× relative to gpt-4o-mini) to drive the credit multiplier
+// system for the "Qualità Intervistatore" feature. These are not market API prices.
 export const MODEL_PRICING = {
-    [LLMModel.GPT4O_MINI]: { input: 0.15, output: 0.60 },
+    [LLMModel.GPT4O_MINI]: { input: 0.15, output: 0.60 },   // baseline (1×)
+    [LLMModel.GPT41_MINI]: { input: 0.15, output: 0.60 },   // tier 1: quantitativo (1×)
+    [LLMModel.GPT41]:      { input: 0.30, output: 1.20 },   // tier 2: intermedio    (2×)
     [LLMModel.CLAUDE_HAIKU]: { input: 0.80, output: 4.00 },
     [LLMModel.CLAUDE_SONNET]: { input: 3.00, output: 15.00 },
+    [LLMModel.CLAUDE_SONNET_45]: { input: 0.45, output: 1.80 }, // tier 3: avanzato (3×)
     [LLMModel.GEMINI_FLASH]: { input: 0.10, output: 0.40 },
     [LLMModel.GEMINI_FLASH_LITE]: { input: 0.075, output: 0.30 }
 } as const;

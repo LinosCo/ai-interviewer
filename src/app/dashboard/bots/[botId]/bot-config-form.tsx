@@ -17,10 +17,11 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Info } from 'lucide-react';
 import Link from 'next/link';
 
-export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
+export default function BotConfigForm({ bot, canUseBranding = false, organizationPlan = 'TRIAL' }: { bot: BotWithRelations, canUseBranding?: boolean, organizationPlan?: string }) {
     const updateAction = updateBotAction.bind(null, bot.id);
     const [provider, setProvider] = useState(bot.modelProvider || 'openai');
     const [isRecruiting, setIsRecruiting] = useState(bot.collectCandidateData ?? false);
+    const isBusinessPlan = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(organizationPlan);
 
     // Wrapper to ignore return type compatibility issues with form action
     const handleSubmit = async (formData: FormData) => {
@@ -106,6 +107,79 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
 
             {/* SCOPE MARKER */}
             <input type="hidden" name="_scope" value="all" />
+
+            {/* Interviewer Quality Tier */}
+            <section>
+                <h2 className="text-lg font-semibold mb-1 border-b pb-2">Modalità Intervistatore</h2>
+                <p className="text-xs text-gray-500 mb-4">Scegli la filosofia dell&apos;intervista in base ai tuoi obiettivi di ricerca.</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {[
+                        {
+                            value: 'quantitativo',
+                            icon: '📊',
+                            label: 'Quantitativo',
+                            desc: 'Molti invii, risultati uniformi e comparabili statisticamente. Ideale per survey su larga scala.',
+                            credits: '~1 credito/messaggio',
+                            locked: false,
+                        },
+                        {
+                            value: 'intermedio',
+                            icon: '🔍',
+                            label: 'Intermedio',
+                            desc: 'Bilanciato tra copertura e profondità. Segue i segnali forti senza perdere la struttura.',
+                            credits: '~2 crediti/messaggio',
+                            locked: !isBusinessPlan,
+                        },
+                        {
+                            value: 'avanzato',
+                            icon: '🎯',
+                            label: 'Avanzato',
+                            desc: 'Pochi intervistati motivati. Cattura insight profondi, sintetizza cross-turn, formula ipotesi.',
+                            credits: '~3 crediti/messaggio',
+                            locked: !isBusinessPlan,
+                        },
+                    ].map((tier) => {
+                        const currentTier = (bot as any).interviewerQuality || 'quantitativo';
+                        const selected = currentTier === tier.value;
+                        return (
+                            <label
+                                key={tier.value}
+                                className={`relative flex flex-col gap-2 p-4 rounded-lg border-2 transition-all ${
+                                    tier.locked
+                                        ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50'
+                                        : selected
+                                        ? 'cursor-pointer border-indigo-500 bg-indigo-50'
+                                        : 'cursor-pointer border-gray-200 hover:border-gray-300 bg-white'
+                                }`}
+                            >
+                                <input
+                                    type="radio"
+                                    name="interviewerQuality"
+                                    value={tier.value}
+                                    defaultChecked={selected}
+                                    disabled={tier.locked}
+                                    className="sr-only"
+                                />
+                                <div className="flex items-center gap-2 font-semibold text-sm">
+                                    <span>{tier.icon}</span>
+                                    <span>{tier.label}</span>
+                                    {tier.locked && (
+                                        <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Business</span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-gray-600">{tier.desc}</p>
+                                <p className="text-xs font-medium text-indigo-600">{tier.credits}</p>
+                            </label>
+                        );
+                    })}
+                </div>
+                {!isBusinessPlan && (
+                    <p className="text-xs text-gray-500 mt-2">
+                        Intermedio e Avanzato richiedono il piano Business.{' '}
+                        <a href="/dashboard/billing" className="text-indigo-600 underline">Upgrade →</a>
+                    </p>
+                )}
+            </section>
 
             {/* BRANDING MOVED TO NEW COMPONENT */}
 
@@ -227,16 +301,13 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                     <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
                                         {provider === 'openai' ? (
                                             <>
-                                                <optgroup label="GPT-4o (Flagship)">
-                                                    <option value="gpt-4o">GPT-4o (Best Overall)</option>
-                                                    <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                                                <optgroup label="GPT-4.1 (Current)">
+                                                    <option value="gpt-4.1">GPT-4.1 (Best Overall)</option>
+                                                    <option value="gpt-4.1-mini">GPT-4.1 Mini (Fast & Efficient)</option>
                                                 </optgroup>
-                                                <optgroup label="Reasoning Models">
-                                                    <option value="o1-preview">o1 Preview (Deep Reasoning)</option>
-                                                    <option value="o1-mini">o1 Mini (Fast Reasoning)</option>
-                                                </optgroup>
-                                                <optgroup label="Legacy">
-                                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                                <optgroup label="GPT-4o (Stable)">
+                                                    <option value="gpt-4o">GPT-4o</option>
+                                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
                                                 </optgroup>
 
                                             </>
@@ -253,28 +324,6 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                         )}
                                     </select>
                                 </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">OpenAI API Key (Override)</label>
-                                <input
-                                    type="password"
-                                    name="openaiApiKey"
-                                    defaultValue={bot.openaiApiKey || ''}
-                                    placeholder="sk-..."
-                                    autoComplete="new-password"
-                                    className="w-full border p-2 rounded font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Anthropic API Key (Override)</label>
-                                <input
-                                    type="password"
-                                    name="anthropicApiKey"
-                                    defaultValue={bot.anthropicApiKey || ''}
-                                    placeholder="sk-ant-..."
-                                    autoComplete="new-password"
-                                    className="w-full border p-2 rounded font-mono"
-                                />
                             </div>
                         </div>
                     </div>

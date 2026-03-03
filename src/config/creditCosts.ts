@@ -77,6 +77,12 @@ function resolvePricingModel(modelName: string): PricingModelKey | null {
     if (!normalized) return null;
 
     const aliases: Array<{ prefix: string; model: PricingModelKey }> = [
+        // Tier-based models — more specific prefixes MUST come before less specific ones
+        // (prefix matching exits on first match; 'gpt-4.1-mini' starts with 'gpt-4.1').
+        { prefix: 'gpt-4.1-mini', model: LLMModel.GPT41_MINI },          // tier 1 (1×)
+        { prefix: 'gpt-4.1', model: LLMModel.GPT41 },                    // tier 2 (2×)
+        { prefix: 'claude-sonnet-4-5', model: LLMModel.CLAUDE_SONNET_45 }, // tier 3 (3×)
+        // Existing models
         { prefix: 'gpt-4o-mini', model: LLMModel.GPT4O_MINI },
         { prefix: 'claude-3-5-haiku', model: LLMModel.CLAUDE_HAIKU },
         { prefix: 'claude-sonnet-4', model: LLMModel.CLAUDE_SONNET },
@@ -104,6 +110,12 @@ function getModelPricing(modelName: string): { input: number; output: number } |
     const normalized = String(modelName || '').toLowerCase().trim();
     if (!normalized) return null;
 
+    // Tier-based fallbacks (more specific, checked before generic patterns).
+    // 'gpt-4.1-mini' contains 'gpt-4.1' and 'claude-sonnet-4-5' contains 'sonnet', so order matters.
+    if (normalized.includes('gpt-4.1-mini')) return MODEL_PRICING[LLMModel.GPT41_MINI];
+    if (normalized.includes('gpt-4.1')) return MODEL_PRICING[LLMModel.GPT41];
+    if (normalized.includes('claude-sonnet-4-5')) return MODEL_PRICING[LLMModel.CLAUDE_SONNET_45];
+
     // Conservative fallbacks for generic model names.
     if (normalized.includes('sonnet')) return MODEL_PRICING[LLMModel.CLAUDE_SONNET];
     if (normalized.includes('haiku')) return MODEL_PRICING[LLMModel.CLAUDE_HAIKU];
@@ -126,6 +138,12 @@ export function getModelCreditMultiplier(modelName: string): number {
         const modelCost = modelPricing.input + modelPricing.output;
         return Math.max(1, Math.min(8, modelCost / baselineCost));
     }
+
+    // Tier-based fallbacks: checked before generic patterns to ensure correct multiplier.
+    // 'gpt-4.1-mini' contains 'gpt-4.1' so mini MUST be checked first.
+    if (normalized.includes('gpt-4.1-mini')) return 1;  // quantitativo tier: 1×
+    if (normalized.includes('gpt-4.1')) return 2;       // intermedio tier:   2×
+    if (normalized.includes('claude-sonnet-4-5')) return 3; // avanzato tier: 3×
 
     if (normalized.includes('gpt-4o-mini') || normalized.includes('haiku') || normalized.includes('flash-8b')) {
         return 1;

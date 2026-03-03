@@ -312,7 +312,18 @@ export async function processTrainingMessage(
     getConfigValue('openaiApiKey'),
     getConfigValue('anthropicApiKey'),
   ])
-  const model = getModel(bot.modelProvider, bot.modelName, {
+
+  // Tier-based model override — maps interviewerQuality to provider + model
+  const trainingTier = (bot as any).interviewerQuality || 'quantitativo'
+  const effectiveTrainingProvider = trainingTier === 'avanzato' ? 'anthropic' : (bot.modelProvider || 'openai')
+  const effectiveTrainingModel = trainingTier === 'avanzato'
+    ? 'claude-sonnet-4-5-20250929'
+    : trainingTier === 'intermedio'
+    ? 'gpt-4.1'
+    : 'gpt-4.1-mini' // quantitativo
+  console.log(`🎓 [TRAINING_MODEL_ROUTING] tier=${trainingTier} provider=${effectiveTrainingProvider} model=${effectiveTrainingModel}`)
+
+  const model = getModel(effectiveTrainingProvider, effectiveTrainingModel, {
     botOpenAIKey: bot.customApiKey,
     globalOpenAIKey: globalConfig?.openaiApiKey || openaiConfigKey,
     globalAnthropicKey: globalConfig?.anthropicApiKey || anthropicConfigKey,
@@ -435,7 +446,7 @@ export async function processTrainingMessage(
         prompt: userMessage,
         maxOutputTokens: 180,
       })
-      await logTrainingTokens(bot.organizationId, bot.modelName, explainResult.usage, 'training-explain')
+      await logTrainingTokens(bot.organizationId, effectiveTrainingModel, explainResult.usage, 'training-explain')
 
       // Transition to DIALOGUING (replaces old CHECKING flow)
       const newState: TrainingSupervisorState = {
@@ -478,6 +489,7 @@ export async function processTrainingMessage(
           minCheckingTurns: minTurns,
           maxCheckingTurns: maxTurns,
           learnerProfile,
+          qualityTier: trainingTier,
         },
         recentMessages,
         currentTopicHistory
@@ -506,8 +518,8 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
       ])
 
       await Promise.all([
-        logTrainingTokens(bot.organizationId, bot.modelName, tutorResult.usage, 'training-dialogue'),
-        logTrainingTokens(bot.organizationId, bot.modelName, evalResult.usage, 'training-eval'),
+        logTrainingTokens(bot.organizationId, effectiveTrainingModel, tutorResult.usage, 'training-dialogue'),
+        logTrainingTokens(bot.organizationId, effectiveTrainingModel, evalResult.usage, 'training-eval'),
       ])
 
       const eval_ = evalResult.object.evaluation
@@ -578,7 +590,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
             ),
             prompt: `Genera il quiz finale. Copri tutti i ${topics.length} topic.`,
           })
-          await logTrainingTokens(bot.organizationId, bot.modelName, quizResult.usage, 'training-final-quiz-gen')
+          await logTrainingTokens(bot.organizationId, effectiveTrainingModel, quizResult.usage, 'training-final-quiz-gen')
 
           const finalQuizQuestions = normalizeFinalQuizQuestions(
             quizResult.object.questions as QuizQuestion[],
@@ -668,7 +680,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
           }),
           prompt: `Genera 2-3 domande di verifica sul topic "${currentTopic.label}".`,
         })
-        await logTrainingTokens(bot.organizationId, bot.modelName, quizResult.usage, 'training-generate-quiz')
+        await logTrainingTokens(bot.organizationId, effectiveTrainingModel, quizResult.usage, 'training-generate-quiz')
         quizzes = quizResult.object.questions
       }
 
@@ -740,7 +752,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
           system: buildFinalFeedbackPrompt(finalState.topicResults, overallScore, passed, bot.language),
           prompt: 'Genera il messaggio di chiusura.',
         })
-        await logTrainingTokens(bot.organizationId, bot.modelName, feedbackResult.usage, 'training-final-feedback')
+        await logTrainingTokens(bot.organizationId, effectiveTrainingModel, feedbackResult.usage, 'training-final-feedback')
         text = feedbackResult.text
 
         await prisma.trainingSession.update({
@@ -839,7 +851,7 @@ Precedente approccio usato: ${currentTopicHistory.at(-1)?.suggestedApproach ?? '
         ),
         prompt: 'Genera il messaggio di chiusura.',
       })
-      await logTrainingTokens(bot.organizationId, bot.modelName, feedbackResult.usage, 'training-final-feedback')
+      await logTrainingTokens(bot.organizationId, effectiveTrainingModel, feedbackResult.usage, 'training-final-feedback')
 
       const finalState: TrainingSupervisorState = { ...state, phase: 'COMPLETE' }
 

@@ -222,8 +222,12 @@ export async function POST(req: Request) {
         }
         const language = bot.language || 'en';
         const interviewObjective = String((bot as any).researchGoal || '').trim();
-        const shouldCollectData = (bot as any).collectCandidateData;
-        console.log('[DEBUG chat/route] shouldCollectData:', shouldCollectData, typeof shouldCollectData, 'candidateDataFields:', (bot as any).candidateDataFields);
+        const candidateDataFields = (bot as any).candidateDataFields ?? [];
+        // Legacy fix: bots created before the collectCandidateData flag was introduced
+        // may have candidateDataFields populated but collectCandidateData = false.
+        // Mirror the same auto-enable logic used in chatbot/message/route.ts.
+        const shouldCollectData = Boolean((bot as any).collectCandidateData) || (Array.isArray(candidateDataFields) && candidateDataFields.length > 0);
+        console.log('[DEBUG chat/route] shouldCollectData:', shouldCollectData, typeof shouldCollectData, 'collectCandidateData:', (bot as any).collectCandidateData, 'candidateDataFields:', candidateDataFields);
         const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
         const interviewProject = (bot as any).project || {};
         const interviewOrganizationId: string | null =

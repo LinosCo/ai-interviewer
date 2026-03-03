@@ -114,7 +114,7 @@ export default async function TrainingBotSettingsPage({
         ))}
       </div>
 
-      {activeTab === 'config' && <TrainingBotConfigForm mode="edit" bot={bot} />}
+      {activeTab === 'config' && <TrainingBotConfigForm mode="edit" bot={bot} organizationPlan={planType} />}
 
       {activeTab === 'knowledge' && (
         <div className="bg-white border border-gray-200 rounded-xl p-6">

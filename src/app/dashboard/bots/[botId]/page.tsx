@@ -67,7 +67,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
                         </Link>
                     </div>
                 </div>
-                <ChatbotSettings bot={bot} canUseKnowledgeBase={canUseKnowledgeBase} projects={projects} />
+                <ChatbotSettings bot={bot} canUseKnowledgeBase={canUseKnowledgeBase} projects={projects} organizationPlan={bot.project.organization?.plan || 'TRIAL'} />
             </div>
         );
     }
@@ -95,7 +95,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                    <BotConfigForm bot={bot} canUseBranding={canUseBranding} />
+                    <BotConfigForm bot={bot} canUseBranding={canUseBranding} organizationPlan={bot.project.organization?.plan || 'TRIAL'} />
                     {/* Updated Landing/Branding Editor */}
                     <LandingPageEditor bot={bot} plan={bot.project.organization?.plan || 'TRIAL'} />
                     <TopicsEditor botId={bot.id} topics={bot.topics} canUseConditionalLogic={canUseConditionalLogic} />

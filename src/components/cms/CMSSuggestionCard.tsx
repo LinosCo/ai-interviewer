@@ -226,7 +226,7 @@ export function CMSSuggestionCard({
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          {showPushButton && pushResult !== 'success' && suggestion.status === 'PENDING' && (
+          {showPushButton && pushResult !== 'success' && ['PENDING', 'FAILED'].includes(suggestion.status) && (
             <button
               onClick={handlePush}
               disabled={isPushing}
@@ -237,7 +237,7 @@ export function CMSSuggestionCard({
               ) : (
                 <Send className="w-4 h-4" />
               )}
-              Invia al CMS
+              {suggestion.status === 'FAILED' ? 'Riprova invio' : 'Invia al CMS'}
             </button>
           )}
 
@@ -249,7 +249,7 @@ export function CMSSuggestionCard({
           )}
 
           {/* Social dispatch button — only when suggestion is PENDING and projectId is set */}
-          {showSocialButton && projectId && suggestion.status === 'PENDING' && !socialResult && (
+          {showSocialButton && projectId && ['PENDING', 'FAILED'].includes(suggestion.status) && !socialResult && (
             <div className="relative" ref={socialMenuRef}>
               <button
                 onClick={() => setShowSocialMenu(v => !v)}

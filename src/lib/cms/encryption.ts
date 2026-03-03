@@ -10,10 +10,10 @@ const SALT_LENGTH = 32;
  * The key should be a 32-byte hex string (64 characters).
  */
 function getEncryptionKey(): Buffer {
-    const key = process.env.CMS_ENCRYPTION_KEY;
+    const key = process.env.CMS_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY;
 
     if (!key) {
-        throw new Error('CMS_ENCRYPTION_KEY environment variable is not set');
+        throw new Error('CMS_ENCRYPTION_KEY (or ENCRYPTION_KEY fallback) environment variable is not set');
     }
 
     // If key is hex-encoded (64 chars = 32 bytes)
@@ -26,7 +26,7 @@ function getEncryptionKey(): Buffer {
         return crypto.scryptSync(key, 'bt-cms-salt', 32);
     }
 
-    throw new Error('CMS_ENCRYPTION_KEY must be at least 32 characters or a 64-char hex string');
+    throw new Error('CMS_ENCRYPTION_KEY (or ENCRYPTION_KEY fallback) must be at least 32 characters or a 64-char hex string');
 }
 
 /**

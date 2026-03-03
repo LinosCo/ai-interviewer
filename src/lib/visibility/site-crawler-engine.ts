@@ -16,6 +16,7 @@ import { auditPage, type PageSEOAudit } from './seo-audit-engine';
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_SITEMAP_URLS = 50;
 const CRAWL_CONCURRENCY = 4;
+const MAX_SITEMAP_DEPTH = 3;
 
 // ─── LLMO Interfaces ─────────────────────────────────────────────────────────
 
@@ -93,6 +94,99 @@ async function fetchRaw(url: string): Promise<string | null> {
     }
 }
 
+function normalizeXmlLoc(raw: string): string | null {
+    const trimmed = raw.replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+    if (!trimmed) return null;
+    try {
+        return new URL(trimmed).toString();
+    } catch {
+        return null;
+    }
+}
+
+function extractSitemapLocs(xml: string): string[] {
+    const urls: string[] = [];
+    const matches = xml.matchAll(/<loc[^>]*>([\s\S]*?)<\/loc>/gi);
+    for (const match of matches) {
+        const normalized = normalizeXmlLoc(match[1] || '');
+        if (normalized) urls.push(normalized);
+    }
+    return urls;
+}
+
+function isLikelySitemapUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url);
+        const pathname = parsed.pathname.toLowerCase();
+        if (pathname.endsWith('.xml') || pathname.endsWith('.xml.gz')) return true;
+        return pathname.includes('sitemap');
+    } catch {
+        const lower = url.toLowerCase();
+        return lower.endsWith('.xml') || lower.endsWith('.xml.gz') || lower.includes('sitemap');
+    }
+}
+
+async function discoverSitemapsFromRobots(baseUrl: string): Promise<string[]> {
+    const normalized = baseUrl.replace(/\/$/, '');
+    const robotsTxt = await fetchRaw(`${normalized}/robots.txt`);
+    if (!robotsTxt) return [];
+
+    const sitemaps = robotsTxt
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => /^sitemap:/i.test(line))
+        .map((line) => line.replace(/^sitemap:\s*/i, '').trim())
+        .map((loc) => normalizeXmlLoc(loc))
+        .filter((loc): loc is string => !!loc);
+
+    return Array.from(new Set(sitemaps));
+}
+
+async function collectUrlsFromSitemap(params: {
+    sitemapUrl: string;
+    depth?: number;
+    visited?: Set<string>;
+}): Promise<string[]> {
+    const depth = params.depth ?? 0;
+    const visited = params.visited ?? new Set<string>();
+    const sitemapUrl = params.sitemapUrl;
+
+    if (depth > MAX_SITEMAP_DEPTH) return [];
+    if (visited.has(sitemapUrl)) return [];
+    visited.add(sitemapUrl);
+
+    const xml = await fetchRaw(sitemapUrl);
+    if (!xml) return [];
+
+    const locs = extractSitemapLocs(xml);
+    if (locs.length === 0) return [];
+
+    const pageUrls: string[] = [];
+    const subSitemaps: string[] = [];
+
+    for (const loc of locs) {
+        if (isLikelySitemapUrl(loc)) subSitemaps.push(loc);
+        else pageUrls.push(loc);
+    }
+
+    if (pageUrls.length >= MAX_SITEMAP_URLS || subSitemaps.length === 0) {
+        return Array.from(new Set(pageUrls)).slice(0, MAX_SITEMAP_URLS);
+    }
+
+    const nestedUrls: string[] = [...pageUrls];
+    for (const sub of subSitemaps) {
+        if (nestedUrls.length >= MAX_SITEMAP_URLS) break;
+        const fromSub = await collectUrlsFromSitemap({
+            sitemapUrl: sub,
+            depth: depth + 1,
+            visited
+        });
+        nestedUrls.push(...fromSub);
+    }
+
+    return Array.from(new Set(nestedUrls)).slice(0, MAX_SITEMAP_URLS);
+}
+
 /**
  * Discover page URLs by parsing sitemap.xml (and optionally sitemap_index.xml).
  * Returns up to MAX_SITEMAP_URLS URLs. Falls back to an empty array if no
@@ -107,46 +201,9 @@ export async function parseSitemap(baseUrl: string): Promise<{ urls: string[]; s
     ];
 
     for (const candidate of candidates) {
-        const xml = await fetchRaw(candidate);
-        if (!xml) continue;
-
-        const $ = cheerio.load(xml, { xmlMode: true });
-
-        // Sitemap index → collect sub-sitemap URLs then fetch each
-        const subSitemaps: string[] = [];
-        $('sitemapindex sitemap loc, sitemap loc').each((_, el) => {
-            const loc = $(el).text().trim();
-            if (loc && (loc.endsWith('.xml') || loc.includes('sitemap'))) {
-                subSitemaps.push(loc);
-            }
-        });
-
-        const directUrls: string[] = [];
-        $('urlset url loc').each((_, el) => {
-            const loc = $(el).text().trim();
-            if (loc) directUrls.push(loc);
-        });
-
-        if (subSitemaps.length > 0 && directUrls.length === 0) {
-            // Fetch sub-sitemaps to collect page URLs
-            const allUrls: string[] = [];
-            for (const sub of subSitemaps.slice(0, 5)) {
-                const subXml = await fetchRaw(sub);
-                if (!subXml) continue;
-                const $sub = cheerio.load(subXml, { xmlMode: true });
-                $sub('urlset url loc').each((_, el) => {
-                    const loc = $sub(el).text().trim();
-                    if (loc) allUrls.push(loc);
-                });
-                if (allUrls.length >= MAX_SITEMAP_URLS) break;
-            }
-            if (allUrls.length > 0) {
-                return { urls: allUrls.slice(0, MAX_SITEMAP_URLS), sitemapUrl: candidate };
-            }
-        }
-
-        if (directUrls.length > 0) {
-            return { urls: directUrls.slice(0, MAX_SITEMAP_URLS), sitemapUrl: candidate };
+        const urls = await collectUrlsFromSitemap({ sitemapUrl: candidate });
+        if (urls.length > 0) {
+            return { urls, sitemapUrl: candidate };
         }
     }
 
@@ -154,45 +211,37 @@ export async function parseSitemap(baseUrl: string): Promise<{ urls: string[]; s
 }
 
 async function parseProvidedSitemap(sitemapUrl: string): Promise<{ urls: string[]; sitemapUrl: string | null }> {
-    const xml = await fetchRaw(sitemapUrl);
-    if (!xml) return { urls: [], sitemapUrl: null };
+    let originBase: string | null = null;
+    try {
+        const parsed = new URL(sitemapUrl);
+        originBase = `${parsed.protocol}//${parsed.host}`;
+    } catch {
+        // ignore invalid sitemap url, handled by fetch failures below
+    }
 
-    const $ = cheerio.load(xml, { xmlMode: true });
+    const candidates = new Set<string>([sitemapUrl]);
 
-    const subSitemaps: string[] = [];
-    $('sitemapindex sitemap loc, sitemap loc').each((_, el) => {
-        const loc = $(el).text().trim();
-        if (loc && (loc.endsWith('.xml') || loc.includes('sitemap'))) {
-            subSitemaps.push(loc);
-        }
-    });
+    if (originBase) {
+        const robotsSitemaps = await discoverSitemapsFromRobots(originBase);
+        for (const url of robotsSitemaps) candidates.add(url);
+        candidates.add(`${originBase}/sitemap.xml`);
+        candidates.add(`${originBase}/sitemap_index.xml`);
+    }
 
-    const directUrls: string[] = [];
-    $('urlset url loc').each((_, el) => {
-        const loc = $(el).text().trim();
-        if (loc) directUrls.push(loc);
-    });
+    const discovered: string[] = [];
+    let firstSuccessfulSitemap: string | null = null;
+    const visited = new Set<string>();
 
-    if (subSitemaps.length > 0 && directUrls.length === 0) {
-        const allUrls: string[] = [];
-        for (const sub of subSitemaps.slice(0, 8)) {
-            const subXml = await fetchRaw(sub);
-            if (!subXml) continue;
-            const $sub = cheerio.load(subXml, { xmlMode: true });
-            $sub('urlset url loc').each((_, el) => {
-                const loc = $sub(el).text().trim();
-                if (loc) allUrls.push(loc);
-            });
-            if (allUrls.length >= MAX_SITEMAP_URLS) break;
-        }
-        if (allUrls.length > 0) {
-            return { urls: allUrls.slice(0, MAX_SITEMAP_URLS), sitemapUrl };
-        }
+    for (const candidate of candidates) {
+        if (discovered.length >= MAX_SITEMAP_URLS) break;
+        const urls = await collectUrlsFromSitemap({ sitemapUrl: candidate, visited });
+        if (urls.length > 0 && !firstSuccessfulSitemap) firstSuccessfulSitemap = candidate;
+        discovered.push(...urls);
     }
 
     return {
-        urls: directUrls.slice(0, MAX_SITEMAP_URLS),
-        sitemapUrl: directUrls.length > 0 ? sitemapUrl : null,
+        urls: Array.from(new Set(discovered)).slice(0, MAX_SITEMAP_URLS),
+        sitemapUrl: firstSuccessfulSitemap
     };
 }
 

@@ -446,7 +446,8 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (formData.has('interviewerQuality')) (data as any).interviewerQuality = getStr('interviewerQuality');
     if (formData.has('cilBonusTurnCapOverride')) {
         const raw = formData.get('cilBonusTurnCapOverride') as string;
-        (data as any).cilBonusTurnCapOverride = raw === '' ? null : parseInt(raw, 10) || null;
+        const cilParsed = parseInt(raw, 10);
+        (data as any).cilBonusTurnCapOverride = raw === '' ? null : (isNaN(cilParsed) ? null : cilParsed);
     }
 
     if (formData.has('openaiApiKey')) data.openaiApiKey = encryptIfNeeded(getStr('openaiApiKey')) || null;

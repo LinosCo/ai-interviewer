@@ -1,5 +1,5 @@
 // src/lib/interview/cil/__tests__/conversation-intelligence.test.ts
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { generateCILAnalysis } from '../conversation-intelligence'
 
 describe('generateCILAnalysis', () => {

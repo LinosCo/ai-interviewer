@@ -6,44 +6,64 @@ import { ChevronDown } from 'lucide-react';
 
 const faqs = [
   {
-    question: "Cos'è Business Tuner e a chi è rivolto?",
+    question: "Cos'e Business Tuner e a chi e rivolto?",
     answer:
-      'Business Tuner è una piattaforma AI per interviste, chatbot, visibility monitoring e copilot strategico. È pensata per team marketing, prodotto e consulenza che vogliono un unico workspace con controllo costi tramite crediti organizzazione.',
+      'Business Tuner e una piattaforma di AI Marketing Intelligence per PMI, team marketing/prodotto, HR, agenzie e consulenti. Unisce ascolto stakeholder, monitoraggio reputazione, Copilot strategico e automazioni operative.',
   },
   {
-    question: 'Come funziona il modello a crediti?',
+    question: 'Qual e la differenza rispetto a tool analytics tradizionali?',
     answer:
-      'Ogni organizzazione ha un budget mensile di crediti in base al piano. Ogni operazione AI consuma crediti. Quando i crediti mensili finiscono, il sistema usa automaticamente gli eventuali Credit Pack acquistati.',
+      'Gli analytics mostrano cosa succede. Business Tuner aiuta a capire perche succede e cosa fare dopo: integra feedback qualitativo, segnali conversazionali, brand monitoring e raccomandazioni operative del Copilot.',
   },
   {
-    question: 'Cosa succede quando i crediti finiscono?',
+    question: 'In quanto tempo posso vedere valore?',
     answer:
-      'Le API AI vengono bloccate automaticamente finché non hai crediti disponibili. Puoi acquistare un Credit Pack (small/medium/large) o attendere il reset mensile.',
+      'Molti team ottengono i primi insight utili gia nei primi giorni. Il valore cresce rapidamente quando attivi un ciclo continuo: ascolto, prioritizzazione del Copilot, esecuzione e verifica impatto.',
   },
   {
-    question: 'I Credit Pack scadono?',
+    question: 'Serve un team tecnico per partire?',
     answer:
-      'No. I Credit Pack non scadono, restano disponibili sull’organizzazione e vengono consumati dopo i crediti mensili del piano.',
+      'No. La piattaforma e pensata per team business: setup guidato, flussi pronti e interfaccia orientata all\'azione. Le integrazioni avanzate sono disponibili quando vuoi, senza bloccare la partenza.',
   },
   {
-    question: 'Posso acquistare il piano Business online?',
+    question: 'Che ruolo ha il Copilot strategico?',
     answer:
-      'No. Il piano Business è gestito solo tramite team Sales, con proposta su misura per volumi, integrazioni e supporto.',
+      'Il Copilot e il layer decisionale: legge i segnali dei vari moduli, evidenzia priorita, propone playbook e suggerisce le prossime azioni per marketing, prodotto e operations.',
   },
   {
-    question: 'Posso provare prima di pagare?',
+    question: 'Posso automatizzare le azioni suggerite?',
     answer:
-      'Sì. Puoi partire dal piano gratuito e passare a Starter/Pro quando vuoi. Business viene attivato solo tramite contatto Sales.',
+      'Si. Puoi instradare insight e suggerimenti verso i tuoi strumenti con webhook e n8n, creando workflow no-code per notifiche, task, contenuti e follow-up operativi.',
   },
   {
-    question: 'I miei dati sono al sicuro?',
+    question: 'Posso iniziare con un solo caso d\'uso?',
     answer:
-      'Sì. Dati cifrati in transito e a riposo, infrastruttura europea e gestione conforme GDPR. I dati restano sotto il controllo della tua organizzazione.',
+      'Assolutamente. Puoi partire da un solo obiettivo (es. ascolto clienti o chatbot sul sito) e poi estendere gradualmente ad altri moduli mantenendo tutto nello stesso workspace.',
   },
   {
-    question: 'Come funziona il supporto?',
+    question: 'Come gestisco team e progetti interni?',
     answer:
-      'Supporto standard su tutti i piani. Per Business includiamo onboarding e supporto commerciale dedicato concordato in fase Sales.',
+      'Puoi organizzare il lavoro per team/progetto e mantenere governance chiara su accessi, ownership e responsabilita. Questo rende piu semplice scalare la collaborazione tra funzioni.',
+  },
+  {
+    question: 'Con quali sistemi posso integrarmi?',
+    answer:
+      'Puoi collegarti ai canali principali del tuo stack digitale: sito web, Search Console, monitoraggio SERP/AI e integrazioni operative via webhook o n8n per orchestrare i processi.',
+  },
+  {
+    question: 'E adatto anche ad agenzie e consulenti?',
+    answer:
+      'Si. E utile per chi gestisce piu clienti e vuole standardizzare discovery, insight e azioni: meno lavoro frammentato, piu qualita strategica percepita dal cliente.',
+  },
+  {
+    question: 'I dati e le conversazioni sono protetti?',
+    answer:
+      'Si. La piattaforma applica misure di sicurezza su dati in transito e a riposo e supporta una gestione organizzata degli accessi per ridurre rischi operativi.',
+  },
+  {
+    question: 'Posso fare una prova prima di decidere?',
+    answer:
+      'Si. Puoi vedere il prodotto in azione con demo guidata e partire in modo progressivo, validando il valore sul tuo contesto prima di estendere l\'adozione.',
   },
 ];
 
@@ -103,7 +123,7 @@ export function FAQSection() {
             Domande <span className="gradient-text">frequenti</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))]">
-            Prezzi, crediti, pack e gestione piani
+            Prodotto, adozione, integrazioni e operativita quotidiana
           </p>
         </motion.div>
 

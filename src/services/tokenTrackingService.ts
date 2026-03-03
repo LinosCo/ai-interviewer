@@ -22,6 +22,12 @@ import {
  * - Il TokenLog viene mantenuto per analytics dettagliate
  */
 export class TokenTrackingService {
+    private static strategicMarginActions: Set<CreditAction> = new Set([
+        'copilot_message',
+        'copilot_analysis',
+        'ai_tip_generation'
+    ]);
+
     /**
      * Mappa categorie token a azioni crediti
      */
@@ -125,10 +131,12 @@ export class TokenTrackingService {
         const modelMultiplier = getModelCreditMultiplier(model);
         const modelAdjustedBaseCost = Math.max(1, Math.ceil(baseCost * modelMultiplier));
         const tokenBasedCost = Math.max(1, Math.ceil(totalTokens * TOKEN_TO_CREDIT_RATE * modelMultiplier));
+        const targetMargin = this.strategicMarginActions.has(action) ? 5 : 4;
         const marginFloorCost = getMinCreditsForMargin(
             inputTokens,
             outputTokens,
-            model
+            model,
+            targetMargin
         );
         const creditsToConsume = Math.max(modelAdjustedBaseCost, tokenBasedCost, marginFloorCost);
 

@@ -13,14 +13,14 @@ const integrations = [
                 <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">n8n</text>
             </svg>
         ),
-        description: 'Instrada gli AI Tips verso Slack, Notion, CRM e oltre 400 app.',
+        description: 'Instrada insight e AI Tips verso Slack, Notion, CRM e oltre 400 app senza codice.',
         badge: 'Automazione',
         badgeColor: 'bg-pink-100 text-pink-700',
     },
     {
         name: 'Webhook',
         logo: <Webhook className="w-7 h-7 text-[hsl(var(--coral))]" />,
-        description: 'Ricevi notifiche in uscita su ogni nuova risposta, tip o evento.',
+        description: 'Ricevi eventi pronti da usare nel tuo stack: nuovi insight, tip prioritari, stato azioni.',
         badge: 'Notifiche',
         badgeColor: 'bg-[hsl(var(--coral)/0.1)] text-[hsl(var(--coral))]',
     },
@@ -32,24 +32,39 @@ const integrations = [
                 <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">G</text>
             </svg>
         ),
-        description: 'Importa query, posizioni e CTR dalla Search Console per correlare dati SEO con il feedback qualitativo.',
+        description: 'Importa query, posizioni e CTR per collegare performance SEO a feedback qualitativo e intenti reali.',
         badge: 'SEO',
         badgeColor: 'bg-blue-100 text-blue-700',
     },
     {
         name: 'SERP & AI Monitor',
         logo: <Search className="w-7 h-7 text-green-600" />,
-        description: 'Monitora come il tuo brand appare su Google e nelle risposte AI di ChatGPT, Claude e Gemini.',
+        description: 'Monitora come il brand appare su Google e nelle risposte AI, con confronto continuo rispetto ai competitor.',
         badge: 'Visibilità',
         badgeColor: 'bg-green-100 text-green-700',
     },
 ];
 
 const flowSteps = [
-    { icon: Bell, label: 'Nuovo feedback raccolto' },
-    { icon: RefreshCw, label: "AI genera insight e tip" },
-    { icon: Webhook, label: 'Webhook / n8n inviato' },
-    { icon: TrendingUp, label: 'Azione nei tuoi tool' },
+    { icon: Bell, label: 'Segnale raccolto' },
+    { icon: RefreshCw, label: 'Copilot prioritizza' },
+    { icon: Webhook, label: 'Regola n8n/webhook' },
+    { icon: TrendingUp, label: 'Task eseguito e tracciato' },
+];
+
+const playbooks = [
+    {
+        title: 'Lead Qualification',
+        text: 'Dal chatbot al CRM con campi arricchiti e priorita commerciale automatica.',
+    },
+    {
+        title: 'Content Loop',
+        text: 'Da insight ricorrenti a FAQ, contenuti e ticket editoriale nei tuoi tool di lavoro.',
+    },
+    {
+        title: 'Brand Recovery',
+        text: 'Alert su cali di visibilita AI + check list operativa per recupero copertura.',
+    },
 ];
 
 export function AutomationSection() {
@@ -79,8 +94,8 @@ export function AutomationSection() {
                         <span className="gradient-text">dove ne hai bisogno</span>
                     </h2>
                     <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-                        Collega Business Tuner ai tuoi strumenti. Instrada automaticamente ogni AI Tip
-                        verso Slack, Notion, il tuo CRM — o qualsiasi altro sistema via n8n o webhook.
+                        Collega Business Tuner al tuo stack operativo. Dal segnale all&apos;azione:
+                        il Copilot propone, le automazioni distribuiscono, il team esegue.
                     </p>
                 </motion.div>
 
@@ -141,6 +156,24 @@ export function AutomationSection() {
                     ))}
                 </div>
 
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5 }}
+                    className="grid md:grid-cols-3 gap-4 mb-12"
+                >
+                    {playbooks.map((playbook) => (
+                        <div
+                            key={playbook.title}
+                            className="rounded-2xl border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--card)/0.75)] p-5"
+                        >
+                            <p className="text-sm font-semibold text-[hsl(var(--foreground))] mb-2">{playbook.title}</p>
+                            <p className="text-sm text-[hsl(var(--muted-foreground))]">{playbook.text}</p>
+                        </div>
+                    ))}
+                </motion.div>
+
                 {/* CTA strip */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -150,7 +183,7 @@ export function AutomationSection() {
                     className="text-center"
                 >
                     <p className="text-[hsl(var(--muted-foreground))] mb-4 text-sm">
-                        Webhook e integrazioni disponibili dal piano <strong>Pro</strong>. Google Search Console e SERP monitoring inclusi in tutti i piani.
+                        Workflow no-code disponibili nei piani con Copilot e strumenti avanzati (Pro+).
                     </p>
                     <Link
                         href="#pricing"

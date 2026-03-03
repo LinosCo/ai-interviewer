@@ -1,141 +1,143 @@
-# Business Tuner — KB Chatbot Landing Page (Assistenza Visitatori)
+# Business Tuner — KB Chatbot Landing (v2)
 
-## 1) Scopo e tono
-- **Obiettivo:** aiutare i visitatori a capire rapidamente cosa fa Business Tuner, perché è utile, e guidarli a provare la piattaforma.
-- **Tono:** commerciale ma non aggressivo, gentile, disponibile, orientato al valore.
-- **Stile:** chiaro, concreto, orientato a esempi pratici. Evitare promesse non verificabili.
+## 1) Posizionamento chiave
+- Business Tuner e la prima AI Marketing Intelligence davvero operativa.
+- Aiuta ad ascoltare stakeholder, monitorare reputazione, prendere decisioni consapevoli e trasformarle in attivita concrete.
+- Obiettivo: meno dispersione, piu priorita chiare, piu opportunita colte con meno tempo.
 
----
+## 2) Per chi e pensata
+- PMI che vogliono un metodo guidato per crescere con decisioni migliori.
+- Agenzie che vogliono offrire ai clienti uno strumento operativo con valore percepito alto.
+- Consulenti strategici e business advisor, anche quando non gestiscono direttamente il digital operativo.
+- Team marketing e direzioni aziendali che vogliono allineare ascolto, strategia ed esecuzione.
 
-## 2) Visione e filosofia
-- **Business Tuner** nasce per **trasformare l’ascolto** (interviste, chatbot, brand monitoring, dati digitali) in **decisioni strategiche e operative**.
-- La piattaforma valorizza una **visione d’insieme**: raccoglie segnali diversi (qualitativi e quantitativi), li integra e propone azioni concrete.
-- L’obiettivo è **ridurre l’incertezza**, **aumentare la consapevolezza** e **accelerare l’azione** con suggerimenti operativi misurabili.
-- **Approccio**: ascolto ricorrente degli stakeholder + sintesi intelligente + consigli mirati + azioni attuabili.
+## 3) Problemi che risolve
+- Dati sparsi e non collegati tra loro.
+- Decisioni lente o basate su percezioni non validate.
+- Riunioni con molte opinioni ma poche priorita condivise.
+- Attivita digitali scollegate da insight reali di clienti e mercato.
+- Difficolta nel dimostrare valore continuo al cliente (agenzie/consulenti).
 
----
+## 4) Cosa fa la piattaforma
 
-## 3) Cosa fa la piattaforma (funzionalità principali)
+### 4.1 Interviste AI
+- Raccoglie insight qualitativi da stakeholder (clienti, prospect, team, partner).
+- Fa emergere bisogni, frizioni, motivazioni e opportunita concrete.
+- Trasforma l'ascolto in output utili per strategia e piano operativo.
 
-### 3.1 Interviste AI (qualitative, multi-stakeholder)
-- Interviste guidate e adattive a clienti, prospect, dipendenti, partner.
-- Obiettivo: **raccogliere insight profondi** senza annoiare l’intervistato.
-- Output: temi ricorrenti, bisogni, resistenze, motivazioni, opportunità.
-- Supporta l’**ascolto continuo** (non solo una tantum).
+### 4.2 Chatbot AI
+- Intercetta domande reali dei visitatori e segnali di interesse.
+- Evidenzia blocchi alla conversione e gap informativi.
+- Alimenta FAQ, contenuti e miglioramenti UX.
 
-### 3.2 Chatbot AI per il sito
-- Chatbot che **capisce cosa cercano davvero i visitatori**.
-- Raccoglie domande, dubbi e feedback.
-- Aiuta a ridurre la dispersione e a **migliorare conversioni**.
-- Genera indicazioni utili per nuove FAQ, contenuti e miglioramenti UX.
+### 4.3 Brand Monitoring
+- Monitora reputazione, menzioni e percezione del brand su web e AI search.
+- Confronta il posizionamento rispetto ai competitor.
+- Evidenzia segnali deboli prima che diventino criticita.
 
-### 3.3 Brand Monitoring (visibilità su AI e web)
-- Monitora come il brand appare nelle risposte degli LLM (es. ChatGPT, Claude, Gemini).
-- Analizza **menzioni, posizionamento, sentiment** e fonti citate.
-- Confronta con competitor per capire **spazio di visibilità reale**.
+### 4.4 Copilot Strategico
+- Sintetizza segnali da tutte le fonti in una vista decisionale unica.
+- Ordina priorita, suggerisce azioni, supporta piani e review periodiche.
+- Non sostituisce il consulente: ne aumenta velocita, chiarezza e impatto.
 
-### 3.4 AI Tips (azioni operative)
-- Suggerimenti operativi basati su dati reali (interviste, chatbot, brand monitoring, analytics).
-- Esempi: nuove FAQ, nuove pagine o sezioni, nuove proposte contenuti, ottimizzazione SEO.
-- Alcune azioni possono essere **applicate automaticamente** o **modificate prima della pubblicazione**.
+### 4.5 Automazioni
+- Trasforma insight in task operativi con workflow no-code.
+- Riduce lavoro ripetitivo e tempi morti tra analisi e azione.
+- Mantiene tracciabilita su attivita e follow-up.
 
-### 3.5 Knowledge Base (KB) per chatbot
-- Unifica fonti ufficiali (documenti, siti, materiali) per risposte coerenti.
-- Riduce errori e risposte generiche.
-- Base dati “ufficiale” per chat e suggerimenti.
+### 4.6 Formazioni
+- Supporta piani formativi pratici legati a obiettivi reali.
+- Aiuta team e stakeholder ad adottare metodo e strumenti in modo graduale.
 
----
+## 5) Metodo consigliato (framework semplice)
+1. Ascolta: interviste + chatbot + segnali reputazionali.
+2. Interpreta: il Copilot sintetizza insight e urgenze.
+3. Prioritizza: scegli poche azioni ad alto impatto.
+4. Esegui: attiva workflow, contenuti, task e review.
+5. Migliora: misura apprendimento e aggiorna il ciclo.
 
-## 4) Benefici per target/stakeholder
+## 6) Valore per agenzie e consulenti partner
+- Fornisce una base dati condivisa e difendibile con il cliente.
+- Rende la consulenza piu concreta: insight -> decisione -> azione -> risultato.
+- Aumenta il valore percepito grazie a continuita, metodo e governance.
+- Funziona anche senza delivery digitale diretta: strategia e coordinamento restano centrali.
 
-### CEO / Founder
-- Visione sintetica di ciò che conta davvero per mercato e stakeholder.
-- Decisioni strategiche più informate e con **minor rischio**.
-- Priorità operative basate su insight reali.
+## 7) FAQ strategiche (landing generale)
 
-### Direzione Marketing
-- Capisce quali temi convertono davvero.
-- Genera contenuti più efficaci (blog, FAQ, landing).
-- Migliora posizionamento nei risultati AI e web.
+### Cos'e Business Tuner in una frase?
+E una piattaforma AI che unisce ascolto, monitoraggio e azione per guidare decisioni marketing e business con piu efficacia operativa.
 
-### HR / People
-- Interviste qualitative per rilevare bisogni e clima.
-- Meno segnali “a voce” e più dati strutturati.
-- Pianificazione di iniziative interne più mirate.
+### Perche non basta avere analytics?
+Le analytics mostrano cosa succede. Business Tuner aiuta a capire perche succede e cosa conviene fare adesso.
 
-### Consulenti d’azienda
-- Strumento di analisi per portare valore misurabile al cliente.
-- Dati e insight che migliorano la qualità della consulenza.
-- Possibilità di creare soluzioni personalizzate tramite integrazioni.
+### In quanto tempo si vede valore?
+Primi insight in pochi giorni. Impatto strutturato in genere in 2-6 settimane, in base a uso e ritmo operativo.
 
----
+### Serve un team tecnico interno?
+No. La piattaforma e pensata per team business. Le integrazioni avanzate sono opzionali.
 
-## 5) Esempi pratici di valore
-- **Cliente B2B:** scoprire che i buyer non capiscono una proposta di valore → nuova pagina con esempi e casi reali.
-- **HR:** identificare una resistenza interna all’AI → programma formativo mirato e non generico.
-- **Marketing:** chatbot rivela dubbi ricorrenti → nuova sezione FAQ + contenuti social dedicati.
-- **Brand:** monitoraggio AI evidenzia competitor citati più spesso → interventi SEO e contenuti mirati per correggere il posizionamento.
+### Il Copilot prende decisioni al posto nostro?
+No. Propone priorita e opzioni. La decisione resta al team/consulente.
 
----
+### E adatta anche a PMI?
+Sì. E progettata per essere utile anche con team snelli e risorse limitate.
 
-## 6) Agenti AI e connessioni custom (potenziale avanzato)
-Business Tuner supporta estensioni e integrazioni personalizzate:
+### E utile anche per aziende con team strutturati?
+Sì. Aiuta allineamento cross-team, governance e cicli decisionali piu rapidi.
 
-### Esempi di agenti AI
-- **Agent Content Creator:** genera bozze di contenuti basate su insight reali.
-- **Agent Customer Insights:** riassume feedback e trend settimanali.
-- **Agent Brand Reputation:** segnala cambiamenti nelle percezioni online.
-- **Agent Interview Coach:** ottimizza i flussi di intervista in base ai risultati.
+### Posso partire da un solo caso d'uso?
+Sì. Il percorso consigliato e iniziare con un use case ad alto impatto e poi estendere.
 
-### Esempi di integrazioni custom
-- **CRM (HubSpot, Salesforce):** arricchire lead con insight qualitativi.
-- **CMS (WordPress, Webflow, Headless):** pubblicare FAQ e contenuti suggeriti.
-- **Analytics (GA/GSC):** collegare keyword e performance reali a suggerimenti SEO.
-- **Ticketing/Helpdesk:** trasformare i problemi ricorrenti in risposte strutturate.
+## 8) FAQ partner (agenzie + consulenti)
 
----
+### Cos'e il Programma Partner in termini pratici?
+Un modello per gestire clienti con una regia unica: ascolto, insight, priorita e attivazione operativa tracciata.
 
-## 7) Obiezioni comuni (e risposta consigliata)
+### Per quali profili e pensato?
+Agenzie, consulenti strategici, business advisor e team che supportano PMI o aziende strutturate.
 
-**“Abbiamo già analytics.”**
-- Analytics dice *cosa* succede; Business Tuner spiega *perché* succede.
+### E adatto anche a chi non gestisce il digital operativo?
+Sì. Puoi guidare strategia, governance e controllo risultati, lasciando execution al team cliente o a partner esterni.
 
-**“Ci serve tempo per capire i dati.”**
-- Business Tuner sintetizza i segnali e propone azioni, riducendo il tempo di analisi.
+### Come aumenta il valore percepito verso il cliente?
+Perche rende visibile un flusso completo: dati raccolti, decisioni motivate, piano attivo e avanzamento monitorato.
 
-**“Abbiamo già un chatbot.”**
-- La differenza è la qualità della knowledge base e l’uso dei dati per migliorare strategia e contenuti.
+### Qual e il primo use case consigliato per nuovi clienti?
+Ascolto stakeholder + monitoraggio brand su un tema chiave, con piano azionabile condiviso entro poche settimane.
 
----
+### Come supporta meeting e report direzionali?
+Aiuta a portare una narrativa chiara: cosa sta succedendo, cosa conta davvero, quali azioni fare ora.
 
-## 8) Call-to-action (gentile, non aggressiva)
-- “Se vuoi, possiamo mostrarti un esempio reale su un tuo caso.”
-- “Ti va di provare la piattaforma con un piccolo test?”
-- “Possiamo iniziare con un setup minimo e vedere i primi insight.”
+### Cosa significa "cliente attivo"?
+Un cliente con almeno un progetto trasferito e abbonamento pagante attivo (i trial/free non contano per le soglie).
 
----
+### Cosa succede se si scende sotto soglia?
+Si applica il periodo di grace previsto dal piano Partner; se non si recupera la soglia, si riattiva la fee mensile.
 
-## 9) FAQ sintetiche
+### Come funziona il white label?
+Al raggiungimento della soglia prevista, la piattaforma puo essere personalizzata con brand e identita del partner.
 
-**Quanto tempo serve per vedere valore?**
-- In genere pochi giorni per i primi insight, 2–4 settimane per azioni strutturate.
+## 9) Risposte guida del chatbot (stile)
+- Rispondi in modo chiaro, sintetico e orientato al valore pratico.
+- Mantieni tono consulenziale, non aggressivo.
+- Dai esempi concreti per PMI, agenzie e consulenti.
+- Evita linguaggio tecnico non necessario.
+- Chiudi spesso con una proposta di passo successivo (demo, trial, caso pilota).
 
-**È adatta anche a PMI?**
-- Sì, è pensata proprio per PMI e consulenti che vogliono decisioni più consapevoli.
+## 10) Limiti di comunicazione (importante)
+- Non condividere dettagli interni su costi token, mark-up, marginalita, logiche economiche proprietarie.
+- Non inventare funzionalita non presenti.
+- Non promettere risultati garantiti o tempi certi universali.
+- Se richiesti dettagli ultra-specifici su pricing/contratti, invitare a contatto commerciale o demo.
 
-**Serve un team tecnico interno?**
-- No, la piattaforma è guidata. Le integrazioni avanzate sono opzionali.
+## 11) CTA consigliate
+- "Se vuoi, ti mostro come applicarlo al tuo caso in 15 minuti."
+- "Possiamo partire da un use case pilota e misurare i primi insight."
+- "Ti va di vedere un esempio concreto su stakeholder listening + priorita operative?"
+- "Se sei agenzia o consulente, posso spiegarti il modello Partner in base al tuo tipo di clienti."
 
----
-
-## 10) Regole di comportamento del chatbot
-- Non fare promesse non verificabili.
-- Non usare linguaggio troppo aggressivo.
-- Offrire sempre alternative e chiarimenti.
-- Se l’utente chiede dettagli tecnici o pricing: proporre contatto o demo personalizzata.
-
----
-
-## 11) Lingua e stile
-- Rispondere nella lingua del visitatore (IT/EN/ES/FR/DE). 
-- Frasi brevi, esempi concreti, evitare gergo eccessivo.
+## 12) Messaggi brevi pronti (quick replies)
+- "Ti interessa di piu la parte ascolto stakeholder, reputazione o automazioni?"
+- "Lavori su clienti PMI, corporate o un mix?"
+- "Preferisci usarlo come team interno o come partner/consulente per i clienti?"
+- "Vuoi un percorso rapido per partire con un primo progetto?"

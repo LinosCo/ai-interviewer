@@ -40,6 +40,11 @@ import {
     buildMicroPlannerDecision,
     buildMicroPlannerPromptBlock
 } from '@/lib/interview/micro-planner';
+import { generateCILAnalysis } from '@/lib/interview/cil/conversation-intelligence';
+import { mergeCILState, EMPTY_CIL_STATE } from '@/lib/interview/cil/cil-state';
+import { computeCILBonusCap, applyCILBudgetSignal } from '@/lib/interview/explore-deepen-machine';
+import { buildCILContextBlock } from '@/lib/llm/prompt-builder';
+import type { CILAnalysis, CILState } from '@/lib/interview/cil/types';
 
 import {
     InterestingTopic, TopicBudget,
@@ -136,6 +141,7 @@ export interface InterviewState {
     extensionOfferAttempts?: number;
     runtimeInterviewKnowledge?: RuntimeInterviewKnowledge | null;
     runtimeInterviewKnowledgeSignature?: string | null;
+    cilState?: CILState | null;
 }
 
 interface QualityTelemetry {
@@ -590,6 +596,7 @@ export async function POST(req: Request) {
             extensionOfferAttempts: rawMetadata.extensionOfferAttempts ?? 0,
             runtimeInterviewKnowledge: rawMetadata.runtimeInterviewKnowledge ?? null,
             runtimeInterviewKnowledgeSignature: rawMetadata.runtimeInterviewKnowledgeSignature ?? null,
+            cilState: rawMetadata.cilState ?? null,
         };
 
         const activeTopics = state.phase === 'DEEPEN' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -658,7 +665,7 @@ export async function POST(req: Request) {
         // ====================================================================
         // 3. PHASE MACHINE
         // ====================================================================
-        const nextState = { ...state };
+        let nextState = { ...state };
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
@@ -1215,6 +1222,30 @@ export async function POST(req: Request) {
             nextState.runtimeInterviewKnowledge = null;
             nextState.runtimeInterviewKnowledgeSignature = null;
         }
+
+        // --- CIL PRE-PASS (avanzato only, parallel with remaining sync work) ---
+        const isAvanzato = ((bot as any).interviewerQuality || 'quantitativo') === 'avanzato';
+        const AVANZATO_CIL_RECENT_TURNS = 6;
+
+        const cilPromise: Promise<CILAnalysis | null> = isAvanzato
+            ? (async () => {
+                const topicKnowledge = runtimeInterviewKnowledge?.topics.find(
+                    t => t.topicId === currentTopic.id
+                ) ?? null;
+                const recentTurns = canonicalMessages
+                    .slice(-AVANZATO_CIL_RECENT_TURNS)
+                    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+                return generateCILAnalysis({
+                    recentTurns,
+                    currentTopicId: currentTopic.id,
+                    cilState: state.cilState ?? EMPTY_CIL_STATE,
+                    topicKnowledge,
+                    model: modelRegistry.primary,
+                    language: bot.language || 'it'
+                });
+            })()
+            : Promise.resolve(null);
+
         const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
             ? detectUserTurnSignal({
                 userMessage: lastMessage.content,
@@ -1384,6 +1415,26 @@ hard_rules:
                 coverage: microPlannerDecision.topicCoverage,
                 knowledgeSource: microPlannerDecision.knowledgeSource
             });
+        }
+
+        // Await CIL and apply budget stealing (before prompt finalization)
+        const cilAnalysis = await cilPromise;
+
+        if (cilAnalysis?.budgetSignal && isAvanzato) {
+            const cap = computeCILBonusCap(nextState, (bot as any).cilBonusTurnCapOverride ?? null);
+            nextState = applyCILBudgetSignal(nextState, cilAnalysis.budgetSignal, cap);
+        }
+
+        // Block 6.5 — CIL context (avanzato only)
+        if (cilAnalysis && isAvanzato) {
+            const cilBlock = buildCILContextBlock(
+                cilAnalysis,
+                state.cilState ?? null,
+                (bot as any).interviewerQuality || 'quantitativo'
+            );
+            if (cilBlock) {
+                systemPrompt += `\n\n${cilBlock}`;
+            }
         }
 
         if (userTurnSignal === 'clarification') {
@@ -2160,6 +2211,15 @@ hard_rules:
         // ====================================================================
         // 6. SAVE & UPDATE STATE (parallelized for speed)
         // ====================================================================
+        // Persist CIL state
+        if (cilAnalysis && isAvanzato) {
+            nextState.cilState = mergeCILState(
+                state.cilState ?? EMPTY_CIL_STATE,
+                cilAnalysis,
+                canonicalMessages.length
+            );
+        }
+
         // Run save operations in parallel - they're independent
         await Promise.all([
             // Save assistant message

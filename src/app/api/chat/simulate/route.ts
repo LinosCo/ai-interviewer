@@ -1,3 +1,4 @@
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -17,6 +18,9 @@ interface MockTopic extends TopicBlock {
 }
 
 export async function POST(req: Request) {
+    const session = await auth();
+    if (!session?.user?.id) return new Response('Unauthorized', { status: 401 });
+
     try {
         const body = await req.json();
         const { messages, config, currentTopicIndex = 0, effectiveDuration = 0 } = body;
@@ -104,7 +108,7 @@ export async function POST(req: Request) {
         // We track if topic transition happens to return it to client
         const messagesForAI = messages.map((m: any) => ({ role: m.role, content: m.content }));
 
-        // Fix: Vercel AI SDK throws if messages is empty
+        // Fix: AI SDK throws if messages is empty
         if (messagesForAI.length === 0) {
             messagesForAI.push({ role: 'user', content: "I am ready to start." });
         }

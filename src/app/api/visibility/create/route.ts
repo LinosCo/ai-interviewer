@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { PLANS, PlanType } from '@/config/plans';
 import { resolveActiveOrganizationIdForUser } from '@/lib/active-organization';
 import { checkTrialResourceLimit } from '@/lib/trial-limits';
-import { createVisibilityConfigWithGuard, normalizeBrandName } from '@/lib/visibility/create-config';
+import { createVisibilityConfigWithGuard, normalizeBrandAliases, normalizeBrandName } from '@/lib/visibility/create-config';
 
 export async function POST(request: Request) {
     try {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { brandName, category, description, language, territory, prompts, competitors, organizationId, websiteUrl, additionalUrls } = body;
+        const { brandName, brandAliases, category, description, language, territory, prompts, competitors, organizationId, websiteUrl, additionalUrls } = body;
 
         // Determine organizationId: use provided if admin, or fallback to selected org cookie
         let finalOrganizationId = organizationId;
@@ -91,6 +91,9 @@ export async function POST(request: Request) {
         const { projectId } = body;
 
         const normalizedBrandName = typeof brandName === 'string' ? normalizeBrandName(brandName) : '';
+        const normalizedBrandAliases = normalizeBrandAliases(brandAliases).filter(
+            (alias) => alias.toLowerCase() !== normalizedBrandName.toLowerCase()
+        );
 
         if (!normalizedBrandName || !category) {
             return NextResponse.json(
@@ -133,6 +136,7 @@ export async function POST(request: Request) {
             organizationId: finalOrganizationId,
             projectId: projectId || null,
             brandName: normalizedBrandName,
+            brandAliases: normalizedBrandAliases,
             category,
             description,
             websiteUrl,
@@ -365,7 +369,7 @@ export async function PATCH(request: Request) {
         }
 
         const body = await request.json();
-        const { id, brandName, category, description, language, territory, isActive, prompts, competitors, projectId, websiteUrl, additionalUrls } = body;
+        const { id, brandName, brandAliases, category, description, language, territory, isActive, prompts, competitors, projectId, websiteUrl, additionalUrls } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Configuration id is required' }, { status: 400 });
@@ -374,7 +378,7 @@ export async function PATCH(request: Request) {
         // Check if config exists and user belongs to the same organization.
         const existingConfig = await prisma.visibilityConfig.findUnique({
             where: { id },
-            select: { id: true, organizationId: true }
+            select: { id: true, organizationId: true, brandName: true }
         });
 
         if (!existingConfig) {
@@ -431,13 +435,20 @@ export async function PATCH(request: Request) {
             }
         }
 
+        const normalizedPatchBrandName = typeof brandName === 'string' ? normalizeBrandName(brandName) : undefined;
+        const effectiveBrandName = normalizedPatchBrandName || existingConfig.brandName;
+        const normalizedPatchAliases = brandAliases !== undefined
+            ? normalizeBrandAliases(brandAliases).filter((alias) => alias.toLowerCase() !== effectiveBrandName.toLowerCase())
+            : undefined;
+
         // Use a transaction to ensure atomic updates for prompts and competitors
         const updatedConfig = await prisma.$transaction(async (tx) => {
             // 1. Update basic info
             const config = await tx.visibilityConfig.update({
                 where: { id: existingConfig.id },
                 data: {
-                    ...(brandName && { brandName }),
+                    ...(normalizedPatchBrandName && { brandName: normalizedPatchBrandName }),
+                    ...(normalizedPatchAliases !== undefined && { brandAliases: normalizedPatchAliases }),
                     ...(category && { category }),
                     ...(description !== undefined && { description }),
                     ...(websiteUrl !== undefined && { websiteUrl }),

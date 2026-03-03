@@ -57,13 +57,13 @@ export function WizardStepCompetitors({ config, setConfig, maxCompetitors = 5 }:
             </div>
 
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-stone-700 mb-2">
                     Aggiungi Competitor
                 </label>
                 <div className="flex gap-3">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search className="h-5 w-5 text-gray-400" />
+                            <Search className="h-5 w-5 text-stone-400" />
                         </div>
                         <input
                             type="text"
@@ -71,14 +71,14 @@ export function WizardStepCompetitors({ config, setConfig, maxCompetitors = 5 }:
                             onChange={(e) => setNewCompetitor(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={isLimitReached}
-                            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            className="block w-full pl-10 pr-3 py-2 border border-stone-300 rounded-lg focus:ring-amber-500 focus:border-amber-400 disabled:bg-stone-100 disabled:cursor-not-allowed"
                             placeholder={isLimitReached ? "Limite raggiunto" : "Es. Competitor X, Inc."}
                         />
                     </div>
                     <button
                         onClick={addCompetitor}
                         disabled={!newCompetitor.trim() || isLimitReached}
-                        className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-4 py-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />
                         Aggiungi
@@ -94,19 +94,19 @@ export function WizardStepCompetitors({ config, setConfig, maxCompetitors = 5 }:
             {/* List */}
             <div className="space-y-3">
                 {config.competitors.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-xl">
+                    <div className="text-center py-8 text-stone-500 border-2 border-dashed border-stone-200 rounded-xl">
                         Nessun competitor aggiunto
                     </div>
                 ) : (
                     config.competitors.map((competitor) => (
                         <div
                             key={competitor.id}
-                            className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg shadow-sm group hover:border-purple-200 transition-all"
+                            className="flex items-center justify-between p-4 bg-white border border-stone-200 rounded-lg shadow-sm group hover:border-stone-300 transition-all"
                         >
-                            <span className="font-medium text-gray-900">{competitor.name}</span>
+                            <span className="font-medium text-stone-900">{competitor.name}</span>
                             <button
                                 onClick={() => removeCompetitor(competitor.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>

@@ -40,7 +40,7 @@ function pickIntent(rand: () => number): UserIntent {
 
 function newBaseState(remainingSec: number): PhaseSimulatorState {
     return {
-        phase: 'DEEP',
+        phase: 'DEEPEN',
         shouldCollectData: true,
         candidateFieldIds: ['fullName', 'email', 'phone'],
         deepAccepted: null,

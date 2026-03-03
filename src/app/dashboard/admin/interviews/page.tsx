@@ -205,6 +205,7 @@ export default async function AdminInterviewQualityPage({ searchParams }: PagePr
                     <p className="text-sm text-gray-500">Nessun bot con campione sufficiente nella finestra selezionata.</p>
                 ) : (
                     <div className="overflow-auto">
+                        <div className="overflow-x-auto w-full">
                         <table className="w-full text-sm">
                             <thead className="text-left text-gray-500 border-b border-gray-200">
                                 <tr>
@@ -231,6 +232,7 @@ export default async function AdminInterviewQualityPage({ searchParams }: PagePr
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 )}
             </div>

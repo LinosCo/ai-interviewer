@@ -55,7 +55,6 @@ export async function POST(request: NextRequest) {
                         : (sendResult.error as any)?.message || 'Unknown email error';
                 console.error('[forgot-password] password reset email failed:', {
                     userId: user.id,
-                    email: user.email,
                     reason
                 });
             }

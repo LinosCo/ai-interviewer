@@ -35,13 +35,19 @@
       return {
         botId: script.getAttribute('data-bot-id'),
         apiBase: script.getAttribute('data-domain') || scriptUrl.origin,
-        forceConsent: script.getAttribute('data-force-consent') === 'true'
+        forceConsent: script.getAttribute('data-force-consent') === 'true',
+        autoOpen: script.getAttribute('data-auto-open') === 'true',
+        hideOnMobile: script.getAttribute('data-hide-mobile') === 'true',
+        delay: parseInt(script.getAttribute('data-delay') || '0', 10) || 0
       };
     } catch {
       return {
         botId: script.getAttribute('data-bot-id'),
         apiBase: script.getAttribute('data-domain') || window.location.origin,
-        forceConsent: script.getAttribute('data-force-consent') === 'true'
+        forceConsent: script.getAttribute('data-force-consent') === 'true',
+        autoOpen: script.getAttribute('data-auto-open') === 'true',
+        hideOnMobile: script.getAttribute('data-hide-mobile') === 'true',
+        delay: parseInt(script.getAttribute('data-delay') || '0', 10) || 0
       };
     }
   }
@@ -52,6 +58,9 @@
     console.error('BusinessTuner: data-bot-id is required and must be valid', CONFIG);
     return;
   }
+
+  // data-hide-mobile: do not mount widget on small screens
+  if (CONFIG.hideOnMobile && window.innerWidth < 640) return;
 
   function sanitizeContextText(text, maxLen) {
     if (!text || typeof text !== 'string') return '';
@@ -117,6 +126,7 @@
     };
   }
 
+  function mountWidget() {
   // Create Iframe Container
   const container = document.createElement('div');
   container.id = 'bt-root';
@@ -133,8 +143,12 @@
   container.style.justifyContent = 'flex-end';
   container.style.padding = '20px';
 
-  // Construct Iframe URL
-  const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}${CONFIG.forceConsent ? '?forceConsent=true' : ''}`;
+  // Construct Iframe URL — include all URL-param-driven features
+  const widgetParams = new URLSearchParams();
+  if (CONFIG.forceConsent) widgetParams.set('forceConsent', 'true');
+  if (CONFIG.autoOpen) widgetParams.set('autoOpen', 'true');
+  const widgetQuery = widgetParams.toString();
+  const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}${widgetQuery ? '?' + widgetQuery : ''}`;
 
   const iframe = document.createElement('iframe');
   iframe.src = widgetUrl;
@@ -150,6 +164,8 @@
 
   // Communication
   window.addEventListener('message', (event) => {
+    const expectedOrigin = new URL(widgetUrl).origin;
+    if (event.origin !== expectedOrigin) return;
     let data = event.data;
     if (typeof data === 'string') {
       try {
@@ -187,9 +203,17 @@
         iframe.contentWindow.postMessage({
           type: 'bt-widget-page-context',
           pageContext: buildPageContext()
-        }, '*');
+        }, new URL(widgetUrl).origin);
       }
     }
   });
+  } // end mountWidget
+
+  // data-delay: defer widget mount by the specified milliseconds
+  if (CONFIG.delay > 0) {
+    setTimeout(mountWidget, CONFIG.delay);
+  } else {
+    mountWidget();
+  }
 
 })(window);

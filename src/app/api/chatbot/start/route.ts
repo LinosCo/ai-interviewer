@@ -59,8 +59,7 @@ export async function POST(req: NextRequest) {
             });
 
             if (!isAllowed) {
-                // Log but maybe allow for now or block? Blocking for security.
-                // return Response.json({ error: 'Domain not allowed' }, { status: 403 });
+                return Response.json({ error: 'Domain not allowed' }, { status: 403 });
             }
         }
 

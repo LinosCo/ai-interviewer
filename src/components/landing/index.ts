@@ -8,6 +8,8 @@ export { NewsSection } from './NewsSection';
 export { HowItWorks } from './HowItWorks';
 export { WhySection } from './WhySection';
 export { UseCasesSection } from './UseCasesSection';
+export { TrainingBotSection } from './TrainingBotSection';
+export { AutomationSection } from './AutomationSection';
 export { PricingSection } from './PricingSection';
 export { FAQSection } from './FAQSection';
 export { CTASection } from './CTASection';

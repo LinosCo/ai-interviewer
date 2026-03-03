@@ -37,6 +37,8 @@ interface StrategicContext {
     chatbotFaqSuggestions: Array<{ question: string; occurrences: number }>;
     crossChannelInsights: Array<{ topic: string; suggestedActions: any; priorityScore: number }>;
     knowledgeSources: Array<{ title?: string; type?: string; snippet: string }>;
+    chatbotConversationSignals: Array<{ text: string; createdAt?: string }>;
+    interviewSnippets: Array<{ theme: string; snippet: string; strengthScore: number }>;
     websiteAnalytics?: {
         avgBounceRate?: number;
         avgSessionDuration?: number;
@@ -187,6 +189,12 @@ export class WebsiteAnalysisEngine {
         if (context.interviewThemes.length > 0) {
             evidence.push(`${context.interviewThemes.length} temi emersi da interviste`);
         }
+        if (context.chatbotConversationSignals.length > 0) {
+            evidence.push(`${context.chatbotConversationSignals.length} segnali conversazionali reali da chatbot`);
+        }
+        if (context.interviewSnippets.length > 0) {
+            evidence.push(`${context.interviewSnippets.length} estratti interviste con snippet`);
+        }
         if (context.visibilityScanInsights.length > 0) {
             const missing = context.visibilityScanInsights.filter(v => !v.brandMentioned).length;
             evidence.push(`${missing} prompt AI senza menzione brand`);
@@ -202,6 +210,62 @@ export class WebsiteAnalysisEngine {
         }
 
         return evidence.slice(0, 6);
+    }
+
+    private static fallbackDraftForRecommendation(
+        rec: z.infer<typeof RecommendationSchema>,
+        context: StrategicContext,
+        content: MultiPageScrapedContent
+    ) {
+        const title = (rec.title || '').trim() || 'Aggiornamento contenuto prioritario';
+        const slug = title
+            .toLowerCase()
+            .replace(/[^a-z0-9àèéìòùäöüßçñ\s-]/gi, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .slice(0, 80);
+
+        const primaryGap = context.knowledgeGaps[0]?.topic;
+        const primaryFaq = context.chatbotFaqSuggestions[0]?.question;
+        const primaryTheme = context.interviewThemes[0]?.name;
+        const primaryPrompt = context.visibilityScanInsights.find(v => !v.brandMentioned)?.prompt;
+        const target = primaryGap || primaryFaq || primaryTheme || primaryPrompt || 'bisogno utente prioritario';
+
+        const homepage = content.homepage.url || '';
+        const body = [
+            `## Obiettivo`,
+            `Chiarire in modo operativo il tema: "${target}".`,
+            ``,
+            `## Cosa aggiungere`,
+            `- Una sezione con risposta diretta alla domanda principale degli utenti.`,
+            `- Un esempio concreto di applicazione nel contesto del brand.`,
+            `- Una CTA finale con passo successivo misurabile.`,
+            ``,
+            `## Perche ora`,
+            `Questo intervento e prioritario per migliorare copertura prompt AI, comprensione utente e conversione delle visite.`,
+            ``,
+            `## Pagina target`,
+            `${homepage || 'Pagina principale o sezione coerente del sito'}`,
+        ].join('\n');
+
+        const targetSection = rec.type === 'add_faq'
+            ? 'faq'
+            : rec.type === 'social_post'
+                ? 'social'
+                : rec.type === 'add_page'
+                    ? 'pages'
+                    : 'blog';
+
+        return {
+            title,
+            slug,
+            body,
+            metaDescription: (`Guida pratica su ${target}: intervento prioritario per migliorare visibilita AI e chiarezza del sito.`).slice(0, 160),
+            targetSection,
+            ...(rec.type === 'social_post'
+                ? { mediaBrief: 'Visual con problema reale + soluzione concreta + CTA in 3 scene brevi.' }
+                : {})
+        };
     }
 
     private static detectContentOverlap(
@@ -250,7 +314,7 @@ export class WebsiteAnalysisEngine {
             context.capabilities?.hasWooCommerce ? 'WOOCOMMERCE_MCP' : null
         ].filter(Boolean) as string[];
 
-        return recommendations.map(rec => {
+        const normalized = recommendations.map(rec => {
             const overlap = this.detectContentOverlap(rec, content, context);
             let normalizedType = rec.type;
             let normalizedDescription = rec.description;
@@ -325,7 +389,7 @@ export class WebsiteAnalysisEngine {
                         }
                         : {})
                 }
-                : rec.contentDraft;
+                : this.fallbackDraftForRecommendation(rec, context, content);
 
             return {
                 ...rec,
@@ -340,6 +404,66 @@ export class WebsiteAnalysisEngine {
                 explainability
             };
         });
+
+        if (normalized.length >= 8) return normalized;
+
+        const backfills: Array<z.infer<typeof RecommendationSchema>> = [];
+        const needed = 8 - normalized.length;
+        const sources = [
+            ...context.knowledgeGaps.map(g => ({ kind: 'gap' as const, label: g.topic })),
+            ...context.chatbotFaqSuggestions.map(f => ({ kind: 'faq' as const, label: f.question })),
+            ...context.interviewThemes.map(t => ({ kind: 'theme' as const, label: t.name })),
+        ].slice(0, needed * 2);
+
+        for (const src of sources) {
+            if (backfills.length >= needed) break;
+            const title = src.kind === 'faq'
+                ? `Aggiungi risposta operativa: ${src.label}`
+                : src.kind === 'theme'
+                    ? `Pagina di approfondimento su: ${src.label}`
+                    : `Colma gap informativo: ${src.label}`;
+            const type = src.kind === 'faq' ? 'add_faq' : (src.kind === 'theme' ? 'add_page' : 'address_knowledge_gap');
+            const draft = this.fallbackDraftForRecommendation({
+                type,
+                priority: 'medium',
+                title,
+                description: `Suggerimento generato da segnali reali del progetto: ${src.label}`,
+                impact: 'Migliore copertura intent utente e aumento menzioni rilevanti nei motori AI.',
+            } as z.infer<typeof RecommendationSchema>, context, content);
+
+            backfills.push({
+                type,
+                priority: 'medium',
+                title,
+                description: `Azione concreta basata su segnale reale: ${src.label}.`,
+                impact: 'Riduce gap informativi e aumenta la probabilita di menzione utile nei risultati AI/SEO.',
+                dataSource: src.kind === 'faq' ? 'chatbot_faq' : src.kind === 'theme' ? 'interview_theme' : 'knowledge_gap',
+                relatedPrompts: context.visibilityScanInsights.slice(0, 2).map(v => v.prompt),
+                strategyAlignment: context.organizationVision || context.organizationValueProp || context.strategicPlan || 'Allineamento strategico del progetto',
+                evidencePoints: evidencePoints.slice(0, 3),
+                contentDraft: draft,
+                implementation: {
+                    ...defaultPublicationRouting(
+                        inferContentKind({
+                            suggestionType: type === 'add_faq' ? 'CREATE_FAQ' : 'CREATE_PAGE',
+                            tipType: type,
+                            targetSection: draft.targetSection,
+                            title
+                        }),
+                        context.capabilities || {
+                            hasCmsApi: true,
+                            hasWordPress: false,
+                            hasWooCommerce: false,
+                            hasGoogleAnalytics: false,
+                            hasSearchConsole: false
+                        },
+                        draft.targetSection
+                    )
+                }
+            } as z.infer<typeof RecommendationSchema>);
+        }
+
+        return [...normalized, ...backfills].slice(0, 12);
     }
 
     /**
@@ -456,16 +580,46 @@ export class WebsiteAnalysisEngine {
             select: { title: true, type: true, content: true }
         }) : [];
 
-        // Fetch cross-channel insights
-        const crossChannelInsights = await prisma.crossChannelInsight.findMany({
-            where: {
-                organizationId,
-                ...(config?.projectId ? { projectId: config.projectId } : {})
-            },
-            orderBy: { priorityScore: 'desc' },
-            take: 5,
-            select: { topicName: true, suggestedActions: true, priorityScore: true }
-        });
+        // Fetch cross-channel insights strictly scoped to project to avoid cross-brand contamination.
+        const crossChannelInsights = config?.projectId
+            ? await prisma.crossChannelInsight.findMany({
+                where: {
+                    organizationId,
+                    projectId: config.projectId
+                },
+                orderBy: { priorityScore: 'desc' },
+                take: 5,
+                select: { topicName: true, suggestedActions: true, priorityScore: true }
+            })
+            : [];
+
+        const chatbotConversationSignals = botIds.length > 0
+            ? await prisma.message.findMany({
+                where: {
+                    role: 'user',
+                    conversation: { botId: { in: botIds } }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 16,
+                select: { content: true, createdAt: true }
+            })
+            : [];
+
+        const interviewSnippets = botIds.length > 0
+            ? await prisma.themeOccurrence.findMany({
+                where: {
+                    theme: { botId: { in: botIds } },
+                    snippet: { not: null }
+                },
+                orderBy: { strengthScore: 'desc' },
+                take: 12,
+                select: {
+                    snippet: true,
+                    strengthScore: true,
+                    theme: { select: { name: true } }
+                }
+            })
+            : [];
 
         // Fetch latest website analytics (GA/GSC) if CMS connection exists
         let websiteAnalytics: StrategicContext['websiteAnalytics'] | undefined;
@@ -563,6 +717,21 @@ export class WebsiteAnalysisEngine {
                 type: k.type ?? undefined,
                 snippet: (k.content || '').replace(/\s+/g, ' ').slice(0, 220)
             })),
+            chatbotConversationSignals: chatbotConversationSignals
+                .map(m => ({
+                    text: (m.content || '').replace(/\s+/g, ' ').trim(),
+                    createdAt: m.createdAt?.toISOString()
+                }))
+                .filter(m => m.text.length >= 20)
+                .slice(0, 12),
+            interviewSnippets: interviewSnippets
+                .map(s => ({
+                    theme: s.theme.name,
+                    snippet: (s.snippet || '').replace(/\s+/g, ' ').trim(),
+                    strengthScore: s.strengthScore
+                }))
+                .filter(s => s.snippet.length >= 20)
+                .slice(0, 10),
             websiteAnalytics,
             capabilities
         };
@@ -815,7 +984,7 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
    - Valuta chiarezza e struttura
    - Il tono deve essere coerente con i temi delle interviste
 
-5. RECOMMENDATIONS (5-10 raccomandazioni):
+5. RECOMMENDATIONS (8-14 raccomandazioni):
    CRITICHE: Le raccomandazioni devono essere:
    - SPECIFICHE: "Aggiungi una sezione FAQ che risponda a [domanda specifica da knowledge gap]"
    - STRATEGICHE: Basate sui dati reali dell'organizzazione
@@ -840,8 +1009,8 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
    - social_post: Bozza post social basata su insight (con descrizione visual)
    - product_content_optimization: Ottimizzazione descrizioni prodotto (utile se WooCommerce attivo)
 
-   CONTENUTO OPERATIVO (solo per add_page, add_faq, modify_content, competitive_positioning, social_post, product_content_optimization):
-   - Aggiungi "contentDraft" con:
+   CONTENUTO OPERATIVO (obbligatorio per tutte le raccomandazioni):
+   - Aggiungi SEMPRE "contentDraft" con:
      • title (SEO-friendly)
      • slug (breve, con trattini)
      • body (Markdown con H2/H3, paragrafi brevi, liste, CTA)
@@ -850,6 +1019,7 @@ La tua analisi deve essere STRATEGICA e BASATA SUI DATI. Non fornire raccomandaz
      • mediaBrief (solo per social_post: descrizione del visual/video più adatto)
      • targetEntityId/targetEntitySlug (solo product_content_optimization, se disponibile)
    - Il testo deve essere ottimizzato per LLM: esplicita brand, prodotto/servizio e termini chiave del prompt.
+   - Ogni body deve contenere almeno: Obiettivo, Azione concreta, Esempio applicato, CTA operativa.
    - Non includere claim non verificati; se un dato non è nelle fonti, riformula come ipotesi o suggerisci verifica.`
         });
 
@@ -901,6 +1071,20 @@ ${lowConfidence.length > 0 ? `⚠️ Risposte a bassa affidabilità (senza fonti
 ${context.chatbotFaqSuggestions.map(f => `- "${f.question}" (${f.occurrences} volte)`).join('\n')}
 
 Queste domande vengono poste ripetutamente dagli utenti - il sito dovrebbe rispondere chiaramente.`);
+        }
+
+        if (context.chatbotConversationSignals.length > 0) {
+            sections.push(`🧩 ESTRATTI CONVERSAZIONI CHATBOT (progetto corrente):
+${context.chatbotConversationSignals.slice(0, 8).map(s => `- "${s.text.slice(0, 220)}"`).join('\n')}
+
+Usa questi estratti per proporre contenuti implementabili su bisogni reali.`);
+        }
+
+        if (context.interviewSnippets.length > 0) {
+            sections.push(`🧠 SNIPPET DA INTERVISTE (progetto corrente):
+${context.interviewSnippets.slice(0, 8).map(s => `- [${s.theme}] ${s.snippet}`).join('\n')}
+
+Questi snippet vanno trasformati in sezioni/pagine concrete, non in suggerimenti generici.`);
         }
 
         // Cross-Channel Insights

@@ -30,7 +30,7 @@ export async function authenticate(
         });
 
         // If we get here without error, login was successful
-        console.log('Login successful, result:', result);
+        console.log('Login successful');
         return null;
     } catch (error: unknown) {
         const unknownError = error as { digest?: string };

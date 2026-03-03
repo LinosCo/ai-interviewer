@@ -134,7 +134,7 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
             case 'positive': return <TrendingUp className="w-4 h-4 text-green-500" />;
             case 'negative': return <TrendingDown className="w-4 h-4 text-red-500" />;
             case 'mixed': return <AlertTriangle className="w-4 h-4 text-amber-500" />;
-            default: return <Minus className="w-4 h-4 text-gray-400" />;
+            default: return <Minus className="w-4 h-4 text-stone-400" />;
         }
     };
 
@@ -143,14 +143,14 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
             case 'positive': return 'bg-green-100 text-green-800 border-green-200';
             case 'negative': return 'bg-red-100 text-red-800 border-red-200';
             case 'mixed': return 'bg-amber-100 text-amber-800 border-amber-200';
-            default: return 'bg-gray-100 text-gray-800 border-gray-200';
+            default: return 'bg-stone-100 text-stone-800 border-stone-200';
         }
     };
 
     const getImportanceColor = (score: number) => {
         if (score >= 70) return 'text-red-600 font-bold';
         if (score >= 50) return 'text-amber-600 font-medium';
-        return 'text-gray-500';
+        return 'text-stone-500';
     };
 
     const formatDate = (dateStr: string) => {
@@ -189,10 +189,10 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
 
     if (loading) {
         return (
-            <Card className="border-0 shadow-lg">
+            <Card className="border border-stone-100 shadow-sm">
                 <CardContent className="p-8 text-center">
                     <RefreshCw className="w-8 h-8 animate-spin mx-auto text-amber-500" />
-                    <p className="mt-4 text-gray-500">Caricamento monitoraggio Google...</p>
+                    <p className="mt-4 text-stone-500">Caricamento monitoraggio Google...</p>
                 </CardContent>
             </Card>
         );
@@ -204,7 +204,7 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
     return (
         <div className="space-y-6">
             {/* Header */}
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50">
+            <Card className="border border-stone-100 bg-white shadow-sm">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -222,7 +222,7 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                             <select
                                 value={resultType}
                                 onChange={(e) => setResultType(e.target.value as 'news' | 'web')}
-                                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                             >
                                 <option value="news">News</option>
                                 <option value="web">Web (contenuti recenti)</option>
@@ -230,7 +230,7 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                             <select
                                 value={dateRange}
                                 onChange={(e) => setDateRange(e.target.value as typeof dateRange)}
-                                className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
                             >
                                 <option value="last_day">Ultime 24 ore</option>
                                 <option value="last_week">Ultimi 7 giorni</option>
@@ -254,36 +254,36 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                 {latestScan && (
                     <CardContent className="pt-0">
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                            <div className="bg-white/60 rounded-lg p-4">
-                                <p className="text-sm text-gray-500">Totale Menzioni</p>
-                                <p className="text-2xl font-bold text-gray-900">{latestScan.totalResults}</p>
+                            <div className="bg-stone-50 rounded-lg p-4">
+                                <p className="text-sm text-stone-500">Totale Menzioni</p>
+                                <p className="text-2xl font-bold text-stone-900">{latestScan.totalResults}</p>
                             </div>
-                            <div className="bg-white/60 rounded-lg p-4">
-                                <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <div className="bg-stone-50 rounded-lg p-4">
+                                <p className="text-sm text-stone-500 flex items-center gap-1">
                                     <TrendingUp className="w-3 h-3 text-green-500" /> Positive
                                 </p>
                                 <p className="text-2xl font-bold text-green-600">{latestScan.positiveCount}</p>
                             </div>
-                            <div className="bg-white/60 rounded-lg p-4">
-                                <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <div className="bg-stone-50 rounded-lg p-4">
+                                <p className="text-sm text-stone-500 flex items-center gap-1">
                                     <TrendingDown className="w-3 h-3 text-red-500" /> Negative
                                 </p>
                                 <p className="text-2xl font-bold text-red-600">{latestScan.negativeCount}</p>
                             </div>
-                            <div className="bg-white/60 rounded-lg p-4">
-                                <p className="text-sm text-gray-500">Importanza Media</p>
+                            <div className="bg-stone-50 rounded-lg p-4">
+                                <p className="text-sm text-stone-500">Importanza Media</p>
                                 <p className={`text-2xl font-bold ${getImportanceColor(latestScan.avgImportance)}`}>
                                     {Math.round(latestScan.avgImportance)}%
                                 </p>
                             </div>
-                            <div className="bg-white/60 rounded-lg p-4">
-                                <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <div className="bg-stone-50 rounded-lg p-4">
+                                <p className="text-sm text-stone-500 flex items-center gap-1">
                                     <Clock className="w-3 h-3" /> Ultimo Scan
                                 </p>
-                                <p className="text-sm font-medium text-gray-700">
+                                <p className="text-sm font-medium text-stone-700">
                                     {formatDate(latestScan.completedAt)}
                                 </p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-stone-500 mt-1">
                                     {getScanTypeLabel(latestScan.scanType)} • {getDateRangeLabel(latestScan.dateRange)}
                                 </p>
                             </div>
@@ -304,10 +304,10 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
             {/* Results List */}
             {hasResults ? (
                 <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-900">Menzioni Recenti</h3>
+                    <h3 className="font-semibold text-stone-900">Menzioni Recenti</h3>
 
                     {data.results.map((result) => (
-                        <Card key={result.id} className={`border-0 shadow-md transition-all ${result.sentiment === 'negative' ? 'border-l-4 border-l-red-400' : ''}`}>
+                        <Card key={result.id} className={`border border-stone-100 shadow-sm transition-all ${result.sentiment === 'negative' ? 'border-l-4 border-l-red-400' : ''}`}>
                             <CardContent className="p-4">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
@@ -320,7 +320,7 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                                                 {result.sourceType}
                                             </Badge>
                                             {result.relatedToLLMVisibility && (
-                                                <Badge className="bg-purple-100 text-purple-700 text-xs">
+                                                <Badge className="bg-amber-50 text-amber-700 text-xs border-amber-200">
                                                     Impatto LLM
                                                 </Badge>
                                             )}
@@ -333,47 +333,47 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                                             href={result.url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="font-medium text-gray-900 hover:text-blue-600 flex items-center gap-1"
+                                            className="font-medium text-stone-900 hover:text-blue-600 flex items-center gap-1"
                                         >
                                             {result.title}
                                             <ExternalLink className="w-3 h-3" />
                                         </a>
 
-                                        <p className="text-sm text-gray-500 mt-1">
+                                        <p className="text-sm text-stone-500 mt-1">
                                             {result.sourceDomain} • Reputazione: {result.sourceReputation}/100
                                         </p>
 
-                                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                                        <p className="text-sm text-stone-600 mt-2 line-clamp-2">
                                             {result.snippet}
                                         </p>
 
                                         {expandedResults.has(result.id) && (
-                                            <div className="mt-4 space-y-3 bg-gray-50 rounded-lg p-4">
+                                            <div className="mt-4 space-y-3 bg-stone-50 rounded-lg p-4">
                                                 {result.contentSummary && (
                                                     <div>
-                                                        <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Riassunto AI</p>
-                                                        <p className="text-sm text-gray-700">{result.contentSummary}</p>
+                                                        <p className="text-xs font-semibold text-stone-500 uppercase mb-1">Riassunto AI</p>
+                                                        <p className="text-sm text-stone-700">{result.contentSummary}</p>
                                                     </div>
                                                 )}
 
                                                 <div className="grid grid-cols-3 gap-4 text-sm">
                                                     <div>
-                                                        <p className="text-xs text-gray-500">Rilevanza</p>
+                                                        <p className="text-xs text-stone-500">Rilevanza</p>
                                                         <p className="font-medium">{result.relevanceScore}%</p>
                                                     </div>
                                                     <div>
-                                                        <p className="text-xs text-gray-500">Tipo Menzione</p>
+                                                        <p className="text-xs text-stone-500">Tipo Menzione</p>
                                                         <p className="font-medium">{result.brandMentionType}</p>
                                                     </div>
                                                     <div>
-                                                        <p className="text-xs text-gray-500">Categoria</p>
+                                                        <p className="text-xs text-stone-500">Categoria</p>
                                                         <p className="font-medium">{result.topicCategory || 'N/A'}</p>
                                                     </div>
                                                 </div>
 
                                                 {result.suggestedActions && result.suggestedActions.length > 0 && (
                                                     <div>
-                                                        <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Azioni Suggerite</p>
+                                                        <p className="text-xs font-semibold text-stone-500 uppercase mb-2">Azioni Suggerite</p>
                                                         <div className="space-y-2">
                                                             {result.suggestedActions.map((action, idx) => (
                                                                 <div key={idx} className="flex items-start gap-2 text-sm">
@@ -382,12 +382,12 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                                                                         className={
                                                                             action.priority === 'high' ? 'bg-red-50 text-red-700' :
                                                                                 action.priority === 'medium' ? 'bg-amber-50 text-amber-700' :
-                                                                                    'bg-gray-50 text-gray-700'
+                                                                                    'bg-stone-50 text-stone-700'
                                                                         }
                                                                     >
                                                                         {action.type}
                                                                     </Badge>
-                                                                    <span className="text-gray-600">{action.description}</span>
+                                                                    <span className="text-stone-600">{action.description}</span>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -401,7 +401,7 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                                         <div className={`text-lg font-bold ${getImportanceColor(result.importanceScore)}`}>
                                             {result.importanceScore}%
                                         </div>
-                                        <p className="text-xs text-gray-400">importanza</p>
+                                        <p className="text-xs text-stone-400">importanza</p>
 
                                         <Button
                                             variant="ghost"
@@ -428,11 +428,11 @@ export function SerpMonitoringSection({ projectId, configId }: { projectId?: str
                     ))}
                 </div>
             ) : !loading && (
-                <Card className="border-0 shadow-md">
+                <Card className="border border-stone-100 shadow-sm">
                     <CardContent className="p-8 text-center">
-                        <Newspaper className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                        <h3 className="font-semibold text-gray-700 mb-2">Nessun risultato SERP</h3>
-                        <p className="text-gray-500 mb-4">
+                        <Newspaper className="w-12 h-12 mx-auto text-stone-300 mb-4" />
+                        <h3 className="font-semibold text-stone-700 mb-2">Nessun risultato SERP</h3>
+                        <p className="text-stone-500 mb-4">
                             Non sono ancora stati trovati risultati. Avvia una scansione per monitorare le menzioni del tuo brand su Google.
                         </p>
                         <Button onClick={runScan} disabled={scanning}>

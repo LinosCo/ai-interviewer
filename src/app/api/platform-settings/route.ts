@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
 import { Prisma } from '@prisma/client';
-
-const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+import {
+    getDefaultInterviewMethodologyKnowledge,
+    getStrategicMarketingKnowledgeByOrg,
+    setStrategicMarketingKnowledgeByOrg
+} from '@/lib/marketing/strategic-kb';
+import {
+    getTrainingMethodologyKnowledgeByOrg,
+    setTrainingMethodologyKnowledgeByOrg
+} from '@/lib/training/training-methodology-kb';
 
 export async function POST(req: NextRequest) {
     try {
@@ -16,6 +23,8 @@ export async function POST(req: NextRequest) {
         const {
             organizationId,
             methodologyKnowledge,
+            trainingMethodologyKnowledge,
+            strategicMarketingKnowledge,
             strategicPlan,
             platformOpenaiApiKey,
             platformAnthropicApiKey,
@@ -43,7 +52,8 @@ export async function POST(req: NextRequest) {
             smtpPass,
             smtpFromEmail,
             smtpNotificationEmail,
-            publicDemoBotId
+            publicDemoBotId,
+            resendApiKey
         } = body;
 
         const currentUser = await prisma.user.findUnique({
@@ -70,19 +80,35 @@ export async function POST(req: NextRequest) {
         }
         const canManageGlobalConfig = currentUser?.role === 'ADMIN';
 
-        // Update organization's methodology and strategic plan
+        const currentSettings = await prisma.platformSettings.findUnique({
+            where: { organizationId },
+            select: { id: true, methodologyKnowledge: true }
+        });
+
+        const safeInterviewMethodology = typeof methodologyKnowledge === 'string'
+            ? methodologyKnowledge
+            : (currentSettings?.methodologyKnowledge || getDefaultInterviewMethodologyKnowledge() || 'Metodologia interviste non configurata.');
+
+        // Update organization's interview methodology and strategic plan
         const settings = await prisma.platformSettings.upsert({
             where: { organizationId },
             update: {
-                methodologyKnowledge,
+                methodologyKnowledge: safeInterviewMethodology,
                 strategicPlan: strategicPlan || null
             },
             create: {
                 organizationId,
-                methodologyKnowledge,
+                methodologyKnowledge: safeInterviewMethodology,
                 strategicPlan: strategicPlan || null
             }
         });
+
+        if (typeof strategicMarketingKnowledge === 'string') {
+            await setStrategicMarketingKnowledgeByOrg(organizationId, strategicMarketingKnowledge);
+        }
+        if (typeof trainingMethodologyKnowledge === 'string') {
+            await setTrainingMethodologyKnowledgeByOrg(organizationId, trainingMethodologyKnowledge);
+        }
 
         // Link organization to these settings if not already
         await prisma.organization.update({
@@ -117,7 +143,8 @@ export async function POST(req: NextRequest) {
             smtpPass,
             smtpFromEmail,
             smtpNotificationEmail,
-            publicDemoBotId
+            publicDemoBotId,
+            resendApiKey
         ].some((value) => value !== undefined);
 
         if (hasGlobalConfigPayload && !canManageGlobalConfig) {
@@ -206,6 +233,7 @@ export async function POST(req: NextRequest) {
             if (smtpNotificationEmail !== undefined) globalConfigUpdate.smtpNotificationEmail = smtpNotificationEmail;
 
             if (publicDemoBotId !== undefined) globalConfigUpdate.publicDemoBotId = publicDemoBotId;
+            if (resendApiKey !== undefined) globalConfigUpdate.resendApiKey = resendApiKey;
 
             // Only perform update if there are fields to update
             if (Object.keys(globalConfigUpdate).length > 0) {
@@ -221,7 +249,15 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        return NextResponse.json(settings);
+        const [marketingKnowledge, trainingKnowledge] = await Promise.all([
+            getStrategicMarketingKnowledgeByOrg(organizationId),
+            getTrainingMethodologyKnowledgeByOrg(organizationId)
+        ]);
+        return NextResponse.json({
+            ...settings,
+            trainingMethodologyKnowledge: trainingKnowledge.knowledge,
+            strategicMarketingKnowledge: marketingKnowledge.knowledge
+        });
     } catch (error) {
         console.error('Error saving platform settings:', error);
         return NextResponse.json(

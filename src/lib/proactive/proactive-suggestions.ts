@@ -1,6 +1,7 @@
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 export interface ProactiveSuggestion {
     reason: string;
@@ -30,11 +31,11 @@ export async function analyzeForProactiveSuggestions(
             model: openai('gpt-4o-mini'),
             schema: suggestionSchema,
             prompt: `
-                Analizza questa risposta breve dell'utente in un'intervista sul tema "${currentTopicLabel}".
-                
-                Risposta Utente: "${userMessage}"
-                
-                Contesto aggiuntivo (se presente): ${knowledgeBase || 'Nessuno'}
+                Analizza questa risposta breve dell'utente in un'intervista sul tema "${sanitizeConfig(currentTopicLabel, 200)}".
+
+                Risposta Utente: "${sanitize(userMessage, 500)}"
+
+                Contesto aggiuntivo (se presente): ${sanitizeConfig(knowledgeBase, 500) || 'Nessuno'}
                 
                 Se la risposta è troppo vaga (es. "Sì", "Non so", "Forse"), genera 3 suggerimenti che l'utente potrebbe cliccare per rispondere in modo più completo.
                 Se la risposta è adeguata, setta isVague=false.

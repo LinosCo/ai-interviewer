@@ -107,6 +107,30 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
         }
     };
 
+    const deleteBot = async (tool: ToolItem) => {
+        const confirmed = window.confirm(
+            `Eliminare definitivamente "${tool.name}"?\n\nQuesta azione cancellerà il bot e tutti i suoi dati (conversazioni, risposte, insight). Non è reversibile.`
+        );
+        if (!confirmed) return;
+
+        setActionLoading(tool.id);
+        try {
+            const res = await fetch(`/api/bots/${tool.id}`, { method: 'DELETE' });
+
+            if (res.ok) {
+                showToast('Bot eliminato definitivamente');
+                fetchBots();
+            } else {
+                const data = await res.json().catch(() => ({}));
+                showToast(data.error || 'Errore durante l\'eliminazione', 'error');
+            }
+        } catch (err) {
+            showToast('Errore di rete', 'error');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     if (loading) {
         return (
             <Card>
@@ -240,6 +264,22 @@ export function ProjectToolsManager({ projectId, projectName }: ProjectToolsMana
                                                 onClick={() => transferBot(tool.id, defaultProjectId)}
                                                 disabled={actionLoading === tool.id}
                                                 title="Rimuovi dal progetto (sposta nel progetto di default dell'organizzazione)"
+                                                className="text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+                                            >
+                                                {actionLoading === tool.id ? (
+                                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                                ) : (
+                                                    <ArrowRight className="w-4 h-4" />
+                                                )}
+                                            </Button>
+                                        )}
+                                        {tool.type === 'bot' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => deleteBot(tool)}
+                                                disabled={actionLoading === tool.id}
+                                                title="Elimina definitivamente il bot e tutti i suoi dati"
                                                 className="text-red-500 hover:text-red-600 hover:bg-red-50"
                                             >
                                                 {actionLoading === tool.id ? (

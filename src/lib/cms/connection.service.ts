@@ -862,7 +862,7 @@ BUSINESS_TUNER_URL=${process.env.NEXT_PUBLIC_APP_URL || 'https://app.businesstun
             return { success: false, error: 'CMS connection not found' };
         }
 
-        if (suggestion.status !== 'PENDING') {
+        if (!['PENDING', 'FAILED'].includes(suggestion.status)) {
             return { success: false, error: `Suggestion already ${suggestion.status.toLowerCase()}` };
         }
 

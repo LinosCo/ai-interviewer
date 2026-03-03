@@ -39,12 +39,14 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
 
     // Check if we are in "full" mode (straight to chat window)
     const isFullMode = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('full') === 'true';
+    // data-auto-open: embed host requests widget open immediately
+    const autoOpen = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('autoOpen') === 'true';
 
     useEffect(() => {
-        if (isFullMode) {
+        if (isFullMode || autoOpen) {
             setIsOpen(true);
         }
-    }, [isFullMode]);
+    }, [isFullMode, autoOpen]);
 
     useEffect(() => {
         async function fetchBot() {
@@ -68,6 +70,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
         if (typeof window === 'undefined' || window.parent === window) return;
 
         const handleMessage = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
             const data = event.data;
             if (data?.type !== 'bt-widget-page-context' || !data.pageContext) return;
 
@@ -81,7 +84,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
         };
 
         window.addEventListener('message', handleMessage);
-        window.parent.postMessage({ type: 'bt-widget-get-context' }, '*');
+        window.parent.postMessage({ type: 'bt-widget-get-context' }, document.referrer ? new URL(document.referrer).origin : '*');
 
         return () => {
             window.removeEventListener('message', handleMessage);
@@ -96,7 +99,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
             window.parent.postMessage({
                 type: 'bt-widget-resize',
                 isOpen
-            }, '*');
+            }, document.referrer ? new URL(document.referrer).origin : '*');
         };
 
         // Send immediately and repeat briefly to avoid missed first handshake.

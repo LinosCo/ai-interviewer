@@ -58,9 +58,10 @@ export function CookieConsent() {
                             </div>
                             <button
                                 onClick={() => setIsVisible(false)}
+                                aria-label="Chiudi avviso cookie"
                                 className="text-stone-300 hover:text-stone-500 transition-colors"
                             >
-                                <X size={20} />
+                                <X size={20} aria-hidden="true" />
                             </button>
                         </div>
 

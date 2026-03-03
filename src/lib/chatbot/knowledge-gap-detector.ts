@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const GapSchema = z.object({
     topic: z.string().describe("The main topic of the missing information"),
@@ -63,15 +64,33 @@ export async function detectKnowledgeGaps(botId: string, lookbackDays: number = 
                 const { object: gap } = await generateObject({
                     model: openai("gpt-4o-mini"),
                     schema: GapSchema,
+                    temperature: 0,
                     prompt: `
-                    Analyze this interaction where the bot failed to answer.
-                    
-                    Bot Context: ${bot.description || "Customer Service Bot"}
-                    
-                    User Question: "${userQuestion.content}"
-                    Bot Response: "${messages[fallbackIndex].content}"
-                    
-                    Identify the knowledge gap.
+                    You are a knowledge gap analyst. An AI chatbot failed to answer a user question.
+                    Analyze the interaction and identify the specific knowledge gap.
+
+                    Bot Context: ${sanitizeConfig(bot.description) || "Customer Service Bot"}
+
+                    User Question: "${sanitize(userQuestion.content)}"
+                    Bot Response: "${sanitize(messages[fallbackIndex].content)}"
+
+                    Gap Categories (choose the most fitting):
+                    - PRODUCT_INFO: Missing product specs, features, availability
+                    - PRICING: Missing pricing, plans, discounts, payment info
+                    - PROCESS: Missing how-to, steps, procedures, workflows
+                    - POLICY: Missing return/refund/cancellation/legal policies
+                    - CONTACT: Missing contact details, support channels, hours
+                    - TECHNICAL: Missing technical specs, integration, compatibility
+                    - COMPANY: Missing about-us, team, history, certifications
+                    - OTHER: Does not fit above categories
+
+                    Priority rules:
+                    - HIGH: Direct blocker to purchase or main user goal; asked multiple times
+                    - MEDIUM: Important context the user needs but not an immediate blocker
+                    - LOW: Nice-to-have detail, edge case, or out-of-scope request
+
+                    Generate a clear FAQ question and a draft answer. If the answer is not inferable
+                    from context, describe exactly what information should be added to the knowledge base.
                 `
                 });
 

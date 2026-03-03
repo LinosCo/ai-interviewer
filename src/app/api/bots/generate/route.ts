@@ -3,13 +3,16 @@ import { prisma } from '@/lib/prisma';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
+import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { TokenCategory } from '@prisma/client';
 
 export async function POST(req: Request) {
-    try {
-        console.log('--- GENERATE API CALLED ---');
+    const session = await auth();
+    if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-        // Allow public generation for onboarding flow
-        // const session = await auth(); 
+    try {
+        console.log('--- GENERATE API CALLED ---'); 
 
         let goal;
         try {
@@ -72,10 +75,10 @@ export async function POST(req: Request) {
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema: configSchema,
-            prompt: `Sei "Business Tuner AI", un esperto stratega di ricerca qualitativa. 
+            prompt: `Sei "Business Tuner AI", un esperto stratega di ricerca qualitativa.
 L'utente vuole lanciare un'indagine con questo obiettivo grezzo:
 
-"${goal}"
+"${sanitize(goal, 1000)}"
 
 Il tuo compito è strutturare un'intervista professionale che trasformi questo obiettivo in insight di valore.
 NON generare domande generiche. Genera OBIETTIVI DI RICERCA che l'AI userà per formulare domande dinamiche.
@@ -93,6 +96,26 @@ Output richiesto:
 
 Rispondi in italiano.`
         });
+
+        // Track token usage for credit system. This route is public (onboarding),
+        // so session/orgId may not be available. TokenTrackingService handles missing
+        // orgId gracefully by logging to 'unknown' without blocking.
+        try {
+            const session = await auth();
+            const userId = session?.user?.id;
+            await TokenTrackingService.logTokenUsage({
+                organizationId: '' as string, // resolved from userId/membership by service fallback
+                userId,
+                inputTokens: result.usage?.inputTokens ?? 0,
+                outputTokens: result.usage?.outputTokens ?? 0,
+                category: TokenCategory.INTERVIEW,
+                model: 'gpt-4o-mini',
+                operation: 'interview-generate',
+                resourceType: 'interview_generate',
+            });
+        } catch (trackingErr) {
+            console.error('[TokenTracking] bots/generate usage log failed:', trackingErr);
+        }
 
         return Response.json({
             ...result.object,

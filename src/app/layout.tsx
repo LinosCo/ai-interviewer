@@ -1,45 +1,61 @@
-import type { Metadata } from "next";
-import "./globals.css";
-import { ToastContainer } from "@/components/toast";
-import { Providers } from "@/components/Providers";
-import { AnalyticsGate } from "@/components/AnalyticsGate";
-import { auth } from "@/auth";
-
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.it';
+import type { Metadata } from 'next';
+import './globals.css';
+import { ToastContainer } from '@/components/toast';
+import { Providers } from '@/components/Providers';
+import { AnalyticsGate } from '@/components/AnalyticsGate';
+import { auth } from '@/auth';
+import { CookieConsent } from '@/components/CookieConsent';
+import {
+  BRAND_KEYWORDS,
+  DEFAULT_LOCALE,
+  DEFAULT_OG_IMAGE_URL,
+  DEFAULT_TWITTER_IMAGE_URL,
+  HOME_PAGE_DESCRIPTION,
+  HOME_PAGE_TITLE,
+  SITE_NAME,
+  SITE_TWITTER_HANDLE,
+  SITE_URL,
+} from '@/lib/seo';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
   title: {
-    default: "Business Tuner - Ascolta il mercato. Decidi meglio.",
-    template: "%s | Business Tuner",
+    default: `${SITE_NAME} - ${HOME_PAGE_TITLE}`,
+    template: `%s | ${SITE_NAME}`,
   },
-  description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
-  keywords: [
-    "interviste AI",
-    "feedback clienti",
-    "ricerca qualitativa",
-    "customer research",
-    "user research",
-    "feedback stakeholder",
-    "intelligenza artificiale",
-    "business intelligence",
-    "analisi mercato",
-  ],
-  authors: [{ name: "Business Tuner" }],
-  creator: "Business Tuner",
+  description: HOME_PAGE_DESCRIPTION,
+  keywords: BRAND_KEYWORDS,
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
   openGraph: {
-    type: "website",
-    locale: "it_IT",
-    url: siteUrl,
-    siteName: "Business Tuner",
-    title: "Business Tuner - Ascolta il mercato. Decidi meglio.",
-    description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
+    type: 'website',
+    locale: DEFAULT_LOCALE,
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} - ${HOME_PAGE_TITLE}`,
+    description: HOME_PAGE_DESCRIPTION,
+    images: [
+      {
+        url: DEFAULT_OG_IMAGE_URL,
+        width: 1200,
+        height: 630,
+        alt: `${SITE_NAME} - ${HOME_PAGE_TITLE}`,
+      },
+    ],
   },
   twitter: {
-    card: "summary_large_image",
-    title: "Business Tuner - Ascolta il mercato. Decidi meglio.",
-    description: "Interviste AI per raccogliere feedback qualitativi da clienti e stakeholder.",
-    creator: "@businesstuner",
+    card: 'summary_large_image',
+    title: `${SITE_NAME} - ${HOME_PAGE_TITLE}`,
+    description: HOME_PAGE_DESCRIPTION,
+    creator: SITE_TWITTER_HANDLE,
+    site: SITE_TWITTER_HANDLE,
+    images: [DEFAULT_TWITTER_IMAGE_URL],
+  },
+  icons: {
+    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
+    shortcut: ['/icon.svg'],
+    apple: [{ url: '/icon.svg' }],
   },
   robots: {
     index: true,
@@ -47,14 +63,12 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
     },
   },
 };
-
-import { CookieConsent } from "@/components/CookieConsent";
 
 export default async function RootLayout({
   children,

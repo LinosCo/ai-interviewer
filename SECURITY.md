@@ -50,8 +50,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 # Add to .env
 ENCRYPTION_KEY=your_64_character_hex_key_here
 
-# Add to Vercel/Production Environment Variables
-vercel env add ENCRYPTION_KEY
+# Add to Railway production environment variables via Railway Dashboard → Variables
 ```
 
 ### Migrating Existing API Keys
@@ -211,7 +210,7 @@ Recommended: Use `@upstash/ratelimit` with Redis
 
 3. **Recommended Tools**
    - Sentry for error tracking
-   - Vercel Analytics for performance
+   - Railway metrics for performance
    - Custom analytics for security events
 
 ### Production Checklist
@@ -227,7 +226,7 @@ Before deploying to production:
 - [ ] Enable rate limiting middleware
 - [ ] Set up error monitoring (Sentry)
 - [ ] Configure CSP headers
-- [ ] Enable Vercel security headers
+- [ ] Configure security headers in next.config.ts
 - [ ] Review all environment variables
 - [ ] Audit user roles and permissions
 - [ ] Test password reset flow

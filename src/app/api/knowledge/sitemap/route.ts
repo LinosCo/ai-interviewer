@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { scrapeUrl } from '@/lib/scraping';
 import { NextResponse } from 'next/server';
 import Sitemapper from 'sitemapper';
+import { indexKnowledgeSource } from '@/lib/kb/semantic-search';
 
 
 function getMainLanguageUrls(urls: string[]): string[] {
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
         for (const siteUrl of limitedSites) {
             try {
                 const scraped = await scrapeUrl(siteUrl);
-                await prisma.knowledgeSource.create({
+                const ks = await prisma.knowledgeSource.create({
                     data: {
                         botId,
                         type: 'url',
@@ -107,6 +108,9 @@ export async function POST(req: Request) {
                         content: `URL: ${scraped.url}\n\nTitle: ${scraped.title}\n\n${scraped.content}`,
                     }
                 });
+                // Fire-and-forget embedding
+                indexKnowledgeSource(ks.id, ks.title, ks.content)
+                    .catch(err => console.error('[sitemap] embedding failed:', err));
                 processedCount++;
             } catch (err) {
                 console.error(`Failed sitesmap url scrape: ${siteUrl}`, err);

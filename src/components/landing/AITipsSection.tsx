@@ -6,31 +6,31 @@ import { Sparkles, TrendingUp, Users, AlertTriangle, Heart } from 'lucide-react'
 const tips = [
   {
     icon: TrendingUp,
-    category: 'Crescita',
-    title: 'Opportunità di upselling',
+    category: 'Priorita Revenue',
+    title: 'Opportunita di upselling in clienti ad alta intenzione',
     description:
-      "I clienti premium menzionano spesso l'interesse per servizi aggiuntivi. Considera di proporre un pacchetto esteso.",
+      "Il Copilot rileva richieste ricorrenti su servizi premium e propone il playbook: offerta, timing, segmento e messaggio.",
   },
   {
     icon: Users,
-    category: 'Team',
-    title: 'Clima aziendale positivo',
+    category: 'Adozione Team',
+    title: 'Gap operativo tra vendite e delivery',
     description:
-      "Il 78% del team ha risposto positivamente. È il momento ideale per lanciare nuove iniziative.",
+      "Dalle interviste emergono attriti di handover. Viene suggerito un piano di allineamento con ownership e KPI.",
   },
   {
     icon: AlertTriangle,
-    category: 'Attenzione',
-    title: 'Feedback ricorrente',
+    category: 'Rischio Cliente',
+    title: 'Feedback negativo ricorrente in post-vendita',
     description:
-      '3 clienti hanno menzionato ritardi nella spedizione. Verifica con la logistica.',
+      'I segnali del chatbot evidenziano un pattern: ritardi percepiti. Il Copilot priorizza azioni su comunicazione e processo.',
   },
   {
     icon: Heart,
-    category: 'Soddisfazione',
-    title: 'NPS in crescita',
+    category: 'Visibilita',
+    title: 'Brand citato poco nelle risposte AI',
     description:
-      'Il Net Promoter Score è salito di 12 punti. I clienti sono più propensi a raccomandare.',
+      'Il monitoraggio brand evidenzia competitor piu presenti. Il Copilot suggerisce contenuti e FAQ per recuperare copertura.',
   },
 ];
 
@@ -50,15 +50,15 @@ export function AITipsSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--coral)/0.2)] border border-[hsl(var(--coral)/0.3)] mb-6">
             <Sparkles className="w-4 h-4 text-[hsl(var(--coral))]" />
-            <span className="text-sm font-medium text-[hsl(var(--coral))]">AI-Powered</span>
+            <span className="text-sm font-medium text-[hsl(var(--coral))]">Copilot Strategico</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-[hsl(var(--foreground))]">
-            Consigli pratici,{' '}
-            <span className="gradient-text">non solo dati</span>
+            Ti dice cosa fare,{' '}
+            <span className="gradient-text">in quale ordine e perche</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-            L&apos;AI di Business Tuner non si limita a raccogliere informazioni. Ti
-            dice cosa fare, quando agire e perché.
+            Non solo insight: raccomandazioni operative basate sui tuoi segnali reali,
+            con priorita, contesto e prossimi passi per il team.
           </p>
         </motion.div>
 
@@ -91,7 +91,7 @@ export function AITipsSection() {
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[hsl(var(--border)/0.5)]">
                   <Sparkles className="w-4 h-4 text-[hsl(var(--coral)/0.6)]" />
                   <span className="text-sm text-[hsl(var(--muted-foreground))]">
-                    Generato da Business Tuner AI
+                    Proposta dal Copilot, verificabile dal team
                   </span>
                 </div>
               </div>

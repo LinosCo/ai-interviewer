@@ -50,11 +50,11 @@ Business Tuner è una piattaforma SaaS che automatizza le interviste qualitative
 ## 🛠 Stack Tecnologico
 
 - **Framework**: Next.js 16.0.8 (App Router)
-- **Database**: PostgreSQL (Neon serverless)
+- **Database**: PostgreSQL (Railway)
 - **Authentication**: NextAuth 5.0.0-beta.30
 - **AI Providers**: OpenAI (GPT-4), Anthropic (Claude 3.5)
 - **Payments**: Stripe 20.1.0
-- **Hosting**: Vercel
+- **Hosting**: Railway
 
 ---
 

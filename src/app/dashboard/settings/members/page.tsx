@@ -4,6 +4,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useState, useEffect } from 'react';
 import { Building2, UserPlus, Users, Shield, Trash2, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { inviteMemberSchema } from '@/lib/validation/schemas';
 
 interface Member {
     id: string;
@@ -46,7 +47,14 @@ export default function TeamManagementPage() {
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!currentOrganization || !inviteEmail) return;
+        if (!currentOrganization) return;
+
+        // Client-side validation
+        const validation = inviteMemberSchema.safeParse({ email: inviteEmail });
+        if (!validation.success) {
+            setMessage({ type: 'error', text: validation.error.issues[0]?.message ?? 'Email non valida' });
+            return;
+        }
 
         setIsInviting(true);
         setMessage(null);
@@ -70,6 +78,26 @@ export default function TeamManagementPage() {
             setMessage({ type: 'error', text: 'Errore di connessione' });
         } finally {
             setIsInviting(false);
+        }
+    };
+
+    const handleRemoveMember = async (userId: string) => {
+        if (!currentOrganization) return;
+        if (!confirm('Rimuovere questo membro dall\'organizzazione?')) return;
+        try {
+            const res = await fetch(
+                `/api/organizations/${currentOrganization.id}/members?userId=${userId}`,
+                { method: 'DELETE' }
+            );
+            if (res.ok) {
+                setMembers(prev => prev.filter(m => m.user.id !== userId));
+                setMessage({ type: 'success', text: 'Membro rimosso.' });
+            } else {
+                const text = await res.text();
+                setMessage({ type: 'error', text: text || 'Errore durante la rimozione.' });
+            }
+        } catch {
+            setMessage({ type: 'error', text: 'Errore di connessione.' });
         }
     };
 
@@ -193,7 +221,11 @@ export default function TeamManagementPage() {
                                                 {member.role}
                                             </div>
                                             {member.role !== 'OWNER' && (
-                                                <button className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                                                <button
+                                                    onClick={() => handleRemoveMember(member.user.id)}
+                                                    className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                                    title="Rimuovi membro"
+                                                >
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             )}

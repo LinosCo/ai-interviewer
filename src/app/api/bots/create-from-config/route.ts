@@ -10,6 +10,7 @@ import {
     getDefaultProjectNameForOrganization,
     syncLegacyProjectAccessForProject
 } from '@/lib/domain/workspace';
+import { planService } from '@/services/planService';
 
 function generateSlug(name: string): string {
     const base = name
@@ -126,6 +127,20 @@ export async function POST(req: Request) {
         }
 
         console.log('🎯 [CREATE-BOT] Checking usage limits for org');
+
+        // Enforce plan-level maxChatbots limit (API-level enforcement)
+        if (user.role !== 'ADMIN') {
+            const botLimitCheck = await planService.checkActiveInterviewsLimit(project.organizationId);
+            if (!botLimitCheck.allowed) {
+                return new Response(JSON.stringify({
+                    error: 'PLAN_LIMIT_REACHED',
+                    message: 'Piano non supporta ulteriori bot. Aggiorna il tuo piano.'
+                }), {
+                    status: 403,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+        }
 
         const requestedBotType = normalizeBotTypeForTrialLimit(config.botType);
         if (user.role !== 'ADMIN') {

@@ -1,0 +1,800 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Plus, Trash2 } from 'lucide-react'
+import type {
+  TrainingBot,
+  TrainingTopicBlock,
+  RewardConfig,
+  TraineeEducationLevel,
+  TraineeCompetenceLevel,
+  FailureMode,
+  BotStatus,
+} from '@prisma/client'
+
+type BotWithTopics = TrainingBot & {
+  topics: TrainingTopicBlock[]
+  rewardConfig?: RewardConfig | null
+}
+
+interface InitialValues {
+  name?: string
+  learningGoal?: string
+  targetAudience?: string
+  tone?: string
+  introMessage?: string
+  maxDurationMins?: number
+  collectTraineeData?: boolean
+  traineeDataFields?: string[]
+  traineeEducationLevel?: TraineeEducationLevel
+  traineeCompetenceLevel?: TraineeCompetenceLevel
+  passScoreThreshold?: number
+  modelProvider?: string
+  modelName?: string
+  customApiKey?: string
+  topics?: Array<{
+    label: string
+    description: string
+    learningObjectives: string[]
+    minCheckingTurns: number
+    maxCheckingTurns: number
+  }>
+}
+
+type Props =
+  | {
+      mode: 'create'
+      organizationId: string
+      bot?: never
+      initialValues?: InitialValues
+    }
+  | {
+      mode: 'edit'
+      bot: BotWithTopics
+      organizationId?: never
+      initialValues?: never
+    }
+
+interface TopicDraft {
+  id?: string
+  label: string
+  description: string
+  learningObjectives: string  // newline-separated for textarea
+  minCheckingTurns: number
+  maxCheckingTurns: number
+}
+
+function slugify(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide border-b border-gray-100 pb-2 mb-4">
+      {children}
+    </h3>
+  )
+}
+
+function Field({
+  label,
+  required,
+  children,
+  hint,
+}: {
+  label: string
+  required?: boolean
+  children: React.ReactNode
+  hint?: string
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-sm font-medium text-gray-700">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      {children}
+      {hint && <p className="text-xs text-gray-400">{hint}</p>}
+    </div>
+  )
+}
+
+const inputCls =
+  'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition'
+const selectCls =
+  'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition'
+const textareaCls =
+  'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-y min-h-[80px]'
+
+export default function TrainingBotConfigForm({ mode, bot, organizationId, initialValues }: Props) {
+  const router = useRouter()
+
+  // Identity — seeded from bot (edit) or initialValues (create after AI gen) or defaults
+  const [name, setName] = useState(bot?.name ?? initialValues?.name ?? '')
+  const [slug, setSlug] = useState(bot?.slug ?? (initialValues?.name ? slugify(initialValues.name) : ''))
+  const [language, setLanguage] = useState(bot?.language ?? 'it')
+  const [tone, setTone] = useState(bot?.tone ?? initialValues?.tone ?? 'professional')
+  const [introMessage, setIntroMessage] = useState(bot?.introMessage ?? initialValues?.introMessage ?? '')
+
+  // Obiettivo formativo
+  const [learningGoal, setLearningGoal] = useState(bot?.learningGoal ?? initialValues?.learningGoal ?? '')
+  const [targetAudience, setTargetAudience] = useState(bot?.targetAudience ?? initialValues?.targetAudience ?? '')
+
+  // Profilo Trainee
+  const [traineeEducationLevel, setTraineeEducationLevel] = useState<TraineeEducationLevel>(
+    bot?.traineeEducationLevel ?? initialValues?.traineeEducationLevel ?? 'PROFESSIONAL'
+  )
+  const [traineeCompetenceLevel, setTraineeCompetenceLevel] = useState<TraineeCompetenceLevel>(
+    bot?.traineeCompetenceLevel ?? initialValues?.traineeCompetenceLevel ?? 'INTERMEDIATE'
+  )
+
+  // Valutazione
+  const [failureMode, setFailureMode] = useState<FailureMode>(bot?.failureMode ?? 'PERMISSIVE')
+  const [passScoreThreshold, setPassScoreThreshold] = useState(
+    bot?.passScoreThreshold ?? initialValues?.passScoreThreshold ?? 70
+  )
+  const [maxRetries, setMaxRetries] = useState(bot?.maxRetries ?? 1)
+  const [maxDurationMins, setMaxDurationMins] = useState(
+    bot?.maxDurationMins ?? initialValues?.maxDurationMins ?? 30
+  )
+  const [collectTraineeData, setCollectTraineeData] = useState(
+    bot?.collectTraineeData ?? initialValues?.collectTraineeData ?? true
+  )
+  const [rewardEnabled, setRewardEnabled] = useState(Boolean(bot?.rewardConfig?.enabled))
+  const [rewardDisplayText, setRewardDisplayText] = useState(
+    bot?.rewardConfig?.displayText ?? 'Certificato di completamento'
+  )
+  const [modelProvider, setModelProvider] = useState((bot?.modelProvider ?? initialValues?.modelProvider ?? 'openai').toLowerCase())
+  const [modelName, setModelName] = useState(bot?.modelName ?? initialValues?.modelName ?? 'gpt-4o-mini')
+  const [customApiKey, setCustomApiKey] = useState(bot?.customApiKey ?? initialValues?.customApiKey ?? '')
+  const [traineeDataFieldsText, setTraineeDataFieldsText] = useState(() => {
+    const fromBot = Array.isArray(bot?.traineeDataFields) ? (bot?.traineeDataFields as unknown[]) : null
+    const fromInitial = initialValues?.traineeDataFields ?? null
+    const questions = (fromBot ?? fromInitial ?? [
+      'Qual è il tuo ruolo e in quale contesto userai questo argomento?',
+      'Che livello senti di avere oggi su questo tema? (base, intermedio, avanzato)',
+      'Quale risultato pratico vuoi ottenere entro fine lezione?',
+    ]).filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+    return questions.join('\n')
+  })
+
+  // Topics — seeded from bot (edit), initialValues (AI-generated create), or empty
+  const [topics, setTopics] = useState<TopicDraft[]>(
+    bot?.topics.map((t) => ({
+      id: t.id,
+      label: t.label,
+      description: t.description ?? '',
+      learningObjectives: (t.learningObjectives ?? []).join('\n'),
+      minCheckingTurns: t.minCheckingTurns ?? 2,
+      maxCheckingTurns: t.maxCheckingTurns ?? 6,
+    })) ??
+    initialValues?.topics?.map((t) => ({
+      label: t.label,
+      description: t.description,
+      learningObjectives: t.learningObjectives.join('\n'),
+      minCheckingTurns: t.minCheckingTurns,
+      maxCheckingTurns: t.maxCheckingTurns,
+    })) ??
+    []
+  )
+
+  // Branding
+  const [primaryColor, setPrimaryColor] = useState(bot?.primaryColor ?? '#4f46e5')
+  const [logoUrl, setLogoUrl] = useState(bot?.logoUrl ?? '')
+
+  // Pubblicazione
+  const [status, setStatus] = useState<BotStatus>(bot?.status ?? 'DRAFT')
+
+  // UI state
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+
+  function handleNameChange(val: string) {
+    setName(val)
+    if (mode === 'create') {
+      setSlug(slugify(val))
+    }
+  }
+
+  function addTopic() {
+    setTopics((prev) => [...prev, { label: '', description: '', learningObjectives: '', minCheckingTurns: 2, maxCheckingTurns: 6 }])
+  }
+
+  function removeTopic(idx: number) {
+    setTopics((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  function updateTopic(idx: number, field: keyof TopicDraft, value: string) {
+    setTopics((prev) =>
+      prev.map((t, i) => (i === idx ? { ...t, [field]: value } : t))
+    )
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setSuccess(false)
+
+    // Validate slug (trim first so trailing/leading spaces don't cause false failures)
+    const trimmedSlug = slug.trim()
+    if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
+      setError('Lo slug può contenere solo lettere minuscole, numeri e trattini.')
+      return
+    }
+
+    const payload = {
+      name: name.trim(),
+      slug: trimmedSlug,
+      language,
+      tone: tone.trim(),
+      introMessage: introMessage.trim() || null,
+      learningGoal: learningGoal.trim() || null,
+      targetAudience: targetAudience.trim() || null,
+      traineeEducationLevel,
+      traineeCompetenceLevel,
+      failureMode,
+      passScoreThreshold: Number(passScoreThreshold),
+      maxRetries: Number(maxRetries),
+      maxDurationMins: Math.min(180, Math.max(10, Number(maxDurationMins) || 30)),
+      modelProvider,
+      modelName: modelName.trim() || (modelProvider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o-mini'),
+      customApiKey: customApiKey.trim() || null,
+      collectTraineeData,
+      traineeDataFields: collectTraineeData
+        ? traineeDataFieldsText
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 5)
+        : [],
+      rewardConfig: {
+        enabled: rewardEnabled,
+        displayText: rewardDisplayText.trim() || 'Certificato di completamento',
+        showOnLanding: false,
+      },
+      topics: topics
+        .filter((t) => t.label.trim())
+        .map((t, idx) => ({
+          id: t.id,
+          label: t.label.trim(),
+          description: t.description.trim() || null,
+          orderIndex: idx,
+          learningObjectives: t.learningObjectives
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean),
+          minCheckingTurns: t.minCheckingTurns,
+          maxCheckingTurns: t.maxCheckingTurns,
+        })),
+      primaryColor: primaryColor || null,
+      logoUrl: logoUrl.trim() || null,
+      status,
+      ...(mode === 'create' ? { organizationId } : {}),
+    }
+
+    setSaving(true)
+    try {
+      const url =
+        mode === 'create' ? '/api/training-bots' : `/api/training-bots/${bot.id}`
+
+      const res = await fetch(url, {
+        method: mode === 'create' ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const cloned = res.clone()
+        const data = (await res.json().catch(() => null)) as { error?: string } | null
+        const fallbackText = await cloned.text().catch(() => '')
+        throw new Error(data?.error ?? (fallbackText || `Errore ${res.status}`))
+      }
+
+      if (mode === 'create') {
+        const created = (await res.json()) as { bot: { id: string } }
+        router.push(`/dashboard/training/${created.bot.id}`)
+        router.refresh()
+      } else {
+        setSuccess(true)
+        router.refresh()
+        router.push(`/dashboard/training/${bot.id}`)
+        setTimeout(() => setSuccess(false), 3000)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore durante il salvataggio.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      {/* 1. Identity */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Identità</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Nome" required>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="Es. Formazione Sicurezza"
+              className={inputCls}
+              required
+            />
+          </Field>
+
+          <Field
+            label="Slug"
+            required
+            hint="Solo lettere minuscole, numeri e trattini. Es: formazione-sicurezza"
+          >
+            <input
+              type="text"
+              value={slug}
+              onChange={(e) => setSlug(slugify(e.target.value))}
+              placeholder="formazione-sicurezza"
+              className={inputCls}
+              required
+            />
+          </Field>
+
+          <Field label="Lingua">
+            <select value={language} onChange={(e) => setLanguage(e.target.value)} className={selectCls}>
+              <option value="it">Italiano</option>
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+            </select>
+          </Field>
+
+          <Field label="Tono" hint="Es: professionale, amichevole, formale">
+            <input
+              type="text"
+              value={tone}
+              onChange={(e) => setTone(e.target.value)}
+              placeholder="professional"
+              className={inputCls}
+            />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Field label="Messaggio introduttivo">
+              <textarea
+                value={introMessage}
+                onChange={(e) => setIntroMessage(e.target.value)}
+                placeholder="Ciao! Benvenuto nel percorso formativo. Iniziamo insieme..."
+                className={textareaCls}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Obiettivo formativo */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Obiettivo Formativo</SectionTitle>
+        <div className="space-y-4">
+          <Field label="Obiettivo di apprendimento">
+            <textarea
+              value={learningGoal}
+              onChange={(e) => setLearningGoal(e.target.value)}
+              placeholder="Descrivere l'obiettivo principale del percorso formativo..."
+              className={textareaCls}
+            />
+          </Field>
+
+          <Field label="Target audience">
+            <textarea
+              value={targetAudience}
+              onChange={(e) => setTargetAudience(e.target.value)}
+              placeholder="Descrivere il pubblico di destinazione..."
+              className={textareaCls}
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* 3. Profilo Trainee */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Profilo Trainee</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <Field label="Livello di istruzione">
+            <select
+              value={traineeEducationLevel}
+              onChange={(e) => setTraineeEducationLevel(e.target.value as TraineeEducationLevel)}
+              className={selectCls}
+            >
+              <option value="PRIMARY">Elementare</option>
+              <option value="SECONDARY">Superiore</option>
+              <option value="UNIVERSITY">Universitario</option>
+              <option value="PROFESSIONAL">Professionale</option>
+            </select>
+          </Field>
+
+          <Field label="Livello di competenza">
+            <select
+              value={traineeCompetenceLevel}
+              onChange={(e) => setTraineeCompetenceLevel(e.target.value as TraineeCompetenceLevel)}
+              className={selectCls}
+            >
+              <option value="BEGINNER">Principiante</option>
+              <option value="INTERMEDIATE">Intermedio</option>
+              <option value="ADVANCED">Avanzato</option>
+              <option value="EXPERT">Esperto</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-800">Onboarding iniziale</p>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={collectTraineeData}
+                onChange={(e) => setCollectTraineeData(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Abilitato
+            </label>
+          </div>
+
+          <Field
+            label="Domande iniziali (una per riga)"
+            hint="2-5 domande brevi per calibrare livello, contesto ed esempi pratici."
+          >
+            <textarea
+              value={traineeDataFieldsText}
+              onChange={(e) => setTraineeDataFieldsText(e.target.value)}
+              className={textareaCls}
+              style={{ minHeight: '95px' }}
+              disabled={!collectTraineeData}
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* 4. Valutazione */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Valutazione</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Field label="Modalità di fallimento">
+            <select
+              value={failureMode}
+              onChange={(e) => setFailureMode(e.target.value as FailureMode)}
+              className={selectCls}
+            >
+              <option value="PERMISSIVE">Permissiva</option>
+              <option value="STRICT">Rigorosa</option>
+            </select>
+          </Field>
+
+          <Field label="Soglia di superamento (%)" hint="0–100">
+            <input
+              type="number"
+              value={passScoreThreshold}
+              onChange={(e) => setPassScoreThreshold(Number(e.target.value))}
+              min={0}
+              max={100}
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Tentativi massimi" hint="0–5">
+            <input
+              type="number"
+              value={maxRetries}
+              onChange={(e) => setMaxRetries(Number(e.target.value))}
+              min={0}
+              max={5}
+              className={inputCls}
+            />
+          </Field>
+
+          <Field label="Durata lezione (minuti)" hint="10–180">
+            <input
+              type="number"
+              value={maxDurationMins}
+              onChange={(e) => setMaxDurationMins(parseInt(e.target.value, 10) || 30)}
+              min={10}
+              max={180}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* 5. Argomenti */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Modello AI Tutor</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Provider">
+            <select
+              value={modelProvider}
+              onChange={(e) => {
+                const provider = e.target.value
+                setModelProvider(provider)
+                setModelName(provider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o-mini')
+              }}
+              className={selectCls}
+            >
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </Field>
+
+          <Field label="Modello">
+            <select
+              value={modelName}
+              onChange={(e) => setModelName(e.target.value)}
+              className={selectCls}
+            >
+              {modelProvider === 'anthropic' ? (
+                <>
+                  <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+                  <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
+                </>
+              ) : (
+                <>
+                  <option value="gpt-4o-mini">GPT-4o mini</option>
+                  <option value="gpt-4.1-mini">GPT-4.1 mini</option>
+                  <option value="gpt-4.1">GPT-4.1</option>
+                </>
+              )}
+            </select>
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Field
+              label="API key custom (opzionale)"
+              hint="Se vuoto, il sistema usa la Global Config. Impostala solo se vuoi un key/model routing dedicato al formatore."
+            >
+              <input
+                type="password"
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+                placeholder={modelProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+                className={inputCls}
+                autoComplete="off"
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Argomenti */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <SectionTitle>Argomenti</SectionTitle>
+          <button
+            type="button"
+            onClick={addTopic}
+            className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Aggiungi argomento
+          </button>
+        </div>
+
+        {topics.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
+            <p className="text-gray-400 text-sm">
+              Nessun argomento aggiunto. Clicca su &quot;Aggiungi argomento&quot; per iniziare.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {topics.map((topic, idx) => (
+              <div
+                key={topic.id ?? idx}
+                className="border border-gray-200 rounded-lg p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-400 uppercase">
+                    Argomento {idx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeTopic(idx)}
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <Field label="Titolo" required>
+                  <input
+                    type="text"
+                    value={topic.label}
+                    onChange={(e) => updateTopic(idx, 'label', e.target.value)}
+                    placeholder="Es. Sicurezza sul lavoro"
+                    className={inputCls}
+                    required
+                  />
+                </Field>
+
+                <Field label="Descrizione">
+                  <textarea
+                    value={topic.description}
+                    onChange={(e) => updateTopic(idx, 'description', e.target.value)}
+                    placeholder="Descrivi brevemente questo argomento..."
+                    className={textareaCls}
+                    style={{ minHeight: '60px' }}
+                  />
+                </Field>
+
+                <Field
+                  label="Obiettivi di apprendimento"
+                  hint="Un obiettivo per riga. Es: Saper applicare le norme di sicurezza sul lavoro"
+                >
+                  <textarea
+                    value={topic.learningObjectives}
+                    onChange={(e) => updateTopic(idx, 'learningObjectives', e.target.value)}
+                    placeholder={"Saper identificare i rischi principali\nConoscere le procedure di emergenza"}
+                    className={textareaCls}
+                    style={{ minHeight: '80px' }}
+                  />
+                </Field>
+
+                {/* Dialogue turns */}
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 mb-1 block">Turni minimi di dialogo</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={4}
+                      value={topic.minCheckingTurns}
+                      onChange={(e) =>
+                        setTopics((prev) =>
+                          prev.map((t, i) =>
+                            i === idx ? { ...t, minCheckingTurns: parseInt(e.target.value) || 2 } : t
+                          )
+                        )
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-xs text-gray-500 mb-1 block">Turni massimi</label>
+                    <input
+                      type="number"
+                      min={3}
+                      max={12}
+                      value={topic.maxCheckingTurns}
+                      onChange={(e) =>
+                        setTopics((prev) =>
+                          prev.map((t, i) =>
+                            i === idx ? { ...t, maxCheckingTurns: parseInt(e.target.value) || 6 } : t
+                          )
+                        )
+                      }
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 6. Branding */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Branding</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Colore primario">
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="h-9 w-14 border border-gray-200 rounded cursor-pointer p-1"
+              />
+              <input
+                type="text"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                placeholder="#4f46e5"
+                className={inputCls}
+              />
+            </div>
+          </Field>
+
+          <Field label="URL logo" hint="URL pubblico dell'immagine">
+            <input
+              type="url"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="https://..."
+              className={inputCls}
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* 7. Reward certificato */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Certificato</SectionTitle>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Emetti certificato a fine percorso</p>
+              <p className="text-xs text-gray-500 mt-0.5">Mostra il certificato nella schermata di completamento.</p>
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={rewardEnabled}
+                onChange={(e) => setRewardEnabled(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Attivo
+            </label>
+          </div>
+
+          <Field label="Titolo certificato" hint="Es. Certificato di completamento">
+            <input
+              type="text"
+              value={rewardDisplayText}
+              onChange={(e) => setRewardDisplayText(e.target.value)}
+              className={inputCls}
+              disabled={!rewardEnabled}
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* 7. Pubblicazione */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Pubblicazione</SectionTitle>
+        <Field label="Stato">
+          <select value={status} onChange={(e) => setStatus(e.target.value as BotStatus)} className={selectCls}>
+            <option value="DRAFT">Bozza</option>
+            <option value="PUBLISHED">Pubblicato</option>
+            <option value="PAUSED">In pausa</option>
+            <option value="ARCHIVED">Archiviato</option>
+          </select>
+        </Field>
+      </div>
+
+      {/* Error / Success */}
+      {error && (
+        <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          <span className="flex-shrink-0 mt-0.5">⚠</span>
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+          <span>✓</span>
+          Modifiche salvate con successo.
+        </div>
+      )}
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={saving}
+          className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors text-sm"
+        >
+          {saving
+            ? 'Salvataggio...'
+            : mode === 'create'
+              ? 'Crea percorso'
+              : 'Salva modifiche'}
+        </button>
+      </div>
+    </form>
+  )
+}

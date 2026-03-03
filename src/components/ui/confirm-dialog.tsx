@@ -47,7 +47,7 @@ export function ConfirmDialog({
 
     const buttonClass = variant === "destructive"
         ? "bg-red-600 hover:bg-red-700 text-white"
-        : "bg-indigo-600 hover:bg-indigo-700 text-white";
+        : "bg-amber-600 hover:bg-amber-700 text-white";
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,7 +61,7 @@ export function ConfirmDialog({
                         type="button"
                         onClick={() => onOpenChange(false)}
                         disabled={isLoading || loading}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                        className="px-4 py-2 text-sm font-medium text-stone-700 bg-white border border-stone-300 rounded-md hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50"
                     >
                         {cancelLabel}
                     </button>
@@ -69,7 +69,7 @@ export function ConfirmDialog({
                         type="button"
                         onClick={handleConfirm}
                         disabled={isLoading || loading}
-                        className={`px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 ${buttonClass}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 ${buttonClass}`}
                     >
                         {isLoading || loading ? "..." : confirmLabel}
                     </button>

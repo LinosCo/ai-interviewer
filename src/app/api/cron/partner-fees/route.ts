@@ -13,9 +13,9 @@ import { sendPartnerTrialExpiredEmail } from '@/lib/email';
 
 export async function POST(request: Request) {
     try {
-        // Verifica cron secret
-        const cronSecret = request.headers.get('x-cron-secret');
-        if (cronSecret !== process.env.CRON_SECRET) {
+        // Auth: Bearer token obbligatorio per cron job
+        const authHeader = request.headers.get('authorization');
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
             return NextResponse.json({ error: 'Non autorizzato' }, { status: 401 });
         }
 

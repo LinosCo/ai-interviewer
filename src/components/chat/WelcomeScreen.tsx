@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bot, Play, Info } from 'lucide-react';
+import { Bot, Play, Info, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
@@ -31,6 +31,9 @@ export function WelcomeScreen({ bot, onStart, onCancel, brandColor = '#F59E0B' }
 • Durata stimata: ${bot.maxDurationMins || 10} minuti
 • Risposte protette dalla privacy
 • Proseguimento fluido e naturale`;
+
+    // Contact URL for AI Act Article 52 human operator link
+    const contactUrl = bot.contactUrl || 'mailto:support@example.com';
 
     return (
         <div className="flex flex-col items-center justify-center min-h-[70vh] w-full max-w-4xl mx-auto p-6 md:p-12 text-center animate-in fade-in slide-in-from-bottom-5 duration-1000 relative z-10">
@@ -91,6 +94,20 @@ export function WelcomeScreen({ bot, onStart, onCancel, brandColor = '#F59E0B' }
                 <div className="h-px w-8 bg-gray-200" />
                 <span>Powered by Business Tuner AI</span>
                 <div className="h-px w-8 bg-gray-200" />
+            </div>
+
+            {/* AI Act Article 52 — AI system disclosure */}
+            <div className="mt-6 flex flex-col items-center gap-1 text-xs text-gray-400">
+                <div className="flex items-center gap-1.5">
+                    <AlertCircle size={12} aria-hidden="true" />
+                    <span>Stai interagendo con un sistema di intelligenza artificiale</span>
+                </div>
+                <a
+                    href={contactUrl}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+                >
+                    Hai bisogno di aiuto? Contatta un operatore &rarr;
+                </a>
             </div>
         </div>
     );

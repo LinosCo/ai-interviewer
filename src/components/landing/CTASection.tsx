@@ -27,18 +27,18 @@ export function CTASection() {
           >
             <Sparkles className="w-4 h-4 text-[hsl(var(--coral))]" />
             <span className="text-sm font-medium text-[hsl(var(--coral))]">
-              Inizia oggi, risultati domani
+              Dall\'insight all\'azione in tempi rapidi
             </span>
           </motion.div>
 
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-[hsl(var(--foreground))] mb-6">
-            Pronto ad ascoltare{' '}
-            <span className="gradient-text">i tuoi stakeholder</span>?
+            Pronto a trasformare segnali dispersi in{' '}
+            <span className="gradient-text">decisioni migliori</span>?
           </h2>
 
           <p className="text-lg md:text-xl text-[hsl(var(--muted-foreground))] mb-10 max-w-2xl mx-auto">
-            Unisciti a centinaia di imprenditori italiani che hanno già
-            trasformato il modo in cui prendono decisioni.
+            Ascolta stakeholder, monitora reputazione, coordina attivita digitali
+            con il Copilot e fai crescere il team con una routine piu efficace.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -65,8 +65,8 @@ export function CTASection() {
             transition={{ delay: 0.8 }}
             className="mt-8 text-sm text-[hsl(var(--muted-foreground))]"
           >
-            Setup in 5 minuti &nbsp;&bull;&nbsp; Nessuna carta richiesta &nbsp;&bull;&nbsp;
-            Cancella quando vuoi
+            Setup guidato &nbsp;&bull;&nbsp; Workflow no-code &nbsp;&bull;&nbsp;
+            Adozione semplice per il team
           </motion.p>
         </motion.div>
       </div>

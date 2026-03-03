@@ -1,6 +1,7 @@
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
 
 /**
  * Fact Extractor Service
@@ -62,19 +63,23 @@ export async function extractFactsFromMessage(
 
     const openai = createOpenAI({ apiKey });
 
-    // Build context of recent messages
-    const recentContext = conversationContext.slice(-5).join('\n');
+    // Sanitize all end-user content before prompt interpolation
+    const safeMessage = sanitize(userMessage, 2000);
+    const recentContext = conversationContext
+        .slice(-5)
+        .map(msg => sanitize(msg, 1000))
+        .join('\n');
 
-    // Build existing facts summary
+    // Existing facts are LLM-extracted — sanitize as user data
     const existingFactsSummary = existingFacts.length > 0
-        ? existingFacts.map(f => `- ${f.content} (${f.topic})`).join('\n')
+        ? existingFacts.map(f => `- ${sanitize(f.content, 300)} (${sanitize(f.topic, 50)})`).join('\n')
         : 'None yet';
 
     const prompt = `
 Analizza questo messaggio dell'utente ed estrai NUOVI fatti rilevanti.
 
 MESSAGGIO UTENTE:
-"${userMessage}"
+"${safeMessage}"
 
 CONTESTO CONVERSAZIONE RECENTE:
 ${recentContext}

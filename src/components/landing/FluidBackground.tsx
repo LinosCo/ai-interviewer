@@ -1,10 +1,35 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 export function FluidBackground() {
+  const [prefersReduced, setPrefersReduced] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReduced(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefersReduced(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  if (prefersReduced) {
+    // Static fallback — no animation, respects user OS preference
+    return (
+      <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+        <div className="absolute inset-0 gradient-mesh" />
+        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-coral/30 to-orange-400/20 blur-[120px]" />
+        <div className="absolute -top-20 -right-40 w-[500px] h-[500px] rounded-full bg-gradient-to-bl from-amber/25 to-purple-400/15 blur-[100px]" />
+        <div className="absolute top-1/3 left-1/3 w-[700px] h-[700px] rounded-full bg-gradient-to-r from-blue-400/15 to-cyan-400/10 blur-[150px]" />
+        <div className="absolute bottom-20 right-20 w-[500px] h-[500px] rounded-full bg-gradient-to-tl from-coral/25 to-amber/20 blur-[120px]" />
+        <div className="absolute top-2/3 left-10 w-[400px] h-[400px] rounded-full bg-gradient-to-tr from-purple-400/10 to-pink-400/10 blur-[100px]" />
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden">
+    <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
       {/* Base mesh gradient */}
       <div className="absolute inset-0 gradient-mesh" />
 

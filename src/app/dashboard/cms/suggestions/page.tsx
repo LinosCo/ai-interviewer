@@ -550,7 +550,7 @@ export default function SuggestionsPage() {
                                     >
                                         Copia JSON
                                     </button>
-                                    {selectedSuggestion.status === 'PENDING' && (
+                                    {['PENDING', 'FAILED'].includes(selectedSuggestion.status) && (
                                         <button
                                             onClick={() => setEditing(!editing)}
                                             className="text-xs text-amber-600 hover:text-amber-700"
@@ -745,7 +745,7 @@ export default function SuggestionsPage() {
                             </div>
                         )}
 
-                        {selectedSuggestion.status === 'PENDING' && (
+                        {['PENDING', 'FAILED'].includes(selectedSuggestion.status) && (
                             <div className="flex gap-3 pt-4 border-t border-gray-200">
                                 <button
                                     onClick={() => handleReject(selectedSuggestion.id)}
@@ -759,7 +759,7 @@ export default function SuggestionsPage() {
                                     disabled={actionLoading}
                                     className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                                 >
-                                    {actionLoading ? 'Invio...' : 'Invia al canale'}
+                                    {actionLoading ? 'Invio...' : (selectedSuggestion.status === 'FAILED' ? 'Riprova invio' : 'Invia al canale')}
                                 </button>
                             </div>
                         )}

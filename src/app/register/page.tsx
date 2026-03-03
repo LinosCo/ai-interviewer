@@ -1,7 +1,9 @@
 'use client';
 
-import { useActionState, Suspense, useState } from 'react';
+import { useActionState, Suspense, useRef, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { registerUser } from './actions';
 import Link from 'next/link';
 import { colors, gradients } from '@/lib/design-system';
@@ -9,15 +11,43 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Input } from '@/components/ui/business-tuner/Input';
 import { Card } from '@/components/ui/business-tuner/Card';
+import { registerClientSchema, type RegisterClientInput } from '@/lib/validation/schemas';
+import { PasswordStrength } from '@/components/ui/PasswordStrength';
+
+const errorStyle: React.CSSProperties = {
+    color: '#EF4444',
+    fontSize: '0.75rem',
+    marginTop: '4px',
+    display: 'block',
+};
 
 function RegisterForm() {
     const searchParams = useSearchParams();
     const plan = searchParams.get('plan');
-    const [errorMessage, dispatch, isPending] = useActionState(registerUser, undefined);
-    const [hasSubmitted, setHasSubmitted] = useState(false);
+    const billing = searchParams.get('billing') || 'monthly';
 
-    // Combined loading state
-    const isLoading = isPending || (hasSubmitted && errorMessage === null);
+    const [serverError, dispatch, isPending] = useActionState(registerUser, undefined);
+    const [, startTransition] = useTransition();
+    const formRef = useRef<HTMLFormElement>(null);
+
+    const {
+        register,
+        handleSubmit,
+        watch,
+        formState: { errors, isSubmitSuccessful },
+    } = useForm<RegisterClientInput>({
+        resolver: zodResolver(registerClientSchema),
+    });
+
+    const passwordValue = watch('password', '');
+    const isLoading = isPending || (isSubmitSuccessful && serverError === null);
+
+    const onSubmit = () => {
+        if (formRef.current) {
+            const formData = new FormData(formRef.current);
+            startTransition(() => { dispatch(formData); });
+        }
+    };
 
     return (
         <div style={{
@@ -31,7 +61,6 @@ function RegisterForm() {
             position: 'relative',
             overflow: 'hidden'
         }}>
-            {/* Decorative Elements */}
             <div style={{ position: 'absolute', top: '5%', left: '5%', width: '350px', height: '350px', background: `radial-gradient(circle, ${colors.amberLight} 0%, transparent 60%)`, opacity: 0.5, filter: 'blur(50px)' }} />
             <div style={{ position: 'absolute', bottom: '5%', right: '5%', width: '450px', height: '450px', background: `radial-gradient(circle, ${colors.rose} 0%, transparent 60%)`, opacity: 0.4, filter: 'blur(60px)' }} />
 
@@ -51,43 +80,43 @@ function RegisterForm() {
                 </div>
 
                 <Card variant="glass" padding="2.5rem">
-                    <form action={dispatch} onSubmit={() => setHasSubmitted(true)}>
+                    <form ref={formRef} onSubmit={handleSubmit(onSubmit)}>
                         <input type="hidden" name="plan" value={plan || ''} />
-                        <input type="hidden" name="billing" value={searchParams.get('billing') || 'monthly'} />
+                        <input type="hidden" name="billing" value={billing} />
 
                         <div style={{ marginBottom: '1rem' }}>
                             <Input
                                 label="Nome completo"
                                 type="text"
-                                name="name"
-                                required
+                                {...register('name')}
                                 placeholder="Mario Rossi"
                                 disabled={isLoading}
                             />
+                            {errors.name && <span style={errorStyle}>{errors.name.message}</span>}
                         </div>
 
                         <div style={{ marginBottom: '1rem' }}>
                             <Input
                                 label="Email aziendale"
                                 type="email"
-                                name="email"
-                                required
+                                {...register('email')}
                                 placeholder="nome@azienda.com"
                                 disabled={isLoading}
                                 icon={<Icons.Building size={18} />}
                             />
+                            {errors.email && <span style={errorStyle}>{errors.email.message}</span>}
                         </div>
 
                         <div style={{ marginBottom: '1.25rem' }}>
                             <Input
                                 label="Ragione Sociale / Nome Azienda"
                                 type="text"
-                                name="companyName"
-                                required
+                                {...register('companyName')}
                                 placeholder="Azienda S.r.l."
                                 disabled={isLoading}
                                 icon={<Icons.Building size={18} />}
                             />
+                            {errors.companyName && <span style={errorStyle}>{errors.companyName.message}</span>}
                         </div>
 
                         <div style={{ marginBottom: '1.25rem' }}>
@@ -105,18 +134,18 @@ function RegisterForm() {
                             <Input
                                 label="Password"
                                 type="password"
-                                name="password"
-                                required
-                                placeholder="Creane una sicura"
-                                minLength={6}
+                                {...register('password')}
+                                placeholder="Almeno 8 caratteri, 1 maiuscola, 1 numero"
                                 disabled={isLoading}
-                                icon={<Icons.Check size={18} />} // Using Check as placeholder for "secure" lock icon if lock not available
+                                icon={<Icons.Check size={18} />}
                             />
+                            {errors.password && <span style={errorStyle}>{errors.password.message}</span>}
+                            <PasswordStrength password={passwordValue} />
                         </div>
 
-                        {errorMessage && (
+                        {serverError && (
                             <div style={{ padding: '0.75rem', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '8px', color: '#DC2626', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-                                {errorMessage}
+                                {serverError}
                             </div>
                         )}
 
@@ -130,7 +159,7 @@ function RegisterForm() {
                         </Button>
 
                         <p style={{ fontSize: '0.75rem', color: colors.subtle, textAlign: 'center', marginTop: '1rem', lineHeight: 1.5 }}>
-                            Cliccando su "Inizia prova gratuita", accetti i nostri <Link href="/terms" style={{ color: colors.text, textDecoration: 'underline' }}>Termini di Servizio</Link> e la <Link href="/privacy" style={{ color: colors.text, textDecoration: 'underline' }}>Privacy Policy</Link>.
+                            Cliccando su &quot;Inizia prova gratuita&quot;, accetti i nostri <Link href="/terms" style={{ color: colors.text, textDecoration: 'underline' }}>Termini di Servizio</Link> e la <Link href="/privacy" style={{ color: colors.text, textDecoration: 'underline' }}>Privacy Policy</Link>.
                         </p>
                     </form>
                 </Card>

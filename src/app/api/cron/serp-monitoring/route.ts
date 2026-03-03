@@ -6,19 +6,17 @@ import { getAdminApiKey } from '@/lib/visibility/llm-providers';
 /**
  * Weekly SERP Monitoring Cron Job
  *
- * This endpoint is designed to be called by a cron scheduler (e.g., Vercel Cron)
+ * This endpoint is designed to be called by a cron scheduler (e.g., Railway Cron)
  * to automatically scan Google for brand mentions across all active organizations.
  *
  * Recommended schedule: Weekly (every Monday)
- * Vercel cron: 0 8 * * 1 (Every Monday at 8:00 AM UTC)
+ * Railway cron: 0 8 * * 1 (Every Monday at 8:00 AM UTC)
  */
 export async function GET(request: Request) {
     try {
-        // 1. Verify cron secret (for security)
+        // Auth: Bearer token obbligatorio per cron job
         const authHeader = request.headers.get('authorization');
-        const cronSecret = process.env.CRON_SECRET;
-
-        if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 

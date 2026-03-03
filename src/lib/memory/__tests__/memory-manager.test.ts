@@ -25,7 +25,7 @@ describe('MemoryManager', () => {
                 usesEmoji: false
             };
 
-            const result = MemoryManager.formatForPrompt(memory);
+            const result = MemoryManager.formatForPrompt(memory, { language: 'it' });
 
             expect(result).toContain('INFORMAZIONI GIÀ RACCOLTE');
             expect(result).toContain('L\'utente è a Verona per vacanza');
@@ -43,7 +43,7 @@ describe('MemoryManager', () => {
                 usesEmoji: false
             };
 
-            const result = MemoryManager.formatForPrompt(memory);
+            const result = MemoryManager.formatForPrompt(memory, { language: 'it' });
 
             expect(result).toContain('SEGNALI DI FATICA');
             expect(result).toContain('domande più brevi');
@@ -60,7 +60,7 @@ describe('MemoryManager', () => {
                 usesEmoji: false
             };
 
-            const result = MemoryManager.formatForPrompt(memory);
+            const result = MemoryManager.formatForPrompt(memory, { language: 'it' });
             expect(result).toContain('STILE COMUNICATIVO RILEVATO');
             expect(result).toContain('Mantieni un registro formale');
         });

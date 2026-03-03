@@ -31,7 +31,7 @@ export async function runVisibilityScan() {
     }
 
     // In a real app, this should likely be a background job (Queue) because it takes time.
-    // For MVP, we run it and await (might timeout Vercel functions > 10s).
+    // For MVP, we run it and await (might timeout for large datasets > 10s).
     // Better: Start it, return "Started", and let client poll.
     // For this demo: await (assuming few prompts).
 

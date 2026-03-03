@@ -8,6 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface PlatformSettingsState {
     id?: string;
     methodologyKnowledge?: string;
+    trainingMethodologyKnowledge?: string;
+    strategicMarketingKnowledge?: string;
     strategicPlan?: string;
 }
 
@@ -37,6 +39,7 @@ interface GlobalConfigState {
     smtpFromEmail?: string;
     smtpNotificationEmail?: string;
     publicDemoBotId?: string;
+    resendApiKey?: string;
 }
 
 export default function PlatformSettingsPage() {
@@ -97,7 +100,7 @@ export default function PlatformSettingsPage() {
                         Impostazioni Team: <span className="text-amber-600">{currentOrganization.name}</span>
                     </h1>
                     <p className="text-gray-600 mt-2">
-                        Configura la metodologia e il piano strategico per questo spazio di lavoro.
+                        Configura metodologia interviste, metodologia formazione, KB marketing strategico e piano strategico per questo spazio di lavoro.
                     </p>
                 </div>
 
@@ -106,6 +109,8 @@ export default function PlatformSettingsPage() {
                         organizationId={currentOrganization.id}
                         isAdmin={isAdmin}
                         currentKnowledge={settings?.methodologyKnowledge || ''}
+                        currentTrainingKnowledge={settings?.trainingMethodologyKnowledge || ''}
+                        currentMarketingKnowledge={settings?.strategicMarketingKnowledge || ''}
                         currentStrategicPlan={settings?.strategicPlan || ''}
                         platformOpenaiApiKey={globalConfig?.openaiApiKey || ''}
                         platformAnthropicApiKey={globalConfig?.anthropicApiKey || ''}
@@ -132,6 +137,7 @@ export default function PlatformSettingsPage() {
                         smtpFromEmail={globalConfig?.smtpFromEmail}
                         smtpNotificationEmail={globalConfig?.smtpNotificationEmail}
                         publicDemoBotId={globalConfig?.publicDemoBotId}
+                        resendApiKey={globalConfig?.resendApiKey}
                     />
                 </div>
             </div>

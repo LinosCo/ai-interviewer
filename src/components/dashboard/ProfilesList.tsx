@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 
 interface Profile {
     id: string;
@@ -39,6 +40,9 @@ interface Profile {
 }
 
 export default function ProfilesList({ profiles }: { profiles: Profile[] }) {
+    const router = useRouter();
+    const pathname = usePathname();
+
     const escapeCsv = (value: unknown): string => {
         const text = String(value ?? '');
         if (/[",\n\r]/.test(text)) {
@@ -169,7 +173,7 @@ export default function ProfilesList({ profiles }: { profiles: Profile[] }) {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => window.location.href = `${profile.id}`}
+                                    onClick={() => router.push(`${pathname}/${profile.id}`)}
                                 >
                                     Dettagli
                                 </Button>

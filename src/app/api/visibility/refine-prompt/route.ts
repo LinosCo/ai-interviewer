@@ -8,6 +8,7 @@ import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
+import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const RefinePromptSchema = z.object({
     refinedPrompt: z.string().describe("The improved version of the original prompt"),
@@ -99,8 +100,8 @@ When refining a prompt, you should:
 
 Provide both the refined prompt and a brief list of what you improved.`;
 
-        const userPrompt = `Original prompt: "${promptText}"
-Brand context: "${brandName}"
+        const userPrompt = `Original prompt: "${sanitize(promptText, 1000)}"
+Brand context: "${sanitizeConfig(brandName, 200)}"
 Target language: ${languageName}
 Target market: ${territoryContext}
 

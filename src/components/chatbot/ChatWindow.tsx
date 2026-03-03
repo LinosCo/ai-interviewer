@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Loader2, Bot, User, Shield, ExternalLink } from 'lucide-react';
+import { Send, X, Loader2, Bot, User, Shield, ExternalLink, ThumbsUp, ThumbsDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -291,6 +291,10 @@ export default function ChatWindow({
 
     const [conversationId, setConversationId] = useState<string | null>(null);
 
+    // Session rating (Gap R — feedback loop)
+    const [sessionRating, setSessionRating] = useState<'UP' | 'DOWN' | null>(null);
+    const [isRatingLoading, setIsRatingLoading] = useState(false);
+
     // GDPR Consent State
     const [hasConsented, setHasConsented] = useState(false);
     const [marketingConsent, setMarketingConsentState] = useState(false);
@@ -494,6 +498,30 @@ export default function ChatWindow({
         }
     };
 
+    // Session-level rating handler: toggles and persists via metadata
+    const handleSessionRating = async (rating: 'UP' | 'DOWN') => {
+        if (!conversationId || isRatingLoading) return;
+        setIsRatingLoading(true);
+        const next = sessionRating === rating ? null : rating;
+        setSessionRating(next); // optimistic
+        try {
+            await fetch(`/api/chatbot/sessions/${conversationId}/rating`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rating }),
+            });
+        } catch {
+            setSessionRating(sessionRating); // rollback
+        } finally {
+            setIsRatingLoading(false);
+        }
+    };
+
+    // Number of assistant messages (excluding welcome placeholder)
+    const assistantMessageCount = messages.filter(
+        m => m.role === 'assistant' && m.id !== 'welcome'
+    ).length;
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -596,6 +624,39 @@ export default function ChatWindow({
                                 )}
                                 <div ref={messagesEndRef} />
                             </div>
+
+                            {/* Session feedback strip — appears after ≥2 bot responses */}
+                            {assistantMessageCount >= 2 && (
+                                <div className="flex items-center justify-center gap-2 py-1.5 px-3 border-t bg-gray-50">
+                                    <span className="text-[11px] text-gray-400 select-none">
+                                        Questa conversazione è stata utile?
+                                    </span>
+                                    <button
+                                        onClick={() => handleSessionRating('UP')}
+                                        disabled={isRatingLoading}
+                                        aria-label="Sì, utile"
+                                        className={`p-1 rounded transition-colors disabled:opacity-40 ${
+                                            sessionRating === 'UP'
+                                                ? 'text-emerald-600 bg-emerald-50'
+                                                : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                        }`}
+                                    >
+                                        <ThumbsUp className="w-3.5 h-3.5" aria-hidden="true" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleSessionRating('DOWN')}
+                                        disabled={isRatingLoading}
+                                        aria-label="No, non utile"
+                                        className={`p-1 rounded transition-colors disabled:opacity-40 ${
+                                            sessionRating === 'DOWN'
+                                                ? 'text-red-500 bg-red-50'
+                                                : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                                        }`}
+                                    >
+                                        <ThumbsDown className="w-3.5 h-3.5" aria-hidden="true" />
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Input Area */}
                             <div className="p-3 border-t bg-white">

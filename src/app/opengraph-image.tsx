@@ -4,9 +4,9 @@ import { ImageResponse } from 'next/og';
 export const runtime = 'edge';
 
 // Image metadata
-const BRAND_NAME = process.env.NEXT_PUBLIC_BRAND_NAME || 'Voler AI';
+const BRAND_NAME = 'Business Tuner';
 
-export const alt = `${BRAND_NAME} - Ascolta il mercato. Decidi meglio.`;
+export const alt = `${BRAND_NAME} - AI Marketing Intelligence Operativa`;
 export const size = {
     width: 1200,
     height: 630,
@@ -89,7 +89,7 @@ export default function Image() {
                         display: 'flex',
                     }}
                 >
-                    Ascolta il mercato. Decidi meglio.
+                    AI Marketing Intelligence Operativa
                 </div>
 
                 {/* Description */}
@@ -104,7 +104,7 @@ export default function Image() {
                         display: 'flex',
                     }}
                 >
-                    Interviste AI per raccogliere feedback qualitativi da clienti e stakeholder
+                    Ascolta stakeholder, monitora reputazione e attiva azioni con il Copilot
                 </div>
             </div>
         ),

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import Script from 'next/script';
 
 type ConsentState = 'accepted' | 'declined' | null;
@@ -38,7 +37,6 @@ function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
 gtag('config', 'G-YFHBW5N28B');`}
       </Script>
-      <SpeedInsights />
     </>
   );
 }

@@ -11,12 +11,13 @@ import { VisibilityTrendChart } from "@/components/visibility/VisibilityTrendCha
 import { GapAnalysisSection } from "@/components/visibility/GapAnalysisSection";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Settings, History, Calendar, Newspaper, Plus, Building2 } from "lucide-react";
+import { Settings, History, Calendar, Newspaper, Plus, Building2, Globe } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisibilityProjectFilter } from "./VisibilityProjectFilter";
 import { cookies } from "next/headers";
+import { AutoCompetitorSuggestions } from "./AutoCompetitorSuggestions";
 
 export default async function VisibilityPage({
     searchParams
@@ -61,7 +62,11 @@ export default async function VisibilityPage({
                     }
                     : {})
             },
-            include: { prompts: true, project: { select: { id: true, name: true } } }
+            include: {
+                prompts: true,
+                competitors: { where: { enabled: true }, select: { name: true } },
+                project: { select: { id: true, name: true } }
+            }
         });
     } catch (error: any) {
         if (error?.code !== 'P2021') throw error;
@@ -73,7 +78,11 @@ export default async function VisibilityPage({
                     ? { projectId: projectIdFilter }
                     : {})
             },
-            include: { prompts: true, project: { select: { id: true, name: true } } }
+            include: {
+                prompts: true,
+                competitors: { where: { enabled: true }, select: { name: true } },
+                project: { select: { id: true, name: true } }
+            }
         });
     }
 
@@ -110,10 +119,10 @@ export default async function VisibilityPage({
                     <VisibilityProjectFilter currentProjectId={projectIdFilter} />
                 </div>
 
-                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-                    <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun brand configurato per questo progetto</h3>
-                    <p className="text-gray-500 mb-6">Configura il monitoraggio della visibilità per questo progetto</p>
+                <div className="bg-white rounded-2xl border border-stone-100 p-12 text-center">
+                    <Building2 className="w-12 h-12 text-stone-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-stone-900 mb-2">Nessun brand configurato per questo progetto</h3>
+                    <p className="text-stone-500 mb-6">Configura il monitoraggio della visibilità per questo progetto</p>
                     <Link
                         href={`/dashboard/visibility/create?projectId=${projectIdFilter}`}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
@@ -142,6 +151,7 @@ export default async function VisibilityPage({
         ? await prisma.visibilityScan.findUnique({
             where: { id: selectedScanId },
             include: {
+                metrics: true,
                 responses: {
                     include: { prompt: true }
                 }
@@ -151,11 +161,22 @@ export default async function VisibilityPage({
             where: { configId: config.id, status: 'completed' },
             orderBy: { completedAt: 'desc' },
             include: {
+                metrics: true,
                 responses: {
                     include: { prompt: true }
                 }
             }
         });
+
+    const autoCompetitorSuggestions = (() => {
+        if (!activeScan?.metrics?.length) return [];
+        const metric = activeScan.metrics
+            .filter((m) => m.metricType === 'auto_competitor_suggestions')
+            .sort((a, b) => b.id.localeCompare(a.id))[0];
+        const raw = (metric?.dimensions as any)?.suggestions;
+        if (!Array.isArray(raw)) return [];
+        return raw.map((item) => String(item || '').trim()).filter(Boolean);
+    })();
 
     const totalScans = await prisma.visibilityScan.count({
         where: { configId: config.id, status: 'completed' }
@@ -209,7 +230,7 @@ export default async function VisibilityPage({
                             <span className="font-medium text-amber-600">{config.brandName}</span>
                         )}
                         {config.project && (
-                            <span className="text-gray-400 ml-2">• {config.project.name}</span>
+                            <span className="text-stone-400 ml-2">• {config.project.name}</span>
                         )}
                     </p>
                 </div>
@@ -223,6 +244,14 @@ export default async function VisibilityPage({
                         </Link>
                     )}
                     <VisibilityProjectFilter currentProjectId={projectIdFilter || config.projectId || undefined} />
+                    {config.websiteUrl && (
+                        <Link href={`/dashboard/visibility/site-analysis?configId=${config.id}`}>
+                            <Button variant="outline" size="sm" className="gap-2 border-amber-200 text-amber-700 hover:bg-amber-50">
+                                <Globe className="h-4 w-4" />
+                                Analisi Sito
+                            </Button>
+                        </Link>
+                    )}
                     <Link href={`/dashboard/visibility/create?configId=${config.id}${config.projectId ? `&projectId=${config.projectId}` : ''}`}>
                         <Button variant="outline" size="sm" className="gap-2">
                             <Settings className="h-4 w-4" />
@@ -232,6 +261,14 @@ export default async function VisibilityPage({
                     <ScanForm configId={config.id} />
                 </div>
             </div>
+
+            {autoCompetitorSuggestions.length > 0 && (
+                <AutoCompetitorSuggestions
+                    configId={config.id}
+                    suggestions={autoCompetitorSuggestions}
+                    existingCompetitors={(config.competitors || []).map((c) => c.name)}
+                />
+            )}
 
             <Tabs defaultValue="llm" className="space-y-6">
                 <TabsList className="bg-stone-100">

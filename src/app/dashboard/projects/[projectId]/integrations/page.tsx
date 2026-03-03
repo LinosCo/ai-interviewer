@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { IntegrationsGrid } from '@/components/integrations';
+import { AnimatePresence } from 'framer-motion';
+import { ConnectionsTab } from '@/components/integrations/ConnectionsTab';
+import { AiRoutingTab } from '@/components/integrations/AiRoutingTab';
 
 interface MCPConnection {
   id: string;
@@ -128,6 +130,13 @@ export default function IntegrationsPage() {
   const [currentOrgId, setCurrentOrgId] = useState<string>('');
   const [currentOrgName, setCurrentOrgName] = useState<string>('');
   const [userPlan, setUserPlan] = useState<UserPlan>('FREE');
+  const [notification, setNotification] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'connections' | 'routing' | 'settings'>('connections');
+
+  const showNotification = useCallback((type: 'error' | 'success', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 4000);
+  }, []);
 
   // Fetch all integrations data
   const fetchData = useCallback(async () => {
@@ -309,7 +318,7 @@ export default function IntegrationsPage() {
       } else {
         const error = await res.json();
         console.error('Failed to get CMS dashboard URL:', error);
-        alert(error.error || 'Impossibile aprire il CMS');
+        showNotification('error', error.error || 'Impossibile aprire il CMS');
       }
     } catch (error) {
       console.error('Error opening CMS dashboard:', error);
@@ -317,6 +326,10 @@ export default function IntegrationsPage() {
   };
 
   const handleConfigureCMS = () => {
+    if (cmsConnection?.id) {
+      router.push(`/dashboard/cms/${cmsConnection.id}/settings`);
+      return;
+    }
     router.push(`/dashboard/projects/${projectId}/integrations/connect/cms`);
   };
 
@@ -342,15 +355,32 @@ export default function IntegrationsPage() {
     router.push(`/dashboard/projects/${projectId}/integrations/connect/n8n`);
   };
 
+  const handleUpdateGoogle = async (id: string, data: { ga4PropertyId?: string; gscSiteUrl?: string }) => {
+    const res = await fetch(`/api/integrations/google/connections/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Errore durante il salvataggio');
+    }
+  };
+
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4" />
-          <div className="h-4 bg-gray-200 rounded w-1/2" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="px-8 pt-8 space-y-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-7 bg-gray-100 rounded-full w-40" />
+          <div className="h-4 bg-gray-100 rounded-full w-64" />
+          <div className="flex gap-4 border-b border-gray-100 pb-0">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-10 w-24 bg-gray-100 rounded-t-xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-48 bg-gray-200 rounded-xl" />
+              <div key={i} className="h-44 bg-gray-100 rounded-[2.5rem]" />
             ))}
           </div>
         </div>
@@ -358,34 +388,172 @@ export default function IntegrationsPage() {
     );
   }
 
+  const TABS = [
+    { id: 'connections' as const, label: 'Connessioni' },
+    { id: 'routing' as const, label: 'AI Routing' },
+    { id: 'settings' as const, label: 'Impostazioni' },
+  ] as const;
+  const hasBusinessTier = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(userPlan);
+
+  // Compute number of active connections for the tab badge
+  const activeCount = [
+    ...mcpConnections.filter(c => c.status === 'ACTIVE'),
+    ...(
+      googleConnection &&
+      (googleConnection.ga4Status === 'ACTIVE' || googleConnection.gscStatus === 'ACTIVE')
+        ? [googleConnection]
+        : []
+    ),
+    ...(cmsConnection?.status === 'ACTIVE' ? [cmsConnection] : []),
+    ...(n8nConnection?.status === 'ACTIVE' ? [n8nConnection] : []),
+  ].length;
+
   return (
-    <div className="p-8">
-      <IntegrationsGrid
-        mcpConnections={mcpConnections}
-        googleConnection={googleConnection}
-        cmsConnection={cmsConnection}
-        n8nConnection={n8nConnection}
-        userPlan={userPlan}
-        onTestMCP={handleTestMCP}
-        onDeleteMCP={handleDeleteMCP}
-        onConfigureMCP={handleConfigureMCP}
-        onTestGA4={handleTestGA4}
-        onTestGSC={handleTestGSC}
-        onConfigureGoogle={handleConfigureGoogle}
-        onDeleteGoogle={handleDeleteGoogle}
-        onDeleteCMS={handleDeleteCMS}
-        onOpenCMSDashboard={handleOpenCMSDashboard}
-        onConfigureCMS={handleConfigureCMS}
-        onTestN8N={handleTestN8N}
-        onDeleteN8N={handleDeleteN8N}
-        onConfigureN8N={handleConfigureN8N}
-        projects={projects}
-        organizations={organizations}
-        currentProjectId={projectId}
-        currentOrgId={currentOrgId}
-        currentOrgName={currentOrgName}
-        onRefresh={fetchData}
-      />
+    <div className="flex flex-col h-[calc(100vh-80px)] overflow-hidden">
+      {/* Page header + tab bar */}
+      <div className="px-8 pt-8 pb-0 flex-shrink-0">
+        {/* Inline notification */}
+        {notification && (
+          <div
+            className={`mb-4 px-4 py-3 rounded-2xl text-sm font-medium flex items-center justify-between
+              ${notification.type === 'error'
+                ? 'bg-red-50 text-red-700 border border-red-100'
+                : 'bg-green-50 text-green-700 border border-green-100'
+              }`}
+          >
+            <span>{notification.message}</span>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-4 text-current opacity-60 hover:opacity-100 transition-opacity"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        <div className="mb-5">
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Integrazioni</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Connetti i tuoi strumenti e configura il routing automatico dei contenuti AI.
+          </p>
+        </div>
+
+        <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-blue-900">
+              Configurazione assistita con Strategy Copilot
+            </p>
+            <p className="text-xs text-blue-800/90 mt-1">
+              Usa il Copilot (icona con scintille in basso a destra) per impostare connessioni, testarle e preparare AI Tips instradabili.
+            </p>
+          </div>
+          {!hasBusinessTier && (
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard/billing/plans')}
+              className="h-9 px-4 rounded-full text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+            >
+              Passa a Business
+            </button>
+          )}
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex gap-0 border-b border-gray-100">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                relative px-4 py-3 text-sm font-semibold transition-colors
+                ${activeTab === tab.id
+                  ? 'text-blue-600'
+                  : 'text-gray-400 hover:text-gray-600'
+                }
+              `}
+            >
+              <span className="flex items-center gap-2">
+                {tab.label}
+                {tab.id === 'connections' && activeCount > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black">
+                    {activeCount}
+                  </span>
+                )}
+              </span>
+              {activeTab === tab.id && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab content area */}
+      <div className="flex-1 overflow-y-auto px-8">
+        <AnimatePresence mode="wait">
+          {activeTab === 'connections' && (
+            <ConnectionsTab
+              key="connections"
+              activeCount={activeCount}
+              mcpConnections={mcpConnections}
+              googleConnection={googleConnection}
+              cmsConnection={cmsConnection}
+              n8nConnection={n8nConnection}
+              userPlan={userPlan}
+              onTestMCP={handleTestMCP}
+              onDeleteMCP={handleDeleteMCP}
+              onConfigureMCP={handleConfigureMCP}
+              onTestGA4={handleTestGA4}
+              onTestGSC={handleTestGSC}
+              onConfigureGoogle={handleConfigureGoogle}
+              onDeleteGoogle={handleDeleteGoogle}
+              onDeleteCMS={handleDeleteCMS}
+              onOpenCMSDashboard={handleOpenCMSDashboard}
+              onConfigureCMS={handleConfigureCMS}
+              onTestN8N={handleTestN8N}
+              onDeleteN8N={handleDeleteN8N}
+              onConfigureN8N={handleConfigureN8N}
+              onUpdateGoogle={handleUpdateGoogle}
+              projects={projects}
+              organizations={organizations}
+              currentProjectId={projectId}
+              currentOrgId={currentOrgId}
+              currentOrgName={currentOrgName}
+              onRefresh={fetchData}
+            />
+          )}
+          {activeTab === 'routing' && (
+            <AiRoutingTab
+              key="routing"
+              projectId={projectId}
+              mcpConnections={mcpConnections}
+              cmsConnection={cmsConnection}
+              n8nConnection={n8nConnection}
+            />
+          )}
+          {activeTab === 'settings' && (
+            <div
+              key="settings"
+              className="flex-1 overflow-y-auto pt-6 pb-8"
+            >
+              <div className="p-8 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm">
+                <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">
+                  Impostazioni progetto
+                </p>
+                <p className="text-sm text-gray-400">
+                  Le impostazioni di progetto sono disponibili dalla sezione{' '}
+                  <a
+                    href={`/dashboard/projects`}
+                    className="text-blue-600 font-semibold hover:underline"
+                  >
+                    Progetti →
+                  </a>
+                </p>
+              </div>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

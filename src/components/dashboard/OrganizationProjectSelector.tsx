@@ -5,6 +5,7 @@ import { useProject, ALL_PROJECTS_OPTION } from '@/contexts/ProjectContext';
 import { Building2, ChevronDown, Folder, LayoutGrid, Search, Plus, Check } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, KeyboardEvent } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface Organization {
     id: string;
@@ -24,8 +25,10 @@ interface Project {
 type DropdownMode = 'org' | 'project' | null;
 
 export default function OrganizationProjectSelector() {
-    const { organizations, currentOrganization, setCurrentOrganization, loading: orgLoading, error: orgError, refetchOrganizations } = useOrganization();
+    const { organizations, currentOrganization, setCurrentOrganization, error: orgError, refetchOrganizations } = useOrganization();
     const { projects, selectedProject, setSelectedProject, loading: projectLoading, isOrgAdmin } = useProject();
+    const router = useRouter();
+    const pathname = usePathname();
 
     const [dropdownMode, setDropdownMode] = useState<DropdownMode>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -33,7 +36,6 @@ export default function OrganizationProjectSelector() {
 
     const containerRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const hasAutoRetriedRef = useRef(false);
     const closeDropdown = useCallback(() => {
         setDropdownMode(null);
         setSearchQuery('');
@@ -45,7 +47,12 @@ export default function OrganizationProjectSelector() {
         org.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const showAllProjectsOption = isOrgAdmin || projects.length > 1;
+    const canManageOrganizationProjects =
+        isOrgAdmin ||
+        currentOrganization?.role === 'OWNER' ||
+        currentOrganization?.role === 'ADMIN';
+
+    const showAllProjectsOption = canManageOrganizationProjects || projects.length > 1;
     const filteredProjects = [
         ...(showAllProjectsOption ? [ALL_PROJECTS_OPTION] : []),
         ...projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -74,7 +81,17 @@ export default function OrganizationProjectSelector() {
     const handleProjectSelect = useCallback((project: Project) => {
         setSelectedProject(project);
         closeDropdown();
-    }, [setSelectedProject, closeDropdown]);
+
+        // If we're on a project-specific URL route (e.g. /dashboard/projects/[id]/integrations),
+        // navigate to the same sub-route for the newly selected project so the page data refreshes.
+        if (project.id !== ALL_PROJECTS_OPTION.id) {
+            const projectRouteMatch = pathname?.match(/^(\/dashboard\/projects\/)([^/]+)(\/.*)?$/);
+            if (projectRouteMatch) {
+                const suffix = projectRouteMatch[3] || '';
+                router.push(`/dashboard/projects/${project.id}${suffix}`);
+            }
+        }
+    }, [setSelectedProject, closeDropdown, router, pathname]);
 
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
         const itemsCount = dropdownMode === 'org' ? filteredOrganizations.length : filteredProjects.length;
@@ -365,6 +382,21 @@ export default function OrganizationProjectSelector() {
                                         </button>
                                     );
                                 })
+                            )}
+
+                            {canManageOrganizationProjects && (
+                                <div className="border-t border-gray-100 mt-1 pt-1">
+                                    <Link
+                                        href={`/dashboard/projects/new?orgId=${currentOrganization.id}`}
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left text-amber-600 hover:bg-amber-50 transition-colors"
+                                        onClick={() => setDropdownMode(null)}
+                                    >
+                                        <div className="p-1.5 rounded-md bg-amber-100 shrink-0">
+                                            <Plus className="w-4 h-4" />
+                                        </div>
+                                        <span className="text-sm font-medium">Nuovo progetto</span>
+                                    </Link>
+                                </div>
                             )}
                         </div>
                     </div>

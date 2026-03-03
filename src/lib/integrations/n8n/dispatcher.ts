@@ -9,6 +9,12 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import {
+    formatForChannel,
+    inferChannelConfig,
+    type SocialChannelConfig,
+    type SocialPayload,
+} from './social-templates';
 
 export interface TipPayload {
     id: string;
@@ -19,6 +25,13 @@ export interface TipPayload {
     metaDescription?: string;
     suggestedHashtags?: string[];
     url?: string;
+}
+
+export interface DispatchResult {
+    attempted: boolean;
+    success: boolean;
+    connectionId?: string;
+    error?: string;
 }
 
 export interface PublicationEvent {
@@ -48,8 +61,21 @@ export class N8NDispatcher {
     ): Promise<void> {
         if (!tips.length) return;
 
+        await this.dispatchTipsWithResult(projectId, tips);
+    }
+
+    static async dispatchTipsWithResult(
+        projectId: string,
+        tips: TipPayload[]
+    ): Promise<DispatchResult> {
+        if (!tips.length) {
+            return { attempted: false, success: false, error: 'No tips to dispatch' };
+        }
+
         const connection = await this.getActiveConnection(projectId);
-        if (!connection || !connection.triggerOnTips) return;
+        if (!connection || !connection.triggerOnTips) {
+            return { attempted: false, success: false, error: 'No active n8n connection for project' };
+        }
 
         const project = await prisma.project.findUnique({
             where: { id: projectId },
@@ -72,7 +98,12 @@ export class N8NDispatcher {
             }))
         };
 
-        await this.sendWebhook(connection.id, connection.webhookUrl, payload);
+        const webhookResult = await this.sendWebhook(connection.id, connection.webhookUrl, payload);
+        return {
+            ...webhookResult,
+            attempted: true,
+            connectionId: connection.id
+        };
     }
 
     /**
@@ -108,6 +139,49 @@ export class N8NDispatcher {
         await this.sendWebhook(connection.id, connection.webhookUrl, payload);
     }
 
+    /**
+     * Dispatch a single tip formatted for a specific social channel.
+     *
+     * The payload is enriched with platform-specific formatting (LinkedIn
+     * article, LinkedIn carousel, Facebook post, Instagram caption) before
+     * being sent to the n8n webhook with the `social_content_ready` event.
+     *
+     * @param projectId - The project owning the n8n connection
+     * @param tip       - The raw tip payload (from CMSSuggestion or AI tips)
+     * @param channel   - Target channel config; omit to infer from tip metadata
+     * @param brandName - Optional brand name for post attribution
+     */
+    static async dispatchSocialContent(
+        projectId: string,
+        tip: TipPayload,
+        channel?: SocialChannelConfig,
+        brandName?: string
+    ): Promise<void> {
+        const connection = await this.getActiveConnection(projectId);
+        if (!connection) return;
+
+        const project = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { name: true }
+        });
+
+        const resolvedChannel = channel ?? inferChannelConfig(tip);
+        const socialPayload: SocialPayload = formatForChannel(
+            tip,
+            resolvedChannel,
+            { brandName: brandName ?? project?.name }
+        );
+
+        const payload: WebhookPayload = {
+            event: 'social_content_ready',
+            timestamp: new Date().toISOString(),
+            project: { id: projectId, name: project?.name ?? 'Unknown' },
+            social: socialPayload,
+        };
+
+        await this.sendWebhook(connection.id, connection.webhookUrl, payload);
+    }
+
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
@@ -130,7 +204,7 @@ export class N8NDispatcher {
         connectionId: string,
         webhookUrl: string,
         payload: WebhookPayload
-    ): Promise<void> {
+    ): Promise<DispatchResult> {
         try {
             const response = await fetch(webhookUrl, {
                 method: 'POST',
@@ -143,7 +217,12 @@ export class N8NDispatcher {
                 const errorText = `HTTP ${response.status}: ${response.statusText}`;
                 console.warn(`N8NDispatcher: Webhook failed for ${connectionId}: ${errorText}`);
                 await this.updateConnectionStatus(connectionId, errorText);
-                return;
+                return {
+                    attempted: true,
+                    success: false,
+                    connectionId,
+                    error: errorText
+                };
             }
 
             // Success: update lastTriggerAt, clear lastError
@@ -154,10 +233,22 @@ export class N8NDispatcher {
                     lastError: null
                 }
             });
+
+            return {
+                attempted: true,
+                success: true,
+                connectionId
+            };
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : 'Unknown error';
             console.warn(`N8NDispatcher: Webhook error for ${connectionId}:`, errorMsg);
             await this.updateConnectionStatus(connectionId, errorMsg);
+            return {
+                attempted: true,
+                success: false,
+                connectionId,
+                error: errorMsg
+            };
         }
     }
 

@@ -7,6 +7,7 @@ type CreateVisibilityConfigInput = {
     organizationId: string;
     projectId?: string | null;
     brandName: string;
+    brandAliases?: string[];
     category: string;
     description?: string;
     websiteUrl?: string | null;
@@ -32,6 +33,14 @@ type CreateVisibilityConfigResult = {
 
 export function normalizeBrandName(name: string): string {
     return name.trim().replace(/\s+/g, ' ');
+}
+
+export function normalizeBrandAliases(input: unknown): string[] {
+    if (!Array.isArray(input)) return [];
+    const aliases = input
+        .map((item) => normalizeBrandName(String(item || '')))
+        .filter(Boolean);
+    return Array.from(new Set(aliases));
 }
 
 function toNullableJsonInput(
@@ -62,6 +71,9 @@ export async function createVisibilityConfigWithGuard(
     input: CreateVisibilityConfigInput
 ): Promise<CreateVisibilityConfigResult> {
     const normalizedBrandName = normalizeBrandName(input.brandName);
+    const normalizedBrandAliases = normalizeBrandAliases(input.brandAliases).filter(
+        (alias) => alias.toLowerCase() !== normalizedBrandName.toLowerCase()
+    );
 
     const prompts = input.prompts || [];
     const competitors = input.competitors || [];
@@ -90,6 +102,7 @@ export async function createVisibilityConfigWithGuard(
                 organizationId: input.organizationId,
                 projectId: input.projectId || null,
                 brandName: normalizedBrandName,
+                brandAliases: normalizedBrandAliases,
                 category: input.category,
                 description: input.description || '',
                 websiteUrl: input.websiteUrl || null,

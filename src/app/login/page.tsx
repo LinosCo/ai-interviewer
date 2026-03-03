@@ -1,7 +1,9 @@
 'use client';
 
-import { Suspense, useActionState, useEffect, useState } from 'react';
+import { Suspense, useActionState, useEffect, useRef, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { authenticate } from './actions';
 import Link from 'next/link';
 import { colors, gradients } from '@/lib/design-system';
@@ -9,31 +11,49 @@ import { Icons } from '@/components/ui/business-tuner/Icons';
 import { Button } from '@/components/ui/business-tuner/Button';
 import { Input } from '@/components/ui/business-tuner/Input';
 import { Card } from '@/components/ui/business-tuner/Card';
+import { loginSchema, type LoginInput } from '@/lib/validation/schemas';
+
+const errorStyle: React.CSSProperties = {
+    color: '#EF4444',
+    fontSize: '0.75rem',
+    marginTop: '4px',
+    display: 'block',
+};
 
 function LoginForm() {
     const searchParams = useSearchParams();
-    const [errorMessage, dispatch, isPending] = useActionState(authenticate, undefined);
-    const [hasSubmitted, setHasSubmitted] = useState(false);
+    const [serverError, dispatch, isPending] = useActionState(authenticate, undefined);
+    const [, startTransition] = useTransition();
+    const formRef = useRef<HTMLFormElement>(null);
+
     const nextPathRaw = searchParams.get('next');
     const nextPath = nextPathRaw && nextPathRaw.startsWith('/') ? nextPathRaw : null;
     const verificationState = searchParams.get('verification');
     const verifiedState = searchParams.get('verified');
     const verificationReason = searchParams.get('reason');
 
-    // Combined loading state: pending action OR navigating to dashboard
-    const isLoading = isPending || (hasSubmitted && errorMessage === null);
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitSuccessful },
+    } = useForm<LoginInput>({
+        resolver: zodResolver(loginSchema),
+    });
+
+    const isLoading = isPending || (isSubmitSuccessful && serverError === null);
 
     useEffect(() => {
-        if (!isPending && errorMessage === null && hasSubmitted) {
+        if (!isPending && serverError === null && isSubmitSuccessful) {
             const target = nextPath || '/dashboard';
-            // Full page reload ensures SessionProvider starts fresh with new auth cookie.
-            // Client-side router.replace() would keep stale 'unauthenticated' SessionProvider state.
             window.location.replace(target);
         }
-    }, [errorMessage, isPending, hasSubmitted, nextPath]);
+    }, [serverError, isPending, isSubmitSuccessful, nextPath]);
 
-    const handleSubmit = () => {
-        setHasSubmitted(true);
+    const onSubmit = () => {
+        if (formRef.current) {
+            const formData = new FormData(formRef.current);
+            startTransition(() => { dispatch(formData); });
+        }
     };
 
     return (
@@ -48,7 +68,6 @@ function LoginForm() {
             position: 'relative',
             overflow: 'hidden'
         }}>
-            {/* Decorative Elements */}
             <div style={{ position: 'absolute', top: '10%', right: '10%', width: '300px', height: '300px', background: `radial-gradient(circle, ${colors.amberLight} 0%, transparent 70%)`, opacity: 0.4, filter: 'blur(40px)' }} />
             <div style={{ position: 'absolute', bottom: '10%', left: '10%', width: '400px', height: '400px', background: `radial-gradient(circle, ${colors.peach} 0%, transparent 70%)`, opacity: 0.5, filter: 'blur(60px)' }} />
 
@@ -62,55 +81,55 @@ function LoginForm() {
                 </div>
 
                 <Card variant="glass" padding="2.5rem">
-                    <form action={dispatch} onSubmit={handleSubmit}>
+                    <form ref={formRef} onSubmit={handleSubmit(onSubmit)}>
                         <div style={{ marginBottom: '1.5rem' }}>
                             <Input
                                 label="Email"
                                 type="email"
-                                name="email"
-                                required
+                                {...register('email')}
                                 placeholder="nome@azienda.com"
                                 disabled={isLoading}
                                 icon={<Icons.Users size={18} />}
                             />
+                            {errors.email && <span style={errorStyle}>{errors.email.message}</span>}
                         </div>
                         <div style={{ marginBottom: '0.5rem' }}>
                             <Input
                                 label="Password"
                                 type="password"
-                                name="password"
-                                required
+                                {...register('password')}
                                 placeholder="••••••••"
                                 disabled={isLoading}
-                                icon={<div style={{ width: '18px' }}>🔒</div>} // Placeholder icon if Lock not available
+                                icon={<div style={{ width: '18px' }}>🔒</div>}
                             />
+                            {errors.password && <span style={errorStyle}>{errors.password.message}</span>}
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem', marginTop: '0.75rem' }}>
                             <Link href="/forgot-password" style={{ fontSize: '0.875rem', color: colors.amber, textDecoration: 'none', fontWeight: 500 }}>
                                 Password dimenticata?
                             </Link>
                         </div>
 
-                        {errorMessage && (
+                        {serverError && (
                             <div style={{ padding: '0.75rem', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '8px', color: '#DC2626', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-                                {errorMessage}
+                                {serverError}
                             </div>
                         )}
 
-                        {!errorMessage && verificationState === 'sent' && (
+                        {!serverError && verificationState === 'sent' && (
                             <div style={{ padding: '0.75rem', background: '#DBEAFE', border: '1px solid #93C5FD', borderRadius: '8px', color: '#1D4ED8', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
                                 Ti abbiamo inviato una email di conferma. Apri il link per attivare l&apos;account.
                             </div>
                         )}
 
-                        {!errorMessage && verifiedState === '1' && (
+                        {!serverError && verifiedState === '1' && (
                             <div style={{ padding: '0.75rem', background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: '8px', color: '#166534', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
                                 Email confermata con successo. Ora puoi accedere.
                             </div>
                         )}
 
-                        {!errorMessage && verifiedState === '0' && (
+                        {!serverError && verifiedState === '0' && (
                             <div style={{ padding: '0.75rem', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: '8px', color: '#92400E', fontSize: '0.875rem', marginBottom: '1.5rem', textAlign: 'center' }}>
                                 {verificationReason === 'expired_token'
                                     ? 'Il link di conferma è scaduto. Richiedi un nuovo link dal supporto.'
@@ -118,12 +137,7 @@ function LoginForm() {
                             </div>
                         )}
 
-                        <Button
-                            type="submit"
-                            fullWidth
-                            disabled={isLoading}
-                            withShimmer={!isLoading}
-                        >
+                        <Button type="submit" fullWidth disabled={isLoading} withShimmer={!isLoading}>
                             {isLoading ? 'Accesso in corso...' : 'Accedi'}
                         </Button>
                     </form>

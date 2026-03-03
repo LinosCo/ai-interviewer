@@ -222,6 +222,7 @@ export default function ProjectDetailView({
                     </h2>
 
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="overflow-x-auto w-full">
                         <table className="w-full text-sm text-left">
                             <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
                                 <tr>
@@ -268,6 +269,7 @@ export default function ProjectDetailView({
                                 )}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
 
@@ -278,6 +280,7 @@ export default function ProjectDetailView({
                     </h2>
 
                     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="overflow-x-auto w-full">
                         <table className="w-full text-sm text-left">
                             <thead className="border-b border-slate-100 bg-slate-50 text-[11px] font-bold uppercase tracking-wide text-slate-600">
                                 <tr>
@@ -316,6 +319,7 @@ export default function ProjectDetailView({
                                 )}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             </div>

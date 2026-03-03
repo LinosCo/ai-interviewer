@@ -5,6 +5,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { WorkspaceError, assertOrganizationAccess, syncLegacyProjectAccessForProject } from '@/lib/domain/workspace';
 import { createProjectWithNameGuard } from '@/lib/projects/create-project';
+import { planService } from '@/services/planService';
 
 const createProjectSchema = z.object({
   name: z.string().trim().min(1, 'Nome progetto richiesto'),
@@ -98,6 +99,21 @@ export async function POST(req: Request) {
     }
 
     await assertOrganizationAccess(session.user.id, finalOrgId, 'ADMIN');
+
+    // Enforce plan-level maxProjects limit (API-level enforcement)
+    const orgPlan = await planService.getOrganizationPlan(finalOrgId);
+    const maxProjects = orgPlan.features.maxProjects;
+    if (maxProjects !== -1) {
+      const projectCount = await prisma.project.count({
+        where: { organizationId: finalOrgId }
+      });
+      if (projectCount >= maxProjects) {
+        return NextResponse.json(
+          { error: 'Limite progetti raggiunto. Aggiorna il tuo piano.' },
+          { status: 403 }
+        );
+      }
+    }
 
     const { project, created } = await createProjectWithNameGuard({
       name,

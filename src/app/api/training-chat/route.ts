@@ -1,0 +1,43 @@
+// src/app/api/training-chat/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { processTrainingMessage } from '@/lib/training/training-service'
+import { Prisma } from '@prisma/client'
+
+const RequestSchema = z.object({
+  message: z.string().min(1),
+  sessionId: z.string(),
+})
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { message, sessionId } = RequestSchema.parse(body)
+
+    const result = await processTrainingMessage(sessionId, message)
+
+    return NextResponse.json(result)
+  } catch (err) {
+    console.error('[training-chat]', err)
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Invalid request', details: err.issues }, { status: 400 })
+    }
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2007') {
+        return NextResponse.json(
+          { error: 'Schema DB training non aggiornato (enum/valori non compatibili).' },
+          { status: 503 }
+        )
+      }
+    }
+    if (err instanceof Error) {
+      if (err.message === 'OPENAI_API_KEY_MISSING' || err.message === 'ANTHROPIC_API_KEY_MISSING') {
+        return NextResponse.json(
+          { error: 'Chiave API mancante nel Global Config (o variabili ambiente).' },
+          { status: 503 }
+        )
+      }
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

@@ -42,6 +42,7 @@ export function DashboardSidebar({
     const primaryItems = [
         { href: '/dashboard/interviews', icon: Icons.MessageSquare, label: 'Interviste AI', visible: true },
         { href: '/dashboard/bots', icon: Icons.Bot, label: 'Chatbot AI', visible: hasChatbot },
+        { href: '/dashboard/training', icon: Icons.GraduationCap, label: 'Formazione', visible: true },
         { href: '/dashboard/visibility', icon: Icons.Search, label: 'Brand Monitor', visible: hasVisibilityTracker },
         { href: '/dashboard/insights', icon: Icons.Layers, label: 'AI Tips', visible: hasAiTips },
     ].filter(item => item.visible);
@@ -51,16 +52,17 @@ export function DashboardSidebar({
         { href: '/dashboard/projects', icon: Icons.FolderKanban, label: 'Progetti', visible: canManageProjects },
         { href: '/dashboard/settings/members', icon: Icons.Users, label: 'Team', visible: true },
         { href: '/dashboard/billing', icon: Icons.CreditCard, label: 'Abbonamento', visible: true },
-        { href: '/dashboard/cms', icon: Icons.Globe, label: 'Gestione Sito', visible: hasCMSIntegration },
+        { href: '/dashboard/cms', icon: Icons.Globe, label: 'Contenuti AI', visible: hasCMSIntegration },
         {
             href: activeProjectId
                 ? `/dashboard/projects/${activeProjectId}/integrations`
                 : (projects?.length > 0 ? `/dashboard/projects/${projects[0].id}/integrations` : '/dashboard/projects'),
             icon: Icons.Link,
-            label: 'Connessioni',
+            label: 'Integrazioni',
             visible: true
         },
         { href: '/dashboard/templates', icon: Icons.LayoutTemplate, label: 'Template', visible: true },
+        { href: '/dashboard/settings', icon: Icons.Settings, label: 'Impostazioni', visible: true },
     ].filter(item => item.visible);
 
     const adminItems = [
@@ -70,6 +72,7 @@ export function DashboardSidebar({
         { href: '/dashboard/admin/users', icon: Icons.Users, label: 'Utenti' },
         { href: '/dashboard/admin/projects', icon: Icons.FolderKanban, label: 'Progetti' },
         { href: '/dashboard/admin/cms', icon: Icons.Link, label: 'CMS' },
+        { href: '/dashboard/settings', icon: Icons.Settings, label: 'Impostazioni piattaforma' },
     ];
 
     return (
@@ -216,20 +219,7 @@ export function DashboardSidebar({
                     )}
 
                     {/* Settings & Sign Out */}
-                    <div className="pt-1 flex items-center justify-between px-1">
-                        <Link
-                            href="/dashboard/settings"
-                            onClick={() => setIsOpen(false)}
-                            className={`
-                                flex items-center gap-2 px-2 py-1.5 rounded-lg
-                                text-xs font-medium transition-colors hover:bg-slate-50 text-slate-500
-                                ${pathname === '/dashboard/settings' ? 'text-slate-900 bg-slate-50' : ''}
-                            `}
-                        >
-                            <Icons.Settings size={16} />
-                            <span>Impostazioni</span>
-                        </Link>
-
+                    <div className="pt-1 flex items-center justify-end px-1">
                         <button
                             onClick={() => signOutAction()}
                             className="

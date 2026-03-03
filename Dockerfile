@@ -9,9 +9,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-# prisma/ must be copied before npm ci because postinstall runs `prisma generate`
+# prisma/ and prisma.config.ts must be copied before npm ci because postinstall runs `prisma generate`
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
+COPY prisma.config.ts ./
 RUN npm ci
 
 # Copy remaining source and build
@@ -27,4 +28,7 @@ RUN npm run build
 EXPOSE 8080
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["npm", "start"]
+# Run pre-start repair script (detects migration drift, rolls back phantom-applied
+# migrations, then runs prisma migrate deploy) before starting the app.
+# Uses pg directly to check actual table existence vs _prisma_migrations tracker.
+CMD ["sh", "-c", "node scripts/pre-start.js && npm start"]

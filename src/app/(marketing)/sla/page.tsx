@@ -304,7 +304,7 @@ export default function SLAPage() {
                     <li>Integrazioni con servizi terzi (Zapier, Webhooks custom del cliente)</li>
                     <li>Problemi causati da uso improprio o violazione dei Terms of Service</li>
                     <li>Attacchi DDoS o security incidents non dovuti a negligenza di Voler AI</li>
-                    <li>Downtime di provider terzi (OpenAI, Anthropic, Stripe, Neon, Vercel)</li>
+                    <li>Downtime di provider terzi (OpenAI, Anthropic, Stripe, Railway)</li>
                 </ul>
 
                 <h2>9. Miglioramento Continuo</h2>

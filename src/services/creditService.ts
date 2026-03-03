@@ -346,6 +346,8 @@ export const CreditService = {
                 Number(org.monthlyCreditsLimit)
             );
 
+        const now = new Date();
+
         let effectiveResetDate = org.creditsResetDate;
         if (!effectiveResetDate) {
             effectiveResetDate = org.subscription?.currentPeriodEnd || null;
@@ -356,7 +358,13 @@ export const CreditService = {
             effectiveResetDate = nextFromMonthly;
         }
         if (!effectiveResetDate) {
-            const now = new Date();
+            effectiveResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        }
+
+        // Guard: if every path produced a date in the past (e.g. cron missed a cycle,
+        // or monthlyResetDate is stale), advance to the 1st of next month so the UI
+        // always shows a future reset date.
+        if (effectiveResetDate <= now) {
             effectiveResetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         }
 
@@ -516,6 +524,7 @@ export const CreditService = {
             ai_tip_generation: 'ai_tips',
             copilot_message: 'copilot',
             copilot_analysis: 'copilot',
+            training_session_message: 'training',
             export_pdf_simple: 'export',
             export_pdf_analysis: 'export',
             export_csv: 'export'

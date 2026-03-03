@@ -7,9 +7,9 @@ import {
 
 describe('phase-flow', () => {
     describe('shouldInterceptTopicPhaseClosure', () => {
-        it('blocks premature completion/closure in SCAN or DEEP', () => {
+        it('blocks premature completion/closure in EXPLORE or DEEPEN', () => {
             expect(shouldInterceptTopicPhaseClosure({
-                phase: 'DEEP',
+                phase: 'DEEPEN',
                 isGoodbyeResponse: false,
                 isGoodbyeWithQuestion: false,
                 hasNoQuestion: false,
@@ -18,7 +18,7 @@ describe('phase-flow', () => {
             })).toBe(true);
 
             expect(shouldInterceptTopicPhaseClosure({
-                phase: 'SCAN',
+                phase: 'EXPLORE',
                 isGoodbyeResponse: false,
                 isGoodbyeWithQuestion: false,
                 hasNoQuestion: false,
@@ -29,7 +29,7 @@ describe('phase-flow', () => {
 
         it('does not block normal topic questions', () => {
             expect(shouldInterceptTopicPhaseClosure({
-                phase: 'DEEP',
+                phase: 'DEEPEN',
                 isGoodbyeResponse: false,
                 isGoodbyeWithQuestion: false,
                 hasNoQuestion: false,

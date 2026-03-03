@@ -7,10 +7,9 @@ import { planService } from '@/services/planService';
  * This should be run as a cron job on the 1st of each month at 00:00 UTC
  * 
  * Deployment options:
- * - Vercel Cron Jobs
+ * - Railway Cron
  * - GitHub Actions scheduled workflow
  * - External cron service (e.g., cron-job.org)
- * - Serverless function with scheduler
  */
 
 async function resetMonthlyCounters(): Promise<void> {

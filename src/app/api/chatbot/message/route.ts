@@ -4,6 +4,8 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { searchKnowledgeSources } from '@/lib/kb/semantic-search';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
 import {
     hasConfiguredScope,
     hasRecentHelpfulAssistantReply,
@@ -209,7 +211,7 @@ async function extractFieldFromMessage(
         const result = await generateObject({
             model: openai('gpt-4o-mini'),
             schema,
-            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
+            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${sanitize(userMessage)}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
             temperature: 0
         });
 
@@ -300,6 +302,13 @@ export async function POST(req: Request) {
         const session = conversation.chatbotSession;
         if (!session) return Response.json({ error: 'Session not found' }, { status: 404 });
 
+        // Verify the request comes from the session that owns this conversation
+        const requestSessionId = req.headers.get('x-session-id') ||
+            new URL(req.url).searchParams.get('sessionId');
+        if (!requestSessionId || session.sessionId !== requestSessionId) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const creditsCheck = await checkCreditsForAction(
             'chatbot_session_message',
             undefined,
@@ -337,6 +346,21 @@ export async function POST(req: Request) {
         let nextMissingField = isLeadCollectionEnabled
             ? getNextMissingField(candidateFields, candidateProfile, declinedFields)
             : null;
+
+        // Semantic KB retrieval: when the bot has many KB sources, filter to the
+        // most relevant ones for this specific message rather than stuffing all into the prompt.
+        const KB_SEMANTIC_THRESHOLD = 8; // use semantic search only when KB is large
+        if (Array.isArray(bot.knowledgeSources) && bot.knowledgeSources.length > KB_SEMANTIC_THRESHOLD) {
+            const relevantSources = await searchKnowledgeSources(bot.id, message, 5, 0.25);
+            if (relevantSources.length > 0) {
+                bot.knowledgeSources = relevantSources.map(r => ({
+                    id: r.id,
+                    title: r.title,
+                    content: r.content,
+                    type: r.type,
+                }));
+            }
+        }
 
         const systemPromptBase = buildChatbotPrompt(bot, session);
         const scopeLexicon = buildScopeLexicon(bot);
@@ -407,6 +431,7 @@ export async function POST(req: Request) {
                 try {
                     const smartDecision = await generateObject({
                         model: openai('gpt-4o-mini'),
+                        temperature: 0,
                         schema: z.object({
                             shouldAsk: z.boolean(),
                             reason: z.string().optional()
@@ -456,8 +481,8 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
         // If we have a missing field and triggered
         let justExtractedField: { field: string; value: string } | null = null;
 
-        // Initialize attempt count tracking
-        const fieldAttemptCounts: Record<string, number> = {};
+        // Initialize attempt count tracking — load persisted counts so auto-skip survives request boundaries
+        const fieldAttemptCounts: Record<string, number> = ((metadata.fieldAttemptCounts as Record<string, number>) ?? {});
 
         let shouldAttemptExtraction = false;
         if (nextMissingField && shouldCollect) {
@@ -500,7 +525,7 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
 
                     if (validationResult.isValid && extraction.value) {
                         candidateProfile[nextMissingField.field] = extraction.value;
-                        console.log(`✅ [CHATBOT] Field "${nextMissingField.field}" extracted: ${extraction.value}`);
+                        console.log(`✅ [CHATBOT] Field "${nextMissingField.field}" extracted successfully`);
 
                         // Save to database
                         await prisma.conversation.update({
@@ -516,12 +541,16 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
                             value: extraction.value
                         };
                     } else {
-                        // Field extraction failed - provide feedback and re-ask
-                        // TODO: Persist fieldAttemptCounts in database to enable auto-skip after 2 failures.
-                        // Currently fieldAttemptCounts is re-initialized every request, so attempt tracking doesn't persist.
-                        // Once persisted, add back: if (attemptCount >= 2) { auto-skip logic }
-                        console.log(`⚠️ [CHATBOT] Validation failed for "${nextMissingField.field}": ${validationResult.feedback}`);
-                        // Feedback will be included in next bot response (bot will acknowledge and re-ask with better explanation)
+                        // Field extraction failed — persist attempt count and auto-skip after 2 consecutive failures
+                        fieldAttemptCounts[nextMissingField.field] = attemptCount;
+                        console.log(`⚠️ [CHATBOT] Validation failed for "${nextMissingField.field}" (attempt ${attemptCount}): ${validationResult.feedback}`);
+                        if (attemptCount >= 2) {
+                            candidateProfile[nextMissingField.field] = '__SKIPPED__';
+                            declinedFields.add(nextMissingField.field);
+                            delete fieldAttemptCounts[nextMissingField.field];
+                            console.log(`⏭️ [CHATBOT] Auto-skipping "${nextMissingField.field}" after ${attemptCount} failed attempts`);
+                            nextMissingField = getNextMissingField(candidateFields, candidateProfile, declinedFields);
+                        }
                     }
                 }
             }
@@ -600,6 +629,7 @@ NON-NEGOTIABLE RULES
             try {
                 result = await generateObject({
                     model: openai('gpt-4o-mini'),
+                    temperature: 0,
                     schema,
                     schemaName: 'ChatbotResponse',
                     schemaDescription: 'A single response string from the chatbot assistant.',
@@ -659,7 +689,8 @@ NON-NEGOTIABLE RULES
             data: {
                 metadata: {
                     ...(metadata || {}),
-                    leadCapture
+                    leadCapture,
+                    fieldAttemptCounts,
                 }
             } as any
         });
@@ -759,14 +790,14 @@ function buildChatbotPrompt(bot: any, session: any): string {
         ? session.pageDescription.replace(/\s+/g, ' ').trim()
         : '';
     const pageContentSnippet = typeof session?.pageContent === 'string'
-        ? session.pageContent.replace(/\s+/g, ' ').trim().slice(0, 1600)
+        ? sanitize(session.pageContent.replace(/\s+/g, ' ').trim(), 1600)
         : '';
     const pageContextSection = shouldUsePageContext
         ? `
 ## PAGE CONTEXT
-Current page title: ${pageTitle || 'N/A'}
+Current page title: ${sanitize(pageTitle, 200) || 'N/A'}
 Current page URL: ${pageUrl || 'N/A'}
-Page description: ${pageDescription || 'N/A'}
+Page description: ${sanitize(pageDescription, 500) || 'N/A'}
 Visible page content snippet: ${pageContentSnippet || 'N/A'}
 `
         : '';

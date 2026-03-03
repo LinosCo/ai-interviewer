@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { normalizeBrandAliases, normalizeBrandName } from '@/lib/visibility/create-config';
 
 /**
  * GET /api/visibility/[configId]
@@ -123,7 +124,12 @@ export async function PATCH(
 
         // Update allowed fields only
         const updateData: any = {};
-        if (body.brandName !== undefined) updateData.brandName = body.brandName;
+        if (body.brandName !== undefined) updateData.brandName = normalizeBrandName(String(body.brandName));
+        if (body.brandAliases !== undefined) {
+            const effectiveBrandName = updateData.brandName || config.brandName;
+            updateData.brandAliases = normalizeBrandAliases(body.brandAliases)
+                .filter((alias) => alias.toLowerCase() !== String(effectiveBrandName).toLowerCase());
+        }
         if (body.category !== undefined) updateData.category = body.category;
         if (body.description !== undefined) updateData.description = body.description;
         if (body.language !== undefined) updateData.language = body.language;

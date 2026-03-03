@@ -12,11 +12,9 @@ import { CreditService } from '@/services/creditService';
 
 export async function POST(request: Request) {
     try {
-        // Verify cron secret
-        const cronSecret = request.headers.get('x-cron-secret');
-        const expectedSecret = process.env.CRON_SECRET;
-
-        if (!expectedSecret || cronSecret !== expectedSecret) {
+        // Auth: Bearer token obbligatorio per cron job
+        const authHeader = request.headers.get('authorization');
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
             return NextResponse.json(
                 { error: 'Non autorizzato' },
                 { status: 401 }

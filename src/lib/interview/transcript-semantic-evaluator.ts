@@ -1,8 +1,7 @@
 import { buildMessageAnchors, responseMentionsAnchors } from './topic-anchors';
-// NOTE: Disabled in v2 - quality pipeline removed
-// import { evaluateInterviewQuestionQuality, type QualitativePhase } from './qualitative-evaluator';
-// Backward compatible type that includes both old and new phase names for script compatibility
-export type QualitativePhase = 'EXPLORE' | 'DEEPEN' | 'DEEP_OFFER' | 'DATA_COLLECTION' | 'SCAN' | 'DEEP';
+import { evaluateInterviewQuestionQuality, type QualitativePhase } from './qualitative-evaluator';
+// Re-export the phase type for external consumers
+export type { QualitativePhase };
 
 export interface TranscriptSemanticTurn {
     role: 'user' | 'assistant';
@@ -124,26 +123,10 @@ function hasAnchorOverlap(aText: string, bText: string, language: string): boole
     return responseMentionsAnchors(bText || '', aRoots);
 }
 
-// NOTE: Disabled in v2 - quality pipeline removed
 export function evaluateTranscriptSemanticFlow(params: {
     turns: TranscriptSemanticTurn[];
     language?: string;
 }): TranscriptSemanticResult {
-    // Stub implementation - quality pipeline removed in v2
-    return {
-        passed: true,
-        score: 100,
-        evaluatedTurns: 0,
-        failedTurns: 0,
-        transitionTurns: 0,
-        transitionFailures: 0,
-        consentTurns: 0,
-        consentFailures: 0,
-        issues: [],
-        turns: []
-    };
-
-    /* DISABLED IN V2
     const language = params.language || 'it';
     const isItalian = language.toLowerCase().startsWith('it');
     const bridgePattern = isItalian ? BRIDGE_IT : BRIDGE_EN;
@@ -312,5 +295,4 @@ export function evaluateTranscriptSemanticFlow(params: {
         issues,
         turns: results
     };
-    */
 }

@@ -1,8 +1,105 @@
 import { prisma } from '@/lib/prisma';
 import { getSystemLLM } from '@/lib/visibility/llm-providers';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
+import { CONTENT_KIND_LABELS, type ContentKind } from '@/lib/cms/content-kinds';
+import { buildInsightActionMetadata } from '@/lib/insights/action-metadata';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+
+// ---------------------------------------------------------------------------
+// Optimization B: TTL in-memory cache (15-minute window)
+// Resets on cold start — acceptable for serverless; prevents LLM hammering.
+// ---------------------------------------------------------------------------
+interface SyncResult {
+    insights: any[];
+    healthReport: any;
+}
+const syncCache = new Map<string, { result: SyncResult; ts: number }>();
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+// ---------------------------------------------------------------------------
+// Optimization A: compact summarizers — replace large JSON.stringify blobs
+// Each helper picks only the 3-5 most signal-rich fields and caps strings.
+// ---------------------------------------------------------------------------
+
+/** Truncate a string to `max` chars, appending "…" if cut. */
+function trunc(value: string | null | undefined, max: number): string {
+    const s = (value ?? '').trim();
+    return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+/**
+ * Serialize an array compactly for LLM consumption.
+ * Each element is rendered as a single YAML-ish line so the model can parse
+ * it without the overhead of nested JSON braces/commas.
+ */
+function summarizeWebsite(items: Array<{ title: string; type: string; contentSnippet: string }>): string {
+    if (!items.length) return 'Nessuna fonte';
+    return items.map(s =>
+        `• [${s.type}] ${trunc(s.title, 60)}: ${trunc(s.contentSnippet, 150)}`
+    ).join('\n');
+}
+
+function summarizeChatbot(items: Array<{ gapsCount: number; sentiment: any; clusterCount: number; leads: any }>): string {
+    if (!items.length) return 'Nessun dato chatbot';
+    return items.map((a, i) =>
+        `• Bot ${i + 1}: gap=${a.gapsCount}, cluster=${a.clusterCount}, lead=${a.leads ?? 0}, sentiment=${trunc(String(a.sentiment ?? ''), 40)}`
+    ).join('\n');
+}
+
+function summarizeInterviews(items: Array<{
+    id: string; source: string; themes: any; quotes: string[]; sentiment: any; nps: any;
+}>): string {
+    if (!items.length) return 'Nessuna intervista';
+    return items.map(a => {
+        const themes = Array.isArray(a.themes) ? a.themes.slice(0, 3).join(', ') : trunc(String(a.themes ?? ''), 80);
+        const quote = a.quotes?.[0] ? `"${trunc(a.quotes[0], 130)}"` : '';
+        return `• #${a.id} (${a.source}) | temi: ${themes} | sentiment: ${a.sentiment ?? '?'} | nps: ${a.nps ?? '?'} ${quote ? `| citazione: ${quote}` : ''}`;
+    }).join('\n');
+}
+
+function summarizeVisibility(items: Array<{
+    platform: string; responseText: string; brandMentioned: any; competitors: any;
+}>): string {
+    if (!items.length) return 'Nessun dato visibilità';
+    return items.map(r =>
+        `• ${r.platform}: brand_menzionato=${r.brandMentioned ?? '?'} | "${trunc(r.responseText, 150)}"`
+    ).join('\n');
+}
+
+function summarizeSerp(serp: {
+    totalMentions: number;
+    sentimentBreakdown: { positive: number; negative: number; neutral?: number };
+    topCategories: any[];
+    recentAlerts: any[];
+} | null): string {
+    if (!serp) return 'Nessun dato SERP disponibile';
+    const cats = (serp.topCategories ?? []).slice(0, 3).map((c: any) => String(c)).join(', ');
+    const alerts = (serp.recentAlerts ?? []).slice(0, 2).map((a: any) => trunc(String(a?.title ?? a), 80)).join(' | ');
+    return `menzioni=${serp.totalMentions}, pos=${serp.sentimentBreakdown.positive}, neg=${serp.sentimentBreakdown.negative}` +
+        (cats ? `, categorie: ${cats}` : '') +
+        (alerts ? `, alert: ${alerts}` : '');
+}
+
+function summarizeWebAnalytics(wa: {
+    avgPageviews: number;
+    avgBounceRate: number;
+    topPages: any[];
+    searchQueries: any[];
+    lowPerformingPages: any[];
+} | null): string {
+    if (!wa) return 'Dati non disponibili - CMS non connesso o Google Analytics non configurato';
+    const pages = (wa.topPages as any[]).slice(0, 3).map((p: any) => trunc(String(p?.path ?? p), 50)).join(', ');
+    const queries = (wa.searchQueries as any[]).slice(0, 5).map((q: any) => trunc(String(q?.query ?? q), 40)).join(', ');
+    const bounce = (wa.avgBounceRate * 100).toFixed(1);
+    return `pageview_medi=${Math.round(wa.avgPageviews)}/giorno, bounce=${bounce}%` +
+        (pages ? `, top_pagine: ${pages}` : '') +
+        (queries ? `, query_ricerca: ${queries}` : '');
+}
+
+// ---------------------------------------------------------------------------
+// Zod Schemas (unchanged)
+// ---------------------------------------------------------------------------
 
 const ActionSchema = z.object({
     // Potentially automatable actions (only when required integrations are available)
@@ -23,7 +120,14 @@ const ActionSchema = z.object({
     target: z.enum(['chatbot', 'interview', 'visibility', 'website', 'pr', 'serp', 'strategy', 'product', 'marketing']),
     title: z.string().describe('Titolo breve e chiaro dell\'azione suggerita'),
     body: z.string().describe('Descrizione dettagliata dell\'azione da compiere'),
-    reasoning: z.string().describe('Spiegazione del perché questa azione è importante basata sui dati raccolti')
+    reasoning: z.string().describe('Spiegazione del perché questa azione è importante basata sui dati raccolti'),
+    strategicAlignment: z.string().describe('Come questa azione supporta visione strategica e value proposition'),
+    evidence: z.array(z.object({
+        sourceType: z.enum(['interview', 'chatbot', 'visibility', 'serp', 'analytics', 'kb', 'strategy', 'site_analysis']),
+        sourceRef: z.string().describe('Riferimento sintetico della fonte: es. interview#12ab, gsc:query=..., llm:ChatGPT'),
+        detail: z.string().describe('Evidenza concreta con numeri o pattern osservato')
+    })).min(1).max(4),
+    coordination: z.string().optional().describe('Come coordinare questa azione con altri canali (sito/social/interviste/PR)')
 });
 
 const InsightSchema = z.object({
@@ -57,7 +161,16 @@ const SyncResultSchema = z.object({
 });
 
 export class CrossChannelSyncEngine {
-    static async sync(organizationId: string, projectId?: string) {
+    static async sync(organizationId: string, projectId?: string): Promise<SyncResult> {
+        // ---------------------------------------------------------------------------
+        // Optimization B: return cached result if still fresh
+        // ---------------------------------------------------------------------------
+        const cacheKey = `${organizationId}::${projectId ?? '__org__'}`;
+        const cached = syncCache.get(cacheKey);
+        if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+            return cached.result;
+        }
+
         // 0. Fetch strategic context (project-level if available, otherwise org-level)
         let strategicVision: string | null = null;
         let valueProposition: string | null = null;
@@ -129,8 +242,6 @@ export class CrossChannelSyncEngine {
                 }
             });
         }
-
-        // 2-6 ... (skipping for BREVITY in replacement targetContent/content)
 
         // 2. Fetch Interview themes with conversation details for citations
         const analyses = await prisma.conversationAnalysis.findMany({
@@ -216,8 +327,8 @@ export class CrossChannelSyncEngine {
                 websiteAnalytics = {
                     avgPageviews: recentAnalytics.reduce((sum, a) => sum + a.pageviews, 0) / recentAnalytics.length,
                     avgBounceRate: recentAnalytics.reduce((sum, a) => sum + a.bounceRate, 0) / recentAnalytics.length,
-                    topPages: recentAnalytics[0]?.topPages || [],
-                    searchQueries: recentAnalytics[0]?.topSearchQueries || [],
+                    topPages: (recentAnalytics[0]?.topPages || []) as any[],
+                    searchQueries: (recentAnalytics[0]?.topSearchQueries || []) as any[],
                     lowPerformingPages: (recentAnalytics[0]?.topPages as any[] || [])
                         .filter((p: any) => p.bounceRate > 0.7)
                         .slice(0, 5)
@@ -235,6 +346,19 @@ export class CrossChannelSyncEngine {
             }
         })) > 0;
         const canAutoPublishToCms = Boolean(cmsConnection && ['ACTIVE', 'PARTIAL'].includes(cmsConnection.status));
+        const enabledRoutingKinds = projectId
+            ? new Set(
+                (await prisma.tipRoutingRule.findMany({
+                    where: { projectId, enabled: true },
+                    select: { contentKind: true }
+                })).map((rule) => rule.contentKind as ContentKind)
+            )
+            : new Set<ContentKind>();
+        const routingKindsSummary = enabledRoutingKinds.size > 0
+            ? Array.from(enabledRoutingKinds)
+                .map(kind => `${CONTENT_KIND_LABELS[kind] || kind} (${kind})`)
+                .join(', ')
+            : 'Nessuna regola di routing attiva';
 
         // 6. Summarize data for LLM with compact identifiers for citations
         const truncate = (value: string, max: number) => (value || '').slice(0, max);
@@ -290,7 +414,7 @@ export class CrossChannelSyncEngine {
         });
 
         const websiteSummary = limitArray(knowledgeSources, 8).map(s => ({
-            title: s.title,
+            title: s.title || '',
             type: s.type,
             contentSnippet: truncate(s.content || '', 220)
         }));
@@ -325,6 +449,39 @@ export class CrossChannelSyncEngine {
             if (best && best.score >= 0.38) return best;
             return null;
         };
+
+        const sourceEvidenceCatalog = [
+            'INTERVISTE:',
+            interviewSummary.length > 0
+                ? interviewSummary.slice(0, 6).map((i) =>
+                    `- interview#${i.id}: ${i.source}; temi=${Array.isArray(i.themes) ? i.themes.slice(0, 2).join(', ') : String(i.themes || '')}; quote=${(i.quotes || []).slice(0, 1).join(' | ')}`
+                ).join('\n')
+                : '- nessuna intervista',
+            'CHATBOT:',
+            chatbotSummary.length > 0
+                ? chatbotSummary.slice(0, 6).map((c, idx) =>
+                    `- chatbot#${idx + 1}: gaps=${c.gapsCount}; cluster=${c.clusterCount}; leads=${c.leads ?? 0}; sentiment=${String(c.sentiment ?? 'n/d')}`
+                ).join('\n')
+                : '- nessun dato chatbot',
+            'VISIBILITA LLM:',
+            visibilitySummary.length > 0
+                ? visibilitySummary.slice(0, 6).map((v, idx) =>
+                    `- llm#${idx + 1}:${v.platform}; brandMentioned=${String(v.brandMentioned)}; excerpt=${trunc(v.responseText || '', 90)}`
+                ).join('\n')
+                : '- nessun dato visibilita',
+            'SERP:',
+            serpSummary
+                ? `- serp: mentioni=${serpSummary.totalMentions}; positive=${serpSummary.sentimentBreakdown.positive}; negative=${serpSummary.sentimentBreakdown.negative}`
+                : '- nessun dato serp',
+            'ANALYTICS:',
+            websiteAnalytics
+                ? `- analytics: pageviews_medi=${Math.round(websiteAnalytics.avgPageviews || 0)}; bounce=${((websiteAnalytics.avgBounceRate || 0) * 100).toFixed(1)}%; top_queries=${((websiteAnalytics.searchQueries || []) as any[]).slice(0, 3).map((q: any) => String(q?.query || q)).join(', ')}`
+                : '- analytics non disponibili',
+            'KNOWLEDGE BASE:',
+            websiteSummary.length > 0
+                ? websiteSummary.slice(0, 6).map((k) => `- kb:${k.type}:${trunc(k.title, 50)}`).join('\n')
+                : '- nessuna fonte kb',
+        ].join('\n');
 
         // 7. Query LLM for Unified Evaluation
         const { model } = await getSystemLLM();
@@ -364,33 +521,27 @@ ${strategicContextText}
 =============================================================
 
 1️⃣ KNOWLEDGE BASE DEL CHATBOT (cosa risponde il chatbot):
-${JSON.stringify(websiteSummary)}
+${summarizeWebsite(websiteSummary)}
 
 2️⃣ ANALISI CHATBOT (gap, domande frequenti, sentiment):
-${JSON.stringify(chatbotSummary)}
+${summarizeChatbot(chatbotSummary)}
 
 3️⃣ FEEDBACK DALLE INTERVISTE (con ID per citazioni):
-${JSON.stringify(interviewSummary)}
+${summarizeInterviews(interviewSummary)}
 
 4️⃣ REPUTAZIONE SUGLI AI (ChatGPT, Claude, Perplexity):
-${JSON.stringify(visibilitySummary)}
+${summarizeVisibility(visibilitySummary)}
 
 5️⃣ MENZIONI SU GOOGLE/NEWS:
-${serpSummary ? JSON.stringify({
-                totalMentions: serpSummary.totalMentions,
-                sentimentBreakdown: serpSummary.sentimentBreakdown,
-                topCategories: serpSummary.topCategories,
-                recentAlerts: serpSummary.recentAlerts
-            }) : 'Nessun dato SERP disponibile'}
+${summarizeSerp(serpSummary)}
 
 6️⃣ ANALYTICS SITO WEB (Google Analytics + Search Console):
-${websiteAnalytics ? JSON.stringify({
-                avgPageviewsGiornalieri: Math.round(websiteAnalytics.avgPageviews),
-                bounceRateMedio: (websiteAnalytics.avgBounceRate * 100).toFixed(1) + '%',
-                paginePiuVisitate: (websiteAnalytics.topPages as any[]).slice(0, 5),
-                queryDiRicerca: (websiteAnalytics.searchQueries as any[]).slice(0, 10),
-                pagineConAltoBounce: websiteAnalytics.lowPerformingPages
-            }) : 'Dati non disponibili - CMS non connesso o Google Analytics non configurato'}
+${summarizeWebAnalytics(websiteAnalytics)}
+
+=============================================================
+📚 CATALOGO FONTI PER EVIDENZE (usa questi riferimenti nei tips)
+=============================================================
+${sourceEvidenceCatalog}
 
 =============================================================
 📈 HEALTH REPORT RICHIESTO
@@ -451,14 +602,28 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
    30-49: Ottimizzazione
    0-29: Nice-to-have
 
-6. MAX 5-7 INSIGHTS:
-   Genera solo i suggerimenti più impattanti e rilevanti.
+6. NUMERO INSIGHTS:
+   Con strategia definita genera 6-10 insights, ognuno con almeno 1 azione implementabile.
+   Se i dati sono pochi, genera meno ma non sotto 3.
 
 7. STRATEGIA MANCANTE:
    Se non c'è visione o value proposition definite, genera SOLO 1-2 suggerimenti per costruirle e fermati.
 
 8. CONTENUTI:
-   Per create_content/modify_content cita una KB o una query GSC rilevante. Se il contenuto esiste già, proponi un aggiornamento mirato (non un nuovo contenuto).`,
+   Per create_content/modify_content cita una KB o una query GSC rilevante. Se il contenuto esiste già, proponi un aggiornamento mirato (non un nuovo contenuto).
+
+9. AUTOMAZIONI E ROUTING:
+   Preferisci azioni già instradabili sulla piattaforma.
+   Routing disponibile nel progetto: ${routingKindsSummary}.
+   Quando proponi create_content/modify_content, specifica un output concreto pronto da trasformare in bozza (es. titolo pagina/articolo + struttura + CTA).
+
+10. EVIDENZE STRUTTURATE OBBLIGATORIE:
+   Ogni action deve compilare il campo evidence con almeno 2 fonti quando possibile (minimo 1 solo se davvero c'e scarsita dati).
+   Ogni evidenza deve avere sourceType, sourceRef e detail con dati concreti.
+
+11. COERENZA STRATEGICA E MULTI-CANALE:
+   Per insights con priorita >= 70, genera almeno 2 azioni coordinate su canali diversi (es. sito + social, sito + interviste, sito + PR).
+   Usa il campo coordination per spiegare la sequenza operativa tra canali.`,
             temperature: 0.15
         });
 
@@ -501,6 +666,62 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
         };
 
         const savedInsights: any[] = [];
+        const buildFallbackEvidence = () => {
+            const evidences: Array<{ sourceType: string; sourceRef: string; detail: string }> = [];
+
+            if (interviewSummary[0]) {
+                evidences.push({
+                    sourceType: 'interview',
+                    sourceRef: `interview#${interviewSummary[0].id}`,
+                    detail: `Tema principale: ${Array.isArray(interviewSummary[0].themes) ? interviewSummary[0].themes.slice(0, 1).join(', ') : 'n/d'}`
+                });
+            }
+            if (chatbotSummary[0]) {
+                evidences.push({
+                    sourceType: 'chatbot',
+                    sourceRef: 'chatbot:analytics',
+                    detail: `Gap=${chatbotSummary[0].gapsCount}, cluster=${chatbotSummary[0].clusterCount}, leads=${chatbotSummary[0].leads ?? 0}`
+                });
+            }
+            if (visibilitySummary[0]) {
+                evidences.push({
+                    sourceType: 'visibility',
+                    sourceRef: `llm:${visibilitySummary[0].platform}`,
+                    detail: `Brand mentioned=${String(visibilitySummary[0].brandMentioned)}`
+                });
+            }
+            if (serpSummary) {
+                evidences.push({
+                    sourceType: 'serp',
+                    sourceRef: 'serp:summary',
+                    detail: `Menzioni=${serpSummary.totalMentions}, positive=${serpSummary.sentimentBreakdown.positive}, negative=${serpSummary.sentimentBreakdown.negative}`
+                });
+            }
+            if (websiteAnalytics) {
+                evidences.push({
+                    sourceType: 'analytics',
+                    sourceRef: 'ga4+gsc:7d',
+                    detail: `Pageviews medie=${Math.round(websiteAnalytics.avgPageviews || 0)}, bounce=${((websiteAnalytics.avgBounceRate || 0) * 100).toFixed(1)}%`
+                });
+            }
+            if (websiteSummary[0]) {
+                evidences.push({
+                    sourceType: 'kb',
+                    sourceRef: `kb:${websiteSummary[0].type}`,
+                    detail: `Contenuto correlato: ${trunc(websiteSummary[0].title || 'fonte', 70)}`
+                });
+            }
+
+            if (evidences.length === 0) {
+                evidences.push({
+                    sourceType: 'strategy',
+                    sourceRef: 'strategic_context',
+                    detail: 'Evidenza minima disponibile: usare allineamento strategico e validare con nuovi dati.'
+                });
+            }
+            return evidences.slice(0, 3);
+        };
+
         const visibilityPayload = {
             visibilitySummary,
             websiteAnalytics: websiteAnalytics || null,
@@ -536,6 +757,9 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                     title: "Analisi Efficacia Brand & Sito",
                     body: `Soddisfazione Chatbot: ${object.healthReport.chatbotSatisfaction.score}%. Efficacia Sito: ${object.healthReport.websiteEffectiveness.score}%. Visibilità Brand: ${object.healthReport.brandVisibility.score}%.${serpSummary ? ` Menzioni Google: ${serpSummary.totalMentions} (${serpSummary.sentimentBreakdown.positive} positive, ${serpSummary.sentimentBreakdown.negative} negative).` : ''}`,
                     reasoning: object.healthReport.websiteEffectiveness.feedbackSummary,
+                    strategicAlignment: strategicVision || valueProposition || 'Allineare comunicazione e posizionamento ai bisogni reali emersi.',
+                    evidence: buildFallbackEvidence(),
+                    coordination: 'Usare questo health report come base per prioritizzare azioni sito, chatbot e visibilita nel prossimo sprint.',
                     autoApply: false
                 }
             ]
@@ -548,31 +772,57 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             seenTopics.add(rawInsight.topicName);
 
             const preparedActions = (rawInsight.suggestedActions || []).flatMap((action: any) => {
+                const metadata = buildInsightActionMetadata(action);
                 const match = findContentMatch(action.title || '', action.body || '');
                 if (action.type === 'add_faq' && match) {
                     return [];
                 }
                 if (action.type === 'create_content' && match) {
+                    const normalizedEvidence = Array.isArray(action.evidence) && action.evidence.length > 0
+                        ? action.evidence.slice(0, 4)
+                        : buildFallbackEvidence();
                     return [{
                         ...action,
                         type: 'modify_content',
                         target: 'website',
                         title: `Aggiorna contenuto esistente: ${match.title}`,
                         body: `${action.body}\n\nNota: contenuto simile già presente ("${match.title}"). Trasforma il suggerimento in un aggiornamento mirato di quel contenuto.`,
-                        validation: { status: 'duplicate', matchTitle: match.title, score: match.score }
+                        validation: { status: 'duplicate', matchTitle: match.title, score: match.score },
+                        evidence: normalizedEvidence,
+                        strategicAlignment: action.strategicAlignment || strategicVision || valueProposition || 'Allineamento con direzione strategica del progetto.',
+                        coordination: action.coordination || 'Dopo l\'aggiornamento pagina, sincronizzare snippet social o FAQ correlate.',
+                        workflowStatus: 'draft',
+                        ...metadata
                     }];
                 }
+                const normalizedEvidence = Array.isArray(action.evidence) && action.evidence.length > 0
+                    ? action.evidence.slice(0, 4)
+                    : buildFallbackEvidence();
+                const hasRoutingRule =
+                    Boolean(metadata.contentKind) &&
+                    (projectId ? enabledRoutingKinds.has(metadata.contentKind as ContentKind) : true);
                 const canAutoApply =
                     (action.type === 'add_faq' && hasChatbotInScope) ||
-                    ((action.type === 'create_content' || action.type === 'modify_content') && canAutoPublishToCms);
+                    (Boolean(metadata.contentKind) && canAutoPublishToCms && hasRoutingRule);
 
                 return [{
                     ...action,
+                    workflowStatus: 'draft',
                     autoApply: canAutoApply,
+                    evidence: normalizedEvidence,
+                    strategicAlignment: action.strategicAlignment || strategicVision || valueProposition || 'Allineamento con obiettivi strategici del brand.',
+                    coordination: action.coordination || (
+                        action.target === 'website'
+                            ? 'Coordinare con canali social/intervista per amplificazione e validazione dei messaggi.'
+                            : 'Coordinare con aggiornamenti sito per mantenere coerenza del messaggio.'
+                    ),
+                    ...metadata,
                     ...(match ? { validation: { status: 'overlap', matchTitle: match.title, score: match.score } } : {}),
                     automationRequirements: {
                         hasChatbotInScope,
-                        canAutoPublishToCms
+                        canAutoPublishToCms,
+                        hasRoutingRule,
+                        routedContentKind: metadata.contentKind
                     }
                 }];
             });
@@ -590,9 +840,16 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
             savedInsights.push(insight);
         }
 
-        return {
+        const result: SyncResult = {
             insights: savedInsights,
             healthReport: object.healthReport
         };
+
+        // ---------------------------------------------------------------------------
+        // Optimization B: store result in cache before returning
+        // ---------------------------------------------------------------------------
+        syncCache.set(cacheKey, { result, ts: Date.now() });
+
+        return result;
     }
 }

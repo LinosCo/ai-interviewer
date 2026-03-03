@@ -266,5 +266,11 @@ export const Icons = {
     ChevronDown: (props: IconProps) => <ChevronDown {...props} />,
     Brain: (props: IconProps) => <Brain {...props} />,
     Timer: (props: IconProps) => <Timer {...props} />,
-    Activity: (props: IconProps) => <Activity {...props} />
+    Activity: (props: IconProps) => <Activity {...props} />,
+    GraduationCap: ({ size = 20, color = 'currentColor', ...props }: IconProps) => (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...props}>
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+            <path d="M6 12v5c3 3 9 3 12 0v-5" />
+        </svg>
+    ),
 };

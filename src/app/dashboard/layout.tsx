@@ -170,7 +170,6 @@ export default async function DashboardLayout({
                 {/* Strategy Copilot - AI Assistant */}
                 <StrategyCopilot
                     userTier={userTier}
-                    organizationId={organizationId}
                 />
             </div>
         </DashboardProviders>

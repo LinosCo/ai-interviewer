@@ -40,6 +40,40 @@ import {
     buildMicroPlannerPromptBlock
 } from '@/lib/interview/micro-planner';
 
+import {
+    InterestingTopic, TopicBudget,
+    extractSnippet, computeEngagementScore, shouldUseCriticalModelForTopicTurn,
+    ITALIAN_STOPWORDS, ENGLISH_STOPWORDS, tokenizeForScoring, lexicalOverlapScore,
+    buildTopicSemanticText, getDeepTopics, buildDeepTopicOrder,
+    getScanPlanTurns, getDeepPlanTurns, getRemainingSubGoals,
+    buildDeepPlan, selectDeepFocusPoint, buildExtensionPreviewHints,
+    sanitizeUserSnippet,
+} from '@/lib/chat/context-helpers';
+import {
+    isExtensionOfferQuestion, generateConsentQuestionOnly, generateFieldQuestionOnly,
+    extractLastAssistantQuestion, buildUserBridgeHint,
+    buildRuntimeSemanticContextPrompt,
+    normalizeSingleQuestion,
+    collectRecentBridgeStems,
+    detectUserTurnSignal, isClarificationHandledResponse,
+    isScopeBoundaryHandledResponse, buildNaturalTopicCue,
+    type UserTurnSignal,
+} from '@/lib/chat/response-builder';
+import {
+    extractFieldFromMessage,
+    checkUserIntent,
+    detectExplicitClosureIntent,
+    type LLMUsageCollector,
+    type LLMUsagePayload,
+} from '@/lib/interview/chat-intent';
+import {
+    generateQuestionOnly,
+    generateDeepOfferOnly,
+    enforceDeepOfferQuestion,
+} from '@/lib/interview/question-generator';
+import { completeInterview } from '@/lib/interview/interview-completion';
+import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
+import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
 export const maxDuration = 60;
 
 // ============================================================================
@@ -65,21 +99,6 @@ function isLocalSimulationRequest(req: Request): boolean {
 // ============================================================================
 // TYPES
 // ============================================================================
-interface InterestingTopic {
-    topicId: string;
-    topicLabel: string;
-    engagementScore: number;  // 0-1 based on response length
-    bestSnippet?: string;
-}
-
-interface TopicBudget {
-    baseTurns: number;
-    minTurns: number;
-    maxTurns: number;
-    turnsUsed: number;
-    bonusTurnsGranted: number;
-}
-
 export interface InterviewState {
     phase: Phase;
     topicIndex: number;
@@ -138,18 +157,6 @@ interface FlowGuardTelemetry {
     questionDedupIntercepted: boolean;
 }
 
-interface LLMUsagePayload {
-    inputTokens?: number | null;
-    outputTokens?: number | null;
-    totalTokens?: number | null;
-}
-
-type LLMUsageCollector = (payload: {
-    source: string;
-    model?: string | null;
-    usage?: LLMUsagePayload | null;
-}) => void;
-
 const ChatRequestSchema = z.object({
     messages: z.array(z.object({
         role: z.enum(['user', 'assistant', 'system']),
@@ -163,1337 +170,6 @@ const ChatRequestSchema = z.object({
 });
 
 type ClientMessage = z.infer<typeof ChatRequestSchema>['messages'][number];
-
-// ============================================================================ 
-// HELPERS: Engagement scoring and snippets
-// ============================================================================
-function extractSnippet(text: string, maxLen: number = 120): string {
-    const clean = text.replace(/\s+/g, ' ').trim();
-    if (!clean) return '';
-    // Prefer first sentence if available
-    const firstSentence = clean.split(/[.!?]/)[0]?.trim();
-    const snippet = (firstSentence && firstSentence.length >= 20) ? firstSentence : clean;
-    return snippet.length > maxLen ? snippet.slice(0, maxLen - 1) + '…' : snippet;
-}
-
-function computeEngagementScore(text: string, language: string): number {
-    const clean = text.trim();
-    if (!clean) return 0;
-
-    const words = clean.split(/\s+/).length;
-    const lengthScore = Math.min(1, words / 60);
-
-    const examplePattern = language === 'it'
-        ? /\b(ad esempio|per esempio|ad es\.|esempio)\b/i
-        : /\b(for example|for instance|e\.g\.)\b/i;
-    const hasExample = examplePattern.test(clean) ? 1 : 0;
-
-    const hasNumbers = /\b\d{1,4}\b/.test(clean) ? 1 : 0;
-
-    const specificityPattern = language === 'it'
-        ? /\b(srl|spa|s\.p\.a|snc|sas|societ[aà]|azienda|cliente|fornitore)\b/i
-        : /\b(ltd|inc|llc|gmbh|company|client|customer|supplier)\b/i;
-    const hasSpecificity = specificityPattern.test(clean) ? 1 : 0;
-
-    const emotionPattern = language === 'it'
-        ? /\b(adoro|odio|frustrante|entusiasmante|deluso|soddisfatto|preoccupato)\b/i
-        : /\b(love|hate|frustrating|exciting|disappointed|satisfied|concerned)\b/i;
-    const hasEmotion = emotionPattern.test(clean) ? 1 : 0;
-
-    const score = (
-        lengthScore * 0.4 +
-        hasExample * 0.2 +
-        hasNumbers * 0.15 +
-        hasSpecificity * 0.15 +
-        hasEmotion * 0.1
-    );
-
-    return Math.max(0, Math.min(1, score));
-}
-
-function shouldUseCriticalModelForTopicTurn(params: {
-    phase: Phase;
-    supervisorStatus?: string;
-    userTurnSignal: 'none' | 'clarification' | 'off_topic_question';
-    userMessage?: string | null;
-    language: string;
-}): { useCritical: boolean; reason: string } {
-    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') {
-        return { useCritical: false, reason: 'not_topic_phase' };
-    }
-
-    if (params.userTurnSignal === 'clarification') {
-        return { useCritical: true, reason: 'clarification_turn' };
-    }
-    if (params.userTurnSignal === 'off_topic_question') {
-        return { useCritical: true, reason: 'scope_recovery_turn' };
-    }
-
-    const supervisorStatus = String(params.supervisorStatus || '');
-    if (supervisorStatus === 'TRANSITION' || supervisorStatus === 'START_DEEP' || supervisorStatus === 'START_DEEP_BRIEF') {
-        return { useCritical: true, reason: 'topic_transition_turn' };
-    }
-
-    const userMessage = String(params.userMessage || '').trim();
-    const userWords = userMessage.split(/\s+/).filter(Boolean).length;
-    const signalScore = userMessage ? computeEngagementScore(userMessage, params.language) : 0;
-    const highSignalAnswer = userWords >= 35 || signalScore >= 0.28;
-    if (supervisorStatus === 'DEEPENING' && highSignalAnswer) {
-        return { useCritical: true, reason: 'high_signal_deepening' };
-    }
-
-    return { useCritical: false, reason: 'standard_turn' };
-}
-
-const ITALIAN_STOPWORDS = new Set([
-    'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'uno', 'una',
-    'di', 'a', 'da', 'in', 'con', 'su', 'per', 'tra', 'fra',
-    'e', 'o', 'ma', 'se', 'che', 'non', 'piu', 'più',
-    'del', 'dello', 'della', 'dei', 'degli', 'delle',
-    'al', 'allo', 'alla', 'ai', 'agli', 'alle',
-    'nel', 'nello', 'nella', 'nei', 'negli', 'nelle'
-]);
-const ENGLISH_STOPWORDS = new Set([
-    'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then',
-    'of', 'to', 'in', 'on', 'at', 'for', 'with', 'from', 'by', 'as',
-    'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'this', 'that', 'these', 'those', 'it', 'its', 'their', 'them'
-]);
-
-function tokenizeForScoring(text: string, language: string): Set<string> {
-    const source = String(text || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .split(/\s+/)
-        .map(t => t.trim())
-        .filter(Boolean);
-
-    const stopwords = language === 'it' ? ITALIAN_STOPWORDS : ENGLISH_STOPWORDS;
-    const tokens = source.filter(t => t.length >= 3 && !stopwords.has(t));
-    return new Set(tokens);
-}
-
-function lexicalOverlapScore(aText: string, bText: string, language: string): number {
-    const a = tokenizeForScoring(aText, language);
-    const b = tokenizeForScoring(bText, language);
-    if (!a.size || !b.size) return 0;
-
-    let intersection = 0;
-    for (const token of a) {
-        if (b.has(token)) intersection++;
-    }
-    return intersection / Math.max(1, Math.min(a.size, b.size));
-}
-
-function buildTopicSemanticText(topic: any): string {
-    const subGoals = Array.isArray(topic?.subGoals) ? topic.subGoals.join(' ') : '';
-    return `${topic?.label || ''} ${subGoals}`.trim();
-}
-
-function getDeepTopics(botTopics: any[], deepOrder?: string[]) {
-    if (!deepOrder || deepOrder.length === 0) return botTopics;
-    return deepOrder
-        .map(id => botTopics.find(t => t.id === id))
-        .filter(Boolean);
-}
-
-function buildDeepTopicOrder(
-    botTopics: any[],
-    interestingTopics: InterestingTopic[] | undefined,
-    history?: Record<string, string[]>,
-    interviewObjective?: string,
-    language: string = 'en'
-): string[] {
-    const scored = botTopics.map((t, idx) => {
-        const match = (interestingTopics || []).find(it => it.topicId === t.id);
-        const remainingSubGoals = getRemainingSubGoals(t, history).length;
-        const totalSubGoals = Math.max(1, Array.isArray(t?.subGoals) ? t.subGoals.length : 1);
-        const uncoveredRatio = Math.max(0, Math.min(1, remainingSubGoals / totalSubGoals));
-        const topicText = buildTopicSemanticText(t);
-        const snippetText = match?.bestSnippet || '';
-        const interestScore = match?.engagementScore ?? 0;
-        const snippetAlignment = snippetText
-            ? lexicalOverlapScore(topicText, snippetText, language)
-            : 0;
-        const objectiveAlignment = interviewObjective
-            ? lexicalOverlapScore(topicText, interviewObjective, language)
-            : 0;
-        // Naturalness-first weighting:
-        // 1) what remains uncovered, 2) what sounded interesting, 3) what aligns with interview objective.
-        const priorityScore = (
-            uncoveredRatio * 0.4 +
-            interestScore * 0.25 +
-            snippetAlignment * 0.15 +
-            objectiveAlignment * 0.2
-        );
-
-        return {
-            id: t.id,
-            score: priorityScore,
-            remainingSubGoals,
-            idx
-        };
-    }).sort((a, b) =>
-        (b.remainingSubGoals - a.remainingSubGoals) ||
-        (b.score - a.score) ||
-        (a.idx - b.idx)
-    );
-
-    return scored.map(s => s.id);
-}
-
-function getScanPlanTurns(plan: InterviewPlan, topicId: string): number {
-    const topic = plan.explore.topics.find(t => t.topicId === topicId);
-    return Math.max(1, topic?.maxTurns ?? 1);
-}
-
-function getDeepPlanTurns(plan: InterviewPlan, topicId: string): number {
-    const base = plan.deepen.maxTurnsPerTopic;
-    return Math.max(1, base);
-}
-
-function getRemainingSubGoals(topic: any, history: Record<string, string[]> | undefined) {
-    const used = (history || {})[topic.id] || [];
-    return (topic.subGoals || []).filter((sg: string) => !used.includes(sg));
-}
-
-function buildDeepPlan(
-    botTopics: any[],
-    plan: InterviewPlan,
-    history: Record<string, string[]> | undefined,
-    interestingTopics: InterestingTopic[] | undefined,
-    remainingSec?: number,
-    interviewObjective?: string,
-    language: string = 'en'
-) {
-    const topicsWithRemaining = botTopics.filter(t => getRemainingSubGoals(t, history).length > 0);
-    if (topicsWithRemaining.length > 0) {
-        const ordered = buildDeepTopicOrder(
-            botTopics,
-            interestingTopics,
-            history,
-            interviewObjective,
-            language
-        ).filter(id =>
-            topicsWithRemaining.some(t => t.id === id)
-        );
-        const deepTurnsByTopic: Record<string, number> = {};
-
-        // Naturalness-first allocation:
-        // - guarantee at least 1 turn per remaining topic
-        // - then add extra turns in priority order, capped by uncovered sub-goals and plan max.
-        const availableTurnsRaw = typeof remainingSec === 'number'
-            ? Math.floor(Math.max(0, remainingSec) / 45)
-            : ordered.length * (plan.deepen.maxTurnsPerTopic || 2);
-        const availableTurns = Math.max(ordered.length, availableTurnsRaw);
-
-        for (const topicId of ordered) {
-            deepTurnsByTopic[topicId] = 1;
-        }
-
-        const maxTurnsByTopic: Record<string, number> = {};
-        for (const topicId of ordered) {
-            const topic = botTopics.find(t => t.id === topicId);
-            if (!topic) continue;
-            const remainingSubGoals = getRemainingSubGoals(topic, history).length;
-            const planMax = getDeepPlanTurns(plan, topicId);
-            maxTurnsByTopic[topicId] = Math.max(1, Math.min(planMax, remainingSubGoals));
-        }
-
-        let remainingBudget = Math.max(0, availableTurns - ordered.length);
-        while (remainingBudget > 0) {
-            let allocatedInRound = false;
-            for (const topicId of ordered) {
-                if (remainingBudget <= 0) break;
-                const current = deepTurnsByTopic[topicId] || 1;
-                const maxForTopic = maxTurnsByTopic[topicId] || 1;
-                if (current < maxForTopic) {
-                    deepTurnsByTopic[topicId] = current + 1;
-                    remainingBudget -= 1;
-                    allocatedInRound = true;
-                }
-            }
-            if (!allocatedInRound) break;
-        }
-        return { deepTopicOrder: ordered, deepTurnsByTopic };
-    }
-
-    const fallbackCount = Math.max(1, plan.deepen.fallbackTurns || 2);
-    const ordered = buildDeepTopicOrder(
-        botTopics,
-        interestingTopics,
-        history,
-        interviewObjective,
-        language
-    ).slice(0, fallbackCount);
-    const deepTurnsByTopic: Record<string, number> = {};
-    ordered.forEach(id => {
-        deepTurnsByTopic[id] = 1;
-    });
-    return { deepTopicOrder: ordered, deepTurnsByTopic };
-}
-
-function selectDeepFocusPoint(params: {
-    topic: any;
-    availableSubGoals: string[];
-    engagingSnippet?: string;
-    interviewObjective?: string;
-    lastUserMessage?: string;
-    language: string;
-}): string {
-    const { topic, availableSubGoals, engagingSnippet, interviewObjective, lastUserMessage, language } = params;
-    if (!availableSubGoals || availableSubGoals.length === 0) {
-        return topic?.label || '';
-    }
-
-    const contextText = [engagingSnippet || '', lastUserMessage || '']
-        .filter(Boolean)
-        .join(' ')
-        .trim();
-    const objectiveText = String(interviewObjective || '').trim();
-
-    let bestSubGoal = availableSubGoals[0];
-    let bestScore = -1;
-
-    for (const subGoal of availableSubGoals) {
-        const objectiveScore = objectiveText
-            ? lexicalOverlapScore(subGoal, objectiveText, language)
-            : 0;
-        const contextScore = contextText
-            ? lexicalOverlapScore(subGoal, contextText, language)
-            : 0;
-        const score = objectiveScore * 0.6 + contextScore * 0.4;
-
-        if (score > bestScore) {
-            bestScore = score;
-            bestSubGoal = subGoal;
-        }
-    }
-
-    return bestSubGoal;
-}
-
-function buildExtensionPreviewHints(params: {
-    botTopics: any[];
-    deepOrder?: string[];
-    history?: Record<string, string[]>;
-    interestingTopics?: InterestingTopic[];
-    interviewObjective?: string;
-    language: string;
-    startIndex?: number;
-    maxItems?: number;
-}): string[] {
-    const {
-        botTopics,
-        deepOrder,
-        history,
-        interestingTopics,
-        interviewObjective,
-        language,
-        startIndex = 0,
-        maxItems = 2
-    } = params;
-
-    const deepTopics = getDeepTopics(botTopics, deepOrder);
-    const baseTopics = deepTopics.length > 0 ? deepTopics : botTopics;
-    if (!baseTopics.length) return [];
-
-    const safeStart = Math.max(0, Math.min(startIndex, Math.max(0, baseTopics.length - 1)));
-    const rotatedTopics = [
-        ...baseTopics.slice(safeStart),
-        ...baseTopics.slice(0, safeStart)
-    ];
-
-    const preview: string[] = [];
-    for (const topic of rotatedTopics) {
-        const availableSubGoals = getRemainingSubGoals(topic, history);
-        if (availableSubGoals.length === 0) continue;
-
-        const engagingSnippet = (interestingTopics || []).find(
-            (it: InterestingTopic) => it.topicId === topic.id
-        )?.bestSnippet || '';
-
-        const focusPoint = selectDeepFocusPoint({
-            topic,
-            availableSubGoals,
-            engagingSnippet,
-            interviewObjective,
-            lastUserMessage: '',
-            language
-        });
-
-        const compactFocus = sanitizeUserSnippet(focusPoint, 10) || focusPoint;
-        preview.push(compactFocus || topic.label);
-        if (preview.length >= maxItems) break;
-    }
-
-    if (preview.length > 0) return preview;
-    return rotatedTopics.slice(0, maxItems).map(t => t.label).filter(Boolean);
-}
-
-// ============================================================================
-// HELPER: Extract field from user message
-// ============================================================================
-async function extractFieldFromMessage(
-    fieldName: string,
-    userMessage: string,
-    apiKey: string,
-    language: string = 'en',
-    options?: { onUsage?: LLMUsageCollector }
-): Promise<{ value: string | null; confidence: 'high' | 'low' | 'none' }> {
-    const openai = createOpenAI({ apiKey });
-
-    const fieldDescriptions: Record<string, string> = {
-        name: language === 'it'
-            ? 'Nome della persona (può essere solo nome, o nome e cognome)'
-            : 'Name of the person (can be first name only, or full name)',
-        fullName: language === 'it'
-            ? 'Nome della persona (può essere solo nome, o nome e cognome)'
-            : 'Name of the person (can be first name only, or full name)',
-        email: language === 'it' ? 'Indirizzo email' : 'Email address',
-        phone: language === 'it' ? 'Numero di telefono' : 'Phone number',
-        company: language === 'it' ? 'Nome dell\'azienda o organizzazione' : 'Company or organization name',
-        linkedin: language === 'it' ? 'URL del profilo LinkedIn o social' : 'LinkedIn or social profile URL',
-        portfolio: language === 'it' ? 'URL del portfolio o sito web personale' : 'Portfolio or personal website URL',
-        role: language === 'it' ? 'Ruolo o posizione lavorativa' : 'Job role or position',
-        location: language === 'it' ? 'Città o località' : 'City or location',
-        budget: language === 'it' ? 'Budget disponibile' : 'Available budget',
-        availability: language === 'it' ? 'Disponibilità temporale' : 'Time availability'
-    };
-
-    const schema = z.object({
-        extractedValue: z.string().nullable(),
-        confidence: z.enum(['high', 'low', 'none'])
-    });
-
-    try {
-        // Field-specific extraction rules
-        let fieldSpecificRules = '';
-        if (fieldName === 'name' || fieldName === 'fullName') {
-            fieldSpecificRules = `\n- For name: Accept first name only (e.g., "Marco", "Franco", "Anna"). Don't require full name.\n- If the message contains a word that looks like a name, extract it.`;
-        } else if (fieldName === 'company') {
-            fieldSpecificRules = `\n- For company: Look for business names, often ending in spa, srl, ltd, inc, llc, or containing words like "azienda", "società", "company".\n- Extract the company name even if mixed with other info (e.g., "Ferri spa e sono ceo" → extract "Ferri spa").\n- Accept any business/organization name the user provides.`;
-        } else if (fieldName === 'role') {
-            fieldSpecificRules = `\n- For role: Look for job titles like CEO, CTO, manager, developer, designer, etc.\n- Extract the role even if mixed with other info (e.g., "Ferri spa e sono ceo" → extract "ceo").`;
-        }
-
-        const result = await generateObject({
-            model: openai('gpt-4o-mini'),
-            schema,
-            prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${userMessage}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
-            temperature: 0
-        });
-        options?.onUsage?.({
-            source: 'extract_field_from_message',
-            model: 'gpt-4o-mini',
-            usage: (result as any)?.usage
-        });
-        return { value: result.object.extractedValue, confidence: result.object.confidence };
-    } catch (e) {
-        console.error(`Field extraction failed for "${fieldName}":`, e);
-        return { value: null, confidence: 'none' };
-    }
-}
-
-// ============================================================================
-// HELPER: Check user intent (consent/refusal/neutral)
-// ============================================================================
-async function checkUserIntent(
-    userMessage: string,
-    apiKey: string,
-    language: string,
-    context: 'consent' | 'deep_offer' | 'stop_confirmation',
-    options?: { onUsage?: LLMUsageCollector }
-): Promise<'ACCEPT' | 'REFUSE' | 'NEUTRAL'> {
-    const normalized = String(userMessage || '')
-        .trim()
-        .toLowerCase()
-        .replace(/[!?.,;:()\[\]"]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    // Fast-path deterministic intent for extension consent to avoid accidental accepts
-    // on unrelated content replies.
-    if (context === 'deep_offer') {
-        if (isClarificationSignal(userMessage, language)) return 'NEUTRAL';
-
-        const refuseSet = new Set([
-            'no',
-            'no grazie',
-            'direi di no',
-            'anche no',
-            'non ora',
-            'meglio di no',
-            'preferisco di no',
-            'stop',
-            'basta'
-        ]);
-        const acceptSet = new Set([
-            'si',
-            'sì',
-            'yes',
-            'ok',
-            'va bene',
-            'certo',
-            'volontieri',
-            'continuiamo',
-            'proseguiamo',
-            'andiamo avanti'
-        ]);
-
-        if (refuseSet.has(normalized)) return 'REFUSE';
-        if (acceptSet.has(normalized)) return 'ACCEPT';
-
-        const refusePattern = /\b(non voglio continuare|non continuare|abbiamo gia parlato troppo|chiudiamo qui|fermiamoci|preferisco chiudere)\b/i;
-        if (refusePattern.test(normalized)) return 'REFUSE';
-
-        const acceptPattern = /\b(voglio continuare|possiamo continuare|continuiamo|proseguiamo|andiamo avanti|estendiamo)\b/i;
-        if (acceptPattern.test(normalized)) return 'ACCEPT';
-    }
-
-    const openai = createOpenAI({ apiKey });
-
-    const contextPrompts = {
-        consent: `The system asked for contact details. Did the user agree?`,
-        deep_offer: `The system asked whether the user wants to EXTEND the interview by a few minutes to continue. Did the user accept?`,
-        stop_confirmation: `The system noticed the user might be tired or wants to stop, and asked for confirmation to conclude. Did the user confirm they want to STOP?`
-    };
-
-    const schema = z.object({
-        intent: z.enum(['ACCEPT', 'REFUSE', 'NEUTRAL']),
-        reason: z.string()
-    });
-
-    try {
-        const classificationHints = context === 'consent'
-            ? `ACCEPT = user agrees to share contact details; REFUSE = user declines; NEUTRAL = unrelated`
-            : context === 'deep_offer'
-                ? `ACCEPT = user explicitly agrees to extend/continue; REFUSE = user declines extension; NEUTRAL = unrelated or just answers content`
-                : `ACCEPT = user confirms they want to stop; REFUSE = user wants to continue; NEUTRAL = unclear`;
-        const result = await generateObject({
-            model: openai('gpt-4o-mini'),
-            schema,
-            prompt: `${contextPrompts[context]}\nLanguage: ${language}\nUser message: "${userMessage}"\n\nClassify intent. ${classificationHints}.`,
-            temperature: 0
-        });
-        options?.onUsage?.({
-            source: `check_user_intent_${context}`,
-            model: 'gpt-4o-mini',
-            usage: (result as any)?.usage
-        });
-        return result.object.intent;
-    } catch (e) {
-        console.error('Intent check failed:', e);
-        return 'NEUTRAL';
-    }
-}
-
-// ============================================================================
-// HELPER: Detect explicit user intent to conclude the interview now
-// ============================================================================
-async function detectExplicitClosureIntent(
-    userMessage: string,
-    apiKey: string,
-    language: string,
-    options?: { onUsage?: LLMUsageCollector }
-): Promise<{ wantsToConclude: boolean; confidence: 'high' | 'medium' | 'low'; reason: string }> {
-    const text = String(userMessage || '').trim();
-    if (!text) {
-        return { wantsToConclude: false, confidence: 'low', reason: 'empty_message' };
-    }
-
-    const openai = createOpenAI({ apiKey });
-    const schema = z.object({
-        wantsToConclude: z.boolean().describe('True only when the user explicitly wants to stop/conclude now.'),
-        confidence: z.enum(['high', 'medium', 'low']),
-        reason: z.string()
-    });
-
-    try {
-        const result = await generateObject({
-            model: openai('gpt-4o-mini'),
-            schema,
-            prompt: [
-                `Classify interviewee intent from a single message.`,
-                `Language: ${language}`,
-                `User message: "${text}"`,
-                ``,
-                `Return wantsToConclude=true ONLY if the user is explicitly asking to stop/end/conclude now, or clearly refusing to continue now.`,
-                `Return false for normal topic answers, generic frustration without explicit stop request, uncertainty, or unrelated content.`,
-                `Be strict: avoid false positives.`
-            ].join('\n'),
-            temperature: 0
-        });
-        options?.onUsage?.({
-            source: 'detect_explicit_closure_intent',
-            model: 'gpt-4o-mini',
-            usage: (result as any)?.usage
-        });
-        return result.object;
-    } catch (e) {
-        console.error('Explicit closure intent detection failed:', e);
-        return { wantsToConclude: false, confidence: 'low', reason: 'detection_error' };
-    }
-}
-
-async function generateQuestionOnly(params: {
-    model: any;
-    language: string;
-    topicLabel: string;
-    topicCue?: string | null;
-    subGoal?: string | null;
-    lastUserMessage?: string | null;
-    previousAssistantQuestion?: string | null;
-    semanticBridgeHint?: string | null;
-    avoidBridgeStems?: string[];
-    requireAcknowledgment?: boolean;
-    transitionMode?: 'bridge' | 'clean_pivot';
-    onUsage?: LLMUsageCollector;
-}) {
-    const {
-        model,
-        language,
-        topicLabel,
-        topicCue,
-        subGoal,
-        lastUserMessage,
-        previousAssistantQuestion,
-        semanticBridgeHint,
-        avoidBridgeStems,
-        requireAcknowledgment,
-        transitionMode
-    } = params;
-    const questionSchema = z.object({
-        question: z.string().describe("A single interview question ending with a question mark.")
-    });
-
-    const structureInstruction = requireAcknowledgment
-        ? `Output structure: (1) one short acknowledgment sentence; (2) one specific question.`
-        : `Output structure: one concise question.`;
-    const transitionInstruction = transitionMode === 'bridge'
-        ? `Transition mode: bridge naturally from the user's point to "${topicLabel}" without literal quotes.`
-        : transitionMode === 'clean_pivot'
-            ? `Transition mode: clean pivot. Use a neutral acknowledgment and do not paraphrase irrelevant user details.`
-            : null;
-    const diagnosticHint = buildSoftDiagnosticHint({
-        language,
-        lastUserMessage: lastUserMessage || '',
-        topicLabel,
-        subGoal: subGoal || ''
-    });
-
-    const prompt = [
-        `Language: ${language}`,
-        `Topic title (internal): ${topicLabel}`,
-        topicCue ? `Natural topic cue for user-facing wording: ${topicCue}` : null,
-        subGoal ? `Sub-goal: ${subGoal}` : null,
-        lastUserMessage ? `User last message: "${lastUserMessage}"` : null,
-        previousAssistantQuestion ? `Previous assistant question to avoid repeating: "${previousAssistantQuestion}"` : null,
-        avoidBridgeStems && avoidBridgeStems.length > 0
-            ? `Do NOT reuse these recent bridge openings (normalized): ${avoidBridgeStems.slice(0, 8).join(' | ')}`
-            : null,
-        semanticBridgeHint ? `Bridge hint: ${semanticBridgeHint}` : null,
-        `Acknowledgment quality: reference one concrete detail from the user's message (fact, constraint, example, or cause/effect).`,
-        `Avoid stock openers like "molto interessante", "e un punto importante", "grazie per aver condiviso", "very interesting", "that's an important point", "thanks for sharing".`,
-        `Prefer concrete follow-ups over broad prompts like "cosa ne pensi?" / "what do you think?" unless no better signal is available.`,
-        diagnosticHint || null,
-        structureInstruction,
-        transitionInstruction,
-        `Task: Ask exactly ONE concise interview question about the topic. Do NOT close the interview. Do NOT ask for contact data. Avoid literal quote of user's words. Do NOT repeat the topic title verbatim; use natural phrasing. End with a single question mark.`
-    ].filter(Boolean).join('\n');
-
-    const result = await generateObject({
-        model,
-        schema: questionSchema,
-        prompt,
-        temperature: 0.2
-    });
-    params.onUsage?.({
-        source: 'generate_question_only',
-        model: (model as any)?.modelId || null,
-        usage: (result as any)?.usage
-    });
-
-    let question = normalizeSingleQuestion(String(result.object.question || '').trim());
-    if (topicCue) {
-        question = replaceLiteralTopicTitle(question, topicLabel, topicCue);
-    }
-    return question;
-}
-
-async function generateDeepOfferOnly(params: {
-    model: any;
-    language: string;
-    extensionPreview?: string[];
-    onUsage?: LLMUsageCollector;
-}) {
-    const schema = z.object({
-        message: z.string().describe('A short message that ends with one yes/no extension question.')
-    });
-
-    const previewHints = (params.extensionPreview || [])
-        .map(h => String(h || '').trim())
-        .filter(Boolean)
-        .slice(0, 1);
-    const starterTheme = previewHints[0] || '';
-
-    const prompt = [
-        `Language: ${params.language}`,
-        `Task: Write a short extension message with this structure:`,
-        `1) Start with a short thank-you for the user's availability and answers so far.`,
-        `2) Say naturally that the planned interview time is over (or would be over).`,
-        starterTheme
-            ? `3) Propose to continue and mention one indirect starting point connected to what the user shared, for example around: ${starterTheme}. Use no quotes, labels, or list formatting.`
-            : `3) Propose to continue and mention one concrete single starting point connected to what the user shared, using indirect wording.`,
-        `4) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
-        `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
-        `Keep it natural and concise. End with exactly one question mark.`
-    ].join('\n');
-
-    const result = await generateObject({
-        model: params.model,
-        schema,
-        prompt,
-        temperature: 0.2
-    });
-    params.onUsage?.({
-        source: 'generate_deep_offer_only',
-        model: (params.model as any)?.modelId || null,
-        usage: (result as any)?.usage
-    });
-
-    return normalizeSingleQuestion(String(result.object.message || '').trim());
-}
-
-async function enforceDeepOfferQuestion(params: {
-    model: any;
-    language: string;
-    currentText?: string | null;
-    extensionPreview?: string[];
-    onUsage?: LLMUsageCollector;
-}) {
-    const { model, language, currentText, extensionPreview } = params;
-    const cleanedCurrent = normalizeSingleQuestion(
-        String(currentText || '')
-            .replace(/INTERVIEW_COMPLETED/gi, '')
-            .trim()
-    );
-
-    if (isExtensionOfferQuestion(cleanedCurrent, language)) {
-        return cleanedCurrent;
-    }
-
-    try {
-        const generated = await generateDeepOfferOnly({ model, language, extensionPreview, onUsage: params.onUsage });
-        if (isExtensionOfferQuestion(generated, language)) {
-            return generated;
-        }
-    } catch (e) {
-        console.error('enforceDeepOfferQuestion generation failed:', e);
-    }
-
-    const hintText = (extensionPreview || []).map(v => String(v || '').trim()).filter(Boolean)[0] || '';
-    return language === 'it'
-        ? (hintText
-            ? `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu, partendo da uno dei punti emersi, ad esempio ${hintText}. Ti va di proseguire ancora per qualche minuto?`
-            : `Grazie per il tempo e per i contributi condivisi fin qui. Il tempo previsto per l'intervista sarebbe terminato: se vuoi, possiamo continuare con qualche domanda in piu su uno dei punti più utili emersi. Ti va di proseguire ancora per qualche minuto?`)
-        : (hintText
-            ? `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions, starting from one point that emerged, for example ${hintText}. Would you like to continue for a few more minutes?`
-            : `Thank you for your time and the insights shared so far. The planned interview time would now be over: if you want, we can continue with a few extra questions on one useful point that emerged. Would you like to continue for a few more minutes?`);
-}
-
-function isExtensionOfferQuestion(message: string, language: string): boolean {
-    const text = String(message || '').trim().toLowerCase();
-    if (!text || !text.includes('?')) return false;
-    const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    const itPattern = /\b(ti va di continuare|vuoi continuare|qualche minuto in più|hai ancora qualche minuto|hai disponibilità|estendere(?:\s+l')?\s*intervista|proseguire|ulteriore(?:i)? domanda(?:e)? di approfondimento)\b/i;
-    const enPattern = /\b(would you like to continue|do you want to continue|few more minutes|are you available|extend the interview|continue for a few more minutes|follow-up questions|deep-dive questions)\b/i;
-    return isItalian ? itPattern.test(text) : enPattern.test(text);
-}
-
-async function generateConsentQuestionOnly(params: {
-    model: any;
-    language: string;
-    onUsage?: LLMUsageCollector;
-}) {
-    const schema = z.object({
-        question: z.string().describe('A single yes/no consent question ending with a question mark.')
-    });
-
-    const prompt = [
-        `Language: ${params.language}`,
-        `Task: Write a natural transition into data collection and ask exactly ONE yes/no question asking permission to collect contact details for follow-up.`,
-        `Structure: (1) one short linking sentence acknowledging content interview closure; (2) one yes/no consent question.`,
-        `Do NOT ask for any specific field yet. Do NOT ask topic questions. Do NOT close the interview.`,
-        `Keep it natural and concise. End with exactly one question mark.`
-    ].join('\n');
-
-    const result = await generateObject({
-        model: params.model,
-        schema,
-        prompt,
-        temperature: 0.2
-    });
-    params.onUsage?.({
-        source: 'generate_consent_question_only',
-        model: (params.model as any)?.modelId || null,
-        usage: (result as any)?.usage
-    });
-
-    return normalizeSingleQuestion(String(result.object.question || '').trim());
-}
-
-async function generateFieldQuestionOnly(params: {
-    model: any;
-    language: string;
-    fieldLabel: string;
-    onUsage?: LLMUsageCollector;
-}) {
-    const schema = z.object({
-        question: z.string().describe('A single field collection question ending with a question mark.')
-    });
-
-    const prompt = [
-        `Language: ${params.language}`,
-        `Target field to collect now: ${params.fieldLabel}`,
-        `Task: Ask exactly ONE concise question to collect this field only.`,
-        `Do NOT ask for other fields. Do NOT ask topic questions. Do NOT close the interview.`,
-        `Keep it natural and concise. End with exactly one question mark.`
-    ].join('\n');
-
-    const result = await generateObject({
-        model: params.model,
-        schema,
-        prompt,
-        temperature: 0.2
-    });
-    params.onUsage?.({
-        source: 'generate_field_question_only',
-        model: (params.model as any)?.modelId || null,
-        usage: (result as any)?.usage
-    });
-
-    return normalizeSingleQuestion(String(result.object.question || '').trim());
-}
-
-function sanitizeUserSnippet(input: string, maxWords: number = 10): string {
-    const compact = (input || '').replace(/\s+/g, ' ').trim();
-    if (!compact) return '';
-    const withoutPunctuation = compact.replace(/[?!.,;:()[\]{}"“”'’`]/g, '').trim();
-    return withoutPunctuation.split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ');
-}
-
-function extractLastAssistantQuestion(input?: string | null): string {
-    const text = String(input || '')
-        .replace(/\s+/g, ' ')
-        .trim();
-    if (!text || !text.includes('?')) return '';
-
-    const pieces = text
-        .split('?')
-        .map(chunk => chunk.trim())
-        .filter(Boolean);
-    if (pieces.length === 0) return '';
-    return `${pieces[pieces.length - 1]}?`;
-}
-
-function getUserResponseDepth(input?: string | null): 'brief' | 'balanced' | 'rich' {
-    const words = String(input || '')
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean).length;
-    if (words <= 10) return 'brief';
-    if (words >= 35) return 'rich';
-    return 'balanced';
-}
-
-function buildUserBridgeHint(input: string, language: string): string {
-    const signal = sanitizeUserSnippet(input, 14);
-    if (!signal) return '';
-    return language === 'it'
-        ? `Apri collegandoti semanticamente al punto utente su "${signal}" senza citazione letterale.`
-        : `Open by semantically linking to the user point about "${signal}" without literal quoting.`;
-}
-
-function buildRuntimeSemanticContextPrompt(params: {
-    language: string;
-    phase: Phase;
-    targetTopicLabel: string;
-    supervisorInsight?: SupervisorInsight;
-    lastUserMessage?: string | null;
-    previousAssistantMessage?: string | null;
-    recentBridgeStems?: string[];
-}): string {
-    const lastUserMessage = String(params.lastUserMessage || '').trim();
-    if (!lastUserMessage) return '';
-
-    const language = params.language || 'en';
-    const userSignal = sanitizeUserSnippet(lastUserMessage, 18);
-    const previousQuestion = extractLastAssistantQuestion(params.previousAssistantMessage);
-    const responseDepth = getUserResponseDepth(lastUserMessage);
-    const transitionMode: TransitionMode | undefined = params.supervisorInsight?.transitionMode;
-    const phase = params.phase;
-    const clarificationRequested = isClarificationSignal(lastUserMessage, language);
-
-    const depthHintIt: Record<'brief' | 'balanced' | 'rich', string> = {
-        brief: 'Risposta breve: usa una domanda semplice e concreta, con un solo focus.',
-        balanced: 'Risposta equilibrata: approfondisci un dettaglio specifico emerso ora.',
-        rich: 'Risposta ricca: seleziona un solo elemento ad alto valore e approfondiscilo.'
-    };
-    const depthHintEn: Record<'brief' | 'balanced' | 'rich', string> = {
-        brief: 'Short answer: use one simple, concrete follow-up with a single focus.',
-        balanced: 'Balanced answer: deepen one specific detail that just emerged.',
-        rich: 'Rich answer: pick one high-value element and probe that only.'
-    };
-
-    const transitionHintIt = transitionMode === 'bridge'
-        ? 'Transizione: usa un ponte naturale dal punto utente al nuovo focus.'
-        : transitionMode === 'clean_pivot'
-            ? 'Transizione: pivot pulito con aggancio neutro, senza forzare dettagli non pertinenti.'
-            : 'Transizione: mantieni continuità naturale col turno precedente.';
-    const transitionHintEn = transitionMode === 'bridge'
-        ? 'Transition: use a natural bridge from the user point into the new focus.'
-        : transitionMode === 'clean_pivot'
-            ? 'Transition: use a clean pivot with a neutral bridge, no forced irrelevant details.'
-            : 'Transition: keep natural continuity from the previous turn.';
-
-    const recentStems = (params.recentBridgeStems || []).slice(0, 5);
-    const stemsHintIt = recentStems.length > 0
-        ? `8. NON iniziare con nessuna di queste aperture già usate di recente: ${recentStems.map(s => `"${s}"`).join(', ')}. Usa un incipit diverso e naturale.`
-        : '8. Varia l\'incipit: non usare la stessa apertura del turno precedente.';
-    const stemsHintEn = recentStems.length > 0
-        ? `8. Do NOT start with any of these recently used openings: ${recentStems.map(s => `"${s}"`).join(', ')}. Use a different, natural opening.`
-        : '8. Vary your opening: do not reuse the same opening as the previous turn.';
-
-    if ((language || '').toLowerCase().startsWith('it')) {
-        return `
-## RUNTIME SEMANTIC CONTEXT
-- Fase attiva: ${phase}
-- Topic target: "${params.targetTopicLabel}"
-- Segnale utente da valorizzare (parafrasi, non citazione): "${userSignal || 'N/A'}"
-- Ultima domanda assistente da NON ripetere: "${previousQuestion || 'N/A'}"
-- Profondità risposta utente: ${responseDepth}
-
-Istruzioni di coerenza:
-1. Inizia con una frase breve che riconosce genuinamente il contenuto della risposta utente (non una formula).
-2. Mantieni la nuova domanda semanticamente diversa dalla precedente.
-3. ${depthHintIt[responseDepth]}
-4. ${transitionHintIt}
-5. Evita formule rigide ("ora passiamo a", "cambio argomento") e chiusure premature.
-6. Evita aperture generiche/retoriche ("molto interessante", "e un punto importante", "grazie per aver condiviso"): reagisci al merito con un dettaglio concreto.
-7. Se naturale, preferisci una lente diagnostica (esempio, impatto, priorita o azione) con un vincolo leggero (tempo, segmento, canale o metrica). Se risulta forzato o fuori tema, resta su una domanda semplice.
-${stemsHintIt}
-${clarificationRequested
-                ? '9. L\'utente sta chiedendo un chiarimento/disambiguazione: chiarisci prima in modo diretto la domanda precedente e poi fai una sola domanda di follow-up coerente.'
-                : ''}
-`.trim();
-    }
-
-    return `
-## RUNTIME SEMANTIC CONTEXT
-- Active phase: ${phase}
-- Target topic: "${params.targetTopicLabel}"
-- User signal to leverage (paraphrase, no literal quote): "${userSignal || 'N/A'}"
-- Previous assistant question to avoid repeating: "${previousQuestion || 'N/A'}"
-- User response depth: ${responseDepth}
-
-Coherence instructions:
-1. Open with one short sentence that genuinely acknowledges the content of the user's response (not a formula).
-2. Keep the new question semantically distinct from the previous one.
-3. ${depthHintEn[responseDepth]}
-4. ${transitionHintEn}
-5. Avoid rigid templates ("now let's move to") and premature closure cues.
-6. Avoid generic/ceremonial openers ("very interesting", "that's an important point", "thanks for sharing"): respond to the substance using one concrete detail.
-7. If natural, prefer a diagnostic lens (example, impact, priority, or action) with one light constraint (timeframe, segment, channel, or metric). If this feels forced or off-topic, keep a simple focused question.
-${stemsHintEn}
-${clarificationRequested
-            ? '9. The user is asking for clarification/disambiguation: first clarify your previous question directly, then ask one coherent follow-up question.'
-            : ''}
-`.trim();
-}
-
-function buildSoftDiagnosticHint(params: {
-    language: string;
-    lastUserMessage?: string | null;
-    topicLabel?: string | null;
-    subGoal?: string | null;
-}): string {
-    const language = String(params.language || 'en');
-    const isItalian = language.toLowerCase().startsWith('it');
-    const userText = String(params.lastUserMessage || '').trim();
-    const words = userText.split(/\s+/).filter(Boolean).length;
-    if (!userText || words < 5) return '';
-    if (isClarificationSignal(userText, language)) return '';
-
-    const lower = userText.toLowerCase();
-    const hasNegativeSignal = /(problema|critic|risch|limite|debolezz|poco|scarso|difficolt|non )/i.test(lower);
-    const hasPrioritySignal = /(priorit|prima|subito|urgent|urgente|piu importante|più importante)/i.test(lower);
-    const hasImpactSignal = /(impatto|effetto|risultato|crescita|calo|mercato|client|kpi|vendite|margine|tempo|costo)/i.test(lower);
-
-    let lens: 'example' | 'impact' | 'priority' | 'action' = 'example';
-    if (hasPrioritySignal || words >= 35) {
-        lens = 'priority';
-    } else if (hasNegativeSignal) {
-        lens = 'action';
-    } else if (hasImpactSignal || words >= 14) {
-        lens = 'impact';
-    }
-
-    if (isItalian) {
-        const lensLabel = lens === 'priority'
-            ? 'priorita'
-            : lens === 'action'
-                ? 'azione'
-                : lens === 'impact'
-                    ? 'impatto'
-                    : 'esempio';
-        return `Suggerimento soft: se coerente con il topic, prova una domanda diagnostica sul piano "${lensLabel}" con un vincolo leggero (tempo, segmento, canale o metrica). Se rischia di essere forzata, ignora questo suggerimento.`;
-    }
-
-    const lensLabel = lens === 'priority'
-        ? 'priority'
-        : lens === 'action'
-            ? 'action'
-            : lens === 'impact'
-                ? 'impact'
-                : 'example';
-    return `Soft suggestion: if coherent with the topic, use a diagnostic "${lensLabel}" follow-up with one light constraint (timeframe, segment, channel, or metric). If this feels forced, ignore this suggestion.`;
-}
-
-function escapeRegexLiteral(input: string): string {
-    return String(input || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function replaceLiteralTopicTitle(text: string, topicLabel: string, replacement: string): string {
-    const source = String(text || '').trim();
-    const label = String(topicLabel || '').trim();
-    const repl = String(replacement || '').trim();
-    if (!source || !label || !repl) return source;
-    const re = new RegExp(escapeRegexLiteral(label), 'gi');
-    return source.replace(re, repl);
-}
-
-function normalizeSingleQuestion(question: string): string {
-    let normalized = String(question || '').trim();
-    const questionMarkCount = (normalized.match(/\?/g) || []).length;
-    if (questionMarkCount > 1) {
-        const firstQuestionIdx = normalized.indexOf('?');
-        normalized = normalized.slice(0, firstQuestionIdx + 1).trim();
-    }
-    if (!normalized.endsWith('?')) {
-        normalized = `${normalized.replace(/[.!?…]+$/g, '').trim()}?`;
-    }
-    return normalized;
-}
-
-const GENERIC_BRIDGE_OPENERS_IT = [
-    /^capisco\b/i,
-    /^chiaro\b/i,
-    /^perfetto\b/i,
-    /^ottimo\b/i,
-    /^bene\b/i,
-    /^grazie\b/i,
-    /^molto interessante\b/i,
-    /^e un punto importante\b/i,
-    /^è un punto importante\b/i,
-    /^quello che dici\b/i
-];
-
-const GENERIC_BRIDGE_OPENERS_EN = [
-    /^i see\b/i,
-    /^got it\b/i,
-    /^perfect\b/i,
-    /^great\b/i,
-    /^thanks\b/i,
-    /^very interesting\b/i,
-    /^that'?s an important point\b/i
-];
-
-function normalizeBridgeStem(text: string): string {
-    return String(text || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function extractBridgeStem(text: string): string {
-    const compact = String(text || '').trim();
-    if (!compact) return '';
-    const firstSentence = compact.split(/[?!\.]/)[0] || compact;
-    return normalizeBridgeStem(firstSentence.split(',')[0]);
-}
-
-function collectRecentBridgeStems(
-    messages: Array<{ role: string; content: string }>,
-    limit: number = 14
-): string[] {
-    const assistantMessages = messages
-        .filter((m) => m.role === 'assistant')
-        .slice(-Math.max(limit * 2, limit));
-    const seen = new Set<string>();
-    const stems: string[] = [];
-    for (let i = assistantMessages.length - 1; i >= 0; i -= 1) {
-        const normalizedStem = normalizeBridgeStem(extractBridgeStem(assistantMessages[i].content));
-        if (!normalizedStem || seen.has(normalizedStem)) continue;
-        seen.add(normalizedStem);
-        stems.push(normalizedStem);
-        if (stems.length >= limit) break;
-    }
-    return stems;
-}
-
-function startsWithGenericBridgeOpener(text: string, language: string): boolean {
-    const firstSentence = String(text || '').trim().split(/[?!\.]/)[0] || '';
-    const patterns = String(language || 'en').toLowerCase().startsWith('it')
-        ? GENERIC_BRIDGE_OPENERS_IT
-        : GENERIC_BRIDGE_OPENERS_EN;
-    return patterns.some((pattern) => pattern.test(firstSentence.trim()));
-}
-
-function isClarificationSignal(input: string, language: string): boolean {
-    const text = String(input || '').trim().toLowerCase();
-    if (!text) return false;
-    const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    const genericPattern = /^(boh|eh|mh|hmm|\?+|ok\??)$/i;
-    if (genericPattern.test(text)) return true;
-    const words = text.split(/\s+/).filter(Boolean);
-    const shortEitherOrQuestion = text.includes('?') && words.length <= 12 && (/\bo\b/.test(text) || /\bor\b/.test(text));
-    const itPattern = /\b(non capisco|non ho capito|non mi [eè] chiaro|puoi chiarire|puoi spiegare meglio|cosa intendi|intendi dire|ti riferisci|in che senso|parli di|quale dei due)\b/i;
-    const enPattern = /\b(i don't understand|i do not understand|not clear|can you clarify|can you explain|what do you mean|do you mean|are you referring to|which one)\b/i;
-    if (isItalian ? itPattern.test(text) : enPattern.test(text)) return true;
-    return shortEitherOrQuestion;
-}
-
-type UserTurnSignal = 'none' | 'clarification' | 'off_topic_question';
-
-function isLikelyUserQuestion(input: string, language: string): boolean {
-    const text = String(input || '').trim().toLowerCase();
-    if (!text) return false;
-    if (text.includes('?')) return true;
-    const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    const itQuestionStarters = /^(come|cosa|perch[eé]|quando|dove|chi|quale|quali|quanto|in che modo|mi spieghi|puoi spiegare)/i;
-    const enQuestionStarters = /^(how|what|why|when|where|who|which|can you|could you|would you|please explain)/i;
-    return isItalian ? itQuestionStarters.test(text) : enQuestionStarters.test(text);
-}
-
-function hasAnyAnchorOverlap(source: string[], target: string[]): boolean {
-    if (!source.length || !target.length) return false;
-    const targetSet = new Set(target);
-    return source.some((root) => targetSet.has(root));
-}
-
-function detectUserTurnSignal(params: {
-    userMessage?: string | null;
-    language: string;
-    phase: Phase;
-    currentTopic: any;
-    targetTopic: any;
-    interviewObjective?: string;
-}): UserTurnSignal {
-    const userMessage = String(params.userMessage || '').trim();
-    if (!userMessage) return 'none';
-    if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') return 'none';
-
-    if (isClarificationSignal(userMessage, params.language)) {
-        return 'clarification';
-    }
-
-    if (!isLikelyUserQuestion(userMessage, params.language)) {
-        return 'none';
-    }
-
-    const language = params.language || 'en';
-    const isItalian = language.toLowerCase().startsWith('it');
-    const userAnchorRoots = buildMessageAnchors(userMessage, language).anchorRoots;
-    const currentAnchorRoots = buildTopicAnchors(params.currentTopic, language).anchorRoots;
-    const targetAnchorRoots = buildTopicAnchors(params.targetTopic, language).anchorRoots;
-    const objectiveAnchorRoots = buildMessageAnchors(String(params.interviewObjective || ''), language).anchorRoots;
-
-    const overlapsTopic =
-        hasAnyAnchorOverlap(userAnchorRoots, currentAnchorRoots) ||
-        hasAnyAnchorOverlap(userAnchorRoots, targetAnchorRoots) ||
-        hasAnyAnchorOverlap(userAnchorRoots, objectiveAnchorRoots);
-
-    if (overlapsTopic) return 'none';
-
-    const explicitOffTopicPattern = isItalian
-        ? /\b(che ore|che tempo|meteo|oroscopo|barzelletta|storia divertente|chi sei|come stai|quanti anni hai|dove vivi|che modello usi|chatgpt|openai|calcio|sport|borsa|bitcoin|criptovalute|ricetta)\b/i
-        : /\b(what time|weather|horoscope|joke|funny story|who are you|how are you|how old are you|where do you live|what model do you use|chatgpt|openai|football|soccer|sports|stock market|bitcoin|crypto|recipe)\b/i;
-    if (explicitOffTopicPattern.test(userMessage)) return 'off_topic_question';
-
-    const metaQuestionPattern = isItalian
-        ? /\b(tu|ti|te|sei|puoi)\b/i
-        : /\b(you|your|are you|can you)\b/i;
-    const words = userMessage.split(/\s+/).filter(Boolean).length;
-    if (words <= 10 && metaQuestionPattern.test(userMessage)) return 'off_topic_question';
-
-    return 'none';
-}
-
-function isClarificationHandledResponse(response: string, language: string): boolean {
-    const text = String(response || '');
-    const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    const itPattern = /\b(per chiarire|intendo|mi riferivo|in altre parole|pi[uù] chiaramente|cio[eè]|parlavo di)\b/i;
-    const enPattern = /\b(to clarify|i meant|i was referring to|in other words|more clearly|that is|i was talking about)\b/i;
-    return (isItalian ? itPattern.test(text) : enPattern.test(text)) && text.includes('?');
-}
-
-function isScopeBoundaryHandledResponse(response: string, language: string): boolean {
-    const text = String(response || '');
-    const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    const itPattern = /\b(fuori(?:\s+dallo)?\s+scopo|esula dallo scopo|nell'ambito di questa intervista|restiamo su|torniamo a|per questa intervista)\b/i;
-    const enPattern = /\b(out of scope|outside the scope|for this interview|let's stay on|let's get back to|within this interview)\b/i;
-    return (isItalian ? itPattern.test(text) : enPattern.test(text)) && text.includes('?');
-}
-
-function buildNaturalTopicCue(topicLabel: string, language: string): string {
-    const label = String(topicLabel || '').trim();
-    const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    if (!label) return isItalian ? 'questo tema' : 'this topic';
-
-    // Extract meaningful keywords from topic label dynamically
-    const anchors = buildMessageAnchors(label, language).anchors;
-    if (anchors.length === 0) return isItalian ? 'questo tema' : 'this topic';
-
-    // Use the most meaningful anchor (longest, most specific)
-    const bestAnchor = anchors.sort((a, b) => b.length - a.length)[0];
-    return isItalian ? bestAnchor : `this aspect about ${bestAnchor}`;
-}
-
-const GENERIC_TOPIC_ANCHORS_IT = new Set([
-    'tema', 'temi', 'aspetto', 'aspetti', 'punto', 'punti',
-    'progetto', 'progetti', 'iniziativa', 'iniziative', 'azienda', 'aziende',
-    'soluzione', 'soluzioni', 'impatto', 'valore', 'processo', 'processi',
-    'sistema', 'sistemi', 'approccio', 'uso'
-]);
-
-const GENERIC_TOPIC_ANCHORS_EN = new Set([
-    'topic', 'topics', 'aspect', 'aspects', 'point', 'points',
-    'project', 'projects', 'initiative', 'initiatives', 'company', 'companies',
-    'solution', 'solutions', 'impact', 'value', 'process', 'processes',
-    'system', 'systems', 'approach', 'usage', 'use'
-]);
-
-function getGenericTopicAnchors(language: string): Set<string> {
-    return (language || 'en').toLowerCase().startsWith('it')
-        ? GENERIC_TOPIC_ANCHORS_IT
-        : GENERIC_TOPIC_ANCHORS_EN;
-}
-
-function hasMeaningfulTopicOverlap(params: {
-    userMessage?: string;
-    nextTopic: any;
-    language: string;
-}): { hasSignal: boolean; overlaps: string[] } {
-    const userMessage = String(params.userMessage || '').trim();
-    if (!userMessage || !params.nextTopic) return { hasSignal: false, overlaps: [] };
-    if (isClarificationSignal(userMessage, params.language)) return { hasSignal: false, overlaps: [] };
-
-    const genericAnchors = getGenericTopicAnchors(params.language);
-    const userAnchors = buildMessageAnchors(userMessage, params.language).anchors
-        .map(a => a.toLowerCase())
-        .filter(a => !genericAnchors.has(a));
-    const topicAnchors = buildTopicAnchors(params.nextTopic, params.language).anchors
-        .map(a => a.toLowerCase())
-        .filter(a => !genericAnchors.has(a));
-
-    const overlapSet = new Set<string>();
-    for (const u of userAnchors) {
-        for (const t of topicAnchors) {
-            if (u === t) {
-                overlapSet.add(u);
-                continue;
-            }
-            if (u.length >= 8 && t.length >= 8) {
-                if (u.startsWith(t.slice(0, 8)) || t.startsWith(u.slice(0, 8))) {
-                    overlapSet.add(u.length <= t.length ? u : t);
-                }
-            }
-        }
-    }
-
-    if (overlapSet.size > 0) {
-        return { hasSignal: true, overlaps: Array.from(overlapSet) };
-    }
-
-    const labelTokens = String(params.nextTopic.label || '')
-        .toLowerCase()
-        .split(/[^\p{L}\p{N}]+/u)
-        .filter(token => token.length >= 4 && !genericAnchors.has(token));
-    const lowerUser = userMessage.toLowerCase();
-    const labelHits = labelTokens.filter(token => lowerUser.includes(token));
-    if (labelHits.length > 0) {
-        return { hasSignal: true, overlaps: labelHits };
-    }
-
-    return { hasSignal: false, overlaps: [] };
-}
-
-function isUsableBridgeSnippet(snippet: string, language: string): boolean {
-    const clean = String(snippet || '').replace(/\s+/g, ' ').trim();
-    if (!clean) return false;
-    if (isClarificationSignal(clean, language)) return false;
-
-    const words = clean.split(/\s+/).filter(Boolean);
-    if (words.length < 3) return false;
-
-    const isItalian = (language || 'en').toLowerCase().startsWith('it');
-    const lowSignalPattern = isItalian
-        ? /\b(te l[’']?ho gi[aà] detto|non capisco|preferisco non dirlo|boh|ok|s[iì]|no)\b/i
-        : /\b(i already told you|i don.t understand|prefer not to say|ok|yes|no)\b/i;
-    return !lowSignalPattern.test(clean);
-}
-
-// ============================================================================
-// HELPER: Complete interview and save profile
-// ============================================================================
-async function completeInterview(
-    conversationId: string,
-    messages: any[],
-    apiKey: string,
-    existingProfile: any,
-    options?: { simulationMode?: boolean; onLlmUsage?: LLMUsageCollector }
-): Promise<void> {
-    // Run profile extraction and completion marking in PARALLEL
-    // This saves time by not waiting for one before starting the other
-    const [extractedProfile] = await Promise.all([
-        // Profile extraction (slow LLM call)
-        (async () => {
-            try {
-                const { CandidateExtractor } = await import('@/lib/llm/candidate-extractor');
-                return await CandidateExtractor.extractProfile(messages, apiKey, conversationId, {
-                    onUsage: options?.onLlmUsage
-                });
-            } catch (e) {
-                console.error("Profile extraction failed:", e);
-                return null;
-            }
-        })(),
-        // Mark interview as completed.
-        // In local simulation mode, skip usage counters/credits side effects.
-        options?.simulationMode
-            ? prisma.conversation.update({
-                where: { id: conversationId },
-                data: { status: 'COMPLETED', completedAt: new Date() }
-            })
-            : ChatService.completeInterview(conversationId)
-    ]);
-
-    // Save extracted profile if available
-    if (extractedProfile) {
-        const mergedProfile = { ...extractedProfile, ...existingProfile };
-        await prisma.conversation.update({
-            where: { id: conversationId },
-            data: { candidateProfile: mergedProfile }
-        });
-        console.log("👤 Profile saved");
-    }
-}
 
 // ============================================================================
 // MAIN API HANDLER
@@ -1537,6 +213,12 @@ export async function POST(req: Request) {
         const conversation = await ChatService.loadConversation(conversationId, botId);
         console.log(`⏱️ [TIMING] Data load: ${Date.now() - loadStart}ms`);
         const bot = conversation.bot;
+        if (bot.status !== 'PUBLISHED') {
+            return Response.json({
+                text: "Mi dispiace, questa intervista non è al momento disponibile.",
+                isCompleted: false
+            }, { status: 200 });
+        }
         const language = bot.language || 'en';
         const interviewObjective = String((bot as any).researchGoal || '').trim();
         const shouldCollectData = (bot as any).collectCandidateData;
@@ -1825,7 +507,7 @@ export async function POST(req: Request) {
                 canonicalMessages,
                 openAIKey,
                 conversation.candidateProfile || {},
-                { simulationMode, onLlmUsage: collectLlmUsage }
+                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
             );
             await prisma.message.create({
                 data: {
@@ -1951,7 +633,7 @@ export async function POST(req: Request) {
 
         console.log(`📊 [STATE] Phase: ${state.phase}, Topic: ${currentTopic.label}, Index: ${state.topicIndex}, Turn: ${state.turnInTopic}`);
         console.log(`⏱️ [TIME] Effective: ${effectiveSec}s / Max: ${maxDurationMins}m`);
-        if (lastMessage?.role === 'user') {
+        if (process.env.NODE_ENV === 'development' && lastMessage?.role === 'user') {
             const userPreview = String(lastMessage.content || '').slice(0, 400);
             console.log("💬 [USER] Preview:", userPreview);
         }
@@ -2143,7 +825,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode, onLlmUsage: collectLlmUsage }
+                        { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                 }
@@ -2154,7 +836,7 @@ export async function POST(req: Request) {
                         canonicalMessages,
                         openAIKey,
                         conversation.candidateProfile || {},
-                        { simulationMode, onLlmUsage: collectLlmUsage }
+                        { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                     );
                     supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                     nextState.dataCollectionRefused = true;
@@ -2200,7 +882,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                             );
                             // Set status for AI to say goodbye
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
@@ -2265,7 +947,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             nextState.dataCollectionRefused = true;
@@ -2314,7 +996,7 @@ export async function POST(req: Request) {
                                 canonicalMessages,
                                 openAIKey,
                                 currentProfile,
-                                { simulationMode, onLlmUsage: collectLlmUsage }
+                                { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                             );
                             supervisorInsight = { status: 'COMPLETE_WITHOUT_DATA' };
                             haltCollection = true;
@@ -2588,8 +1270,25 @@ export async function POST(req: Request) {
             systemPrompt += `\n\n${manualKnowledgePrompt || generatedKnowledgePrompt}`;
         }
 
+        // Tone adaptation — active from turn 4 onwards (need enough context to detect style)
+        if (canonicalMessages.length >= 4) {
+            try {
+                const toneAnalyzer = new ToneAnalyzer(openAIKey);
+                const toneProfile = await toneAnalyzer.analyzeTone(canonicalMessages, language);
+                const toneBlock = buildToneAdaptationPrompt(toneProfile, language);
+                if (toneBlock) {
+                    systemPrompt += `\n\n${toneBlock}`;
+                }
+            } catch (toneErr) {
+                // Non-blocking: tone adaptation is best-effort, never fails the main request
+                console.error('[TONE] Analysis failed (non-blocking):', toneErr);
+            }
+        }
+
         console.log("📝 [PROMPT_BUILDER] System Prompt length:", systemPrompt.length);
-        console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 1000) + "...");
+        if (process.env.NODE_ENV === 'development') {
+            console.log("📝 [PROMPT_BUILDER] System Prompt snippet:", systemPrompt.substring(0, 1000) + "...");
+        }
 
         // Inject intro message at start
         if (introMessage && canonicalMessages.length <= 1) {
@@ -2813,8 +1512,10 @@ hard_rules:
         console.timeEnd("LLM");
         let responseText = result.object.response;
         console.log(`🧠 [LLM_REASONING]: ${result.object.meta_comment || 'N/A'}`);
-        console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
-        console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
+        if (process.env.NODE_ENV === 'development') {
+            console.log(`🤖 [LLM_RESPONSE]: "${responseText.substring(0, 100)}..."`);
+            console.log("💬 [BOT] Preview:", responseText.slice(0, 400));
+        }
 
         // ====================================================================
         // 5.4 TRANSITION / EXTENSION OFFER ENFORCEMENT (AI-generated, no hardcoded phrasing)
@@ -3032,6 +1733,19 @@ hard_rules:
 
         // Supervisor logic (no hardcoded overrides to respect AI reasoning)
 
+        // Lazy cache: profile may be updated earlier this request — fetch once, reuse everywhere
+        let _freshCandidateProfileCache: Record<string, unknown> | undefined
+        const getFreshCandidateProfile = async (): Promise<Record<string, unknown>> => {
+            if (_freshCandidateProfileCache === undefined) {
+                const r = await prisma.conversation.findUnique({
+                    where: { id: conversationId },
+                    select: { candidateProfile: true },
+                })
+                _freshCandidateProfileCache = (r?.candidateProfile as Record<string, unknown>) ?? {}
+            }
+            return _freshCandidateProfileCache
+        }
+
         // If in DATA_COLLECTION phase, ALWAYS ensure we ask for the specific field
         if (nextState.phase === 'DATA_COLLECTION') {
             if (nextState.dataCollectionRefused || supervisorInsight?.status === 'COMPLETE_WITHOUT_DATA') {
@@ -3052,11 +1766,7 @@ hard_rules:
 
                 // CRITICAL: Re-read profile from DB to get updated values after extraction
                 // The `conversation.candidateProfile` is stale (from start of request)
-                const freshConversation = await prisma.conversation.findUnique({
-                    where: { id: conversationId },
-                    select: { candidateProfile: true }
-                });
-                const currentProfile = (freshConversation?.candidateProfile as any) || {};
+                const currentProfile = await getFreshCandidateProfile();
 
                 // Find first missing field (must match logic in data collection phase)
                 // Consider: already collected, explicitly skipped, or asked too many times
@@ -3170,7 +1880,7 @@ hard_rules:
                 const enforcedSystem = `${systemPrompt}\n\nCRITICAL: Do NOT end the interview. Ask exactly ONE question about the topic "${enforceTopic}". Do not mention contacts, rewards, or closing. The response MUST end with a question mark.`;
                 const retry = await trackedGenerateObject({ model: criticalModel, schema, messages: messagesForAI, system: enforcedSystem, temperature: 0.3 });
                 responseText = retry.object.response?.trim() || responseText;
-                console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
+                if (process.env.NODE_ENV === 'development') console.log("🧭 [SUPERVISOR] Override response:", responseText.slice(0, 300));
 
                 // If the override still isn't a proper question, use fallback question-only generation (MAX 1 retry)
                 const stillBad = !responseText.includes('?') || goodbyePattern.test(responseText);
@@ -3189,7 +1899,7 @@ hard_rules:
                             requireAcknowledgment: true,
                             onUsage: collectLlmUsage
                         });
-                        console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
+                        if (process.env.NODE_ENV === 'development') console.log("🧭 [SUPERVISOR] Question-only response:", responseText.slice(0, 300));
                     } catch (e) {
                         console.error("Question-only generation failed:", e);
                         // Final fallback: simple question
@@ -3268,11 +1978,7 @@ hard_rules:
         if (nextState.phase === 'DATA_COLLECTION' && !nextState.dataCollectionRefused && supervisorInsight?.status !== 'COMPLETE_WITHOUT_DATA') {
             const candidateFields = (bot.candidateDataFields as any[]) || [];
             const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
-            const freshConvForDataGuard = await prisma.conversation.findUnique({
-                where: { id: conversationId },
-                select: { candidateProfile: true }
-            });
-            const currentProfileForDataGuard = (freshConvForDataGuard?.candidateProfile as any) || {};
+            const currentProfileForDataGuard = await getFreshCandidateProfile();
             const missingFieldForDataGuard = getNextMissingCandidateField(
                 candidateFieldIds,
                 currentProfileForDataGuard,
@@ -3374,11 +2080,7 @@ hard_rules:
             // Verify we're actually done - MUST re-read from DB for fresh data
             const candidateFields = (bot.candidateDataFields as any[]) || [];
             const candidateFieldIds = normalizeCandidateFieldIds(candidateFields);
-            const freshConvForCompletion = await prisma.conversation.findUnique({
-                where: { id: conversationId },
-                select: { candidateProfile: true }
-            });
-            const currentProfileForCompletion = (freshConvForCompletion?.candidateProfile as any) || {};
+            const currentProfileForCompletion = await getFreshCandidateProfile();
             // A field is considered "done" if: collected, skipped, or asked too many times
             const MAX_FIELD_ATTEMPTS_COMPLETION = 3;
             const missingFieldForCompletion = getNextMissingCandidateField(
@@ -3427,7 +2129,7 @@ hard_rules:
                     canonicalMessages,
                     openAIKey,
                     currentProfileForCompletion || {},
-                    { simulationMode, onLlmUsage: collectLlmUsage }
+                    { simulationMode, onLlmUsage: collectLlmUsage, language, effectiveDuration: typeof effectiveDuration === 'number' ? effectiveDuration : null }
                 );
                 const finalResponseText = responseText.replace(/INTERVIEW_COMPLETED/gi, '').trim();
                 await prisma.message.create({

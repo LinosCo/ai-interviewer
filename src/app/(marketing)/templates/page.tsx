@@ -7,7 +7,7 @@ export default function TemplatesPage() {
         <div className="bg-stone-50 min-h-screen pt-24 pb-20">
             <div className="max-w-7xl mx-auto px-6">
                 <div className="text-center max-w-3xl mx-auto mb-16">
-                    <h1 className="text-4xl md:text-5xl font-bold text-stone-900 mb-6">Template Gallery</h1>
+                    <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold text-stone-900 mb-6">Template Gallery</h1>
                     <p className="text-xl text-stone-600">
                         Inizia velocemente con modelli testati e ottimizzati per ogni scenario di ricerca.
                     </p>
@@ -61,7 +61,7 @@ export default function TemplatesPage() {
                 </div>
 
                 {/* Request Template CTA */}
-                <div className="mt-20 bg-amber-100 rounded-[2.5rem] p-12 text-center border border-amber-200">
+                <div className="mt-20 bg-amber-100 rounded-[2.5rem] p-6 md:p-12 text-center border border-amber-200">
                     <h3 className="text-2xl font-bold text-amber-900 mb-4">Non trovi quello che cerchi?</h3>
                     <p className="text-amber-800 mb-8 max-w-xl mx-auto">
                         Inviaci la tua idea di ricerca e il nostro team di esperti preparerà un template personalizzato per te.

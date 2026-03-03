@@ -3,6 +3,18 @@ import { z } from 'zod';
 import Sitemapper from 'sitemapper';
 import { scrapeUrl } from '@/lib/scraping';
 import { assertOrganizationAccess, assertProjectAccess } from '@/lib/domain/workspace';
+import { CMSSuggestionGenerator } from '@/lib/cms/suggestion-generator';
+import { TipRoutingExecutor } from '@/lib/cms/tip-routing-executor';
+import { N8NDispatcher } from '@/lib/integrations/n8n/dispatcher';
+import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
+import { GoogleService } from '@/lib/integrations/google/google.service';
+import { CMSConnectionService } from '@/lib/cms/connection.service';
+import { encrypt } from '@/lib/integrations/encryption';
+import { normalizeMcpEndpoint } from '@/lib/integrations/mcp/endpoint';
+import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
+import { buildInsightActionMetadata } from '@/lib/insights/action-metadata';
+import { getKBCategories, searchPlatformKB } from '@/lib/copilot/platform-kb';
+import { getDefaultStrategicMarketingKnowledge, getStrategicMarketingKnowledgeByOrg } from '@/lib/marketing/strategic-kb';
 
 type ToolContext = {
     userId: string;
@@ -39,9 +51,60 @@ async function resolveAccessibleProjectIds(context: ToolContext, requestedProjec
     return projects.map((project) => project.id);
 }
 
+async function resolveSingleProjectId(context: ToolContext, requestedProjectId?: string | null): Promise<string | null> {
+    const projectIds = await resolveAccessibleProjectIds(context, requestedProjectId);
+    return projectIds[0] || null;
+}
+
 function clampLimit(limit?: number): number {
     if (!limit || Number.isNaN(limit)) return 5;
     return Math.min(Math.max(1, Math.floor(limit)), 10);
+}
+
+function parseAdditionalUrls(value: unknown): Array<{ url: string; label?: string }> {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((entry: any) => ({
+            url: typeof entry?.url === 'string' ? entry.url : '',
+            label: typeof entry?.label === 'string' ? entry.label : undefined
+        }))
+        .filter((entry) => entry.url);
+}
+
+export function createPlatformHelpSearchTool() {
+    return {
+        description: 'Search the Business Tuner product help knowledge base by keyword and category.',
+        inputSchema: z.object({
+            query: z.string().min(2).describe('Help search query in Italian or English.'),
+            category: z.string().optional().default('all').describe('Optional category filter. Use "all" for global search.'),
+            limit: z.number().optional().default(5).describe('Maximum help entries to return (hard-capped to 10).')
+        }),
+        execute: async ({ query, category, limit }: { query: string; category?: string; limit?: number }) => {
+            try {
+                const safeLimit = clampLimit(limit);
+                const kbCategory = typeof category === 'string' && category.trim().length > 0 ? category.trim() : 'all';
+                const allCategories = getKBCategories();
+                const effectiveCategory = kbCategory === 'all' || allCategories.includes(kbCategory) ? kbCategory : 'all';
+                const results = await searchPlatformKB(query, effectiveCategory);
+
+                return {
+                    query,
+                    category: effectiveCategory,
+                    categories: allCategories,
+                    totalMatches: results.length,
+                    entries: results.slice(0, safeLimit).map((entry) => ({
+                        id: entry.id,
+                        title: entry.title,
+                        category: entry.category,
+                        contentPreview: entry.content.slice(0, 1200)
+                    }))
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] Error searching platform help:', error);
+                return { error: 'Failed to search platform help', details: error.message || 'Unknown error' };
+            }
+        }
+    };
 }
 
 export function createProjectTranscriptsTool(context: ToolContext) {
@@ -263,6 +326,961 @@ export function createProjectIntegrationsTool(context: ToolContext) {
     };
 }
 
+const routingDestinationSchema = z.enum(['mcp', 'cms', 'n8n']);
+
+export function createTipRoutingManagerTool(context: ToolContext) {
+    return {
+        description: 'List, create, update, toggle or delete AI routing rules for a project.',
+        inputSchema: z.object({
+            operation: z.enum(['list', 'create', 'update', 'toggle', 'delete']).default('list'),
+            projectId: z.string().optional().describe('Project ID. If omitted, uses selected/current project.'),
+            ruleId: z.string().optional().describe('Required for update/toggle/delete.'),
+            contentKind: z.string().optional().describe('Content kind (es. BLOG_ARTICLE, META_DESCRIPTION, SCHEMA_PATCH).'),
+            behavior: z.string().optional().default('create_post'),
+            label: z.string().optional(),
+            mcpTool: z.string().optional(),
+            destinationType: routingDestinationSchema.optional(),
+            destinationConnectionId: z.string().optional(),
+            enabled: z.boolean().optional(),
+            priority: z.number().optional()
+        }),
+        execute: async ({
+            operation,
+            projectId,
+            ruleId,
+            contentKind,
+            behavior,
+            label,
+            mcpTool,
+            destinationType,
+            destinationConnectionId,
+            enabled,
+            priority
+        }: {
+            operation?: 'list' | 'create' | 'update' | 'toggle' | 'delete';
+            projectId?: string;
+            ruleId?: string;
+            contentKind?: string;
+            behavior?: string;
+            label?: string;
+            mcpTool?: string;
+            destinationType?: 'mcp' | 'cms' | 'n8n';
+            destinationConnectionId?: string;
+            enabled?: boolean;
+            priority?: number;
+        }) => {
+            try {
+                const op = operation || 'list';
+                const targetProjectId = await resolveSingleProjectId(context, projectId);
+                if (!targetProjectId) {
+                    return { error: 'No accessible project found for this request.' };
+                }
+
+                if (op === 'list') {
+                    await assertProjectAccess(context.userId, targetProjectId, 'VIEWER');
+                    const rules = await prisma.tipRoutingRule.findMany({
+                        where: { projectId: targetProjectId },
+                        include: {
+                            mcpConnection: { select: { id: true, name: true, type: true, status: true } },
+                            cmsConnection: { select: { id: true, name: true, status: true } },
+                            n8nConnection: { select: { id: true, name: true, status: true } }
+                        },
+                        orderBy: { priority: 'desc' }
+                    });
+                    return { success: true, projectId: targetProjectId, count: rules.length, rules };
+                }
+
+                await assertProjectAccess(context.userId, targetProjectId, 'ADMIN');
+
+                const resolveDestinationData = async () => {
+                    if (!destinationType && !destinationConnectionId) {
+                        return null;
+                    }
+                    if (!destinationType || !destinationConnectionId) {
+                        throw new Error('destinationType and destinationConnectionId are both required when setting destination.');
+                    }
+
+                    if (destinationType === 'mcp') {
+                        const conn = await prisma.mCPConnection.findFirst({
+                            where: {
+                                id: destinationConnectionId,
+                                OR: [
+                                    { projectId: targetProjectId },
+                                    { projectShares: { some: { projectId: targetProjectId } } }
+                                ]
+                            },
+                            select: { id: true }
+                        });
+                        if (!conn) throw new Error('MCP connection not found for this project.');
+                        return {
+                            mcpConnectionId: conn.id,
+                            cmsConnectionId: null,
+                            n8nConnectionId: null
+                        };
+                    }
+
+                    if (destinationType === 'cms') {
+                        const conn = await prisma.cMSConnection.findFirst({
+                            where: {
+                                id: destinationConnectionId,
+                                OR: [
+                                    { projectId: targetProjectId },
+                                    { projectShares: { some: { projectId: targetProjectId } } }
+                                ]
+                            },
+                            select: { id: true }
+                        });
+                        if (!conn) throw new Error('CMS connection not found for this project.');
+                        return {
+                            mcpConnectionId: null,
+                            cmsConnectionId: conn.id,
+                            n8nConnectionId: null
+                        };
+                    }
+
+                    const conn = await prisma.n8NConnection.findFirst({
+                        where: { id: destinationConnectionId, projectId: targetProjectId },
+                        select: { id: true }
+                    });
+                    if (!conn) throw new Error('n8n connection not found for this project.');
+                    return {
+                        mcpConnectionId: null,
+                        cmsConnectionId: null,
+                        n8nConnectionId: conn.id
+                    };
+                };
+
+                if (op === 'create') {
+                    if (!contentKind) return { error: 'contentKind is required for create.' };
+                    const destinationData = await resolveDestinationData();
+                    if (!destinationData) return { error: 'Destination is required for create.' };
+
+                    const rule = await prisma.tipRoutingRule.create({
+                        data: {
+                            projectId: targetProjectId,
+                            contentKind: String(contentKind),
+                            behavior: String(behavior || 'create_post'),
+                            mcpTool: mcpTool ? String(mcpTool) : null,
+                            label: label ? String(label) : null,
+                            priority: typeof priority === 'number' ? Number(priority) : 0,
+                            enabled: enabled !== false,
+                            ...destinationData
+                        },
+                        include: {
+                            mcpConnection: { select: { id: true, name: true, type: true, status: true } },
+                            cmsConnection: { select: { id: true, name: true, status: true } },
+                            n8nConnection: { select: { id: true, name: true, status: true } }
+                        }
+                    });
+                    return { success: true, operation: op, projectId: targetProjectId, rule };
+                }
+
+                if (!ruleId) return { error: 'ruleId is required for this operation.' };
+
+                const existing = await prisma.tipRoutingRule.findFirst({
+                    where: { id: ruleId, projectId: targetProjectId }
+                });
+                if (!existing) {
+                    return { error: 'Rule not found for this project.' };
+                }
+
+                if (op === 'delete') {
+                    await prisma.tipRoutingRule.delete({ where: { id: ruleId } });
+                    return { success: true, operation: op, projectId: targetProjectId, ruleId };
+                }
+
+                if (op === 'toggle') {
+                    const nextEnabled = typeof enabled === 'boolean' ? enabled : !existing.enabled;
+                    const updated = await prisma.tipRoutingRule.update({
+                        where: { id: ruleId },
+                        data: { enabled: nextEnabled },
+                        include: {
+                            mcpConnection: { select: { id: true, name: true, type: true, status: true } },
+                            cmsConnection: { select: { id: true, name: true, status: true } },
+                            n8nConnection: { select: { id: true, name: true, status: true } }
+                        }
+                    });
+                    return { success: true, operation: op, projectId: targetProjectId, rule: updated };
+                }
+
+                const updateData: Record<string, unknown> = {};
+                if (typeof contentKind === 'string') updateData.contentKind = contentKind;
+                if (typeof behavior === 'string') updateData.behavior = behavior;
+                if (typeof label !== 'undefined') updateData.label = label ? String(label) : null;
+                if (typeof mcpTool !== 'undefined') updateData.mcpTool = mcpTool ? String(mcpTool) : null;
+                if (typeof enabled === 'boolean') updateData.enabled = enabled;
+                if (typeof priority === 'number' && !Number.isNaN(priority)) updateData.priority = Number(priority);
+
+                const destinationData = await resolveDestinationData();
+                if (destinationData) {
+                    Object.assign(updateData, destinationData);
+                }
+
+                if (Object.keys(updateData).length === 0) {
+                    return { error: 'No update fields provided.' };
+                }
+
+                const updated = await prisma.tipRoutingRule.update({
+                    where: { id: ruleId },
+                    data: updateData,
+                    include: {
+                        mcpConnection: { select: { id: true, name: true, type: true, status: true } },
+                        cmsConnection: { select: { id: true, name: true, status: true } },
+                        n8nConnection: { select: { id: true, name: true, status: true } }
+                    }
+                });
+
+                return { success: true, operation: op, projectId: targetProjectId, rule: updated };
+            } catch (error: any) {
+                console.error('[Copilot Tool] manageTipRouting error:', error);
+                return { error: 'Failed to manage routing rules', details: error?.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
+export function createProjectConnectionsOpsTool(context: ToolContext) {
+    return {
+        description: 'Inspect, test and configure project connections (MCP, Google, CMS, n8n) and verify routing readiness.',
+        inputSchema: z.object({
+            operation: z.enum([
+                'status',
+                'test',
+                'create_mcp',
+                'update_mcp',
+                'create_google',
+                'update_google',
+                'upsert_n8n',
+                'associate_cms'
+            ]).default('status'),
+            projectId: z.string().optional(),
+            connectionTypes: z.array(z.enum(['mcp', 'google', 'cms', 'n8n'])).optional(),
+            connectionId: z.string().optional(),
+            mcpType: z.enum(['WORDPRESS', 'WOOCOMMERCE']).optional(),
+            type: z.enum(['WORDPRESS', 'WOOCOMMERCE']).optional().describe('Alias of mcpType'),
+            name: z.string().optional(),
+            endpoint: z.string().optional(),
+            credentials: z.any().optional(),
+            serviceAccountJson: z.string().optional(),
+            ga4PropertyId: z.string().nullable().optional(),
+            gscSiteUrl: z.string().nullable().optional(),
+            webhookUrl: z.string().optional(),
+            triggerOnTips: z.boolean().optional(),
+            cmsConnectionId: z.string().optional(),
+            shareRole: z.enum(['OWNER', 'EDITOR', 'VIEWER']).optional().default('VIEWER'),
+            testAfterSave: z.boolean().optional().default(false)
+        }),
+        execute: async ({
+            operation,
+            projectId,
+            connectionTypes,
+            connectionId,
+            mcpType,
+            type,
+            name,
+            endpoint,
+            credentials,
+            serviceAccountJson,
+            ga4PropertyId,
+            gscSiteUrl,
+            webhookUrl,
+            triggerOnTips,
+            cmsConnectionId,
+            shareRole,
+            testAfterSave
+        }: {
+            operation?: 'status' | 'test' | 'create_mcp' | 'update_mcp' | 'create_google' | 'update_google' | 'upsert_n8n' | 'associate_cms';
+            projectId?: string;
+            connectionTypes?: Array<'mcp' | 'google' | 'cms' | 'n8n'>;
+            connectionId?: string;
+            mcpType?: 'WORDPRESS' | 'WOOCOMMERCE';
+            type?: 'WORDPRESS' | 'WOOCOMMERCE';
+            name?: string;
+            endpoint?: string;
+            credentials?: unknown;
+            serviceAccountJson?: string;
+            ga4PropertyId?: string | null;
+            gscSiteUrl?: string | null;
+            webhookUrl?: string;
+            triggerOnTips?: boolean;
+            cmsConnectionId?: string;
+            shareRole?: 'OWNER' | 'EDITOR' | 'VIEWER';
+            testAfterSave?: boolean;
+        }) => {
+            try {
+                const op = operation || 'status';
+                const targetProjectId = await resolveSingleProjectId(context, projectId);
+                if (!targetProjectId) {
+                    return { error: 'No accessible project found for this request.' };
+                }
+
+                const isWriteOp = op !== 'status';
+                await assertProjectAccess(context.userId, targetProjectId, isWriteOp ? 'ADMIN' : 'VIEWER');
+
+                const project = await prisma.project.findUnique({
+                    where: { id: targetProjectId },
+                    select: {
+                        id: true,
+                        name: true,
+                        organizationId: true,
+                        organization: { select: { plan: true } }
+                    }
+                });
+                if (!project) {
+                    return { error: 'Project not found.' };
+                }
+
+                const shouldTestAfterSave = Boolean(testAfterSave);
+
+                const ensureIntegrationAllowed = async () => {
+                    if (!project.organizationId) {
+                        throw new Error('Project organization not found.');
+                    }
+                    const integrationCheck = await checkIntegrationCreationAllowed(project.organizationId);
+                    if (!integrationCheck.allowed) {
+                        throw new Error(integrationCheck.reason || 'Integration creation unavailable on this plan.');
+                    }
+                };
+
+                const parseCredentials = () => {
+                    if (credentials == null) return null;
+                    if (typeof credentials === 'string') {
+                        try {
+                            return JSON.parse(credentials);
+                        } catch {
+                            throw new Error('credentials must be valid JSON when passed as string.');
+                        }
+                    }
+                    if (typeof credentials === 'object') return credentials;
+                    throw new Error('credentials must be an object or JSON string.');
+                };
+
+                const runN8NTest = async (conn: { id: string; name: string; webhookUrl: string }) => {
+                    await prisma.n8NConnection.update({
+                        where: { id: conn.id },
+                        data: { status: 'TESTING' }
+                    });
+
+                    try {
+                        const response = await fetch(conn.webhookUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                event: 'test',
+                                timestamp: new Date().toISOString(),
+                                projectId: targetProjectId,
+                                source: 'copilot'
+                            })
+                        });
+
+                        if (response.ok) {
+                            await prisma.n8NConnection.update({
+                                where: { id: conn.id },
+                                data: {
+                                    status: 'ACTIVE',
+                                    lastTriggerAt: new Date(),
+                                    lastError: null
+                                }
+                            });
+                            return { success: true, message: 'Webhook test successful' };
+                        }
+
+                        const errorText = await response.text();
+                        await prisma.n8NConnection.update({
+                            where: { id: conn.id },
+                            data: {
+                                status: 'ERROR',
+                                lastError: `HTTP ${response.status}: ${errorText.slice(0, 200)}`
+                            }
+                        });
+                        return { success: false, message: `Webhook returned ${response.status}` };
+                    } catch (err: any) {
+                        const errMessage = err?.message || 'Failed to connect to webhook';
+                        await prisma.n8NConnection.update({
+                            where: { id: conn.id },
+                            data: {
+                                status: 'ERROR',
+                                lastError: errMessage
+                            }
+                        });
+                        return { success: false, message: errMessage };
+                    }
+                };
+
+                if (op === 'create_mcp') {
+                    const finalType = mcpType || type;
+                    if (!finalType || !name || !endpoint) {
+                        return { error: 'create_mcp requires mcpType/type, name and endpoint.' };
+                    }
+                    const parsedCredentials = parseCredentials();
+                    if (!parsedCredentials) {
+                        return { error: 'create_mcp requires credentials.' };
+                    }
+
+                    await ensureIntegrationAllowed();
+
+                    const existing = await prisma.mCPConnection.findFirst({
+                        where: { projectId: targetProjectId, type: finalType }
+                    });
+                    if (existing) {
+                        return { error: `A ${finalType} connection already exists for this project.` };
+                    }
+
+                    const created = await prisma.mCPConnection.create({
+                        data: {
+                            projectId: targetProjectId,
+                            type: finalType,
+                            name: String(name),
+                            endpoint: normalizeMcpEndpoint(finalType, String(endpoint)),
+                            credentials: encrypt(JSON.stringify(parsedCredentials)),
+                            status: 'PENDING',
+                            createdBy: context.userId,
+                            organizationId: project.organizationId || null,
+                            availableTools: []
+                        },
+                        select: {
+                            id: true,
+                            projectId: true,
+                            type: true,
+                            name: true,
+                            endpoint: true,
+                            status: true,
+                            availableTools: true,
+                            lastError: true,
+                            lastSyncAt: true
+                        }
+                    });
+
+                    const testResult = shouldTestAfterSave
+                        ? await MCPGatewayService.testConnection(created.id)
+                        : null;
+
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        connection: created,
+                        testResult
+                    };
+                }
+
+                if (op === 'update_mcp') {
+                    if (!connectionId) {
+                        return { error: 'update_mcp requires connectionId.' };
+                    }
+
+                    const existing = await prisma.mCPConnection.findUnique({
+                        where: { id: connectionId },
+                        select: {
+                            id: true,
+                            projectId: true,
+                            type: true
+                        }
+                    });
+                    if (!existing) return { error: 'MCP connection not found.' };
+                    if (existing.projectId !== targetProjectId) {
+                        return { error: 'This MCP connection is not directly owned by the selected project.' };
+                    }
+
+                    const updateData: Record<string, unknown> = {};
+                    if (typeof name === 'string' && name.trim()) updateData.name = name.trim();
+                    if (typeof endpoint === 'string' && endpoint.trim()) {
+                        updateData.endpoint = normalizeMcpEndpoint(existing.type, endpoint);
+                        updateData.status = 'PENDING';
+                    }
+                    if (credentials != null) {
+                        const parsed = parseCredentials();
+                        updateData.credentials = encrypt(JSON.stringify(parsed));
+                        updateData.status = 'PENDING';
+                    }
+
+                    if (Object.keys(updateData).length === 0) {
+                        return { error: 'No update fields provided for update_mcp.' };
+                    }
+
+                    const updated = await prisma.mCPConnection.update({
+                        where: { id: connectionId },
+                        data: updateData,
+                        select: {
+                            id: true,
+                            projectId: true,
+                            type: true,
+                            name: true,
+                            endpoint: true,
+                            status: true,
+                            availableTools: true,
+                            lastError: true,
+                            lastSyncAt: true
+                        }
+                    });
+
+                    const testResult = shouldTestAfterSave
+                        ? await MCPGatewayService.testConnection(updated.id)
+                        : null;
+
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        connection: updated,
+                        testResult
+                    };
+                }
+
+                if (op === 'create_google') {
+                    if (!serviceAccountJson) {
+                        return { error: 'create_google requires serviceAccountJson.' };
+                    }
+                    await ensureIntegrationAllowed();
+
+                    let serviceAccount: { client_email?: string };
+                    try {
+                        serviceAccount = JSON.parse(serviceAccountJson);
+                    } catch {
+                        return { error: 'Invalid serviceAccountJson format.' };
+                    }
+                    if (!serviceAccount.client_email) {
+                        return { error: 'Invalid serviceAccountJson: missing client_email.' };
+                    }
+
+                    const existing = await prisma.googleConnection.findUnique({
+                        where: { projectId: targetProjectId },
+                        select: { id: true }
+                    });
+                    if (existing) {
+                        return { error: 'A Google connection already exists for this project.' };
+                    }
+
+                    const ga4Value = ga4PropertyId && String(ga4PropertyId).trim() ? String(ga4PropertyId).trim() : null;
+                    const gscValue = gscSiteUrl && String(gscSiteUrl).trim() ? String(gscSiteUrl).trim() : null;
+
+                    const created = await prisma.googleConnection.create({
+                        data: {
+                            projectId: targetProjectId,
+                            serviceAccountEmail: serviceAccount.client_email,
+                            serviceAccountJson: encrypt(serviceAccountJson),
+                            ga4Enabled: Boolean(ga4Value),
+                            ga4PropertyId: ga4Value,
+                            ga4Status: ga4Value ? 'PENDING' : 'DISABLED',
+                            gscEnabled: Boolean(gscValue),
+                            gscSiteUrl: gscValue,
+                            gscStatus: gscValue ? 'PENDING' : 'DISABLED',
+                            createdBy: context.userId
+                        },
+                        select: {
+                            id: true,
+                            projectId: true,
+                            serviceAccountEmail: true,
+                            ga4Enabled: true,
+                            ga4PropertyId: true,
+                            ga4Status: true,
+                            ga4LastError: true,
+                            gscEnabled: true,
+                            gscSiteUrl: true,
+                            gscStatus: true,
+                            gscLastError: true
+                        }
+                    });
+
+                    let testResult: Record<string, unknown> | null = null;
+                    if (shouldTestAfterSave) {
+                        testResult = {
+                            ga4: created.ga4Enabled && created.ga4PropertyId
+                                ? await GoogleService.testGA4(created.id)
+                                : { success: false, skipped: true, reason: 'GA4 non configurato' },
+                            gsc: created.gscEnabled && created.gscSiteUrl
+                                ? await GoogleService.testGSC(created.id)
+                                : { success: false, skipped: true, reason: 'GSC non configurato' }
+                        };
+                    }
+
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        connection: created,
+                        testResult
+                    };
+                }
+
+                if (op === 'update_google') {
+                    if (!connectionId) return { error: 'update_google requires connectionId.' };
+
+                    const existing = await prisma.googleConnection.findUnique({
+                        where: { id: connectionId },
+                        select: {
+                            id: true,
+                            projectId: true,
+                            ga4Enabled: true,
+                            gscEnabled: true
+                        }
+                    });
+                    if (!existing) return { error: 'Google connection not found.' };
+                    if (existing.projectId !== targetProjectId) {
+                        return { error: 'This Google connection is not owned by the selected project.' };
+                    }
+
+                    const updateData: Record<string, unknown> = {};
+
+                    if (typeof serviceAccountJson === 'string' && serviceAccountJson.trim()) {
+                        let parsed: { client_email?: string };
+                        try {
+                            parsed = JSON.parse(serviceAccountJson);
+                        } catch {
+                            return { error: 'Invalid serviceAccountJson format.' };
+                        }
+                        if (!parsed.client_email) {
+                            return { error: 'Invalid serviceAccountJson: missing client_email.' };
+                        }
+                        updateData.serviceAccountEmail = parsed.client_email;
+                        updateData.serviceAccountJson = encrypt(serviceAccountJson);
+                        updateData.ga4Status = existing.ga4Enabled ? 'PENDING' : 'DISABLED';
+                        updateData.gscStatus = existing.gscEnabled ? 'PENDING' : 'DISABLED';
+                    }
+
+                    if (ga4PropertyId !== undefined) {
+                        const normalizedGa4 = ga4PropertyId && String(ga4PropertyId).trim()
+                            ? String(ga4PropertyId).trim()
+                            : null;
+                        if (normalizedGa4) {
+                            updateData.ga4Enabled = true;
+                            updateData.ga4PropertyId = normalizedGa4;
+                            updateData.ga4Status = 'PENDING';
+                        } else {
+                            updateData.ga4Enabled = false;
+                            updateData.ga4PropertyId = null;
+                            updateData.ga4Status = 'DISABLED';
+                        }
+                    }
+
+                    if (gscSiteUrl !== undefined) {
+                        const normalizedGsc = gscSiteUrl && String(gscSiteUrl).trim()
+                            ? String(gscSiteUrl).trim()
+                            : null;
+                        if (normalizedGsc) {
+                            updateData.gscEnabled = true;
+                            updateData.gscSiteUrl = normalizedGsc;
+                            updateData.gscStatus = 'PENDING';
+                        } else {
+                            updateData.gscEnabled = false;
+                            updateData.gscSiteUrl = null;
+                            updateData.gscStatus = 'DISABLED';
+                        }
+                    }
+
+                    if (Object.keys(updateData).length === 0) {
+                        return { error: 'No update fields provided for update_google.' };
+                    }
+
+                    const updated = await prisma.googleConnection.update({
+                        where: { id: connectionId },
+                        data: updateData,
+                        select: {
+                            id: true,
+                            projectId: true,
+                            serviceAccountEmail: true,
+                            ga4Enabled: true,
+                            ga4PropertyId: true,
+                            ga4Status: true,
+                            ga4LastError: true,
+                            gscEnabled: true,
+                            gscSiteUrl: true,
+                            gscStatus: true,
+                            gscLastError: true
+                        }
+                    });
+
+                    let testResult: Record<string, unknown> | null = null;
+                    if (shouldTestAfterSave) {
+                        testResult = {
+                            ga4: updated.ga4Enabled && updated.ga4PropertyId
+                                ? await GoogleService.testGA4(updated.id)
+                                : { success: false, skipped: true, reason: 'GA4 non configurato' },
+                            gsc: updated.gscEnabled && updated.gscSiteUrl
+                                ? await GoogleService.testGSC(updated.id)
+                                : { success: false, skipped: true, reason: 'GSC non configurato' }
+                        };
+                    }
+
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        connection: updated,
+                        testResult
+                    };
+                }
+
+                if (op === 'upsert_n8n') {
+                    if (webhookUrl) {
+                        try {
+                            new URL(webhookUrl);
+                        } catch {
+                            return { error: 'Invalid webhookUrl format.' };
+                        }
+                    }
+
+                    const current = await prisma.n8NConnection.findUnique({
+                        where: { projectId: targetProjectId },
+                        select: {
+                            id: true,
+                            projectId: true,
+                            name: true,
+                            webhookUrl: true,
+                            status: true,
+                            triggerOnTips: true,
+                            lastTriggerAt: true,
+                            lastError: true
+                        }
+                    });
+
+                    if (!current) {
+                        await ensureIntegrationAllowed();
+                    }
+
+                    const plan = String(project.organization?.plan || '').toUpperCase();
+                    if (!['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(plan)) {
+                        return { error: 'Upgrade to BUSINESS required for n8n integration.' };
+                    }
+
+                    const nextWebhookUrl = webhookUrl || current?.webhookUrl;
+                    if (!nextWebhookUrl) {
+                        return { error: 'upsert_n8n requires webhookUrl when no connection exists.' };
+                    }
+
+                    const upserted = await prisma.n8NConnection.upsert({
+                        where: { projectId: targetProjectId },
+                        create: {
+                            projectId: targetProjectId,
+                            name: name?.trim() || 'n8n Automation',
+                            webhookUrl: nextWebhookUrl,
+                            triggerOnTips: typeof triggerOnTips === 'boolean' ? triggerOnTips : true,
+                            createdBy: context.userId,
+                            status: 'PENDING'
+                        },
+                        update: {
+                            name: name?.trim() || current?.name || 'n8n Automation',
+                            webhookUrl: nextWebhookUrl,
+                            triggerOnTips: typeof triggerOnTips === 'boolean'
+                                ? triggerOnTips
+                                : (current?.triggerOnTips ?? true),
+                            status: 'PENDING'
+                        },
+                        select: {
+                            id: true,
+                            projectId: true,
+                            name: true,
+                            webhookUrl: true,
+                            status: true,
+                            triggerOnTips: true,
+                            lastTriggerAt: true,
+                            lastError: true
+                        }
+                    });
+
+                    const testResult = shouldTestAfterSave
+                        ? await runN8NTest({
+                            id: upserted.id,
+                            name: upserted.name,
+                            webhookUrl: upserted.webhookUrl
+                        })
+                        : null;
+
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        connection: upserted,
+                        testResult
+                    };
+                }
+
+                if (op === 'associate_cms') {
+                    if (!cmsConnectionId) {
+                        return { error: 'associate_cms requires cmsConnectionId.' };
+                    }
+
+                    const result = await CMSConnectionService.associateProject(
+                        cmsConnectionId,
+                        targetProjectId,
+                        context.userId,
+                        shareRole || 'VIEWER'
+                    );
+
+                    if (!result.success) {
+                        return { error: result.error || 'Failed to associate CMS connection.' };
+                    }
+
+                    const associated = await prisma.cMSConnection.findUnique({
+                        where: { id: cmsConnectionId },
+                        select: {
+                            id: true,
+                            name: true,
+                            status: true,
+                            cmsApiUrl: true,
+                            lastSyncAt: true,
+                            lastSyncError: true
+                        }
+                    });
+
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        connection: associated
+                    };
+                }
+
+                const typeFilter = new Set(connectionTypes && connectionTypes.length > 0
+                    ? connectionTypes
+                    : ['mcp', 'google', 'cms', 'n8n']);
+
+                const [mcpConnections, googleConnection, cmsConnections, n8nConnection] = await Promise.all([
+                    typeFilter.has('mcp')
+                        ? prisma.mCPConnection.findMany({
+                            where: {
+                                OR: [
+                                    { projectId: targetProjectId },
+                                    { projectShares: { some: { projectId: targetProjectId } } }
+                                ]
+                            },
+                            select: {
+                                id: true,
+                                type: true,
+                                name: true,
+                                status: true,
+                                endpoint: true,
+                                lastSyncAt: true,
+                                lastError: true
+                            }
+                        })
+                        : Promise.resolve([]),
+                    typeFilter.has('google')
+                        ? prisma.googleConnection.findUnique({
+                            where: { projectId: targetProjectId },
+                            select: {
+                                id: true,
+                                ga4Enabled: true,
+                                ga4Status: true,
+                                ga4PropertyId: true,
+                                ga4LastError: true,
+                                gscEnabled: true,
+                                gscStatus: true,
+                                gscSiteUrl: true,
+                                gscLastError: true
+                            }
+                        })
+                        : Promise.resolve(null),
+                    typeFilter.has('cms')
+                        ? prisma.cMSConnection.findMany({
+                            where: {
+                                OR: [
+                                    { projectId: targetProjectId },
+                                    { projectShares: { some: { projectId: targetProjectId } } }
+                                ]
+                            },
+                            select: {
+                                id: true,
+                                name: true,
+                                status: true,
+                                cmsApiUrl: true,
+                                lastSyncAt: true,
+                                lastSyncError: true
+                            }
+                        })
+                        : Promise.resolve([]),
+                    typeFilter.has('n8n')
+                        ? prisma.n8NConnection.findUnique({
+                            where: { projectId: targetProjectId },
+                            select: {
+                                id: true,
+                                name: true,
+                                webhookUrl: true,
+                                status: true,
+                                lastTriggerAt: true,
+                                lastError: true
+                            }
+                        })
+                        : Promise.resolve(null)
+                ]);
+
+                if (op === 'status') {
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        routingReady: (mcpConnections.length > 0) || Boolean(cmsConnections.length > 0) || Boolean(n8nConnection),
+                        connections: {
+                            mcp: mcpConnections,
+                            google: googleConnection,
+                            cms: cmsConnections,
+                            n8n: n8nConnection
+                        }
+                    };
+                }
+
+                const tests: Array<Record<string, unknown>> = [];
+
+                for (const conn of mcpConnections) {
+                    if (connectionId && conn.id !== connectionId) continue;
+                    const result = await MCPGatewayService.testConnection(conn.id);
+                    tests.push({ type: 'mcp', connectionId: conn.id, name: conn.name, result });
+                }
+
+                if (googleConnection && (!connectionId || googleConnection.id === connectionId)) {
+                    const results: Record<string, unknown> = {};
+                    if (googleConnection.ga4Enabled && googleConnection.ga4PropertyId) {
+                        results.ga4 = await GoogleService.testGA4(googleConnection.id);
+                    } else {
+                        results.ga4 = { success: false, skipped: true, reason: 'GA4 non configurato' };
+                    }
+                    if (googleConnection.gscEnabled && googleConnection.gscSiteUrl) {
+                        results.gsc = await GoogleService.testGSC(googleConnection.id);
+                    } else {
+                        results.gsc = { success: false, skipped: true, reason: 'GSC non configurato' };
+                    }
+                    tests.push({ type: 'google', connectionId: googleConnection.id, name: 'Google', result: results });
+                }
+
+                for (const conn of cmsConnections) {
+                    if (connectionId && conn.id !== connectionId) continue;
+                    const result = await CMSConnectionService.testConnection(conn.id);
+                    tests.push({ type: 'cms', connectionId: conn.id, name: conn.name, result });
+                }
+
+                if (n8nConnection && (!connectionId || n8nConnection.id === connectionId)) {
+                    const result = await runN8NTest({
+                        id: n8nConnection.id,
+                        name: n8nConnection.name,
+                        webhookUrl: n8nConnection.webhookUrl
+                    });
+                    tests.push({
+                        type: 'n8n',
+                        connectionId: n8nConnection.id,
+                        name: n8nConnection.name,
+                        result
+                    });
+                }
+
+                if (connectionId && tests.length === 0) {
+                    return { error: 'Connection not found for this project or filtered types.' };
+                }
+
+                return {
+                    success: true,
+                    operation: op,
+                    projectId: targetProjectId,
+                    tested: tests.length,
+                    tests
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] manageProjectConnections error:', error);
+                return { error: 'Failed to manage connections', details: error?.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
 export function createVisibilityInsightsTool(context: ToolContext) {
     return {
         description: 'Fetch latest visibility/brand monitor data, website analysis and AI tips state for selected or accessible projects.',
@@ -290,6 +1308,8 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                             id: true,
                             brandName: true,
                             projectId: true,
+                            websiteUrl: true,
+                            additionalUrls: true,
                             isActive: true,
                             updatedAt: true,
                             scans: {
@@ -300,7 +1320,26 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                             websiteAnalyses: {
                                 orderBy: { startedAt: 'desc' },
                                 take: 1,
-                                select: { id: true, overallScore: true, completedAt: true, recommendations: true }
+                                select: {
+                                    id: true,
+                                    websiteUrl: true,
+                                    overallScore: true,
+                                    structuredDataScore: true,
+                                    valuePropositionScore: true,
+                                    keywordCoverageScore: true,
+                                    contentClarityScore: true,
+                                    promptsAddressed: true,
+                                    pagesScraped: true,
+                                    structuredDataFound: true,
+                                    valuePropositions: true,
+                                    keywordAnalysis: true,
+                                    contentAnalysis: true,
+                                    status: true,
+                                    startedAt: true,
+                                    completedAt: true,
+                                    errorMessage: true,
+                                    recommendations: true
+                                }
                             },
                             tipActions: {
                                 orderBy: { updatedAt: 'desc' },
@@ -320,6 +1359,8 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                             id: true,
                             brandName: true,
                             projectId: true,
+                            websiteUrl: true,
+                            additionalUrls: true,
                             isActive: true,
                             updatedAt: true,
                             scans: {
@@ -330,7 +1371,26 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                             websiteAnalyses: {
                                 orderBy: { startedAt: 'desc' },
                                 take: 1,
-                                select: { id: true, overallScore: true, completedAt: true, recommendations: true }
+                                select: {
+                                    id: true,
+                                    websiteUrl: true,
+                                    overallScore: true,
+                                    structuredDataScore: true,
+                                    valuePropositionScore: true,
+                                    keywordCoverageScore: true,
+                                    contentClarityScore: true,
+                                    promptsAddressed: true,
+                                    pagesScraped: true,
+                                    structuredDataFound: true,
+                                    valuePropositions: true,
+                                    keywordAnalysis: true,
+                                    contentAnalysis: true,
+                                    status: true,
+                                    startedAt: true,
+                                    completedAt: true,
+                                    errorMessage: true,
+                                    recommendations: true
+                                }
                             },
                             tipActions: {
                                 orderBy: { updatedAt: 'desc' },
@@ -344,20 +1404,79 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                 return {
                     scope: { projectIds: limitedProjectIds },
                     visibility: configs.map((cfg: any) => ({
+                        scrapingScope: {
+                            primaryWebsiteUrl: cfg.websiteUrl || null,
+                            additionalUrls: parseAdditionalUrls(cfg.additionalUrls)
+                        },
+                        latestWebsiteAnalysis: cfg.websiteAnalyses?.[0]
+                            ? (() => {
+                                const recs = Array.isArray(cfg.websiteAnalyses[0].recommendations)
+                                    ? cfg.websiteAnalyses[0].recommendations as Array<Record<string, unknown>>
+                                    : [];
+                                const prompts = cfg.websiteAnalyses[0].promptsAddressed as Record<string, unknown> | null;
+                                const keywordAnalysis = cfg.websiteAnalyses[0].keywordAnalysis as Record<string, unknown> | null;
+                                const structuredData = cfg.websiteAnalyses[0].structuredDataFound as Record<string, unknown> | null;
+                                const contentAnalysis = cfg.websiteAnalyses[0].contentAnalysis as Record<string, unknown> | null;
+                                return {
+                                    id: cfg.websiteAnalyses[0].id,
+                                    websiteUrl: cfg.websiteAnalyses[0].websiteUrl || null,
+                                    status: cfg.websiteAnalyses[0].status,
+                                    overallScore: cfg.websiteAnalyses[0].overallScore,
+                                    structuredDataScore: cfg.websiteAnalyses[0].structuredDataScore,
+                                    valuePropositionScore: cfg.websiteAnalyses[0].valuePropositionScore,
+                                    keywordCoverageScore: cfg.websiteAnalyses[0].keywordCoverageScore,
+                                    contentClarityScore: cfg.websiteAnalyses[0].contentClarityScore,
+                                    pagesScraped: cfg.websiteAnalyses[0].pagesScraped || 0,
+                                    startedAt: cfg.websiteAnalyses[0].startedAt,
+                                    completedAt: cfg.websiteAnalyses[0].completedAt,
+                                    errorMessage: cfg.websiteAnalyses[0].errorMessage || null,
+                                    recommendationCount: recs.length,
+                                    topRecommendations: recs.slice(0, 5).map((r) => ({
+                                        type: typeof r.type === 'string' ? r.type : 'N/D',
+                                        title: typeof r.title === 'string' ? r.title : 'N/D',
+                                        priority: typeof r.priority === 'string' ? r.priority : null,
+                                        impact: typeof r.impact === 'string' ? r.impact : null
+                                    })),
+                                    structuredDataSummary: structuredData
+                                        ? {
+                                            schemaTypes: Array.isArray(structuredData.schemaTypes) ? structuredData.schemaTypes.slice(0, 10) : [],
+                                            hasFaq: Boolean((structuredData as any).hasFaq),
+                                            hasOrganization: Boolean((structuredData as any).hasOrganization)
+                                        }
+                                        : null,
+                                    keywordSummary: keywordAnalysis
+                                        ? {
+                                            opportunities: Array.isArray((keywordAnalysis as any).opportunities)
+                                                ? ((keywordAnalysis as any).opportunities as Array<Record<string, unknown>>).slice(0, 5)
+                                                : [],
+                                            coveredKeywords: Array.isArray((keywordAnalysis as any).coveredKeywords)
+                                                ? ((keywordAnalysis as any).coveredKeywords as string[]).slice(0, 12)
+                                                : []
+                                        }
+                                        : null,
+                                    contentSummary: contentAnalysis
+                                        ? {
+                                            readability: (contentAnalysis as any).readability || null,
+                                            clarityIssues: Array.isArray((contentAnalysis as any).clarityIssues)
+                                                ? ((contentAnalysis as any).clarityIssues as unknown[]).slice(0, 6)
+                                                : []
+                                        }
+                                        : null,
+                                    promptsCoverage: prompts
+                                        ? {
+                                            addressed: Array.isArray(prompts.addressed) ? prompts.addressed.length : 0,
+                                            gaps: Array.isArray(prompts.gaps) ? prompts.gaps.length : 0
+                                        }
+                                        : null
+                                };
+                            })()
+                            : null,
                         configId: cfg.id,
                         brandName: cfg.brandName,
                         projectId: cfg.projectId,
                         isActive: cfg.isActive,
                         updatedAt: cfg.updatedAt,
                         latestScan: cfg.scans?.[0] || null,
-                        latestWebsiteAnalysis: cfg.websiteAnalyses?.[0]
-                            ? {
-                                ...cfg.websiteAnalyses[0],
-                                recommendationCount: Array.isArray(cfg.websiteAnalyses[0].recommendations)
-                                    ? cfg.websiteAnalyses[0].recommendations.length
-                                    : 0
-                            }
-                            : null,
                         tipActionsSummary: {
                             active: cfg.tipActions.filter((t: any) => t.status === 'active').length,
                             completed: cfg.tipActions.filter((t: any) => t.status === 'completed').length,
@@ -369,6 +1488,195 @@ export function createVisibilityInsightsTool(context: ToolContext) {
             } catch (error: any) {
                 console.error('[Copilot Tool] Error fetching visibility insights:', error);
                 return { error: 'Failed to fetch visibility insights', details: error.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
+export function createProjectAiTipsTool(context: ToolContext) {
+    return {
+        description: 'Fetch AI tips from Insights (CrossChannelInsight) plus Visibility tip actions, including evidence and source references.',
+        inputSchema: z.object({
+            projectId: z.string().optional().describe('Optional project ID. If omitted, uses selected/current project or all accessible projects.'),
+            limit: z.number().optional().default(10).describe('Maximum records to return (hard-capped to 10).'),
+            statuses: z.array(z.string()).optional().describe('Optional insight status filter (es. new, starred, completed, archived).'),
+            includeActions: z.boolean().optional().default(true),
+            includeVisibilityTips: z.boolean().optional().default(true)
+        }),
+        execute: async ({
+            projectId,
+            limit,
+            statuses,
+            includeActions,
+            includeVisibilityTips
+        }: {
+            projectId?: string;
+            limit?: number;
+            statuses?: string[];
+            includeActions?: boolean;
+            includeVisibilityTips?: boolean;
+        }) => {
+            try {
+                const projectIds = await resolveAccessibleProjectIds(context, projectId);
+                if (projectIds.length === 0) {
+                    return { error: 'No accessible project found for this request.' };
+                }
+
+                const insightWhere: Record<string, unknown> = {
+                    organizationId: context.organizationId,
+                    projectId: { in: projectIds }
+                };
+                if (Array.isArray(statuses) && statuses.length > 0) {
+                    insightWhere.status = { in: statuses };
+                }
+
+                const insights = await prisma.crossChannelInsight.findMany({
+                    where: insightWhere as any,
+                    orderBy: [{ priorityScore: 'desc' }, { updatedAt: 'desc' }],
+                    take: clampLimit(limit),
+                    select: {
+                        id: true,
+                        projectId: true,
+                        topicName: true,
+                        status: true,
+                        priorityScore: true,
+                        crossChannelScore: true,
+                        interviewData: true,
+                        chatbotData: true,
+                        visibilityData: true,
+                        suggestedActions: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        project: { select: { name: true } }
+                    }
+                });
+
+                let visibilityTips: Array<Record<string, unknown>> = [];
+                if (includeVisibilityTips !== false) {
+                    const configs = await prisma.visibilityConfig.findMany({
+                        where: {
+                            organizationId: context.organizationId,
+                            projectId: { in: projectIds }
+                        },
+                        select: {
+                            id: true,
+                            brandName: true,
+                            projectId: true,
+                            tipActions: {
+                                orderBy: { updatedAt: 'desc' },
+                                take: 40,
+                                select: {
+                                    id: true,
+                                    tipKey: true,
+                                    tipTitle: true,
+                                    tipType: true,
+                                    status: true,
+                                    completedAt: true,
+                                    dismissedAt: true,
+                                    updatedAt: true
+                                }
+                            }
+                        }
+                    });
+
+                    visibilityTips = configs.flatMap((cfg) =>
+                        cfg.tipActions.map((tip) => ({
+                            ...tip,
+                            configId: cfg.id,
+                            brandName: cfg.brandName,
+                            projectId: cfg.projectId
+                        }))
+                    );
+                }
+
+                const summarizeChannelData = (value: unknown) => {
+                    if (!value || typeof value !== 'object') return null;
+                    const record = value as Record<string, unknown>;
+                    return {
+                        keys: Object.keys(record).slice(0, 12),
+                        preview: JSON.stringify(record).slice(0, 900)
+                    };
+                };
+
+                const formattedInsights = insights.map((insight: any) => {
+                    const rawActions = Array.isArray(insight.suggestedActions)
+                        ? insight.suggestedActions as Array<Record<string, unknown>>
+                        : [];
+                    const actionItems = includeActions !== false
+                        ? rawActions.slice(0, 8).map((action) => {
+                            const evidence = Array.isArray(action.evidence)
+                                ? (action.evidence as Array<Record<string, unknown>>).slice(0, 4)
+                                : [];
+                            return {
+                                type: typeof action.type === 'string' ? action.type : 'N/D',
+                                target: typeof action.target === 'string' ? action.target : 'N/D',
+                                title: typeof action.title === 'string' ? action.title : null,
+                                body: typeof action.body === 'string' ? action.body : null,
+                                reasoning: typeof action.reasoning === 'string' ? action.reasoning : null,
+                                strategicAlignment: typeof action.strategicAlignment === 'string' ? action.strategicAlignment : null,
+                                coordination: typeof action.coordination === 'string' ? action.coordination : null,
+                                evidence
+                            };
+                        })
+                        : [];
+
+                    const sources = new Set<string>();
+                    const evidenceBySourceType: Record<string, number> = {};
+                    for (const action of actionItems) {
+                        const evidence = Array.isArray(action.evidence) ? action.evidence : [];
+                        for (const ev of evidence as Array<Record<string, unknown>>) {
+                            const sourceType = typeof ev.sourceType === 'string' ? ev.sourceType : null;
+                            const sourceRef = typeof ev.sourceRef === 'string' ? ev.sourceRef : null;
+                            if (sourceType || sourceRef) {
+                                sources.add(`${sourceType || 'source'}:${sourceRef || 'n/a'}`);
+                            }
+                            if (sourceType) {
+                                evidenceBySourceType[sourceType] = (evidenceBySourceType[sourceType] || 0) + 1;
+                            }
+                        }
+                    }
+
+                    const interviewSummary = summarizeChannelData(insight.interviewData);
+                    const chatbotSummary = summarizeChannelData(insight.chatbotData);
+                    const visibilitySummary = summarizeChannelData(insight.visibilityData);
+                    if (interviewSummary) sources.add(`cross_channel_interview:${insight.id}`);
+                    if (chatbotSummary) sources.add(`cross_channel_chatbot:${insight.id}`);
+                    if (visibilitySummary) sources.add(`cross_channel_visibility:${insight.id}`);
+
+                    return {
+                        id: insight.id,
+                        projectId: insight.projectId,
+                        projectName: insight.project?.name || null,
+                        topicName: insight.topicName,
+                        status: insight.status,
+                        priorityScore: insight.priorityScore,
+                        crossChannelScore: insight.crossChannelScore,
+                        actionsCount: rawActions.length,
+                        evidenceBySourceType,
+                        sources: Array.from(sources).slice(0, 20),
+                        dataSignals: {
+                            interview: interviewSummary,
+                            chatbot: chatbotSummary,
+                            visibility: visibilitySummary
+                        },
+                        actions: actionItems,
+                        createdAt: insight.createdAt,
+                        updatedAt: insight.updatedAt
+                    };
+                });
+
+                return {
+                    scope: { projectIds },
+                    aiTips: formattedInsights,
+                    visibilityTips,
+                    summary: {
+                        insightCount: formattedInsights.length,
+                        visibilityTipCount: visibilityTips.length
+                    }
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] Error fetching AI tips:', error);
+                return { error: 'Failed to fetch AI tips', details: error.message || 'Unknown error' };
             }
         }
     };
@@ -442,6 +1750,76 @@ export function createExternalAnalyticsTool(context: ToolContext) {
     };
 }
 
+export function createStrategicKnowledgeTool(context: ToolContext) {
+    return {
+        description: 'Fetch organization-level strategic marketing knowledge base and strategic plan (updatable from settings) for contextual marketing decisions.',
+        inputSchema: z.object({
+            query: z.string().optional().describe('Optional query to extract relevant sections from strategic marketing knowledge.'),
+            limit: z.number().optional().default(5).describe('Max matched sections to return (hard-capped to 10).')
+        }),
+        execute: async ({ query, limit }: { query?: string; limit?: number }) => {
+            try {
+                await assertOrganizationAccess(context.userId, context.organizationId, 'VIEWER');
+
+                const settings = await prisma.platformSettings.findFirst({
+                    where: { organizationId: context.organizationId },
+                    select: {
+                        updatedAt: true,
+                        strategicPlan: true
+                    }
+                });
+
+                const strategicMarketing = await getStrategicMarketingKnowledgeByOrg(context.organizationId);
+                const methodology = String(strategicMarketing.knowledge || getDefaultStrategicMarketingKnowledge() || '').trim();
+                const strategicPlan = String(settings?.strategicPlan || '').trim();
+                const safeLimit = clampLimit(limit);
+
+                const rawSections = methodology
+                    .split(/\n{2,}/)
+                    .map((section) => section.trim())
+                    .filter(Boolean);
+
+                const queryWords = String(query || '')
+                    .toLowerCase()
+                    .split(/\s+/)
+                    .map((w) => w.trim())
+                    .filter((w) => w.length > 2);
+
+                const rankedSections = queryWords.length === 0
+                    ? rawSections.map((section, idx) => ({ section, score: rawSections.length - idx }))
+                    : rawSections
+                        .map((section) => {
+                            const lc = section.toLowerCase();
+                            let score = 0;
+                            for (const word of queryWords) {
+                                const regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                                score += (lc.match(regex) || []).length;
+                            }
+                            return { section, score };
+                        })
+                        .filter((item) => item.score > 0)
+                        .sort((a, b) => b.score - a.score);
+
+                return {
+                    hasKnowledge: Boolean(methodology || strategicPlan),
+                    updatedAt: settings?.updatedAt || strategicMarketing.updatedAt || null,
+                    strategicMarketingKnowledgeLength: methodology.length,
+                    strategicPlanLength: strategicPlan.length,
+                    strategicMarketingKnowledgePreview: methodology.slice(0, 2000),
+                    strategicPlanPreview: strategicPlan.slice(0, 2000),
+                    matchedSections: rankedSections.slice(0, safeLimit).map((item) => ({
+                        text: item.section.slice(0, 1200),
+                        score: item.score
+                    }))
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] Error fetching strategic knowledge:', error);
+                return { error: 'Failed to fetch strategic knowledge', details: error.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
 export function createKnowledgeBaseTool(context: ToolContext) {
     return {
         description: 'Fetch chatbot knowledge base corpus and scraping scope (URL/sitemap) from chatbot sources and Brand Monitor settings.',
@@ -487,15 +1865,6 @@ export function createKnowledgeBaseTool(context: ToolContext) {
                 });
 
                 const urlRegex = /https?:\/\/[^\s)\]"']+/gi;
-                const parseAdditionalUrls = (value: unknown): Array<{ url: string; label?: string }> => {
-                    if (!Array.isArray(value)) return [];
-                    return value
-                        .map((entry: any) => ({
-                            url: typeof entry?.url === 'string' ? entry.url : '',
-                            label: typeof entry?.label === 'string' ? entry.label : undefined
-                        }))
-                        .filter((entry) => entry.url);
-                };
 
                 const kbByProject = limitedProjectIds.map((pid) => {
                     const projectBots = bots.filter((b) => b.projectId === pid);
@@ -733,6 +2102,199 @@ export function createScrapeWebSourceTool(context: ToolContext) {
             } catch (error: any) {
                 console.error('[Copilot Tool] Error scraping web source:', error);
                 return { error: 'Failed to scrape URL', details: error.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
+const strategicTipActionSchema = z.object({
+    type: z.enum([
+        'add_faq',
+        'add_interview_topic',
+        'add_visibility_prompt',
+        'create_content',
+        'modify_content',
+        'respond_to_press',
+        'monitor_competitor',
+        'strategic_recommendation',
+        'pricing_change',
+        'product_improvement',
+        'marketing_campaign'
+    ]),
+    target: z.enum([
+        'chatbot',
+        'interview',
+        'visibility',
+        'website',
+        'pr',
+        'serp',
+        'strategy',
+        'product',
+        'marketing'
+    ]),
+    title: z.string().min(3).max(160),
+    body: z.string().min(10).max(5000),
+    reasoning: z.string().min(6).max(2000),
+    strategicAlignment: z.string().min(6).max(1200).optional(),
+    coordination: z.string().min(6).max(1200).optional(),
+    evidence: z.array(z.object({
+        sourceType: z.enum(['interview', 'chatbot', 'visibility', 'serp', 'analytics', 'kb', 'strategy', 'site_analysis']),
+        sourceRef: z.string().min(2).max(120),
+        detail: z.string().min(6).max(500)
+    })).max(4).optional()
+});
+
+export function createStrategicTipCreationTool(context: ToolContext) {
+    return {
+        description: 'Create a new AI Tip in Insights and optionally generate implementable CMS content drafts with routing automation.',
+        inputSchema: z.object({
+            projectId: z.string().optional().describe('Project ID. If omitted, uses selected project in Copilot context.'),
+            topicName: z.string().min(5).max(180).describe('Strategic AI tip title shown in Insights.'),
+            reasoning: z.string().min(10).max(4000).describe('Strategic rationale and evidence behind the tip.'),
+            priorityScore: z.number().min(0).max(100).optional().default(70),
+            actions: z.array(strategicTipActionSchema).min(1).max(6),
+            autoCreateContentDrafts: z.boolean().optional().default(true).describe('Generate CMS suggestions from content-related actions.'),
+            autoDispatchRouting: z.boolean().optional().default(false).describe('If true, run n8n dispatch and tip routing rules after draft generation.')
+        }),
+        execute: async ({
+            projectId,
+            topicName,
+            reasoning,
+            priorityScore,
+            actions,
+            autoCreateContentDrafts,
+            autoDispatchRouting
+        }: {
+            projectId?: string;
+            topicName: string;
+            reasoning: string;
+            priorityScore?: number;
+            actions: Array<{
+                type: string;
+                target: string;
+                title: string;
+                body: string;
+                reasoning: string;
+                strategicAlignment?: string;
+                coordination?: string;
+                evidence?: Array<{
+                    sourceType: string;
+                    sourceRef: string;
+                    detail: string;
+                }>;
+            }>;
+            autoCreateContentDrafts?: boolean;
+            autoDispatchRouting?: boolean;
+        }) => {
+            try {
+                const scopedProjectIds = await resolveAccessibleProjectIds(context, projectId);
+                const targetProjectId = (projectId || context.projectId || scopedProjectIds[0] || null) as string | null;
+                if (!targetProjectId) {
+                    return { error: 'No accessible project selected. Pass a valid projectId.' };
+                }
+                if (!scopedProjectIds.includes(targetProjectId)) {
+                    return { error: 'Project is not accessible for current user/context.' };
+                }
+
+                const enrichedActions = actions.map((action) => ({
+                    ...action,
+                    reasoning: action.reasoning || reasoning,
+                    strategicAlignment: action.strategicAlignment || reasoning,
+                    coordination: action.coordination || 'Coordinare questa azione con gli altri canali del piano editoriale.',
+                    evidence: Array.isArray(action.evidence) && action.evidence.length > 0
+                        ? action.evidence
+                        : [{
+                            sourceType: 'strategy',
+                            sourceRef: 'copilot:user_request',
+                            detail: 'Tip creato da richiesta esplicita del team su base strategica del progetto.'
+                        }],
+                    workflowStatus: 'draft',
+                    ...buildInsightActionMetadata(action)
+                }));
+
+                const insight = await prisma.crossChannelInsight.create({
+                    data: {
+                        organizationId: context.organizationId,
+                        projectId: targetProjectId,
+                        topicName,
+                        crossChannelScore: 85,
+                        priorityScore: Number(priorityScore ?? 70),
+                        status: 'new',
+                        interviewData: [],
+                        chatbotData: [],
+                        visibilityData: {
+                            source: 'copilot_strategic',
+                            createdBy: context.userId,
+                            createdAt: new Date().toISOString(),
+                            globalReasoning: reasoning
+                        } as any,
+                        suggestedActions: enrichedActions as any
+                    }
+                });
+
+                let suggestionIds: string[] = [];
+                if (autoCreateContentDrafts) {
+                    suggestionIds = await CMSSuggestionGenerator.generateFromInsight(insight.id);
+                }
+
+                const routing = { dispatchedToN8N: false, routedRules: 0, routingFailures: 0 };
+                if (autoDispatchRouting && suggestionIds.length > 0) {
+                    const suggestions = await prisma.cMSSuggestion.findMany({
+                        where: { id: { in: suggestionIds } },
+                        select: {
+                            id: true,
+                            title: true,
+                            body: true,
+                            type: true,
+                            targetSection: true,
+                            metaDescription: true,
+                            cmsPreviewUrl: true,
+                        },
+                    });
+                    const tipsPayload = suggestions.map((s) => ({
+                        id: s.id,
+                        title: s.title,
+                        content: s.body,
+                        contentKind: String(s.type),
+                        targetChannel: s.targetSection ?? undefined,
+                        metaDescription: s.metaDescription ?? undefined,
+                        url: s.cmsPreviewUrl ?? undefined,
+                    }));
+
+                    try {
+                        await N8NDispatcher.dispatchTips(targetProjectId, tipsPayload);
+                        routing.dispatchedToN8N = true;
+                    } catch (err) {
+                        console.warn('[Copilot Tool] dispatchTips failed:', err);
+                    }
+
+                    try {
+                        const results = await TipRoutingExecutor.execute(targetProjectId, tipsPayload);
+                        routing.routedRules = results.length;
+                        routing.routingFailures = results.filter((r) => !r.success).length;
+                    } catch (err) {
+                        console.warn('[Copilot Tool] TipRoutingExecutor failed:', err);
+                    }
+                }
+
+                return {
+                    success: true,
+                    insight: {
+                        id: insight.id,
+                        projectId: insight.projectId,
+                        topicName: insight.topicName,
+                        priorityScore: insight.priorityScore,
+                        actionsCount: enrichedActions.length
+                    },
+                    automations: {
+                        contentDraftsCreated: suggestionIds.length,
+                        suggestionIds,
+                        ...routing
+                    }
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] createStrategicTip error:', error);
+                return { error: 'Failed to create AI tip from Copilot', details: error?.message || 'Unknown error' };
             }
         }
     };

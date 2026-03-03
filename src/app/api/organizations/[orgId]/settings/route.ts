@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
-import { Prisma } from '@prisma/client';
-import fs from 'node:fs';
-import path from 'node:path';
+import {
+    getDefaultInterviewMethodologyKnowledge,
+    getDefaultStrategicMarketingKnowledge,
+    getStrategicMarketingKnowledgeByOrg
+} from '@/lib/marketing/strategic-kb';
+import { getDefaultTrainingMethodologyKnowledge, getTrainingMethodologyKnowledgeByOrg } from '@/lib/training/training-methodology-kb';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 async function getGlobalConfigCompat() {
     try {
@@ -45,21 +47,12 @@ async function getGlobalConfigCompat() {
             smtpPass: config.smtpPass,
             smtpFromEmail: config.smtpFromEmail,
             smtpNotificationEmail: config.smtpNotificationEmail,
-            publicDemoBotId: config.publicDemoBotId
+            publicDemoBotId: config.publicDemoBotId,
+            resendApiKey: config.resendApiKey
         };
     } catch (error) {
         console.error('[settings] getGlobalConfigCompat error:', error);
         return null;
-    }
-}
-
-function getDefaultMethodologyKnowledge(): string {
-    try {
-        const filePath = path.join(process.cwd(), 'knowledge', 'interview-methodology.md');
-        return fs.readFileSync(filePath, 'utf-8');
-    } catch (error) {
-        console.error('Error loading default methodology knowledge:', error);
-        return '';
     }
 }
 
@@ -100,16 +93,26 @@ export async function GET(
             where: { organizationId: orgId }
         });
 
-        const defaultMethodology = getDefaultMethodologyKnowledge();
+        const defaultMethodology = getDefaultInterviewMethodologyKnowledge();
+        const defaultTrainingKnowledge = getDefaultTrainingMethodologyKnowledge();
+        const defaultMarketingKnowledge = getDefaultStrategicMarketingKnowledge();
+        const trainingKnowledgeRow = await getTrainingMethodologyKnowledgeByOrg(orgId);
+        const marketingKnowledgeRow = await getStrategicMarketingKnowledgeByOrg(orgId);
+        const trainingMethodologyKnowledge = (trainingKnowledgeRow.knowledge || '').trim() || defaultTrainingKnowledge;
+        const strategicMarketingKnowledge = (marketingKnowledgeRow.knowledge || '').trim() || defaultMarketingKnowledge;
         const settingsWithDefaults = settings
             ? {
                 ...settings,
                 methodologyKnowledge: settings.methodologyKnowledge?.trim()
                     ? settings.methodologyKnowledge
-                    : defaultMethodology
+                    : defaultMethodology,
+                trainingMethodologyKnowledge,
+                strategicMarketingKnowledge
             }
             : {
                 methodologyKnowledge: defaultMethodology,
+                trainingMethodologyKnowledge,
+                strategicMarketingKnowledge,
                 strategicPlan: null
             };
 

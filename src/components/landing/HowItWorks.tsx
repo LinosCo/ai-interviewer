@@ -7,30 +7,30 @@ const steps = [
   {
     icon: Settings,
     number: '01',
-    title: 'Configura',
+    title: 'Attiva',
     description:
-      'Collega i tuoi canali e definisci i tuoi stakeholder: clienti, team, partner.',
+      'Configura progetto, obiettivi e canali con setup guidato. Nessuna implementazione complessa.',
   },
   {
     icon: Database,
     number: '02',
-    title: 'Raccogli',
+    title: 'Ascolta',
     description:
-      "L'AI conduce interviste, risponde via chat e monitora le menzioni automaticamente.",
+      "Interviste AI, chatbot e monitoraggio brand raccolgono segnali continui da clienti, team e mercato.",
   },
   {
     icon: Lightbulb,
     number: '03',
-    title: 'Analizza',
+    title: 'Prioritizza',
     description:
-      'Ricevi insight unificati e consigli pratici basati su tutti i dati raccolti.',
+      'Il Copilot strategico unifica i dati e propone priorita, azioni e playbook operativi.',
   },
   {
     icon: Rocket,
     number: '04',
-    title: 'Agisci',
+    title: 'Esegui',
     description:
-      "Prendi decisioni informate e misura l'impatto delle tue azioni nel tempo.",
+      "Attiva automazioni e handoff ai tuoi tool (n8n, webhook, CMS). Misura impatto e iterazione nel tempo.",
   },
 ];
 
@@ -52,8 +52,8 @@ export function HowItWorks() {
             Come <span className="gradient-text">funziona</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-            Da zero a insight in 4 semplici passaggi. Nessuna competenza tecnica
-            richiesta.
+            Da zero a decisioni operative in 4 passaggi. Workflow pensato per team
+            business, non per specialisti tecnici.
           </p>
         </motion.div>
 

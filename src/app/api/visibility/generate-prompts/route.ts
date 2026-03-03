@@ -9,6 +9,7 @@ import { PLANS, PlanType } from '@/config/plans';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
+import { sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const PromptGenerationSchema = z.object({
     prompts: z.array(z.string()).describe("Array of monitoring prompts in the specified language")
@@ -131,11 +132,15 @@ The prompts should:
 
 Generate ${promptCount} unique prompts.`;
 
-        const userPrompt = `Brand: "${brandName}"
-Category: "${category}"
-Description: "${description || 'Not provided'}"
+        const safeBrand = sanitizeConfig(brandName, 200);
+        const safeCategory = sanitizeConfig(category, 200);
+        const safeDescription = sanitizeConfig(description, 500) || 'Not provided';
 
-Generate ${promptCount} diverse search prompts that someone interested in ${category} might ask an AI assistant. 
+        const userPrompt = `Brand: "${safeBrand}"
+Category: "${safeCategory}"
+Description: "${safeDescription}"
+
+Generate ${promptCount} diverse search prompts that someone interested in ${safeCategory} might ask an AI assistant.
 The prompts should be in ${languageName} and target users in ${territoryContext}.
 
 Examples of good prompt types:

@@ -3,12 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { PLANS, PlanType } from '@/config/plans';
 import { generateObject } from 'ai';
-import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { getLLMProvider, getSystemLLM } from '@/lib/visibility/llm-providers';
+import { getSystemLLM } from '@/lib/visibility/llm-providers';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
+import { sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const CompetitorSuggestionSchema = z.object({
     suggestions: z.array(z.string()).describe("List of competitor names")
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
         const plan = PLANS[user.plan as PlanType] || PLANS[PlanType.FREE];
 
         const body = await request.json();
-        const { action, name, website, enabled = true, category, brandName } = body;
+        const { action, name, website, enabled = true, category, brandName, configId, existingCompetitors } = body;
 
         // Handle AI suggestion (Stateless, no config needed)
         if (action === 'suggest' && category && brandName) {
@@ -75,12 +75,17 @@ export async function POST(request: Request) {
                 const suggestionLimit = 5;
 
                 const { model } = await getSystemLLM();
+                const existingList = Array.isArray(existingCompetitors)
+                    ? existingCompetitors.map((item: unknown) => String(item || '').trim()).filter(Boolean)
+                    : [];
+
                 const result = await generateObject({
                     model,
                     schema: CompetitorSuggestionSchema,
-                    prompt: `Generate a list of ${suggestionLimit} main competitors for "${brandName}" in the "${category}" category.
+                    prompt: `Generate a list of ${suggestionLimit} main competitors for "${sanitizeConfig(brandName, 200)}" in the "${sanitizeConfig(category, 200)}" category.
 
 Only include well-known, legitimate competitors that users might compare against.
+Avoid duplicates and do not include already tracked competitors: ${JSON.stringify(existingList)}.
 Return only the company/product names, without descriptions.`,
                     temperature: 0.3
                 });
@@ -118,7 +123,10 @@ Return only the company/product names, without descriptions.`,
         }
 
         const config = await prisma.visibilityConfig.findFirst({
-            where: { organizationId },
+            where: {
+                organizationId,
+                ...(typeof configId === 'string' && configId ? { id: configId } : {})
+            },
             include: {
                 competitors: {
                     where: { enabled: true }

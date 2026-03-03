@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
 import { CreditService } from '@/services/creditService';
 import { PLANS } from '@/config/plans';
+import { sendPaymentFailedEmail } from '@/lib/email';
 
 function unixTimestampToDate(value: unknown): Date | null {
     const raw = typeof value === 'string' ? Number.parseInt(value, 10) : value;
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Webhook persistence failed' }, { status: 500 });
     }
 
+    // FIX 1: Handler errors after persist → log + return 200 (prevents Stripe infinite retries)
     try {
         switch (event.type) {
             case 'checkout.session.completed': {
@@ -125,6 +127,17 @@ export async function POST(req: NextRequest) {
                 await handlePaymentFailed(invoice);
                 break;
             }
+            case 'customer.subscription.trial_will_end': {
+                const subscription = event.data.object as Stripe.Subscription;
+                await handleTrialWillEnd(subscription);
+                break;
+            }
+            // FIX 2: Handle payment_intent.payment_failed to revoke optimistically-granted credits
+            case 'payment_intent.payment_failed': {
+                const paymentIntent = event.data.object as Stripe.PaymentIntent;
+                await handlePaymentIntentFailed(paymentIntent);
+                break;
+            }
             default:
                 break;
         }
@@ -139,7 +152,9 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ received: true });
     } catch (error: any) {
-        console.error('Webhook handler error:', error);
+        // Event is already persisted (idempotency recorded). Log the error but
+        // return 200 so Stripe does NOT retry infinitely.
+        console.error('[Stripe webhook] Handler error after persist:', error);
 
         await prisma.stripeWebhookEvent.update({
             where: { eventId: event.id },
@@ -148,10 +163,9 @@ export async function POST(req: NextRequest) {
             }
         }).catch(() => null);
 
-        return NextResponse.json(
-            { error: 'Webhook handler failed' },
-            { status: 500 }
-        );
+        // Return 200 — the event was received and persisted; handler failure is
+        // a business-logic error we must investigate, not a reason to retry.
+        return NextResponse.json({ received: true, handlerError: true });
     }
 }
 
@@ -260,7 +274,10 @@ async function handleSubscriptionCreated(session: Stripe.Checkout.Session, strip
 
 async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription) {
     const subscription = await prisma.subscription.findUnique({
-        where: { stripeSubscriptionId: stripeSubscription.id }
+        where: { stripeSubscriptionId: stripeSubscription.id },
+        include: {
+            organization: { select: { plan: true } }
+        }
     });
 
     if (!subscription) return;
@@ -280,6 +297,19 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
     const { planType, billingCycle } = await resolvePlanAndCycleFromPriceId(priceId);
     const orgUpdateData = await buildOrganizationPlanUpdate(subscription.organizationId, planType, billingCycle);
     const periodDates = getStripePeriodDates(stripeSubscription);
+
+    // Downgrade detection: confronta rank piano vecchio vs nuovo
+    const oldPlanType = subscription.organization.plan as PlanType;
+    const oldRank = PLAN_RANK[oldPlanType] ?? 0;
+    const newRank = PLAN_RANK[planType] ?? 0;
+    const isDowngrade = newRank < oldRank;
+
+    if (isDowngrade) {
+        console.log(
+            `[stripe/webhook] Plan downgrade detected: ${oldPlanType} → ${planType} ` +
+            `for org ${subscription.organizationId}`
+        );
+    }
 
     await prisma.$transaction([
         prisma.subscription.update({
@@ -301,6 +331,11 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
             data: orgUpdateData
         })
     ]);
+
+    // Dopo la transazione: se è un downgrade, applica i limiti del nuovo piano
+    if (isDowngrade) {
+        await enforceDowngradeLimits(subscription.organizationId, planType);
+    }
 }
 
 async function handleSubscriptionCanceled(stripeSubscription: Stripe.Subscription) {
@@ -330,6 +365,29 @@ async function handleSubscriptionCanceled(stripeSubscription: Stripe.Subscriptio
             }
         })
     ]);
+}
+
+async function handleTrialWillEnd(stripeSubscription: Stripe.Subscription) {
+    const subscription = await prisma.subscription.findUnique({
+        where: { stripeSubscriptionId: stripeSubscription.id },
+        select: { id: true, organizationId: true, trialEndsAt: true }
+    });
+
+    if (!subscription) return;
+
+    const trialEndsAt = unixTimestampToDate(stripeSubscription.trial_end);
+
+    // Aggiorna la data di fine trial (può essere già corretta, ma confermiamo)
+    await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { trialEndsAt }
+    });
+
+    console.log(
+        `[stripe/webhook] Trial will end for org ${subscription.organizationId} ` +
+        `at ${trialEndsAt?.toISOString() ?? 'unknown'}`
+    );
+    // TODO: inviare notifica email/in-app all'utente quando il sistema email sarà pronto
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
@@ -362,6 +420,55 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         where: { stripeSubscriptionId },
         data: { status: SubscriptionStatus.PAST_DUE }
     });
+
+    // FIX 3: Send payment failure email to org owners/admins
+    const subscription = await prisma.subscription.findFirst({
+        where: { stripeSubscriptionId },
+        include: {
+            organization: {
+                include: {
+                    members: {
+                        where: { role: { in: ['OWNER', 'ADMIN'] } },
+                        include: { user: true }
+                    }
+                }
+            }
+        }
+    });
+    if (subscription) {
+        for (const member of subscription.organization.members) {
+            if (member.user.email) {
+                try {
+                    await sendPaymentFailedEmail(member.user.email, member.user.name || 'there');
+                } catch (e) {
+                    console.error('[Email] Failed to send payment failure notification', e);
+                }
+            }
+        }
+    }
+}
+
+// FIX 2: Handler for payment_intent.payment_failed — revokes optimistically-granted credits
+async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
+    // Find OrgCreditPack by stripePaymentId to potentially revoke credits
+    const creditPack = await prisma.orgCreditPack.findFirst({
+        where: { stripePaymentId: paymentIntent.id },
+        include: { organization: { include: { members: { include: { user: true } } } } }
+    });
+    if (creditPack) {
+        // Revoke the credits that were optimistically granted
+        await prisma.$transaction([
+            prisma.orgCreditPack.update({
+                where: { id: creditPack.id },
+                data: { creditsRemaining: BigInt(0) }
+            }),
+            prisma.organization.update({
+                where: { id: creditPack.organizationId },
+                data: { packCreditsAvailable: { decrement: creditPack.creditsRemaining } }
+            })
+        ]);
+        console.log(`[Stripe] Revoked credits for failed payment ${paymentIntent.id}`);
+    }
 }
 
 function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
@@ -373,6 +480,59 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
     if (typeof rawSubscription === 'string') return rawSubscription;
     if (rawSubscription && typeof rawSubscription.id === 'string') return rawSubscription.id;
     return null;
+}
+
+// ─── Downgrade enforcement ───────────────────────────────────────────────────
+
+/** Rank numerico per rilevare downgrade. Più alto = piano superiore. */
+const PLAN_RANK: Record<string, number> = {
+    FREE: 0,
+    TRIAL: 1,
+    STARTER: 2,
+    PRO: 3,
+    PARTNER: 3,
+    BUSINESS: 4,
+    ENTERPRISE: 5,
+    ADMIN: 5,
+};
+
+/**
+ * Se il nuovo piano ha un limite hard di bot pubblicati,
+ * pausa i bot in eccesso (i più vecchi rimangono PAUSED).
+ */
+async function enforceDowngradeLimits(
+    organizationId: string,
+    newPlanType: PlanType
+): Promise<void> {
+    const newPlan = PLANS[newPlanType] || PLANS[PlanType.FREE];
+    const maxBots = newPlan.limits.maxChatbots;
+
+    // -1 = illimitato → nessuna azione necessaria
+    if (maxBots === -1) return;
+
+    const publishedBots = await prisma.bot.findMany({
+        where: {
+            project: { organizationId },
+            status: 'PUBLISHED',
+        },
+        orderBy: { createdAt: 'desc' }, // i più recenti hanno priorità
+        select: { id: true },
+    });
+
+    if (publishedBots.length <= maxBots) return;
+
+    // Pausa i bot in eccesso (i più vecchi, coda della lista ordinata desc)
+    const tosPause = publishedBots.slice(maxBots).map((b) => b.id);
+
+    await prisma.bot.updateMany({
+        where: { id: { in: tosPause } },
+        data: { status: 'PAUSED' },
+    });
+
+    console.log(
+        `[stripe/webhook] Downgrade enforcement: paused ${tosPause.length} bot(s) ` +
+        `for org ${organizationId} (new maxBots: ${maxBots})`
+    );
 }
 
 function mapTierToPlanType(tier: string): PlanType {

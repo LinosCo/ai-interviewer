@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { getAdminApiKey, getSystemLLM } from './llm-providers';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { sanitize } from '@/lib/llm/prompt-sanitizer';
+import { findAnyNameMentionPosition, findNameMentionPosition } from './name-matching';
 
 // Known source reputations (Italian + International)
 const SOURCE_REPUTATIONS: Record<string, { score: number; type: string }> = {
@@ -385,7 +387,8 @@ export class SerpMonitoringEngine {
         competitors: string[],
         query: string,
         language: string = 'en',
-        territory: string = 'US'
+        territory: string = 'US',
+        brandAliases: string[] = []
     ): Promise<{
         aiOverview: {
             text: string;
@@ -433,41 +436,17 @@ export class SerpMonitoringEngine {
             };
         }
 
-        // Analyze the AI Overview text for brand mentions
-        const text = overview.text.toLowerCase();
-        const brandLower = brandName.toLowerCase();
-
-        // Check if brand is mentioned
-        const brandMentioned = text.includes(brandLower);
-
-        // Find position (simple: count occurrences before brand mention)
-        let brandPosition: number | null = null;
-        if (brandMentioned) {
-            // Split by common separators and find brand position
-            const parts = text.split(/[,;.\n]/);
-            for (let i = 0; i < parts.length; i++) {
-                if (parts[i].includes(brandLower)) {
-                    brandPosition = i + 1;
-                    break;
-                }
-            }
-        }
+        // Analyze the AI Overview text for brand mentions (exact + typo/similar)
+        const text = overview.text;
+        const brandMatch = findAnyNameMentionPosition(text, [brandName, ...(brandAliases || [])]);
+        const brandMentioned = brandMatch.mentioned;
+        const brandPosition = brandMatch.position;
 
         // Check competitor positions
         const competitorPositions: Record<string, number | null> = {};
         for (const competitor of competitors) {
-            const compLower = competitor.toLowerCase();
-            if (text.includes(compLower)) {
-                const parts = text.split(/[,;.\n]/);
-                for (let i = 0; i < parts.length; i++) {
-                    if (parts[i].includes(compLower)) {
-                        competitorPositions[competitor] = i + 1;
-                        break;
-                    }
-                }
-            } else {
-                competitorPositions[competitor] = null;
-            }
+            const match = findNameMentionPosition(text, competitor);
+            competitorPositions[competitor] = match.mentioned ? match.position : null;
         }
 
         return {
@@ -653,8 +632,8 @@ Per ogni risultato, valuta:
 RISULTATI DA ANALIZZARE:
 ${batch.map((r, idx) => `
 [${idx + 1}] Fonte: ${r.sourceDomain} (Reputazione: ${r.sourceReputation}/100)
-Titolo: ${r.title}
-Snippet: ${r.snippet}
+Titolo: ${sanitize(r.title, 200)}
+Snippet: ${sanitize(r.snippet, 500)}
 `).join('\n---\n')}
 
 Restituisci un array di analisi, una per ogni risultato nell'ordine dato.`,

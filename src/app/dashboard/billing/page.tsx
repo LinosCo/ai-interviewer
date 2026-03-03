@@ -271,6 +271,7 @@ export default async function BillingPage({
     const monthlyRemaining = Math.max(0, monthlyLimit - monthlyUsed);
     const monthlyRatio = monthlyLimit > 0 ? monthlyUsed / monthlyLimit : 0;
     const monthlyPercentage = Math.min(100, Math.round(monthlyRatio * 100));
+    const monthlyRemainingPercentage = Math.max(0, 100 - monthlyPercentage);
     const isUnlimited = monthlyLimit === -1;
     const creditsResetDate = organization.creditsResetDate;
 
@@ -345,29 +346,38 @@ export default async function BillingPage({
                                 </div>
                             </div>
 
-                            {/* Barra avanzamento crediti mensili */}
+                            {/* Barra disponibilita crediti mensili (decrescente con il consumo) */}
                             <div className="mt-3">
                                 <div
                                     className="h-2 bg-stone-200 rounded-full overflow-hidden"
                                     role="progressbar"
-                                    aria-valuenow={monthlyPercentage}
+                                    aria-valuenow={monthlyRemainingPercentage}
                                     aria-valuemin={0}
                                     aria-valuemax={100}
-                                    aria-label="Utilizzo crediti mensili"
+                                    aria-label="Crediti mensili disponibili"
                                 >
                                     <div
                                         className={`h-full transition-all duration-300 ${
-                                            monthlyRatio >= 0.95 ? 'bg-red-500' :
-                                            monthlyRatio >= 0.85 ? 'bg-orange-500' :
-                                            monthlyRatio >= 0.70 ? 'bg-yellow-500' :
+                                            monthlyRemainingPercentage <= 5 ? 'bg-red-500' :
+                                            monthlyRemainingPercentage <= 15 ? 'bg-orange-500' :
+                                            monthlyRemainingPercentage <= 30 ? 'bg-yellow-500' :
                                             'bg-green-500'
                                         }`}
-                                        style={{ width: `${monthlyPercentage}%` }}
+                                        style={{ width: `${monthlyRemainingPercentage}%` }}
                                     />
                                 </div>
-                                <p className="text-xs text-stone-400 mt-1 text-right">
-                                    {monthlyPercentage}% utilizzato
-                                </p>
+                                <div className="text-xs text-stone-400 mt-1 flex items-center justify-between">
+                                    <span>{formatMonthlyCredits(monthlyUsed)} utilizzati</span>
+                                    <span>{monthlyRemainingPercentage}% disponibili</span>
+                                </div>
+                                {creditsResetDate && (
+                                    <p className="text-[11px] text-stone-500 mt-2">
+                                        Reset crediti mensili: {new Date(creditsResetDate).toLocaleDateString('it-IT', {
+                                            day: 'numeric',
+                                            month: 'long'
+                                        })}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Sezione Pack Extra — visibile solo se disponibili */}
@@ -385,15 +395,13 @@ export default async function BillingPage({
                                         </div>
                                         <p className="text-2xl font-black text-amber-600">{formatMonthlyCredits(packAvailable)}</p>
                                     </div>
-                                    <div
-                                        className="h-2 bg-amber-200 rounded-full overflow-hidden"
-                                        role="progressbar"
-                                        aria-valuenow={100}
-                                        aria-valuemin={0}
-                                        aria-valuemax={100}
-                                        aria-label="Pack extra crediti disponibili"
-                                    >
-                                        <div className="h-full w-full bg-amber-500 rounded-full" />
+                                    <div className="mt-2 flex items-center justify-between rounded-lg bg-amber-100/70 border border-amber-200 px-3 py-2">
+                                        <p className="text-[11px] font-semibold text-amber-700">
+                                            Disponibili dopo i crediti mensili
+                                        </p>
+                                        <p className="text-[10px] text-amber-600">
+                                            Non scadono mai
+                                        </p>
                                     </div>
                                     <p className="text-[10px] text-amber-500 mt-1">
                                         {formatMonthlyCredits(packAvailable)} crediti pack disponibili
@@ -403,14 +411,6 @@ export default async function BillingPage({
                             </>
                         )}
 
-                        {creditsResetDate && !isUnlimited && (
-                            <p className="text-xs text-stone-500 text-center mt-4">
-                                Reset: {new Date(creditsResetDate).toLocaleDateString('it-IT', {
-                                    day: 'numeric',
-                                    month: 'long'
-                                })}
-                            </p>
-                        )}
                     </div>
 
                     {/* Features Grid */}

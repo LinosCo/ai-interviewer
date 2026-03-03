@@ -28,19 +28,19 @@ function TrustBadgesView() {
         <svg className="w-4 h-4 text-[hsl(var(--coral))]" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
         </svg>
-        Setup in 5 minuti
+        Setup guidato in pochi minuti
       </span>
       <span className="flex items-center gap-2">
         <svg className="w-4 h-4 text-[hsl(var(--coral))]" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
         </svg>
-        Nessuna carta richiesta
+        Nessun team tecnico richiesto
       </span>
       <span className="flex items-center gap-2">
         <svg className="w-4 h-4 text-[hsl(var(--coral))]" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
         </svg>
-        Cancella quando vuoi
+        Copilot + automazioni no-code
       </span>
     </div>
   );
@@ -66,6 +66,9 @@ export function HeroSection() {
             transition={{ duration: 0.6 }}
             className="text-center max-w-5xl mx-auto"
           >
+            <p className="text-xs md:text-sm uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))] mb-4 md:mb-6 font-semibold">
+              La prima AI Marketing Intelligence davvero operativa
+            </p>
             {/* Animated Headline */}
             <h1 className="font-display text-[2rem] md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.2] md:leading-[1.1] mb-4 md:mb-8">
               <span className="text-[hsl(var(--foreground))]">Ti piacerebbe sapere</span>
@@ -88,9 +91,9 @@ export function HeroSection() {
 
             {/* Subtitle */}
             <p className="text-base md:text-xl text-[hsl(var(--muted-foreground))] mb-8 md:mb-12 max-w-2xl mx-auto leading-relaxed px-2 md:px-0">
-              La piattaforma di marketing e business intelligence che ascolta mercato,
-              dipendenti e filiera. Raccoglie feedback, identifica problemi e ti guida
-              verso decisioni migliori.
+              Ti aiuta ad ascoltare gli stakeholder, monitorare la reputazione, prendere
+              decisioni consapevoli e organizzare attivita digitali in modo efficiente:
+              meno tempo sprecato, piu opportunita concrete.
             </p>
 
             {/* CTAs */}
@@ -129,6 +132,14 @@ export function HeroSection() {
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.5)] text-[hsl(var(--muted-foreground))] text-sm font-medium">
                 <Users className="w-4 h-4" />
                 HR
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--card))] border border-[hsl(var(--border)/0.5)] text-[hsl(var(--muted-foreground))] text-sm font-medium">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 6h16" />
+                  <path d="M4 12h16" />
+                  <path d="M4 18h10" />
+                </svg>
+                Agenzie & Consulenti
               </div>
             </motion.div>
 

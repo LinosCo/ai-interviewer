@@ -38,23 +38,19 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
     if (!bot) notFound();
     const projectAccess = await assertProjectAccess(session.user.id, bot.projectId, 'MEMBER');
 
-    const projects = await prisma.project.findMany({
-        where: {
-            organizationId: projectAccess.organizationId
-        },
-        select: {
-            id: true,
-            name: true,
-            isPersonal: true
-        },
-        orderBy: { createdAt: 'asc' }
-    });
-
     const organizationId = projectAccess.organizationId;
 
-    const canUseKnowledgeBase = await isFeatureEnabled(organizationId, 'knowledgeBase');
-    const canUseConditionalLogic = await isFeatureEnabled(organizationId, 'conditionalLogic');
-    const canUseBranding = await isFeatureEnabled(organizationId, 'customLogo');
+    // Run all independent queries concurrently
+    const [projects, canUseKnowledgeBase, canUseConditionalLogic, canUseBranding] = await Promise.all([
+        prisma.project.findMany({
+            where: { organizationId },
+            select: { id: true, name: true, isPersonal: true },
+            orderBy: { createdAt: 'asc' }
+        }),
+        isFeatureEnabled(organizationId, 'knowledgeBase'),
+        isFeatureEnabled(organizationId, 'conditionalLogic'),
+        isFeatureEnabled(organizationId, 'customLogo'),
+    ]);
 
     if ((bot as any).botType === 'chatbot') {
         return (

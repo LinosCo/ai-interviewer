@@ -3,6 +3,8 @@
 import { ExternalLink, Settings, Trash2, ArrowRightLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { showToast } from '@/components/toast';
+import { ConfirmDialog, useConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface CMSConnectionCardProps {
     connection: {
@@ -24,12 +26,13 @@ interface CMSConnectionCardProps {
 export default function CMSConnectionCard({ connection, canManage, onSettings, onTransfer, onDelete }: CMSConnectionCardProps) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [isOpeningDashboard, setIsOpeningDashboard] = useState(false);
+    const cmsConfirm = useConfirmDialog();
 
     const statusColors = {
         ACTIVE: 'bg-green-100 text-green-700 border-green-200',
         PENDING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
         ERROR: 'bg-red-100 text-red-700 border-red-200',
-        DISABLED: 'bg-gray-100 text-gray-700 border-gray-200'
+        DISABLED: 'bg-stone-100 text-stone-700 border-stone-200'
     };
 
     const statusLabels = {
@@ -40,9 +43,13 @@ export default function CMSConnectionCard({ connection, canManage, onSettings, o
     };
 
     const handleDelete = async () => {
-        if (!confirm('Sei sicuro di voler eliminare questa connessione CMS? Questa azione non può essere annullata.')) {
-            return;
-        }
+        const ok = await cmsConfirm.open({
+            title: 'Elimina connessione CMS',
+            description: 'Sei sicuro di voler eliminare questa connessione CMS? Questa azione non può essere annullata.',
+            confirmLabel: 'Elimina',
+            variant: 'destructive',
+        });
+        if (!ok) return;
         setIsDeleting(true);
         try {
             await onDelete?.(connection.id);
@@ -68,11 +75,11 @@ export default function CMSConnectionCard({ connection, canManage, onSettings, o
             } else {
                 const error = await res.json();
                 console.error('Failed to get CMS dashboard URL:', error);
-                alert(error.error || 'Impossibile aprire il CMS');
+                showToast(error.error || 'Impossibile aprire il CMS', 'error');
             }
         } catch (error) {
             console.error('Error opening CMS dashboard:', error);
-            alert('Errore durante l\'apertura del CMS');
+            showToast('Errore durante l\'apertura del CMS', 'error');
         } finally {
             setIsOpeningDashboard(false);
         }
@@ -83,14 +90,14 @@ export default function CMSConnectionCard({ connection, canManage, onSettings, o
             <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-bold text-gray-900">{connection.name}</h3>
+                        <h3 className="font-bold text-stone-900">{connection.name}</h3>
                         <span className={`px-2 py-0.5 text-xs font-bold rounded-full border ${statusColors[connection.status]}`}>
                             {statusLabels[connection.status]}
                         </span>
                     </div>
-                    <p className="text-sm text-gray-500">Progetto: {connection.projectName}</p>
+                    <p className="text-sm text-stone-500">Progetto: {connection.projectName}</p>
                     {connection.lastPingAt && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-stone-400 mt-1">
                             Ultimo ping: {new Date(connection.lastPingAt).toLocaleString('it-IT')}
                         </p>
                     )}
@@ -163,6 +170,8 @@ export default function CMSConnectionCard({ connection, canManage, onSettings, o
                     </>
                 )}
             </div>
+
+            <ConfirmDialog {...cmsConfirm.dialogProps} />
         </div>
     );
 }

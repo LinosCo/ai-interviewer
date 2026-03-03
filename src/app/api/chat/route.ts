@@ -603,7 +603,8 @@ export async function POST(req: Request) {
             language,
             researchGoal: bot.researchGoal || '',
             targetAudience: bot.targetAudience || '',
-            plan: interviewPlan
+            plan: interviewPlan,
+            interviewerQuality: (bot as any).interviewerQuality || 'quantitativo'
         });
         const manualInterviewGuide = extractManualInterviewGuideSource(
             (bot.knowledgeSources || []).map((source: any) => ({

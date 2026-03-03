@@ -153,4 +153,18 @@ describe('runtime-knowledge', () => {
         expect(block).toContain('MANUALE, EDITABILE');
         expect(block).toContain('Contesto aziendale');
     });
+
+    it('produces different signatures for different quality tiers', () => {
+        const base = {
+            language: 'it',
+            researchGoal: 'understand decision-making',
+            targetAudience: 'product managers',
+            plan: {
+                meta: { topicsSignature: 'abc123', maxDurationMins: 30 }
+            } as any
+        }
+        const sigQuantitativo = buildRuntimeInterviewKnowledgeSignature({ ...base, interviewerQuality: 'quantitativo' })
+        const sigAvanzato = buildRuntimeInterviewKnowledgeSignature({ ...base, interviewerQuality: 'avanzato' })
+        expect(sigQuantitativo).not.toBe(sigAvanzato)
+    });
 });

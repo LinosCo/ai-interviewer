@@ -129,13 +129,15 @@ export function buildRuntimeInterviewKnowledgeSignature(params: {
     researchGoal?: string | null;
     targetAudience?: string | null;
     plan: InterviewPlan;
+    interviewerQuality?: string | null;
 }): string {
     const basis = [
         params.language || 'en',
         params.researchGoal || '',
         params.targetAudience || '',
         params.plan?.meta?.topicsSignature || '',
-        params.plan?.meta?.maxDurationMins || ''
+        params.plan?.meta?.maxDurationMins || '',
+        params.interviewerQuality || 'quantitativo'
     ].join('|');
     return `rk-v1-${hashString(basis)}`;
 }

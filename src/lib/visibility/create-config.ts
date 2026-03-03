@@ -61,7 +61,7 @@ async function acquireVisibilityNameLock(
     const lockKey = `${organizationId}:${scope}:${normalizedBrandName.toLowerCase()}`;
 
     try {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`;
     } catch (error) {
         console.warn('[visibility-create] Advisory lock unavailable:', error);
     }

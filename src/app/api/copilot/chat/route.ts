@@ -46,6 +46,19 @@ function isAnthropicModelNotFound(error: unknown): boolean {
     return message.includes('not_found_error') || message.includes('model:');
 }
 
+function isPlaceholderCopilotResponse(text: string): boolean {
+    const normalized = String(text || '').toLowerCase().trim();
+    if (!normalized) return true;
+
+    return [
+        'lasciami cercare',
+        'cerco subito',
+        'scusa per il ritardo',
+        'verifico adesso',
+        'un momento mentre controllo'
+    ].some((snippet) => normalized.includes(snippet));
+}
+
 export async function POST(req: Request) {
     try {
         const session = await auth();
@@ -279,7 +292,7 @@ export async function POST(req: Request) {
 
             return generateText({
                 model: llm as any,
-                system: systemPrompt + "\n\nCRITICAL: Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
+                system: systemPrompt + "\n\nCRITICAL: Never stop at 'I'm searching' or similar placeholder messages. If you use tools, always provide the final concrete answer in the same turn. Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
                 messages: inputMessages,
                 tools: toolSet,
                 ...(toolSet ? { maxSteps: 4 } : {}),
@@ -367,9 +380,15 @@ export async function POST(req: Request) {
             }
         }
 
-        const responseText = typeof finalObject?.response === 'string'
+        let responseText = typeof finalObject?.response === 'string'
             ? finalObject.response
             : String(finalObject?.response ?? result.text ?? '');
+
+        if (isPlaceholderCopilotResponse(responseText) && kbResults.length > 0) {
+            const top = kbResults[0];
+            responseText = `Ho trovato questo nella documentazione di Business Tuner:\n\n**${top.title}**\n\n${top.content.slice(0, 1100)}\n\nSe vuoi, posso darti i passaggi operativi esatti sul tuo progetto.`;
+            finalObject.usedKnowledgeBase = true;
+        }
 
         // 10. Log copilot session
         const estimatedTokens = Math.ceil((message.length + responseText.length) / 4);

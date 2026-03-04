@@ -155,19 +155,14 @@ export function AutomationSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6 }}
-                    className="flex flex-wrap justify-center items-center gap-3 mb-16"
+                    className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-16"
                 >
-                    {flowSteps.map((step, i) => (
-                        <div key={step.label} className="flex items-center gap-3">
-                            <div className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-[hsl(var(--border)/0.5)]">
-                                <div className="w-8 h-8 rounded-xl gradient-bg flex items-center justify-center flex-shrink-0">
-                                    <step.icon className="w-4 h-4 text-white" />
-                                </div>
-                                <span className="text-sm font-medium whitespace-nowrap">{step.label}</span>
+                    {flowSteps.map((step) => (
+                        <div key={step.label} className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3 border border-[hsl(var(--border)/0.5)]">
+                            <div className="w-8 h-8 rounded-xl gradient-bg flex items-center justify-center flex-shrink-0">
+                                <step.icon className="w-4 h-4 text-white" />
                             </div>
-                            {i < flowSteps.length - 1 && (
-                                <ArrowRight className="w-4 h-4 text-[hsl(var(--muted-foreground))] flex-shrink-0" />
-                            )}
+                            <span className="text-sm font-medium leading-tight">{step.label}</span>
                         </div>
                     ))}
                 </motion.div>

@@ -123,8 +123,8 @@ const features = [
 export function FeaturesSection() {
   return (
     <section id="strumenti" className="pt-8 pb-20 md:pt-12 md:pb-28 relative">
-      {/* White overlay */}
-      <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px]" />
+      {/* Colored phase overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.07)] via-transparent to-[hsl(var(--amber)/0.08)]" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div
@@ -248,22 +248,22 @@ export function FeaturesSection() {
               insieme — interviste, chat e monitoraggio continuo — per darti insight che
               nessuno strumento singolo potrebbe offrire.
             </p>
-            <div className="flex flex-wrap justify-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--coral)/0.1)] border border-[hsl(var(--coral)/0.2)]">
                 <MessageSquare className="w-4 h-4 text-[hsl(var(--coral))]" />
                 <span className="text-sm font-medium">Interviste AI</span>
               </div>
-              <div className="text-[hsl(var(--muted-foreground))]">+</div>
+              <div className="hidden sm:block text-[hsl(var(--muted-foreground))]">+</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--amber)/0.1)] border border-[hsl(var(--amber)/0.2)]">
                 <Bot className="w-4 h-4 text-[hsl(var(--amber))]" />
                 <span className="text-sm font-medium">Chatbot</span>
               </div>
-              <div className="text-[hsl(var(--muted-foreground))]">+</div>
+              <div className="hidden sm:block text-[hsl(var(--muted-foreground))]">+</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20">
                 <LineChart className="w-4 h-4 text-green-500" />
                 <span className="text-sm font-medium">Monitoraggio Continuo</span>
               </div>
-              <div className="text-[hsl(var(--muted-foreground))]">=</div>
+              <div className="hidden sm:block text-[hsl(var(--muted-foreground))]">=</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full gradient-bg shadow-glow">
                 <Zap className="w-4 h-4 text-white" />
                 <span className="text-sm font-medium text-white">
@@ -271,8 +271,11 @@ export function FeaturesSection() {
                 </span>
               </div>
             </div>
+            <p className="sm:hidden text-sm text-[hsl(var(--muted-foreground))] mt-4">
+              Interviste AI + Chatbot + Monitoraggio Continuo = Visione completa
+            </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {['SERP AI', 'Search Console', 'Menzioni Brand', 'Webhook', 'n8n', 'CRM'].map((integration) => (
+              {['Google Analytics', 'Search Console', 'WordPress', 'WooCommerce', 'Webhook', 'n8n', 'CRM'].map((integration) => (
                 <span
                   key={integration}
                   className="px-3 py-1.5 rounded-full text-xs font-medium border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]"

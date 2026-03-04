@@ -127,86 +127,116 @@
   }
 
   function mountWidget() {
-  // Create Iframe Container
-  const container = document.createElement('div');
-  container.id = 'bt-root';
-  container.style.position = 'fixed';
-  container.style.bottom = '0';
-  container.style.right = '0';
-  container.style.zIndex = '2147483647';
-  container.style.width = '120px';
-  container.style.height = '120px';
-  container.style.transition = 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-  container.style.pointerEvents = 'none'; // Background clicks go through
-  container.style.display = 'flex';
-  container.style.alignItems = 'flex-end';
-  container.style.justifyContent = 'flex-end';
-  container.style.padding = '20px';
+    // Create Iframe Container
+    const container = document.createElement('div');
+    container.id = 'bt-root';
+    container.style.position = 'fixed';
+    container.style.bottom = '0';
+    container.style.right = '0';
+    container.style.zIndex = '2147483647';
+    container.style.width = '112px';
+    container.style.height = '112px';
+    container.style.transition = 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    container.style.pointerEvents = 'none'; // Background clicks go through
+    container.style.display = 'flex';
+    container.style.alignItems = 'flex-end';
+    container.style.justifyContent = 'flex-end';
+    container.style.boxSizing = 'border-box';
+    container.style.padding = '12px';
 
-  // Construct Iframe URL — include all URL-param-driven features
-  const widgetParams = new URLSearchParams();
-  if (CONFIG.forceConsent) widgetParams.set('forceConsent', 'true');
-  if (CONFIG.autoOpen) widgetParams.set('autoOpen', 'true');
-  const widgetQuery = widgetParams.toString();
-  const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}${widgetQuery ? '?' + widgetQuery : ''}`;
-
-  const iframe = document.createElement('iframe');
-  iframe.src = widgetUrl;
-  iframe.style.width = '100%';
-  iframe.style.height = '100%';
-  iframe.style.border = 'none';
-  iframe.style.borderRadius = '20px';
-  iframe.style.pointerEvents = 'auto'; // Iframe captures clicks
-  iframe.allow = 'microphone; autoplay';
-
-  container.appendChild(iframe);
-  document.body.appendChild(container);
-
-  // Communication
-  window.addEventListener('message', (event) => {
+    // Construct Iframe URL — include all URL-param-driven features
+    const widgetParams = new URLSearchParams();
+    if (CONFIG.forceConsent) widgetParams.set('forceConsent', 'true');
+    if (CONFIG.autoOpen) widgetParams.set('autoOpen', 'true');
+    const widgetQuery = widgetParams.toString();
+    const widgetUrl = `${CONFIG.apiBase}/w/${CONFIG.botId}${widgetQuery ? '?' + widgetQuery : ''}`;
     const expectedOrigin = new URL(widgetUrl).origin;
-    if (event.origin !== expectedOrigin) return;
-    let data = event.data;
-    if (typeof data === 'string') {
-      try {
-        data = JSON.parse(data);
-      } catch {
-        data = null;
-      }
-    }
 
-    if (!data || typeof data !== 'object') return;
+    const iframe = document.createElement('iframe');
+    iframe.src = widgetUrl;
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.style.borderRadius = '20px';
+    iframe.style.pointerEvents = 'auto'; // Iframe captures clicks
+    iframe.allow = 'microphone; autoplay';
 
-    if (data && data.type === 'bt-widget-resize') {
+    container.appendChild(iframe);
+    document.body.appendChild(container);
+
+    let isWidgetOpen = false;
+
+    function applyClosedState() {
       const isMobile = window.innerWidth < 640;
+      container.style.width = isMobile ? '96px' : '112px';
+      container.style.height = isMobile ? '96px' : '112px';
+      container.style.padding = isMobile ? '8px' : '12px';
+      iframe.style.borderRadius = '20px';
+    }
 
-      if (data.isOpen) {
-        if (isMobile) {
-          container.style.width = '100%';
-          container.style.height = '100%';
-          container.style.padding = '0';
-        } else {
-          container.style.width = '420px';
-          container.style.height = '750px';
-          container.style.padding = '20px';
-        }
+    function applyOpenState() {
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+      const isMobile = viewportW < 640;
+
+      if (isMobile) {
+        container.style.width = '100vw';
+        container.style.height = '100dvh';
+        container.style.padding = '0';
+        iframe.style.borderRadius = '0px';
+        return;
+      }
+
+      const targetWidth = Math.max(320, Math.min(420, viewportW - 24));
+      const targetHeight = Math.max(520, Math.min(760, viewportH - 24));
+      container.style.width = `${targetWidth}px`;
+      container.style.height = `${targetHeight}px`;
+      container.style.padding = '12px';
+      iframe.style.borderRadius = '20px';
+    }
+
+    function applyWidgetSize(open) {
+      if (open) {
+        applyOpenState();
       } else {
-        container.style.width = '120px';
-        container.style.height = '120px';
-        container.style.padding = '20px';
+        applyClosedState();
       }
     }
 
-    if (data && data.type === 'bt-widget-get-context') {
-      // Reply only to our widget iframe.
-      if (event.source === iframe.contentWindow && iframe.contentWindow) {
-        iframe.contentWindow.postMessage({
-          type: 'bt-widget-page-context',
-          pageContext: buildPageContext()
-        }, new URL(widgetUrl).origin);
+    applyWidgetSize(false);
+
+    // Keep dimensions coherent during viewport changes (rotate/rescale).
+    window.addEventListener('resize', () => applyWidgetSize(isWidgetOpen));
+
+    // Communication
+    window.addEventListener('message', (event) => {
+      if (event.origin !== expectedOrigin) return;
+      let data = event.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          data = null;
+        }
       }
-    }
-  });
+
+      if (!data || typeof data !== 'object') return;
+
+      if (data.type === 'bt-widget-resize') {
+        isWidgetOpen = Boolean(data.isOpen);
+        applyWidgetSize(isWidgetOpen);
+      }
+
+      if (data.type === 'bt-widget-get-context') {
+        // Reply only to our widget iframe.
+        if (event.source === iframe.contentWindow && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: 'bt-widget-page-context',
+            pageContext: buildPageContext()
+          }, expectedOrigin);
+        }
+      }
+    });
   } // end mountWidget
 
   // data-delay: defer widget mount by the specified milliseconds

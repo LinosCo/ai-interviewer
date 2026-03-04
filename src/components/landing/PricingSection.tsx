@@ -17,8 +17,8 @@ export function PricingSection() {
 
     return (
         <section id="pricing" className="pt-8 pb-20 md:pt-12 md:pb-28 relative">
-            {/* White overlay */}
-            <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px]" />
+            {/* Colored phase overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.06)] via-transparent to-[hsl(var(--amber)/0.08)]" />
 
             <div className="max-w-7xl mx-auto px-6 relative z-10">
                 <motion.div
@@ -36,7 +36,7 @@ export function PricingSection() {
                     </p>
 
                     {/* Billing toggle */}
-                    <div className="flex items-center justify-center gap-4">
+                    <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
                         <span className={`text-sm font-medium transition-colors ${!isYearly ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'}`}>
                             Mensile
                         </span>
@@ -227,7 +227,7 @@ export function PricingSection() {
                                     Con il programma Partner puoi gestire i tuoi clienti da un&apos;unica dashboard,
                                     trasferire progetti e guadagnare l&apos;accesso gratuito alla piattaforma.
                                 </p>
-                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div className="grid sm:grid-cols-2 gap-3 md:gap-4 mb-6">
                                     <div className="flex items-center gap-2">
                                         <Check className="w-5 h-5 text-green-500" />
                                         <span className="text-sm">Trial {PARTNER_PLAN.trialDays} giorni</span>

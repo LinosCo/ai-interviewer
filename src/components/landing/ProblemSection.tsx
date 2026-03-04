@@ -76,7 +76,7 @@ export function ProblemSection() {
         </motion.div>
 
         {/* Headers row */}
-        <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 max-w-4xl mx-auto">
+        <div className="hidden md:grid grid-cols-2 gap-8 mb-6 max-w-4xl mx-auto">
           <div className="flex justify-center">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[hsl(var(--coral)/0.2)] text-[hsl(var(--coral))] text-sm font-medium">
               <TrendingDown className="w-4 h-4" />
@@ -100,10 +100,14 @@ export function ProblemSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: index * 0.1 }}
-              className="grid grid-cols-2 gap-4 md:gap-8"
+              className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8"
             >
               {/* Problem card */}
               <div className="p-4 rounded-2xl bg-[hsl(var(--coral)/0.05)] border border-[hsl(var(--coral)/0.2)]">
+                <div className="md:hidden inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[hsl(var(--coral)/0.15)] text-[hsl(var(--coral))] text-[11px] font-semibold mb-3">
+                  <TrendingDown className="w-3 h-3" />
+                  Il problema
+                </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg bg-[hsl(var(--coral)/0.2)] flex items-center justify-center flex-shrink-0">
                     <X className="w-4 h-4 text-[hsl(var(--coral))]" />
@@ -120,6 +124,10 @@ export function ProblemSection() {
 
               {/* Solution card */}
               <div className="p-4 rounded-2xl bg-[hsl(var(--amber)/0.05)] border border-[hsl(var(--amber)/0.2)]">
+                <div className="md:hidden inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-[hsl(var(--amber)/0.2)] text-[hsl(var(--amber))] text-[11px] font-semibold mb-3">
+                  <Sparkles className="w-3 h-3" />
+                  La soluzione
+                </div>
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center flex-shrink-0">
                     <Check className="w-4 h-4 text-white" />

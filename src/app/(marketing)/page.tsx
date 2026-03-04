@@ -54,49 +54,54 @@ export default function LandingPage() {
     <div className="min-h-screen overflow-x-hidden relative">
       <FluidBackground />
       <main className="relative">
-        {/* Hero Section */}
+        {/* Hero (colored) */}
         <HeroSection />
 
-        {/* Transition: Hero → HowItWorks */}
+        {/* Colored -> White */}
         <div className="h-32 section-fade-from-transparent" />
-        <HowItWorks />
-
-        {/* Transition: HowItWorks → Problem */}
-        <div className="h-16 bg-white" />
         <ProblemSection />
 
-        {/* Transition: Problem → Ascolto */}
+        {/* White -> Colored */}
+        <div className="h-24 section-fade-to-transparent" />
         <FeaturesSection />
 
-        {/* Transition: Ascolto → Decidi */}
+        {/* Colored -> White */}
+        <div className="h-24 section-fade-from-transparent" />
+        <HowItWorks />
+
+        {/* White -> Colored */}
         <div className="h-24 section-fade-to-transparent" />
         <AITipsSection />
 
-        {/* Transition: Decidi → Esegui */}
-        <div className="h-20 bg-transparent" />
-        <AutomationSection />
-
-        {/* Transition: Esegui → Monitora */}
+        {/* Colored -> White */}
         <div className="h-24 section-fade-from-transparent" />
         <NewsSection />
 
-        {/* Transition: Monitora → Formazione */}
-        <div className="h-10 bg-white" />
+        {/* White -> Colored */}
+        <div className="h-24 section-fade-to-transparent" />
+        <AutomationSection />
+
+        {/* Colored -> White */}
+        <div className="h-24 section-fade-from-transparent" />
         <TrainingBotSection />
 
-        {/* Transition: Formazione → Why */}
+        {/* White -> Colored */}
         <div className="h-24 section-fade-to-transparent" />
-        <WhySection />
-
-        {/* Transition: Why → UseCases */}
-        <div className="h-24 section-fade-from-transparent" />
         <UseCasesSection />
 
-        {/* Transition: UseCases → Pricing */}
+        {/* Colored -> White */}
+        <div className="h-24 section-fade-from-transparent" />
+        <WhySection />
+
+        {/* White -> Colored */}
+        <div className="h-24 section-fade-to-transparent" />
         <PricingSection />
+
+        {/* Colored -> White */}
+        <div className="h-24 section-fade-from-transparent" />
         <FAQSection />
 
-        {/* Transition: FAQ (white) → CTA (transparent) */}
+        {/* White -> Colored */}
         <div className="h-24 section-fade-to-transparent" />
         <CTASection />
       </main>

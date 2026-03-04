@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Send, X, Lightbulb, MessageSquare, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import { useProject } from '@/contexts/ProjectContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -91,11 +92,13 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     const [loadingTitle, setLoadingTitle] = useState(BASE_LOADING_STAGES[0]);
     const [error, setError] = useState<string | null>(null);
     const [conversationId, setConversationId] = useState<string | null>(null);
+    const [unreadAlerts, setUnreadAlerts] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const loadingStageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { selectedProject } = useProject();
+    const { currentOrganization } = useOrganization();
     const hasProjectAccess = ['PRO', 'BUSINESS', 'ENTERPRISE', 'ADMIN', 'PARTNER'].includes(userTier.toUpperCase());
 
     const clearLoadingTimers = () => {
@@ -119,6 +122,18 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             clearLoadingTimers();
         };
     }, []);
+
+    // Fetch unread alert count on mount
+    useEffect(() => {
+        const orgId = currentOrganization?.id;
+        if (!orgId) return;
+        fetch(`/api/copilot/alerts?organizationId=${orgId}&unreadOnly=true&limit=1`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data?.unreadCount) setUnreadAlerts(data.unreadCount);
+            })
+            .catch(() => {});
+    }, [currentOrganization?.id]);
 
     // Restore conversation from localStorage when opening
     useEffect(() => {
@@ -319,10 +334,15 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
                         onClick={() => setIsOpen(true)}
-                        className="fixed bottom-6 right-4 md:right-6 w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40"
+                        className="fixed bottom-6 right-4 md:right-6 w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40 relative"
                         title="Strategy Copilot"
                     >
                         <Sparkles className="w-6 h-6" />
+                        {unreadAlerts > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                                {unreadAlerts > 9 ? '9+' : unreadAlerts}
+                            </span>
+                        )}
                     </motion.button>
                 )}
             </AnimatePresence>

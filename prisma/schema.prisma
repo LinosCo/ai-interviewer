@@ -191,6 +191,7 @@ model Organization {
   cmsConnections         CMSConnection[]
   copilotSessions        CopilotSession[]
   copilotConversations   CopilotConversation[]
+  copilotAlerts          CopilotAlert[]
   crossChannelInsights   CrossChannelInsight[]
   mcpConnections         MCPConnection[]
   members                Membership[]
@@ -1479,6 +1480,24 @@ model CopilotMessage {
 
   @@index([conversationId])
   @@index([conversationId, createdAt])
+}
+
+
+model CopilotAlert {
+  id             String    @id @default(cuid())
+  organizationId String
+  alertType      String    // TRAFFIC_DROP | NEGATIVE_LLM_MENTION | KNOWLEDGE_GAP_STALE | INTEGRATION_STALE
+  severity       String    @default("medium")  // low | medium | high
+  title          String
+  body           String
+  metadata       Json?
+  isRead         Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  readAt         DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isRead])
+  @@index([organizationId, createdAt])
 }
 
 model CreditTransaction {

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Database, Lightbulb, Rocket, LineChart } from 'lucide-react';
+import { Database, Lightbulb, Rocket, LineChart, ArrowRight } from 'lucide-react';
 
 const steps = [
   {
@@ -49,7 +49,7 @@ export function HowItWorks() {
           className="text-center mb-16"
         >
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Il ciclo strategico <span className="gradient-text">continuo</span>
+            Il ciclo strategico di <span className="gradient-text">miglioramento continuo</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
             Ascolta, decidi, esegui e monitora: ogni fase alimenta la successiva in
@@ -80,6 +80,28 @@ export function HowItWorks() {
                   <p className="text-[hsl(var(--muted-foreground))] leading-relaxed">{step.description}</p>
                 </div>
               </div>
+
+              {/* Cycle connectors on desktop (inner corners of each box) */}
+              {index === 0 && (
+                <div className="hidden lg:flex absolute -right-4 -bottom-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
+                  <ArrowRight className="w-4 h-4 text-white" />
+                </div>
+              )}
+              {index === 1 && (
+                <div className="hidden lg:flex absolute -left-4 -bottom-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
+                  <ArrowRight className="w-4 h-4 text-white rotate-90" />
+                </div>
+              )}
+              {index === 3 && (
+                <div className="hidden lg:flex absolute -left-4 -top-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
+                  <ArrowRight className="w-4 h-4 text-white rotate-180" />
+                </div>
+              )}
+              {index === 2 && (
+                <div className="hidden lg:flex absolute -right-4 -top-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
+                  <ArrowRight className="w-4 h-4 text-white -rotate-90" />
+                </div>
+              )}
             </motion.div>
           ))}
         </div>

@@ -3,7 +3,6 @@
 import {
   FluidBackground,
   HeroSection,
-  ProcessRail,
   HowItWorks,
   ProblemSection,
   FeaturesSection,
@@ -55,8 +54,6 @@ export default function LandingPage() {
     <div className="min-h-screen overflow-x-hidden relative">
       <FluidBackground />
       <main className="relative">
-        <ProcessRail />
-
         {/* Hero Section */}
         <HeroSection />
 

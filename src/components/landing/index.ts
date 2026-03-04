@@ -1,7 +1,6 @@
 export { FluidBackground } from './FluidBackground';
 export { LandingHeader } from './LandingHeader';
 export { HeroSection } from './HeroSection';
-export { ProcessRail } from './ProcessRail';
 export { ProblemSection } from './ProblemSection';
 export { FeaturesSection } from './FeaturesSection';
 export { AITipsSection } from './AITipsSection';

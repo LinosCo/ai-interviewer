@@ -290,6 +290,7 @@ export default function ChatWindow({
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const [conversationId, setConversationId] = useState<string | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(null);
 
     // Session rating (Gap R — feedback loop)
     const [sessionRating, setSessionRating] = useState<'UP' | 'DOWN' | null>(null);
@@ -341,11 +342,12 @@ export default function ChatWindow({
 
             try {
                 // Generate or retrieve session ID
-                let sessionId = localStorage.getItem('bt_sid');
-                if (!sessionId) {
-                    sessionId = 's_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('bt_sid', sessionId);
+                let sid = localStorage.getItem('bt_sid');
+                if (!sid) {
+                    sid = 's_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('bt_sid', sid);
                 }
+                setSessionId(sid);
 
                 const fallbackDescription =
                     document.querySelector('meta[name="description"], meta[property="og:description"]')?.getAttribute('content') || '';
@@ -368,7 +370,7 @@ export default function ChatWindow({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         botId,
-                        sessionId,
+                        sessionId: sid,
                         pageContext: enablePageContext ? resolvedContext : undefined,
                         gdprConsent: {
                             data: true,
@@ -432,11 +434,13 @@ export default function ChatWindow({
             // Call API
             const res = await fetch('/api/chatbot/message', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(sessionId ? { 'x-session-id': sessionId } : {})
+                },
                 body: JSON.stringify({
-                    conversationId, // Use the real conversation ID
+                    conversationId,
                     message: userMsg,
-                    // History is handled by backend usually, but if needed:
                     history: newMessages.slice(-6)
                 })
             });

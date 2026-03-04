@@ -560,13 +560,12 @@ export async function updateBotAction(botId: string, formData: FormData) {
             // But actually we should only throw if they are DIFFERENT from default.
         }
 
-        // Plan gate: Intermedio and Avanzato tiers require Business plan
+        // Feature gate: Avanzato tier requires advancedInterview feature flag
         const requestedTier = (data as any).interviewerQuality;
-        if (requestedTier === 'intermedio' || requestedTier === 'avanzato') {
-            const orgPlan = bot.project.organization?.plan || 'FREE';
-            const isAllowed = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(orgPlan);
-            if (!isAllowed) {
-                throw new Error('Le modalità Intermedio e Avanzato sono disponibili solo nei piani Business.');
+        if (requestedTier === 'avanzato') {
+            const canUseAdvanced = await isFeatureEnabled(bot.project.organizationId, 'advancedInterview');
+            if (!canUseAdvanced) {
+                throw new Error('La modalità Avanzato è disponibile solo nei piani PRO e superiori.');
             }
         }
     }

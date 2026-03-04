@@ -33,7 +33,7 @@ export class PromptBuilder {
     ): string {
         const isAvanzato = interviewerQuality === 'avanzato';
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
-        const qualityTier = (bot as any).interviewerQuality || 'quantitativo';
+        const qualityTier = (bot as any).interviewerQuality || 'standard';
 
         // Sanitize admin-configured fields before prompt interpolation
         const safeName = sanitizeConfig(bot.name);
@@ -259,38 +259,26 @@ ${topicLines}
             const subGoals = (currentTopic.subGoals || []).filter(Boolean).map(g => sanitizeConfig(g, 200));
             const subGoalPreview = subGoals.slice(0, 3).join(' | ') || (isItalian ? 'N/A' : 'N/A');
             const safeTopicLabel = sanitizeConfig(currentTopic.label, 200);
-            const qualityTierLocal = (bot as any)?.interviewerQuality || 'quantitativo';
+            const isAvanzatoLocal = ((bot as any)?.interviewerQuality || 'standard') === 'avanzato';
 
-            const metodoIT = qualityTierLocal === 'avanzato'
+            const metodoIT = isAvanzatoLocal
                 ? `Metodo: Ascolta prima, poi rispondi in modo autentico. Non fare echo letterale.
 - Sintetizza in modo originale ciò che l'utente ha detto (non ripetere le sue parole)
 - Se rilevante, collega a qualcosa detto in turni precedenti ("Prima hai accennato a... — c'è un filo comune?")
 - Formula un'ipotesi e testala con la domanda ("Sembra che... — è così?")
 - Puoi deviare dal sub-goal pianificato per inseguire un segnale significativo
 Obiettivo: qualità dell'insight, non copertura sistematica.`
-                : qualityTierLocal === 'intermedio'
-                ? `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto. Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
-- Se emerge un segnale forte (impatto concreto, dettaglio inatteso, contraddizione), approfondiscilo prima di passare al sub-goal successivo.
-- Se l'utente usa ripetutamente la stessa parola o concetto, esplicitalo: "Hai usato più volte la parola X — cosa significa per te in questo contesto?"
-- Se vedi una contraddizione tra ciò che l'utente dice ora e ciò che ha detto prima, mettila in evidenza con delicatezza.
-Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.`
                 : `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto (es. riprendi un dettaglio concreto o un'emozione espressa). Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
 Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.
 Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contraddizioni.`;
 
-            const methodEN = qualityTierLocal === 'avanzato'
+            const methodEN = isAvanzatoLocal
                 ? `Method: Listen first, then respond authentically. Do not echo the user's words back literally.
 - Synthesize what the user said in your own words
 - If relevant, connect to something said in previous turns ("You mentioned earlier... — is there a connection?")
 - Form a hypothesis and test it with your question ("It seems like... — is that right?")
 - You may deviate from the planned sub-goal to follow a significant signal
 Goal: quality of insight, not systematic coverage.`
-                : qualityTierLocal === 'intermedio'
-                ? `Method: Open with a genuine, specific acknowledgment of what the user just said. Then ask ONE exploratory question focused on the sub-goal.
-- If a strong signal emerges (concrete impact, unexpected detail, contradiction), deepen it before moving to the next sub-goal.
-- If the user repeatedly uses the same word or concept, name it: "You've used the word X a few times — what does that mean for you here?"
-- If you notice a contradiction between what the user said now and earlier, surface it gently.
-Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.`
                 : `Method: Open with a genuine, specific acknowledgment of what the user just said (e.g. reflect a concrete detail or emotion they expressed). Then ask ONE exploratory question focused on the sub-goal.
 Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.
 Listen for depth signals: concrete examples, lived impacts, constraints, contradictions.`;
@@ -350,9 +338,9 @@ Brief natural bridge, then ONE opening question for the next topic.
             const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 500).trim();
             const crossTopicNotes = sanitize(supervisorInsight?.crossTopicNotes || '', 400).trim();
             const safeLabel = sanitizeConfig(currentTopic.label, 200);
-            const qualityTierDeep = (bot as any)?.interviewerQuality || 'quantitativo';
+            const isAvanzatoDeep = ((bot as any)?.interviewerQuality || 'standard') === 'avanzato';
 
-            if (qualityTierDeep === 'avanzato') {
+            if (isAvanzatoDeep) {
                 return isItalian ? `
 ## FASE: APPROFONDIMENTO (QUALITATIVO)
 Topic: "${safeLabel}"

@@ -228,7 +228,9 @@ export async function POST(req: Request) {
             }, { status: 200 });
         }
         const language = bot.language || 'en';
-        const tierConfig = getTierConfig((bot as any).interviewerQuality);
+        const interviewerQuality: 'standard' | 'avanzato' =
+            ((bot as any).interviewerQuality === 'avanzato') ? 'avanzato' : 'standard';
+        const tierConfig = getTierConfig(interviewerQuality);
         const interviewObjective = String((bot as any).researchGoal || '').trim();
         const candidateDataFields = (bot as any).candidateDataFields ?? [];
         // Legacy fix: bots created before the collectCandidateData flag was introduced
@@ -613,7 +615,7 @@ export async function POST(req: Request) {
             researchGoal: bot.researchGoal || '',
             targetAudience: bot.targetAudience || '',
             plan: interviewPlan,
-            interviewerQuality: (bot as any).interviewerQuality || 'quantitativo'
+            interviewerQuality: interviewerQuality
         });
         const manualInterviewGuide = extractManualInterviewGuideSource(
             (bot.knowledgeSources || []).map((source: any) => ({
@@ -643,7 +645,7 @@ export async function POST(req: Request) {
                     subGoals: topic.subGoals || []
                 })),
                 timeoutMs: tierConfig.knowledge.runtimeKnowledgeTimeoutMs,
-                interviewerQuality: (bot as any).interviewerQuality || 'quantitativo',
+                interviewerQuality: interviewerQuality,
                 onUsage: collectLlmUsage
             })
             : Promise.resolve(hasValidRuntimeKnowledge ? state.runtimeInterviewKnowledge || null : null);
@@ -860,7 +862,8 @@ export async function POST(req: Request) {
                 }
 
                 // crossTopicSynthesis: inject notes from other already-covered topics into DEEPENING insight
-                if (supervisorInsight.status === 'DEEPENING') {
+                // Only for tiers that enable this feature (avanzato); standard bots skip this block.
+                if (tierConfig.naturalness.crossTopicSynthesis && supervisorInsight.status === 'DEEPENING') {
                     const keyInsights = state.topicKeyInsights || {};
                     const currentId = currentTopic.id;
                     const otherInsights = Object.entries(keyInsights)
@@ -1274,7 +1277,7 @@ export async function POST(req: Request) {
         }
 
         // --- CIL PRE-PASS (avanzato only, parallel with remaining sync work) ---
-        const isAvanzato = ((bot as any).interviewerQuality || 'quantitativo') === 'avanzato';
+        const isAvanzato = interviewerQuality === 'avanzato';
         const AVANZATO_CIL_RECENT_TURNS = 6;
 
         const cilPromise: Promise<CILAnalysis | null> = isAvanzato
@@ -1360,7 +1363,7 @@ export async function POST(req: Request) {
             supervisorInsight,
             interviewPlan,
             manualInterviewGuide || undefined,
-            (bot as any).interviewerQuality
+            interviewerQuality
         );
         const manualKnowledgePrompt = buildManualKnowledgePromptBlock({
             manualGuide: manualInterviewGuide,
@@ -1412,7 +1415,7 @@ export async function POST(req: Request) {
 
         // Final reinforcement based on phase - CLEAR STATUS BANNER
         const shouldShowStatusBanner = (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') &&
-            ['EXPLORING', 'DEEPENING', 'TRANSITION', 'START_DEEP', 'START_DEEP_BRIEF'].includes(supervisorInsight?.status);
+            ['EXPLORING', 'DEEPENING', 'TRANSITION'].includes(supervisorInsight?.status);
 
         if (shouldShowStatusBanner) {
             const bannerTopics = nextState.phase === 'DEEPEN'
@@ -1476,7 +1479,7 @@ hard_rules:
             const cilBlock = buildCILContextBlock(
                 cilAnalysis,
                 state.cilState ?? null,
-                (bot as any).interviewerQuality || 'quantitativo'
+                interviewerQuality
             );
             if (cilBlock) {
                 systemPrompt += `\n\n${cilBlock}`;
@@ -2329,15 +2332,6 @@ hard_rules:
         // ====================================================================
         // 6. SAVE & UPDATE STATE (parallelized for speed)
         // ====================================================================
-        // Record sub-goal used this turn so micro-planner advances on next turn
-        if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
-            const history = { ...(nextState.topicSubGoalHistory || {}) };
-            const existing = history[plannerTopicId] || [];
-            if (!existing.includes(microPlannerDecision.focusSubGoal)) {
-                history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
-                nextState.topicSubGoalHistory = history;
-            }
-        }
 
         // Persist CIL state
         if (cilAnalysis && isAvanzato) {

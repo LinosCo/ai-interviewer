@@ -133,15 +133,16 @@ export function FeaturesSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] mb-6">
             <Zap className="w-4 h-4 text-[hsl(var(--coral))]" />
-            <span className="text-sm font-medium">3 strumenti, 1 piattaforma</span>
+            <span className="text-sm font-medium">01 Ascolta - 3 strumenti, 1 piattaforma</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Ascolta{' '}
-            <span className="gradient-text">clienti, team e partner</span>
+            Ascolto continuo,{' '}
+            <span className="gradient-text">come processo integrato</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-            Tre strumenti potenti che parlano tra loro, connessi dall&apos;AI per
-            raccogliere feedback da tutti gli stakeholder e darti una visione completa
+            Non una ricerca una tantum: Business Tuner raccoglie segnali in modo
+            ricorrente da clienti, team e stakeholder, trasformandoli in insight
+            sistemici e utilizzabili.
           </p>
         </motion.div>
 

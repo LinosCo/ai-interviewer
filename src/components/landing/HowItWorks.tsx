@@ -10,14 +10,14 @@ const steps = [
     number: '01',
     title: 'Ascolta',
     description:
-      'Interviste AI, chatbot e monitoraggio continuo raccolgono segnali da clienti, team e mercato.',
+      "L'ascolto diventa un processo integrato: raccogli segnali in modo continuo da clienti, team e stakeholder.",
   },
   {
     icon: Lightbulb,
     number: '02',
     title: 'Decidi',
     description:
-      'Il copilot strategico unifica i dati e propone priorita, azioni e playbook operativi.',
+      "Il Copilot incrocia i dati con la strategia di business e costruisce una visione di insieme orientata all'azione.",
   },
   {
     icon: Rocket,
@@ -31,7 +31,7 @@ const steps = [
     number: '04',
     title: 'Monitora',
     description:
-      "Misura impatto e iterazioni nel tempo, con KPI chiari per migliorare il funnel in modo continuo.",
+      'Misura impatto, monitora competitor e attiva formazione con certificazione per team e stakeholder.',
   },
 ];
 
@@ -77,10 +77,11 @@ export function HowItWorks() {
           className="text-center mb-16"
         >
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Come <span className="gradient-text">funziona</span>
+            Il ciclo strategico <span className="gradient-text">continuo</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-            Da zero a decisioni operative in 4 passaggi: ascolta, decidi, esegui, monitora.
+            Ascolta, decidi, esegui e monitora: ogni fase alimenta la successiva in
+            un processo operativo che non si interrompe.
           </p>
         </motion.div>
 

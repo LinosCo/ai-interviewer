@@ -150,7 +150,7 @@ export function PricingSection() {
                     transition={{ delay: 0.5 }}
                     className="text-center text-[hsl(var(--muted-foreground))] mt-8"
                 >
-                    Tutti i piani includono 14 giorni di prova gratuita. Nessuna carta richiesta.
+                    Tutti i piani includono 14 giorni di prova gratuita, con onboarding guidato per team, consulenti e agenzie.
                 </motion.p>
 
                 {/* Credit Packs Section */}

@@ -20,7 +20,7 @@ const integrations = [
     {
         name: 'Webhook',
         logo: <Webhook className="w-7 h-7 text-[hsl(var(--coral))]" />,
-        description: 'Ricevi eventi pronti da usare nel tuo stack: nuovi insight, tip prioritari, stato azioni.',
+        description: 'Ricevi eventi pronti da usare nel tuo stack: nuovi insight, tip operativi, stato azioni.',
         badge: 'Notifiche',
         badgeColor: 'bg-[hsl(var(--coral)/0.1)] text-[hsl(var(--coral))]',
     },
@@ -47,7 +47,7 @@ const integrations = [
 
 const flowSteps = [
     { icon: Bell, label: 'Segnale raccolto' },
-    { icon: RefreshCw, label: 'Copilot prioritizza' },
+    { icon: RefreshCw, label: 'Copilot orienta la decisione' },
     { icon: Webhook, label: 'Regola n8n/webhook' },
     { icon: TrendingUp, label: 'Task eseguito e tracciato' },
 ];
@@ -55,7 +55,7 @@ const flowSteps = [
 const playbooks = [
     {
         title: 'Lead Qualification',
-        text: 'Dal chatbot al CRM con campi arricchiti e priorita commerciale automatica.',
+        text: 'Dal chatbot al CRM con campi arricchiti e qualificazione commerciale automatica.',
     },
     {
         title: 'Content Loop',
@@ -70,7 +70,7 @@ const playbooks = [
 export function AutomationSection() {
     return (
         <section
-            id="integrazioni"
+            id="esegui"
             className="pt-8 pb-24 md:pt-12 md:pb-32 relative overflow-hidden"
         >
             {/* Subtle gradient overlay — transparent background like AITipsSection */}
@@ -87,11 +87,11 @@ export function AutomationSection() {
                 >
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--amber)/0.2)] border border-[hsl(var(--amber)/0.3)] mb-6">
                         <Workflow className="w-4 h-4 text-[hsl(var(--amber))]" />
-                        <span className="text-sm font-medium text-[hsl(var(--amber))]">Integrazioni & Automazioni</span>
+                        <span className="text-sm font-medium text-[hsl(var(--amber))]">03 Esegui - Integrazioni & Automazioni</span>
                     </div>
                     <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-[hsl(var(--foreground))]">
-                        I tuoi insight,{' '}
-                        <span className="gradient-text">dove ne hai bisogno</span>
+                        Dall&apos;insight all&apos;azione,{' '}
+                        <span className="gradient-text">senza attriti operativi</span>
                     </h2>
                     <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
                         Collega Business Tuner al tuo stack operativo. Dal segnale all&apos;azione:

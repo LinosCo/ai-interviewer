@@ -3,11 +3,11 @@
 import {
   FluidBackground,
   HeroSection,
-  ProblemSection,
+  HowItWorks,
   FeaturesSection,
   AITipsSection,
+  AutomationSection,
   NewsSection,
-  HowItWorks,
   WhySection,
   UseCasesSection,
   PricingSection,
@@ -55,36 +55,36 @@ export default function LandingPage() {
         {/* Hero Section */}
         <HeroSection />
 
-        {/* Transition: Hero → Problem (white background) */}
-        <div className="h-32 section-fade-from-transparent" />
+        {/* Transition: Hero → HowItWorks */}
+        <div className="h-24 section-fade-from-transparent" />
+        <HowItWorks />
 
-        {/* Problem Section (white background) */}
-        <ProblemSection />
-
-        {/* Transition: Problem (white) → Features (white) - no transition needed */}
+        {/* Transition: HowItWorks → Ascolto */}
+        <div className="h-10 bg-white" />
         <FeaturesSection />
 
-        {/* Transition: Features (white) → AITips (transparent) */}
+        {/* Transition: Ascolto → Decidi */}
         <div className="h-24 section-fade-to-transparent" />
         <AITipsSection />
 
-        {/* Transition: AITips (transparent) → News (white) */}
+        {/* Transition: Decidi → Esegui */}
+        <div className="h-20 bg-transparent" />
+        <AutomationSection />
+
+        {/* Transition: Esegui → Monitora */}
         <div className="h-24 section-fade-from-transparent" />
         <NewsSection />
 
-        {/* Transition: News (white) → HowItWorks (white) */}
-        <div className="h-16 bg-white" />
-        <HowItWorks />
-
-        {/* Transition: HowItWorks (white) → Why (transparent) */}
-        <div className="h-24 section-fade-to-transparent" />
-        <WhySection />
-
-        {/* Transition: Why → UseCases (clean white handoff) */}
+        {/* Transition: Monitora → UseCases */}
         <div className="h-10 bg-white" />
         <UseCasesSection />
 
-        {/* Transition: UseCases → Pricing (white) */}
+        {/* Transition: UseCases → Why */}
+        <div className="h-24 section-fade-to-transparent" />
+        <WhySection />
+
+        {/* Transition: Why → Pricing (white) */}
+        <div className="h-10 bg-white" />
         <PricingSection />
         <FAQSection />
 

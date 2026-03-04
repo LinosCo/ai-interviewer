@@ -12,7 +12,7 @@ export interface GenerateCILAnalysisParams {
     language: string;
 }
 
-const CIL_TIMEOUT_MS = 4000;
+const CIL_TIMEOUT_MS = 2500;
 
 const cilAnalysisSchema = z.object({
     openThreads: z.array(z.object({

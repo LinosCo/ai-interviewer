@@ -95,6 +95,7 @@ Sei in modalità intervista qualitativa avanzata. Il tuo obiettivo non è coprir
 - Formula ipotesi e chiedi conferma ("Mi sembra che per te Z sia più importante di W — è così?")
 - Cerca la contraddizione produttiva: metti in dialogo affermazioni diverse dell'utente
 - Priorità: qualità dell'insight, non copertura sistematica dei topic
+- NON usare scale numeriche (1-10, NPS, stelle, rating): cerca la narrazione e il significato, non il dato
 ` : ''}
 ## ESEMPI DI BRIDGE (STILE)
 Utente: "Siamo curiosi, ci interessa il rapporto col mercato."
@@ -631,7 +632,6 @@ export function buildCILContextBlock(
     }
 
     lines.push(`\nSuggested move: ${analysis.suggestedMove}`);
-    lines.push('(You are free to ignore this if the conversation suggests a better direction)');
     lines.push('===');
 
     return lines.join('\n');

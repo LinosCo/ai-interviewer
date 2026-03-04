@@ -78,7 +78,8 @@ function computeSignalScore(userMessage: string, language: string): number {
         ? [/\bdecision/i, /\btempo\b/i, /\bcosto\b/i, /\bqualita\b/i, /\bmercato\b/i]
         : [/\bdecision\b/i, /\btime\b/i, /\bcost\b/i, /\bquality\b/i, /\bmarket\b/i];
 
-    const hasNumbers = /\b\d{1,4}\b/.test(text) ? 1 : 0;
+    // Require ≥10 words to avoid rewarding scale answers ("8", "7/10") as numeric richness
+    const hasNumbers = /\b\d{1,4}\b/.test(text) && words >= 10 ? 1 : 0;
     const hasCauseEffect = containsAny(text, causeEffectPatterns) ? 1 : 0;
     const hasExample = containsAny(text, examplePatterns) ? 1 : 0;
     const hasImpact = containsAny(text, impactPatterns) ? 1 : 0;
@@ -247,11 +248,20 @@ function selectKnowledgeCue(input: MicroPlannerInput, focusSubGoal: string): Pre
     return buildFallbackCue(input.language, input.topicLabel, focusSubGoal);
 }
 
+function detectConstraintSignal(text: string, language: string): boolean {
+    const isItalian = (language || '').toLowerCase().startsWith('it');
+    const constraintPatterns = isItalian
+        ? [/\bvinc[oa]lo\b/i, /\blimite\b/i, /\bnon possiamo\b/i, /\bnon riusciamo\b/i, /\bdifficolt[aà]\b/i, /\bostacolo\b/i, /\bimpossibile\b/i, /\bnon abbiamo\b/i, /\bmanca\b/i, /\bfrenante\b/i]
+        : [/\bconstraint\b/i, /\blimitation\b/i, /\bcannot\b/i, /\bwe can't\b/i, /\bdifficulty\b/i, /\bobstacle\b/i, /\bimpossible\b/i, /\bblocking\b/i, /\bmissing\b/i, /\bbarrier\b/i];
+    return constraintPatterns.some(p => p.test(text));
+}
+
 function determineQuestionMode(params: {
     phase: MicroPlannerPhase;
     signalScore: number;
     prioritizeCoverage: boolean;
     userTurnSignal: UserTurnSignal;
+    hasConstraintSignal: boolean;
 }): MicroPlannerDecision['mode'] {
     if (params.userTurnSignal === 'clarification') {
         return 'cover_subgoal';
@@ -261,9 +271,11 @@ function determineQuestionMode(params: {
     }
     if (params.phase === 'DEEPEN') {
         if (params.signalScore >= 0.34) return 'probe_impact';
+        if (params.hasConstraintSignal) return 'probe_constraint';
         return 'probe_example';
     }
     if (params.signalScore >= 0.42) return 'probe_impact';
+    if (params.hasConstraintSignal && params.signalScore >= 0.2) return 'probe_constraint';
     if (params.signalScore >= 0.28) return 'probe_example';
     return 'cover_subgoal';
 }
@@ -288,11 +300,13 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput): MicroPlanne
 
     const focusSubGoal = remaining[0] || subGoals[0] || input.topicLabel;
     const knowledgeCue = selectKnowledgeCue(input, focusSubGoal);
+    const hasConstraintSignal = detectConstraintSignal(userMessage, input.language);
     const mode = determineQuestionMode({
         phase: input.phase,
         signalScore,
         prioritizeCoverage,
-        userTurnSignal
+        userTurnSignal,
+        hasConstraintSignal
     });
     const commentStyle = determineCommentStyle(userTurnSignal, signalScore);
 

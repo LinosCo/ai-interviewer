@@ -669,15 +669,38 @@ export async function POST(req: Request) {
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
+        // Mutable ref so buildDeepOfferInsight (defined below) can read the CIL result
+        // that is only resolved later via await cilPromise.
+        const cilAnalysisRef: { current: CILAnalysis | null } = { current: null };
+
         const buildDeepOfferInsight = (
             sourceState: InterviewState,
             validationFeedback?: ValidationResponse
         ) => {
+            // For avanzato, enrich interestingTopics with CIL high-strength threads
+            // so the extension offer cites specific semantic threads, not just engagement scores.
+            let effectiveInterestingTopics = sourceState.interestingTopics;
+            if (isAvanzato && cilAnalysisRef.current) {
+                const highThreadTopics: InterestingTopic[] = cilAnalysisRef.current.openThreads
+                    .filter(t => t.strength === 'high')
+                    .map(t => ({
+                        topicId: t.sourceTopicId,
+                        topicLabel: botTopics.find(bt => bt.id === t.sourceTopicId)?.label || '',
+                        engagementScore: 0.9,
+                        bestSnippet: t.anchoredHypothesis || t.description
+                    }));
+                if (highThreadTopics.length > 0) {
+                    const existing = (sourceState.interestingTopics || []).filter(
+                        it => !highThreadTopics.some(ct => ct.topicId === it.topicId)
+                    );
+                    effectiveInterestingTopics = [...highThreadTopics, ...existing];
+                }
+            }
             const extensionPreview = buildExtensionPreviewHints({
                 botTopics,
                 deepOrder: sourceState.deepTopicOrder,
                 history: sourceState.topicSubGoalHistory,
-                interestingTopics: sourceState.interestingTopics,
+                interestingTopics: effectiveInterestingTopics,
                 interviewObjective,
                 language,
                 startIndex: sourceState.topicIndex,
@@ -1268,6 +1291,7 @@ export async function POST(req: Request) {
         // Await CIL and apply budget stealing BEFORE building micro-planner so that
         // plannerMaxTurns already reflects any bonus turns granted by CIL.
         const cilAnalysis = await cilPromise;
+        cilAnalysisRef.current = cilAnalysis;
 
         if (cilAnalysis?.budgetSignal && isAvanzato) {
             const cap = computeCILBonusCap(nextState, (bot as any).cilBonusTurnCapOverride ?? null);
@@ -1407,6 +1431,18 @@ hard_rules:
                 systemPrompt += `\n\n${runtimeSemanticContext}`;
             }
         }
+        // Block 6.5 — CIL context (avanzato only) — injected BEFORE micro-planner
+        if (cilAnalysis && isAvanzato) {
+            const cilBlock = buildCILContextBlock(
+                cilAnalysis,
+                state.cilState ?? null,
+                (bot as any).interviewerQuality || 'quantitativo'
+            );
+            if (cilBlock) {
+                systemPrompt += `\n\n${cilBlock}`;
+            }
+        }
+
         if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
             const microPlannerPrompt = buildMicroPlannerPromptBlock({
                 language,
@@ -1425,18 +1461,6 @@ hard_rules:
                 coverage: microPlannerDecision.topicCoverage,
                 knowledgeSource: microPlannerDecision.knowledgeSource
             });
-        }
-
-        // Block 6.5 — CIL context (avanzato only)
-        if (cilAnalysis && isAvanzato) {
-            const cilBlock = buildCILContextBlock(
-                cilAnalysis,
-                state.cilState ?? null,
-                (bot as any).interviewerQuality || 'quantitativo'
-            );
-            if (cilBlock) {
-                systemPrompt += `\n\n${cilBlock}`;
-            }
         }
 
         if (userTurnSignal === 'clarification') {
@@ -2202,6 +2226,15 @@ hard_rules:
                     }
                 });
                 await flushInterviewTokenUsage('completed_response');
+                // Record sub-goal used this turn on completion path
+                if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
+                    const history = { ...(nextState.topicSubGoalHistory || {}) };
+                    const existing = history[plannerTopicId] || [];
+                    if (!existing.includes(microPlannerDecision.focusSubGoal)) {
+                        history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
+                        nextState.topicSubGoalHistory = history;
+                    }
+                }
                 // Persist CIL state before completion return
                 if (cilAnalysis && isAvanzato) {
                     nextState.cilState = mergeCILState(
@@ -2221,6 +2254,16 @@ hard_rules:
         // ====================================================================
         // 6. SAVE & UPDATE STATE (parallelized for speed)
         // ====================================================================
+        // Record sub-goal used this turn so micro-planner advances on next turn
+        if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
+            const history = { ...(nextState.topicSubGoalHistory || {}) };
+            const existing = history[plannerTopicId] || [];
+            if (!existing.includes(microPlannerDecision.focusSubGoal)) {
+                history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
+                nextState.topicSubGoalHistory = history;
+            }
+        }
+
         // Persist CIL state
         if (cilAnalysis && isAvanzato) {
             nextState.cilState = mergeCILState(

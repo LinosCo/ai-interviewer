@@ -18,7 +18,8 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:check-schema": "node scripts/db/check-schema-drift.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.56",

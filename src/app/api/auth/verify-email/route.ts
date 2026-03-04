@@ -12,8 +12,15 @@ export async function GET(request: NextRequest) {
     const rawEmail = request.nextUrl.searchParams.get('email');
     const nextPath = sanitizeNextPath(request.nextUrl.searchParams.get('next'));
 
+    const appBaseUrl = (
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.AUTH_URL ||
+        process.env.NEXTAUTH_URL ||
+        'https://businesstuner.voler.ai'
+    ).replace(/\/+$/, '');
+
     const redirectToLogin = (params: Record<string, string>) => {
-        const url = new URL('/login', request.url);
+        const url = new URL(`${appBaseUrl}/login`);
         for (const [key, value] of Object.entries(params)) {
             url.searchParams.set(key, value);
         }

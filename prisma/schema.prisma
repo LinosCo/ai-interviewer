@@ -473,7 +473,7 @@ model Bot {
   maxOpenQuestions      Int                  @default(5)
   modelProvider         String               @default("openai")
   modelName             String               @default("gpt-4o-mini")
-  interviewerQuality    InterviewerQuality   @default(standard)
+  interviewerQuality    String               @default("quantitativo")
   openaiApiKey          String?
   anthropicApiKey       String?
   logoUrl               String?
@@ -1843,10 +1843,6 @@ enum BotStatus {
   ARCHIVED
 }
 
-enum InterviewerQuality {
-  standard
-  avanzato
-}
 
 enum Role {
   OWNER

@@ -20,7 +20,7 @@ import Link from 'next/link';
 export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
     const updateAction = updateBotAction.bind(null, bot.id);
     const [provider, setProvider] = useState(bot.modelProvider || 'openai');
-    const [quality, setQuality] = useState<'standard' | 'avanzato'>(bot.interviewerQuality || 'standard');
+    const [quality, setQuality] = useState(bot.interviewerQuality || 'quantitativo');
     const [isRecruiting, setIsRecruiting] = useState(bot.collectCandidateData ?? false);
 
     // Wrapper to ignore return type compatibility issues with form action
@@ -118,10 +118,11 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                         <select
                             name="interviewerQuality"
                             value={quality}
-                            onChange={(e) => setQuality(e.target.value as 'standard' | 'avanzato')}
+                            onChange={(e) => setQuality(e.target.value)}
                             className="w-full border p-2 rounded"
                         >
-                            <option value="standard">Standard — Veloce e comparabile</option>
+                            <option value="quantitativo">Quantitativo — Veloce e comparabile</option>
+                            <option value="intermedio">Intermedio — Bilanciato qualità/costo</option>
                             <option value="avanzato">Avanzato — Intervista qualitativa profonda</option>
                         </select>
                         <p className="text-xs text-gray-500 mt-1">

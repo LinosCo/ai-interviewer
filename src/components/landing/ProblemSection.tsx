@@ -56,7 +56,8 @@ const comparisons = [
 
 export function ProblemSection() {
   return (
-    <section className="py-24 md:py-32 relative overflow-hidden bg-white/90">
+    <section className="py-24 md:py-32 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.05)] via-transparent to-[hsl(var(--amber)/0.06)]" />
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

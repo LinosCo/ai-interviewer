@@ -59,15 +59,15 @@ export default function LandingPage() {
 
         {/* Colored -> White */}
         <div className="h-32 section-fade-from-transparent" />
-        <ProblemSection />
+        <HowItWorks />
 
         {/* White -> Colored */}
         <div className="h-24 section-fade-to-transparent" />
-        <FeaturesSection />
+        <ProblemSection />
 
         {/* Colored -> White */}
         <div className="h-24 section-fade-from-transparent" />
-        <HowItWorks />
+        <FeaturesSection />
 
         {/* White -> Colored */}
         <div className="h-24 section-fade-to-transparent" />

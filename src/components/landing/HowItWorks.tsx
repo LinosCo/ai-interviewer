@@ -1,11 +1,22 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Database, Lightbulb, Rocket, LineChart, ArrowRight } from 'lucide-react';
+import {
+  Database,
+  Lightbulb,
+  Rocket,
+  LineChart,
+  CornerRightDown,
+  CornerDownLeft,
+  CornerLeftUp,
+  CornerUpRight,
+} from 'lucide-react';
 
 const steps = [
   {
     icon: Database,
+    cycleIcon: CornerRightDown,
+    arrowSide: 'right',
     number: '01',
     title: 'Ascolta',
     description:
@@ -13,6 +24,8 @@ const steps = [
   },
   {
     icon: Lightbulb,
+    cycleIcon: CornerDownLeft,
+    arrowSide: 'left',
     number: '02',
     title: 'Decidi',
     description:
@@ -20,6 +33,8 @@ const steps = [
   },
   {
     icon: Rocket,
+    cycleIcon: CornerUpRight,
+    arrowSide: 'right',
     number: '03',
     title: 'Esegui',
     description:
@@ -27,6 +42,8 @@ const steps = [
   },
   {
     icon: LineChart,
+    cycleIcon: CornerLeftUp,
+    arrowSide: 'left',
     number: '04',
     title: 'Monitora',
     description:
@@ -67,12 +84,26 @@ export function HowItWorks() {
               transition={{ duration: 0.5, delay: index * 0.1 }}
               className="relative h-full"
             >
+              {step.arrowSide === 'right' ? (
+                <step.cycleIcon className="hidden lg:block absolute top-1/2 right-6 -translate-y-1/2 w-16 h-16 xl:w-20 xl:h-20 text-[hsl(var(--coral))] z-20 pointer-events-none" strokeWidth={2.2} />
+              ) : (
+                <step.cycleIcon className="hidden lg:block absolute top-1/2 left-6 -translate-y-1/2 w-16 h-16 xl:w-20 xl:h-20 text-[hsl(var(--coral))] z-20 pointer-events-none" strokeWidth={2.2} />
+              )}
+
               <div className="relative bg-[hsl(var(--card))] rounded-2xl p-6 border border-[hsl(var(--border)/0.5)] shadow-soft hover:shadow-medium transition-all z-10 h-full min-h-[260px] flex flex-col">
-                <div className="absolute -top-4 left-6 px-3 py-1 rounded-full gradient-bg shadow-glow">
+                <div
+                  className={`absolute -top-4 ${step.arrowSide === 'left' ? 'right-6' : 'left-6'} px-3 py-1 rounded-full gradient-bg shadow-glow`}
+                >
                   <span className="text-sm font-bold text-white">{step.number}</span>
                 </div>
 
-                <div className="pt-4 flex h-full flex-col">
+                <div
+                  className={`pt-4 flex h-full flex-col ${
+                    step.arrowSide === 'left'
+                      ? 'items-start text-left lg:items-end lg:text-right lg:pl-24'
+                      : 'items-start text-left lg:pr-24'
+                  }`}
+                >
                   <div className="w-14 h-14 rounded-xl bg-[hsl(var(--secondary))] flex items-center justify-center mb-4">
                     <step.icon className="w-7 h-7 text-[hsl(var(--coral))]" />
                   </div>
@@ -80,28 +111,6 @@ export function HowItWorks() {
                   <p className="text-[hsl(var(--muted-foreground))] leading-relaxed">{step.description}</p>
                 </div>
               </div>
-
-              {/* Cycle connectors on desktop (inner corners of each box) */}
-              {index === 0 && (
-                <div className="hidden lg:flex absolute -right-4 -bottom-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
-                  <ArrowRight className="w-4 h-4 text-white" />
-                </div>
-              )}
-              {index === 1 && (
-                <div className="hidden lg:flex absolute -left-4 -bottom-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
-                  <ArrowRight className="w-4 h-4 text-white rotate-90" />
-                </div>
-              )}
-              {index === 3 && (
-                <div className="hidden lg:flex absolute -left-4 -top-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
-                  <ArrowRight className="w-4 h-4 text-white rotate-180" />
-                </div>
-              )}
-              {index === 2 && (
-                <div className="hidden lg:flex absolute -right-4 -top-4 w-8 h-8 rounded-full bg-[hsl(var(--coral))] items-center justify-center shadow-glow z-20">
-                  <ArrowRight className="w-4 h-4 text-white -rotate-90" />
-                </div>
-              )}
             </motion.div>
           ))}
         </div>

@@ -1,18 +1,78 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Webhook, Search, ArrowRight, Workflow, TrendingUp, Bell, RefreshCw } from 'lucide-react';
+import { Webhook, ArrowRight, Workflow, TrendingUp, Bell, RefreshCw, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
+
+const logoGoogleAnalytics = (
+    <svg viewBox="0 0 40 40" className="w-7 h-7" fill="none" aria-hidden="true">
+        <rect width="40" height="40" rx="8" fill="#F9AB00" />
+        <rect x="10" y="20" width="5" height="12" rx="2.5" fill="white" />
+        <rect x="18" y="14" width="5" height="18" rx="2.5" fill="white" />
+        <circle cx="30" cy="27" r="4" fill="white" />
+    </svg>
+);
+
+const logoSearchConsole = (
+    <svg viewBox="0 0 40 40" className="w-7 h-7" fill="none" aria-hidden="true">
+        <rect width="40" height="40" rx="8" fill="#4285F4" />
+        <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="12" fontWeight="700">GSC</text>
+    </svg>
+);
+
+const logoWordPress = (
+    <svg viewBox="0 0 40 40" className="w-7 h-7" fill="none" aria-hidden="true">
+        <rect width="40" height="40" rx="8" fill="#21759B" />
+        <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="14" fontWeight="700">W</text>
+    </svg>
+);
+
+const logoWooCommerce = (
+    <svg viewBox="0 0 40 40" className="w-7 h-7" fill="none" aria-hidden="true">
+        <rect width="40" height="40" rx="8" fill="#96588A" />
+        <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="11" fontWeight="700">WOO</text>
+    </svg>
+);
+
+const logoN8n = (
+    <svg viewBox="0 0 40 40" className="w-7 h-7" fill="none" aria-hidden="true">
+        <rect width="40" height="40" rx="8" fill="#EA4B71" />
+        <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="12" fontWeight="700">n8n</text>
+    </svg>
+);
 
 const integrations = [
     {
+        name: 'Google Analytics',
+        logo: logoGoogleAnalytics,
+        description: 'Collega i dati di traffico e conversione per contestualizzare insight e azioni nel funnel.',
+        badge: 'Analytics',
+        badgeColor: 'bg-orange-100 text-orange-700',
+    },
+    {
+        name: 'Google Search Console',
+        logo: logoSearchConsole,
+        description: 'Importa query, posizioni e CTR per collegare performance SEO a feedback qualitativo e intenti reali.',
+        badge: 'SEO',
+        badgeColor: 'bg-blue-100 text-blue-700',
+    },
+    {
+        name: 'WordPress',
+        logo: logoWordPress,
+        description: 'Sincronizza contenuti e pagine per applicare rapidamente le azioni suggerite dal Copilot.',
+        badge: 'CMS',
+        badgeColor: 'bg-sky-100 text-sky-700',
+    },
+    {
+        name: 'WooCommerce',
+        logo: logoWooCommerce,
+        description: 'Attiva flussi su catalogo e percorso di acquisto, collegando insight a decisioni e-commerce.',
+        badge: 'E-commerce',
+        badgeColor: 'bg-violet-100 text-violet-700',
+    },
+    {
         name: 'n8n',
-        logo: (
-            <svg viewBox="0 0 40 40" className="w-7 h-7" fill="none">
-                <rect width="40" height="40" rx="8" fill="#EA4B71" />
-                <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">n8n</text>
-            </svg>
-        ),
+        logo: logoN8n,
         description: 'Instrada insight e AI Tips verso Slack, Notion, CRM e oltre 400 app senza codice.',
         badge: 'Automazione',
         badgeColor: 'bg-pink-100 text-pink-700',
@@ -24,25 +84,15 @@ const integrations = [
         badge: 'Notifiche',
         badgeColor: 'bg-[hsl(var(--coral)/0.1)] text-[hsl(var(--coral))]',
     },
-    {
-        name: 'Google Search Console',
-        logo: (
-            <svg viewBox="0 0 40 40" className="w-7 h-7" fill="none">
-                <rect width="40" height="40" rx="8" fill="#4285F4" />
-                <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">G</text>
-            </svg>
-        ),
-        description: 'Importa query, posizioni e CTR per collegare performance SEO a feedback qualitativo e intenti reali.',
-        badge: 'SEO',
-        badgeColor: 'bg-blue-100 text-blue-700',
-    },
-    {
-        name: 'SERP & AI Monitor',
-        logo: <Search className="w-7 h-7 text-green-600" />,
-        description: 'Monitora come il brand appare su Google e nelle risposte AI, con confronto continuo rispetto ai competitor.',
-        badge: 'Visibilità',
-        badgeColor: 'bg-green-100 text-green-700',
-    },
+];
+
+const connectedPlatforms = [
+    { name: 'Google Analytics', logo: logoGoogleAnalytics },
+    { name: 'Search Console', logo: logoSearchConsole },
+    { name: 'WordPress', logo: logoWordPress },
+    { name: 'WooCommerce', logo: logoWooCommerce },
+    { name: 'Webhook', logo: <Webhook className="w-5 h-5 text-[hsl(var(--coral))]" /> },
+    { name: 'n8n', logo: logoN8n },
 ];
 
 const flowSteps = [
@@ -123,7 +173,7 @@ export function AutomationSection() {
                 </motion.div>
 
                 {/* Integration cards grid */}
-                <div className="grid md:grid-cols-2 gap-6 mb-12">
+                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 mb-10">
                     {integrations.map((integration, index) => (
                         <motion.div
                             key={integration.name}
@@ -155,6 +205,39 @@ export function AutomationSection() {
                         </motion.div>
                     ))}
                 </div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5 }}
+                    className="mb-12"
+                >
+                    <div className="rounded-2xl border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--card)/0.75)] p-5 md:p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <BarChart3 className="w-4 h-4 text-[hsl(var(--coral))]" />
+                            <p className="text-sm font-semibold text-[hsl(var(--foreground))]">
+                                Piattaforme esterne collegabili
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                            {connectedPlatforms.map((platform) => (
+                                <div
+                                    key={platform.name}
+                                    className="rounded-xl border border-[hsl(var(--border)/0.6)] bg-[hsl(var(--background)/0.85)] px-3 py-3 flex items-center gap-2"
+                                    title={platform.name}
+                                >
+                                    <div className="w-7 h-7 flex items-center justify-center flex-shrink-0">
+                                        {platform.logo}
+                                    </div>
+                                    <span className="text-xs font-medium text-[hsl(var(--foreground))] whitespace-nowrap">
+                                        {platform.name}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </motion.div>
 
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}

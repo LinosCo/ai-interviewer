@@ -20,6 +20,7 @@ import Link from 'next/link';
 export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
     const updateAction = updateBotAction.bind(null, bot.id);
     const [provider, setProvider] = useState(bot.modelProvider || 'openai');
+    const [quality, setQuality] = useState<'standard' | 'avanzato'>(bot.interviewerQuality || 'standard');
     const [isRecruiting, setIsRecruiting] = useState(bot.collectCandidateData ?? false);
 
     // Wrapper to ignore return type compatibility issues with form action
@@ -112,6 +113,21 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
             <section>
                 <h2 className="text-lg font-semibold mb-4 border-b pb-2">Constraints & Features</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1">Interview Quality</label>
+                        <select
+                            name="interviewerQuality"
+                            value={quality}
+                            onChange={(e) => setQuality(e.target.value as 'standard' | 'avanzato')}
+                            className="w-full border p-2 rounded"
+                        >
+                            <option value="standard">Standard — Veloce e comparabile</option>
+                            <option value="avanzato">Avanzato — Intervista qualitativa profonda</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Avanzato: modello critico aggressivo, budget generosi, naturalezza avanzata.
+                        </p>
+                    </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Max Duration (Minutes)</label>
                         <input type="number" name="maxDurationMins" defaultValue={bot.maxDurationMins} className="w-full border p-2 rounded" />
@@ -227,27 +243,28 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                                     <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
                                         {provider === 'openai' ? (
                                             <>
-                                                <optgroup label="GPT-4o (Flagship)">
-                                                    <option value="gpt-4o">GPT-4o (Best Overall)</option>
-                                                    <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+                                                <optgroup label="GPT-5 (Current)">
+                                                    <option value="gpt-5-mini">GPT-5 Mini (Fast & Efficient)</option>
+                                                    <option value="gpt-5">GPT-5 (Strong)</option>
+                                                    <option value="gpt-5.1">GPT-5.1 (Strong+)</option>
+                                                    <option value="gpt-5.2">GPT-5.2 (Flagship)</option>
                                                 </optgroup>
-                                                <optgroup label="Reasoning Models">
-                                                    <option value="o1-preview">o1 Preview (Deep Reasoning)</option>
-                                                    <option value="o1-mini">o1 Mini (Fast Reasoning)</option>
+                                                <optgroup label="Legacy (GPT-4)">
+                                                    <option value="gpt-4o">GPT-4o</option>
+                                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                                    <option value="gpt-4.1">GPT-4.1</option>
+                                                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
                                                 </optgroup>
-                                                <optgroup label="Legacy">
-                                                    <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                                                </optgroup>
-
                                             </>
                                         ) : (
                                             <>
-                                                <optgroup label="Claude 4.5 (New)">
-                                                    <option value="claude-sonnet-4-5-20250929">Claude 4.5 Sonnet (2025-09-29)</option>
+                                                <optgroup label="Claude 4.x (Current)">
+                                                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Flagship)</option>
+                                                    <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fast)</option>
                                                 </optgroup>
-                                                <optgroup label="Claude 3.5 (Stable)">
+                                                <optgroup label="Legacy (Claude 3.5)">
                                                     <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                                                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</option>
+                                                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
                                                 </optgroup>
                                             </>
                                         )}

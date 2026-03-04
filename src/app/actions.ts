@@ -409,7 +409,8 @@ export async function updateBotAction(botId: string, formData: FormData) {
     if (formData.has('language')) data.language = getStr('language');
     if (formData.has('tone')) data.tone = getStr('tone');
     if (formData.has('introMessage')) data.introMessage = getStr('introMessage');
-    const shouldRegeneratePlan = formData.has('maxDurationMins');
+    if (formData.has('interviewerQuality')) data.interviewerQuality = getStr('interviewerQuality') as any;
+    const shouldRegeneratePlan = formData.has('maxDurationMins') || formData.has('interviewerQuality');
     if (formData.has('maxDurationMins')) data.maxDurationMins = Number(formData.get('maxDurationMins'));
 
     // Handle slug update with validation

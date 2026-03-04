@@ -256,13 +256,27 @@ function detectConstraintSignal(text: string, language: string): boolean {
     return constraintPatterns.some(p => p.test(text));
 }
 
+export interface ProbeThresholds {
+    probeExampleThreshold: number;       // default 0.28
+    probeImpactExploreThreshold: number; // default 0.42
+    probeImpactDeepenThreshold: number;  // default 0.34
+}
+
+const DEFAULT_THRESHOLDS: ProbeThresholds = {
+    probeExampleThreshold: 0.28,
+    probeImpactExploreThreshold: 0.42,
+    probeImpactDeepenThreshold: 0.34,
+};
+
 function determineQuestionMode(params: {
     phase: MicroPlannerPhase;
     signalScore: number;
     prioritizeCoverage: boolean;
     userTurnSignal: UserTurnSignal;
     hasConstraintSignal: boolean;
+    thresholds?: ProbeThresholds;
 }): MicroPlannerDecision['mode'] {
+    const t = params.thresholds || DEFAULT_THRESHOLDS;
     if (params.userTurnSignal === 'clarification') {
         return 'cover_subgoal';
     }
@@ -270,13 +284,13 @@ function determineQuestionMode(params: {
         return 'cover_subgoal';
     }
     if (params.phase === 'DEEPEN') {
-        if (params.signalScore >= 0.34) return 'probe_impact';
+        if (params.signalScore >= t.probeImpactDeepenThreshold) return 'probe_impact';
         if (params.hasConstraintSignal) return 'probe_constraint';
         return 'probe_example';
     }
-    if (params.signalScore >= 0.42) return 'probe_impact';
+    if (params.signalScore >= t.probeImpactExploreThreshold) return 'probe_impact';
     if (params.hasConstraintSignal && params.signalScore >= 0.2) return 'probe_constraint';
-    if (params.signalScore >= 0.28) return 'probe_example';
+    if (params.signalScore >= t.probeExampleThreshold) return 'probe_example';
     return 'cover_subgoal';
 }
 
@@ -286,7 +300,7 @@ function determineCommentStyle(userTurnSignal: UserTurnSignal, signalScore: numb
     return 'neutral_bridge';
 }
 
-export function buildMicroPlannerDecision(input: MicroPlannerInput): MicroPlannerDecision {
+export function buildMicroPlannerDecision(input: MicroPlannerInput, thresholds?: ProbeThresholds): MicroPlannerDecision {
     const userTurnSignal = input.userTurnSignal || 'none';
     const userMessage = String(input.userMessage || '');
     const signalScore = computeSignalScore(userMessage, input.language);
@@ -306,7 +320,8 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput): MicroPlanne
         signalScore,
         prioritizeCoverage,
         userTurnSignal,
-        hasConstraintSignal
+        hasConstraintSignal,
+        thresholds
     });
     const commentStyle = determineCommentStyle(userTurnSignal, signalScore);
 

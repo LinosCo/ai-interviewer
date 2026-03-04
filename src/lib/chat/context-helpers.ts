@@ -70,11 +70,18 @@ export function shouldUseCriticalModelForTopicTurn(params: {
     userTurnSignal: 'none' | 'clarification' | 'off_topic_question';
     userMessage?: string | null;
     language: string;
+    criticalEscalation?: 'selective' | 'aggressive';
 }): { useCritical: boolean; reason: string } {
     if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') {
         return { useCritical: false, reason: 'not_topic_phase' };
     }
 
+    // Aggressive mode (avanzato): critical for ALL explore/deepen turns
+    if (params.criticalEscalation === 'aggressive') {
+        return { useCritical: true, reason: 'aggressive_escalation' };
+    }
+
+    // Selective mode (standard): critical only for high-value turns (~25-30%)
     if (params.userTurnSignal === 'clarification') {
         return { useCritical: true, reason: 'clarification_turn' };
     }

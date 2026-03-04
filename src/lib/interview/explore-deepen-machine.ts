@@ -205,7 +205,8 @@ export function handleDeepenPhase({
     botTopics,
     language,
     maxDurationMins,
-    effectiveSec
+    effectiveSec,
+    deepenMaxTurnsPerTopic = 2
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -213,6 +214,7 @@ export function handleDeepenPhase({
     language: string;
     maxDurationMins: number;
     effectiveSec: number;
+    deepenMaxTurnsPerTopic?: number;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'DEEPENING' };
@@ -229,8 +231,8 @@ export function handleDeepenPhase({
     const currentUncoveredIndex = uncoveredTopics.indexOf(currentTopic.id);
     const budget = state.topicBudgets[currentTopic.id];
     const maxTurnsForDeepen = Math.min(
-        2, // Default max turns per topic in DEEPEN
-        Math.max(1, (budget?.maxTurns || 2) - (budget?.turnsUsed || 0))
+        deepenMaxTurnsPerTopic,
+        Math.max(1, (budget?.maxTurns || deepenMaxTurnsPerTopic) - (budget?.turnsUsed || 0))
     );
 
     if (state.turnInTopic >= maxTurnsForDeepen) {

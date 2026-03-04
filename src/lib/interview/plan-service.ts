@@ -2,8 +2,23 @@ import { prisma } from '@/lib/prisma';
 import type { Bot, TopicBlock } from '@prisma/client';
 import type { InterviewPlan, InterviewPlanOverrides, PlanTopic } from './plan-types';
 
-const SECONDS_PER_TURN = 45;
 const PLAN_LOGIC_VERSION = '2.0';
+
+export interface PlanBudgetConfig {
+  planBaseTurnsDivisor: number;   // seconds per turn (default 45)
+  planBaseTurnsMin: number;       // min baseTurns per topic (default 2)
+  planMaxTurnsBonus: number;      // added to baseTurns for maxTurns (default 2)
+  deepenFallbackTurns: number;    // fallback turns for deepen (default 2)
+  deepenMaxTurnsPerTopic: number; // max turns per topic in deepen (default 2)
+}
+
+const DEFAULT_BUDGET_CONFIG: PlanBudgetConfig = {
+  planBaseTurnsDivisor: 45,
+  planBaseTurnsMin: 2,
+  planMaxTurnsBonus: 2,
+  deepenFallbackTurns: 2,
+  deepenMaxTurnsPerTopic: 2,
+};
 
 function buildTopicsSignature(topics: TopicBlock[]) {
   return topics
@@ -11,16 +26,17 @@ function buildTopicsSignature(topics: TopicBlock[]) {
     .join('||');
 }
 
-export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[]): InterviewPlan {
+export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[], budgetConfig?: Partial<PlanBudgetConfig>): InterviewPlan {
+  const cfg = { ...DEFAULT_BUDGET_CONFIG, ...budgetConfig };
   const totalTimeSec = (bot.maxDurationMins || 10) * 60;
   const perTopicTimeSec = totalTimeSec / Math.max(1, topics.length);
-  const timeBasedMax = Math.max(1, Math.floor(perTopicTimeSec / SECONDS_PER_TURN));
+  const timeBasedMax = Math.max(1, Math.floor(perTopicTimeSec / cfg.planBaseTurnsDivisor));
 
   const explorTopics: PlanTopic[] = topics.map(t => {
     const topicMaxTurns = Number(t.maxTurns || timeBasedMax);
     const minTurns = 1;
-    const baseTurns = Math.max(2, Math.floor(perTopicTimeSec / SECONDS_PER_TURN));
-    const maxTurns = baseTurns + 2;
+    const baseTurns = Math.max(cfg.planBaseTurnsMin, Math.floor(perTopicTimeSec / cfg.planBaseTurnsDivisor));
+    const maxTurns = baseTurns + cfg.planMaxTurnsBonus;
 
     return {
       topicId: t.id,
@@ -51,8 +67,8 @@ export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[]): Intervie
       topics: explorTopics
     },
     deepen: {
-      maxTurnsPerTopic: 2,
-      fallbackTurns: 2
+      maxTurnsPerTopic: cfg.deepenMaxTurnsPerTopic,
+      fallbackTurns: cfg.deepenFallbackTurns
     }
   };
 }

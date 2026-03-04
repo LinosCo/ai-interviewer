@@ -19,8 +19,7 @@ import Link from 'next/link';
 
 export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
     const updateAction = updateBotAction.bind(null, bot.id);
-    const [provider, setProvider] = useState(bot.modelProvider || 'openai');
-    const [quality, setQuality] = useState(bot.interviewerQuality || 'quantitativo');
+    const [quality, setQuality] = useState(bot.interviewerQuality || 'standard');
     const [isRecruiting, setIsRecruiting] = useState(bot.collectCandidateData ?? false);
 
     // Wrapper to ignore return type compatibility issues with form action
@@ -211,93 +210,6 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                 </div>
             </section>
 
-            <section className="bg-gray-50 rounded-lg p-4 border">
-                <details className="group">
-                    <summary className="flex justify-between items-center font-medium cursor-pointer list-none text-gray-700">
-                        <span className="flex items-center gap-2">
-                            Advanced Settings (Model & API)
-                        </span>
-                        <span className="transition group-open:rotate-180">
-                            <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                        </span>
-                    </summary>
-                    <div className="text-neutral-600 mt-4 group-open:animate-fadeIn">
-                        <div className="space-y-4">
-                            <div className="bg-yellow-50 p-4 rounded text-sm text-yellow-800 border border-yellow-100">
-                                These settings are for advanced users. By default, the platform handles model selection and API keys.
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Model Provider</label>
-                                    <select
-                                        name="modelProvider"
-                                        value={provider}
-                                        onChange={(e) => setProvider(e.target.value)}
-                                        className="w-full border p-2 rounded"
-                                    >
-                                        <option value="openai">OpenAI (ChatGPT)</option>
-                                        <option value="anthropic">Anthropic (Claude)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">Model Name</label>
-                                    <select name="modelName" defaultValue={bot.modelName} className="w-full border p-2 rounded">
-                                        {provider === 'openai' ? (
-                                            <>
-                                                <optgroup label="GPT-5 (Current)">
-                                                    <option value="gpt-5-mini">GPT-5 Mini (Fast & Efficient)</option>
-                                                    <option value="gpt-5">GPT-5 (Strong)</option>
-                                                    <option value="gpt-5.1">GPT-5.1 (Strong+)</option>
-                                                    <option value="gpt-5.2">GPT-5.2 (Flagship)</option>
-                                                </optgroup>
-                                                <optgroup label="Legacy (GPT-4)">
-                                                    <option value="gpt-4o">GPT-4o</option>
-                                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                                    <option value="gpt-4.1">GPT-4.1</option>
-                                                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                                                </optgroup>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <optgroup label="Claude 4.x (Current)">
-                                                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (Flagship)</option>
-                                                    <option value="claude-haiku-4-5">Claude Haiku 4.5 (Fast)</option>
-                                                </optgroup>
-                                                <optgroup label="Legacy (Claude 3.5)">
-                                                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
-                                                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-                                                </optgroup>
-                                            </>
-                                        )}
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">OpenAI API Key (Override)</label>
-                                <input
-                                    type="password"
-                                    name="openaiApiKey"
-                                    defaultValue={bot.openaiApiKey || ''}
-                                    placeholder="sk-..."
-                                    autoComplete="new-password"
-                                    className="w-full border p-2 rounded font-mono"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-1">Anthropic API Key (Override)</label>
-                                <input
-                                    type="password"
-                                    name="anthropicApiKey"
-                                    defaultValue={bot.anthropicApiKey || ''}
-                                    placeholder="sk-ant-..."
-                                    autoComplete="new-password"
-                                    className="w-full border p-2 rounded font-mono"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </details>
-            </section>
 
             <div className="pt-4 align-right">
                 <button type="submit" className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">

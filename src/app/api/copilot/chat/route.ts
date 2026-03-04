@@ -8,6 +8,7 @@ import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
 import { canAccessProjectData } from '@/lib/copilot/permissions';
 import { searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { PlanType } from '@/config/plans';
+import { getConfigValue } from '@/lib/config';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { cookies } from 'next/headers';
@@ -44,6 +45,19 @@ function isConnectionError(error: unknown): boolean {
 function isAnthropicModelNotFound(error: unknown): boolean {
     const message = (error instanceof Error ? error.message : String(error || '')).toLowerCase();
     return message.includes('not_found_error') || message.includes('model:');
+}
+
+function isPlaceholderCopilotResponse(text: string): boolean {
+    const normalized = String(text || '').toLowerCase().trim();
+    if (!normalized) return true;
+
+    return [
+        'lasciami cercare',
+        'cerco subito',
+        'scusa per il ritardo',
+        'verifico adesso',
+        'un momento mentre controllo'
+    ].some((snippet) => normalized.includes(snippet));
 }
 
 export async function POST(req: Request) {
@@ -174,16 +188,8 @@ export async function POST(req: Request) {
         const kbContext = kbResults.slice(0, 2).map(r => `[${r.title}]: ${r.content}`).join('\n\n');
 
         // 6. Get API key (Anthropic for Claude 4.5 Opus)
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: {
-                anthropicApiKey: true,
-                openaiApiKey: true
-            }
-        });
-
-        const anthropicApiKey = globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
-        const openaiApiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
+        const anthropicApiKey = await getConfigValue('anthropicApiKey') || '';
+        const openaiApiKey = await getConfigValue('openaiApiKey') || '';
 
         if (!anthropicApiKey && !openaiApiKey) {
             return NextResponse.json({
@@ -279,7 +285,7 @@ export async function POST(req: Request) {
 
             return generateText({
                 model: llm as any,
-                system: systemPrompt + "\n\nCRITICAL: Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
+                system: systemPrompt + "\n\nCRITICAL: Never stop at 'I'm searching' or similar placeholder messages. If you use tools, always provide the final concrete answer in the same turn. Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
                 messages: inputMessages,
                 tools: toolSet,
                 ...(toolSet ? { maxSteps: 4 } : {}),
@@ -367,9 +373,15 @@ export async function POST(req: Request) {
             }
         }
 
-        const responseText = typeof finalObject?.response === 'string'
+        let responseText = typeof finalObject?.response === 'string'
             ? finalObject.response
             : String(finalObject?.response ?? result.text ?? '');
+
+        if (isPlaceholderCopilotResponse(responseText) && kbResults.length > 0) {
+            const top = kbResults[0];
+            responseText = `Ho trovato questo nella documentazione di Business Tuner:\n\n**${top.title}**\n\n${top.content.slice(0, 1100)}\n\nSe vuoi, posso darti i passaggi operativi esatti sul tuo progetto.`;
+            finalObject.usedKnowledgeBase = true;
+        }
 
         // 10. Log copilot session
         const estimatedTokens = Math.ceil((message.length + responseText.length) / 4);

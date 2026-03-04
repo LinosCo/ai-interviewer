@@ -8,15 +8,17 @@
  * and user queries at retrieval time.
  */
 
+import { getConfigValue } from '@/lib/config';
+
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMS = 1536;
 const MAX_CONTENT_CHARS = 8000; // ~2000 tokens, well within model limit
 
 /** Generate a single embedding vector for a text string */
 export async function generateEmbedding(text: string): Promise<number[] | null> {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = await getConfigValue('openaiApiKey');
     if (!apiKey) {
-        console.warn('[embedding-service] OPENAI_API_KEY not set — skipping embedding');
+        console.warn('[embedding-service] OpenAI API key not configured — skipping embedding');
         return null;
     }
 

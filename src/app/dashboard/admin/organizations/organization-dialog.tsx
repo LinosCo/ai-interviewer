@@ -150,20 +150,20 @@ export default function OrganizationDialog({ isOpen, onClose, organization }: Or
                         </div>
                     )}
 
-                    <DialogFooter>
+                    <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="mr-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            className="w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:mr-2 sm:w-auto"
                         >
                             Annulla
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="bg-amber-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-amber-700 disabled:opacity-50"
+                            className="w-full rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 sm:w-auto"
                         >
-                            {isSubmitting ? 'Salvataggio...' : organization ? 'Trasferisci' : 'Crea'}
+                            {isSubmitting ? 'Salvataggio...' : organization ? 'Salva modifiche' : 'Crea'}
                         </button>
                     </DialogFooter>
                 </form>

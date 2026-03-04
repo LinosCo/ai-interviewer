@@ -30,6 +30,7 @@ interface ChatbotSettingsProps {
     bot: any;
     canUseKnowledgeBase: boolean;
     projects: any[];
+    organizationPlan?: string;
 }
 
 const TABS = [
@@ -41,9 +42,10 @@ const TABS = [
     { id: 'test', label: 'Test & Debug', icon: MessageSquare },
 ];
 
-export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: ChatbotSettingsProps) {
+export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects, organizationPlan = 'TRIAL' }: ChatbotSettingsProps) {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState('general');
+    const isBusinessPlan = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(organizationPlan);
     const [config, setConfig] = useState({
         name: bot.name,
         tone: bot.tone || '',
@@ -57,6 +59,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
         backgroundColor: bot.backgroundColor || '', // Ensure consistent value for hydration
         privacyPolicyUrl: bot.privacyPolicyUrl || '',
         enablePageContext: bot.enablePageContext ?? false,
+        interviewerQuality: (bot.interviewerQuality as string) || 'quantitativo',
     });
     const [isSaving, setIsSaving] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(true); // Toggle for mobile maybe
@@ -109,6 +112,7 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
                     logoUrl: config.logoUrl,
                     privacyPolicyUrl: config.privacyPolicyUrl,
                     enablePageContext: config.enablePageContext,
+                    interviewerQuality: config.interviewerQuality,
                     botType: 'chatbot'
                 })
             });
@@ -256,6 +260,81 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects }: 
                                                 />
                                                 <p className="text-[10px] text-gray-400 font-bold italic ml-1">* Questo è il primo messaggio che l'utente vedrà quando apre la chat.</p>
                                             </div>
+                                        </div>
+
+                                        {/* Modalità Chatbot */}
+                                        <div className="space-y-3">
+                                            <div className="space-y-1">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Modalità Chatbot</h4>
+                                                <p className="text-xs text-gray-400 ml-1">Scegli come il chatbot raccoglie le informazioni durante la conversazione.</p>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                {[
+                                                    {
+                                                        value: 'quantitativo',
+                                                        icon: '📊',
+                                                        label: 'Strutturato',
+                                                        desc: 'Conversazione strutturata. Raccoglie dati in modo sistematico.',
+                                                        credits: '~1 credito/messaggio',
+                                                        locked: false,
+                                                    },
+                                                    {
+                                                        value: 'intermedio',
+                                                        icon: '🔍',
+                                                        label: 'Naturale',
+                                                        desc: 'Più naturale. Trova il momento giusto per raccogliere le info.',
+                                                        credits: '~2 crediti/messaggio',
+                                                        locked: !isBusinessPlan,
+                                                    },
+                                                    {
+                                                        value: 'avanzato',
+                                                        icon: '🎯',
+                                                        label: 'Contestuale',
+                                                        desc: 'Estrae dati dai segnali impliciti della conversazione.',
+                                                        credits: '~3 crediti/messaggio',
+                                                        locked: !isBusinessPlan,
+                                                    },
+                                                ].map((tier) => {
+                                                    const selected = config.interviewerQuality === tier.value;
+                                                    return (
+                                                        <label
+                                                            key={tier.value}
+                                                            className={`relative flex flex-col gap-2 p-4 rounded-2xl border-2 transition-all ${
+                                                                tier.locked
+                                                                    ? 'opacity-50 cursor-not-allowed border-gray-100 bg-gray-50'
+                                                                    : selected
+                                                                    ? 'cursor-pointer border-blue-500 bg-blue-50'
+                                                                    : 'cursor-pointer border-gray-100 hover:border-gray-200 bg-gray-50/50'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="interviewerQuality"
+                                                                value={tier.value}
+                                                                checked={selected}
+                                                                onChange={() => !tier.locked && setConfig({ ...config, interviewerQuality: tier.value })}
+                                                                disabled={tier.locked}
+                                                                className="sr-only"
+                                                            />
+                                                            <div className="flex items-center gap-2 font-bold text-sm">
+                                                                <span>{tier.icon}</span>
+                                                                <span>{tier.label}</span>
+                                                                {tier.locked && (
+                                                                    <span className="ml-auto text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">Business</span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[11px] text-gray-500">{tier.desc}</p>
+                                                            <p className="text-[11px] font-bold text-blue-600">{tier.credits}</p>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                            {!isBusinessPlan && (
+                                                <p className="text-xs text-gray-400 ml-1">
+                                                    Naturale e Contestuale richiedono il piano Business.{' '}
+                                                    <a href="/dashboard/billing" className="text-blue-600 underline">Upgrade →</a>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 )}

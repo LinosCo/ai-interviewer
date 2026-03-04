@@ -6,6 +6,7 @@ import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
 import { searchKnowledgeSources } from '@/lib/kb/semantic-search';
 import { sanitize } from '@/lib/llm/prompt-sanitizer';
+import { getConfigValue } from '@/lib/config';
 import {
     hasConfiguredScope,
     hasRecentHelpfulAssistantReply,
@@ -21,6 +22,17 @@ import { validateExtractedField, checkSkipIntent } from '@/lib/interview/field-v
 export const maxDuration = 30;
 
 const LEAD_SPLIT_TOKEN = '[[LEAD_QUESTION]]';
+
+/**
+ * Maps interviewerQuality tier to the chatbot OpenAI model name.
+ * Note: 'avanzato' for chatbot uses gpt-4.1 (not Claude) — field extraction
+ * doesn't need cross-provider complexity.
+ */
+function getChatbotModelName(bot: any): string {
+    const tier = bot?.interviewerQuality || 'quantitativo';
+    if (tier === 'avanzato' || tier === 'intermedio') return 'gpt-4.1';
+    return 'gpt-4.1-mini'; // quantitativo (default)
+}
 
 // Helper function to collect LLM usage
 type LLMUsageCollector = (usage: any) => void;
@@ -170,9 +182,10 @@ async function extractFieldFromMessage(
     userMessage: string,
     apiKey: string,
     language: string = 'en',
-    options?: { onUsage?: LLMUsageCollector }
+    options?: { onUsage?: LLMUsageCollector; modelName?: string }
 ): Promise<{ value: string | null; confidence: 'high' | 'low' | 'none' }> {
     const openai = createOpenAI({ apiKey });
+    const extractModel = options?.modelName || 'gpt-4.1-mini';
 
     const fieldDescriptions: Record<string, string> = {
         name: language === 'it'
@@ -209,7 +222,7 @@ async function extractFieldFromMessage(
         }
 
         const result = await generateObject({
-            model: openai('gpt-4o-mini'),
+            model: openai(extractModel),
             schema,
             prompt: `Extract "${fieldName}" (${fieldDescriptions[fieldName] || fieldName}) from: "${sanitize(userMessage)}"\n\nRules:\n- Return null if not found\n- Do NOT infer name from email address\n- For email: look for xxx@xxx.xxx pattern\n- For phone: look for numeric sequences${fieldSpecificRules}`,
             temperature: 0
@@ -372,7 +385,7 @@ export async function POST(req: Request) {
             select: { openaiApiKey: true }
         });
 
-        const apiKey = bot.openaiApiKey || globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
+        const apiKey = bot.openaiApiKey || globalConfig?.openaiApiKey || await getConfigValue('openaiApiKey') || '';
 
         if (!apiKey) {
             return Response.json({
@@ -382,6 +395,7 @@ export async function POST(req: Request) {
         }
 
         const openai = createOpenAI({ apiKey });
+        const tierModelName = getChatbotModelName(bot);
 
         let finalResponse = '';
 
@@ -430,7 +444,7 @@ export async function POST(req: Request) {
                 console.log('[SmartLeadGen] Evaluating for conversation:', conversationId, 'Msg count:', totalUserMessages);
                 try {
                     const smartDecision = await generateObject({
-                        model: openai('gpt-4o-mini'),
+                        model: openai(tierModelName),
                         temperature: 0,
                         schema: z.object({
                             shouldAsk: z.boolean(),
@@ -510,7 +524,7 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
                         userMessage,
                         apiKey,
                         language as 'it' | 'en',
-                        { onUsage: createUsageCollector() }
+                        { onUsage: createUsageCollector(), modelName: tierModelName }
                     );
                     const attemptCount = (fieldAttemptCounts[nextMissingField.field] || 0) + 1;
 
@@ -628,7 +642,7 @@ NON-NEGOTIABLE RULES
         if (!finalResponse) {
             try {
                 result = await generateObject({
-                    model: openai('gpt-4o-mini'),
+                    model: openai(tierModelName),
                     temperature: 0,
                     schema,
                     schemaName: 'ChatbotResponse',
@@ -707,7 +721,7 @@ NON-NEGOTIABLE RULES
                     inputTokens: result.usage.inputTokens || 0,
                     outputTokens: result.usage.outputTokens || 0,
                     category: 'CHATBOT',
-                    model: 'gpt-4o-mini',
+                    model: tierModelName,
                     operation: 'chatbot-response',
                     resourceType: 'chatbot',
                     resourceId: bot.id

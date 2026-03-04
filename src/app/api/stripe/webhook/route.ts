@@ -4,6 +4,7 @@ import { BillingCycle, PlanType, SubscriptionStatus, SubscriptionTier } from '@p
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getStripeClient } from '@/lib/stripe';
+import { getConfigValue } from '@/lib/config';
 import { CreditService } from '@/services/creditService';
 import { PLANS } from '@/config/plans';
 import { sendPaymentFailedEmail } from '@/lib/email';
@@ -29,33 +30,15 @@ function getStripePeriodDates(subscription: any) {
     return { currentPeriodStart, currentPeriodEnd, trialEndsAt };
 }
 
-async function resolveStripeWebhookSecret(): Promise<string | null> {
-    if (process.env.STRIPE_WEBHOOK_SECRET) {
-        return process.env.STRIPE_WEBHOOK_SECRET;
-    }
-
-    try {
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: { stripeWebhookSecret: true }
-        });
-        return globalConfig?.stripeWebhookSecret || null;
-    } catch (error) {
-        console.warn('[stripe/webhook] Failed to load webhook secret from GlobalConfig:', error);
-        return null;
-    }
-}
-
 export async function POST(req: NextRequest) {
     const body = await req.text();
     const signature = req.headers.get('stripe-signature');
-    const webhookSecret = await resolveStripeWebhookSecret();
+    const webhookSecret = await getConfigValue('stripeWebhookSecret');
 
     if (!signature || !webhookSecret) {
         console.warn('[stripe/webhook] Missing config –', {
             hasSignature: !!signature,
             hasSecret: !!webhookSecret,
-            secretSource: process.env.STRIPE_WEBHOOK_SECRET ? 'env' : 'db',
         });
         return NextResponse.json({ error: 'Missing Stripe webhook configuration' }, { status: 400 });
     }

@@ -153,6 +153,116 @@ Campi minimi target:
 }
 ```
 
+## Parametri autenticazione richiesti (allineati al codice BT attuale)
+Questa sezione descrive i parametri gia' richiesti dalla codebase BT per autenticare la connessione CMS.
+Se il CMS vuole essere compatibile subito con BT, deve supportare questi campi.
+
+### Credenziali generate da BT (una tantum in fase connect)
+- `BUSINESS_TUNER_API_KEY`:
+  - formato generato: prefisso `bt_live_` + random string.
+  - uso: autenticare chiamate BT -> CMS (`X-BT-API-Key`) e chiamate CMS -> BT `validate-session` (Bearer).
+- `BUSINESS_TUNER_WEBHOOK_SECRET`:
+  - formato generato: prefisso `whsec_` + random string.
+  - uso: firmare webhooks CMS -> BT con HMAC-SHA256.
+- `BUSINESS_TUNER_WEBHOOK_URL`:
+  - valore BT: `https://<bt-domain>/api/webhooks/cms/<connectionId>`.
+  - uso: endpoint da chiamare dal CMS per eventi content publish/update/delete.
+- `BUSINESS_TUNER_URL`:
+  - URL base BT, utile per integrazione dashboard/session.
+
+### Parametri obbligatori BT -> CMS
+Endpoint CMS che BT gia' chiama:
+- `GET /status`
+- `POST /suggestions`
+- `GET /pages`, `GET /posts`, `GET /categories` (discovery)
+
+Header richiesto:
+- `X-BT-API-Key: <BUSINESS_TUNER_API_KEY>`
+
+Note:
+- Header `X-BT-API-Key` e' obbligatorio per compatibilita' con il codice BT corrente.
+- Al momento il codice BT non firma queste chiamate con HMAC: l'autenticazione primaria e' API key.
+
+### Parametri obbligatori CMS -> BT (webhook principale)
+Endpoint BT:
+- `POST /api/webhooks/cms/<connectionId>`
+
+Header richiesto:
+- `x-cms-signature: <signature>`
+
+Firma richiesta:
+- algoritmo: `HMAC-SHA256`
+- input: `raw body` (stringa esatta non modificata)
+- chiave: `BUSINESS_TUNER_WEBHOOK_SECRET`
+- digest atteso: `hex`
+- formato accettato: `sha256=<hex>` oppure `<hex>`
+
+Payload minimo tipico:
+- `event`: `content.published|content.updated|content.deleted`
+- `contentId`, `contentType`, `title`, `slug`, `url`, `publishedAt`
+- opzionale: `btSuggestionId`
+
+### Parametri obbligatori CMS -> BT (suggestion applied callback)
+Endpoint BT:
+- `POST /api/cms/webhooks/suggestion-applied`
+
+Header richiesto:
+- `x-bt-signature: <hex>`
+
+Firma richiesta:
+- algoritmo: `HMAC-SHA256`
+- input: `raw body`
+- chiave: `BUSINESS_TUNER_WEBHOOK_SECRET`
+- formato richiesto da questo endpoint specifico: solo `hex` (senza prefisso `sha256=`)
+
+Body richiesto:
+- `suggestionId` (required)
+- `connectionId` (required)
+- `appliedBy` (optional)
+- `contentId` (optional)
+- `publishedUrl` (optional)
+
+### Parametri obbligatori CMS -> BT (validazione sessione SSO)
+Endpoint BT:
+- `POST /api/cms/validate-session`
+
+Header richiesto:
+- `Authorization: Bearer <BUSINESS_TUNER_API_KEY>`
+
+Body JSON richiesto:
+- `token`: JWT ricevuto da BT (`bt_token`)
+- `connectionId`: id connessione BT (`bt_connection`)
+
+### Parametri query per apertura dashboard CMS da BT
+Quando BT apre la dashboard CMS passa:
+- `bt_token=<jwt>`
+- `bt_connection=<connectionId>`
+
+Il JWT e' firmato da BT con questa precedenza:
+1. `CMS_JWT_SECRET` (se configurato in BT)
+2. `webhookSecret` della connessione
+3. `apiKey` della connessione
+
+## Esempio firma webhook (CMS -> BT)
+```bash
+BODY='{"event":"content.published","contentId":"123","contentType":"post","title":"Titolo","slug":"titolo","url":"https://example.com/titolo","publishedAt":"2026-03-03T14:00:00Z"}'
+SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$BUSINESS_TUNER_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+curl -X POST "$BUSINESS_TUNER_WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -H "x-cms-signature: sha256=$SIG" \
+  -d "$BODY"
+```
+
+### Riferimenti codice BT (fonte requisiti auth)
+- `src/lib/cms/connection.service.ts`: genera `BUSINESS_TUNER_API_KEY`, `BUSINESS_TUNER_WEBHOOK_SECRET`, `BUSINESS_TUNER_WEBHOOK_URL`; usa `X-BT-API-Key` su `/status` e `/suggestions`.
+- `src/lib/cms/suggestion.service.ts`: invio suggerimenti al CMS con header `X-BT-API-Key`.
+- `src/lib/integrations/site-discovery.service.ts`: discovery (`/pages`, `/posts`, `/categories`) con `X-BT-API-Key`.
+- `src/app/api/webhooks/cms/[connectionId]/route.ts`: verifica webhook inbound con `x-cms-signature`.
+- `src/lib/cms/encryption.ts`: logica HMAC (`verifyWebhookSignature`) e gestione prefisso `sha256=`.
+- `src/app/api/cms/webhooks/suggestion-applied/route.ts`: verifica `x-bt-signature` in formato hex.
+- `src/app/api/cms/validate-session/route.ts`: richiede `Authorization: Bearer <BUSINESS_TUNER_API_KEY>`.
+- `src/lib/cms/session.service.ts`: query params `bt_token` + `bt_connection` e strategia firma JWT.
+
 ## Mapping Tip BT -> Contract
 - Tip generico BT -> `interventionType` + `taskType`.
 - Prompt libero BT -> `inputData.instructions` (non sostituisce i campi strutturati).
@@ -247,7 +357,14 @@ Retry:
 - `GET /api/integrations/bt/ai-tips/:jobId` -> stato + risultato
 - `POST /api/integrations/bt/ai-tips/:jobId/apply` -> applica patch approvata (opzionale)
 
-## Env vars minime
+## Env vars minime (compatibilita' codice BT attuale)
+- `BUSINESS_TUNER_API_KEY=bt_live_xxx`
+- `BUSINESS_TUNER_WEBHOOK_URL=https://<bt-domain>/api/webhooks/cms/<connectionId>`
+- `BUSINESS_TUNER_WEBHOOK_SECRET=whsec_xxx`
+- `BUSINESS_TUNER_URL=https://<bt-domain>`
+- `CMS_JWT_SECRET=<opzionale, se vuoi secret dedicato JWT>`
+
+## Env vars minime (nuovo endpoint AI Tips proposto)
 - `BT_AI_TIPS_ENABLED=true|false`
 - `BT_AI_TIPS_AUTH_MODE=bearer|hmac`
 - `BT_AI_TIPS_SHARED_SECRET=...` (se HMAC)

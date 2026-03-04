@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
+import { getConfigValue } from '@/lib/config';
 import { PLANS, PlanType, PlanLimits, PlanFeatures } from '@/config/plans';
 import { Prisma } from '@prisma/client';
 
@@ -65,6 +66,18 @@ async function getGlobalConfigCompat(columns: readonly string[]): Promise<Record
 }
 
 async function getStripeConfig() {
+    // Get secret key via centralised config (DB-first, dev env fallback via STRIPE_SECRET_KEY)
+    let secretKey: string | null = null;
+    try {
+        secretKey = await getConfigValue('stripeSecretKey');
+    } catch {
+        // ConfigurationError in production – Stripe is not configured
+        return null;
+    }
+
+    if (!secretKey) return null;
+
+    // Price IDs are not auth secrets – read from DB with env var fallback for legacy setups
     const envPrices = {
         STARTER: process.env.STRIPE_PRICE_STARTER,
         STARTER_YEARLY: process.env.STRIPE_PRICE_STARTER_YEARLY,
@@ -81,65 +94,39 @@ async function getStripeConfig() {
         ENTERPRISE_YEARLY: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY
     };
 
-    // 1. Env vars take precedence
-    if (process.env.STRIPE_SECRET_KEY) {
-        return {
-            secretKey: process.env.STRIPE_SECRET_KEY,
-            prices: envPrices
-        };
-    }
-
-    // 2. DB fallback
-    let secretKeyFromDb: string | null = null;
-
+    let dbPrices: Partial<Record<string, string | null>> = {};
     try {
-        const secretConfig = await getGlobalConfigCompat(['stripeSecretKey']);
-        secretKeyFromDb = typeof secretConfig?.stripeSecretKey === 'string'
-            ? secretConfig.stripeSecretKey
-            : null;
-    } catch (e) {
-        console.warn("Failed to fetch Stripe secret key from global config", e);
-    }
-
-    if (secretKeyFromDb) {
-        let dbPrices: Partial<Record<string, string | null>> = {};
-
-        try {
-            const priceConfig = await getGlobalConfigCompat(GLOBAL_CONFIG_PRICE_COLUMNS);
-
-            if (priceConfig) {
-                const pc = priceConfig as any;
-                dbPrices = {
-                    STARTER: pc.stripePriceStarter,
-                    STARTER_YEARLY: pc.stripePriceStarterYearly,
-                    PRO: pc.stripePricePro,
-                    PRO_YEARLY: pc.stripePriceProYearly,
-                    BUSINESS: pc.stripePriceBusiness,
-                    BUSINESS_YEARLY: pc.stripePriceBusinessYearly,
-                    PARTNER: pc.stripePricePartner,
-                    PARTNER_YEARLY: pc.stripePricePartnerYearly,
-                    ENTERPRISE: pc.stripePriceEnterprise,
-                    ENTERPRISE_YEARLY: pc.stripePriceEnterpriseYearly,
-                    PACK_SMALL: pc.stripePricePackSmall,
-                    PACK_MEDIUM: pc.stripePricePackMedium,
-                    PACK_LARGE: pc.stripePricePackLarge
-                };
-            }
-        } catch (e) {
-            // Non-fatal: keep Stripe enabled using secret key + env/default prices.
-            console.warn("Failed to fetch Stripe prices from global config", e);
+        const priceConfig = await getGlobalConfigCompat(GLOBAL_CONFIG_PRICE_COLUMNS);
+        if (priceConfig) {
+            const pc = priceConfig as any;
+            dbPrices = {
+                STARTER: pc.stripePriceStarter,
+                STARTER_YEARLY: pc.stripePriceStarterYearly,
+                PRO: pc.stripePricePro,
+                PRO_YEARLY: pc.stripePriceProYearly,
+                BUSINESS: pc.stripePriceBusiness,
+                BUSINESS_YEARLY: pc.stripePriceBusinessYearly,
+                PARTNER: pc.stripePricePartner,
+                PARTNER_YEARLY: pc.stripePricePartnerYearly,
+                ENTERPRISE: pc.stripePriceEnterprise,
+                ENTERPRISE_YEARLY: pc.stripePriceEnterpriseYearly,
+                PACK_SMALL: pc.stripePricePackSmall,
+                PACK_MEDIUM: pc.stripePricePackMedium,
+                PACK_LARGE: pc.stripePricePackLarge
+            };
         }
-
-        return {
-            secretKey: secretKeyFromDb,
-            prices: {
-                ...envPrices,
-                ...dbPrices
-            }
-        };
+    } catch (e) {
+        // Non-fatal: keep Stripe enabled using secret key + env/default prices.
+        console.warn("Failed to fetch Stripe prices from global config", e);
     }
 
-    return null;
+    return {
+        secretKey,
+        prices: {
+            ...envPrices,
+            ...dbPrices
+        }
+    };
 }
 
 /**
@@ -151,7 +138,7 @@ export async function getStripeClientSafe(): Promise<Stripe | null> {
 
     const config = await getStripeConfig();
     if (!config || !config.secretKey) {
-        console.warn('[Stripe] Not configured – set STRIPE_SECRET_KEY in env or via Admin dashboard.');
+        console.warn('[Stripe] Not configured – configure it in Admin → Platform Settings, or set STRIPE_SECRET_KEY as a fallback env var.');
         return null;
     }
 
@@ -170,9 +157,16 @@ export async function getStripeClientSafe(): Promise<Stripe | null> {
 export async function getStripeClient(): Promise<Stripe> {
     const client = await getStripeClientSafe();
     if (!client) {
-        throw new Error('Stripe is not configured. Please set env vars or configure in dashboard.');
+        throw new Error('Stripe is not configured. Configure it in Admin → Platform Settings, or set STRIPE_SECRET_KEY as a fallback env var.');
     }
     return client;
+}
+
+/**
+ * Invalidates the cached Stripe client (e.g. after updating the secret key in Admin settings).
+ */
+export function invalidateStripeClient(): void {
+    _stripe = null;
 }
 
 export async function getPricingPlans(): Promise<Record<PlanKey, PriceConfig>> {

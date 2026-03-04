@@ -13,6 +13,7 @@ import { decryptIfNeeded, encryptIfNeeded } from '@/lib/encryption'
 import fs from 'fs';
 import path from 'path';
 import { User, Prisma } from '@prisma/client';
+import { getConfigValue } from '@/lib/config';
 import { transferBotToProject } from './actions/project-tools';
 import {
     assertOrganizationAccess,
@@ -81,8 +82,8 @@ async function getEffectiveApiKey(user: User, botSpecificKey?: string | null) {
             select: { openaiApiKey: true }
         });
         if (globalConfig?.openaiApiKey) return decryptIfNeeded(globalConfig.openaiApiKey);
-        // Never expose env key directly - should be set in DB encrypted
-        return process.env.OPENAI_API_KEY;
+        // Fall back to centralised config (dev env var fallback)
+        return await getConfigValue('openaiApiKey');
     }
 
     // 4. Regular User Logic: No fallback to Global/Env allowed
@@ -443,6 +444,17 @@ export async function updateBotAction(botId: string, formData: FormData) {
 
     if (formData.has('modelProvider')) data.modelProvider = getStr('modelProvider');
     if (formData.has('modelName')) data.modelName = getStr('modelName');
+    if (formData.has('interviewerQuality')) (data as any).interviewerQuality = getStr('interviewerQuality');
+    if (formData.has('cilBonusTurnCapOverride')) {
+        const raw = formData.get('cilBonusTurnCapOverride') as string;
+        const cilParsed = parseInt(raw, 10);
+        (data as any).cilBonusTurnCapOverride = raw === '' ? null : (isNaN(cilParsed) ? null : cilParsed);
+    }
+    // CIL cap override is only meaningful for avanzato tier
+    if ((data as any).cilBonusTurnCapOverride !== undefined &&
+        (data as any).interviewerQuality !== 'avanzato') {
+        (data as any).cilBonusTurnCapOverride = null;
+    }
 
     if (formData.has('openaiApiKey')) data.openaiApiKey = encryptIfNeeded(getStr('openaiApiKey')) || null;
     if (formData.has('anthropicApiKey')) data.anthropicApiKey = encryptIfNeeded(getStr('anthropicApiKey')) || null;
@@ -531,7 +543,10 @@ export async function updateBotAction(botId: string, formData: FormData) {
     // We should probably convert empty string to null.
 
     // Feature Gating
-    const bot = await prisma.bot.findUnique({ where: { id: botId }, include: { project: true } });
+    const bot = await prisma.bot.findUnique({
+        where: { id: botId },
+        include: { project: { include: { organization: true } } }
+    });
     if (bot?.project?.organizationId) {
         const canLogo = await isFeatureEnabled(bot.project.organizationId, 'customLogo');
         const canColor = await isFeatureEnabled(bot.project.organizationId, 'customColor');
@@ -540,9 +555,19 @@ export async function updateBotAction(botId: string, formData: FormData) {
             throw new Error("Logo personalizzato disponibile solo nei piani PRO e BUSINESS.");
         }
         if (!canColor && (data.primaryColor || data.backgroundColor || data.textColor)) {
-            // Basic check: if they are different from default? 
+            // Basic check: if they are different from default?
             // For now assume if they are in formData they are being set.
             // But actually we should only throw if they are DIFFERENT from default.
+        }
+
+        // Plan gate: Intermedio and Avanzato tiers require Business plan
+        const requestedTier = (data as any).interviewerQuality;
+        if (requestedTier === 'intermedio' || requestedTier === 'avanzato') {
+            const orgPlan = bot.project.organization?.plan || 'FREE';
+            const isAllowed = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(orgPlan);
+            if (!isAllowed) {
+                throw new Error('Le modalità Intermedio e Avanzato sono disponibili solo nei piani Business.');
+            }
         }
     }
 

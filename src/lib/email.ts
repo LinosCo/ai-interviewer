@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import net from 'node:net';
 import tls from 'node:tls';
 import { prisma } from '@/lib/prisma';
+import { getConfigValue } from '@/lib/config';
 
 // Lazy initialization to prevent build errors when API key is not set
 let resend: Resend | null = null;
@@ -9,12 +10,32 @@ const DEFAULT_FROM_EMAIL = 'Business Tuner <businesstuner@voler.ai>';
 const DEFAULT_NOTIFICATION_EMAIL = 'businesstuner@voler.ai';
 
 function getAppBaseUrl() {
-    return (
+    const candidates = [
         process.env.NEXT_PUBLIC_APP_URL ||
-        process.env.AUTH_URL ||
-        process.env.NEXTAUTH_URL ||
-        'https://app.voler.ai'
-    );
+        null,
+        process.env.AUTH_URL || null,
+        process.env.NEXTAUTH_URL || null,
+        'https://businesstuner.voler.ai',
+    ];
+
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        const normalized = candidate.trim();
+        if (!normalized) continue;
+        try {
+            const parsed = new URL(normalized);
+            const host = parsed.hostname.toLowerCase();
+            const isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+            if (process.env.NODE_ENV === 'production' && isLocalHost) {
+                continue;
+            }
+            return normalized.replace(/\/+$/, '');
+        } catch {
+            // Ignore malformed URL candidates.
+        }
+    }
+
+    return 'https://businesstuner.voler.ai';
 }
 
 function getResendClient() {
@@ -207,16 +228,28 @@ export async function testEmailProviderConnection(overrides?: {
         }
     }).catch(() => null);
 
-    const smtpHost = overrides?.smtpHost ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST ?? null;
-    const smtpUser = overrides?.smtpUser ?? globalConfig?.smtpUser ?? process.env.SMTP_USER ?? null;
-    const smtpPass = overrides?.smtpPass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS ?? null;
-    const smtpPortRaw = overrides?.smtpPort ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465;
+    // Resolve SMTP config from centralised store (DB-first, dev env fallback).
+    // Use allSettled so a missing key in production doesn't zero out all SMTP config.
+    const smtpResults = await Promise.allSettled([
+        getConfigValue('smtpHost'),
+        getConfigValue('smtpUser'),
+        getConfigValue('smtpPass'),
+        getConfigValue('smtpPort'),
+        getConfigValue('smtpSecure'),
+    ]);
+    const [smtpHostConfig, smtpUserConfig, smtpPassConfig, smtpPortConfig, smtpSecureConfig] =
+        smtpResults.map((r) => (r.status === 'fulfilled' ? r.value : null));
+
+    const smtpHost = overrides?.smtpHost ?? globalConfig?.smtpHost ?? smtpHostConfig ?? null;
+    const smtpUser = overrides?.smtpUser ?? globalConfig?.smtpUser ?? smtpUserConfig ?? null;
+    const smtpPass = overrides?.smtpPass ?? globalConfig?.smtpPass ?? smtpPassConfig ?? null;
+    const smtpPortRaw = overrides?.smtpPort ?? globalConfig?.smtpPort ?? smtpPortConfig ?? 465;
     const smtpPort = Number(smtpPortRaw);
     const smtpSecure = typeof (overrides?.smtpSecure) === 'boolean'
         ? Boolean(overrides?.smtpSecure)
         : typeof globalConfig?.smtpSecure === 'boolean'
             ? globalConfig.smtpSecure
-            : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
+            : (smtpSecureConfig ? smtpSecureConfig === 'true' : smtpPort === 465);
 
     if (smtpHost && smtpUser && smtpPass) {
         try {
@@ -485,6 +518,18 @@ export async function sendEmail(params: {
         }
     }).catch(() => null);
 
+    // Resolve SMTP config from centralised store (DB-first, dev env fallback).
+    // Use allSettled so a missing key in production doesn't zero out all SMTP config.
+    const smtpResults = await Promise.allSettled([
+        getConfigValue('smtpHost'),
+        getConfigValue('smtpUser'),
+        getConfigValue('smtpPass'),
+        getConfigValue('smtpPort'),
+        getConfigValue('smtpSecure'),
+    ]);
+    const [smtpHostConfig, smtpUserConfig, smtpPassConfig, smtpPortConfig, smtpSecureConfig] =
+        smtpResults.map((r) => (r.status === 'fulfilled' ? r.value : null));
+
     const from =
         params.from ??
         params.smtpOverrides?.fromEmail ??
@@ -492,48 +537,53 @@ export async function sendEmail(params: {
         process.env.EMAIL_FROM ??
         DEFAULT_FROM_EMAIL;
 
-    // Resend takes priority over custom SMTP when configured
     const resendApiKey = params.smtpOverrides?.resendApiKey ?? globalConfig?.resendApiKey ?? process.env.RESEND_API_KEY;
+    const smtpHost = params.smtpOverrides?.host ?? globalConfig?.smtpHost ?? smtpHostConfig;
+    const smtpUser = params.smtpOverrides?.user ?? globalConfig?.smtpUser ?? smtpUserConfig;
+    const smtpPass = params.smtpOverrides?.pass ?? globalConfig?.smtpPass ?? smtpPassConfig;
+    const smtpPort = Number(params.smtpOverrides?.port ?? globalConfig?.smtpPort ?? smtpPortConfig ?? 465);
+    const smtpSecure = typeof params.smtpOverrides?.secure === 'boolean'
+        ? params.smtpOverrides.secure
+        : typeof globalConfig?.smtpSecure === 'boolean'
+            ? globalConfig.smtpSecure
+            : (smtpSecureConfig ? smtpSecureConfig === 'true' : smtpPort === 465);
+
     if (!resend && resendApiKey) {
         resend = new Resend(resendApiKey);
     }
 
-    if (!resendApiKey) {
-        // No Resend — fall back to custom SMTP
-        const smtpHost = params.smtpOverrides?.host ?? globalConfig?.smtpHost ?? process.env.SMTP_HOST;
-        const smtpUser = params.smtpOverrides?.user ?? globalConfig?.smtpUser ?? process.env.SMTP_USER;
-        const smtpPass = params.smtpOverrides?.pass ?? globalConfig?.smtpPass ?? process.env.SMTP_PASS;
-        const smtpPort = Number(params.smtpOverrides?.port ?? globalConfig?.smtpPort ?? process.env.SMTP_PORT ?? 465);
-        const smtpSecure = typeof params.smtpOverrides?.secure === 'boolean'
-            ? params.smtpOverrides.secure
-            : typeof globalConfig?.smtpSecure === 'boolean'
-                ? globalConfig.smtpSecure
-            : (process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : smtpPort === 465);
-
-        if (smtpHost && smtpUser && smtpPass) {
-            try {
-                const data = await sendEmailViaSmtp({
-                    host: smtpHost,
-                    port: smtpPort,
-                    secure: smtpSecure,
-                    user: smtpUser,
-                    pass: smtpPass,
-                    from,
-                    to: params.to,
-                    subject: params.subject,
-                    html: params.html
-                });
-                return { success: true, data };
-            } catch (error) {
-                console.error('SMTP email send failed:', error);
-                return { success: false, error };
-            }
+    const trySmtp = async () => {
+        if (!smtpHost || !smtpUser || !smtpPass) {
+            return { success: false, error: 'SMTP fallback unavailable (missing host/user/pass)' };
         }
+        try {
+            const data = await sendEmailViaSmtp({
+                host: smtpHost,
+                port: smtpPort,
+                secure: smtpSecure,
+                user: smtpUser,
+                pass: smtpPass,
+                from,
+                to: params.to,
+                subject: params.subject,
+                html: params.html
+            });
+            return { success: true, data };
+        } catch (error) {
+            console.error('SMTP email send failed:', error);
+            return { success: false, error };
+        }
+    };
+
+    if (!resendApiKey) {
+        // No Resend configured — use SMTP path directly.
+        return trySmtp();
     }
+
     const resendClient = getResendClient();
     if (!resendClient) {
         console.error('No email provider configured. Set SMTP_* or RESEND_API_KEY.');
-        return { success: false, error: 'Email service not configured' };
+        return trySmtp();
     }
 
     try {
@@ -546,12 +596,16 @@ export async function sendEmail(params: {
 
         if (error) {
             console.error('Error sending email:', error);
+            const smtpFallback = await trySmtp();
+            if (smtpFallback.success) return smtpFallback;
             return { success: false, error };
         }
 
         return { success: true, data };
     } catch (error) {
         console.error('Failed to send email:', error);
+        const smtpFallback = await trySmtp();
+        if (smtpFallback.success) return smtpFallback;
         return { success: false, error };
     }
 }

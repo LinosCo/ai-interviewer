@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { UserRole } from '@prisma/client';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import UserDialog from './user-dialog';
-import { deleteUser } from '@/app/actions/admin';
+import { deleteUser, forceActivateUser } from '@/app/actions/admin';
 
 interface Project {
     id: string;
@@ -16,6 +16,8 @@ interface User {
     id: string;
     name: string | null;
     email: string;
+    emailVerified: Date | null;
+    verificationPendingUntil?: Date | null;
     role: UserRole;
     projectAccess: { projectId: string; project: Project }[];
     memberships: {
@@ -55,9 +57,20 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                 await deleteUser(userId);
                 alert('User deleted successfully');
                 router.refresh();
-            } catch (error) {
-                alert('Failed to delete user');
-            }
+        } catch {
+            alert('Failed to delete user');
+        }
+        }
+    };
+
+    const handleForceActivate = async (userId: string) => {
+        if (!confirm('Confermi l’attivazione manuale di questo account?')) return;
+        try {
+            await forceActivateUser(userId);
+            alert('Utente attivato con successo');
+            router.refresh();
+        } catch {
+            alert('Attivazione manuale fallita');
         }
     };
 
@@ -82,6 +95,7 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Access</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
@@ -101,6 +115,28 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                                         {user.role}
                                     </span>
                                 </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    {user.emailVerified ? (
+                                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            Verified
+                                        </span>
+                                    ) : (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800 w-fit">
+                                                Pending
+                                            </span>
+                                            {user.verificationPendingUntil ? (
+                                                <span className="text-xs text-gray-500">
+                                                    Token fino a {new Date(user.verificationPendingUntil).toLocaleString('it-IT')}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-red-500">
+                                                    Nessun token attivo
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4">
                                     <div className="text-sm text-gray-500">
                                         {user.role === 'ADMIN' ? (
@@ -119,6 +155,14 @@ export default function UsersView({ users, projects }: UsersViewProps) {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    {!user.emailVerified && (
+                                        <button
+                                            onClick={() => handleForceActivate(user.id)}
+                                            className="text-green-700 hover:text-green-900 mr-4"
+                                        >
+                                            Attiva
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => handleEdit(user)}
                                         className="text-amber-600 hover:text-amber-900 mr-4"

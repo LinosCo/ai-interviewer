@@ -7,6 +7,7 @@ import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
 import { TokenCategory } from '@prisma/client';
 import { checkCreditsForAction } from '@/lib/guards/resourceGuard';
+import { getConfigValue } from '@/lib/config';
 
 const generateSchema = z.object({
     goal: z.string().min(5).optional(),
@@ -67,12 +68,8 @@ export async function POST(req: Request) {
 
         const { goal, userPrompt, businessContext, currentConfig, refinementPrompt } = validation.data;
 
-        // Get API key
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: { openaiApiKey: true }
-        });
-        const apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
+        // Get API key from centralised config (DB-first, env fallback in dev)
+        const apiKey = await getConfigValue('openaiApiKey');
 
         if (!apiKey) {
             return Response.json({ error: 'API_KEY_MISSING', message: 'Chiave API OpenAI mancante.' }, { status: 401 });

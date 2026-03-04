@@ -1,5 +1,5 @@
 import { auth } from '@/auth';
-import { prisma } from '@/lib/prisma';
+import { getConfigValue } from '@/lib/config';
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
@@ -23,17 +23,8 @@ export async function POST(req: Request) {
         return Response.json({ error: 'prompt is required' }, { status: 400 });
     }
 
-    // Get API key from global config or env
-    let apiKey: string | undefined;
-    try {
-        const globalConfig = await prisma.globalConfig.findUnique({
-            where: { id: 'default' },
-            select: { openaiApiKey: true },
-        });
-        apiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY;
-    } catch {
-        apiKey = process.env.OPENAI_API_KEY;
-    }
+    // Get API key from global config
+    const apiKey = await getConfigValue('openaiApiKey') ?? undefined;
 
     if (!apiKey) {
         return Response.json(

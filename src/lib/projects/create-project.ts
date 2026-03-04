@@ -28,7 +28,7 @@ async function acquireProjectNameLock(
 
   try {
     // Serialize concurrent creates for the same org/name pair.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey})::bigint)`;
   } catch (error) {
     // If advisory locks are unavailable, continue with best-effort dedupe check below.
     console.warn('[project-create] Advisory lock unavailable:', error);

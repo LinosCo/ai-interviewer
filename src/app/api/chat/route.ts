@@ -10,6 +10,7 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { TokenTrackingService } from '@/services/tokenTrackingService';
+import { getConfigValue } from '@/lib/config';
 import { getOrCreateInterviewPlan } from '@/lib/interview/plan-service';
 import type { InterviewPlan } from '@/lib/interview/plan-types';
 import { buildTopicAnchors, buildMessageAnchors, responseMentionsAnchors } from '@/lib/interview/topic-anchors';
@@ -39,6 +40,11 @@ import {
     buildMicroPlannerDecision,
     buildMicroPlannerPromptBlock
 } from '@/lib/interview/micro-planner';
+import { generateCILAnalysis } from '@/lib/interview/cil/conversation-intelligence';
+import { mergeCILState, EMPTY_CIL_STATE } from '@/lib/interview/cil/cil-state';
+import { computeCILBonusCap, applyCILBudgetSignal } from '@/lib/interview/explore-deepen-machine';
+import { buildCILContextBlock } from '@/lib/llm/prompt-builder';
+import type { CILAnalysis, CILState } from '@/lib/interview/cil/types';
 
 import {
     InterestingTopic, TopicBudget,
@@ -136,6 +142,7 @@ export interface InterviewState {
     extensionOfferAttempts?: number;
     runtimeInterviewKnowledge?: RuntimeInterviewKnowledge | null;
     runtimeInterviewKnowledgeSignature?: string | null;
+    cilState?: CILState | null;
 }
 
 interface QualityTelemetry {
@@ -223,7 +230,12 @@ export async function POST(req: Request) {
         const language = bot.language || 'en';
         const tierConfig = getTierConfig((bot as any).interviewerQuality);
         const interviewObjective = String((bot as any).researchGoal || '').trim();
-        const shouldCollectData = (bot as any).collectCandidateData;
+        const candidateDataFields = (bot as any).candidateDataFields ?? [];
+        // Legacy fix: bots created before the collectCandidateData flag was introduced
+        // may have candidateDataFields populated but collectCandidateData = false.
+        // Mirror the same auto-enable logic used in chatbot/message/route.ts.
+        const shouldCollectData = Boolean((bot as any).collectCandidateData) || (Array.isArray(candidateDataFields) && candidateDataFields.length > 0);
+        console.log('[DEBUG chat/route] shouldCollectData:', shouldCollectData, typeof shouldCollectData, 'collectCandidateData:', (bot as any).collectCandidateData, 'candidateDataFields:', candidateDataFields);
         const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
         const interviewProject = (bot as any).project || {};
         const interviewOrganizationId: string | null =
@@ -468,7 +480,7 @@ export async function POST(req: Request) {
             // Update progress
             ChatService.updateProgress(conversationId, safeEffectiveDuration),
             // Get API key
-            LLMService.getApiKey(bot, 'openai').then(key => key || process.env.OPENAI_API_KEY || ''),
+            LLMService.getApiKey(bot, 'openai').then(async key => key || await getConfigValue('openaiApiKey') || ''),
             // Pre-fetch routed models (primary + critical paths)
             LLMService.getInterviewRuntimeModels(bot)
         ]);
@@ -586,6 +598,7 @@ export async function POST(req: Request) {
             extensionOfferAttempts: rawMetadata.extensionOfferAttempts ?? 0,
             runtimeInterviewKnowledge: rawMetadata.runtimeInterviewKnowledge ?? null,
             runtimeInterviewKnowledgeSignature: rawMetadata.runtimeInterviewKnowledgeSignature ?? null,
+            cilState: rawMetadata.cilState ?? null,
         };
 
         const activeTopics = state.phase === 'DEEPEN' ? getDeepTopics(botTopics, state.deepTopicOrder) : botTopics;
@@ -599,7 +612,8 @@ export async function POST(req: Request) {
             language,
             researchGoal: bot.researchGoal || '',
             targetAudience: bot.targetAudience || '',
-            plan: interviewPlan
+            plan: interviewPlan,
+            interviewerQuality: (bot as any).interviewerQuality || 'quantitativo'
         });
         const manualInterviewGuide = extractManualInterviewGuideSource(
             (bot.knowledgeSources || []).map((source: any) => ({
@@ -629,6 +643,7 @@ export async function POST(req: Request) {
                     subGoals: topic.subGoals || []
                 })),
                 timeoutMs: tierConfig.knowledge.runtimeKnowledgeTimeoutMs,
+                interviewerQuality: (bot as any).interviewerQuality || 'quantitativo',
                 onUsage: collectLlmUsage
             })
             : Promise.resolve(hasValidRuntimeKnowledge ? state.runtimeInterviewKnowledge || null : null);
@@ -652,19 +667,42 @@ export async function POST(req: Request) {
         // ====================================================================
         // 3. PHASE MACHINE
         // ====================================================================
-        const nextState = { ...state };
+        let nextState = { ...state };
         let systemPrompt = "";
         let nextTopicId = currentTopic.id;
         let supervisorInsight: SupervisorInsight = createDefaultSupervisorInsight();
+        // Mutable ref so buildDeepOfferInsight (defined below) can read the CIL result
+        // that is only resolved later via await cilPromise.
+        const cilAnalysisRef: { current: CILAnalysis | null } = { current: null };
+
         const buildDeepOfferInsight = (
             sourceState: InterviewState,
             validationFeedback?: ValidationResponse
         ) => {
+            // For avanzato, enrich interestingTopics with CIL high-strength threads
+            // so the extension offer cites specific semantic threads, not just engagement scores.
+            let effectiveInterestingTopics = sourceState.interestingTopics;
+            if (isAvanzato && cilAnalysisRef.current) {
+                const highThreadTopics: InterestingTopic[] = cilAnalysisRef.current.openThreads
+                    .filter(t => t.strength === 'high')
+                    .map(t => ({
+                        topicId: t.sourceTopicId,
+                        topicLabel: botTopics.find(bt => bt.id === t.sourceTopicId)?.label || '',
+                        engagementScore: 0.9,
+                        bestSnippet: t.anchoredHypothesis || t.description
+                    }));
+                if (highThreadTopics.length > 0) {
+                    const existing = (sourceState.interestingTopics || []).filter(
+                        it => !highThreadTopics.some(ct => ct.topicId === it.topicId)
+                    );
+                    effectiveInterestingTopics = [...highThreadTopics, ...existing];
+                }
+            }
             const extensionPreview = buildExtensionPreviewHints({
                 botTopics,
                 deepOrder: sourceState.deepTopicOrder,
                 history: sourceState.topicSubGoalHistory,
-                interestingTopics: sourceState.interestingTopics,
+                interestingTopics: effectiveInterestingTopics,
                 interviewObjective,
                 language,
                 startIndex: sourceState.topicIndex,
@@ -767,8 +805,8 @@ export async function POST(req: Request) {
                         checkUserIntent: async (userMessage: string, context: 'deep_offer') =>
                             checkUserIntent(userMessage, openAIKey, language, context, { onUsage: collectLlmUsage }),
                         isExtensionOfferQuestion: (message: string) => isExtensionOfferQuestion(message, language),
-                        buildDeepOfferInsight: (sourceState: InterviewStateLike) =>
-                            buildDeepOfferInsight(sourceState as InterviewState),
+                        buildDeepOfferInsight: (sourceState: InterviewStateLike, validationFeedback?: ValidationResponse) =>
+                            buildDeepOfferInsight(sourceState as InterviewState, validationFeedback),
                         buildDeepPlan: (remainingSec: number) =>
                             buildDeepPlan(
                                 botTopics,
@@ -1234,6 +1272,30 @@ export async function POST(req: Request) {
             nextState.runtimeInterviewKnowledge = null;
             nextState.runtimeInterviewKnowledgeSignature = null;
         }
+
+        // --- CIL PRE-PASS (avanzato only, parallel with remaining sync work) ---
+        const isAvanzato = ((bot as any).interviewerQuality || 'quantitativo') === 'avanzato';
+        const AVANZATO_CIL_RECENT_TURNS = 6;
+
+        const cilPromise: Promise<CILAnalysis | null> = isAvanzato
+            ? (async () => {
+                const topicKnowledge = runtimeInterviewKnowledge?.topics.find(
+                    t => t.topicId === currentTopic.id
+                ) ?? null;
+                const recentTurns = canonicalMessages
+                    .slice(-AVANZATO_CIL_RECENT_TURNS)
+                    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+                return generateCILAnalysis({
+                    recentTurns,
+                    currentTopicId: currentTopic.id,
+                    cilState: state.cilState ?? EMPTY_CIL_STATE,
+                    topicKnowledge,
+                    model: modelRegistry.primary,
+                    language: bot.language || 'it'
+                });
+            })()
+            : Promise.resolve(null);
+
         const userTurnSignal: UserTurnSignal = lastMessage?.role === 'user'
             ? detectUserTurnSignal({
                 userMessage: lastMessage.content,
@@ -1252,6 +1314,17 @@ export async function POST(req: Request) {
             ? getDeepPlanTurns(interviewPlan, plannerTopicId)
             : getScanPlanTurns(interviewPlan, plannerTopicId);
         const plannerUsedSubGoals = (nextState.topicSubGoalHistory || {})[plannerTopicId] || [];
+
+        // Await CIL and apply budget stealing BEFORE building micro-planner so that
+        // plannerMaxTurns already reflects any bonus turns granted by CIL.
+        const cilAnalysis = await cilPromise;
+        cilAnalysisRef.current = cilAnalysis;
+
+        if (cilAnalysis?.budgetSignal && isAvanzato) {
+            const cap = computeCILBonusCap(nextState, (bot as any).cilBonusTurnCapOverride ?? null);
+            nextState = applyCILBudgetSignal(nextState, cilAnalysis.budgetSignal, cap);
+        }
+
         const microPlannerDecision = buildMicroPlannerDecision({
             language,
             phase: nextState.phase,
@@ -1398,6 +1471,18 @@ hard_rules:
                 systemPrompt += `\n\n${runtimeSemanticContext}`;
             }
         }
+        // Block 6.5 — CIL context (avanzato only) — injected BEFORE micro-planner
+        if (cilAnalysis && isAvanzato) {
+            const cilBlock = buildCILContextBlock(
+                cilAnalysis,
+                state.cilState ?? null,
+                (bot as any).interviewerQuality || 'quantitativo'
+            );
+            if (cilBlock) {
+                systemPrompt += `\n\n${cilBlock}`;
+            }
+        }
+
         if (nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') {
             const microPlannerPrompt = buildMicroPlannerPromptBlock({
                 language,
@@ -2206,6 +2291,23 @@ hard_rules:
                     }
                 });
                 await flushInterviewTokenUsage('completed_response');
+                // Record sub-goal used this turn on completion path
+                if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
+                    const history = { ...(nextState.topicSubGoalHistory || {}) };
+                    const existing = history[plannerTopicId] || [];
+                    if (!existing.includes(microPlannerDecision.focusSubGoal)) {
+                        history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
+                        nextState.topicSubGoalHistory = history;
+                    }
+                }
+                // Persist CIL state before completion return
+                if (cilAnalysis && isAvanzato) {
+                    nextState.cilState = mergeCILState(
+                        state.cilState ?? EMPTY_CIL_STATE,
+                        cilAnalysis,
+                        canonicalMessages.length
+                    );
+                }
                 return Response.json({
                     text: finalResponseText,
                     currentTopicId: nextTopicId,
@@ -2227,6 +2329,25 @@ hard_rules:
         // ====================================================================
         // 6. SAVE & UPDATE STATE (parallelized for speed)
         // ====================================================================
+        // Record sub-goal used this turn so micro-planner advances on next turn
+        if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
+            const history = { ...(nextState.topicSubGoalHistory || {}) };
+            const existing = history[plannerTopicId] || [];
+            if (!existing.includes(microPlannerDecision.focusSubGoal)) {
+                history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
+                nextState.topicSubGoalHistory = history;
+            }
+        }
+
+        // Persist CIL state
+        if (cilAnalysis && isAvanzato) {
+            nextState.cilState = mergeCILState(
+                state.cilState ?? EMPTY_CIL_STATE,
+                cilAnalysis,
+                canonicalMessages.length
+            );
+        }
+
         // Run save operations in parallel - they're independent
         await Promise.all([
             // Save assistant message

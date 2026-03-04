@@ -133,6 +133,7 @@ interface DialoguePromptContext {
   minCheckingTurns: number
   maxCheckingTurns: number
   learnerProfile?: string
+  qualityTier?: string
 }
 
 export function buildDialoguePrompt(
@@ -190,8 +191,24 @@ FORMATO RISPOSTA OBBLIGATORIO:
 - Non riaprire il topic da zero a ogni turno.
 - Non annunciare mai il passaggio al prossimo topic (lo gestisce il sistema).
 
-${latestApproach ? `APPROCCIO SUGGERITO (basato sull'ultimo turno): ${latestApproach}` : ''}`
+${latestApproach ? `APPROCCIO SUGGERITO (basato sull'ultimo turno): ${latestApproach}` : ''}
+${ctx.qualityTier === 'avanzato' ? `
+## MODALITÀ SOCRATICA ADATTIVA (AVANZATO)
+Sei in modalità tutoring socratico. Il tuo obiettivo non è trasferire informazioni, ma guidare la scoperta autonoma.
+- Prima di rispondere, valuta implicitamente se lo studente ha compreso il concetto precedente
+- Se rilevi una misconcezione, affrontala esplicitamente: "Hai detto X — in realtà..." poi chiedi conferma
+- Usa il metodo Socratico: fai domande che guidano verso la scoperta, evita risposte dirette quando possibile
+- Collega nuovi concetti a quanto già emerso nella CRONOLOGIA sopra: "Prima hai mostrato di capire X, ora..."
+- Adatta la difficoltà in tempo reale: risposte sicure → incrementa complessità (analisi, sintesi); risposte incerte → torna ai fondamentali
+- Ogni 3-4 turni, sintetizza brevemente i progressi cross-turno: "In questa sessione stai costruendo una buona comprensione di..."
+` : ctx.qualityTier === 'intermedio' ? `
+## ADATTAMENTO RINFORZATO (INTERMEDIO)
+- Se lo studente mostra difficoltà o confusione per 2+ turni consecutivi, fermati e approfondisci il concetto prima di avanzare
+- Adatta il registro in base al livello dimostrato nelle ultime 3 risposte
+- Quando in dubbio tra "spiego" o "chiedo", spiega prima (1-2 frasi) poi chiedi
+` : ''}`
 }
+
 
 export function buildFinalQuizSystemPrompt(
   allTopicLabels: string[],

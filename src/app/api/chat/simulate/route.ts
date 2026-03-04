@@ -7,6 +7,7 @@ import { PromptBuilder } from '@/lib/llm/prompt-builder';
 import { Bot, Conversation, TopicBlock, KnowledgeSource } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import { getConfigValue } from '@/lib/config';
 
 // Mock Interfaces matching Prisma models for the simulator
 interface MockTopic extends TopicBlock {
@@ -86,18 +87,8 @@ export async function POST(req: Request) {
             methodology  // manualKnowledgeGuide
         );
 
-        // 4. Initialize LLM
-        // Use environment key directly since we are in simulator (admin/creator usage)
-        let apiKey = process.env.OPENAI_API_KEY;
-
-        // Fallback to Global Settings if env var is missing
-        if (!apiKey) {
-            const globalConfig = await prisma.globalConfig.findUnique({
-                where: { id: "default" },
-                select: { openaiApiKey: true }
-            }).catch(() => null);
-            apiKey = globalConfig?.openaiApiKey || undefined;
-        }
+        // 4. Initialize LLM (admin/creator usage - use centralised config)
+        const apiKey = await getConfigValue('openaiApiKey') || undefined;
 
         if (!apiKey) throw new Error("OpenAI API Key missing for simulator (Check Global Settings or Env Vars)");
 

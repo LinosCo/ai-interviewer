@@ -64,7 +64,8 @@ export class ToneAnalyzer {
                 "${userMessages}"
 
                 Identifica i tratti stilistici per adattare la risposta dell'AI.
-                Valuta: registro (formale/neutro/colloquiale), verbosità, emotività, uso emoji, complessità linguistica.
+                Valuta: registro, verbosità, emotività, uso emoji, complessità linguistica.
+                IMPORTANTE: usa esclusivamente i valori in inglese come indicato nei campi dello schema (es. 'formal', non 'formale').
             `
             : `
                 Analyze the user's communication style based on these recent messages:

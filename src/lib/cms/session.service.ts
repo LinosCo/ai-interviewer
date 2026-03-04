@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { assertProjectAccess } from '@/lib/domain/workspace';
+import { decrypt } from '@/lib/cms/encryption';
 
 interface CMSSessionPayload {
   userId: string;
@@ -14,8 +15,36 @@ interface CMSSessionPayload {
 }
 
 export class CMSSessionService {
-  private static readonly SECRET = process.env.CMS_JWT_SECRET!;
   private static readonly ISSUER = 'businesstuner.io';
+
+  private static decodeConnectionApiKey(storedApiKey: string): string {
+    try {
+      return decrypt(storedApiKey);
+    } catch {
+      // Backward compatibility for legacy/plain-text keys.
+      return storedApiKey;
+    }
+  }
+
+  private static getJwtSecretCandidates(connection: {
+    apiKey: string;
+    webhookSecret?: string | null;
+  }): string[] {
+    const candidates: string[] = [];
+
+    const explicitSecret = process.env.CMS_JWT_SECRET?.trim();
+    if (explicitSecret) candidates.push(explicitSecret);
+
+    const webhookSecret = connection.webhookSecret
+      ? this.decodeConnectionApiKey(connection.webhookSecret).trim()
+      : '';
+    if (webhookSecret) candidates.push(webhookSecret);
+
+    const connectionApiKey = this.decodeConnectionApiKey(connection.apiKey).trim();
+    if (connectionApiKey) candidates.push(connectionApiKey);
+
+    return Array.from(new Set(candidates));
+  }
 
   /**
    * Genera un token JWT per l'accesso al CMS.
@@ -62,6 +91,11 @@ export class CMSSessionService {
       throw new Error('CMS connection is disabled');
     }
 
+    const jwtSecrets = this.getJwtSecretCandidates(connection);
+    if (jwtSecrets.length === 0) {
+      throw new Error('CMS JWT secret is not configured');
+    }
+
     const payload: Omit<CMSSessionPayload, 'iat' | 'exp'> = {
       userId,
       userEmail: user.email,
@@ -71,7 +105,7 @@ export class CMSSessionService {
       permissions: 'full'
     };
 
-    return jwt.sign(payload, this.SECRET, {
+    return jwt.sign(payload, jwtSecrets[0], {
       expiresIn: '24h',
       issuer: this.ISSUER,
       audience: connection.cmsApiUrl
@@ -88,9 +122,40 @@ export class CMSSessionService {
     error?: string;
   }> {
     try {
-      const payload = jwt.verify(token, this.SECRET, {
-        issuer: this.ISSUER
-      }) as CMSSessionPayload;
+      const connection = await prisma.cMSConnection.findUnique({
+        where: { id: expectedConnectionId },
+        select: {
+          id: true,
+          status: true,
+          apiKey: true,
+          webhookSecret: true
+        }
+      });
+
+      if (!connection || connection.status === 'DISABLED') {
+        return { valid: false, error: 'CMS connection disabled' };
+      }
+
+      const jwtSecrets = this.getJwtSecretCandidates(connection);
+      if (jwtSecrets.length === 0) {
+        return { valid: false, error: 'CMS JWT secret not configured' };
+      }
+
+      let payload: CMSSessionPayload | null = null;
+      for (const secret of jwtSecrets) {
+        try {
+          payload = jwt.verify(token, secret, {
+            issuer: this.ISSUER
+          }) as CMSSessionPayload;
+          break;
+        } catch {
+          // Try next candidate (compat: env/webhook/api).
+        }
+      }
+
+      if (!payload) {
+        return { valid: false, error: 'Invalid token' };
+      }
 
       // Verifica che il token sia per la connessione corretta
       if (payload.connectionId !== expectedConnectionId) {
@@ -105,15 +170,6 @@ export class CMSSessionService {
 
       if (!hasAccess) {
         return { valid: false, error: 'User access revoked' };
-      }
-
-      // Verifica che la connessione CMS sia ancora attiva
-      const connection = await prisma.cMSConnection.findUnique({
-        where: { id: payload.connectionId }
-      });
-
-      if (!connection || connection.status === 'DISABLED') {
-        return { valid: false, error: 'CMS connection disabled' };
       }
 
       return { valid: true, payload };

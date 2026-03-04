@@ -276,3 +276,56 @@ export function handleDeepenPhase({
 
     return { nextState, supervisorInsight, nextTopicId };
 }
+
+// ============================================================================
+// CIL Budget Stealing Functions (Task 5)
+// ============================================================================
+
+// Helper: how many topics come after the current one
+function topicsAfterCurrent(state: InterviewState): number {
+    return Math.max(0, Object.keys(state.topicBudgets).length - state.topicIndex - 1)
+}
+
+/**
+ * Compute the maximum number of CIL bonus turns for the current topic.
+ * Uses manual override if set, otherwise derives from remaining budget and topics.
+ *
+ * NOTE: InterviewState uses `turnsBudgetTotal` (not `totalMaxTurns`).
+ */
+export function computeCILBonusCap(
+    state: InterviewState,
+    manualOverride: number | null | undefined
+): number {
+    if (manualOverride != null) return manualOverride
+    const remainingTopics = state.uncoveredTopics.length + topicsAfterCurrent(state)
+    const remainingBudget = state.turnsBudgetTotal - state.turnsUsedTotal
+    const sharePerTopic = remainingBudget / Math.max(remainingTopics, 1)
+    return Math.min(Math.max(Math.floor(sharePerTopic * 0.5), 1), 4)
+}
+
+/**
+ * Extend the current topic's turn budget by 1 if a CIL high-strength thread
+ * is detected and the per-topic cap has not been reached.
+ */
+export function applyCILBudgetSignal(
+    state: InterviewState,
+    signal: { extend: boolean; topicId: string; reason: string },
+    cap: number
+): InterviewState {
+    if (!signal.extend) return state
+    const budget = state.topicBudgets[signal.topicId]
+    if (!budget) return state
+    const alreadyApplied = budget.cilBonusApplied ?? 0
+    if (alreadyApplied >= cap) return state
+    return {
+        ...state,
+        topicBudgets: {
+            ...state.topicBudgets,
+            [signal.topicId]: {
+                ...budget,
+                maxTurns: budget.maxTurns + 1,
+                cilBonusApplied: alreadyApplied + 1
+            }
+        }
+    }
+}

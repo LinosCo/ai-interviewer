@@ -48,12 +48,14 @@ type Props =
       organizationId: string
       bot?: never
       initialValues?: InitialValues
+      organizationPlan?: string
     }
   | {
       mode: 'edit'
       bot: BotWithTopics
       organizationId?: never
       initialValues?: never
+      organizationPlan?: string
     }
 
 interface TopicDraft {
@@ -112,7 +114,7 @@ const selectCls =
 const textareaCls =
   'w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-y min-h-[80px]'
 
-export default function TrainingBotConfigForm({ mode, bot, organizationId, initialValues }: Props) {
+export default function TrainingBotConfigForm({ mode, bot, organizationId, initialValues, organizationPlan = 'TRIAL' }: Props) {
   const router = useRouter()
 
   // Identity — seeded from bot (edit) or initialValues (create after AI gen) or defaults
@@ -153,6 +155,8 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
   const [modelProvider, setModelProvider] = useState((bot?.modelProvider ?? initialValues?.modelProvider ?? 'openai').toLowerCase())
   const [modelName, setModelName] = useState(bot?.modelName ?? initialValues?.modelName ?? 'gpt-4o-mini')
   const [customApiKey, setCustomApiKey] = useState(bot?.customApiKey ?? initialValues?.customApiKey ?? '')
+  const [interviewerQuality, setInterviewerQuality] = useState<string>((bot as any)?.interviewerQuality ?? 'quantitativo')
+  const isBusinessPlan = ['BUSINESS', 'PARTNER', 'ENTERPRISE', 'ADMIN'].includes(organizationPlan)
   const [traineeDataFieldsText, setTraineeDataFieldsText] = useState(() => {
     const fromBot = Array.isArray(bot?.traineeDataFields) ? (bot?.traineeDataFields as unknown[]) : null
     const fromInitial = initialValues?.traineeDataFields ?? null
@@ -246,6 +250,7 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
       modelProvider,
       modelName: modelName.trim() || (modelProvider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gpt-4o-mini'),
       customApiKey: customApiKey.trim() || null,
+      interviewerQuality,
       collectTraineeData,
       traineeDataFields: collectTraineeData
         ? traineeDataFieldsText
@@ -511,6 +516,79 @@ export default function TrainingBotConfigForm({ mode, bot, organizationId, initi
             />
           </Field>
         </div>
+      </div>
+
+      {/* 5a. Modalità Tutor */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <SectionTitle>Modalità Tutor AI</SectionTitle>
+        <p className="text-xs text-gray-500 mb-4">Scegli la filosofia del tutoring in base ai tuoi obiettivi formativi.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            {
+              value: 'quantitativo',
+              icon: '📊',
+              label: 'Strutturato',
+              desc: 'Percorso strutturato. Segue il curriculum in ordine.',
+              credits: '~1 credito/messaggio',
+              locked: false,
+            },
+            {
+              value: 'intermedio',
+              icon: '🔍',
+              label: 'Adattivo',
+              desc: 'Si ferma a spiegare se lo studente è in difficoltà.',
+              credits: '~2 crediti/messaggio',
+              locked: !isBusinessPlan,
+            },
+            {
+              value: 'avanzato',
+              icon: '🎯',
+              label: 'Socratico',
+              desc: 'Guida la scoperta con domande, rileva misconcezioni.',
+              credits: '~3 crediti/messaggio',
+              locked: !isBusinessPlan,
+            },
+          ].map((tier) => {
+            const selected = interviewerQuality === tier.value
+            return (
+              <label
+                key={tier.value}
+                className={`relative flex flex-col gap-2 p-4 rounded-lg border-2 transition-all ${
+                  tier.locked
+                    ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50'
+                    : selected
+                    ? 'cursor-pointer border-indigo-500 bg-indigo-50'
+                    : 'cursor-pointer border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="interviewerQuality"
+                  value={tier.value}
+                  checked={selected}
+                  onChange={() => !tier.locked && setInterviewerQuality(tier.value)}
+                  disabled={tier.locked}
+                  className="sr-only"
+                />
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <span>{tier.icon}</span>
+                  <span>{tier.label}</span>
+                  {tier.locked && (
+                    <span className="ml-auto text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Business</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600">{tier.desc}</p>
+                <p className="text-xs font-medium text-indigo-600">{tier.credits}</p>
+              </label>
+            )
+          })}
+        </div>
+        {!isBusinessPlan && (
+          <p className="text-xs text-gray-500 mt-2">
+            Adattivo e Socratico richiedono il piano Business.{' '}
+            <a href="/dashboard/billing" className="text-indigo-600 underline">Upgrade →</a>
+          </p>
+        )}
       </div>
 
       {/* 5. Argomenti */}

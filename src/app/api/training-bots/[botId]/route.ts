@@ -76,6 +76,7 @@ const UpdateBotSchema = z.object({
   modelProvider: z.enum(['openai', 'anthropic']).optional(),
   modelName: z.string().min(1).max(120).optional(),
   customApiKey: z.string().nullish().transform(v => v ?? undefined),
+  interviewerQuality: z.enum(['quantitativo', 'intermedio', 'avanzato']).optional(),
   collectTraineeData: z.boolean().optional(),
   traineeDataFields: z.array(z.string().min(1)).max(5).optional(),
   rewardConfig: z.object({

@@ -4,9 +4,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { prisma } from '@/lib/prisma';
 import { Bot, Conversation, TopicBlock, Message } from '@prisma/client';
 import { sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
-
-const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+import { getConfigValue } from '@/lib/config';
 
 export async function runInterviewTurn(
     bot: Bot & { topics: TopicBlock[] },
@@ -31,14 +29,14 @@ export async function runInterviewTurn(
     let apiKey: string | undefined;
 
     if (bot.modelProvider === 'anthropic') {
-        apiKey = bot.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+        apiKey = bot.anthropicApiKey || await getConfigValue('anthropicApiKey') || undefined;
         if (!apiKey) {
             throw new Error("No Anthropic API key configured. Please add one in bot settings or system settings.");
         }
         const anthropicProvider = createAnthropic({ apiKey });
         model = anthropicProvider(bot.modelName || 'claude-3-5-sonnet-20241022');
     } else {
-        apiKey = bot.openaiApiKey || process.env.OPENAI_API_KEY;
+        apiKey = bot.openaiApiKey || await getConfigValue('openaiApiKey') || undefined;
         if (!apiKey) {
             throw new Error("No OpenAI API key configured. Please add one in bot settings or system settings.");
         }

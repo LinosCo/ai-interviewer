@@ -4,6 +4,7 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 import type { SupervisorInsight } from '@/lib/interview/interview-supervisor';
 import type { InterviewPlan, PlanTopic } from '@/lib/interview/plan-types';
 import type { ValidationResponse } from '@/lib/interview/validation-response';
+import type { CILAnalysis, CILState } from '@/lib/interview/cil/types';
 import { sanitize, sanitizeConfig } from '@/lib/llm/prompt-sanitizer';
 
 const FIELD_LABELS: Record<string, { it: string, en: string }> = {
@@ -32,6 +33,7 @@ export class PromptBuilder {
     ): string {
         const isAvanzato = interviewerQuality === 'avanzato';
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
+        const qualityTier = (bot as any).interviewerQuality || 'quantitativo';
 
         // Sanitize admin-configured fields before prompt interpolation
         const safeName = sanitizeConfig(bot.name);
@@ -85,6 +87,35 @@ Lingua: Italiano
 5. Mantieni lingua e tono consistenti.
 6. No a ripetizioni letterali di domande precedenti.
 
+## FLUSSO INTERVISTA
+- ESPLORAZIONE: copri i topic previsti con domande mirate, un sub-goal per volta.
+- APPROFONDIMENTO: approfondisci solo i segnali ad alto valore (esempi, impatti, vincoli).
+- DATA_COLLECTION: chiedi consenso e poi raccogli i campi uno alla volta.
+- Chiusura: solo quando il supervisor lo indica.
+
+## PRINCIPI OPERATIVI
+1. Mantieni tono naturale e concreto, senza formule rituali.
+2. In ogni turno: apri con un riconoscimento breve e specifico di ciò che l'utente ha detto, poi poni UNA domanda.
+3. Se emerge un segnale forte (impatto, esempio, vincolo), approfondiscilo prima di cambiare focus.
+4. Evita ripetizioni letterali della domanda precedente.
+5. No promo/link/CTA; no contatti fuori da DATA_COLLECTION.
+${qualityTier === 'avanzato' ? `
+## MODALITÀ QUALITATIVA PROFONDA
+Sei in modalità intervista qualitativa avanzata. Il tuo obiettivo non è coprire sistematicamente i topic ma ottenere insight autentici e profondi.
+- Puoi deviare dall'ordine pianificato se emerge un segnale significativo
+- Sintetizza quanto detto nei turni precedenti ("Prima hai detto X, ora parli di Y — sembra che...")
+- Formula ipotesi e chiedi conferma ("Mi sembra che per te Z sia più importante di W — è così?")
+- Cerca la contraddizione produttiva: metti in dialogo affermazioni diverse dell'utente
+- Priorità: qualità dell'insight, non copertura sistematica dei topic
+- NON usare scale numeriche (1-10, NPS, stelle, rating): cerca la narrazione e il significato, non il dato
+` : ''}
+## ESEMPI DI BRIDGE (STILE)
+Utente: "Siamo curiosi, ci interessa il rapporto col mercato."
+AI: "Mi colpisce il focus sul mercato. In quali momenti questo pesa di più nelle vostre decisioni?"
+
+Utente: "Non ho capito, intendi clienti o fornitori?"
+AI: "Intendo il rapporto con i clienti finali. Quale parte oggi è più difficile da gestire?"
+
 ## KNOWLEDGE BASE
 ${knowledgeText}
 `.trim() : `
@@ -110,6 +141,26 @@ Language: English
 4. Every response ends with "?".
 5. Keep language and tone consistent.
 6. Avoid literal repetition of previous questions.
+
+## INTERVIEW FLOW
+- EXPLORING: cover planned topics with focused questions, one sub-goal at a time.
+- DEEPENING: deepen only high-value signals (examples, impact, constraints).
+- DATA_COLLECTION: ask consent then collect fields one at a time.
+- Closure: only when the supervisor indicates it.
+
+## OPERATING PRINCIPLES
+1. Keep the tone natural and concrete, without ritual phrases.
+2. Each turn: open with a brief, specific acknowledgment of what the user said, then ask ONE question.
+3. If a strong signal appears (impact, example, constraint), deepen it before shifting focus.
+4. Avoid literal repetition of the previous question.
+5. No promo/link/CTA; no contact requests outside DATA_COLLECTION.
+
+## BRIDGE STYLE EXAMPLES
+User: "We're curious about the market relationship."
+AI: "Your market focus stands out. In which decisions does this matter most today?"
+
+User: "I didn't understand, do you mean clients or suppliers?"
+AI: "I mean end clients. Which part is hardest to manage right now?"
 
 ## KNOWLEDGE BASE
 ${knowledgeText}
@@ -208,24 +259,62 @@ ${topicLines}
             const subGoals = (currentTopic.subGoals || []).filter(Boolean).map(g => sanitizeConfig(g, 200));
             const subGoalPreview = subGoals.slice(0, 3).join(' | ') || (isItalian ? 'N/A' : 'N/A');
             const safeTopicLabel = sanitizeConfig(currentTopic.label, 200);
+            const qualityTierLocal = (bot as any)?.interviewerQuality || 'quantitativo';
+
+            const metodoIT = qualityTierLocal === 'avanzato'
+                ? `Metodo: Ascolta prima, poi rispondi in modo autentico. Non fare echo letterale.
+- Sintetizza in modo originale ciò che l'utente ha detto (non ripetere le sue parole)
+- Se rilevante, collega a qualcosa detto in turni precedenti ("Prima hai accennato a... — c'è un filo comune?")
+- Formula un'ipotesi e testala con la domanda ("Sembra che... — è così?")
+- Puoi deviare dal sub-goal pianificato per inseguire un segnale significativo
+Obiettivo: qualità dell'insight, non copertura sistematica.`
+                : qualityTierLocal === 'intermedio'
+                ? `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto. Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
+- Se emerge un segnale forte (impatto concreto, dettaglio inatteso, contraddizione), approfondiscilo prima di passare al sub-goal successivo.
+- Se l'utente usa ripetutamente la stessa parola o concetto, esplicitalo: "Hai usato più volte la parola X — cosa significa per te in questo contesto?"
+- Se vedi una contraddizione tra ciò che l'utente dice ora e ciò che ha detto prima, mettila in evidenza con delicatezza.
+Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.`
+                : `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto (es. riprendi un dettaglio concreto o un'emozione espressa). Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
+Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.
+Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contraddizioni.`;
+
+            const methodEN = qualityTierLocal === 'avanzato'
+                ? `Method: Listen first, then respond authentically. Do not echo the user's words back literally.
+- Synthesize what the user said in your own words
+- If relevant, connect to something said in previous turns ("You mentioned earlier... — is there a connection?")
+- Form a hypothesis and test it with your question ("It seems like... — is that right?")
+- You may deviate from the planned sub-goal to follow a significant signal
+Goal: quality of insight, not systematic coverage.`
+                : qualityTierLocal === 'intermedio'
+                ? `Method: Open with a genuine, specific acknowledgment of what the user just said. Then ask ONE exploratory question focused on the sub-goal.
+- If a strong signal emerges (concrete impact, unexpected detail, contradiction), deepen it before moving to the next sub-goal.
+- If the user repeatedly uses the same word or concept, name it: "You've used the word X a few times — what does that mean for you here?"
+- If you notice a contradiction between what the user said now and earlier, surface it gently.
+Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.`
+                : `Method: Open with a genuine, specific acknowledgment of what the user just said (e.g. reflect a concrete detail or emotion they expressed). Then ask ONE exploratory question focused on the sub-goal.
+Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.
+Listen for depth signals: concrete examples, lived impacts, constraints, contradictions.`;
+
             return isItalian ? `
 ## FASE: ESPLORAZIONE${bonus}
 Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
-Metodo:
-- Apri con un riconoscimento genuino e specifico di ciò che l'utente ha detto (no formule generiche come "interessante" o "capisco" da soli).
-- Fai esattamente UNA domanda esplorativa focalizzata sul sub-goal.
-- Se emerge un segnale forte (impatto concreto, vincolo esplicito, dettaglio inatteso), approfondiscilo prima di passare al sub-goal successivo.
-- Se l'utente usa ripetutamente la stessa parola, esplicitalo: "Hai usato più volte X — cosa significa per te qui?"
+${metodoIT}
+
+## REGOLE BASE
+- Una sola domanda per turno.
+- Nessuna chiusura e nessun contatto in ESPLORAZIONE.
+- Agganciati sempre a un dettaglio specifico di ciò che l'utente ha detto.
 `.trim() : `
 ## PHASE: EXPLORING${bonus}
 Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
-Method:
-- Open with a genuine, specific acknowledgment of what the user just said (avoid empty openers like "Interesting!" or "I see" alone).
-- Ask exactly ONE exploratory question focused on the sub-goal.
-- If a strong signal emerges (concrete impact, explicit constraint, unexpected detail), deepen it before moving to the next sub-goal.
-- If the user repeatedly uses the same word, name it: "You've used X a few times — what does that mean for you here?"
+${methodEN}
+
+## BASE RULES
+- One question per turn.
+- No closure or contact requests in EXPLORING.
+- Always connect to a specific detail the user mentioned.
 `.trim();
         }
 
@@ -261,6 +350,30 @@ Brief natural bridge, then ONE opening question for the next topic.
             const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 500).trim();
             const crossTopicNotes = sanitize(supervisorInsight?.crossTopicNotes || '', 400).trim();
             const safeLabel = sanitizeConfig(currentTopic.label, 200);
+            const qualityTierDeep = (bot as any)?.interviewerQuality || 'quantitativo';
+
+            if (qualityTierDeep === 'avanzato') {
+                return isItalian ? `
+## FASE: APPROFONDIMENTO (QUALITATIVO)
+Topic: "${safeLabel}"
+${engagingSnippet ? `Spunto chiave: "${engagingSnippet}"` : ''}
+Sei in modalità qualitativa. Non seguire uno script.
+- Collega questo momento a quanto emerso in precedenza nella conversazione
+- Formula un'ipotesi e chiedi conferma ("Mi sembra che tu stia dicendo che... — è così?")
+- Cerca la contraddizione produttiva: metti in dialogo affermazioni diverse dell'utente
+- Una sola domanda, ma la più incisiva e rivelante possibile
+`.trim() : `
+## PHASE: DEEPENING (QUALITATIVE)
+Topic: "${safeLabel}"
+${engagingSnippet ? `Key insight: "${engagingSnippet}"` : ''}
+You are in qualitative mode. Do not follow a script.
+- Connect this moment to what emerged earlier in the conversation
+- Form a hypothesis and ask for confirmation ("It seems like you're saying that... — is that right?")
+- Look for productive contradictions: put the user's different statements in dialogue
+- One question only, but make it the most incisive and revealing possible
+`.trim();
+            }
+
             return isItalian ? `
 ## FASE: APPROFONDIMENTO
 Topic: "${safeLabel}"
@@ -323,14 +436,16 @@ Warm and natural tone. Do not ask for contacts or topic questions.
         if (status === 'DATA_COLLECTION_CONSENT') {
             return isItalian ? `
 ## FASE: CONSENSO DATI
-L'intervista contenutistica è conclusa.
-Ringrazia brevemente. Chiedi il consenso per raccogliere i contatti.
-Una sola domanda, nessuna domanda di topic.
+L'intervista è conclusa. Ringrazia per la partecipazione.
+Chiedi esplicitamente se puoi raccogliere i dati di contatto personali (es. nome ed email) per eventuali follow-up futuri.
+La domanda deve riguardare chiaramente la condivisione dei dati personali, NON il proseguire o estendere l'intervista.
+Una sola domanda. Nessuna domanda di topic.
 `.trim() : `
 ## PHASE: DATA_COLLECTION_CONSENT
-The content interview is complete.
-Thank briefly. Ask permission to collect contact details.
-One question only, no topic questions.
+The interview is complete. Thank the participant for their time.
+Explicitly ask if you may collect their personal contact information (e.g. name and email) for potential future follow-up.
+The question must be clearly about sharing personal data, NOT about continuing or extending the interview.
+One question only. No topic questions.
 `.trim();
         }
 
@@ -550,4 +665,60 @@ export function addValidationFeedbackToPrompt(
     : `\n\n⚠️ IMPORTANT FEEDBACK: The user provided a response that wasn't understood correctly.\nMessage to communicate: "${safeFeedback}"\nStrategy: ${safeStrategy || 'ask again'}.\n`;
 
   return basePrompt + feedbackSection;
+}
+
+/**
+ * Build CIL context block (Block 6.5) — avanzato only.
+ * Returns empty string for other tiers or when nothing meaningful to show.
+ */
+export function buildCILContextBlock(
+    analysis: CILAnalysis,
+    cilState: CILState | null,
+    interviewerQuality: string
+): string {
+    if (interviewerQuality !== 'avanzato') return '';
+
+    const highThreads = analysis.openThreads.filter(t => t.strength === 'high');
+    const mediumThreads = analysis.openThreads.filter(t => t.strength === 'medium');
+    const themes = analysis.emergingThemes;
+    const lra = analysis.lastResponseAnalysis;
+    const hasMaterial = highThreads.length > 0 || themes.length > 0 ||
+        lra.activeHypotheses.length > 0 || lra.contradictionFlags.length > 0 ||
+        lra.interruptedThoughts.length > 0 || lra.emotionalCues.length > 0;
+
+    if (!hasMaterial) return '';
+
+    const lines: string[] = ['=== CONVERSATIONAL INTELLIGENCE ==='];
+
+    if (highThreads.length > 0 || mediumThreads.length > 0) {
+        lines.push('\nOpen threads:');
+        for (const t of highThreads) {
+            const hyp = t.anchoredHypothesis ? ` → ${t.anchoredHypothesis}` : '';
+            lines.push(`• [HIGH] "${t.description}"${hyp}`);
+        }
+        for (const t of mediumThreads) {
+            lines.push(`• [MEDIUM] "${t.description}"`);
+        }
+    }
+
+    if (themes.length > 0) {
+        lines.push(`\nEmerging themes: ${themes.join(' · ')}`);
+    }
+
+    const signals = [
+        ...lra.activeHypotheses.map(h => `Hypothesis taking shape: ${sanitize(h, 200)}`),
+        ...lra.contradictionFlags.map(f => `Contradiction: ${sanitize(f, 200)}`),
+        ...lra.emotionalCues.map(c => sanitize(c, 200)),
+        ...lra.interruptedThoughts.map(t => `Interrupted: ${sanitize(t, 200)}`)
+    ].filter(Boolean).slice(0, 4);
+
+    if (signals.length > 0) {
+        lines.push('\nLast response — signals:');
+        for (const s of signals) lines.push(`• ${s}`);
+    }
+
+    lines.push(`\nSuggested move: ${analysis.suggestedMove}`);
+    lines.push('===');
+
+    return lines.join('\n');
 }

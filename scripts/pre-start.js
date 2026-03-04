@@ -44,6 +44,9 @@ const COLUMN_MIGRATION_MAP = {
     'TrainingTopicBlock.minCheckingTurns': '20260301_training_dialogue_kb',
     'TrainingTopicBlock.maxCheckingTurns': '20260301_training_dialogue_kb',
     'KnowledgeSource.trainingBotId':       '20260301_training_dialogue_kb',
+    'Bot.interviewerQuality':              '20260303_add_interviewer_quality',
+    'TrainingBot.interviewerQuality':      '20260303_add_interviewer_quality',
+    'Bot.cilBonusTurnCapOverride':         '20260303_add_cil_bonus_turn_cap_override',
 };
 
 async function tableExists(client, tableName) {

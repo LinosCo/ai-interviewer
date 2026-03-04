@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Trash2, ToggleLeft, ToggleRight, Zap, Pencil, FlaskConical, Loader2 } from 'lucide-react';
 import { CONTENT_KIND_LABELS, ALL_CONTENT_KINDS, type ContentKind } from '@/lib/cms/content-kinds';
-import { ROUTING_TIP_CATEGORY_LABELS } from '@/lib/cms/tip-routing-taxonomy';
+import {
+  ROUTING_TIP_CATEGORY_LABELS,
+  ROUTING_TIP_CATEGORY_ORDER,
+  getContentKindCategory,
+  getContentKindRoutingDisplayLabel,
+  getContentKindSuggestedConnectionsLabel,
+} from '@/lib/cms/tip-routing-taxonomy';
 
 interface TipRoutingRule {
   id: string;
@@ -84,6 +90,12 @@ interface DestinationOption {
   badge: string;
 }
 
+interface ContentKindOptionGroup {
+  category: string;
+  label: string;
+  kinds: ContentKind[];
+}
+
 const DEFAULT_FORM = {
   contentKind: '' as ContentKind | '',
   behavior: 'create_post',
@@ -130,6 +142,23 @@ export function AiRoutingTab({
   const activeEditingRule = editingRuleId
     ? rules.find((rule) => rule.id === editingRuleId) || null
     : null;
+
+  const contentKindOptionGroups = useMemo<ContentKindOptionGroup[]>(() => {
+    const byCategory = new Map<string, ContentKind[]>();
+    for (const kind of ALL_CONTENT_KINDS) {
+      const category = getContentKindCategory(kind);
+      if (!byCategory.has(category)) byCategory.set(category, []);
+      byCategory.get(category)!.push(kind);
+    }
+
+    return ROUTING_TIP_CATEGORY_ORDER
+      .map((category) => ({
+        category,
+        label: ROUTING_TIP_CATEGORY_LABELS[category] || category,
+        kinds: byCategory.get(category) || [],
+      }))
+      .filter((group) => group.kinds.length > 0);
+  }, []);
 
   const formDestinations = useMemo<DestinationOption[]>(() => {
     const items = [...availableDestinations];
@@ -385,12 +414,26 @@ export function AiRoutingTab({
                 className="w-full h-12 rounded-2xl border border-gray-100 bg-gray-50/50 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Seleziona tipo…</option>
-                {ALL_CONTENT_KINDS.map(kind => (
-                  <option key={kind} value={kind}>
-                    {CONTENT_KIND_LABELS[kind]}
-                  </option>
+                {contentKindOptionGroups.map((group) => (
+                  <optgroup key={group.category} label={group.label}>
+                    {group.kinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {getContentKindRoutingDisplayLabel(kind)}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
+              {formData.contentKind && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Categoria AI Tips: <span className="font-semibold text-gray-700">
+                    {ROUTING_TIP_CATEGORY_LABELS[getContentKindCategory(formData.contentKind as ContentKind)]}
+                  </span>
+                  {' · '}Connessione consigliata: <span className="font-semibold text-gray-700">
+                    {getContentKindSuggestedConnectionsLabel(formData.contentKind as ContentKind)}
+                  </span>
+                </p>
+              )}
             </div>
 
             {/* Destination */}
@@ -703,6 +746,9 @@ export function AiRoutingTab({
                   <span className="text-xs font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">
                     {CONTENT_KIND_LABELS[rule.contentKind as ContentKind] || rule.contentKind}
                   </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">
+                    {ROUTING_TIP_CATEGORY_LABELS[getContentKindCategory(rule.contentKind as ContentKind)] || 'Categoria'}
+                  </span>
                   {rule.label && (
                     <span className="text-xs text-gray-400">{rule.label}</span>
                   )}
@@ -712,6 +758,9 @@ export function AiRoutingTab({
                   {rule.mcpTool && (
                     <span className="text-gray-400 ml-1 text-xs">· {rule.mcpTool}</span>
                   )}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Consigliato: {getContentKindSuggestedConnectionsLabel(rule.contentKind as ContentKind)}
                 </p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">

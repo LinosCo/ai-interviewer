@@ -1,4 +1,5 @@
 import { auth } from '@/auth';
+import { getConfigValue } from '@/lib/config';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { generateText } from 'ai';
@@ -253,8 +254,8 @@ export async function POST(req: Request) {
         const baseKb = sanitizeConfig(getDefaultStrategicMarketingKnowledge(), 5000);
         const dataContext = sanitizeConfig(safeJson(signalsSummary, 12000), 12000);
 
-        const openaiApiKey = globalConfig?.openaiApiKey || process.env.OPENAI_API_KEY || '';
-        const anthropicApiKey = globalConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || '';
+        const openaiApiKey = globalConfig?.openaiApiKey || await getConfigValue('openaiApiKey') || '';
+        const anthropicApiKey = globalConfig?.anthropicApiKey || await getConfigValue('anthropicApiKey') || '';
 
         if (!openaiApiKey && !anthropicApiKey) {
             return NextResponse.json({

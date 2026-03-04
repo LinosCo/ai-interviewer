@@ -3,6 +3,15 @@ import { CMSSuggestionStatus, CMSSuggestionType, Prisma } from '@prisma/client';
 import { CMSConnectionService } from './connection.service';
 import { decrypt } from './encryption';
 
+function decodeStoredApiKey(storedApiKey: string): string {
+  try {
+    return decrypt(storedApiKey);
+  } catch {
+    // Backward compatibility for legacy/plain-text keys.
+    return storedApiKey;
+  }
+}
+
 interface CreateSuggestionInput {
   connectionId: string;
   title: string;
@@ -95,12 +104,15 @@ export class CMSSuggestionService {
         priorityScore: suggestion.priorityScore
       };
 
+      const cmsApiKey = decodeStoredApiKey(suggestion.connection.apiKey);
+
       // Invia al CMS
       const response = await fetch(`${suggestion.connection.cmsApiUrl}/suggestions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-BT-API-Key': decrypt(suggestion.connection.apiKey)
+          'X-BT-API-Key': cmsApiKey,
+          'Authorization': `Bearer ${cmsApiKey}`
         },
         body: JSON.stringify(payload)
       });

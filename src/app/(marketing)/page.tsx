@@ -10,6 +10,7 @@ import {
   AITipsSection,
   AutomationSection,
   NewsSection,
+  TrainingBotSection,
   WhySection,
   UseCasesSection,
   PricingSection,
@@ -60,15 +61,14 @@ export default function LandingPage() {
         <HeroSection />
 
         {/* Transition: Hero → HowItWorks */}
-        <div className="h-24 section-fade-from-transparent" />
+        <div className="h-32 section-fade-from-transparent" />
         <HowItWorks />
 
         {/* Transition: HowItWorks → Problem */}
-        <div className="h-10 bg-white" />
+        <div className="h-16 bg-white" />
         <ProblemSection />
 
         {/* Transition: Problem → Ascolto */}
-        <div className="h-10 bg-white" />
         <FeaturesSection />
 
         {/* Transition: Ascolto → Decidi */}
@@ -83,16 +83,19 @@ export default function LandingPage() {
         <div className="h-24 section-fade-from-transparent" />
         <NewsSection />
 
-        {/* Transition: Monitora → UseCases */}
+        {/* Transition: Monitora → Formazione */}
         <div className="h-10 bg-white" />
-        <UseCasesSection />
+        <TrainingBotSection />
 
-        {/* Transition: UseCases → Why */}
+        {/* Transition: Formazione → Why */}
         <div className="h-24 section-fade-to-transparent" />
         <WhySection />
 
-        {/* Transition: Why → Pricing (white) */}
-        <div className="h-10 bg-white" />
+        {/* Transition: Why → UseCases */}
+        <div className="h-24 section-fade-from-transparent" />
+        <UseCasesSection />
+
+        {/* Transition: UseCases → Pricing */}
         <PricingSection />
         <FAQSection />
 

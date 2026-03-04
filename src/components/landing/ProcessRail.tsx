@@ -58,13 +58,13 @@ export function ProcessRail() {
   return (
     <aside
       aria-label="Fasi del processo"
-      className="hidden 2xl:flex fixed left-6 top-1/2 -translate-y-1/2 z-40 pointer-events-none"
+      className="hidden lg:flex fixed left-3 xl:left-5 top-1/2 -translate-y-1/2 z-[45] pointer-events-none"
     >
       <div
         className="pointer-events-auto transition-transform duration-300"
         style={{ transform: `translateY(${drift}px)` }}
       >
-        <div className="rounded-[28px] border border-[hsl(var(--border)/0.65)] bg-[hsl(var(--background)/0.8)] backdrop-blur-md px-2 py-3 shadow-medium">
+        <div className="rounded-[30px] border border-[hsl(var(--border)/0.7)] bg-[hsl(var(--background)/0.9)] backdrop-blur-md px-2 py-3 shadow-strong">
           <div className="flex flex-col gap-2">
             {PHASES.map((phase) => {
               const isActive = activePhase === phase.id;
@@ -78,7 +78,7 @@ export function ProcessRail() {
                   className={`relative rounded-full border px-2 py-4 [writing-mode:vertical-rl] text-xs font-semibold tracking-[0.16em] transition-colors ${
                     isActive
                       ? 'border-[hsl(var(--coral)/0.45)] bg-[hsl(var(--coral)/0.14)] text-[hsl(var(--coral))]'
-                      : 'border-[hsl(var(--border))] bg-[hsl(var(--card)/0.82)] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
+                      : 'border-[hsl(var(--border))] bg-[hsl(var(--card)/0.9)] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]'
                   }`}
                 >
                   {phase.label}
@@ -91,4 +91,3 @@ export function ProcessRail() {
     </aside>
   );
 }
-

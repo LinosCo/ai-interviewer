@@ -45,7 +45,7 @@ export function HeroSection() {
             </div>
 
             <h1 className="font-display text-[2rem] md:text-5xl lg:text-6xl xl:text-7xl font-bold leading-[1.2] md:leading-[1.1] mb-4 md:mb-8 text-[hsl(var(--foreground))]">
-              L&apos;AI che ascolta, pianifica e gestisce il marketing digitale
+              L&apos;AI per ascoltare, definire e automatizzare
             </h1>
 
             {/* Subtitle */}

@@ -41,7 +41,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
     const organizationId = projectAccess.organizationId;
 
     // Run all independent queries concurrently
-    const [projects, canUseKnowledgeBase, canUseConditionalLogic, canUseBranding] = await Promise.all([
+    const [projects, canUseKnowledgeBase, canUseConditionalLogic, canUseBranding, canUseAdvancedInterview] = await Promise.all([
         prisma.project.findMany({
             where: { organizationId },
             select: { id: true, name: true, isPersonal: true },
@@ -50,6 +50,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
         isFeatureEnabled(organizationId, 'knowledgeBase'),
         isFeatureEnabled(organizationId, 'conditionalLogic'),
         isFeatureEnabled(organizationId, 'customLogo'),
+        isFeatureEnabled(organizationId, 'advancedInterview'),
     ]);
 
     if ((bot as any).botType === 'chatbot') {
@@ -95,7 +96,7 @@ export default async function BotEditorPage({ params }: { params: Promise<{ botI
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-8">
-                    <BotConfigForm bot={bot} canUseBranding={canUseBranding} />
+                    <BotConfigForm bot={bot} canUseBranding={canUseBranding} canUseAdvancedInterview={canUseAdvancedInterview} currentPlan={bot.project.organization?.plan || 'TRIAL'} />
                     {/* Updated Landing/Branding Editor */}
                     <LandingPageEditor bot={bot} plan={bot.project.organization?.plan || 'TRIAL'} />
                     <TopicsEditor botId={bot.id} topics={bot.topics} canUseConditionalLogic={canUseConditionalLogic} />

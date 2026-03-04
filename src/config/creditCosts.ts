@@ -78,6 +78,10 @@ function resolvePricingModel(modelName: string): PricingModelKey | null {
 
     const aliases: Array<{ prefix: string; model: PricingModelKey }> = [
         { prefix: 'gpt-4o-mini', model: LLMModel.GPT4O_MINI },
+        { prefix: 'gpt-5-mini', model: LLMModel.GPT5_MINI },
+        { prefix: 'gpt-5.2', model: LLMModel.GPT5_2 },
+        { prefix: 'gpt-5.1', model: LLMModel.GPT5_1 },
+        { prefix: 'gpt-5', model: LLMModel.GPT5 },
         { prefix: 'claude-3-5-haiku', model: LLMModel.CLAUDE_HAIKU },
         { prefix: 'claude-sonnet-4', model: LLMModel.CLAUDE_SONNET },
         { prefix: 'claude-sonnet-4-6', model: LLMModel.CLAUDE_SONNET },
@@ -127,6 +131,8 @@ export function getModelCreditMultiplier(modelName: string): number {
         return Math.max(1, Math.min(8, modelCost / baselineCost));
     }
 
+    if (normalized.includes('gpt-5-mini')) return 3;
+    if (normalized.includes('gpt-5')) return 8;
     if (normalized.includes('gpt-4o-mini') || normalized.includes('haiku') || normalized.includes('flash-8b')) {
         return 1;
     }

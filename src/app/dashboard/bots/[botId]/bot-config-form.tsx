@@ -14,13 +14,19 @@ type BotWithRelations = Bot & {
 };
 
 import { Icons } from '@/components/ui/business-tuner/Icons';
-import { Info } from 'lucide-react';
+import { Info, Check, Lock } from 'lucide-react';
+import { UpgradeModal } from '@/components/modals/UpgradeModal';
 import Link from 'next/link';
 
-export default function BotConfigForm({ bot, canUseBranding = false }: { bot: BotWithRelations, canUseBranding?: boolean }) {
+export default function BotConfigForm({ bot, canUseBranding = false, canUseAdvancedInterview = false, currentPlan = 'TRIAL' }: { bot: BotWithRelations, canUseBranding?: boolean, canUseAdvancedInterview?: boolean, currentPlan?: string }) {
     const updateAction = updateBotAction.bind(null, bot.id);
-    const [quality, setQuality] = useState(bot.interviewerQuality || 'standard');
+    const [quality, setQuality] = useState(() => {
+        const saved = bot.interviewerQuality;
+        if (saved === 'avanzato' && canUseAdvancedInterview) return 'avanzato';
+        return 'standard';
+    });
     const [isRecruiting, setIsRecruiting] = useState(bot.collectCandidateData ?? false);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
     // Wrapper to ignore return type compatibility issues with form action
     const handleSubmit = async (formData: FormData) => {
@@ -112,21 +118,98 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
             <section>
                 <h2 className="text-lg font-semibold mb-4 border-b pb-2">Constraints & Features</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Interview Quality</label>
-                        <select
-                            name="interviewerQuality"
-                            value={quality}
-                            onChange={(e) => setQuality(e.target.value)}
-                            className="w-full border p-2 rounded"
-                        >
-                            <option value="quantitativo">Quantitativo — Veloce e comparabile</option>
-                            <option value="intermedio">Intermedio — Bilanciato qualità/costo</option>
-                            <option value="avanzato">Avanzato — Intervista qualitativa profonda</option>
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Avanzato: modello critico aggressivo, budget generosi, naturalezza avanzata.
-                        </p>
+                    <div className="col-span-1 md:col-span-2">
+                        <label className="block text-sm font-medium mb-3">Interview Quality</label>
+                        <input type="hidden" name="interviewerQuality" value={quality} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Standard Card */}
+                            <button
+                                type="button"
+                                onClick={() => setQuality('standard')}
+                                className={`text-left p-4 rounded-lg border-2 transition-all ${
+                                    quality === 'standard'
+                                        ? 'border-amber-500 bg-amber-50/30 ring-2 ring-amber-500'
+                                        : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                        quality === 'standard' ? 'border-amber-500' : 'border-gray-300'
+                                    }`}>
+                                        {quality === 'standard' && <div className="w-2 h-2 rounded-full bg-amber-500" />}
+                                    </div>
+                                    <span className="font-semibold text-gray-900">Standard</span>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-3 ml-6">Interviste rapide e scalabili</p>
+                                <ul className="space-y-1.5 ml-6">
+                                    <li className="flex items-center gap-2 text-sm text-gray-600">
+                                        <Check size={14} className="text-green-500 shrink-0" />
+                                        Veloce (&lt; 3s per risposta)
+                                    </li>
+                                    <li className="flex items-center gap-2 text-sm text-gray-600">
+                                        <Check size={14} className="text-green-500 shrink-0" />
+                                        Strutturato e comparabile
+                                    </li>
+                                    <li className="flex items-center gap-2 text-sm text-gray-600">
+                                        <Check size={14} className="text-green-500 shrink-0" />
+                                        Ideale per survey e validazione
+                                    </li>
+                                </ul>
+                            </button>
+
+                            {/* Avanzato Card */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!canUseAdvancedInterview) {
+                                        setShowUpgradeModal(true);
+                                        return;
+                                    }
+                                    setQuality('avanzato');
+                                }}
+                                className={`text-left p-4 rounded-lg border-2 transition-all relative ${
+                                    quality === 'avanzato'
+                                        ? 'border-amber-500 bg-amber-50/30 ring-2 ring-amber-500'
+                                        : !canUseAdvancedInterview
+                                        ? 'border-gray-200 opacity-60 cursor-not-allowed'
+                                        : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                        quality === 'avanzato' ? 'border-amber-500' : 'border-gray-300'
+                                    }`}>
+                                        {quality === 'avanzato' && <div className="w-2 h-2 rounded-full bg-amber-500" />}
+                                    </div>
+                                    <span className="font-semibold text-gray-900">Avanzato</span>
+                                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold uppercase rounded-full">PRO</span>
+                                    {!canUseAdvancedInterview && <Lock size={14} className="text-gray-400" />}
+                                </div>
+                                <p className="text-sm text-gray-600 mb-3 ml-6">Come avere un ricercatore qualitativo esperto</p>
+                                <ul className="space-y-1.5 ml-6">
+                                    <li className="flex items-center gap-2 text-sm text-gray-600">
+                                        <Check size={14} className="text-green-500 shrink-0" />
+                                        Modello AI critico su ogni risposta
+                                    </li>
+                                    <li className="flex items-center gap-2 text-sm text-gray-600">
+                                        <Check size={14} className="text-green-500 shrink-0" />
+                                        Turni riflessivi e sintesi cross-topic
+                                    </li>
+                                    <li className="flex items-center gap-2 text-sm text-gray-600">
+                                        <Check size={14} className="text-green-500 shrink-0" />
+                                        Rilevamento esitazioni
+                                    </li>
+                                    <li className="flex items-center gap-2 text-sm text-gray-600">
+                                        <Check size={14} className="text-green-500 shrink-0" />
+                                        Transizioni narrative naturali
+                                    </li>
+                                </ul>
+                                <p className="text-[10px] text-amber-600 mt-3 ml-6 flex items-center gap-1">
+                                    <Info size={10} />
+                                    Consuma più crediti rispetto alla modalità standard
+                                </p>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Max Duration (Minutes)</label>
@@ -216,6 +299,14 @@ export default function BotConfigForm({ bot, canUseBranding = false }: { bot: Bo
                     Save Changes
                 </button>
             </div>
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                currentPlan={currentPlan}
+                requiredPlan="PRO"
+                feature="Intervista Avanzata"
+                reason="feature_locked"
+            />
         </form >
     );
 }

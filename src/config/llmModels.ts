@@ -16,6 +16,10 @@ export enum LLMProvider {
 export enum LLMModel {
     // OpenAI
     GPT4O_MINI = 'gpt-4o-mini',
+    GPT5_MINI = 'gpt-5-mini',
+    GPT5 = 'gpt-5',
+    GPT5_1 = 'gpt-5.1',
+    GPT5_2 = 'gpt-5.2',
 
     // Anthropic
     CLAUDE_HAIKU = 'claude-3-5-haiku-latest',
@@ -108,5 +112,9 @@ export const MODEL_PRICING = {
     [LLMModel.CLAUDE_HAIKU]: { input: 0.80, output: 4.00 },
     [LLMModel.CLAUDE_SONNET]: { input: 3.00, output: 15.00 },
     [LLMModel.GEMINI_FLASH]: { input: 0.10, output: 0.40 },
-    [LLMModel.GEMINI_FLASH_LITE]: { input: 0.075, output: 0.30 }
+    [LLMModel.GEMINI_FLASH_LITE]: { input: 0.075, output: 0.30 },
+    [LLMModel.GPT5_MINI]: { input: 0.25, output: 2.00 },
+    [LLMModel.GPT5]: { input: 1.25, output: 10.00 },
+    [LLMModel.GPT5_1]: { input: 1.25, output: 10.00 },
+    [LLMModel.GPT5_2]: { input: 1.75, output: 14.00 }
 } as const;

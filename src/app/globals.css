@@ -406,6 +406,11 @@ body {
   display: none !important;
 }
 
+/* Always hide landing-embedded widget in dashboard area */
+.hide-dashboard-widget #bt-root {
+  display: none !important;
+}
+
 /* Font display utility */
 .font-display {
   font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;

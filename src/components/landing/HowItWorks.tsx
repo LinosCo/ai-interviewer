@@ -15,7 +15,7 @@ import {
 const steps = [
   {
     icon: Database,
-    cycleIcon: CornerRightDown,
+    cycleIcon: CornerUpRight,
     arrowSide: 'right',
     number: '01',
     title: 'Ascolta',
@@ -24,7 +24,7 @@ const steps = [
   },
   {
     icon: Lightbulb,
-    cycleIcon: CornerDownLeft,
+    cycleIcon: CornerRightDown,
     arrowSide: 'left',
     number: '02',
     title: 'Decidi',
@@ -33,8 +33,9 @@ const steps = [
   },
   {
     icon: Rocket,
-    cycleIcon: CornerUpRight,
-    arrowSide: 'right',
+    cycleIcon: CornerDownLeft,
+    arrowSide: 'left',
+    placementClass: 'sm:col-start-2 sm:row-start-2',
     number: '03',
     title: 'Esegui',
     description:
@@ -43,7 +44,8 @@ const steps = [
   {
     icon: LineChart,
     cycleIcon: CornerLeftUp,
-    arrowSide: 'left',
+    arrowSide: 'right',
+    placementClass: 'sm:col-start-1 sm:row-start-2',
     number: '04',
     title: 'Monitora',
     description:
@@ -82,12 +84,12 @@ export function HowItWorks() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="relative h-full"
+              className={`relative h-full ${step.placementClass ?? ''}`}
             >
               {step.arrowSide === 'right' ? (
-                <step.cycleIcon className="hidden lg:block absolute top-1/2 right-6 -translate-y-1/2 w-16 h-16 xl:w-20 xl:h-20 text-[hsl(var(--coral))] z-20 pointer-events-none" strokeWidth={2.2} />
+                <step.cycleIcon className="hidden lg:block absolute top-1/2 right-6 -translate-y-1/2 w-20 h-20 xl:w-24 xl:h-24 text-[hsl(var(--coral))] z-20 pointer-events-none" strokeWidth={2.2} />
               ) : (
-                <step.cycleIcon className="hidden lg:block absolute top-1/2 left-6 -translate-y-1/2 w-16 h-16 xl:w-20 xl:h-20 text-[hsl(var(--coral))] z-20 pointer-events-none" strokeWidth={2.2} />
+                <step.cycleIcon className="hidden lg:block absolute top-1/2 left-6 -translate-y-1/2 w-20 h-20 xl:w-24 xl:h-24 text-[hsl(var(--coral))] z-20 pointer-events-none" strokeWidth={2.2} />
               )}
 
               <div className="relative bg-[hsl(var(--card))] rounded-2xl p-6 border border-[hsl(var(--border)/0.5)] shadow-soft hover:shadow-medium transition-all z-10 h-full min-h-[260px] flex flex-col">
@@ -100,8 +102,8 @@ export function HowItWorks() {
                 <div
                   className={`pt-4 flex h-full flex-col ${
                     step.arrowSide === 'left'
-                      ? 'items-start text-left lg:items-end lg:text-right lg:pl-24'
-                      : 'items-start text-left lg:pr-24'
+                      ? 'items-start text-left lg:pl-28 lg:ml-auto lg:max-w-[78%]'
+                      : 'items-start text-left lg:pr-28 lg:mr-auto lg:max-w-[78%]'
                   }`}
                 >
                   <div className="w-14 h-14 rounded-xl bg-[hsl(var(--secondary))] flex items-center justify-center mb-4">

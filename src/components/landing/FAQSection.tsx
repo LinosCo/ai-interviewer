@@ -3,7 +3,59 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
-import { LANDING_FAQS } from './landing-faq-data';
+
+const faqs = [
+  {
+    question: "Cos'è Business Tuner e a chi è rivolto?",
+    answer:
+      'Business Tuner è una piattaforma AI per interviste, chatbot, visibility monitoring e copilot strategico. È pensata per team marketing, prodotto e consulenza che vogliono un unico workspace con controllo costi tramite crediti organizzazione.',
+  },
+  {
+    question: 'Come funziona il modello a crediti?',
+    answer:
+      'Ogni organizzazione ha un budget mensile di crediti in base al piano. Ogni operazione AI consuma crediti. Quando i crediti mensili finiscono, il sistema usa automaticamente gli eventuali Credit Pack acquistati.',
+  },
+  {
+    question: 'Cosa succede quando i crediti finiscono?',
+    answer:
+      'Le API AI vengono bloccate automaticamente finché non hai crediti disponibili. Puoi acquistare un Credit Pack (small/medium/large) o attendere il reset mensile.',
+  },
+  {
+    question: 'I Credit Pack scadono?',
+    answer:
+      'No. I Credit Pack non scadono, restano disponibili sull’organizzazione e vengono consumati dopo i crediti mensili del piano.',
+  },
+  {
+    question: 'Posso acquistare il piano Business online?',
+    answer:
+      'No. Il piano Business è gestito solo tramite team Sales, con proposta su misura per volumi, integrazioni e supporto.',
+  },
+  {
+    question: 'Posso provare prima di pagare?',
+    answer:
+      'Sì. Puoi partire dal piano gratuito e passare a Starter/Pro quando vuoi. Business viene attivato solo tramite contatto Sales.',
+  },
+  {
+    question: 'I miei dati sono al sicuro?',
+    answer:
+      'Sì. Dati cifrati in transito e a riposo, infrastruttura europea e gestione conforme GDPR. I dati restano sotto il controllo della tua organizzazione.',
+  },
+  {
+    question: 'Come funziona il supporto?',
+    answer:
+      'Supporto standard su tutti i piani. Per Business includiamo onboarding e supporto commerciale dedicato concordato in fase Sales.',
+  },
+  {
+    question: 'Con quali sistemi posso integrarmi?',
+    answer:
+      'Puoi collegare Business Tuner ai canali principali del tuo stack digitale: Google Analytics, Search Console, WordPress, WooCommerce e integrazioni operative via webhook o n8n.',
+  },
+  {
+    question: 'Serve un team tecnico per partire?',
+    answer:
+      'No. La piattaforma è pensata per team business con setup guidato. Il team di voler.ai è a disposizione per impostare il setup della piattaforma, creare le automazioni e collegare il sito. Se vuoi una configurazione completa, puoi richiedere un preventivo via email a businesstuner@voler.ai.',
+  },
+];
 
 function FAQItem({ question, answer, isOpen, onClick }: {
   question: string;
@@ -61,7 +113,7 @@ export function FAQSection() {
             Domande <span className="gradient-text">frequenti</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))]">
-            Prodotto, adozione, integrazioni e operativita quotidiana
+            Prezzi, crediti, pack e gestione piani
           </p>
         </motion.div>
 
@@ -72,7 +124,7 @@ export function FAQSection() {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="space-y-4"
         >
-          {LANDING_FAQS.map((faq, index) => (
+          {faqs.map((faq, index) => (
             <FAQItem
               key={index}
               question={faq.question}

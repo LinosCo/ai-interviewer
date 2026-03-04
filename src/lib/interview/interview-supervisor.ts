@@ -23,9 +23,11 @@ export interface SupervisorInsight {
   transitionBridgeSnippet?: string;
   engagingSnippet?: string;
   extensionPreview?: string[];
+  extensionUserSnippets?: string[]; // What the user actually said on already-covered topics
+  crossTopicNotes?: string; // Cross-topic synthesis: key insights from other covered topics
   stopReason?: string;
-  validationFeedback?: ValidationResponse; // NEW: feedback when validation fails
-  feedbackMessage?: string; // NEW: user-facing message to include in bot response
+  validationFeedback?: ValidationResponse;
+  feedbackMessage?: string;
 }
 
 export function createDefaultSupervisorInsight(): SupervisorInsight {
@@ -34,16 +36,26 @@ export function createDefaultSupervisorInsight(): SupervisorInsight {
 
 export function createDeepOfferInsight(
   extensionPreview?: string[],
-  validationFeedback?: ValidationResponse
+  validationFeedback?: ValidationResponse,
+  extensionUserSnippets?: string[]
 ): SupervisorInsight {
   const cleanPreview = (extensionPreview || [])
     .map(v => String(v || '').trim())
     .filter(Boolean)
     .slice(0, 2);
 
-  return cleanPreview.length > 0
-    ? { status: 'DEEP_OFFER_ASK', extensionPreview: cleanPreview, validationFeedback, feedbackMessage: validationFeedback?.feedback }
-    : { status: 'DEEP_OFFER_ASK', validationFeedback, feedbackMessage: validationFeedback?.feedback };
+  const cleanSnippets = (extensionUserSnippets || [])
+    .map(v => String(v || '').trim())
+    .filter(Boolean)
+    .slice(0, 2);
+
+  return {
+    status: 'DEEP_OFFER_ASK',
+    ...(cleanPreview.length > 0 && { extensionPreview: cleanPreview }),
+    ...(cleanSnippets.length > 0 && { extensionUserSnippets: cleanSnippets }),
+    validationFeedback,
+    feedbackMessage: validationFeedback?.feedback
+  };
 }
 
 export type Phase = 'EXPLORE' | 'DEEP_OFFER' | 'DEEPEN' | 'DATA_COLLECTION';
@@ -61,6 +73,7 @@ export interface InterviewStateLike {
   extensionOfferAttempts?: number;
   deepTopicOrder?: string[];
   deepTurnsByTopic?: Record<string, number>;
+  uncoveredTopics?: string[];
   topicSubGoalHistory?: Record<string, string[]>;
   interestingTopics?: Array<{ topicId: string; bestSnippet?: string }>;
   forceConsentQuestion?: boolean;
@@ -179,15 +192,26 @@ export async function runDeepOfferPhase(params: DeepOfferPhaseParams): Promise<D
     }
 
     nextState.phase = 'DEEPEN';
-    nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex ?? state.topicIndex ?? 0);
-    nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? state.turnInTopic ?? 0);
+    // If resuming mid-DEEPEN (extensionReturnTopicIndex was saved), restore the saved position.
+    // Otherwise this is a fresh EXPLORE→DEEP_OFFER→ACCEPT path: always start from index 0.
+    if (state.extensionReturnTopicIndex !== null && state.extensionReturnTopicIndex !== undefined) {
+      nextState.topicIndex = Math.max(0, state.extensionReturnTopicIndex);
+      nextState.turnInTopic = Math.max(0, state.extensionReturnTurnInTopic ?? 0);
+    } else {
+      nextState.topicIndex = 0;
+      nextState.turnInTopic = 0;
+    }
 
     const maxDurationSec = maxDurationMins * 60;
     const remainingSecForDeep = maxDurationSec - effectiveSec;
     const hasDeepPlan = Boolean(state.deepTurnsByTopic && Object.keys(state.deepTurnsByTopic).length > 0);
     if (!hasDeepPlan) {
       const deepPlan = deps.buildDeepPlan(remainingSecForDeep);
-      nextState.deepTopicOrder = deepPlan.deepTopicOrder;
+      // Use uncoveredTopics as deepTopicOrder so that topicIndex (set by handleDeepenPhase
+      // using uncoveredTopics.indexOf) correctly maps to activeTopics in route.ts.
+      nextState.deepTopicOrder = state.uncoveredTopics?.length
+        ? state.uncoveredTopics
+        : deepPlan.deepTopicOrder;
       nextState.deepTurnsByTopic = deepPlan.deepTurnsByTopic;
     }
 

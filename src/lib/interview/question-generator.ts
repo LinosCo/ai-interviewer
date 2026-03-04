@@ -119,30 +119,43 @@ export async function generateDeepOfferOnly(params: {
     model: any;
     language: string;
     extensionPreview?: string[];
+    extensionUserSnippets?: string[];
     onUsage?: LLMUsageCollector;
 }) {
     const schema = z.object({
         message: z.string().describe('A short message that ends with one yes/no extension question.')
     });
 
-    const previewHints = (params.extensionPreview || [])
+    const previewAreas = (params.extensionPreview || [])
+        .map(h => String(h || '').trim())
+        .filter(Boolean)
+        .slice(0, 2);
+    const userSnippets = (params.extensionUserSnippets || [])
         .map(h => String(h || '').trim())
         .filter(Boolean)
         .slice(0, 1);
-    const starterTheme = previewHints[0] || '';
+
+    const areaContext = previewAreas.length > 0
+        ? `Areas that could still be explored: ${previewAreas.join(', ')}.`
+        : '';
+    const snippetContext = userSnippets.length > 0
+        ? `The user mentioned something interesting about: "${userSnippets[0]}".`
+        : '';
 
     const prompt = [
         `Language: ${params.language}`,
+        areaContext,
+        snippetContext,
         `Task: Write a short extension message with this structure:`,
-        `1) Start with a short thank-you for the user's availability and answers so far.`,
+        `1) Start with a brief, specific thank-you referencing something concrete from the conversation.`,
         `2) Say naturally that the planned interview time is over (or would be over).`,
-        starterTheme
-            ? `3) Propose to continue and mention one indirect starting point connected to what the user shared, for example around: ${starterTheme}. Use no quotes, labels, or list formatting.`
-            : `3) Propose to continue and mention one concrete single starting point connected to what the user shared, using indirect wording.`,
+        previewAreas.length > 0
+            ? `3) Propose to continue, naturally mentioning 1-2 specific areas from the context above. Use no quotes, labels, or list formatting.`
+            : `3) Propose to continue and mention one concrete starting point connected to what the user shared.`,
         `4) Ask exactly ONE yes/no question asking availability for a few more deep-dive questions.`,
         `Do NOT ask topic questions. Do NOT ask for contacts. Do NOT close the interview.`,
         `Keep it natural and concise. End with exactly one question mark.`
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     const result = await generateObject({
         model: params.model,
@@ -172,9 +185,10 @@ export async function enforceDeepOfferQuestion(params: {
     language: string;
     currentText?: string | null;
     extensionPreview?: string[];
+    extensionUserSnippets?: string[];
     onUsage?: LLMUsageCollector;
 }) {
-    const { model, language, currentText, extensionPreview } = params;
+    const { model, language, currentText, extensionPreview, extensionUserSnippets } = params;
     const cleanedCurrent = normalizeSingleQuestion(
         String(currentText || '')
             .replace(/INTERVIEW_COMPLETED/gi, '')
@@ -186,7 +200,7 @@ export async function enforceDeepOfferQuestion(params: {
     }
 
     try {
-        const generated = await generateDeepOfferOnly({ model, language, extensionPreview, onUsage: params.onUsage });
+        const generated = await generateDeepOfferOnly({ model, language, extensionPreview, extensionUserSnippets, onUsage: params.onUsage });
         if (isExtensionOfferQuestion(generated, language)) {
             return generated;
         }

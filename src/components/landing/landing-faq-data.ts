@@ -12,7 +12,7 @@ export const LANDING_FAQS = [
   {
     question: 'In quanto tempo posso vedere valore?',
     answer:
-      'Molti team ottengono i primi insight utili gia nei primi giorni. Il valore cresce rapidamente quando attivi un ciclo continuo: ascolto, prioritizzazione del Copilot, esecuzione e verifica impatto.',
+      "Molti team ottengono i primi insight utili gia nei primi giorni. Il valore cresce rapidamente quando attivi un ciclo continuo: ascolto, visione d'insieme del Copilot, esecuzione e verifica impatto.",
   },
   {
     question: 'Serve un team tecnico per partire?',
@@ -22,7 +22,7 @@ export const LANDING_FAQS = [
   {
     question: 'Che ruolo ha il Copilot strategico?',
     answer:
-      'Il Copilot e il layer decisionale: legge i segnali dei vari moduli, evidenzia priorita, propone playbook e suggerisce le prossime azioni per marketing, prodotto e operations.',
+      "Il Copilot e il layer decisionale: legge i segnali dei vari moduli, costruisce visione d'insieme, propone playbook e suggerisce le prossime azioni per marketing, prodotto e operations.",
   },
   {
     question: 'Posso automatizzare le azioni suggerite?',

@@ -35,6 +35,7 @@ interface ChatWindowProps {
     } | null;
     enablePageContext?: boolean;
     forceConsentScreen?: boolean;
+    embedded?: boolean;
 }
 
 const LEAKED_INSTRUCTION_PATTERN =
@@ -282,7 +283,8 @@ export default function ChatWindow({
     showDataUsageInfo = true,
     hostPageContext = null,
     enablePageContext = true,
-    forceConsentScreen = false
+    forceConsentScreen = false,
+    embedded = false
 }: ChatWindowProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -526,6 +528,10 @@ export default function ChatWindow({
         m => m.role === 'assistant' && m.id !== 'welcome'
     ).length;
 
+    const windowShellClass = embedded
+        ? 'absolute inset-0 w-full h-full bg-white rounded-none sm:rounded-2xl shadow-2xl overflow-hidden border border-gray-200 z-[9001] flex flex-col font-sans'
+        : 'fixed bottom-0 right-0 sm:bottom-24 sm:right-6 w-full sm:w-96 sm:max-w-[calc(100vw-48px)] h-full sm:h-[600px] sm:max-h-[calc(100vh-120px)] bg-white sm:rounded-2xl shadow-2xl overflow-hidden border border-gray-200 z-[9001] flex flex-col font-sans';
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -534,7 +540,7 @@ export default function ChatWindow({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.95 }}
                     transition={{ duration: 0.2 }}
-                    className="fixed bottom-0 right-0 sm:bottom-24 sm:right-6 w-full sm:w-96 sm:max-w-[calc(100vw-48px)] h-full sm:h-[600px] sm:max-h-[calc(100vh-120px)] bg-white sm:rounded-2xl shadow-2xl overflow-hidden border border-gray-200 z-[9001] flex flex-col font-sans"
+                    className={windowShellClass}
                 >
                     {/* GDPR Welcome Screen - shown before consent */}
                     {!hasConsented ? (

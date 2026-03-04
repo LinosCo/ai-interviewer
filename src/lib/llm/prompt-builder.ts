@@ -28,8 +28,10 @@ export class PromptBuilder {
      * Consolidates: buildPersonaPrompt + methodology rules
      */
     private static buildIdentityBlock(
-        bot: Bot & { knowledgeSources?: KnowledgeSource[]; rewardConfig?: any }
+        bot: Bot & { knowledgeSources?: KnowledgeSource[]; rewardConfig?: any },
+        interviewerQuality?: string
     ): string {
+        const isAvanzato = interviewerQuality === 'avanzato';
         const isItalian = String(bot.language || 'en').toLowerCase().startsWith('it');
         const qualityTier = (bot as any).interviewerQuality || 'quantitativo';
 
@@ -51,10 +53,20 @@ export class PromptBuilder {
             })
             .join('\n');
 
+        const avanzatoIT = isAvanzato ? `
+- Sei un ricercatore qualitativo professionista. Non accettare risposte superficiali.
+- Cerca insight inaspettati e connessioni tra temi.
+- Mai scale numeriche ("da 1 a 10"). Sempre domande aperte che producano narrazione.` : '';
+
+        const avanzatoEN = isAvanzato ? `
+- You are a professional qualitative researcher. Do not accept superficial answers.
+- Seek unexpected insights and connections between themes.
+- Never numeric scales ("from 1 to 10"). Always open questions that produce narrative.` : '';
+
         return isItalian ? `
 ## IDENTITÀ & REGOLE BASE
 Sei "${safeName}", una ricerca qualitativa.
-Ruolo: Intervistatore esperienza
+Ruolo: ${isAvanzato ? 'Ricercatore qualitativo professionista' : 'Intervistatore esperienza'}
 Missione: "${safeGoal}"
 Pubblico: "${safeAudience}"
 Tono: "${safeTone || 'Amichevole, professionale, empatico'}"
@@ -65,7 +77,7 @@ Lingua: Italiano
 - La persona con cui parli è l'INTERVISTATO — che condivide esperienza e opinioni.
 - Non assumere il loro ruolo (partecipante, creatore, cliente) a meno che esplicitamente dichiarato.
 - Non dire "Il tuo progetto" a meno che specificamente configurato.
-- Raccogli la loro prospettiva onesta su i temi dell'intervista.
+- Raccogli la loro prospettiva onesta su i temi dell'intervista.${avanzatoIT}
 
 ## REGOLE FONDAMENTALI (SEMPRE)
 1. Una sola domanda per turno.
@@ -109,7 +121,7 @@ ${knowledgeText}
 `.trim() : `
 ## IDENTITY & BASE RULES
 You are "${safeName}", conducting qualitative research.
-Role: Expert interviewer
+Role: ${isAvanzato ? 'Professional qualitative researcher' : 'Expert interviewer'}
 Mission: "${safeGoal}"
 Audience: "${safeAudience}"
 Tone: "${safeTone || 'Friendly, professional, empathetic'}"
@@ -120,7 +132,7 @@ Language: English
 - The person you are talking to is the INTERVIEWEE — someone sharing their experience and opinions.
 - DO NOT assume their role (participant, creator, customer) unless explicitly stated.
 - DO NOT say "Your project" unless specifically configured.
-- Gather their honest perspective on the interview topics.
+- Gather their honest perspective on the interview topics.${avanzatoEN}
 
 ## FUNDAMENTAL RULES (ALWAYS)
 1. One question per turn.
@@ -312,21 +324,31 @@ ${methodEN}
             const nextTopic = nextIndex < allTopics.length ? allTopics[nextIndex] : null;
             const safeCurrentLabel = sanitizeConfig(currentTopic.label, 200);
             const nextLabel = sanitizeConfig(nextTopic?.label, 200) || (isItalian ? 'Chiusura' : 'Closure');
+            // engagingSnippet = what the user said on the departing topic — sanitize as user data
+            const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 200).trim();
+            const bridgeLine = engagingSnippet
+                ? (isItalian
+                    ? `Aggancia la transizione a qualcosa di concreto che l'utente ha condiviso: "${engagingSnippet}"`
+                    : `Anchor the bridge to something concrete the user just shared: "${engagingSnippet}"`)
+                : '';
             return isItalian ? `
 ## FASE: TRANSIZIONE
 Stai per spostarti da "${safeCurrentLabel}" a "${nextLabel}".
+${bridgeLine}
 Fai un ponte breve e naturale, poi UNA domanda di apertura per il nuovo topic.
 `.trim() : `
 ## PHASE: TRANSITION
 Moving from "${safeCurrentLabel}" to "${nextLabel}".
+${bridgeLine}
 Brief natural bridge, then ONE opening question for the next topic.
 `.trim();
         }
 
         // DEEPENING
         if (status === 'DEEPENING') {
-            // engagingSnippet originates from conversation analysis — sanitize as user data
+            // engagingSnippet and crossTopicNotes originate from conversation analysis — sanitize as user data
             const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 500).trim();
+            const crossTopicNotes = sanitize(supervisorInsight?.crossTopicNotes || '', 400).trim();
             const safeLabel = sanitizeConfig(currentTopic.label, 200);
             const qualityTierDeep = (bot as any)?.interviewerQuality || 'quantitativo';
 
@@ -356,35 +378,58 @@ You are in qualitative mode. Do not follow a script.
 ## FASE: APPROFONDIMENTO
 Topic: "${safeLabel}"
 ${engagingSnippet ? `Spunto chiave: "${engagingSnippet}"` : ''}
+${crossTopicNotes ? `Contesto trasversale (altri topic): ${crossTopicNotes}` : ''}
 Approfondisci i segnali significativi. Una sola domanda focalizzata.
 `.trim() : `
 ## PHASE: DEEPENING
 Topic: "${safeLabel}"
 ${engagingSnippet ? `Key insight: "${engagingSnippet}"` : ''}
+${crossTopicNotes ? `Cross-topic context: ${crossTopicNotes}` : ''}
 Deepen significant signals. One focused question.
 `.trim();
         }
 
         // DEEP_OFFER_ASK
         if (status === 'DEEP_OFFER_ASK') {
-            const preview = (supervisorInsight?.extensionPreview || [])
-                .map(v => sanitize(String(v || ''), 200))
-                .filter(Boolean)
-                .slice(0, 2)
-                .join(', ');
+            // extensionPreview = areas/focus points we'd explore (from uncovered topics)
+            // extensionUserSnippets = what the user actually said on covered topics (user data → sanitize)
+            const previewAreas = (supervisorInsight?.extensionPreview || [])
+                .map(v => sanitizeConfig(String(v || '').trim(), 100))
+                .filter(Boolean);
+            const userSnippets = (supervisorInsight?.extensionUserSnippets || [])
+                .map(v => sanitize(String(v || '').trim(), 120))
+                .filter(Boolean);
+
+            const areasLine = previewAreas.length > 0
+                ? (isItalian
+                    ? `Aree ancora da esplorare: ${previewAreas.map(a => `"${a}"`).join(', ')}`
+                    : `Areas still to explore: ${previewAreas.map(a => `"${a}"`).join(', ')}`)
+                : '';
+            const snippetsLine = userSnippets.length > 0
+                ? (isItalian
+                    ? `Da quanto condiviso dall'utente: "${userSnippets[0]}"`
+                    : `From what the user shared: "${userSnippets[0]}"`)
+                : '';
+
             return isItalian ? `
 ## FASE: OFFERTA ESTENSIONE
-Il tempo previsto è quasi concluso.
-${preview ? `Aspetti che potrebbero valere un approfondimento: ${preview}.` : ''}
-Offri di continuare per alcuni minuti${preview ? ' su questi temi specifici' : ''}. Una sola domanda yes/no, tono naturale.
-Non chiedere contatti. Non porre domande di topic.
-`.trim() : `
+Il tempo pianificato è quasi concluso.
+${areasLine}
+${snippetsLine}
+1. Ringrazia brevemente per i contributi condivisi, facendo un riferimento specifico a qualcosa di concreto emerso.
+2. Menziona naturalmente 1-2 aree specifiche che potrebbero essere approfondite.
+3. Chiedi UNA sola domanda yes/no per sapere se vuole continuare ancora qualche minuto.
+Tono caldo e naturale. Non chiedere contatti. Non porre domande di topic.
+`.trim().replace(/\n{3,}/g, '\n') : `
 ## PHASE: EXTENSION OFFER
-Planned interview time is almost up.
-${preview ? `Aspects worth exploring further: ${preview}.` : ''}
-Offer to continue for a few minutes${preview ? ' on these specific topics' : ''}. One yes/no question, natural tone.
-Do not ask for contacts or topic questions.
-`.trim();
+The planned interview time is almost over.
+${areasLine}
+${snippetsLine}
+1. Briefly thank for the contributions, with a specific reference to something concrete that emerged.
+2. Naturally mention 1-2 specific areas that could still be explored.
+3. Ask exactly ONE yes/no question to check if they want to continue a few more minutes.
+Warm and natural tone. Do not ask for contacts or topic questions.
+`.trim().replace(/\n{3,}/g, '\n');
         }
 
         // DATA_COLLECTION_CONSENT
@@ -517,7 +562,37 @@ Brief connection, then ONE exploratory question.
     }
 
     /**
-     * Build the static prompt (blocks 1-5)
+     * BLOCK 5.5: AVANZATO QUALITATIVE METHODOLOGY
+     * Only injected for avanzato tier. Adds deep qualitative interviewing rules.
+     */
+    private static buildAvanzatoMethodologyBlock(language: string): string {
+        const isItalian = String(language || 'en').toLowerCase().startsWith('it');
+
+        return isItalian ? `
+## MODALITÀ QUALITATIVA PROFONDA
+- 1-2 frasi di riconoscimento riflessivo che agganciano un dettaglio specifico della risposta.
+- Mai "Interessante!" come opener. Riformula mostrando comprensione della sfumatura.
+- Mai scale numeriche ("da 1 a 10", "quanto è importante da 1 a 5"). Chiedi SEMPRE con domande aperte che producano racconto ed esperienza.
+- Se l'utente esita ("non so", "forse", "dipende"): sonda gentilmente "Cosa ti frena dal dare una risposta netta?"
+- Se l'utente ha un'affermazione forte ("sicuramente", "sempre", "mai"): gioca l'avvocato del diavolo con garbo.
+- Cross-topic: se rilevi un collegamento con un tema precedente, evidenzialo brevemente.
+- Transizioni: NO "Passiamo a..." — usa ponti narrativi naturali legati all'ultimo contenuto.
+- Se noti risposte sempre più brevi (fatica), accorcia le tue domande e considera di avanzare.
+`.trim() : `
+## DEEP QUALITATIVE MODE
+- 1-2 sentences of reflective acknowledgment that hook into a specific detail from the response.
+- Never "Interesting!" as an opener. Rephrase showing understanding of the nuance.
+- Never numeric scales ("from 1 to 10", "how important from 1 to 5"). ALWAYS use open questions that produce narrative and experience.
+- If the user hesitates ("I don't know", "maybe", "it depends"): gently probe "What holds you back from giving a clear answer?"
+- If the user makes a strong assertion ("definitely", "always", "never"): gently play devil's advocate.
+- Cross-topic: if you detect a connection with a previous theme, briefly highlight it.
+- Transitions: NO "Let's move on to..." — use natural narrative bridges tied to the last content.
+- If you notice increasingly shorter answers (fatigue), shorten your questions and consider advancing.
+`.trim();
+    }
+
+    /**
+     * Build the static prompt (blocks 1-5, optionally 5.5)
      * Blocks 6 (Turn Guidance) and 7 (Guards) are added at runtime in route.ts
      */
     static async build(
@@ -527,12 +602,14 @@ Brief connection, then ONE exploratory question.
         effectiveDurationSeconds: number,
         supervisorInsight?: SupervisorInsight,
         interviewPlan?: InterviewPlan,
-        manualKnowledgeGuide?: string
+        manualKnowledgeGuide?: string,
+        interviewerQuality?: string
     ): Promise<string> {
+        const isAvanzato = interviewerQuality === 'avanzato';
         const parts: string[] = [];
 
         // Block 1: Identity
-        parts.push(this.buildIdentityBlock(bot));
+        parts.push(this.buildIdentityBlock(bot, interviewerQuality));
 
         // Block 2: Interview Context
         parts.push(this.buildInterviewContextBlock(conversation, bot, effectiveDurationSeconds));
@@ -550,6 +627,11 @@ Brief connection, then ONE exploratory question.
             : null;
         const knowledge = this.buildKnowledgeBlock(planTopic || null, interviewPlan, manualKnowledgeGuide, bot.language);
         if (knowledge) parts.push(knowledge);
+
+        // Block 5.5: Avanzato Qualitative Methodology (only for avanzato)
+        if (isAvanzato) {
+            parts.push(this.buildAvanzatoMethodologyBlock(bot.language));
+        }
 
         return parts.join('\n\n');
     }

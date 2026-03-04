@@ -6,7 +6,7 @@ import { Sparkles, TrendingUp, Users, AlertTriangle, Heart } from 'lucide-react'
 const tips = [
   {
     icon: TrendingUp,
-    category: 'Priorita Revenue',
+    category: 'Supporto Strategico',
     title: 'Opportunita di upselling in clienti ad alta intenzione',
     description:
       "Il Copilot rileva richieste ricorrenti su servizi premium e propone il playbook: offerta, timing, segmento e messaggio.",
@@ -23,7 +23,7 @@ const tips = [
     category: 'Rischio Cliente',
     title: 'Feedback negativo ricorrente in post-vendita',
     description:
-      'I segnali del chatbot evidenziano un pattern: ritardi percepiti. Il Copilot priorizza azioni su comunicazione e processo.',
+      'I segnali del chatbot evidenziano un pattern: ritardi percepiti. Il Copilot propone azioni su comunicazione e processo.',
   },
   {
     icon: Heart,
@@ -36,7 +36,7 @@ const tips = [
 
 export function AITipsSection() {
   return (
-    <section className="pt-8 pb-24 md:pt-12 md:pb-32 relative overflow-hidden">
+    <section id="decidi" className="pt-8 pb-24 md:pt-12 md:pb-32 relative overflow-hidden">
       {/* Light overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.05)] via-transparent to-[hsl(var(--amber)/0.05)]" />
 
@@ -50,15 +50,15 @@ export function AITipsSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--coral)/0.2)] border border-[hsl(var(--coral)/0.3)] mb-6">
             <Sparkles className="w-4 h-4 text-[hsl(var(--coral))]" />
-            <span className="text-sm font-medium text-[hsl(var(--coral))]">Copilot Strategico</span>
+            <span className="text-sm font-medium text-[hsl(var(--coral))]">02 Decidi - Ecosistema decisionale</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-[hsl(var(--foreground))]">
-            Ti dice cosa fare,{' '}
-            <span className="gradient-text">in quale ordine e perche</span>
+            Visione di insieme per{' '}
+            <span className="gradient-text">decisioni consapevoli</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-            Non solo insight: raccomandazioni operative basate sui tuoi segnali reali,
-            con priorita, contesto e prossimi passi per il team.
+            Il Copilot incrocia ascolto, monitoraggio continuo e strategia di business
+            definita e propone azioni concrete, motivate e contestualizzate.
           </p>
         </motion.div>
 

@@ -52,8 +52,8 @@ import {
     ITALIAN_STOPWORDS, ENGLISH_STOPWORDS, tokenizeForScoring, lexicalOverlapScore,
     buildTopicSemanticText, getDeepTopics, buildDeepTopicOrder,
     getScanPlanTurns, getDeepPlanTurns, getRemainingSubGoals,
-    buildDeepPlan, selectDeepFocusPoint, buildExtensionPreviewHints,
-    sanitizeUserSnippet,
+    buildDeepPlan, selectDeepFocusPoint, buildExtensionPreviewHints, buildExtensionUserSnippets,
+    sanitizeUserSnippet, detectFatigue,
 } from '@/lib/chat/context-helpers';
 import {
     isExtensionOfferQuestion, generateConsentQuestionOnly, generateFieldQuestionOnly,
@@ -80,6 +80,7 @@ import {
 import { completeInterview } from '@/lib/interview/interview-completion';
 import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
 import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
+import { getTierConfig } from '@/config/interview-tiers';
 export const maxDuration = 60;
 
 // ============================================================================
@@ -227,6 +228,7 @@ export async function POST(req: Request) {
             }, { status: 200 });
         }
         const language = bot.language || 'en';
+        const tierConfig = getTierConfig((bot as any).interviewerQuality);
         const interviewObjective = String((bot as any).researchGoal || '').trim();
         const candidateDataFields = (bot as any).candidateDataFields ?? [];
         // Legacy fix: bots created before the collectCandidateData flag was introduced
@@ -543,7 +545,7 @@ export async function POST(req: Request) {
         // Topics
         const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
         const numTopics = botTopics.length;
-        const interviewPlan = await getOrCreateInterviewPlan(bot);
+        const interviewPlan = await getOrCreateInterviewPlan(bot, tierConfig.budgets);
         console.log("📊 [PLAN] Meta:", {
             maxDurationMins: interviewPlan.meta.maxDurationMins,
             totalTimeSec: interviewPlan.meta.totalTimeSec,
@@ -640,7 +642,7 @@ export async function POST(req: Request) {
                     topicLabel: topic.label,
                     subGoals: topic.subGoals || []
                 })),
-                timeoutMs: 1200,
+                timeoutMs: tierConfig.knowledge.runtimeKnowledgeTimeoutMs,
                 interviewerQuality: (bot as any).interviewerQuality || 'quantitativo',
                 onUsage: collectLlmUsage
             })
@@ -706,7 +708,13 @@ export async function POST(req: Request) {
                 startIndex: sourceState.topicIndex,
                 maxItems: 2
             });
-            return createDeepOfferInsight(extensionPreview, validationFeedback);
+            const extensionUserSnippets = buildExtensionUserSnippets({
+                botTopics,
+                interestingTopics: sourceState.interestingTopics,
+                topicKeyInsights: sourceState.topicKeyInsights,
+                maxItems: 2
+            });
+            return createDeepOfferInsight(extensionPreview, validationFeedback, extensionUserSnippets);
         };
 
         if (lastMessage?.role === 'user') {
@@ -767,7 +775,8 @@ export async function POST(req: Request) {
                     language,
                     interviewPlan,
                     maxDurationMins,
-                    effectiveSec
+                    effectiveSec,
+                    bonusTurnCap: tierConfig.budgets.bonusTurnCap
                 });
 
                 // Merge explore result into nextState
@@ -839,7 +848,8 @@ export async function POST(req: Request) {
                     botTopics,
                     language,
                     maxDurationMins,
-                    effectiveSec
+                    effectiveSec,
+                    deepenMaxTurnsPerTopic: tierConfig.budgets.deepenMaxTurnsPerTopic
                 });
 
                 // Merge deepen result into nextState
@@ -847,6 +857,23 @@ export async function POST(req: Request) {
                 supervisorInsight = deepenResult.supervisorInsight;
                 if (deepenResult.nextTopicId) {
                     nextTopicId = deepenResult.nextTopicId;
+                }
+
+                // crossTopicSynthesis: inject notes from other already-covered topics into DEEPENING insight
+                if (supervisorInsight.status === 'DEEPENING') {
+                    const keyInsights = state.topicKeyInsights || {};
+                    const currentId = currentTopic.id;
+                    const otherInsights = Object.entries(keyInsights)
+                        .filter(([id]) => id !== currentId)
+                        .map(([id, snippet]) => {
+                            const t = botTopics.find(bt => bt.id === id);
+                            return t ? `${t.label}: "${snippet}"` : null;
+                        })
+                        .filter((v): v is string => Boolean(v))
+                        .slice(0, 2);
+                    if (otherInsights.length > 0) {
+                        supervisorInsight = { ...supervisorInsight, crossTopicNotes: otherInsights.join(' | ') };
+                    }
                 }
             }
 
@@ -1311,7 +1338,17 @@ export async function POST(req: Request) {
             userTurnSignal,
             previousAssistantQuestion,
             manualGuide: manualInterviewGuide,
-            runtimeKnowledge: runtimeInterviewKnowledge || state.runtimeInterviewKnowledge || null
+            runtimeKnowledge: runtimeInterviewKnowledge || state.runtimeInterviewKnowledge || null,
+            topicKeyInsights: tierConfig.naturalness.crossTopicSynthesis ? (nextState.topicKeyInsights || {}) : undefined,
+            naturalness: {
+                crossTopicSynthesis: tierConfig.naturalness.crossTopicSynthesis,
+                hesitationDetection: tierConfig.naturalness.hesitationDetection,
+                contextDrivenReordering: tierConfig.naturalness.contextDrivenReordering,
+            },
+        }, {
+            probeExampleThreshold: tierConfig.budgets.probeExampleThreshold,
+            probeImpactExploreThreshold: tierConfig.budgets.probeImpactExploreThreshold,
+            probeImpactDeepenThreshold: tierConfig.budgets.probeImpactDeepenThreshold,
         });
 
 
@@ -1322,7 +1359,8 @@ export async function POST(req: Request) {
             effectiveSec,
             supervisorInsight,
             interviewPlan,
-            manualInterviewGuide || undefined
+            manualInterviewGuide || undefined,
+            (bot as any).interviewerQuality
         );
         const manualKnowledgePrompt = buildManualKnowledgePromptBlock({
             manualGuide: manualInterviewGuide,
@@ -1347,7 +1385,9 @@ export async function POST(req: Request) {
         if (canonicalMessages.length >= 4) {
             try {
                 const toneAnalyzer = new ToneAnalyzer(openAIKey);
-                const toneProfile = await toneAnalyzer.analyzeTone(canonicalMessages, language);
+                const toneProfile = tierConfig.tone.useLlm
+                    ? await toneAnalyzer.analyzeTone(canonicalMessages, language)
+                    : toneAnalyzer.analyzeToHeuristic(canonicalMessages, language);
                 const toneBlock = buildToneAdaptationPrompt(toneProfile, language);
                 if (toneBlock) {
                     systemPrompt += `\n\n${toneBlock}`;
@@ -1459,8 +1499,24 @@ hard_rules:
                 focusSubGoal: microPlannerDecision.focusSubGoal,
                 signalScore: Number(microPlannerDecision.signalScore.toFixed(2)),
                 coverage: microPlannerDecision.topicCoverage,
-                knowledgeSource: microPlannerDecision.knowledgeSource
+                knowledgeSource: microPlannerDecision.knowledgeSource,
+                crossTopicHint: microPlannerDecision.crossTopicHint || null,
+                hesitationHint: microPlannerDecision.hesitationHint || null,
             });
+
+            // Fatigue detection (avanzato only)
+            if (tierConfig.naturalness.fatigueDetection) {
+                const recentUserMsgs = canonicalMessages
+                    .filter(m => m.role === 'user')
+                    .slice(-3)
+                    .map(m => typeof m.content === 'string' ? m.content : '');
+                if (detectFatigue(recentUserMsgs, language)) {
+                    systemPrompt += language === 'it'
+                        ? `\n\n## FATICA RILEVATA\nL'utente mostra segni di disengagement (risposte brevi/generiche). Accorcia la prossima domanda, rendi il tono più leggero, e valuta se avanzare al sub-goal successivo.`
+                        : `\n\n## FATIGUE DETECTED\nThe user shows disengagement signs (short/generic answers). Shorten your next question, lighten the tone, and consider advancing to the next sub-goal.`;
+                    console.log("😴 [FATIGUE] Detected — injecting fatigue hint");
+                }
+            }
         }
 
         if (userTurnSignal === 'clarification') {
@@ -1489,10 +1545,12 @@ hard_rules:
         });
 
         let messagesForAI = canonicalMessages.map((m: any) => ({ role: m.role, content: m.content }));
-        if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' || supervisorInsight?.status === 'DEEP_OFFER_ASK') {
-            // Keep recent messages for context so the LLM can preserve continuity in sensitive transitions.
-            const recentMessages = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
-            messagesForAI = recentMessages;
+        if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT') {
+            // Small context: consent is stateless, recent 6 messages are enough
+            messagesForAI = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
+        } else if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
+            // Bigger context: the AI needs interview history to craft a genuine, contextualised offer
+            messagesForAI = canonicalMessages.slice(-20).map((m: any) => ({ role: m.role, content: m.content }));
         }
 
         const criticalTurnRouting = shouldUseCriticalModelForTopicTurn({
@@ -1500,7 +1558,8 @@ hard_rules:
             supervisorStatus: supervisorInsight?.status,
             userTurnSignal,
             userMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
-            language
+            language,
+            criticalEscalation: tierConfig.modelRouting.criticalEscalation
         });
         const modelForMainResponse = nextState.phase === 'DATA_COLLECTION'
             ? dataCollectionModel
@@ -1536,7 +1595,7 @@ hard_rules:
         try {
             result = await Promise.race([
                 trackedGenerateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: contextWithFeedback, temperature: 0.7 }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 45000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), tierConfig.latency.mainResponseTimeoutMs))
             ]);
         } catch (error: any) {
             if (error.message === "TIMEOUT") {
@@ -1625,7 +1684,10 @@ hard_rules:
             questionDedupIntercepted: false
         };
         const deepOfferPreviewHints: string[] = Array.isArray(supervisorInsight.extensionPreview)
-            ? supervisorInsight.extensionPreview.map(v => String(v || '').trim()).filter(Boolean).slice(0, 1)
+            ? supervisorInsight.extensionPreview.map(v => String(v || '').trim()).filter(Boolean).slice(0, 2)
+            : [];
+        const deepOfferUserSnippets: string[] = Array.isArray(supervisorInsight.extensionUserSnippets)
+            ? supervisorInsight.extensionUserSnippets.map(v => String(v || '').trim()).filter(Boolean).slice(0, 1)
             : [];
         const userBridgeHint = lastMessage?.role === 'user'
             ? buildUserBridgeHint(lastMessage.content, language)
@@ -1651,6 +1713,7 @@ hard_rules:
                     language,
                     currentText: responseText,
                     extensionPreview: deepOfferPreviewHints,
+                    extensionUserSnippets: deepOfferUserSnippets,
                     onUsage: collectLlmUsage
                 });
                 didRegenerate = true;
@@ -2016,6 +2079,7 @@ hard_rules:
                     language,
                     currentText: responseText,
                     extensionPreview: deepOfferPreviewHints,
+                    extensionUserSnippets: deepOfferUserSnippets,
                     onUsage: collectLlmUsage
                 });
             }
@@ -2053,6 +2117,7 @@ hard_rules:
                     language,
                     currentText: responseText,
                     extensionPreview: deepOfferPreviewHints,
+                    extensionUserSnippets: deepOfferUserSnippets,
                     onUsage: collectLlmUsage
                 });
             }
@@ -2248,6 +2313,16 @@ hard_rules:
                     currentTopicId: nextTopicId,
                     isCompleted: true
                 });
+            }
+        }
+
+        // Record the sub-goal used this turn so micro-planner advances on next turn
+        if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
+            const history = { ...(nextState.topicSubGoalHistory || {}) };
+            const existing = history[plannerTopicId] || [];
+            if (!existing.includes(microPlannerDecision.focusSubGoal)) {
+                history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
+                nextState.topicSubGoalHistory = history;
             }
         }
 

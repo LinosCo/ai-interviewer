@@ -45,8 +45,8 @@ const useCases = [
 export function UseCasesSection() {
   return (
     <section className="py-20 md:py-28 relative overflow-hidden">
-      {/* Light background overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--amber)/0.03)] via-transparent to-[hsl(var(--coral)/0.03)]" />
+      {/* Colored phase overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--amber)/0.04)] via-transparent to-[hsl(var(--coral)/0.05)]" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div

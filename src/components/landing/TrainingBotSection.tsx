@@ -26,6 +26,7 @@ const benefits = [
     'Formazione conversazionale, non solo slide',
     'Valutazione automatica con score AI',
     'Knowledge base personalizzata con i tuoi materiali',
+    'Percorsi con certificazione finale per team e stakeholder',
     'Tracciamento progressi per ogni trainee',
     'Multi-topic con obiettivi di apprendimento',
     'Dashboard analytics per HR e team lead',
@@ -59,8 +60,8 @@ export function TrainingBotSection() {
                     </h2>
                     <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
                         Un agente AI che conduce sessioni di formazione strutturate, valuta le
-                        conoscenze acquisite e restituisce punteggi oggettivi. Onboarding, compliance,
-                        product training — tutto automatizzato.
+                        conoscenze acquisite e abilita percorsi certificati. Onboarding, compliance,
+                        product training e allineamento stakeholder in un unico flusso.
                     </p>
                 </motion.div>
 
@@ -204,7 +205,7 @@ export function TrainingBotSection() {
                                     <Trophy className="w-8 h-8 text-[hsl(var(--amber))]" />
                                     <h3 className="font-display text-2xl font-bold">Casi d&apos;uso ideali</h3>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid sm:grid-cols-2 gap-3">
                                     {[
                                         { icon: BookOpen, label: 'Onboarding nuovi assunti' },
                                         { icon: GraduationCap, label: 'Compliance & normative' },

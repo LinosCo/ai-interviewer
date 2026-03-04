@@ -130,21 +130,10 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                     hostPageContext={hostPageContext}
                     enablePageContext={bot.enablePageContext !== false}
                     forceConsentScreen={forceConsent}
+                    embedded={true}
                 />
                 <style jsx global>{`
                     body { margin: 0; padding: 0; overflow: hidden; }
-                    /* Override the fixed positioning of ChatWindow when in full mode */
-                    div[class*="fixed"] {
-                        position: relative !important;
-                        bottom: auto !important;
-                        right: auto !important;
-                        width: 100% !important;
-                        height: 100% !important;
-                        max-width: none !important;
-                        max-height: none !important;
-                        border: none !important;
-                        border-radius: 0 !important;
-                    }
                 `}</style>
             </div>
         );
@@ -178,6 +167,7 @@ export default function PublicWidgetPage({ params }: WidgetPageProps) {
                 hostPageContext={hostPageContext}
                 enablePageContext={bot.enablePageContext !== false}
                 forceConsentScreen={forceConsent}
+                embedded={true}
             />
             {/* Minimal styles for the iframe body */}
             <style jsx global>{`

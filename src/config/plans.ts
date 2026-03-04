@@ -28,6 +28,7 @@ export enum PlanType {
  */
 export interface PlanFeatures {
     interviewAI: 'base' | 'full';
+    advancedInterview: boolean;
     chatbot: boolean;
     visibilityTracker: boolean;
     aiTips: boolean;
@@ -108,6 +109,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         yearlyMonthlyEquivalent: 0,
         features: {
             interviewAI: 'base',
+            advancedInterview: false,
             chatbot: false,
             visibilityTracker: false,
             aiTips: false,
@@ -158,6 +160,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         yearlyMonthlyEquivalent: 0,
         features: {
             interviewAI: 'full',
+            advancedInterview: false,
             chatbot: true,
             visibilityTracker: true,
             aiTips: true,
@@ -210,6 +213,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         stripePriceIdYearly: process.env.STRIPE_PRICE_STARTER_YEARLY,
         features: {
             interviewAI: 'full',
+            advancedInterview: false,
             chatbot: true,
             visibilityTracker: false,
             aiTips: false,
@@ -265,6 +269,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         popular: true,
         features: {
             interviewAI: 'full',
+            advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
             aiTips: true,
@@ -322,6 +327,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         stripePriceIdYearly: process.env.STRIPE_PRICE_BUSINESS_YEARLY,
         features: {
             interviewAI: 'full',
+            advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
             aiTips: true,
@@ -376,6 +382,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         stripePriceIdYearly: process.env.STRIPE_PRICE_PARTNER_YEARLY,
         features: {
             interviewAI: 'full',
+            advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
             aiTips: true,
@@ -432,6 +439,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         stripePriceIdYearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY,
         features: {
             interviewAI: 'full',
+            advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
             aiTips: true,
@@ -483,6 +491,7 @@ export const PLANS: Record<PlanType, PlanConfig> = {
         yearlyMonthlyEquivalent: 0,
         features: {
             interviewAI: 'full',
+            advancedInterview: true,
             chatbot: true,
             visibilityTracker: true,
             aiTips: true,

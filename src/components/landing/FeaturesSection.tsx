@@ -7,14 +7,14 @@ import Link from 'next/link';
 const features = [
   {
     icon: MessageSquare,
-    title: 'Interviste AI che fanno emergere il vero problema',
+    title: 'Raccogli Feedback con Interviste AI',
     description:
-      "L'AI conduce interviste qualitative adattive con clienti, team e partner. Ottieni motivazioni, obiezioni e bisogni reali senza dover orchestrare manualmente ogni sessione.",
+      "L'intelligenza artificiale conduce interviste qualitative personalizzate con clienti, dipendenti e stakeholder. Raccogli insight profondi senza il costo di un ricercatore.",
     benefits: [
       'Interviste automatiche 24/7',
       'Domande adattive basate sulle risposte',
-      'Sintesi per tema, segnale e priorita',
-      'Output subito utilizzabile dal Copilot',
+      'Analisi del sentiment in tempo reale',
+      'Report dettagliati per ogni stakeholder',
     ],
     color: 'coral',
     mockup: (
@@ -44,14 +44,14 @@ const features = [
   },
   {
     icon: Bot,
-    title: 'Chatbot AI che trasforma conversazioni in insight',
+    title: 'Assistente Chat AI per il tuo Sito',
     description:
-      'Non solo FAQ: ogni dialogo diventa un segnale operativo. Il chatbot individua gap informativi, attriti nel funnel e richieste ricorrenti da convertire in azioni concrete.',
+      'Un chatbot che va oltre le risposte. Interagisce con i visitatori per comprendere bisogni e criticità, trasformando ogni conversazione in AI tips strategici per migliorare prodotto, assistenza e logistica.',
     benefits: [
       'Personalizzato con il tuo tono di voce',
-      'Rilevazione continua di intenti e frizioni',
-      'Escalation intelligente dei casi delicati',
-      'Allineato con la tua knowledge base',
+      'Analisi continua dei bisogni dei clienti',
+      'AI Tips per miglioramenti strategici',
+      'Scala automaticamente i casi complessi',
     ],
     color: 'amber',
     mockup: (
@@ -83,34 +83,37 @@ const features = [
   },
   {
     icon: LineChart,
-    title: 'Brand Monitoring su AI + Search',
+    title: 'Monitoraggio Continuo di Mercato e Competitor',
     description:
-      "Monitora come il tuo brand viene raccontato nelle risposte AI e nei segnali search. Confronta competitor, fonti citate e sentiment per capire dove intervenire.",
+      "Il monitoraggio e parte dell'ascolto: osserva segnali di mercato, visibilita AI e movimenti dei competitor per alimentare la base decisionale.",
     benefits: [
-      'Monitoraggio LLM (ChatGPT, Claude, Gemini)',
-      'SERP + Search Console in un unico quadro',
-      'Confronto continuo con i competitor',
-      'Alert su cambi di percezione del brand',
+      'Monitoraggio SERP e risposte AI',
+      'Confronto continuo con competitor',
+      'Trend su menzioni e copertura brand',
+      'Segnali deboli intercettati in anticipo',
     ],
     color: 'green',
     mockup: (
       <div className="bg-[hsl(var(--card))] rounded-xl p-4 shadow-soft border border-[hsl(var(--border)/0.5)]">
         <div className="flex items-center justify-between mb-4">
-          <span className="font-medium text-sm">Reputation Score</span>
-          <span className="text-green-500 font-bold">+12%</span>
+          <span className="font-medium text-sm">Market Signal Monitor</span>
+          <span className="text-green-500 font-bold">Live</span>
         </div>
-        <div className="h-24 flex items-end gap-1">
-          {[40, 55, 45, 60, 70, 65, 80, 75, 85, 78, 90, 88].map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t bg-gradient-to-t from-green-500/60 to-green-400/40"
-              style={{ height: `${h}%` }}
-            />
+        <div className="space-y-3">
+          {[
+            ['Share of Voice AI', '+8% vs mese precedente'],
+            ['Keyword competitor', '2 sorpassi da recuperare'],
+            ['Menzioni brand', 'Nuovo trend emergente'],
+          ].map(([team, signal]) => (
+            <div key={team} className="rounded-lg border border-[hsl(var(--border)/0.6)] bg-white/70 px-3 py-2 flex items-center justify-between">
+              <span className="text-sm font-medium">{team}</span>
+              <span className="text-xs text-[hsl(var(--muted-foreground))]">{signal}</span>
+            </div>
           ))}
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
-          <span>Gen</span>
-          <span>Dic</span>
+          <span>Ultimo ciclo: 7 giorni</span>
+          <span>24 segnali utili</span>
         </div>
       </div>
     ),
@@ -120,8 +123,8 @@ const features = [
 export function FeaturesSection() {
   return (
     <section id="strumenti" className="pt-8 pb-20 md:pt-12 md:pb-28 relative">
-      {/* White overlay */}
-      <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px]" />
+      {/* White phase overlay */}
+      <div className="absolute inset-0 bg-white/86 backdrop-blur-[2px]" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div
@@ -133,15 +136,16 @@ export function FeaturesSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] mb-6">
             <Zap className="w-4 h-4 text-[hsl(var(--coral))]" />
-            <span className="text-sm font-medium">Piattaforma unificata</span>
+            <span className="text-sm font-medium">01 Ascolta - 3 strumenti di ascolto, 1 piattaforma</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Ascolto, analisi e azione{' '}
-            <span className="gradient-text">in un unico flusso</span>
+            Ascolto continuo,{' '}
+            <span className="gradient-text">come processo integrato</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-            Ogni modulo alimenta il Copilot strategico: meno dashboard scollegate,
-            piu decisioni chiare, condivisibili e subito eseguibili.
+            Non una ricerca una tantum: Business Tuner raccoglie segnali in modo
+            ricorrente da clienti, team, stakeholder e mercato, trasformandoli in insight
+            sistemici e utilizzabili.
           </p>
         </motion.div>
 
@@ -237,37 +241,49 @@ export function FeaturesSection() {
           <div className="relative bg-[hsl(var(--card))] rounded-3xl p-8 md:p-12 border border-[hsl(var(--border)/0.5)] shadow-medium text-center">
             <Zap className="w-12 h-12 text-[hsl(var(--coral))] mx-auto mb-6" />
             <h3 className="font-display text-2xl md:text-3xl font-bold mb-4">
-              Il Copilot collega tutto
+              L&apos;ecosistema connesso
             </h3>
             <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto mb-8">
-              Interviste, chatbot, monitoraggio e dati esterni diventano una vista
-              unica. Il Copilot trasforma i segnali in priorita operative, playbook
-              e proposte di automazione pronte per il team.
+              I tre strumenti non lavorano in silos. L&apos;AI analizza tutti i dati
+              insieme — interviste, chat e monitoraggio continuo — per darti insight che
+              nessuno strumento singolo potrebbe offrire.
             </p>
-            <div className="flex flex-wrap justify-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--coral)/0.1)] border border-[hsl(var(--coral)/0.2)]">
                 <MessageSquare className="w-4 h-4 text-[hsl(var(--coral))]" />
                 <span className="text-sm font-medium">Interviste AI</span>
               </div>
-              <div className="text-[hsl(var(--muted-foreground))]">+</div>
+              <div className="hidden sm:block text-[hsl(var(--muted-foreground))]">+</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--amber)/0.1)] border border-[hsl(var(--amber)/0.2)]">
                 <Bot className="w-4 h-4 text-[hsl(var(--amber))]" />
                 <span className="text-sm font-medium">Chatbot</span>
               </div>
-              <div className="text-[hsl(var(--muted-foreground))]">+</div>
+              <div className="hidden sm:block text-[hsl(var(--muted-foreground))]">+</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20">
                 <LineChart className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium">Reputation</span>
+                <span className="text-sm font-medium">Monitoraggio Continuo</span>
               </div>
-              <div className="text-[hsl(var(--muted-foreground))]">→</div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--foreground)/0.06)] border border-[hsl(var(--foreground)/0.12)]">
-                <Zap className="w-4 h-4 text-[hsl(var(--foreground))]" />
-                <span className="text-sm font-medium">Copilot Strategico</span>
+              <div className="hidden sm:block text-[hsl(var(--muted-foreground))]">=</div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full gradient-bg shadow-glow">
+                <Zap className="w-4 h-4 text-white" />
+                <span className="text-sm font-medium text-white">
+                  Visione completa
+                </span>
               </div>
             </div>
-            <p className="text-sm text-[hsl(var(--muted-foreground))] mt-6">
-              Suggerimenti con contesto, azioni prioritarie e handoff verso automazioni.
+            <p className="sm:hidden text-sm text-[hsl(var(--muted-foreground))] mt-4">
+              Interviste AI + Chatbot + Monitoraggio Continuo = Visione completa
             </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              {['Google Analytics', 'Search Console', 'WordPress', 'WooCommerce', 'Webhook', 'n8n', 'CRM'].map((integration) => (
+                <span
+                  key={integration}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]"
+                >
+                  {integration}
+                </span>
+              ))}
+            </div>
           </div>
         </motion.div>
       </div>

@@ -41,7 +41,7 @@ export function computeEngagementScore(text: string, language: string): number {
         : /\b(for example|for instance|e\.g\.)\b/i;
     const hasExample = examplePattern.test(clean) ? 1 : 0;
 
-    // Require ≥10 words to avoid rewarding single-digit scale answers as numeric richness
+    // Require ≥10 words to avoid rewarding single-digit scale answers ("8", "7/10") as numeric richness
     const hasNumbers = /\b\d{1,4}\b/.test(clean) && words >= 10 ? 1 : 0;
 
     const specificityPattern = language === 'it'
@@ -71,11 +71,18 @@ export function shouldUseCriticalModelForTopicTurn(params: {
     userTurnSignal: 'none' | 'clarification' | 'off_topic_question';
     userMessage?: string | null;
     language: string;
+    criticalEscalation?: 'selective' | 'aggressive';
 }): { useCritical: boolean; reason: string } {
     if (params.phase !== 'EXPLORE' && params.phase !== 'DEEPEN') {
         return { useCritical: false, reason: 'not_topic_phase' };
     }
 
+    // Aggressive mode (avanzato): critical for ALL explore/deepen turns
+    if (params.criticalEscalation === 'aggressive') {
+        return { useCritical: true, reason: 'aggressive_escalation' };
+    }
+
+    // Selective mode (standard): critical only for high-value turns (~25-30%)
     if (params.userTurnSignal === 'clarification') {
         return { useCritical: true, reason: 'clarification_turn' };
     }
@@ -385,6 +392,64 @@ export function buildExtensionPreviewHints(params: {
 
     if (preview.length > 0) return preview;
     return rotatedTopics.slice(0, maxItems).map(t => t.label).filter(Boolean);
+}
+
+/**
+ * Returns short snippets of what the user actually said on already-discussed topics.
+ * Used to make the DEEP_OFFER_ASK message contextual and personal.
+ */
+export function buildExtensionUserSnippets(params: {
+    botTopics: any[];
+    interestingTopics?: InterestingTopic[];
+    topicKeyInsights?: Record<string, string>;
+    maxItems?: number;
+}): string[] {
+    const { botTopics, interestingTopics = [], topicKeyInsights = {}, maxItems = 2 } = params;
+
+    const snippets: string[] = [];
+    for (const it of interestingTopics) {
+        if (snippets.length >= maxItems) break;
+        const topic = botTopics.find((t: any) => t.id === it.topicId);
+        if (!topic) continue;
+        const raw = it.bestSnippet || topicKeyInsights[it.topicId] || '';
+        const clean = sanitizeUserSnippet(raw, 18);
+        if (clean) snippets.push(clean);
+    }
+    return snippets;
+}
+
+// ============================================================================
+// Fatigue detection (avanzato)
+// ============================================================================
+const GENERIC_SHORT_IT = /^(ok|sì|si|no|boh|mah|niente|nulla|va bene|tutto bene|non so)\.?$/i;
+const GENERIC_SHORT_EN = /^(ok|yes|no|sure|fine|nothing|idk|i don't know|all good|not really)\.?$/i;
+
+/**
+ * Detects conversational fatigue by analyzing the last N user messages.
+ * Returns true if the user shows signs of disengagement: decreasing word count
+ * and/or generic short answers in the last 3 messages.
+ */
+export function detectFatigue(
+    recentUserMessages: string[],
+    language: string
+): boolean {
+    if (recentUserMessages.length < 3) return false;
+
+    const last3 = recentUserMessages.slice(-3);
+    const isItalian = (language || '').toLowerCase().startsWith('it');
+    const genericPattern = isItalian ? GENERIC_SHORT_IT : GENERIC_SHORT_EN;
+
+    // Check for generic short answers (2 out of 3 = fatigue)
+    const genericCount = last3.filter(msg => genericPattern.test(msg.trim())).length;
+    if (genericCount >= 2) return true;
+
+    // Check for decreasing word count trend
+    const wordCounts = last3.map(msg => msg.trim().split(/\s+/).filter(Boolean).length);
+    const isDecreasing = wordCounts[0] > wordCounts[1] && wordCounts[1] > wordCounts[2];
+    const lastIsShort = wordCounts[2] <= 5;
+    if (isDecreasing && lastIsShort) return true;
+
+    return false;
 }
 
 export function sanitizeUserSnippet(input: string, maxWords: number = 10): string {

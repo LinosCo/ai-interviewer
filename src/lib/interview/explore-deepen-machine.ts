@@ -26,7 +26,8 @@ export function handleExplorePhase({
     language,
     interviewPlan,
     maxDurationMins,
-    effectiveSec
+    effectiveSec,
+    bonusTurnCap = 2
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -36,6 +37,7 @@ export function handleExplorePhase({
     interviewPlan: InterviewPlan;
     maxDurationMins: number;
     effectiveSec: number;
+    bonusTurnCap?: number;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'EXPLORING' };
@@ -81,7 +83,7 @@ export function handleExplorePhase({
     }
 
     // Determine budget action
-    let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget);
+    let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget, bonusTurnCap);
 
     console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns}`);
 
@@ -125,7 +127,12 @@ export function handleExplorePhase({
             nextState.topicIndex = state.topicIndex + 1;
             nextState.turnInTopic = 0;
             nextTopicId = botTopics[nextState.topicIndex].id;
-            supervisorInsight = { status: 'TRANSITION' };
+            // narrativeTransitions: surface what the user said on the departing topic as bridge material
+            const departingSnippet = (state.topicKeyInsights || {})[currentTopic.id] || '';
+            supervisorInsight = {
+                status: 'TRANSITION',
+                ...(departingSnippet && { engagingSnippet: departingSnippet })
+            };
             console.log(`  → Transition to "${botTopics[nextState.topicIndex].label}"`);
 
         } else {
@@ -205,7 +212,8 @@ export function handleDeepenPhase({
     botTopics,
     language,
     maxDurationMins,
-    effectiveSec
+    effectiveSec,
+    deepenMaxTurnsPerTopic = 2
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -213,6 +221,7 @@ export function handleDeepenPhase({
     language: string;
     maxDurationMins: number;
     effectiveSec: number;
+    deepenMaxTurnsPerTopic?: number;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'DEEPENING' };
@@ -229,8 +238,8 @@ export function handleDeepenPhase({
     const currentUncoveredIndex = uncoveredTopics.indexOf(currentTopic.id);
     const budget = state.topicBudgets[currentTopic.id];
     const maxTurnsForDeepen = Math.min(
-        2, // Default max turns per topic in DEEPEN
-        Math.max(1, (budget?.maxTurns || 2) - (budget?.turnsUsed || 0))
+        deepenMaxTurnsPerTopic,
+        Math.max(1, (budget?.maxTurns || deepenMaxTurnsPerTopic) - (budget?.turnsUsed || 0))
     );
 
     if (state.turnInTopic >= maxTurnsForDeepen) {

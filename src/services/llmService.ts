@@ -48,7 +48,7 @@ export class LLMService {
 
     private static getDefaultModelName(provider: ModelProvider, bot: Bot): string {
         if (provider === 'anthropic') {
-            return bot.modelName || 'claude-3-5-sonnet-20241022';
+            return bot.modelName || 'claude-haiku-4-5';
         }
         return bot.modelName || 'gpt-4.1-mini';
     }
@@ -88,6 +88,11 @@ export class LLMService {
     private static getOpenAICriticalFallback(baseModelName: string): string {
         const trimmed = String(baseModelName || '').trim();
         const normalized = trimmed.toLowerCase();
+        // GPT-5 family
+        if (normalized === 'gpt-5-mini') return 'gpt-5.1';
+        if (normalized === 'gpt-5') return 'gpt-5.2';
+        if (normalized === 'gpt-5.1') return 'gpt-5.2';
+        // Legacy GPT-4 family
         if (normalized === 'gpt-4o-mini') return 'gpt-4o';
         if (normalized === 'gpt-4.1-mini') return 'gpt-4.1';
         if (normalized.endsWith('-mini')) return trimmed.replace(/-mini$/i, '');

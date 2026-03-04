@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Newspaper, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, GraduationCap, LineChart, Target } from 'lucide-react';
 
 interface NewsItem {
   id: string;
@@ -16,6 +16,27 @@ interface NewsItem {
 interface LandingNewsResponse {
   items?: NewsItem[];
 }
+
+const monitorPillars = [
+  {
+    icon: LineChart,
+    title: 'KPI e impatto nel tempo',
+    description:
+      'Misura trend, conversioni e risultati delle azioni attivate per capire cosa sta davvero funzionando.',
+  },
+  {
+    icon: Target,
+    title: 'Apprendimento e iterazioni',
+    description:
+      "Chiudi il ciclo con retrospettive operative: cosa ha funzionato, cosa va corretto e cosa standardizzare.",
+  },
+  {
+    icon: GraduationCap,
+    title: 'Formazione con certificazione',
+    description:
+      'Attiva percorsi per team e stakeholder con obiettivi chiari e certificazioni utili all\'adozione continua.',
+  },
+];
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -55,12 +76,8 @@ export function NewsSection() {
     return () => controller.abort();
   }, []);
 
-  if (!loading && items.length === 0) {
-    return null;
-  }
-
   return (
-    <section id="news" className="pt-8 pb-24 md:pt-12 md:pb-32 relative overflow-hidden">
+    <section id="monitora" className="pt-8 pb-24 md:pt-12 md:pb-32 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-white via-[hsl(var(--amber)/0.05)] to-white" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
@@ -72,56 +89,88 @@ export function NewsSection() {
           className="text-center mb-12"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--amber)/0.18)] border border-[hsl(var(--amber)/0.3)] mb-6">
-            <Newspaper className="w-4 h-4 text-[hsl(var(--amber))]" />
-            <span className="text-sm font-medium text-[hsl(var(--amber))]">News</span>
+            <LineChart className="w-4 h-4 text-[hsl(var(--amber))]" />
+            <span className="text-sm font-medium text-[hsl(var(--amber))]">04 Monitora</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-[hsl(var(--foreground))]">
-            Aggiornamenti pubblicati con <span className="gradient-text">AI Tips</span>
+            Monitora impatto e <span className="gradient-text">crescita delle competenze</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-3xl mx-auto">
-            Contenuti editoriali della landing Business Tuner generati dai suggerimenti AI, modificati e pubblicati dal team.
+            Misura KPI, attiva miglioramento continuo e forma team e stakeholder
+            con percorsi certificabili.
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {loading
-            ? Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={`news-loading-${index}`}
-                  className="rounded-2xl border border-[hsl(var(--border)/0.7)] bg-white/80 p-5 animate-pulse h-[210px]"
-                />
-              ))
-            : items.map((item, index) => (
-                <motion.a
-                  key={item.id}
-                  id={`news-${item.slug}`}
-                  href={item.url}
-                  target={item.url.startsWith('http') ? '_blank' : undefined}
-                  rel={item.url.startsWith('http') ? 'noopener noreferrer' : undefined}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.45, delay: index * 0.08 }}
-                  className="group rounded-2xl border border-[hsl(var(--border)/0.75)] bg-white/90 hover:bg-white p-5 shadow-sm hover:shadow-md transition-all"
-                >
-                  <div className="text-xs uppercase tracking-wider text-[hsl(var(--amber))] font-semibold mb-3">
-                    {formatDate(item.publishedAt)}
-                  </div>
-                  <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] leading-snug mb-3">
-                    {item.title}
-                  </h3>
-                  <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed line-clamp-4">
-                    {item.excerpt}
-                  </p>
-                  <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-[hsl(var(--coral))]">
-                    Leggi
-                    <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                  </div>
-                </motion.a>
-              ))}
+        <div className="grid md:grid-cols-3 gap-5 mb-10">
+          {monitorPillars.map((pillar, index) => (
+            <motion.div
+              key={pillar.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.45, delay: index * 0.08 }}
+              className="rounded-2xl border border-[hsl(var(--border)/0.75)] bg-white/90 p-5 shadow-sm"
+            >
+              <div className="w-10 h-10 rounded-lg bg-[hsl(var(--amber)/0.14)] flex items-center justify-center mb-4">
+                <pillar.icon className="w-5 h-5 text-[hsl(var(--amber))]" />
+              </div>
+              <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] leading-snug mb-2">
+                {pillar.title}
+              </h3>
+              <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed">
+                {pillar.description}
+              </p>
+            </motion.div>
+          ))}
         </div>
+
+        {(loading || items.length > 0) && (
+          <>
+            <div className="text-center mb-6">
+              <p className="text-sm uppercase tracking-[0.14em] text-[hsl(var(--muted-foreground))]">
+                Aggiornamenti recenti
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {loading
+                ? Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={`news-loading-${index}`}
+                      className="rounded-2xl border border-[hsl(var(--border)/0.7)] bg-white/80 p-5 animate-pulse h-[210px]"
+                    />
+                  ))
+                : items.map((item, index) => (
+                    <motion.a
+                      key={item.id}
+                      id={`news-${item.slug}`}
+                      href={item.url}
+                      target={item.url.startsWith('http') ? '_blank' : undefined}
+                      rel={item.url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.45, delay: index * 0.08 }}
+                      className="group rounded-2xl border border-[hsl(var(--border)/0.75)] bg-white/90 hover:bg-white p-5 shadow-sm hover:shadow-md transition-all"
+                    >
+                      <div className="text-xs uppercase tracking-wider text-[hsl(var(--amber))] font-semibold mb-3">
+                        {formatDate(item.publishedAt)}
+                      </div>
+                      <h3 className="text-lg font-semibold text-[hsl(var(--foreground))] leading-snug mb-3">
+                        {item.title}
+                      </h3>
+                      <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed line-clamp-4">
+                        {item.excerpt}
+                      </p>
+                      <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-[hsl(var(--coral))]">
+                        Leggi
+                        <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </div>
+                    </motion.a>
+                  ))}
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
 }
-

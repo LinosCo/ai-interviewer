@@ -48,12 +48,13 @@ export function computeSignalScore(userMessage: string, language: string): Signa
 export function computeBudgetAction(
   signalBand: SignalBand,
   turnsUsed: number,
-  budget: { minTurns: number; baseTurns: number; maxTurns: number; bonusTurnsGranted: number }
+  budget: { minTurns: number; baseTurns: number; maxTurns: number; bonusTurnsGranted: number },
+  bonusTurnCap: number = 2
 ): 'continue' | 'advance' | 'bonus' {
   if (signalBand === 'LOW' && turnsUsed >= budget.minTurns) {
     return 'advance';
   }
-  if (signalBand === 'HIGH' && turnsUsed < budget.maxTurns && budget.bonusTurnsGranted < 2) {
+  if (signalBand === 'HIGH' && turnsUsed < budget.maxTurns && budget.bonusTurnsGranted < bonusTurnCap) {
     return 'bonus';
   }
   if (turnsUsed >= budget.baseTurns) {

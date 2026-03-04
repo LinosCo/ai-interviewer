@@ -4,6 +4,7 @@ import {
   FluidBackground,
   HeroSection,
   HowItWorks,
+  ProblemSection,
   FeaturesSection,
   AITipsSection,
   AutomationSection,
@@ -59,7 +60,11 @@ export default function LandingPage() {
         <div className="h-24 section-fade-from-transparent" />
         <HowItWorks />
 
-        {/* Transition: HowItWorks → Ascolto */}
+        {/* Transition: HowItWorks → Problem */}
+        <div className="h-10 bg-white" />
+        <ProblemSection />
+
+        {/* Transition: Problem → Ascolto */}
         <div className="h-10 bg-white" />
         <FeaturesSection />
 

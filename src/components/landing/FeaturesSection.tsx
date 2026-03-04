@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { MessageSquare, Bot, LineChart, Zap, ArrowRight, Check } from 'lucide-react';
+import { MessageSquare, Bot, Users, Zap, ArrowRight, Check } from 'lucide-react';
 import Link from 'next/link';
 
 const features = [
@@ -82,35 +82,38 @@ const features = [
     ),
   },
   {
-    icon: LineChart,
-    title: 'Monitora la Visibilità AI',
+    icon: Users,
+    title: 'Ascolta Team e Stakeholder Interni',
     description:
-      "Scopri come il tuo brand appare nelle risposte di ChatGPT, Claude, Gemini e nella Search Console. Monitora il posizionamento AI e ottimizza la tua visibilità.",
+      "Trasforma l'ascolto interno in un'abitudine organizzativa: raccogli segnali ricorrenti da team, partner e rete commerciale con una routine strutturata.",
     benefits: [
-      'Monitoraggio LLM (ChatGPT, Claude, Gemini)',
-      'Google SERP & Search Console',
-      'Posizionamento vs competitor',
-      'Analisi del sentiment automatica',
+      'Pulse check periodici per funzione',
+      'Trend su collaborazione e motivazione',
+      'Segnali deboli intercettati in anticipo',
+      'Insight operativi per leadership e team',
     ],
     color: 'green',
     mockup: (
       <div className="bg-[hsl(var(--card))] rounded-xl p-4 shadow-soft border border-[hsl(var(--border)/0.5)]">
         <div className="flex items-center justify-between mb-4">
-          <span className="font-medium text-sm">Reputation Score</span>
-          <span className="text-green-500 font-bold">+12%</span>
+          <span className="font-medium text-sm">Team Health Snapshot</span>
+          <span className="text-green-500 font-bold">Aggiornato</span>
         </div>
-        <div className="h-24 flex items-end gap-1">
-          {[40, 55, 45, 60, 70, 65, 80, 75, 85, 78, 90, 88].map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t bg-gradient-to-t from-green-500/60 to-green-400/40"
-              style={{ height: `${h}%` }}
-            />
+        <div className="space-y-3">
+          {[
+            ['Vendite', 'Segnale positivo'],
+            ['Delivery', 'Attrito da allineare'],
+            ['Supporto', 'Richiesta formazione'],
+          ].map(([team, signal]) => (
+            <div key={team} className="rounded-lg border border-[hsl(var(--border)/0.6)] bg-white/70 px-3 py-2 flex items-center justify-between">
+              <span className="text-sm font-medium">{team}</span>
+              <span className="text-xs text-[hsl(var(--muted-foreground))]">{signal}</span>
+            </div>
           ))}
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
-          <span>Gen</span>
-          <span>Dic</span>
+          <span>Ultimo ciclo: 7 giorni</span>
+          <span>42 feedback</span>
         </div>
       </div>
     ),
@@ -133,7 +136,7 @@ export function FeaturesSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--secondary))] border border-[hsl(var(--border))] mb-6">
             <Zap className="w-4 h-4 text-[hsl(var(--coral))]" />
-            <span className="text-sm font-medium">01 Ascolta - 3 strumenti, 1 piattaforma</span>
+            <span className="text-sm font-medium">01 Ascolta - 3 strumenti di ascolto, 1 piattaforma</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
             Ascolto continuo,{' '}
@@ -242,7 +245,7 @@ export function FeaturesSection() {
             </h3>
             <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto mb-8">
               I tre strumenti non lavorano in silos. L&apos;AI analizza tutti i dati
-              insieme — interviste, chat, menzioni e analytics — per darti insight che
+              insieme — interviste, chat e feedback interni — per darti insight che
               nessuno strumento singolo potrebbe offrire.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
@@ -257,8 +260,8 @@ export function FeaturesSection() {
               </div>
               <div className="text-[hsl(var(--muted-foreground))]">+</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20">
-                <LineChart className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium">Reputation</span>
+                <Users className="w-4 h-4 text-green-500" />
+                <span className="text-sm font-medium">Feedback Team</span>
               </div>
               <div className="text-[hsl(var(--muted-foreground))]">=</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full gradient-bg shadow-glow">
@@ -269,7 +272,7 @@ export function FeaturesSection() {
               </div>
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {['Google Analytics', 'Search Console', 'WordPress', 'WooCommerce', 'Webhook', 'n8n'].map((integration) => (
+              {['CRM', 'Slack', 'Email', 'Webhook', 'n8n', 'Form embeddabili'].map((integration) => (
                 <span
                   key={integration}
                   className="px-3 py-1.5 rounded-full text-xs font-medium border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]"

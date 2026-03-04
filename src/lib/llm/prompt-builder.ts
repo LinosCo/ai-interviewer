@@ -258,7 +258,9 @@ ${topicLines}
 Obiettivo: qualità dell'insight, non copertura sistematica.`
                 : qualityTierLocal === 'intermedio'
                 ? `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto. Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
-Se emerge un segnale forte (impatto concreto, dettaglio inatteso, contraddizione), approfondiscilo prima di passare al sub-goal successivo.
+- Se emerge un segnale forte (impatto concreto, dettaglio inatteso, contraddizione), approfondiscilo prima di passare al sub-goal successivo.
+- Se l'utente usa ripetutamente la stessa parola o concetto, esplicitalo: "Hai usato più volte la parola X — cosa significa per te in questo contesto?"
+- Se vedi una contraddizione tra ciò che l'utente dice ora e ciò che ha detto prima, mettila in evidenza con delicatezza.
 Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.`
                 : `Metodo: Apri con un riconoscimento genuino e specifico di ciò che l'utente ha appena detto (es. riprendi un dettaglio concreto o un'emozione espressa). Poi poni UNA sola domanda esplorativa focalizzata sul sub-goal.
 Evita aperture rituali generiche ("Interessante!", "Capisco", "Grazie per averlo condiviso") senza contenuto specifico.
@@ -273,7 +275,9 @@ Ascolta segnali di profondità: esempi concreti, impatti vissuti, vincoli, contr
 Goal: quality of insight, not systematic coverage.`
                 : qualityTierLocal === 'intermedio'
                 ? `Method: Open with a genuine, specific acknowledgment of what the user just said. Then ask ONE exploratory question focused on the sub-goal.
-If a strong signal emerges (concrete impact, unexpected detail, contradiction), deepen it before moving to the next sub-goal.
+- If a strong signal emerges (concrete impact, unexpected detail, contradiction), deepen it before moving to the next sub-goal.
+- If the user repeatedly uses the same word or concept, name it: "You've used the word X a few times — what does that mean for you here?"
+- If you notice a contradiction between what the user said now and earlier, surface it gently.
 Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.`
                 : `Method: Open with a genuine, specific acknowledgment of what the user just said (e.g. reflect a concrete detail or emotion they expressed). Then ask ONE exploratory question focused on the sub-goal.
 Avoid generic ritual openers ("Interesting!", "I see", "Thanks for sharing") without specific content.

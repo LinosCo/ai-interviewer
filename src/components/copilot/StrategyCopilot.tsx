@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Send, X, Lightbulb, MessageSquare, AlertCircle, Loader2 } from 'lucide-react';
+import { Sparkles, Send, X, Lightbulb, MessageSquare, AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import { useProject } from '@/contexts/ProjectContext';
 import ReactMarkdown from 'react-markdown';
 
@@ -12,6 +12,7 @@ interface Message {
     content: string;
     timestamp: Date;
     toolsUsed?: string[];
+    suggestedFollowUp?: string;
 }
 
 interface StrategyCopilotProps {
@@ -89,6 +90,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [loadingTitle, setLoadingTitle] = useState(BASE_LOADING_STAGES[0]);
     const [error, setError] = useState<string | null>(null);
+    const [conversationId, setConversationId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const loadingStageTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -118,21 +120,48 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         };
     }, []);
 
-    // Welcome message
+    // Restore conversation from localStorage when opening
     useEffect(() => {
-        if (isOpen && messages.length === 0) {
-            const welcomeMsg = hasProjectAccess && selectedProject
-                ? `Ciao! Sono lo Strategy Copilot. Sto guardando il progetto **${selectedProject.name}**.\n\nPosso aiutarti a esplorare i dati, trovare insight o creare contenuti. Oppure chiedimi come usare la piattaforma.`
-                : `Ciao! Sono lo Strategy Copilot di Business Tuner.\n\nPosso aiutarti a usare la piattaforma, spiegarti le funzionalita e risolvere problemi. Cosa ti serve?`;
+        if (!isOpen || messages.length > 0) return;
 
-            setMessages([{
-                id: 'welcome',
-                role: 'assistant',
-                content: welcomeMsg,
-                timestamp: new Date()
-            }]);
+        const storedId = localStorage.getItem('copilot-conversation-id');
+        if (storedId) {
+            setConversationId(storedId);
+            fetch(`/api/copilot/chat?conversationId=${storedId}`)
+                .then(r => r.ok ? r.json() : null)
+                .then((data) => {
+                    if (data?.messages?.length > 0) {
+                        setMessages(data.messages.map((m: any, i: number) => ({
+                            id: `restored-${i}`,
+                            role: m.role,
+                            content: m.content,
+                            toolsUsed: m.toolsUsed,
+                            timestamp: new Date(m.createdAt)
+                        })));
+                    } else {
+                        showWelcome();
+                    }
+                })
+                .catch(() => showWelcome());
+        } else {
+            showWelcome();
         }
-    }, [isOpen, messages.length, hasProjectAccess, selectedProject]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
+
+    const showWelcome = () => {
+        const welcomeMsg = hasProjectAccess && selectedProject
+            ? `Ciao! Sono lo Strategy Copilot. Sto guardando il progetto **${selectedProject.name}**.\n\nPosso aiutarti a esplorare i dati, trovare insight o creare contenuti. Oppure chiedimi come usare la piattaforma.`
+            : `Ciao! Sono lo Strategy Copilot di Business Tuner.\n\nPosso aiutarti a usare la piattaforma, spiegarti le funzionalita e risolvere problemi. Cosa ti serve?`;
+        setMessages([{ id: 'welcome', role: 'assistant', content: welcomeMsg, timestamp: new Date() }]);
+    };
+
+    const startNewConversation = () => {
+        localStorage.removeItem('copilot-conversation-id');
+        setConversationId(null);
+        setMessages([]);
+        showWelcome();
+    };
 
     const sendMessage = async (content: string) => {
         const trimmedContent = content.trim();
@@ -163,6 +192,16 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         const controller = new AbortController();
         requestTimeoutRef.current = setTimeout(() => controller.abort(), 65000);
 
+        // Streaming message id — created upfront so we can update it in-place
+        const assistantMsgId = `assistant-${Date.now()}`;
+        // Seed an empty streaming message
+        setMessages(prev => [...prev, {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date()
+        }]);
+
         try {
             const res = await fetch('/api/copilot/chat', {
                 method: 'POST',
@@ -170,28 +209,73 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                 signal: controller.signal,
                 body: JSON.stringify({
                     message: trimmedContent,
-                    history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+                    conversationId: conversationId,
                     projectId: selectedProject?.id !== '__ALL__' ? selectedProject?.id : null
                 })
             });
 
-            const data = await res.json();
-
             if (!res.ok) {
-                throw new Error(data.message || data.error || 'Errore nella risposta');
+                const errData = await res.json().catch(() => ({}));
+                throw new Error((errData as any).message || (errData as any).error || 'Errore nella risposta');
             }
 
-            const assistantResponse = typeof data?.response === 'string'
-                ? data.response
-                : (typeof data?.message === 'string' ? data.message : 'Risposta non disponibile. Riprova.');
+            if (!res.body) throw new Error('No response body');
 
-            setMessages(prev => [...prev, {
-                id: `assistant-${Date.now()}`,
-                role: 'assistant',
-                content: assistantResponse,
-                timestamp: new Date(),
-                toolsUsed: data.toolsUsed
-            }]);
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulated = '';
+            let metaJson: Record<string, any> = {};
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+
+                // Check for replace signal (\x00 = KB fallback replacement)
+                if (chunk.includes('\x00')) {
+                    const parts = chunk.split('\x00');
+                    // Discard anything before the signal, use the replacement text
+                    accumulated = parts.slice(1).join('').replace(/\x01[\s\S]*$/, '');
+                } else if (chunk.includes('\x01')) {
+                    // Metadata frame — split and parse
+                    const parts = chunk.split('\x01');
+                    accumulated += parts[0].replace(/\nFOLLOW_UP:.*$/m, '');
+                    try { metaJson = JSON.parse(parts[1]); } catch { /* ignore */ }
+                } else {
+                    // Remove FOLLOW_UP line if it appears in the streamed text
+                    const followUpIdx = chunk.indexOf('\nFOLLOW_UP:');
+                    accumulated += followUpIdx >= 0 ? chunk.substring(0, followUpIdx) : chunk;
+                }
+
+                // Update the in-place streaming message
+                setMessages(prev => prev.map(m =>
+                    m.id === assistantMsgId
+                        ? { ...m, content: accumulated || ' ' }
+                        : m
+                ));
+            }
+
+            // Finalize with metadata
+            const finalContent = accumulated.trim() || 'Risposta non disponibile. Riprova.';
+            setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: finalContent,
+                        toolsUsed: metaJson.toolsUsed,
+                        suggestedFollowUp: typeof metaJson.suggestedFollowUp === 'string' && metaJson.suggestedFollowUp
+                            ? metaJson.suggestedFollowUp
+                            : undefined
+                    }
+                    : m
+            ));
+
+            // Persist conversationId for cross-refresh continuity
+            if (metaJson.conversationId && metaJson.conversationId !== conversationId) {
+                setConversationId(metaJson.conversationId);
+                localStorage.setItem('copilot-conversation-id', metaJson.conversationId);
+            }
         } catch (err: unknown) {
             const isAbort = err instanceof DOMException && err.name === 'AbortError';
             const fallbackError = err instanceof Error ? err.message : 'Si e verificato un errore. Riprova.';
@@ -200,12 +284,20 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                 : fallbackError;
 
             setError(errorMessage);
-            setMessages(prev => [...prev, {
-                id: `error-${Date.now()}`,
-                role: 'assistant',
-                content: `Mi dispiace, c'e stato un problema: ${errorMessage}. Riprova tra poco.`,
-                timestamp: new Date()
-            }]);
+            const errorContent = `Mi dispiace, c'e stato un problema: ${errorMessage}. Riprova tra poco.`;
+            // Replace the streaming placeholder if it exists, otherwise append
+            setMessages(prev => {
+                const hasPlaceholder = prev.some(m => m.id === assistantMsgId && m.content === '');
+                if (hasPlaceholder) {
+                    return prev.map(m => m.id === assistantMsgId ? { ...m, content: errorContent } : m);
+                }
+                return [...prev, {
+                    id: `error-${Date.now()}`,
+                    role: 'assistant',
+                    content: errorContent,
+                    timestamp: new Date()
+                }];
+            });
         } finally {
             clearLoadingTimers();
             setIsLoading(false);
@@ -260,12 +352,21 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setIsOpen(false)}
-                                    className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={startNewConversation}
+                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                        title="Nuova conversazione"
+                                    >
+                                        <RotateCcw className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => setIsOpen(false)}
+                                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             {hasProjectAccess && (!selectedProject || selectedProject.id === '__ALL__') && (
@@ -282,7 +383,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                             {messages.map((msg) => (
                                 <div
                                     key={msg.id}
-                                    className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                                 >
                                     <div
                                         className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'user'
@@ -314,10 +415,20 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                                             <p className="text-sm">{msg.content}</p>
                                         )}
                                     </div>
+                                    {msg.role === 'assistant' && msg.suggestedFollowUp && (
+                                        <button
+                                            onClick={() => sendMessage(msg.suggestedFollowUp!)}
+                                            disabled={isLoading}
+                                            className="mt-2 self-start text-xs bg-amber-50 border border-amber-200 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                        >
+                                            <Sparkles className="w-3 h-3" />
+                                            {msg.suggestedFollowUp}
+                                        </button>
+                                    )}
                                 </div>
                             ))}
 
-                            {isLoading && (
+                            {isLoading && !messages.some(m => m.id.startsWith('assistant-') && m.content) && (
                                 <div className="flex justify-start">
                                     <div className="bg-white border border-stone-200 rounded-2xl rounded-bl-md px-4 py-3" title={loadingTitle}>
                                         <div className="flex items-center gap-2 text-xs text-stone-500">

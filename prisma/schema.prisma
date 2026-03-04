@@ -1440,6 +1440,17 @@ model CopilotSession {
   @@index([organizationId])
 }
 
+model PlatformKBEntry {
+  id        String   @id
+  title     String
+  content   String
+  category  String
+  keywords  String[]
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}
+
 model CopilotConversation {
   id             String          @id @default(cuid())
   userId         String

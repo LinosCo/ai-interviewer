@@ -1,8 +1,8 @@
 // Platform Knowledge Base for Strategy Copilot
-// In a production environment, this would use vector embeddings and proper RAG
-// For now, we use a simple keyword-based search on structured content
+// Supports pgvector semantic search (primary) with keyword fallback.
+// Embeddings are seeded via /api/admin/platform-kb/reindex.
 
-interface KBEntry {
+export interface KBEntry {
     id: string;
     title: string;
     content: string;
@@ -11,7 +11,7 @@ interface KBEntry {
 }
 
 // Platform knowledge base content
-const PLATFORM_KB: KBEntry[] = [
+export const PLATFORM_KB: KBEntry[] = [
     // Getting Started
     {
         id: 'gs-1',
@@ -1144,48 +1144,63 @@ Tempi di risposta:
 ];
 
 /**
- * Search the platform knowledge base
- * Simple keyword-based search - in production would use vector embeddings
+ * Search the platform knowledge base.
+ * Tries pgvector semantic search first; falls back to keyword scoring
+ * when embeddings are unavailable (cold start or missing OpenAI key).
  */
 export async function searchPlatformKB(
     query: string,
     category: string = 'all'
 ): Promise<KBEntry[]> {
+    // 1. Try semantic search (returns [] on any failure)
+    try {
+        const { searchPlatformKBSemantic } = await import('./platform-kb-vector');
+        const semanticResults = await searchPlatformKBSemantic(query, category, 5, 0.3);
+        if (semanticResults.length > 0) {
+            // Map back to KBEntry shape
+            return semanticResults.map(r => ({
+                id: r.id,
+                title: r.title,
+                content: r.content,
+                category: r.category,
+                keywords: r.keywords,
+            }));
+        }
+    } catch {
+        // pgvector not available or embeddings not seeded — fall through
+    }
+
+    // 2. Keyword fallback
+    return keywordSearchPlatformKB(query, category);
+}
+
+/** Keyword-based search (always available, used as fallback) */
+export function keywordSearchPlatformKB(
+    query: string,
+    category: string = 'all'
+): KBEntry[] {
     const normalizedQuery = query.toLowerCase();
     const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 2);
 
-    // Filter by category if specified
     const entries = category === 'all'
         ? PLATFORM_KB
         : PLATFORM_KB.filter(e => e.category === category);
 
-    // Score each entry
     const scored = entries.map(entry => {
         let score = 0;
 
-        // Check keywords
         for (const keyword of entry.keywords) {
-            if (normalizedQuery.includes(keyword)) {
-                score += 10;
-            }
+            if (normalizedQuery.includes(keyword)) score += 10;
             for (const word of queryWords) {
-                if (keyword.includes(word) || word.includes(keyword)) {
-                    score += 5;
-                }
+                if (keyword.includes(word) || word.includes(keyword)) score += 5;
             }
         }
 
-        // Check title
-        if (entry.title.toLowerCase().includes(normalizedQuery)) {
-            score += 15;
-        }
+        if (entry.title.toLowerCase().includes(normalizedQuery)) score += 15;
         for (const word of queryWords) {
-            if (entry.title.toLowerCase().includes(word)) {
-                score += 3;
-            }
+            if (entry.title.toLowerCase().includes(word)) score += 3;
         }
 
-        // Check content
         for (const word of queryWords) {
             const matches = (entry.content.toLowerCase().match(new RegExp(word, 'g')) || []).length;
             score += matches * 2;
@@ -1194,7 +1209,6 @@ export async function searchPlatformKB(
         return { entry, score };
     });
 
-    // Sort by score and filter out zero scores
     return scored
         .filter(s => s.score > 0)
         .sort((a, b) => b.score - a.score)

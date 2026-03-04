@@ -64,6 +64,10 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects, or
     const [isSaving, setIsSaving] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(true); // Toggle for mobile maybe
     const [newBoundary, setNewBoundary] = useState('');
+    const [showCustomFieldForm, setShowCustomFieldForm] = useState(false);
+    const [customFieldName, setCustomFieldName] = useState('');
+    const [customFieldQuestion, setCustomFieldQuestion] = useState('');
+    const [customFieldRequired, setCustomFieldRequired] = useState(false);
 
     const handleAddBoundary = () => {
         if (!newBoundary.trim()) return;
@@ -78,6 +82,32 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects, or
         setConfig({
             ...config,
             boundaries: config.boundaries.filter((_: string, i: number) => i !== index)
+        });
+    };
+
+    const handleAddCustomField = () => {
+        const key = customFieldName.trim().toLowerCase().replace(/\s+/g, '_');
+        if (!key || config.candidateDataFields.some((f: any) => f.field === key)) return;
+        setConfig({
+            ...config,
+            candidateDataFields: [...config.candidateDataFields, {
+                field: key,
+                question: customFieldQuestion.trim() || `Qual è il tuo ${customFieldName.trim()}?`,
+                required: customFieldRequired
+            }]
+        });
+        setCustomFieldName('');
+        setCustomFieldQuestion('');
+        setCustomFieldRequired(false);
+        setShowCustomFieldForm(false);
+    };
+
+    const handleRemoveCustomField = (key: string) => {
+        const predefined = ['name', 'email', 'phone', 'company', 'role', 'location'];
+        if (predefined.includes(key)) return;
+        setConfig({
+            ...config,
+            candidateDataFields: config.candidateDataFields.filter((f: any) => f.field !== key)
         });
     };
 
@@ -550,6 +580,82 @@ export default function ChatbotSettings({ bot, canUseKnowledgeBase, projects, or
                                                             </button>
                                                         );
                                                     })}
+                                                </div>
+
+                                                {/* Custom Fields */}
+                                                <div className="space-y-4 pt-4 border-t border-gray-100">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Campi Personalizzati</label>
+                                                        <button
+                                                            onClick={() => setShowCustomFieldForm(true)}
+                                                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-600 hover:text-purple-700"
+                                                        >
+                                                            <Plus className="w-3.5 h-3.5" />
+                                                            Aggiungi campo
+                                                        </button>
+                                                    </div>
+
+                                                    {/* List of existing custom fields */}
+                                                    {config.candidateDataFields
+                                                        .filter((f: any) => !['name','email','phone','company','role','location'].includes(f.field))
+                                                        .map((f: any) => (
+                                                            <div key={f.field} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                                                <div>
+                                                                    <span className="text-sm font-bold text-gray-700">{f.field}</span>
+                                                                    {f.question && <p className="text-xs text-gray-400 mt-0.5">{f.question}</p>}
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => handleRemoveCustomField(f.field)}
+                                                                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                                                >
+                                                                    <X className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        ))
+                                                    }
+
+                                                    {/* Inline form to add a custom field */}
+                                                    {showCustomFieldForm && (
+                                                        <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-3">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Nome campo (es. budget)"
+                                                                value={customFieldName}
+                                                                onChange={e => setCustomFieldName(e.target.value)}
+                                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Domanda (opzionale)"
+                                                                value={customFieldQuestion}
+                                                                onChange={e => setCustomFieldQuestion(e.target.value)}
+                                                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                                                            />
+                                                            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={customFieldRequired}
+                                                                    onChange={e => setCustomFieldRequired(e.target.checked)}
+                                                                    className="rounded"
+                                                                />
+                                                                Campo obbligatorio
+                                                            </label>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={handleAddCustomField}
+                                                                    className="flex-1 py-2 text-sm font-bold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                                                                >
+                                                                    Aggiungi
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => { setShowCustomFieldForm(false); setCustomFieldName(''); setCustomFieldQuestion(''); setCustomFieldRequired(false); }}
+                                                                    className="flex-1 py-2 text-sm font-bold bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
+                                                                >
+                                                                    Annulla
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

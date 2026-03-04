@@ -19,6 +19,12 @@ export interface KBSearchResult {
     content: string;
     type: string;
     score: number; // 0-1, higher = more relevant (cosine similarity)
+    sourceUrl: string | null;
+}
+
+function extractSourceUrl(content: string): string | null {
+    const match = content.match(/^URL:\s*(https?:\/\/\S+)/m);
+    return match ? match[1] : null;
 }
 
 /**
@@ -84,6 +90,7 @@ async function semanticSearch(
             content: r.content,
             type: r.type,
             score: Number(r.similarity),
+            sourceUrl: extractSourceUrl(r.content),
         }));
     } catch (error) {
         // pgvector not installed or column missing — fall through to keyword
@@ -117,7 +124,7 @@ function keywordSearch(
             .filter(s => s.score > 0)
             .sort((a, b) => b.score - a.score)
             .slice(0, topK)
-            .map(s => ({ id: s.id, title: s.title, content: s.content, type: s.type, score: s.score }));
+            .map(s => ({ id: s.id, title: s.title, content: s.content, type: s.type, score: s.score, sourceUrl: extractSourceUrl(s.content) }));
     });
 }
 

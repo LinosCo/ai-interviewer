@@ -393,6 +393,40 @@ export function buildExtensionPreviewHints(params: {
     return rotatedTopics.slice(0, maxItems).map(t => t.label).filter(Boolean);
 }
 
+// ============================================================================
+// Fatigue detection (avanzato)
+// ============================================================================
+const GENERIC_SHORT_IT = /^(ok|sì|si|no|boh|mah|niente|nulla|va bene|tutto bene|non so)\.?$/i;
+const GENERIC_SHORT_EN = /^(ok|yes|no|sure|fine|nothing|idk|i don't know|all good|not really)\.?$/i;
+
+/**
+ * Detects conversational fatigue by analyzing the last N user messages.
+ * Returns true if the user shows signs of disengagement: decreasing word count
+ * and/or generic short answers in the last 3 messages.
+ */
+export function detectFatigue(
+    recentUserMessages: string[],
+    language: string
+): boolean {
+    if (recentUserMessages.length < 3) return false;
+
+    const last3 = recentUserMessages.slice(-3);
+    const isItalian = (language || '').toLowerCase().startsWith('it');
+    const genericPattern = isItalian ? GENERIC_SHORT_IT : GENERIC_SHORT_EN;
+
+    // Check for generic short answers (2 out of 3 = fatigue)
+    const genericCount = last3.filter(msg => genericPattern.test(msg.trim())).length;
+    if (genericCount >= 2) return true;
+
+    // Check for decreasing word count trend
+    const wordCounts = last3.map(msg => msg.trim().split(/\s+/).filter(Boolean).length);
+    const isDecreasing = wordCounts[0] > wordCounts[1] && wordCounts[1] > wordCounts[2];
+    const lastIsShort = wordCounts[2] <= 5;
+    if (isDecreasing && lastIsShort) return true;
+
+    return false;
+}
+
 export function sanitizeUserSnippet(input: string, maxWords: number = 10): string {
     const compact = (input || '').replace(/\s+/g, ' ').trim();
     if (!compact) return '';

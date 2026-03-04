@@ -17,6 +17,13 @@ export interface MicroPlannerInput {
     previousAssistantQuestion?: string | null;
     manualGuide?: string | null;
     runtimeKnowledge?: RuntimeInterviewKnowledge | null;
+    // Naturalness (avanzato)
+    topicKeyInsights?: Record<string, string>;
+    naturalness?: {
+        crossTopicSynthesis: boolean;
+        hesitationDetection: boolean;
+        contextDrivenReordering: boolean;
+    };
 }
 
 type KnowledgeCueSource = 'runtime' | 'manual' | 'fallback';
@@ -42,6 +49,9 @@ export interface MicroPlannerDecision {
     };
     signalScore: number;
     knowledgeSource: KnowledgeCueSource;
+    // Naturalness hints (avanzato only)
+    crossTopicHint?: string | null;
+    hesitationHint?: string | null;
 }
 
 function normalizeText(input: string): string {
@@ -256,6 +266,64 @@ function detectConstraintSignal(text: string, language: string): boolean {
     return constraintPatterns.some(p => p.test(text));
 }
 
+// ============================================================================
+// Naturalness detection (avanzato)
+// ============================================================================
+
+const HESITATION_IT = /\b(non so|forse|dipende|bo[hh]?|mah|non saprei|non sono sicur[oa]|può darsi|chissà)\b/i;
+const HESITATION_EN = /\b(I don't know|maybe|it depends|hmm|not sure|I'm not sure|hard to say|I guess)\b/i;
+
+function detectHesitation(text: string, language: string): boolean {
+    const pattern = (language || '').toLowerCase().startsWith('it') ? HESITATION_IT : HESITATION_EN;
+    return pattern.test(text);
+}
+
+function detectCrossTopicOverlap(
+    userMessage: string,
+    currentTopicId: string,
+    topicKeyInsights: Record<string, string>,
+    language: string
+): string | null {
+    const msg = normalizeText(userMessage);
+    if (msg.length < 20) return null;
+    const msgWords = new Set(msg.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+    let bestMatch: { topicId: string; snippet: string; score: number } | null = null;
+
+    for (const [topicId, snippet] of Object.entries(topicKeyInsights)) {
+        if (topicId === currentTopicId || !snippet) continue;
+        const snippetWords = normalizeText(snippet).toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        const overlap = snippetWords.filter(w => msgWords.has(w)).length;
+        const score = overlap / Math.max(1, snippetWords.length);
+        if (score >= 0.3 && overlap >= 2 && (!bestMatch || score > bestMatch.score)) {
+            bestMatch = { topicId, snippet, score };
+        }
+    }
+    return bestMatch ? bestMatch.snippet : null;
+}
+
+function reorderSubGoalsByRelevance(
+    remaining: string[],
+    userMessage: string,
+    language: string
+): string[] {
+    if (remaining.length <= 1) return remaining;
+    const msgNorm = normalizeText(userMessage).toLowerCase();
+    const msgWords = new Set(msgNorm.split(/\s+/).filter(w => w.length > 3));
+
+    const scored = remaining.map(goal => {
+        const goalWords = normalizeText(goal).toLowerCase().split(/\s+/).filter(w => w.length > 3);
+        const overlap = goalWords.filter(w => msgWords.has(w)).length;
+        return { goal, score: overlap };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    // Only reorder if the best non-first goal has meaningfully higher overlap
+    if (scored[0].score >= 2 && scored[0].goal !== remaining[0]) {
+        return scored.map(s => s.goal);
+    }
+    return remaining;
+}
+
 export interface ProbeThresholds {
     probeExampleThreshold: number;       // default 0.28
     probeImpactExploreThreshold: number; // default 0.42
@@ -307,10 +375,15 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput, thresholds?:
 
     const subGoals = Array.isArray(input.topicSubGoals) ? input.topicSubGoals.filter(Boolean) : [];
     const used = Array.isArray(input.usedSubGoals) ? input.usedSubGoals.filter(Boolean) : [];
-    const remaining = subGoals.filter((goal) => !used.includes(goal));
+    let remaining = subGoals.filter((goal) => !used.includes(goal));
     const total = Math.max(1, subGoals.length || 1);
     const turnsLeft = Math.max(1, (input.maxTurnsInTopic || 1) - (input.turnInTopic || 0) + 1);
     const prioritizeCoverage = input.phase === 'EXPLORE' && remaining.length > 0 && turnsLeft <= remaining.length;
+
+    // Naturalness: context-driven sub-goal reordering
+    if (input.naturalness?.contextDrivenReordering && remaining.length > 1 && userMessage) {
+        remaining = reorderSubGoalsByRelevance(remaining, userMessage, input.language);
+    }
 
     const focusSubGoal = remaining[0] || subGoals[0] || input.topicLabel;
     const knowledgeCue = selectKnowledgeCue(input, focusSubGoal);
@@ -332,6 +405,14 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput, thresholds?:
         followupHint = knowledgeCue.interpretationCue;
     }
 
+    // Naturalness hints (avanzato only)
+    const crossTopicHint = input.naturalness?.crossTopicSynthesis && input.topicKeyInsights
+        ? detectCrossTopicOverlap(userMessage, input.topicId, input.topicKeyInsights, input.language)
+        : null;
+    const hesitationHint = input.naturalness?.hesitationDetection && userMessage
+        ? (detectHesitation(userMessage, input.language) ? 'detected' : null)
+        : null;
+
     return {
         mode,
         commentStyle,
@@ -345,7 +426,9 @@ export function buildMicroPlannerDecision(input: MicroPlannerInput, thresholds?:
             prioritizeCoverage
         },
         signalScore,
-        knowledgeSource: knowledgeCue.source
+        knowledgeSource: knowledgeCue.source,
+        crossTopicHint,
+        hesitationHint,
     };
 }
 
@@ -360,7 +443,19 @@ export function buildMicroPlannerPromptBlock(params: {
     const isItalian = (params.language || '').toLowerCase().startsWith('it');
     const decision = params.decision;
 
+    const naturalnessHintsIT: string[] = [];
+    const naturalnessHintsEN: string[] = [];
+    if (decision.crossTopicHint) {
+        naturalnessHintsIT.push(`- CROSS-TOPIC: L'utente ha toccato un tema precedente. Collegamento: "${decision.crossTopicHint}". Integra brevemente il collegamento nella risposta.`);
+        naturalnessHintsEN.push(`- CROSS-TOPIC: User referenced a previous topic. Connection: "${decision.crossTopicHint}". Briefly weave the connection into your response.`);
+    }
+    if (decision.hesitationHint === 'detected') {
+        naturalnessHintsIT.push(`- ESITAZIONE RILEVATA: L'utente mostra incertezza. Sonda gentilmente: "Cosa ti frena dal dare una risposta netta?" o riformula in modo più concreto.`);
+        naturalnessHintsEN.push(`- HESITATION DETECTED: User shows uncertainty. Gently probe: "What holds you back from a definitive answer?" or rephrase more concretely.`);
+    }
+
     if (isItalian) {
+        const hints = naturalnessHintsIT.length > 0 ? '\n' + naturalnessHintsIT.join('\n') + '\n' : '';
         return `
 ## MICRO-PLANNER PRE-TURN (NO FALLBACK REWRITE)
 - Topic attivo: "${params.topicLabel}"
@@ -370,7 +465,7 @@ export function buildMicroPlannerPromptBlock(params: {
 - Hint di approfondimento: ${decision.followupHint}
 - Copertura topic: usati=${decision.topicCoverage.used}/${decision.topicCoverage.total}, rimanenti=${decision.topicCoverage.remaining}, turni_residui=${decision.topicCoverage.turnsLeft}
 - Sorgente knowledge: ${decision.knowledgeSource}
-
+${hints}
 Regole operative:
 1) Se stile=direct_clarification, chiarisci prima in modo diretto e breve.
 2) Se stile=evidence_reflection, commenta un dettaglio concreto dell'utente (no formule generiche).
@@ -381,6 +476,7 @@ Regole operative:
 `.trim();
     }
 
+    const hints = naturalnessHintsEN.length > 0 ? '\n' + naturalnessHintsEN.join('\n') + '\n' : '';
     return `
 ## MICRO-PLANNER PRE-TURN (NO FALLBACK REWRITE)
 - Active topic: "${params.topicLabel}"
@@ -390,7 +486,7 @@ Regole operative:
 - Follow-up hint: ${decision.followupHint}
 - Topic coverage: used=${decision.topicCoverage.used}/${decision.topicCoverage.total}, remaining=${decision.topicCoverage.remaining}, turns_left=${decision.topicCoverage.turnsLeft}
 - Knowledge source: ${decision.knowledgeSource}
-
+${hints}
 Operational rules:
 1) If style=direct_clarification, clarify first in one short direct sentence.
 2) If style=evidence_reflection, reference one concrete user detail (avoid generic openers).

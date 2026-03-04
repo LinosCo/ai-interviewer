@@ -47,7 +47,7 @@ import {
     buildTopicSemanticText, getDeepTopics, buildDeepTopicOrder,
     getScanPlanTurns, getDeepPlanTurns, getRemainingSubGoals,
     buildDeepPlan, selectDeepFocusPoint, buildExtensionPreviewHints,
-    sanitizeUserSnippet,
+    sanitizeUserSnippet, detectFatigue,
 } from '@/lib/chat/context-helpers';
 import {
     isExtensionOfferQuestion, generateConsentQuestionOnly, generateFieldQuestionOnly,
@@ -74,6 +74,7 @@ import {
 import { completeInterview } from '@/lib/interview/interview-completion';
 import { ToneAnalyzer } from '@/lib/tone/tone-analyzer';
 import { buildToneAdaptationPrompt } from '@/lib/tone/tone-prompt-adapter';
+import { getTierConfig } from '@/config/interview-tiers';
 export const maxDuration = 60;
 
 // ============================================================================
@@ -220,6 +221,7 @@ export async function POST(req: Request) {
             }, { status: 200 });
         }
         const language = bot.language || 'en';
+        const tierConfig = getTierConfig((bot as any).interviewerQuality);
         const interviewObjective = String((bot as any).researchGoal || '').trim();
         const shouldCollectData = (bot as any).collectCandidateData;
         const lastIncomingMessage = incomingMessages[incomingMessages.length - 1];
@@ -531,7 +533,7 @@ export async function POST(req: Request) {
         // Topics
         const botTopics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
         const numTopics = botTopics.length;
-        const interviewPlan = await getOrCreateInterviewPlan(bot);
+        const interviewPlan = await getOrCreateInterviewPlan(bot, tierConfig.budgets);
         console.log("📊 [PLAN] Meta:", {
             maxDurationMins: interviewPlan.meta.maxDurationMins,
             totalTimeSec: interviewPlan.meta.totalTimeSec,
@@ -626,7 +628,7 @@ export async function POST(req: Request) {
                     topicLabel: topic.label,
                     subGoals: topic.subGoals || []
                 })),
-                timeoutMs: 1200,
+                timeoutMs: tierConfig.knowledge.runtimeKnowledgeTimeoutMs,
                 onUsage: collectLlmUsage
             })
             : Promise.resolve(hasValidRuntimeKnowledge ? state.runtimeInterviewKnowledge || null : null);
@@ -729,7 +731,8 @@ export async function POST(req: Request) {
                     language,
                     interviewPlan,
                     maxDurationMins,
-                    effectiveSec
+                    effectiveSec,
+                    bonusTurnCap: tierConfig.budgets.bonusTurnCap
                 });
 
                 // Merge explore result into nextState
@@ -801,7 +804,8 @@ export async function POST(req: Request) {
                     botTopics,
                     language,
                     maxDurationMins,
-                    effectiveSec
+                    effectiveSec,
+                    deepenMaxTurnsPerTopic: tierConfig.budgets.deepenMaxTurnsPerTopic
                 });
 
                 // Merge deepen result into nextState
@@ -1238,7 +1242,17 @@ export async function POST(req: Request) {
             userTurnSignal,
             previousAssistantQuestion,
             manualGuide: manualInterviewGuide,
-            runtimeKnowledge: runtimeInterviewKnowledge || state.runtimeInterviewKnowledge || null
+            runtimeKnowledge: runtimeInterviewKnowledge || state.runtimeInterviewKnowledge || null,
+            topicKeyInsights: tierConfig.naturalness.crossTopicSynthesis ? (nextState.topicKeyInsights || {}) : undefined,
+            naturalness: {
+                crossTopicSynthesis: tierConfig.naturalness.crossTopicSynthesis,
+                hesitationDetection: tierConfig.naturalness.hesitationDetection,
+                contextDrivenReordering: tierConfig.naturalness.contextDrivenReordering,
+            },
+        }, {
+            probeExampleThreshold: tierConfig.budgets.probeExampleThreshold,
+            probeImpactExploreThreshold: tierConfig.budgets.probeImpactExploreThreshold,
+            probeImpactDeepenThreshold: tierConfig.budgets.probeImpactDeepenThreshold,
         });
 
 
@@ -1249,7 +1263,8 @@ export async function POST(req: Request) {
             effectiveSec,
             supervisorInsight,
             interviewPlan,
-            manualInterviewGuide || undefined
+            manualInterviewGuide || undefined,
+            (bot as any).interviewerQuality
         );
         const manualKnowledgePrompt = buildManualKnowledgePromptBlock({
             manualGuide: manualInterviewGuide,
@@ -1274,7 +1289,9 @@ export async function POST(req: Request) {
         if (canonicalMessages.length >= 4) {
             try {
                 const toneAnalyzer = new ToneAnalyzer(openAIKey);
-                const toneProfile = await toneAnalyzer.analyzeTone(canonicalMessages, language);
+                const toneProfile = tierConfig.tone.useLlm
+                    ? await toneAnalyzer.analyzeTone(canonicalMessages, language)
+                    : toneAnalyzer.analyzeToHeuristic(canonicalMessages, language);
                 const toneBlock = buildToneAdaptationPrompt(toneProfile, language);
                 if (toneBlock) {
                     systemPrompt += `\n\n${toneBlock}`;
@@ -1374,8 +1391,24 @@ hard_rules:
                 focusSubGoal: microPlannerDecision.focusSubGoal,
                 signalScore: Number(microPlannerDecision.signalScore.toFixed(2)),
                 coverage: microPlannerDecision.topicCoverage,
-                knowledgeSource: microPlannerDecision.knowledgeSource
+                knowledgeSource: microPlannerDecision.knowledgeSource,
+                crossTopicHint: microPlannerDecision.crossTopicHint || null,
+                hesitationHint: microPlannerDecision.hesitationHint || null,
             });
+
+            // Fatigue detection (avanzato only)
+            if (tierConfig.naturalness.fatigueDetection) {
+                const recentUserMsgs = canonicalMessages
+                    .filter(m => m.role === 'user')
+                    .slice(-3)
+                    .map(m => typeof m.content === 'string' ? m.content : '');
+                if (detectFatigue(recentUserMsgs, language)) {
+                    systemPrompt += language === 'it'
+                        ? `\n\n## FATICA RILEVATA\nL'utente mostra segni di disengagement (risposte brevi/generiche). Accorcia la prossima domanda, rendi il tono più leggero, e valuta se avanzare al sub-goal successivo.`
+                        : `\n\n## FATIGUE DETECTED\nThe user shows disengagement signs (short/generic answers). Shorten your next question, lighten the tone, and consider advancing to the next sub-goal.`;
+                    console.log("😴 [FATIGUE] Detected — injecting fatigue hint");
+                }
+            }
         }
 
         if (userTurnSignal === 'clarification') {
@@ -1415,7 +1448,8 @@ hard_rules:
             supervisorStatus: supervisorInsight?.status,
             userTurnSignal,
             userMessage: lastMessage?.role === 'user' ? lastMessage.content : '',
-            language
+            language,
+            criticalEscalation: tierConfig.modelRouting.criticalEscalation
         });
         const modelForMainResponse = nextState.phase === 'DATA_COLLECTION'
             ? dataCollectionModel
@@ -1451,7 +1485,7 @@ hard_rules:
         try {
             result = await Promise.race([
                 trackedGenerateObject({ model: modelForMainResponse, schema, messages: messagesForAI, system: contextWithFeedback, temperature: 0.7 }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 45000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), tierConfig.latency.mainResponseTimeoutMs))
             ]);
         } catch (error: any) {
             if (error.message === "TIMEOUT") {

@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { MessageSquare, Bot, Users, Zap, ArrowRight, Check } from 'lucide-react';
+import { MessageSquare, Bot, LineChart, Zap, ArrowRight, Check } from 'lucide-react';
 import Link from 'next/link';
 
 const features = [
@@ -82,28 +82,28 @@ const features = [
     ),
   },
   {
-    icon: Users,
-    title: 'Ascolta Team e Stakeholder Interni',
+    icon: LineChart,
+    title: 'Monitoraggio Continuo di Mercato e Competitor',
     description:
-      "Trasforma l'ascolto interno in un'abitudine organizzativa: raccogli segnali ricorrenti da team, partner e rete commerciale con una routine strutturata.",
+      "Il monitoraggio e parte dell'ascolto: osserva segnali di mercato, visibilita AI e movimenti dei competitor per alimentare la base decisionale.",
     benefits: [
-      'Pulse check periodici per funzione',
-      'Trend su collaborazione e motivazione',
+      'Monitoraggio SERP e risposte AI',
+      'Confronto continuo con competitor',
+      'Trend su menzioni e copertura brand',
       'Segnali deboli intercettati in anticipo',
-      'Insight operativi per leadership e team',
     ],
     color: 'green',
     mockup: (
       <div className="bg-[hsl(var(--card))] rounded-xl p-4 shadow-soft border border-[hsl(var(--border)/0.5)]">
         <div className="flex items-center justify-between mb-4">
-          <span className="font-medium text-sm">Team Health Snapshot</span>
-          <span className="text-green-500 font-bold">Aggiornato</span>
+          <span className="font-medium text-sm">Market Signal Monitor</span>
+          <span className="text-green-500 font-bold">Live</span>
         </div>
         <div className="space-y-3">
           {[
-            ['Vendite', 'Segnale positivo'],
-            ['Delivery', 'Attrito da allineare'],
-            ['Supporto', 'Richiesta formazione'],
+            ['Share of Voice AI', '+8% vs mese precedente'],
+            ['Keyword competitor', '2 sorpassi da recuperare'],
+            ['Menzioni brand', 'Nuovo trend emergente'],
           ].map(([team, signal]) => (
             <div key={team} className="rounded-lg border border-[hsl(var(--border)/0.6)] bg-white/70 px-3 py-2 flex items-center justify-between">
               <span className="text-sm font-medium">{team}</span>
@@ -113,7 +113,7 @@ const features = [
         </div>
         <div className="mt-4 flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
           <span>Ultimo ciclo: 7 giorni</span>
-          <span>42 feedback</span>
+          <span>24 segnali utili</span>
         </div>
       </div>
     ),
@@ -144,7 +144,7 @@ export function FeaturesSection() {
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
             Non una ricerca una tantum: Business Tuner raccoglie segnali in modo
-            ricorrente da clienti, team e stakeholder, trasformandoli in insight
+            ricorrente da clienti, team, stakeholder e mercato, trasformandoli in insight
             sistemici e utilizzabili.
           </p>
         </motion.div>
@@ -245,7 +245,7 @@ export function FeaturesSection() {
             </h3>
             <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto mb-8">
               I tre strumenti non lavorano in silos. L&apos;AI analizza tutti i dati
-              insieme — interviste, chat e feedback interni — per darti insight che
+              insieme — interviste, chat e monitoraggio continuo — per darti insight che
               nessuno strumento singolo potrebbe offrire.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
@@ -260,8 +260,8 @@ export function FeaturesSection() {
               </div>
               <div className="text-[hsl(var(--muted-foreground))]">+</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/20">
-                <Users className="w-4 h-4 text-green-500" />
-                <span className="text-sm font-medium">Feedback Team</span>
+                <LineChart className="w-4 h-4 text-green-500" />
+                <span className="text-sm font-medium">Monitoraggio Continuo</span>
               </div>
               <div className="text-[hsl(var(--muted-foreground))]">=</div>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full gradient-bg shadow-glow">
@@ -272,7 +272,7 @@ export function FeaturesSection() {
               </div>
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {['CRM', 'Slack', 'Email', 'Webhook', 'n8n', 'Form embeddabili'].map((integration) => (
+              {['SERP AI', 'Search Console', 'Menzioni Brand', 'Webhook', 'n8n', 'CRM'].map((integration) => (
                 <span
                   key={integration}
                   className="px-3 py-1.5 rounded-full text-xs font-medium border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))]"

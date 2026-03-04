@@ -26,9 +26,9 @@ const monitorPillars = [
   },
   {
     icon: Target,
-    title: 'Monitoraggio competitor',
+    title: 'Apprendimento e iterazioni',
     description:
-      'Confronta la tua presenza su SERP e risposte AI rispetto ai competitor per individuare gap e opportunita.',
+      "Chiudi il ciclo con retrospettive operative: cosa ha funzionato, cosa va corretto e cosa standardizzare.",
   },
   {
     icon: GraduationCap,
@@ -93,11 +93,11 @@ export function NewsSection() {
             <span className="text-sm font-medium text-[hsl(var(--amber))]">04 Monitora</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-[hsl(var(--foreground))]">
-            Monitora impatto, competitor e <span className="gradient-text">crescita delle competenze</span>
+            Monitora impatto e <span className="gradient-text">crescita delle competenze</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-3xl mx-auto">
-            Misura KPI, osserva il posizionamento competitivo e attiva formazione
-            continua con certificazione per team e stakeholder.
+            Misura KPI, attiva miglioramento continuo e forma team e stakeholder
+            con percorsi certificabili.
           </p>
         </motion.div>
 

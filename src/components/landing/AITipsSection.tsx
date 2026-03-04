@@ -50,14 +50,14 @@ export function AITipsSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[hsl(var(--coral)/0.2)] border border-[hsl(var(--coral)/0.3)] mb-6">
             <Sparkles className="w-4 h-4 text-[hsl(var(--coral))]" />
-            <span className="text-sm font-medium text-[hsl(var(--coral))]">02 Decidi - Copilot Strategico</span>
+            <span className="text-sm font-medium text-[hsl(var(--coral))]">02 Decidi - Ecosistema decisionale</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-[hsl(var(--foreground))]">
             Visione di insieme per{' '}
             <span className="gradient-text">decisioni consapevoli</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">
-            Il Copilot incrocia i dati raccolti con la tua strategia di business
+            Il Copilot incrocia ascolto, monitoraggio continuo e strategia di business
             definita e propone azioni concrete, motivate e contestualizzate.
           </p>
         </motion.div>

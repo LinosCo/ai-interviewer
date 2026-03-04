@@ -9,7 +9,7 @@ const steps = [
     number: '01',
     title: 'Ascolta',
     description:
-      "L'ascolto diventa un processo integrato: raccogli segnali in modo continuo da clienti, team e stakeholder.",
+      "L'ascolto diventa un processo integrato: raccogli segnali continui da clienti, stakeholder, mercato e competitor.",
   },
   {
     icon: Lightbulb,
@@ -30,7 +30,7 @@ const steps = [
     number: '04',
     title: 'Monitora',
     description:
-      'Misura impatto, monitora competitor e attiva formazione con certificazione per team e stakeholder.',
+      'Misura impatto, consolida apprendimento e attiva formazione con certificazione per team e stakeholder.',
   },
 ];
 

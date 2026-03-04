@@ -200,12 +200,20 @@ ${topicLines}
 ## FASE: ESPLORAZIONE${bonus}
 Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
-Metodo: Fai una breve connessione e UNA sola domanda esplorativa. Ascolta segnali di profondità (esempi, impatti, vincoli).
+Metodo:
+- Apri con un riconoscimento genuino e specifico di ciò che l'utente ha detto (no formule generiche come "interessante" o "capisco" da soli).
+- Fai esattamente UNA domanda esplorativa focalizzata sul sub-goal.
+- Se emerge un segnale forte (impatto concreto, vincolo esplicito, dettaglio inatteso), approfondiscilo prima di passare al sub-goal successivo.
+- Se l'utente usa ripetutamente la stessa parola, esplicitalo: "Hai usato più volte X — cosa significa per te qui?"
 `.trim() : `
 ## PHASE: EXPLORING${bonus}
 Topic: "${safeTopicLabel}"
 Sub-goal: ${subGoalPreview}
-Method: Brief connection, then ONE exploratory question. Listen for depth signals (examples, impact, constraints).
+Method:
+- Open with a genuine, specific acknowledgment of what the user just said (avoid empty openers like "Interesting!" or "I see" alone).
+- Ask exactly ONE exploratory question focused on the sub-goal.
+- If a strong signal emerges (concrete impact, explicit constraint, unexpected detail), deepen it before moving to the next sub-goal.
+- If the user repeatedly uses the same word, name it: "You've used X a few times — what does that mean for you here?"
 `.trim();
         }
 

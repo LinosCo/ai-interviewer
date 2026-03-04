@@ -2149,6 +2149,16 @@ hard_rules:
             }
         }
 
+        // Record the sub-goal used this turn so micro-planner advances on next turn
+        if ((nextState.phase === 'EXPLORE' || nextState.phase === 'DEEPEN') && microPlannerDecision.focusSubGoal) {
+            const history = { ...(nextState.topicSubGoalHistory || {}) };
+            const existing = history[plannerTopicId] || [];
+            if (!existing.includes(microPlannerDecision.focusSubGoal)) {
+                history[plannerTopicId] = [...existing, microPlannerDecision.focusSubGoal];
+                nextState.topicSubGoalHistory = history;
+            }
+        }
+
         // ====================================================================
         // 6. SAVE & UPDATE STATE (parallelized for speed)
         // ====================================================================

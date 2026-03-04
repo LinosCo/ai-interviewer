@@ -40,11 +40,12 @@ export function computeEngagementScore(text: string, language: string): number {
         : /\b(for example|for instance|e\.g\.)\b/i;
     const hasExample = examplePattern.test(clean) ? 1 : 0;
 
-    const hasNumbers = /\b\d{1,4}\b/.test(clean) ? 1 : 0;
+    // Require ≥10 words to avoid rewarding single-digit scale answers ("8", "7/10") as numeric richness
+    const hasNumbers = /\b\d{1,4}\b/.test(clean) && words >= 10 ? 1 : 0;
 
     const specificityPattern = language === 'it'
-        ? /\b(srl|spa|s\.p\.a|snc|sas|societ[aà]|azienda|cliente|fornitore)\b/i
-        : /\b(ltd|inc|llc|gmbh|company|client|customer|supplier)\b/i;
+        ? /\b(srl|spa|s\.p\.a|snc|sas|societ[aà]|azienda|cliente|fornitore|museo|palazzo|villa|chiesa|castello|teatro|giardino|piazza|guida|visita|esposizion|patrimonio|architettur|scultura|dipinto|opera|collezion|monumento|fontana)\b/i
+        : /\b(ltd|inc|llc|gmbh|company|client|customer|supplier|museum|gallery|palace|castle|cathedral|heritage|collection|exhibition|artwork|painting|sculpture|architecture|monument)\b/i;
     const hasSpecificity = specificityPattern.test(clean) ? 1 : 0;
 
     const emotionPattern = language === 'it'

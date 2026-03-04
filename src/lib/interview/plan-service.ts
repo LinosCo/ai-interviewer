@@ -60,7 +60,7 @@ export function buildBaseInterviewPlan(bot: Bot, topics: TopicBlock[], budgetCon
       maxDurationMins: bot.maxDurationMins || 10,
       totalTimeSec,
       perTopicTimeSec,
-      secondsPerTurn: SECONDS_PER_TURN,
+      secondsPerTurn: cfg.planBaseTurnsDivisor,
       topicsSignature: buildTopicsSignature(topics)
     },
     explore: {
@@ -144,9 +144,9 @@ export function mergeInterviewPlan(base: InterviewPlan, overrides?: InterviewPla
   return merged;
 }
 
-export async function getOrCreateInterviewPlan(bot: Bot & { topics: TopicBlock[] }) {
+export async function getOrCreateInterviewPlan(bot: Bot & { topics: TopicBlock[] }, budgetConfig?: Partial<PlanBudgetConfig>) {
   const topics = [...bot.topics].sort((a, b) => a.orderIndex - b.orderIndex);
-  const basePlan = buildBaseInterviewPlan(bot, topics);
+  const basePlan = buildBaseInterviewPlan(bot, topics, budgetConfig);
 
   const existing = await prisma.interviewPlan.findUnique({
     where: { botId: bot.id }
@@ -188,14 +188,14 @@ export async function getOrCreateInterviewPlan(bot: Bot & { topics: TopicBlock[]
   return mergeInterviewPlan(existingBase, overrides);
 }
 
-export async function regenerateInterviewPlan(botId: string) {
+export async function regenerateInterviewPlan(botId: string, budgetConfig?: Partial<PlanBudgetConfig>) {
   const bot = await prisma.bot.findUnique({
     where: { id: botId },
     include: { topics: { orderBy: { orderIndex: 'asc' } } }
   });
   if (!bot) throw new Error('Bot not found');
 
-  const basePlan = buildBaseInterviewPlan(bot, bot.topics);
+  const basePlan = buildBaseInterviewPlan(bot, bot.topics, budgetConfig);
   const existing = await prisma.interviewPlan.findUnique({ where: { botId } });
   const overrides = existing?.overrides as InterviewPlanOverrides | null;
 

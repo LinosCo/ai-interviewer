@@ -26,7 +26,8 @@ export function handleExplorePhase({
     language,
     interviewPlan,
     maxDurationMins,
-    effectiveSec
+    effectiveSec,
+    bonusTurnCap = 2
 }: {
     state: InterviewState;
     currentTopic: TopicBlock;
@@ -36,6 +37,7 @@ export function handleExplorePhase({
     interviewPlan: InterviewPlan;
     maxDurationMins: number;
     effectiveSec: number;
+    bonusTurnCap?: number;
 }): ExploreDeepResult {
     const nextState: Partial<InterviewState> = { ...state };
     let supervisorInsight: SupervisorInsight = { status: 'EXPLORING' };
@@ -81,7 +83,7 @@ export function handleExplorePhase({
     }
 
     // Determine budget action
-    let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget);
+    let action = computeBudgetAction(signal.band, topicBudget.turnsUsed, topicBudget, bonusTurnCap);
 
     console.log(`📊 [EXPLORE] "${currentTopic.label}" signal=${signal.band} action=${action} turns=${topicBudget.turnsUsed}/${topicBudget.baseTurns}`);
 

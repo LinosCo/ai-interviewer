@@ -127,7 +127,12 @@ export function handleExplorePhase({
             nextState.topicIndex = state.topicIndex + 1;
             nextState.turnInTopic = 0;
             nextTopicId = botTopics[nextState.topicIndex].id;
-            supervisorInsight = { status: 'TRANSITION' };
+            // narrativeTransitions: surface what the user said on the departing topic as bridge material
+            const departingSnippet = (state.topicKeyInsights || {})[currentTopic.id] || '';
+            supervisorInsight = {
+                status: 'TRANSITION',
+                ...(departingSnippet && { engagingSnippet: departingSnippet })
+            };
             console.log(`  → Transition to "${botTopics[nextState.topicIndex].label}"`);
 
         } else {

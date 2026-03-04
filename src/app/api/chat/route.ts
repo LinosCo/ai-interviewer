@@ -46,7 +46,7 @@ import {
     ITALIAN_STOPWORDS, ENGLISH_STOPWORDS, tokenizeForScoring, lexicalOverlapScore,
     buildTopicSemanticText, getDeepTopics, buildDeepTopicOrder,
     getScanPlanTurns, getDeepPlanTurns, getRemainingSubGoals,
-    buildDeepPlan, selectDeepFocusPoint, buildExtensionPreviewHints,
+    buildDeepPlan, selectDeepFocusPoint, buildExtensionPreviewHints, buildExtensionUserSnippets,
     sanitizeUserSnippet, detectFatigue,
 } from '@/lib/chat/context-helpers';
 import {
@@ -670,7 +670,13 @@ export async function POST(req: Request) {
                 startIndex: sourceState.topicIndex,
                 maxItems: 2
             });
-            return createDeepOfferInsight(extensionPreview, validationFeedback);
+            const extensionUserSnippets = buildExtensionUserSnippets({
+                botTopics,
+                interestingTopics: sourceState.interestingTopics,
+                topicKeyInsights: sourceState.topicKeyInsights,
+                maxItems: 2
+            });
+            return createDeepOfferInsight(extensionPreview, validationFeedback, extensionUserSnippets);
         };
 
         if (lastMessage?.role === 'user') {
@@ -813,6 +819,23 @@ export async function POST(req: Request) {
                 supervisorInsight = deepenResult.supervisorInsight;
                 if (deepenResult.nextTopicId) {
                     nextTopicId = deepenResult.nextTopicId;
+                }
+
+                // crossTopicSynthesis: inject notes from other already-covered topics into DEEPENING insight
+                if (supervisorInsight.status === 'DEEPENING') {
+                    const keyInsights = state.topicKeyInsights || {};
+                    const currentId = currentTopic.id;
+                    const otherInsights = Object.entries(keyInsights)
+                        .filter(([id]) => id !== currentId)
+                        .map(([id, snippet]) => {
+                            const t = botTopics.find(bt => bt.id === id);
+                            return t ? `${t.label}: "${snippet}"` : null;
+                        })
+                        .filter((v): v is string => Boolean(v))
+                        .slice(0, 2);
+                    if (otherInsights.length > 0) {
+                        supervisorInsight = { ...supervisorInsight, crossTopicNotes: otherInsights.join(' | ') };
+                    }
                 }
             }
 
@@ -1437,10 +1460,12 @@ hard_rules:
         });
 
         let messagesForAI = canonicalMessages.map((m: any) => ({ role: m.role, content: m.content }));
-        if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT' || supervisorInsight?.status === 'DEEP_OFFER_ASK') {
-            // Keep recent messages for context so the LLM can preserve continuity in sensitive transitions.
-            const recentMessages = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
-            messagesForAI = recentMessages;
+        if (supervisorInsight?.status === 'DATA_COLLECTION_CONSENT') {
+            // Small context: consent is stateless, recent 6 messages are enough
+            messagesForAI = canonicalMessages.slice(-6).map((m: any) => ({ role: m.role, content: m.content }));
+        } else if (supervisorInsight?.status === 'DEEP_OFFER_ASK') {
+            // Bigger context: the AI needs interview history to craft a genuine, contextualised offer
+            messagesForAI = canonicalMessages.slice(-20).map((m: any) => ({ role: m.role, content: m.content }));
         }
 
         const criticalTurnRouting = shouldUseCriticalModelForTopicTurn({
@@ -1574,7 +1599,10 @@ hard_rules:
             questionDedupIntercepted: false
         };
         const deepOfferPreviewHints: string[] = Array.isArray(supervisorInsight.extensionPreview)
-            ? supervisorInsight.extensionPreview.map(v => String(v || '').trim()).filter(Boolean).slice(0, 1)
+            ? supervisorInsight.extensionPreview.map(v => String(v || '').trim()).filter(Boolean).slice(0, 2)
+            : [];
+        const deepOfferUserSnippets: string[] = Array.isArray(supervisorInsight.extensionUserSnippets)
+            ? supervisorInsight.extensionUserSnippets.map(v => String(v || '').trim()).filter(Boolean).slice(0, 1)
             : [];
         const userBridgeHint = lastMessage?.role === 'user'
             ? buildUserBridgeHint(lastMessage.content, language)
@@ -1600,6 +1628,7 @@ hard_rules:
                     language,
                     currentText: responseText,
                     extensionPreview: deepOfferPreviewHints,
+                    extensionUserSnippets: deepOfferUserSnippets,
                     onUsage: collectLlmUsage
                 });
                 didRegenerate = true;
@@ -1965,6 +1994,7 @@ hard_rules:
                     language,
                     currentText: responseText,
                     extensionPreview: deepOfferPreviewHints,
+                    extensionUserSnippets: deepOfferUserSnippets,
                     onUsage: collectLlmUsage
                 });
             }
@@ -2002,6 +2032,7 @@ hard_rules:
                     language,
                     currentText: responseText,
                     extensionPreview: deepOfferPreviewHints,
+                    extensionUserSnippets: deepOfferUserSnippets,
                     onUsage: collectLlmUsage
                 });
             }

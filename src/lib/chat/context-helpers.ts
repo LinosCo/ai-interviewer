@@ -393,6 +393,30 @@ export function buildExtensionPreviewHints(params: {
     return rotatedTopics.slice(0, maxItems).map(t => t.label).filter(Boolean);
 }
 
+/**
+ * Returns short snippets of what the user actually said on already-discussed topics.
+ * Used to make the DEEP_OFFER_ASK message contextual and personal.
+ */
+export function buildExtensionUserSnippets(params: {
+    botTopics: any[];
+    interestingTopics?: InterestingTopic[];
+    topicKeyInsights?: Record<string, string>;
+    maxItems?: number;
+}): string[] {
+    const { botTopics, interestingTopics = [], topicKeyInsights = {}, maxItems = 2 } = params;
+
+    const snippets: string[] = [];
+    for (const it of interestingTopics) {
+        if (snippets.length >= maxItems) break;
+        const topic = botTopics.find((t: any) => t.id === it.topicId);
+        if (!topic) continue;
+        const raw = it.bestSnippet || topicKeyInsights[it.topicId] || '';
+        const clean = sanitizeUserSnippet(raw, 18);
+        if (clean) snippets.push(clean);
+    }
+    return snippets;
+}
+
 // ============================================================================
 // Fatigue detection (avanzato)
 // ============================================================================

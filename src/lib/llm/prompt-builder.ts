@@ -235,48 +235,88 @@ Method:
             const nextTopic = nextIndex < allTopics.length ? allTopics[nextIndex] : null;
             const safeCurrentLabel = sanitizeConfig(currentTopic.label, 200);
             const nextLabel = sanitizeConfig(nextTopic?.label, 200) || (isItalian ? 'Chiusura' : 'Closure');
+            // engagingSnippet = what the user said on the departing topic — sanitize as user data
+            const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 200).trim();
+            const bridgeLine = engagingSnippet
+                ? (isItalian
+                    ? `Aggancia la transizione a qualcosa di concreto che l'utente ha condiviso: "${engagingSnippet}"`
+                    : `Anchor the bridge to something concrete the user just shared: "${engagingSnippet}"`)
+                : '';
             return isItalian ? `
 ## FASE: TRANSIZIONE
 Stai per spostarti da "${safeCurrentLabel}" a "${nextLabel}".
+${bridgeLine}
 Fai un ponte breve e naturale, poi UNA domanda di apertura per il nuovo topic.
 `.trim() : `
 ## PHASE: TRANSITION
 Moving from "${safeCurrentLabel}" to "${nextLabel}".
+${bridgeLine}
 Brief natural bridge, then ONE opening question for the next topic.
 `.trim();
         }
 
         // DEEPENING
         if (status === 'DEEPENING') {
-            // engagingSnippet originates from conversation analysis — sanitize as user data
+            // engagingSnippet and crossTopicNotes originate from conversation analysis — sanitize as user data
             const engagingSnippet = sanitize(supervisorInsight?.engagingSnippet || '', 500).trim();
+            const crossTopicNotes = sanitize(supervisorInsight?.crossTopicNotes || '', 400).trim();
             const safeLabel = sanitizeConfig(currentTopic.label, 200);
             return isItalian ? `
 ## FASE: APPROFONDIMENTO
 Topic: "${safeLabel}"
 ${engagingSnippet ? `Spunto chiave: "${engagingSnippet}"` : ''}
+${crossTopicNotes ? `Contesto trasversale (altri topic): ${crossTopicNotes}` : ''}
 Approfondisci i segnali significativi. Una sola domanda focalizzata.
 `.trim() : `
 ## PHASE: DEEPENING
 Topic: "${safeLabel}"
 ${engagingSnippet ? `Key insight: "${engagingSnippet}"` : ''}
+${crossTopicNotes ? `Cross-topic context: ${crossTopicNotes}` : ''}
 Deepen significant signals. One focused question.
 `.trim();
         }
 
         // DEEP_OFFER_ASK
         if (status === 'DEEP_OFFER_ASK') {
+            // extensionPreview = areas/focus points we'd explore (from uncovered topics)
+            // extensionUserSnippets = what the user actually said on covered topics (user data → sanitize)
+            const previewAreas = (supervisorInsight?.extensionPreview || [])
+                .map(v => sanitizeConfig(String(v || '').trim(), 100))
+                .filter(Boolean);
+            const userSnippets = (supervisorInsight?.extensionUserSnippets || [])
+                .map(v => sanitize(String(v || '').trim(), 120))
+                .filter(Boolean);
+
+            const areasLine = previewAreas.length > 0
+                ? (isItalian
+                    ? `Aree ancora da esplorare: ${previewAreas.map(a => `"${a}"`).join(', ')}`
+                    : `Areas still to explore: ${previewAreas.map(a => `"${a}"`).join(', ')}`)
+                : '';
+            const snippetsLine = userSnippets.length > 0
+                ? (isItalian
+                    ? `Da quanto condiviso dall'utente: "${userSnippets[0]}"`
+                    : `From what the user shared: "${userSnippets[0]}"`)
+                : '';
+
             return isItalian ? `
 ## FASE: OFFERTA ESTENSIONE
-Il tempo è quasi concluso.
-Offri di continuare per alcuni minuti. Una sola domanda yes/no, tono naturale.
-Non chiedere contatti. Non porre domande di topic.
-`.trim() : `
+Il tempo pianificato è quasi concluso.
+${areasLine}
+${snippetsLine}
+1. Ringrazia brevemente per i contributi condivisi, facendo un riferimento specifico a qualcosa di concreto emerso.
+2. Menziona naturalmente 1-2 aree specifiche che potrebbero essere approfondite.
+3. Chiedi UNA sola domanda yes/no per sapere se vuole continuare ancora qualche minuto.
+Tono caldo e naturale. Non chiedere contatti. Non porre domande di topic.
+`.trim().replace(/\n{3,}/g, '\n') : `
 ## PHASE: EXTENSION OFFER
-Time is almost up.
-Offer to continue for a few minutes. One yes/no question, natural tone.
-Do not ask for contacts or topic questions.
-`.trim();
+The planned interview time is almost over.
+${areasLine}
+${snippetsLine}
+1. Briefly thank for the contributions, with a specific reference to something concrete that emerged.
+2. Naturally mention 1-2 specific areas that could still be explored.
+3. Ask exactly ONE yes/no question to check if they want to continue a few more minutes.
+Warm and natural tone. Do not ask for contacts or topic questions.
+`.trim().replace(/\n{3,}/g, '\n');
         }
 
         // DATA_COLLECTION_CONSENT

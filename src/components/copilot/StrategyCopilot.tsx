@@ -6,14 +6,6 @@ import { Sparkles, Send, X, Lightbulb, MessageSquare, AlertCircle, Loader2, Rota
 import { useProject } from '@/contexts/ProjectContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import ReactMarkdown from 'react-markdown';
-import { createPortal } from 'react-dom';
-
-const floatingAnchorStyle = {
-    top: 'auto',
-    left: 'auto',
-    right: 'clamp(1rem, 2vw, 1.5rem)',
-    bottom: 'clamp(1rem, 2vw, 1.5rem)',
-} as const;
 
 interface Message {
     id: string;
@@ -27,6 +19,13 @@ interface Message {
 interface StrategyCopilotProps {
     userTier: string;
 }
+
+const copilotAnchorStyle = {
+    left: 'auto',
+    top: 'auto',
+    right: '1rem',
+    bottom: '1rem',
+} as const;
 
 const QUICK_ACTIONS = [
     { label: 'Come creo un\'intervista?', icon: Lightbulb, category: 'help' },
@@ -94,7 +93,6 @@ function buildLoadingStages(prompt: string): string[] {
 
 export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [isMounted, setIsMounted] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -132,9 +130,28 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         };
     }, []);
 
+    // If the landing chatbot embed leaked into dashboard via client-side navigation,
+    // remove it to avoid overlap/conflicts with Strategy Copilot.
     useEffect(() => {
-        setIsMounted(true);
-        return () => setIsMounted(false);
+        if (typeof document === 'undefined') return;
+
+        const removeEmbeddedWidget = () => {
+            document.getElementById('bt-root')?.remove();
+            document
+                .querySelectorAll('script[src*="/embed/chatbot.js"], script[src*="embed/chatbot.js"]')
+                .forEach((node) => {
+                    node.parentNode?.removeChild(node);
+                });
+        };
+
+        removeEmbeddedWidget();
+        const interval = window.setInterval(removeEmbeddedWidget, 1200);
+        const timeout = window.setTimeout(() => window.clearInterval(interval), 10000);
+
+        return () => {
+            window.clearInterval(interval);
+            window.clearTimeout(timeout);
+        };
     }, []);
 
     // Fetch unread alert count on mount, refresh every 5 minutes
@@ -361,7 +378,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         ? [...QUICK_ACTIONS, ...QUICK_ACTIONS_PRO]
         : QUICK_ACTIONS;
 
-    const copilotUi = (
+    return (
         <>
             {/* Floating Bubble */}
             <AnimatePresence>
@@ -371,8 +388,8 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
                         onClick={() => { setIsOpen(true); markAlertsRead(); }}
-                        className="fixed z-[80] w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow relative"
-                        style={floatingAnchorStyle}
+                        className="fixed w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40 relative"
+                        style={copilotAnchorStyle}
                         title="Strategy Copilot"
                     >
                         <Sparkles className="w-6 h-6" />
@@ -392,8 +409,8 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        className="fixed z-[80] w-[min(400px,calc(100vw-2rem))] h-[min(600px,calc(100vh-6rem))] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-stone-200"
-                        style={floatingAnchorStyle}
+                        className="fixed w-[calc(100vw-2rem)] max-w-[400px] h-[min(600px,calc(100vh-6rem))] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-40 border border-stone-200"
+                        style={copilotAnchorStyle}
                     >
                         {/* Header */}
                         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4">
@@ -549,7 +566,4 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             </AnimatePresence>
         </>
     );
-
-    if (!isMounted) return null;
-    return createPortal(copilotUi, document.body);
 }

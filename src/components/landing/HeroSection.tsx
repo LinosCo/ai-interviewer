@@ -124,7 +124,7 @@ function HeroCycleVisual(): React.JSX.Element {
         onMouseLeave={() => setIsPaused(false)}
       >
         <p className="font-display text-2xl md:text-4xl font-bold tracking-tight text-[hsl(var(--foreground))] text-center mb-6 md:mb-8">
-          Un processo di innovazione
+          Il ciclo di miglioramento continuo
         </p>
 
         <div className="flex flex-col md:grid md:grid-cols-[1.2fr_1fr] gap-6 md:gap-8 md:items-center">

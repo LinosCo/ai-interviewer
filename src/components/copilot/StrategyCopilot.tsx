@@ -123,20 +123,27 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         };
     }, []);
 
-    // Fetch unread alert count on mount
+    // Fetch unread alert count on mount, refresh every 5 minutes
     useEffect(() => {
         const orgId = currentOrganization?.id;
         if (!orgId) return;
-        fetch(`/api/copilot/alerts?organizationId=${orgId}&unreadOnly=true&limit=1`)
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-                if (data?.unreadCount) setUnreadAlerts(data.unreadCount);
-            })
-            .catch(() => {});
+
+        const fetchCount = () => {
+            fetch(`/api/copilot/alerts?organizationId=${orgId}&unreadOnly=true&limit=1`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (data?.unreadCount !== undefined) setUnreadAlerts(data.unreadCount);
+                })
+                .catch(() => {});
+        };
+
+        fetchCount();
+        const interval = setInterval(fetchCount, 5 * 60 * 1000);
+        return () => clearInterval(interval);
     }, [currentOrganization?.id]);
 
     const markAlertsRead = async () => {
-        const orgId = (currentOrganization as any)?.id ?? currentOrganization?.id;
+        const orgId = currentOrganization?.id;
         if (!orgId) return;
         try {
             await fetch('/api/copilot/alerts', {

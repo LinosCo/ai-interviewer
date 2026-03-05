@@ -69,7 +69,11 @@ export class CopilotAlertEngine {
 
     let alertsCreated = 0;
     for (const org of orgs) {
-      alertsCreated += await CopilotAlertEngine.runChecksForOrg(org.id);
+      try {
+        alertsCreated += await CopilotAlertEngine.runChecksForOrg(org.id);
+      } catch (e) {
+        console.error(`[alert-engine] org ${org.id} failed:`, e);
+      }
     }
 
     return { orgsChecked: orgs.length, alertsCreated };
@@ -117,25 +121,30 @@ export class CopilotAlertEngine {
   private static async checkNegativeLLMMentions(organizationId: string): Promise<AlertPayload[]> {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const negativeMentions = await prisma.visibilityScan.findMany({
+    const negativeMentions = await prisma.visibilityResponse.findMany({
       where: {
-        config: { organizationId },
+        scan: {
+          visibilityConfig: { organizationId },
+        },
         createdAt: { gte: sevenDaysAgo },
         sentiment: { in: ['negative', 'NEGATIVE'] },
       },
       select: {
-        llmPlatform: true,
-        query: true,
+        platform: true,
         sentiment: true,
-        config: { select: { brandName: true } },
+        scan: {
+          select: {
+            visibilityConfig: { select: { brandName: true } },
+          },
+        },
       },
       take: 10,
     });
 
     if (negativeMentions.length === 0) return [];
 
-    const platforms = [...new Set(negativeMentions.map((m) => m.llmPlatform).filter(Boolean))];
-    const brandName = negativeMentions[0]?.config?.brandName || 'il tuo brand';
+    const platforms = [...new Set(negativeMentions.map((m) => m.platform).filter(Boolean))];
+    const brandName = negativeMentions[0]?.scan?.visibilityConfig?.brandName || 'il tuo brand';
 
     return [{
       alertType: 'NEGATIVE_LLM_MENTION',

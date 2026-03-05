@@ -10,6 +10,7 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+    suggestedLinks?: Array<{ title: string; url: string }>;
 }
 
 interface ChatWindowProps {
@@ -357,7 +358,15 @@ export default function ChatWindow({
                     url: window.parent !== window && document.referrer ? document.referrer : window.location.href,
                     title: document.title || '',
                     description: fallbackDescription,
-                    mainContent: ''
+                    mainContent: (() => {
+                        try {
+                            const headings = [...document.querySelectorAll('h1, h2')]
+                                .map(el => el.textContent?.trim()).filter(Boolean).slice(0, 8).join(' | ');
+                            const prices = [...document.querySelectorAll('[class*="price"],[class*="pricing"],[class*="prezzo"]')]
+                                .map(el => el.textContent?.trim()).filter(Boolean).slice(0, 3).join(' | ');
+                            return [headings, prices].filter(Boolean).join(' | ').slice(0, 2000);
+                        } catch { return ''; }
+                    })()
                 };
 
                 const resolvedContext = {
@@ -467,7 +476,8 @@ export default function ChatWindow({
                         id: `${Date.now()}_${idx}`,
                         role: 'assistant' as const,
                         content,
-                        timestamp: new Date()
+                        timestamp: new Date(),
+                        suggestedLinks: idx === safeResponses.length - 1 ? (data.suggestedLinks || []) : []
                     }))
                 ]);
             } else {
@@ -479,7 +489,8 @@ export default function ChatWindow({
                         id: Date.now().toString(),
                         role: 'assistant',
                         content,
-                        timestamp: new Date()
+                        timestamp: new Date(),
+                        suggestedLinks: data.suggestedLinks || []
                     }
                 ]);
             }
@@ -588,39 +599,51 @@ export default function ChatWindow({
                             {/* Messages Area */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 scrollbar-thin scrollbar-thumb-gray-200">
                                 {messages.map((msg) => (
-                                    <motion.div
-                                        key={msg.id}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                    >
-                                        <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                            {/* Avatar */}
-                                            <div
-                                                className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs shadow-sm mt-auto
+                                    <div key={msg.id}>
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                        >
+                                            <div className={`flex gap-2 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                                                {/* Avatar */}
+                                                <div
+                                                    className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs shadow-sm mt-auto
                                             ${msg.role === 'user' ? 'bg-gray-800' : ''}`}
-                                                style={msg.role === 'assistant' ? { backgroundColor: primaryColor } : {}}
-                                            >
-                                                {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                                            </div>
+                                                    style={msg.role === 'assistant' ? { backgroundColor: primaryColor } : {}}
+                                                >
+                                                    {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                                                </div>
 
-                                            {/* Bubble */}
-                                            <div
-                                                className={`p-3.5 rounded-2xl shadow-sm text-sm leading-relaxed
+                                                {/* Bubble */}
+                                                <div
+                                                    className={`p-3.5 rounded-2xl shadow-sm text-sm leading-relaxed
                                             ${msg.role === 'user'
-                                                        ? 'bg-gray-900 text-white rounded-br-none'
-                                                        : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
-                                                    }`}
-                                            >
-                                                <div className={`prose prose-sm max-w-none ${msg.role === 'user' ? 'prose-invert' : ''} 
+                                                            ? 'bg-gray-900 text-white rounded-br-none'
+                                                            : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                                                        }`}
+                                                >
+                                                    <div className={`prose prose-sm max-w-none ${msg.role === 'user' ? 'prose-invert' : ''}
                                             prose-p:leading-relaxed prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-strong:font-bold prose-ul:list-disc prose-ol:list-decimal`}>
-                                                    <ReactMarkdown>
-                                                        {msg.content}
-                                                    </ReactMarkdown>
+                                                        <ReactMarkdown>
+                                                            {msg.content}
+                                                        </ReactMarkdown>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </motion.div>
+                                        </motion.div>
+                                        {msg.role === 'assistant' && (msg.suggestedLinks?.length ?? 0) > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-1.5 ml-10">
+                                                {msg.suggestedLinks!.map((link, i) => (
+                                                    <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
+                                                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm">
+                                                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                                        {link.title}
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 ))}
 
                                 {isLoading && (

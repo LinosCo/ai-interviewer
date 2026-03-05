@@ -315,6 +315,21 @@ export async function POST(req: Request) {
         const session = conversation.chatbotSession;
         if (!session) return Response.json({ error: 'Session not found' }, { status: 404 });
 
+        // C2: Look up KB entry for the current page URL
+        let pageKbEntry: { title: string | null; content: string } | null = null;
+        if (session?.pageUrl) {
+            try {
+                pageKbEntry = await prisma.knowledgeSource.findFirst({
+                    where: {
+                        botId: bot.id,
+                        type: 'url',
+                        content: { startsWith: `URL: ${session.pageUrl}` }
+                    },
+                    select: { title: true, content: true }
+                });
+            } catch (err) { console.warn('[CHATBOT] Page KB lookup failed:', err); }
+        }
+
         // Verify the request comes from the session that owns this conversation
         const requestSessionId = req.headers.get('x-session-id') ||
             new URL(req.url).searchParams.get('sessionId');
@@ -375,7 +390,7 @@ export async function POST(req: Request) {
             }
         }
 
-        const systemPromptBase = buildChatbotPrompt(bot, session);
+        const systemPromptBase = buildChatbotPrompt(bot, session, pageKbEntry);
         const scopeLexicon = buildScopeLexicon(bot);
         const scopeConfigured = hasConfiguredScope(bot);
 
@@ -554,6 +569,33 @@ OUTPUT: Reply with JSON {"shouldAsk": true/false, "reason": "..."}`,
                             field: justExtractedFieldName,
                             value: extraction.value
                         };
+                        // B1: fire per-field webhook
+                        if (bot.webhookUrl && justExtractedField) {
+                            fireLeadWebhook(bot.webhookUrl, {
+                                event: 'lead_field_captured',
+                                botId: bot.id,
+                                conversationId,
+                                capturedField: justExtractedField.field,
+                                capturedValue: justExtractedField.value,
+                                candidateProfile,
+                                pageUrl: session.pageUrl,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+                        // B3: fire all-complete webhook
+                        if (bot.webhookUrl && justExtractedField) {
+                            const remaining = getNextMissingField(candidateFields, candidateProfile, declinedFields);
+                            if (!remaining) {
+                                fireLeadWebhook(bot.webhookUrl, {
+                                    event: 'lead_complete',
+                                    botId: bot.id,
+                                    conversationId,
+                                    candidateProfile,
+                                    pageUrl: session.pageUrl,
+                                    timestamp: new Date().toISOString()
+                                });
+                            }
+                        }
                     } else {
                         // Field extraction failed — persist attempt count and auto-skip after 2 consecutive failures
                         fieldAttemptCounts[nextMissingField.field] = attemptCount;
@@ -673,6 +715,9 @@ NON-NEGOTIABLE RULES
             );
         }
 
+        const kbSourcesForValidation = Array.isArray(bot.knowledgeSources) ? bot.knowledgeSources : [];
+        const suggestedLinks = extractSuggestedLinks(finalResponse, kbSourcesForValidation);
+
         let splitParts: { before: string; after: string } | null = null;
         if (finalResponse.includes(LEAD_SPLIT_TOKEN)) {
             const [before, after] = finalResponse.split(LEAD_SPLIT_TOKEN, 2);
@@ -756,10 +801,10 @@ NON-NEGOTIABLE RULES
 
         if (splitParts) {
             const responses = [splitParts.before, splitParts.after].filter(Boolean);
-            return Response.json({ responses });
+            return Response.json({ responses, suggestedLinks });
         }
 
-        return Response.json({ response: finalResponse });
+        return Response.json({ response: finalResponse, suggestedLinks });
 
     } catch (error) {
         console.error('Error:', error);
@@ -767,7 +812,38 @@ NON-NEGOTIABLE RULES
     }
 }
 
-function buildChatbotPrompt(bot: any, session: any): string {
+function fireLeadWebhook(url: string, payload: Record<string, unknown>): void {
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).catch(err => console.error('[CHATBOT] Webhook failed:', url, err));
+}
+
+interface SuggestedLink { title: string; url: string; }
+
+function extractSuggestedLinks(
+    responseText: string,
+    kbSources: Array<{ content: string }>
+): SuggestedLink[] {
+    const kbUrls = new Set<string>();
+    for (const source of kbSources) {
+        const m = source.content.match(/^URL:\s*(https?:\/\/\S+)/m);
+        if (m) kbUrls.add(m[1]);
+    }
+    if (kbUrls.size === 0) return [];
+
+    const pattern = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+    const links: SuggestedLink[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(responseText)) !== null) {
+        if (kbUrls.has(m[2].trim())) links.push({ title: m[1].trim(), url: m[2].trim() });
+    }
+    const seen = new Set<string>();
+    return links.filter(l => seen.has(l.url) ? false : (seen.add(l.url), true)).slice(0, 3);
+}
+
+function buildChatbotPrompt(bot: any, session: any, pageKbEntry?: { title: string | null; content: string } | null): string {
     const kb = bot.knowledgeSources?.map((k: any) => `[${k.title}]: ${k.content}`).join('\n\n') || '';
     const researchGoal = typeof bot.researchGoal === 'string' ? bot.researchGoal.trim() : '';
     const topicScope = Array.isArray(bot.topics)
@@ -816,6 +892,10 @@ Visible page content snippet: ${pageContentSnippet || 'N/A'}
 `
         : '';
 
+    const currentPageKbSection = pageKbEntry
+        ? `\n## CURRENT PAGE CONTENT (HIGH PRIORITY)\nThe user is on a page with full scraped content available. Use as primary source:\n${sanitize(pageKbEntry.content, 4000)}\n`
+        : '';
+
     return `
 You are a helpful AI assistant for "${bot.name}".
 Tone: ${bot.tone || 'Professional'}
@@ -830,6 +910,7 @@ ${boundariesText || '- N/A'}
 ## KNOWLEDGE BASE
 ${kb}
 
+${currentPageKbSection}
 ${pageContextSection}
 
 ## INSTRUCTIONS
@@ -844,5 +925,6 @@ ${pageContextSection}
 - Strict scope guardrail: if the user asks something unrelated to the objective/topics above, do NOT answer that out-of-scope request.
 - For out-of-scope requests, reply briefly and politely: state you can help only on the configured topics, propose 1-2 in-scope alternatives, and ask one in-scope follow-up question.
 - Boundary guardrail: if a user request conflicts with any boundary listed above, refuse that specific request briefly and redirect to an allowed alternative.
+- When your answer draws directly from a specific KB page, include at most 2-3 relevant links at the end under "**Pagine utili:**" using markdown format: [Title](URL). Only use URLs that appear verbatim in the knowledge base content above. Never invent or guess URLs.
 `.trim();
 }

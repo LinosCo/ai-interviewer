@@ -1,6 +1,6 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
@@ -26,7 +26,9 @@ import {
     createScrapeWebSourceTool,
     createStrategicTipCreationTool,
     createTipRoutingManagerTool,
-    createProjectConnectionsOpsTool
+    createProjectConnectionsOpsTool,
+    createCompetitorAnalysisTool,
+    createSeoGeoAeoTool
 } from '@/lib/copilot/chat-tools';
 
 export const maxDuration = 60;
@@ -67,7 +69,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { message, history = [], projectId } = await req.json();
+        const { message, conversationId: incomingConversationId, projectId } = await req.json();
 
         if (!message || typeof message !== 'string') {
             return NextResponse.json({ error: 'Message is required' }, { status: 400 });
@@ -213,8 +215,30 @@ export async function POST(req: Request) {
             systemPrompt += `\n\n## Informazioni dalla Knowledge Base\n${kbContext}`;
         }
 
+        // Load or create persistent conversation
+        let conversation: { id: string; messages: { role: string; content: string; toolsUsed: string[] }[] } | null = null;
+        if (incomingConversationId) {
+            conversation = await prisma.copilotConversation.findFirst({
+                where: { id: incomingConversationId, userId: session.user.id },
+                include: {
+                    messages: { orderBy: { createdAt: 'asc' }, take: 20 }
+                }
+            });
+        }
+        if (!conversation) {
+            conversation = await prisma.copilotConversation.create({
+                data: {
+                    userId: session.user.id,
+                    organizationId: organization.id,
+                    projectId: projectId || null
+                },
+                include: { messages: true }
+            });
+        }
+        const conversationId = conversation.id;
+
         const inputMessages = [
-            ...history.slice(-10).map((m: any) => ({
+            ...conversation.messages.map((m) => ({
                 role: m.role as 'user' | 'assistant',
                 content: m.content
             })),
@@ -271,28 +295,25 @@ export async function POST(req: Request) {
             },
             manageProjectConnections: {
                 ...createProjectConnectionsOpsTool(toolContext),
+            },
+            getCompetitorIntelligence: {
+                ...createCompetitorAnalysisTool(toolContext),
+            },
+            analyzeSeoGeoAeo: {
+                ...createSeoGeoAeoTool(toolContext),
             }
         };
 
-        const runLLM = async (provider: 'anthropic' | 'openai', model: string) => {
-            const llm = provider === 'anthropic'
+        const toolSet = hasProjectAccess
+            ? ({ ...supportTools, ...projectTools } as any)
+            : (supportTools as any);
+
+        const SYSTEM_SUFFIX = "\n\nCRITICAL: Never respond with placeholder messages like 'I'm searching' as a final answer. Always complete tool calls and give a full markdown answer. Optionally end with a natural Italian follow-up question on a new line prefixed with 'FOLLOW_UP: '.";
+
+        const buildLLM = (provider: 'anthropic' | 'openai', model: string) =>
+            provider === 'anthropic'
                 ? createAnthropic({ apiKey: anthropicApiKey })(model)
                 : createOpenAI({ apiKey: openaiApiKey })(model);
-
-            const toolSet = hasProjectAccess
-                ? ({ ...supportTools, ...projectTools } as any)
-                : (supportTools as any);
-
-            return generateText({
-                model: llm as any,
-                system: systemPrompt + "\n\nCRITICAL: Never stop at 'I'm searching' or similar placeholder messages. If you use tools, always provide the final concrete answer in the same turn. Your final response MUST be a JSON object with this structure: { \"response\": \"your markdown response\", \"usedKnowledgeBase\": true/false, \"suggestedFollowUp\": \"optional question\" }. Do not include any other text in the final output step.",
-                messages: inputMessages,
-                tools: toolSet,
-                ...(toolSet ? { maxSteps: 4 } : {}),
-                temperature: 0.3,
-                abortSignal: AbortSignal.timeout(45000) // 45s timeout
-            });
-        };
 
         // Sonnet 4.6 is the preferred strategic copilot model.
         const anthropicModelCandidates = [
@@ -303,118 +324,172 @@ export async function POST(req: Request) {
         ].filter(Boolean);
 
         let modelUsed = anthropicModelCandidates[0] || 'claude-4.6-sonnet';
-        let result: any;
+
+        // Metadata captured in onFinish — shared across attempts
+        let capturedUsage: any = null;
+        let capturedToolsUsed: string[] = [];
+
+        const attemptStream = async (provider: 'anthropic' | 'openai', model: string) => {
+            modelUsed = model;
+            return streamText({
+                model: buildLLM(provider, model) as any,
+                system: systemPrompt + SYSTEM_SUFFIX,
+                messages: inputMessages,
+                tools: toolSet,
+                // @ts-expect-error maxSteps is valid in ai v5 but TS overload resolution fails when tools is typed as any
+                maxSteps: 4,
+                temperature: 0.3,
+                abortSignal: AbortSignal.timeout(55000),
+                onFinish: ({ usage, steps }) => {
+                    capturedUsage = usage;
+                    capturedToolsUsed = steps?.flatMap((s: any) => s.toolCalls?.map((tc: any) => tc.toolName) ?? []) ?? [];
+                }
+            });
+        };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let streamResult: Awaited<ReturnType<typeof attemptStream>> | undefined;
 
         try {
             if (anthropicApiKey) {
-                let lastAnthropicError: unknown = null;
+                let lastError: unknown = null;
                 for (const candidate of anthropicModelCandidates) {
                     try {
-                        modelUsed = candidate;
-                        result = await runLLM('anthropic', candidate);
-                        lastAnthropicError = null;
+                        streamResult = await attemptStream('anthropic', candidate);
+                        lastError = null;
                         break;
                     } catch (error) {
-                        lastAnthropicError = error;
-                        if (!isAnthropicModelNotFound(error)) {
-                            throw error;
-                        }
+                        lastError = error;
+                        if (!isAnthropicModelNotFound(error)) throw error;
                     }
                 }
-
-                if (lastAnthropicError) {
-                    throw lastAnthropicError;
-                }
+                if (lastError) throw lastError;
             } else {
                 modelUsed = 'gpt-4o';
-                result = await runLLM('openai', modelUsed);
+                streamResult = await attemptStream('openai', 'gpt-4o');
             }
         } catch (error) {
             if (isConnectionError(error) && openaiApiKey) {
                 console.warn('[Copilot] Fallback to OpenAI due to connection error');
                 modelUsed = 'gpt-4o';
-                result = await runLLM('openai', modelUsed);
+                streamResult = await attemptStream('openai', 'gpt-4o');
             } else {
                 throw error;
             }
         }
 
-        // Parse JSON from result.text
-        let finalObject = { response: result.text, usedKnowledgeBase: false, suggestedFollowUp: '' };
-        try {
-            // Find JSON block if it exists
-            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                finalObject = JSON.parse(jsonMatch[0]);
-            }
-        } catch (e) {
-            console.error('[Copilot] Failed to parse JSON from LLM response:', e);
-            finalObject = { response: result.text, usedKnowledgeBase: false, suggestedFollowUp: '' };
-        }
+        // Stream the text to the client using Server-Sent Events.
+        // After the LLM finishes we append a JSON metadata frame so the client
+        // can extract suggestedFollowUp / toolsUsed without a second round-trip.
+        const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+        const writer = writable.getWriter();
+        const enc = new TextEncoder();
 
-        // 9. Track token usage with new credits system
-        if (result.usage) {
+        (async () => {
+            let fullText = '';
             try {
-                await TokenTrackingService.logTokenUsage({
-                    userId: session.user.id,
-                    organizationId: organization?.id,
-                    projectId: projectId || undefined,
-                    inputTokens: result.usage.inputTokens || 0,
-                    outputTokens: result.usage.outputTokens || 0,
-                    category: 'SUGGESTION',
-                    model: modelUsed,
-                    operation: 'copilot-chat',
-                    resourceType: 'copilot',
-                    resourceId: session.user.id,
-                    actionOverride: 'copilot_message'
-                });
-            } catch (err) {
-                console.error('[Copilot] Credit tracking failed:', err);
-            }
-        }
-
-        let responseText = typeof finalObject?.response === 'string'
-            ? finalObject.response
-            : String(finalObject?.response ?? result.text ?? '');
-
-        if (isPlaceholderCopilotResponse(responseText) && kbResults.length > 0) {
-            const top = kbResults[0];
-            responseText = `Ho trovato questo nella documentazione di Business Tuner:\n\n**${top.title}**\n\n${top.content.slice(0, 1100)}\n\nSe vuoi, posso darti i passaggi operativi esatti sul tuo progetto.`;
-            finalObject.usedKnowledgeBase = true;
-        }
-
-        // 10. Log copilot session
-        const estimatedTokens = Math.ceil((message.length + responseText.length) / 4);
-        const sessionDate = new Date().toISOString().split('T')[0];
-        const sessionKey = `${session.user.id}-${sessionDate}`;
-
-        try {
-            await prisma.copilotSession.upsert({
-                where: { id: sessionKey },
-                update: {
-                    messagesCount: { increment: 1 },
-                    tokensUsed: { increment: estimatedTokens }
-                },
-                create: {
-                    id: sessionKey,
-                    userId: session.user.id,
-                    organizationId: organization.id,
-                    projectId: projectId || null,
-                    messagesCount: 1,
-                    tokensUsed: estimatedTokens
+                for await (const chunk of streamResult!.textStream) {
+                    fullText += chunk;
+                    await writer.write(enc.encode(chunk));
                 }
-            });
-        } catch (e) {
-            // Ignore session logging errors
-            console.error('[Copilot] Session logging error:', e);
-        }
 
-        return NextResponse.json({
-            response: responseText || 'Non sono riuscito a generare una risposta valida. Riprova tra poco.',
-            hasProjectAccess,
-            usedKnowledgeBase: finalObject.usedKnowledgeBase,
-            suggestedFollowUp: finalObject.suggestedFollowUp,
-            toolsUsed: result.steps?.flatMap((s: any) => s.toolCalls?.map((tc: any) => tc.toolName)) || []
+                // Extract and strip FOLLOW_UP line from streamed text
+                let suggestedFollowUp = '';
+                const followUpMatch = fullText.match(/\nFOLLOW_UP:\s*(.+)$/m);
+                if (followUpMatch) {
+                    suggestedFollowUp = followUpMatch[1].trim();
+                }
+
+                // KB fallback for placeholder responses
+                let usedKnowledgeBase = false;
+                if (isPlaceholderCopilotResponse(fullText) && kbResults.length > 0) {
+                    const top = kbResults[0];
+                    const fallback = `Ho trovato questo nella documentazione di Business Tuner:\n\n**${top.title}**\n\n${top.content.slice(0, 1100)}\n\nSe vuoi, posso darti i passaggi operativi esatti sul tuo progetto.`;
+                    await writer.write(enc.encode('\x00' + fallback)); // replace signal
+                    usedKnowledgeBase = true;
+                }
+
+                // Track token usage
+                if (capturedUsage) {
+                    try {
+                        await TokenTrackingService.logTokenUsage({
+                            userId: session.user!.id,
+                            organizationId: organization?.id,
+                            projectId: projectId || undefined,
+                            inputTokens: capturedUsage.promptTokens || capturedUsage.inputTokens || 0,
+                            outputTokens: capturedUsage.completionTokens || capturedUsage.outputTokens || 0,
+                            category: 'SUGGESTION',
+                            model: modelUsed,
+                            operation: 'copilot-chat',
+                            resourceType: 'copilot',
+                            resourceId: session.user!.id,
+                            actionOverride: 'copilot_message'
+                        });
+                    } catch (err) {
+                        console.error('[Copilot] Credit tracking failed:', err);
+                    }
+                }
+
+                // Persist conversation messages
+                try {
+                    await prisma.copilotMessage.createMany({
+                        data: [
+                            { conversationId, role: 'user', content: message, toolsUsed: [] },
+                            { conversationId, role: 'assistant', content: fullText, toolsUsed: capturedToolsUsed }
+                        ]
+                    });
+                    await prisma.copilotConversation.update({
+                        where: { id: conversationId },
+                        data: { updatedAt: new Date() }
+                    });
+                } catch (e) {
+                    console.error('[Copilot] Conversation persistence error:', e);
+                }
+
+                // Log copilot session
+                const estimatedTokens = Math.ceil((message.length + fullText.length) / 4);
+                const sessionDate = new Date().toISOString().split('T')[0];
+                const sessionKey = `${session.user!.id}-${sessionDate}`;
+                try {
+                    await prisma.copilotSession.upsert({
+                        where: { id: sessionKey },
+                        update: { messagesCount: { increment: 1 }, tokensUsed: { increment: estimatedTokens } },
+                        create: {
+                            id: sessionKey,
+                            userId: session.user!.id as string,
+                            organizationId: organization.id,
+                            projectId: projectId || null,
+                            messagesCount: 1,
+                            tokensUsed: estimatedTokens
+                        }
+                    });
+                } catch (e) {
+                    console.error('[Copilot] Session logging error:', e);
+                }
+
+                // Append metadata as a special JSON frame delimited by \x01
+                const meta = JSON.stringify({
+                    conversationId,
+                    hasProjectAccess,
+                    usedKnowledgeBase,
+                    suggestedFollowUp,
+                    toolsUsed: capturedToolsUsed
+                });
+                await writer.write(enc.encode('\x01' + meta));
+            } catch (err) {
+                console.error('[Copilot] Stream error:', err);
+            } finally {
+                await writer.close();
+            }
+        })();
+
+        return new Response(readable, {
+            headers: {
+                'Content-Type': 'text/plain; charset=utf-8',
+                'X-Content-Type-Options': 'nosniff',
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no'
+            }
         });
 
     } catch (error: any) {
@@ -423,6 +498,41 @@ export async function POST(req: Request) {
             { error: 'Internal error', message: error.message },
             { status: 500 }
         );
+    }
+}
+
+export async function GET(req: Request) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const { searchParams } = new URL(req.url);
+        const conversationId = searchParams.get('conversationId');
+        if (!conversationId) {
+            return NextResponse.json({ error: 'conversationId is required' }, { status: 400 });
+        }
+        const conversation = await prisma.copilotConversation.findFirst({
+            where: { id: conversationId, userId: session.user.id },
+            include: {
+                messages: { orderBy: { createdAt: 'asc' }, take: 40 }
+            }
+        });
+        if (!conversation) {
+            return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+        }
+        return NextResponse.json({
+            conversationId: conversation.id,
+            messages: conversation.messages.map(m => ({
+                role: m.role,
+                content: m.content,
+                toolsUsed: m.toolsUsed,
+                createdAt: m.createdAt
+            }))
+        });
+    } catch (error: any) {
+        console.error('[Copilot GET] Error:', error);
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 });
     }
 }
 

@@ -34,6 +34,7 @@ model User {
   plan                    UserPlanType               @default(FREE)
   accounts                Account[]
   copilotSessions         CopilotSession[]
+  copilotConversations    CopilotConversation[]
   creditPacks             CreditPack[]
   creditTransactions      CreditTransaction[]
   sentTransfers           ItemTransferInvite[]       @relation("UserSentTransfers")
@@ -189,6 +190,8 @@ model Organization {
   platformSettingsId     String?                @unique
   cmsConnections         CMSConnection[]
   copilotSessions        CopilotSession[]
+  copilotConversations   CopilotConversation[]
+  copilotAlerts          CopilotAlert[]
   crossChannelInsights   CrossChannelInsight[]
   mcpConnections         MCPConnection[]
   members                Membership[]
@@ -313,8 +316,9 @@ model Project {
   cmsConnectionId      String?
   bots                 Bot[]
   newCmsConnection     CMSConnection?             @relation("NewCMSAssociation")
-  copilotSessions      CopilotSession[]
-  creditTransactions   CreditTransaction[]
+  copilotSessions        CopilotSession[]
+  copilotConversations   CopilotConversation[]
+  creditTransactions     CreditTransaction[]
   crossChannelInsights CrossChannelInsight[]
   googleConnection     GoogleConnection?
   itemTransfers        ItemTransferInvite[]       @relation("ProjectItemTransfers")
@@ -1121,14 +1125,31 @@ model VisibilityPrompt {
 }
 
 model Competitor {
-  id               String           @id @default(cuid())
+  id               String              @id @default(cuid())
   configId         String
   name             String
   website          String?
-  enabled          Boolean          @default(true)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  visibilityConfig VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  enabled          Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  visibilityConfig VisibilityConfig    @relation(fields: [configId], references: [id], onDelete: Cascade)
+  profile          CompetitorProfile?
+}
+
+model CompetitorProfile {
+  id               String      @id @default(cuid())
+  competitorId     String      @unique
+  positioningNotes String?
+  contentGaps      Json?
+  strengths        Json?
+  weaknesses       Json?
+  avgPosition      Float?
+  mentionCount     Int         @default(0)
+  platformsCited   String[]
+  lastAnalyzedAt   DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  competitor       Competitor  @relation(fields: [competitorId], references: [id], onDelete: Cascade)
 }
 
 model VisibilityScan {
@@ -1435,6 +1456,65 @@ model CopilotSession {
 
   @@index([userId])
   @@index([organizationId])
+}
+
+model PlatformKBEntry {
+  id        String   @id
+  title     String
+  content   String
+  category  String
+  keywords  String[]
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}
+
+model CopilotConversation {
+  id             String          @id @default(cuid())
+  userId         String
+  organizationId String
+  projectId      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  messages       CopilotMessage[]
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?        @relation(fields: [projectId], references: [id])
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([userId, updatedAt])
+}
+
+model CopilotMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  toolsUsed      String[]
+  createdAt      DateTime            @default(now())
+  conversation   CopilotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+}
+
+
+model CopilotAlert {
+  id             String    @id @default(cuid())
+  organizationId String
+  alertType      String    // TRAFFIC_DROP | NEGATIVE_LLM_MENTION | KNOWLEDGE_GAP_STALE | INTEGRATION_STALE
+  severity       String    @default("medium")  // low | medium | high
+  title          String
+  body           String
+  metadata       Json?
+  isRead         Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  readAt         DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isRead])
+  @@index([organizationId, createdAt])
 }
 
 model CreditTransaction {

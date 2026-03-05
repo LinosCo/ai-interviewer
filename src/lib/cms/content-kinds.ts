@@ -32,6 +32,13 @@ export const CONTENT_KINDS = {
   LINKEDIN_CAROUSEL: 'LINKEDIN_CAROUSEL',
   LINKEDIN_NEWSLETTER: 'LINKEDIN_NEWSLETTER',
   LINKEDIN_POLL: 'LINKEDIN_POLL',
+
+  // Google Business
+  GOOGLE_BUSINESS_POST: 'GOOGLE_BUSINESS_POST',
+
+  // SEO/GEO/AEO (Wave 3 — T12)
+  CITATION_SNIPPET: 'CITATION_SNIPPET',
+  FEATURED_SNIPPET_OPT: 'FEATURED_SNIPPET_OPT',
 } as const;
 
 export type ContentKind = typeof CONTENT_KINDS[keyof typeof CONTENT_KINDS];
@@ -53,6 +60,9 @@ export const CONTENT_KIND_LABELS: Record<ContentKind, string> = {
   LINKEDIN_CAROUSEL: 'Carousel LinkedIn',
   LINKEDIN_NEWSLETTER: 'Newsletter LinkedIn',
   LINKEDIN_POLL: 'Sondaggio LinkedIn',
+  GOOGLE_BUSINESS_POST: 'Post Google Business',
+  CITATION_SNIPPET: 'Citation Snippet (LLM)',
+  FEATURED_SNIPPET_OPT: 'Featured Snippet Optimizer',
 };
 
 export const ALL_CONTENT_KINDS = Object.values(CONTENT_KINDS);

@@ -57,49 +57,26 @@ export default function LandingPage() {
         {/* 2. Trust Strip */}
         <TrustStrip />
 
-        {/* White -> Colored */}
-        <div className="h-24 section-fade-to-transparent" />
-
         {/* 3. Il Problema */}
         <ProblemSection />
-
-        {/* Colored -> White */}
-        <div className="h-24 section-fade-from-transparent" />
 
         {/* 4. Il Ciclo in Azione (slider multi-scenario) */}
         <HowItWorks />
 
-        {/* White -> Colored */}
-        <div className="h-24 section-fade-to-transparent" />
-
         {/* 5. Gli Strumenti (tab-based) */}
         <FeaturesSection />
-
-        {/* Colored -> White */}
-        <div className="h-24 section-fade-from-transparent" />
 
         {/* 6. Per Chi */}
         <TargetSection />
 
-        {/* White -> Colored */}
-        <div className="h-24 section-fade-to-transparent" />
-
         {/* 7. Perché BT */}
         <WhySection />
-
-        {/* Colored -> White */}
-        <div className="h-24 section-fade-from-transparent" />
 
         {/* 8. Pricing */}
         <PricingSection />
 
-        {/* White -> Colored */}
-        <div className="h-24 section-fade-to-transparent" />
-
         {/* 9. FAQ + CTA Finale */}
         <FAQSection />
-
-        <div className="h-24 section-fade-from-transparent" />
         <CTASection />
       </main>
       <LandingChatbotScript />

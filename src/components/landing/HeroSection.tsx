@@ -117,13 +117,13 @@ function HeroCycleVisual(): React.JSX.Element {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.35, duration: 0.5 }}
-      className="mt-10 md:mt-12 max-w-4xl mx-auto"
+      className="mt-14 md:mt-20 max-w-5xl mx-auto"
     >
       <div
-        className="glass-card rounded-3xl p-6 md:p-8 border border-[hsl(var(--border)/0.6)] shadow-medium"
+        className="glass-card rounded-3xl p-8 md:p-12 border border-[hsl(var(--border)/0.6)] shadow-medium"
         onMouseLeave={() => setIsPaused(false)}
       >
-        <p className="text-sm md:text-base font-semibold tracking-wide text-[hsl(var(--foreground))] text-center mb-6 md:mb-8">
+        <p className="font-display text-2xl md:text-4xl font-bold tracking-tight text-[hsl(var(--foreground))] text-center mb-8 md:mb-12">
           Un processo di innovazione
         </p>
 

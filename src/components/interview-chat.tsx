@@ -724,17 +724,17 @@ export default function InterviewChat({
             <header className={`${isEmbedded ? 'absolute' : 'fixed'} top-2 left-0 right-0 z-50 px-3 py-2 md:p-4 flex items-start justify-between pointer-events-none transition-all duration-300`}>
                 <div className="flex items-center gap-3 bg-white/90 backdrop-blur-md border border-stone-200/50 p-2 pl-3 pr-4 rounded-full shadow-lg pointer-events-auto transition-all hover:shadow-xl hover:scale-105">
                     {logoUrl ? (
-                        <div className="h-8 w-8 rounded-full overflow-hidden border border-stone-100 flex-shrink-0 bg-stone-50">
+                        <div className="h-8 w-8 rounded-lg overflow-hidden border border-stone-100 flex-shrink-0 bg-white">
                             <img
                                 src={logoUrl}
                                 alt={botName}
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-contain"
                                 onError={(e) => {
                                     // Fallback if image fails to load - XSS safe
                                     const img = e.target as HTMLImageElement;
                                     img.style.display = 'none';
                                     const fallbackDiv = document.createElement('div');
-                                    fallbackDiv.className = 'w-full h-full rounded-full flex items-center justify-center text-white';
+                                    fallbackDiv.className = 'w-full h-full rounded-lg flex items-center justify-center text-white';
                                     fallbackDiv.style.background = brandColor;
                                     fallbackDiv.textContent = '?';
                                     img.parentElement?.appendChild(fallbackDiv);
@@ -742,7 +742,7 @@ export default function InterviewChat({
                             />
                         </div>
                     ) : (
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-sm" style={{ background: brandColor }}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 shadow-sm" style={{ background: brandColor }}>
                             <Icons.Chat size={16} />
                         </div>
                     )}
@@ -822,7 +822,7 @@ export default function InterviewChat({
                             />
                             {/* Inner circle with logo */}
                             <motion.div
-                                className="relative flex items-center justify-center rounded-full bg-white shadow-lg"
+                                className="relative flex items-center justify-center rounded-2xl bg-white shadow-lg"
                                 style={{
                                     width: 80,
                                     height: 80,

@@ -142,7 +142,7 @@ Usa questa base come riferimento generale per marketing strategico, SEO, GEO/LLM
 Se i dati progetto suggeriscono deviazioni, spiega esplicitamente il perche.
 
 ---
-${ctx.strategicMarketingKnowledge.slice(0, 3000)}
+${ctx.strategicMarketingKnowledge}
 ---
 ` : ''}
 ${ctx.strategicPlan ? `

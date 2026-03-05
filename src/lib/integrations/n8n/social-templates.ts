@@ -14,8 +14,8 @@ import type { TipPayload } from './dispatcher';
 // Shared types
 // ---------------------------------------------------------------------------
 
-export type SocialPlatform = 'linkedin' | 'facebook' | 'instagram';
-export type LinkedInFormat = 'article' | 'carousel';
+export type SocialPlatform = 'linkedin' | 'facebook' | 'instagram' | 'email' | 'google_business';
+export type LinkedInFormat = 'article' | 'carousel' | 'newsletter' | 'poll';
 
 export interface SocialPayloadBase {
     platform: SocialPlatform;
@@ -68,11 +68,59 @@ export interface InstagramCaptionPayload extends SocialPayloadBase {
     slideTexts: string[];
 }
 
+export interface LinkedInNewsletterPayload extends SocialPayloadBase {
+    platform: 'linkedin';
+    format: 'newsletter';
+    subject: string;
+    introText: string;
+    sections: Array<{ heading: string; body: string }>;
+    ctaText: string;
+    ctaUrl: string | null;
+    hashtags: string[];
+}
+
+export interface LinkedInPollPayload extends SocialPayloadBase {
+    platform: 'linkedin';
+    format: 'poll';
+    question: string;
+    options: string[];
+    /** Context text posted above the poll */
+    contextText: string;
+    hashtags: string[];
+}
+
+export interface EmailSnippetPayload extends SocialPayloadBase {
+    platform: 'email';
+    format: 'snippet';
+    subject: string;
+    preheader: string;
+    bodyHtml: string;
+    bodyText: string;
+    ctaText: string;
+    ctaUrl: string | null;
+}
+
+export interface GoogleBusinessPostPayload extends SocialPayloadBase {
+    platform: 'google_business';
+    format: 'post';
+    /** Max 1500 chars for Google Business posts */
+    text: string;
+    ctaType: 'LEARN_MORE' | 'CALL' | 'BOOK' | 'ORDER' | 'SIGN_UP' | 'SHOP';
+    ctaUrl: string | null;
+    /** Optional: ISO date strings for event posts */
+    eventStart?: string;
+    eventEnd?: string;
+}
+
 export type SocialPayload =
     | LinkedInArticlePayload
     | LinkedInCarouselPayload
+    | LinkedInNewsletterPayload
+    | LinkedInPollPayload
     | FacebookPostPayload
-    | InstagramCaptionPayload;
+    | InstagramCaptionPayload
+    | EmailSnippetPayload
+    | GoogleBusinessPostPayload;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -302,13 +350,173 @@ export function formatInstagramCaption(
 }
 
 // ---------------------------------------------------------------------------
+// LinkedIn Newsletter formatter
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a tip as a LinkedIn Newsletter issue.
+ * Best for thought-leadership series and recurring editorial content.
+ */
+export function formatLinkedInNewsletter(
+    tip: TipPayload,
+    opts: { brandName?: string } = {}
+): LinkedInNewsletterPayload {
+    const hashtags = deriveHashtags(tip, ['#LinkedIn', '#Newsletter']);
+
+    // Split body into sections by double-newline or H2 markdown headers
+    const rawSections = tip.content
+        .split(/\n{2,}|(?=^##\s)/m)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    const sections = rawSections.slice(0, 6).map((block, i) => {
+        const lines = block.split('\n');
+        const heading = lines[0].replace(/^#+\s*/, '').trim() || `Sezione ${i + 1}`;
+        const body = lines.slice(1).join('\n').trim() || block;
+        return { heading, body: truncate(body, 600) };
+    });
+
+    // If no sections were derived, wrap entire content as single section
+    if (sections.length === 0) {
+        sections.push({ heading: tip.title, body: truncate(tip.content, 1200) });
+    }
+
+    return {
+        platform: 'linkedin',
+        format: 'newsletter',
+        tipId: tip.id,
+        brandName: opts.brandName,
+        requiresApproval: true,
+        generatedAt: new Date().toISOString(),
+        subject: tip.title,
+        introText: truncate(tip.metaDescription ?? tip.content.substring(0, 300), 300),
+        sections,
+        ctaText: DEFAULT_CTA_TEXT,
+        ctaUrl: tip.url ?? null,
+        hashtags,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// LinkedIn Poll formatter
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a tip as a LinkedIn Poll payload.
+ * Best for opinion gathering, market research, and engagement campaigns.
+ */
+export function formatLinkedInPoll(
+    tip: TipPayload,
+    opts: { brandName?: string } = {}
+): LinkedInPollPayload {
+    const hashtags = deriveHashtags(tip, ['#LinkedIn', '#Poll']);
+
+    // Extract or generate poll options from tip content
+    const bulletMatches = tip.content.match(/^[-*•]\s+(.+)$/gm) ?? [];
+    const extractedOptions = bulletMatches
+        .map(line => line.replace(/^[-*•]\s+/, '').trim())
+        .filter(opt => opt.length > 0 && opt.length <= 30)
+        .slice(0, 4);
+
+    // LinkedIn polls require 2–4 options, each max 30 chars
+    const fallbackOptions = ['Sì, assolutamente', 'No, non ancora', 'In parte', 'Non so'];
+    const options = extractedOptions.length >= 2 ? extractedOptions : fallbackOptions;
+
+    const contextText = truncate(
+        tip.metaDescription ?? `${tip.title}\n\n${tip.content.substring(0, 200)}`,
+        700
+    );
+
+    return {
+        platform: 'linkedin',
+        format: 'poll',
+        tipId: tip.id,
+        brandName: opts.brandName,
+        requiresApproval: true,
+        generatedAt: new Date().toISOString(),
+        question: truncate(tip.title, 140), // LinkedIn poll question max 140 chars
+        options,
+        contextText,
+        hashtags,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Email Snippet formatter
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a tip as an email / DEM snippet payload.
+ * Produces both HTML and plain-text variants for ESP compatibility.
+ */
+export function formatEmailSnippet(
+    tip: TipPayload,
+    opts: { brandName?: string } = {}
+): EmailSnippetPayload {
+    const preheader = truncate(tip.metaDescription ?? tip.content.substring(0, 90), 90);
+    const brandLabel = opts.brandName ? `<strong>${opts.brandName}</strong><br><br>` : '';
+    const ctaUrl = tip.url ?? null;
+
+    const bodyHtml = `${brandLabel}<h2>${tip.title}</h2>\n<p>${tip.content.replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>')}</p>\n${ctaUrl ? `<a href="${ctaUrl}">${DEFAULT_CTA_TEXT}</a>` : ''}`;
+    const bodyText = `${opts.brandName ? opts.brandName + '\n\n' : ''}${tip.title}\n\n${tip.content}${ctaUrl ? `\n\n${DEFAULT_CTA_TEXT}: ${ctaUrl}` : ''}`;
+
+    return {
+        platform: 'email',
+        format: 'snippet',
+        tipId: tip.id,
+        brandName: opts.brandName,
+        requiresApproval: true,
+        generatedAt: new Date().toISOString(),
+        subject: tip.title,
+        preheader,
+        bodyHtml,
+        bodyText,
+        ctaText: DEFAULT_CTA_TEXT,
+        ctaUrl,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Google Business Post formatter
+// ---------------------------------------------------------------------------
+
+const MAX_GBP_POST = 1500;
+
+/**
+ * Format a tip as a Google Business Profile post.
+ * Best for local business updates, offers, and event announcements.
+ */
+export function formatGoogleBusinessPost(
+    tip: TipPayload,
+    opts: { brandName?: string; ctaType?: GoogleBusinessPostPayload['ctaType'] } = {}
+): GoogleBusinessPostPayload {
+    const brandLabel = opts.brandName ? `📍 ${opts.brandName}\n\n` : '';
+    const summary = tip.metaDescription ?? tip.content.substring(0, 500);
+    const text = truncate(`${brandLabel}${tip.title}\n\n${summary}`, MAX_GBP_POST);
+
+    return {
+        platform: 'google_business',
+        format: 'post',
+        tipId: tip.id,
+        brandName: opts.brandName,
+        requiresApproval: true,
+        generatedAt: new Date().toISOString(),
+        text,
+        ctaType: opts.ctaType ?? 'LEARN_MORE',
+        ctaUrl: tip.url ?? null,
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Channel router
 // ---------------------------------------------------------------------------
 
 export type SocialChannelConfig =
     | { platform: 'linkedin'; format: LinkedInFormat }
     | { platform: 'facebook' }
-    | { platform: 'instagram' };
+    | { platform: 'instagram' }
+    | { platform: 'email' }
+    | { platform: 'google_business'; ctaType?: GoogleBusinessPostPayload['ctaType'] };
 
 /**
  * Route a tip to the correct formatter based on channel config.
@@ -320,13 +528,18 @@ export function formatForChannel(
 ): SocialPayload {
     switch (channel.platform) {
         case 'linkedin':
-            return channel.format === 'carousel'
-                ? formatLinkedInCarousel(tip, opts)
-                : formatLinkedInArticle(tip, opts);
+            if (channel.format === 'carousel') return formatLinkedInCarousel(tip, opts);
+            if (channel.format === 'newsletter') return formatLinkedInNewsletter(tip, opts);
+            if (channel.format === 'poll') return formatLinkedInPoll(tip, opts);
+            return formatLinkedInArticle(tip, opts);
         case 'facebook':
             return formatFacebookPost(tip, opts);
         case 'instagram':
             return formatInstagramCaption(tip, opts);
+        case 'email':
+            return formatEmailSnippet(tip, opts);
+        case 'google_business':
+            return formatGoogleBusinessPost(tip, { ...opts, ctaType: channel.ctaType });
     }
 }
 
@@ -339,6 +552,10 @@ export function inferChannelConfig(tip: TipPayload): SocialChannelConfig {
 
     if (channel.includes('instagram')) return { platform: 'instagram' };
     if (channel.includes('facebook')) return { platform: 'facebook' };
+    if (channel.includes('google_business') || kind.includes('google_business')) return { platform: 'google_business' };
+    if (channel.includes('email') || kind.includes('email_snippet')) return { platform: 'email' };
+    if (channel.includes('newsletter') || kind.includes('newsletter')) return { platform: 'linkedin', format: 'newsletter' };
+    if (channel.includes('poll') || kind.includes('poll')) return { platform: 'linkedin', format: 'poll' };
     if (channel.includes('carousel')) return { platform: 'linkedin', format: 'carousel' };
     if (channel.includes('linkedin') || kind.includes('blog') || kind.includes('article')) {
         return { platform: 'linkedin', format: 'article' };

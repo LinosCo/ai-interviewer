@@ -56,6 +56,7 @@ export class CopilotAlertEngine {
         body: a.body,
         metadata: a.metadata ?? null,
       })),
+      skipDuplicates: true,
     });
 
     return newAlerts.length;

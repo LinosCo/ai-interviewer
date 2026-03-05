@@ -135,6 +135,22 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             .catch(() => {});
     }, [currentOrganization?.id]);
 
+    const markAlertsRead = async () => {
+        const orgId = (currentOrganization as any)?.id ?? currentOrganization?.id;
+        if (!orgId) return;
+        try {
+            await fetch('/api/copilot/alerts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ organizationId: orgId }),
+            });
+        } catch {
+            // best-effort
+        }
+        setUnreadAlerts(0);
+    };
+
+
     // Restore conversation from localStorage when opening
     useEffect(() => {
         if (!isOpen || messages.length > 0) return;
@@ -333,7 +349,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
-                        onClick={() => setIsOpen(true)}
+                        onClick={() => { setIsOpen(true); markAlertsRead(); }}
                         className="fixed bottom-6 right-4 md:right-6 w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40 relative"
                         title="Strategy Copilot"
                     >

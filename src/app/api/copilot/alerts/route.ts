@@ -51,6 +51,7 @@ export async function GET(req: Request) {
       title: true,
       body: true,
       isRead: true,
+      readAt: true,
       createdAt: true,
       metadata: true,
     },

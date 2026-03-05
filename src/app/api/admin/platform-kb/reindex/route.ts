@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth/auth';
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { PLATFORM_KB } from '@/lib/copilot/platform-kb';
 import { indexAllPlatformKBEntries } from '@/lib/copilot/platform-kb-vector';

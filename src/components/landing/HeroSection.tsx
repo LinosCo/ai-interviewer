@@ -117,21 +117,21 @@ function HeroCycleVisual(): React.JSX.Element {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.35, duration: 0.5 }}
-      className="mt-14 md:mt-20 max-w-5xl mx-auto"
+      className="mt-12 md:mt-16 max-w-5xl mx-auto"
     >
       <div
-        className="glass-card rounded-3xl p-8 md:p-12 border border-[hsl(var(--border)/0.6)] shadow-medium"
+        className="glass-card rounded-3xl p-6 md:p-8 border border-[hsl(var(--border)/0.6)] shadow-medium"
         onMouseLeave={() => setIsPaused(false)}
       >
-        <p className="font-display text-2xl md:text-4xl font-bold tracking-tight text-[hsl(var(--foreground))] text-center mb-8 md:mb-12">
+        <p className="font-display text-2xl md:text-4xl font-bold tracking-tight text-[hsl(var(--foreground))] text-center mb-6 md:mb-8">
           Un processo di innovazione
         </p>
 
-        <div className="flex flex-col md:grid md:grid-cols-[1.2fr_1fr] gap-8 md:gap-10 md:items-center">
-          <div className="flex items-center justify-center md:min-h-[30rem]">
-            <div className="relative h-[17.5rem] w-[17.5rem] md:h-[26rem] md:w-[26rem]">
-              <div className="absolute inset-8 md:inset-12 rounded-full border border-[hsl(var(--coral)/0.2)]" />
-              <div className="absolute inset-14 md:inset-20 rounded-full border border-[hsl(var(--amber)/0.2)]" />
+        <div className="flex flex-col md:grid md:grid-cols-[1.2fr_1fr] gap-6 md:gap-8 md:items-center">
+          <div className="flex items-center justify-center md:min-h-[24rem]">
+            <div className="relative h-[15rem] w-[15rem] md:h-[22rem] md:w-[22rem]">
+              <div className="absolute inset-7 md:inset-10 rounded-full border border-[hsl(var(--coral)/0.2)]" />
+              <div className="absolute inset-12 md:inset-[4.25rem] rounded-full border border-[hsl(var(--amber)/0.2)]" />
 
               {CYCLE_PHASES.map((phase, index) => {
                 const isActive = activePhase === index;
@@ -148,7 +148,7 @@ function HeroCycleVisual(): React.JSX.Element {
                       onMouseEnter={() => selectPhaseFromPointer(index)}
                       onFocus={() => selectPhaseFromPointer(index)}
                       onClick={() => selectPhaseFromTap(index)}
-                      className={`w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl border flex items-center justify-center transition-all duration-300 ${
+                      className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl border flex items-center justify-center transition-all duration-300 ${
                         isActive
                           ? 'gradient-bg border-transparent shadow-glow scale-105'
                           : 'bg-[hsl(var(--card))] border-[hsl(var(--border))]'
@@ -156,7 +156,7 @@ function HeroCycleVisual(): React.JSX.Element {
                       aria-label={`Attiva fase ${phase.label}`}
                     >
                       <Icon
-                        className={`w-6 h-6 md:w-8 md:h-8 ${
+                        className={`w-5 h-5 md:w-7 md:h-7 ${
                           isActive ? 'text-white' : 'text-[hsl(var(--muted-foreground))]'
                         }`}
                       />
@@ -165,15 +165,15 @@ function HeroCycleVisual(): React.JSX.Element {
                 );
               })}
 
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-32 md:h-32 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] flex items-center justify-center">
-                <span className="text-lg md:text-3xl font-semibold text-[hsl(var(--foreground))]">
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-28 md:h-28 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] flex items-center justify-center">
+                <span className="text-base md:text-2xl font-semibold text-[hsl(var(--foreground))]">
                   {activePhase + 1}/4
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="hidden md:block md:space-y-3">
+          <div className="hidden md:block md:space-y-2.5">
             <p className="text-xs uppercase tracking-[0.16em] text-[hsl(var(--coral))] font-semibold">
               Fase attiva
             </p>
@@ -189,7 +189,7 @@ function HeroCycleVisual(): React.JSX.Element {
                   onMouseEnter={() => selectPhaseFromPointer(index)}
                   onFocus={() => selectPhaseFromPointer(index)}
                   onClick={() => selectPhaseFromTap(index)}
-                  className={`w-full text-left rounded-xl border p-3 transition-all ${
+                  className={`w-full text-left rounded-xl border p-2.5 transition-all ${
                     isActive
                       ? 'border-[hsl(var(--coral)/0.45)] bg-[hsl(var(--coral)/0.08)] shadow-soft'
                       : 'border-[hsl(var(--border)/0.7)] bg-[hsl(var(--card)/0.65)] hover:border-[hsl(var(--coral)/0.3)]'

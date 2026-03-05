@@ -6,6 +6,7 @@ import { Sparkles, Send, X, Lightbulb, MessageSquare, AlertCircle, Loader2, Rota
 import { useProject } from '@/contexts/ProjectContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import ReactMarkdown from 'react-markdown';
+import { createPortal } from 'react-dom';
 
 interface Message {
     id: string;
@@ -86,6 +87,7 @@ function buildLoadingStages(prompt: string): string[] {
 
 export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -121,6 +123,11 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         return () => {
             clearLoadingTimers();
         };
+    }, []);
+
+    useEffect(() => {
+        setIsMounted(true);
+        return () => setIsMounted(false);
     }, []);
 
     // Fetch unread alert count on mount, refresh every 5 minutes
@@ -347,7 +354,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         ? [...QUICK_ACTIONS, ...QUICK_ACTIONS_PRO]
         : QUICK_ACTIONS;
 
-    return (
+    const copilotUi = (
         <>
             {/* Floating Bubble */}
             <AnimatePresence>
@@ -533,4 +540,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
             </AnimatePresence>
         </>
     );
+
+    if (!isMounted) return null;
+    return createPortal(copilotUi, document.body);
 }

@@ -42,7 +42,7 @@ const scenarios: Scenario[] = [
   {
     title: 'Un cliente segnala tempi di risposta lenti',
     icon: HeartHandshake,
-    accentClass: 'text-[hsl(var(--coral))]',
+    accentClass: 'text-[hsl(var(--foreground))]',
     phases: [
       {
         label: PHASE_LABELS[0],
@@ -69,7 +69,7 @@ const scenarios: Scenario[] = [
   {
     title: 'Il tuo prodotto non compare nelle risposte degli LLM quando dovrebbe',
     icon: TrendingUp,
-    accentClass: 'text-[hsl(var(--amber))]',
+    accentClass: 'text-[hsl(var(--foreground))]',
     phases: [
       {
         label: PHASE_LABELS[0],
@@ -96,7 +96,7 @@ const scenarios: Scenario[] = [
   {
     title: 'Il team ha gap di competenze e i candidati non sono allineati con la visione aziendale',
     icon: GraduationCap,
-    accentClass: 'text-green-500',
+    accentClass: 'text-[hsl(var(--foreground))]',
     phases: [
       {
         label: PHASE_LABELS[0],
@@ -123,7 +123,7 @@ const scenarios: Scenario[] = [
   {
     title: 'Un consulente vuole portare dati reali al cliente invece di opinioni',
     icon: Briefcase,
-    accentClass: 'text-[hsl(var(--coral))]',
+    accentClass: 'text-[hsl(var(--foreground))]',
     phases: [
       {
         label: PHASE_LABELS[0],
@@ -182,8 +182,8 @@ function ScenarioCard({ scenario }: { scenario: Scenario }): React.JSX.Element {
             className="flex flex-col gap-2 rounded-2xl bg-[hsl(var(--background)/0.6)] border border-[hsl(var(--border)/0.35)] p-4"
           >
             <div className="flex items-center gap-2">
-              <phase.icon className="w-4 h-4 text-[hsl(var(--coral))]" />
-              <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[hsl(var(--coral))]">
+              <phase.icon className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+              <span className="text-[11px] uppercase tracking-[0.12em] font-semibold text-[hsl(var(--foreground))]">
                 {phase.label}
               </span>
             </div>
@@ -293,7 +293,7 @@ export function CycleSlider(): React.JSX.Element {
               aria-label={`Vai allo scenario ${index + 1}`}
               className={`rounded-full transition-all duration-300 ${
                 index === mobileActiveIndex
-                  ? 'w-8 h-2.5 bg-[hsl(var(--coral))]'
+                  ? 'w-8 h-2.5 bg-[hsl(var(--foreground))]'
                   : 'w-2.5 h-2.5 bg-[hsl(var(--border))]'
               }`}
             />
@@ -352,7 +352,7 @@ export function CycleSlider(): React.JSX.Element {
                 aria-label={`Vai allo scenario ${index + 1}`}
                 className={`rounded-full transition-all duration-300 ${
                   isCurrent
-                    ? 'w-8 h-2.5 bg-[hsl(var(--coral))]'
+                    ? 'w-8 h-2.5 bg-[hsl(var(--foreground))]'
                     : 'w-2.5 h-2.5 bg-[hsl(var(--border))] hover:bg-[hsl(var(--muted-foreground)/0.4)]'
                 }`}
               />

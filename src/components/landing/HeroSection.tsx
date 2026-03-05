@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -73,13 +73,36 @@ const CYCLE_PHASES: CyclePhase[] = [
 
 function HeroCycleVisual(): React.JSX.Element {
   const [activePhase, setActivePhase] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (isPaused) return;
+
     const timer = setInterval(() => {
       setActivePhase((current) => (current + 1) % CYCLE_PHASES.length);
     }, 2200);
 
     return () => clearInterval(timer);
+  }, [isPaused]);
+
+  const selectPhaseFromPointer = (index: number) => {
+    setActivePhase(index);
+    setIsPaused(true);
+  };
+
+  const selectPhaseFromTap = (index: number) => {
+    setActivePhase(index);
+    setIsPaused(true);
+
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => setIsPaused(false), 4500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    };
   }, []);
 
   return (
@@ -87,55 +110,116 @@ function HeroCycleVisual(): React.JSX.Element {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.35, duration: 0.5 }}
-      className="mt-10 md:mt-12 max-w-2xl mx-auto"
+      className="mt-10 md:mt-12 max-w-4xl mx-auto"
     >
-      <div className="glass-card rounded-3xl p-6 md:p-8 border border-[hsl(var(--border)/0.6)] shadow-medium">
-        <div className="relative mx-auto h-48 w-48">
-          <div className="absolute inset-5 rounded-full border border-[hsl(var(--coral)/0.2)]" />
-          <div className="absolute inset-9 rounded-full border border-[hsl(var(--amber)/0.2)]" />
+      <div
+        className="glass-card rounded-3xl p-6 md:p-8 border border-[hsl(var(--border)/0.6)] shadow-medium"
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        <div className="flex flex-col md:grid md:grid-cols-[1.2fr_1fr] gap-8 md:gap-10 md:items-center">
+          <div className="relative mx-auto md:mx-0 h-56 w-56 md:h-72 md:w-72">
+            <div className="absolute inset-7 md:inset-10 rounded-full border border-[hsl(var(--coral)/0.2)]" />
+            <div className="absolute inset-11 md:inset-16 rounded-full border border-[hsl(var(--amber)/0.2)]" />
 
-          {CYCLE_PHASES.map((phase, index) => {
-            const angle = (index / CYCLE_PHASES.length) * Math.PI * 2 - Math.PI / 2;
-            const x = Math.cos(angle) * 74;
-            const y = Math.sin(angle) * 74;
-            const isActive = activePhase === index;
-            const Icon = phase.icon;
+            {CYCLE_PHASES.map((phase, index) => {
+              const angle = (index / CYCLE_PHASES.length) * Math.PI * 2 - Math.PI / 2;
+              const radius = 96;
+              const x = Math.cos(angle) * radius;
+              const y = Math.sin(angle) * radius;
+              const isActive = activePhase === index;
+              const Icon = phase.icon;
 
-            return (
-              <motion.div
-                key={phase.label}
-                className="absolute left-1/2 top-1/2"
-                style={{ transform: `translate(${x}px, ${y}px)` }}
-              >
-                <div
-                  className={`-translate-x-1/2 -translate-y-1/2 w-12 h-12 md:w-14 md:h-14 rounded-2xl border flex items-center justify-center transition-all duration-300 ${
-                    isActive
-                      ? 'gradient-bg border-transparent shadow-glow scale-105'
-                      : 'bg-[hsl(var(--card))] border-[hsl(var(--border))]'
-                  }`}
+              return (
+                <motion.div
+                  key={phase.label}
+                  className="absolute left-1/2 top-1/2"
+                  style={{ transform: `translate(${x}px, ${y}px)` }}
                 >
-                  <Icon
-                    className={`w-5 h-5 ${
-                      isActive ? 'text-white' : 'text-[hsl(var(--muted-foreground))]'
+                  <button
+                    type="button"
+                    onMouseEnter={() => selectPhaseFromPointer(index)}
+                    onFocus={() => selectPhaseFromPointer(index)}
+                    onClick={() => selectPhaseFromTap(index)}
+                    className={`-translate-x-1/2 -translate-y-1/2 w-12 h-12 md:w-16 md:h-16 rounded-2xl border flex items-center justify-center transition-all duration-300 ${
+                      isActive
+                        ? 'gradient-bg border-transparent shadow-glow scale-105'
+                        : 'bg-[hsl(var(--card))] border-[hsl(var(--border))]'
                     }`}
-                  />
-                </div>
-              </motion.div>
-            );
-          })}
+                    aria-label={`Attiva fase ${phase.label}`}
+                  >
+                    <Icon
+                      className={`w-5 h-5 md:w-6 md:h-6 ${
+                        isActive ? 'text-white' : 'text-[hsl(var(--muted-foreground))]'
+                      }`}
+                    />
+                  </button>
+                </motion.div>
+              );
+            })}
 
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] flex items-center justify-center">
-            <span className="text-sm font-semibold text-[hsl(var(--foreground))]">
-              {activePhase + 1}/4
-            </span>
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] flex items-center justify-center">
+              <span className="text-base md:text-lg font-semibold text-[hsl(var(--foreground))]">
+                {activePhase + 1}/4
+              </span>
+            </div>
+          </div>
+
+          <div className="hidden md:block md:space-y-3">
+            <p className="text-xs uppercase tracking-[0.16em] text-[hsl(var(--coral))] font-semibold">
+              Fase attiva
+            </p>
+
+            {CYCLE_PHASES.map((phase, index) => {
+              const isActive = index === activePhase;
+              const Icon = phase.icon;
+
+              return (
+                <button
+                  key={phase.label}
+                  type="button"
+                  onMouseEnter={() => selectPhaseFromPointer(index)}
+                  onFocus={() => selectPhaseFromPointer(index)}
+                  onClick={() => selectPhaseFromTap(index)}
+                  className={`w-full text-left rounded-xl border p-3 transition-all ${
+                    isActive
+                      ? 'border-[hsl(var(--coral)/0.45)] bg-[hsl(var(--coral)/0.08)] shadow-soft'
+                      : 'border-[hsl(var(--border)/0.7)] bg-[hsl(var(--card)/0.65)] hover:border-[hsl(var(--coral)/0.3)]'
+                  }`}
+                  aria-label={`Seleziona fase ${phase.label}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center ${
+                        isActive ? 'gradient-bg' : 'bg-[hsl(var(--secondary))]'
+                      }`}
+                    >
+                      <Icon
+                        className={`w-4 h-4 ${
+                          isActive ? 'text-white' : 'text-[hsl(var(--muted-foreground))]'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <p
+                        className={`font-semibold ${
+                          isActive ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'
+                        }`}
+                      >
+                        {phase.label}
+                      </p>
+                      <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed">
+                        {phase.description}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="text-center mt-4">
-          <p className="text-xs uppercase tracking-[0.16em] text-[hsl(var(--coral))] font-semibold">
-            Fase attiva
-          </p>
-          <p className="font-display text-xl md:text-2xl font-bold text-[hsl(var(--foreground))] mt-1">
+        <div className="text-center mt-6 md:hidden">
+          <p className="font-display text-xl md:text-2xl font-bold text-[hsl(var(--foreground))]">
             {CYCLE_PHASES[activePhase].label}
           </p>
           <p className="text-sm md:text-base text-[hsl(var(--muted-foreground))] mt-2 max-w-lg mx-auto">

@@ -43,7 +43,8 @@ export function PricingSection() {
                     {/* Per-org pricing badge */}
                     <div className="flex justify-center mb-8">
                         <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[hsl(var(--coral)/0.3)] bg-[hsl(var(--coral)/0.08)] text-sm text-[hsl(var(--foreground))]">
-                            👥 Un abbonamento, utenti illimitati — crea tutte le utenze che vuoi
+                            <Users className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+                            Un abbonamento, utenti illimitati - crea tutte le utenze che vuoi
                         </span>
                     </div>
 

@@ -525,10 +525,10 @@ export async function updateBotAction(botId: string, formData: FormData) {
     }
 
     // Landing Page fields
-    if (formData.has('landingTitle')) data.landingTitle = getStr('landingTitle');
-    if (formData.has('landingDescription')) data.landingDescription = getStr('landingDescription');
-    if (formData.has('landingImageUrl')) data.landingImageUrl = getStr('landingImageUrl');
-    if (formData.has('landingVideoUrl')) data.landingVideoUrl = getStr('landingVideoUrl');
+    if (formData.has('landingTitle')) data.landingTitle = getStr('landingTitle') || null;
+    if (formData.has('landingDescription')) data.landingDescription = getStr('landingDescription') || null;
+    if (formData.has('landingImageUrl')) data.landingImageUrl = getStr('landingImageUrl') || null;
+    if (formData.has('landingVideoUrl')) data.landingVideoUrl = getStr('landingVideoUrl') || null;
 
 
     // Filter out undefined keys so we don't overwrite with null if they were just left empty

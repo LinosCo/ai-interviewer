@@ -8,6 +8,13 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import ReactMarkdown from 'react-markdown';
 import { createPortal } from 'react-dom';
 
+const floatingAnchorStyle = {
+    top: 'auto',
+    left: 'auto',
+    right: 'clamp(1rem, 2vw, 1.5rem)',
+    bottom: 'clamp(1rem, 2vw, 1.5rem)',
+} as const;
+
 interface Message {
     id: string;
     role: 'user' | 'assistant';
@@ -364,7 +371,8 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
                         onClick={() => { setIsOpen(true); markAlertsRead(); }}
-                        className="fixed bottom-6 right-4 md:right-6 w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40 relative"
+                        className="fixed z-[80] w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow relative"
+                        style={floatingAnchorStyle}
                         title="Strategy Copilot"
                     >
                         <Sparkles className="w-6 h-6" />
@@ -384,7 +392,8 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        className="fixed bottom-6 right-4 md:right-6 w-[calc(100vw-2rem)] max-w-[400px] h-[min(600px,calc(100vh-6rem))] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-40 border border-stone-200"
+                        className="fixed z-[80] w-[min(400px,calc(100vw-2rem))] h-[min(600px,calc(100vh-6rem))] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-stone-200"
+                        style={floatingAnchorStyle}
                     >
                         {/* Header */}
                         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4">

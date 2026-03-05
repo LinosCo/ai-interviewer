@@ -2447,3 +2447,40 @@ export function createCompetitorAnalysisTool(context: ToolContext) {
         }
     };
 }
+
+export function createSeoGeoAeoTool(context: ToolContext) {
+    return {
+        description: 'Analyze SEO/GEO/AEO opportunities: featured snippet targets from GSC data (positions 4-20 with high impressions) and citation-building strategy for LLM visibility optimization.',
+        inputSchema: z.object({
+            projectId: z.string().optional().describe('Optional project ID.'),
+            topic: z.string().optional().describe('Topic or keyword for citation-building recommendations.'),
+            mode: z.enum(['featured_snippets', 'citation_building', 'both']).optional().default('both').describe('Which analysis to run.')
+        }),
+        execute: async ({ projectId, topic, mode }: { projectId?: string; topic?: string; mode?: string }) => {
+            const { getFeaturedSnippetOpportunities, getCitationBuildingRecommendations } = await import('@/lib/copilot/seo-geo-aeo');
+
+            const result: Record<string, unknown> = {};
+            const effectiveMode = mode ?? 'both';
+
+            if (effectiveMode === 'featured_snippets' || effectiveMode === 'both') {
+                const opportunities = await getFeaturedSnippetOpportunities(context.organizationId, projectId || context.projectId);
+                result['featuredSnippetOpportunities'] = opportunities;
+                result['featuredSnippetCount'] = opportunities.length;
+            }
+
+            if (effectiveMode === 'citation_building' || effectiveMode === 'both') {
+                const effectiveTopic = topic || 'contenuto del sito';
+                result['citationBuilding'] = getCitationBuildingRecommendations(effectiveTopic);
+            }
+
+            const hasSnippets = Array.isArray(result['featuredSnippetOpportunities']) && (result['featuredSnippetOpportunities'] as unknown[]).length > 0;
+            const hasCitation = result['citationBuilding'] !== undefined;
+
+            if (!hasSnippets && !hasCitation) {
+                return { message: 'Nessun dato disponibile. Assicurati di aver collegato Google Search Console per ottenere opportunità di featured snippet.' };
+            }
+
+            return result;
+        }
+    };
+}

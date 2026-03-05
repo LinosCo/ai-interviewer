@@ -64,6 +64,9 @@ export const CONTENT_KIND_PRIMARY_CATEGORY: Record<ContentKind, RoutingTipCatego
   LINKEDIN_CAROUSEL: 'geo_visibility',
   LINKEDIN_NEWSLETTER: 'geo_visibility',
   LINKEDIN_POLL: 'geo_visibility',
+  GOOGLE_BUSINESS_POST: 'geo_visibility',
+  CITATION_SNIPPET: 'llmo_content',
+  FEATURED_SNIPPET_OPT: 'gsc_performance',
 };
 
 export const CONTENT_KIND_SUGGESTED_CONNECTIONS: Record<ContentKind, SuggestedRoutingConnection[]> = {
@@ -83,6 +86,9 @@ export const CONTENT_KIND_SUGGESTED_CONNECTIONS: Record<ContentKind, SuggestedRo
   LINKEDIN_CAROUSEL: ['n8n'],
   LINKEDIN_NEWSLETTER: ['n8n'],
   LINKEDIN_POLL: ['n8n'],
+  GOOGLE_BUSINESS_POST: ['n8n'],
+  CITATION_SNIPPET: ['site_cms'],
+  FEATURED_SNIPPET_OPT: ['site_cms'],
 };
 
 export function getContentKindCategory(kind: ContentKind): RoutingTipCategory {

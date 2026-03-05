@@ -27,7 +27,8 @@ import {
     createStrategicTipCreationTool,
     createTipRoutingManagerTool,
     createProjectConnectionsOpsTool,
-    createCompetitorAnalysisTool
+    createCompetitorAnalysisTool,
+    createSeoGeoAeoTool
 } from '@/lib/copilot/chat-tools';
 
 export const maxDuration = 60;
@@ -297,6 +298,9 @@ export async function POST(req: Request) {
             },
             getCompetitorIntelligence: {
                 ...createCompetitorAnalysisTool(toolContext),
+            },
+            analyzeSeoGeoAeo: {
+                ...createSeoGeoAeoTool(toolContext),
             }
         };
 

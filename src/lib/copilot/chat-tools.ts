@@ -109,13 +109,26 @@ export function createPlatformHelpSearchTool() {
 
 export function createProjectTranscriptsTool(context: ToolContext) {
     return {
-        description: 'Fetch completed interview transcripts, key quotes and sentiment for the selected or accessible projects.',
-        inputSchema: scopedInputSchema,
-        execute: async ({ projectId, limit }: { projectId?: string; limit?: number }) => {
+        description: 'Fetch completed interview transcripts, key quotes and sentiment for the selected or accessible projects. Supports optional date range filtering.',
+        inputSchema: z.object({
+            projectId: z.string().optional().describe('Optional project ID. If omitted, uses the currently selected project or all accessible projects.'),
+            limit: z.number().optional().default(5).describe('Maximum number of records to return (hard-capped to 10).'),
+            dateFrom: z.string().optional().describe('ISO date string (YYYY-MM-DD) to filter interviews completed on or after this date.'),
+            dateTo: z.string().optional().describe('ISO date string (YYYY-MM-DD) to filter interviews completed on or before this date.')
+        }),
+        execute: async ({ projectId, limit, dateFrom, dateTo }: { projectId?: string; limit?: number; dateFrom?: string; dateTo?: string }) => {
             try {
                 const projectIds = await resolveAccessibleProjectIds(context, projectId);
                 if (projectIds.length === 0) {
                     return { error: 'No accessible project found for this request.' };
+                }
+
+                const dateFilter: Record<string, Date> = {};
+                if (dateFrom) dateFilter.gte = new Date(dateFrom);
+                if (dateTo) {
+                    const end = new Date(dateTo);
+                    end.setHours(23, 59, 59, 999);
+                    dateFilter.lte = end;
                 }
 
                 const conversations = await prisma.conversation.findMany({
@@ -124,7 +137,8 @@ export function createProjectTranscriptsTool(context: ToolContext) {
                             projectId: { in: projectIds },
                             botType: 'interview'
                         },
-                        status: 'COMPLETED'
+                        status: 'COMPLETED',
+                        ...(Object.keys(dateFilter).length > 0 ? { completedAt: dateFilter } : {})
                     },
                     orderBy: { completedAt: 'desc' },
                     take: clampLimit(limit),
@@ -154,7 +168,7 @@ export function createProjectTranscriptsTool(context: ToolContext) {
                 }
 
                 return {
-                    scope: { projectIds },
+                    scope: { projectIds, dateFrom: dateFrom || null, dateTo: dateTo || null },
                     interviews: conversations.map((c: any) => ({
                         id: c.id,
                         projectId: c.bot?.projectId,
@@ -1684,9 +1698,15 @@ export function createProjectAiTipsTool(context: ToolContext) {
 
 export function createExternalAnalyticsTool(context: ToolContext) {
     return {
-        description: 'Fetch external analytics snapshots from Google Analytics (GA4) and Search Console (GSC) for selected or accessible projects.',
-        inputSchema: scopedInputSchema,
-        execute: async ({ projectId, limit }: { projectId?: string; limit?: number }) => {
+        description: 'Fetch external analytics snapshots from Google Analytics (GA4) and Search Console (GSC) for selected or accessible projects. Supports optional date range and period comparison (current vs previous period).',
+        inputSchema: z.object({
+            projectId: z.string().optional().describe('Optional project ID. If omitted, uses the currently selected project or all accessible projects.'),
+            limit: z.number().optional().default(5).describe('Maximum number of projects to return (hard-capped to 10).'),
+            dateFrom: z.string().optional().describe('ISO date string (YYYY-MM-DD) for the start of the period to analyze.'),
+            dateTo: z.string().optional().describe('ISO date string (YYYY-MM-DD) for the end of the period to analyze.'),
+            comparePreviousPeriod: z.boolean().optional().default(false).describe('If true, also fetches the previous equivalent period for week-over-week or month-over-month comparison.')
+        }),
+        execute: async ({ projectId, limit, dateFrom, dateTo, comparePreviousPeriod }: { projectId?: string; limit?: number; dateFrom?: string; dateTo?: string; comparePreviousPeriod?: boolean }) => {
             try {
                 const projectIds = await resolveAccessibleProjectIds(context, projectId);
                 if (projectIds.length === 0) {
@@ -1694,6 +1714,30 @@ export function createExternalAnalyticsTool(context: ToolContext) {
                 }
 
                 const limitedProjectIds = projectIds.slice(0, clampLimit(limit));
+
+                // Build date filter for current period
+                const analyticsWhere: Record<string, any> = {};
+                if (dateFrom || dateTo) {
+                    analyticsWhere.date = {};
+                    if (dateFrom) analyticsWhere.date.gte = new Date(dateFrom);
+                    if (dateTo) {
+                        const end = new Date(dateTo);
+                        end.setHours(23, 59, 59, 999);
+                        analyticsWhere.date.lte = end;
+                    }
+                }
+
+                // Compute previous period window for comparison
+                let prevPeriodWhere: Record<string, any> | null = null;
+                if (comparePreviousPeriod && dateFrom && dateTo) {
+                    const from = new Date(dateFrom);
+                    const to = new Date(dateTo);
+                    const periodMs = to.getTime() - from.getTime();
+                    const prevTo = new Date(from.getTime() - 1);
+                    const prevFrom = new Date(prevTo.getTime() - periodMs);
+                    prevPeriodWhere = { date: { gte: prevFrom, lte: prevTo } };
+                }
+
                 const connections = await prisma.googleConnection.findMany({
                     where: { projectId: { in: limitedProjectIds } },
                     select: {
@@ -1706,8 +1750,9 @@ export function createExternalAnalyticsTool(context: ToolContext) {
                         gscStatus: true,
                         gscSiteUrl: true,
                         analytics: {
+                            where: Object.keys(analyticsWhere).length > 0 ? analyticsWhere : undefined,
                             orderBy: { date: 'desc' },
-                            take: 1,
+                            take: dateFrom || dateTo ? 90 : 1,
                             select: {
                                 date: true,
                                 pageviews: true,
@@ -1724,23 +1769,77 @@ export function createExternalAnalyticsTool(context: ToolContext) {
                     }
                 });
 
+                // Fetch previous period snapshots if comparison requested
+                const prevSnapshotsByProject: Record<string, any[]> = {};
+                if (prevPeriodWhere) {
+                    const prevConnections = await prisma.googleConnection.findMany({
+                        where: { projectId: { in: limitedProjectIds } },
+                        select: {
+                            projectId: true,
+                            analytics: {
+                                where: prevPeriodWhere,
+                                orderBy: { date: 'desc' },
+                                take: 90,
+                                select: {
+                                    date: true,
+                                    pageviews: true,
+                                    sessions: true,
+                                    users: true,
+                                    bounceRate: true,
+                                    searchImpressions: true,
+                                    searchClicks: true,
+                                    avgPosition: true
+                                }
+                            }
+                        }
+                    });
+                    for (const pc of prevConnections) {
+                        prevSnapshotsByProject[pc.projectId] = pc.analytics || [];
+                    }
+                }
+
                 return {
-                    scope: { projectIds: limitedProjectIds },
-                    externalAnalytics: connections.map((conn: any) => ({
-                        projectId: conn.projectId,
-                        projectName: conn.project?.name || null,
-                        ga4: {
-                            enabled: conn.ga4Enabled,
-                            status: conn.ga4Status,
-                            propertyId: conn.ga4PropertyId || null
-                        },
-                        gsc: {
-                            enabled: conn.gscEnabled,
-                            status: conn.gscStatus,
-                            siteUrl: conn.gscSiteUrl || null
-                        },
-                        latestSnapshot: conn.analytics?.[0] || null
-                    }))
+                    scope: { projectIds: limitedProjectIds, dateFrom: dateFrom || null, dateTo: dateTo || null, comparePreviousPeriod: Boolean(comparePreviousPeriod) },
+                    externalAnalytics: connections.map((conn: any) => {
+                        const snapshots: any[] = conn.analytics || [];
+                        const prevSnapshots: any[] = prevSnapshotsByProject[conn.projectId] || [];
+
+                        // Aggregate current period totals
+                        const aggregated = snapshots.length > 0 ? {
+                            periodSnapshots: snapshots.length,
+                            totalPageviews: snapshots.reduce((s: number, r: any) => s + (r.pageviews || 0), 0),
+                            totalSessions: snapshots.reduce((s: number, r: any) => s + (r.sessions || 0), 0),
+                            totalUsers: snapshots.reduce((s: number, r: any) => s + (r.users || 0), 0),
+                            totalSearchImpressions: snapshots.reduce((s: number, r: any) => s + (r.searchImpressions || 0), 0),
+                            totalSearchClicks: snapshots.reduce((s: number, r: any) => s + (r.searchClicks || 0), 0),
+                            avgBounceRate: snapshots.filter((r: any) => r.bounceRate != null).length > 0
+                                ? snapshots.reduce((s: number, r: any) => s + (r.bounceRate || 0), 0) / snapshots.filter((r: any) => r.bounceRate != null).length
+                                : null,
+                            avgPosition: snapshots.filter((r: any) => r.avgPosition != null).length > 0
+                                ? snapshots.reduce((s: number, r: any) => s + (r.avgPosition || 0), 0) / snapshots.filter((r: any) => r.avgPosition != null).length
+                                : null,
+                            latestSnapshot: snapshots[0] || null
+                        } : null;
+
+                        // Aggregate previous period totals
+                        const prevAggregated = prevSnapshots.length > 0 ? {
+                            periodSnapshots: prevSnapshots.length,
+                            totalPageviews: prevSnapshots.reduce((s: number, r: any) => s + (r.pageviews || 0), 0),
+                            totalSessions: prevSnapshots.reduce((s: number, r: any) => s + (r.sessions || 0), 0),
+                            totalUsers: prevSnapshots.reduce((s: number, r: any) => s + (r.users || 0), 0),
+                            totalSearchImpressions: prevSnapshots.reduce((s: number, r: any) => s + (r.searchImpressions || 0), 0),
+                            totalSearchClicks: prevSnapshots.reduce((s: number, r: any) => s + (r.searchClicks || 0), 0)
+                        } : null;
+
+                        return {
+                            projectId: conn.projectId,
+                            projectName: conn.project?.name || null,
+                            ga4: { enabled: conn.ga4Enabled, status: conn.ga4Status, propertyId: conn.ga4PropertyId || null },
+                            gsc: { enabled: conn.gscEnabled, status: conn.gscStatus, siteUrl: conn.gscSiteUrl || null },
+                            currentPeriod: aggregated,
+                            previousPeriod: prevAggregated
+                        };
+                    })
                 };
             } catch (error: any) {
                 console.error('[Copilot Tool] Error fetching external analytics:', error);
@@ -2295,6 +2394,50 @@ export function createStrategicTipCreationTool(context: ToolContext) {
             } catch (error: any) {
                 console.error('[Copilot Tool] createStrategicTip error:', error);
                 return { error: 'Failed to create AI tip from Copilot', details: error?.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
+export function createCompetitorAnalysisTool(context: ToolContext) {
+    return {
+        description: 'Aggregate competitor intelligence from LLM visibility scans: positions, mention frequency, platform coverage, and content gaps per competitor. Returns a competitive landscape overview.',
+        inputSchema: z.object({
+            projectId: z.string().optional().describe('Optional project ID. If omitted, uses all accessible projects.'),
+            limit: z.number().optional().default(3).describe('Maximum number of visibility configs to analyze (1-5).')
+        }),
+        execute: async ({ projectId, limit }: { projectId?: string; limit?: number }) => {
+            try {
+                const { getCompetitorIntelligence } = await import('@/lib/copilot/competitor-analysis');
+                const reports = await getCompetitorIntelligence(
+                    context.organizationId,
+                    projectId || context.projectId,
+                    Math.min(Math.max(1, Math.floor(limit ?? 3)), 5)
+                );
+
+                if (reports.length === 0) {
+                    return { message: 'No visibility configurations with competitor data found for the selected project(s). Configure competitors in the Visibility Monitor section.' };
+                }
+
+                return {
+                    reports: reports.map((r) => ({
+                        brandName: r.brandName,
+                        brandAvgPosition: r.brandAvgPosition,
+                        scanCount: r.scanCount,
+                        dateRange: r.dateRange,
+                        competitors: r.competitors.map((c) => ({
+                            name: c.name,
+                            website: c.website,
+                            avgPosition: c.avgPosition,
+                            mentionCount: c.mentionCount,
+                            platformsCited: c.platformsCited,
+                            positioningNotes: c.profile?.positioningNotes ?? null,
+                            contentGaps: c.profile?.contentGaps ?? null,
+                        })),
+                    })),
+                };
+            } catch (error: any) {
+                return { error: error?.message || 'Failed to fetch competitor intelligence.' };
             }
         }
     };

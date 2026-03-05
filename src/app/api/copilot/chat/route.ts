@@ -26,7 +26,8 @@ import {
     createScrapeWebSourceTool,
     createStrategicTipCreationTool,
     createTipRoutingManagerTool,
-    createProjectConnectionsOpsTool
+    createProjectConnectionsOpsTool,
+    createCompetitorAnalysisTool
 } from '@/lib/copilot/chat-tools';
 
 export const maxDuration = 60;
@@ -293,6 +294,9 @@ export async function POST(req: Request) {
             },
             manageProjectConnections: {
                 ...createProjectConnectionsOpsTool(toolContext),
+            },
+            getCompetitorIntelligence: {
+                ...createCompetitorAnalysisTool(toolContext),
             }
         };
 

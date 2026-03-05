@@ -1125,14 +1125,31 @@ model VisibilityPrompt {
 }
 
 model Competitor {
-  id               String           @id @default(cuid())
+  id               String              @id @default(cuid())
   configId         String
   name             String
   website          String?
-  enabled          Boolean          @default(true)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  visibilityConfig VisibilityConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+  enabled          Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  visibilityConfig VisibilityConfig    @relation(fields: [configId], references: [id], onDelete: Cascade)
+  profile          CompetitorProfile?
+}
+
+model CompetitorProfile {
+  id               String      @id @default(cuid())
+  competitorId     String      @unique
+  positioningNotes String?
+  contentGaps      Json?
+  strengths        Json?
+  weaknesses       Json?
+  avgPosition      Float?
+  mentionCount     Int         @default(0)
+  platformsCited   String[]
+  lastAnalyzedAt   DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  competitor       Competitor  @relation(fields: [competitorId], references: [id], onDelete: Cascade)
 }
 
 model VisibilityScan {

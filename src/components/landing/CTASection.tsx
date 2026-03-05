@@ -7,8 +7,8 @@ import { ArrowRight, Play, Sparkles } from 'lucide-react';
 export function CTASection() {
   return (
     <section id="demo" className="pt-8 pb-20 md:pt-12 md:pb-28 relative overflow-hidden">
-      {/* Light overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.1)] via-[hsl(var(--amber)/0.05)] to-[hsl(var(--coral)/0.1)]" />
+      {/* White phase overlay */}
+      <div className="absolute inset-0 bg-white/88 backdrop-blur-[2px]" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div

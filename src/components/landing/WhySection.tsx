@@ -51,8 +51,8 @@ const reasons = [
 export function WhySection() {
   return (
     <section className="pt-8 pb-24 md:pt-12 md:pb-32 relative overflow-hidden">
-      {/* White phase overlay */}
-      <div className="absolute inset-0 bg-white/88 backdrop-blur-[2px]" />
+      {/* Colored phase overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--amber)/0.04)] via-transparent to-[hsl(var(--coral)/0.05)]" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div

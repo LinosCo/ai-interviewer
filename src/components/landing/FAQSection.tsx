@@ -47,7 +47,7 @@ export function FAQSection() {
 
   return (
     <section id="faq" className="py-20 md:py-28 relative">
-      <div className="absolute inset-0 bg-white/85 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.06)] via-transparent to-[hsl(var(--amber)/0.07)]" />
 
       <div className="max-w-3xl mx-auto px-6 relative z-10">
         <motion.div

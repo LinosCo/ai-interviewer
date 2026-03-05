@@ -6,7 +6,7 @@ import { FeaturesTabs } from './FeaturesTabs';
 export function FeaturesSection(): React.JSX.Element {
   return (
     <section id="strumenti" className="pt-8 pb-20 md:pt-12 md:pb-28 relative">
-      <div className="absolute inset-0 bg-white/86 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.05)] via-transparent to-[hsl(var(--amber)/0.06)]" />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <motion.div

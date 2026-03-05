@@ -6,6 +6,7 @@ import {
   BarChart3,
   Bot,
   Check,
+  ChevronDown,
   GraduationCap,
   Lightbulb,
   LineChart,
@@ -214,8 +215,75 @@ function FeatureCardItem({ card }: { card: FeatureCard }): React.JSX.Element {
   );
 }
 
+function MobileFeatureAccordion({
+  card,
+  isOpen,
+  onToggle,
+}: {
+  card: FeatureCard;
+  isOpen: boolean;
+  onToggle: () => void;
+}): React.JSX.Element {
+  const Icon = card.icon;
+
+  return (
+    <div className="glass-card rounded-2xl border border-[hsl(var(--border)/0.55)] overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full px-4 py-4 flex items-center justify-between gap-3 text-left"
+        aria-expanded={isOpen}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-[hsl(var(--coral)/0.1)] flex items-center justify-center shrink-0">
+            <Icon className="w-5 h-5 text-[hsl(var(--coral))]" />
+          </div>
+          <span className="font-display text-lg font-bold text-[hsl(var(--foreground))] truncate">
+            {card.title}
+          </span>
+        </div>
+        <ChevronDown
+          className={`w-5 h-5 text-[hsl(var(--muted-foreground))] transition-transform ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 border-t border-[hsl(var(--border)/0.45)]">
+              <p className="text-sm text-[hsl(var(--muted-foreground))] leading-relaxed mt-4">
+                {card.description}
+              </p>
+
+              <ul className="space-y-2.5 mt-4">
+                {card.benefits.map((benefit) => (
+                  <li key={benefit} className="flex items-center gap-2.5">
+                    <div className="w-5 h-5 rounded-full gradient-bg flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="text-sm text-[hsl(var(--foreground))]">{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function FeaturesTabs(): React.JSX.Element {
   const [activeTabId, setActiveTabId] = useState<string>(TABS[0].id);
+  const [openCardIndex, setOpenCardIndex] = useState(0);
   const activeTab = TABS.find((tab) => tab.id === activeTabId) ?? TABS[0];
 
   return (
@@ -225,9 +293,9 @@ export function FeaturesTabs(): React.JSX.Element {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="mb-10 overflow-x-auto scrollbar-hide -mx-6 px-6"
+        className="mb-6 md:mb-10 overflow-x-auto scrollbar-hide -mx-6 px-6 sticky md:static top-20 z-20 bg-[hsl(var(--background)/0.92)] md:bg-transparent backdrop-blur-sm md:backdrop-blur-none pb-2"
       >
-        <div className="flex gap-3 min-w-max mx-auto w-fit">
+        <div className="flex gap-3 min-w-max md:mx-auto md:w-fit">
           {TABS.map((tab) => {
             const isActive = tab.id === activeTabId;
             const TabIcon = tab.icon;
@@ -236,7 +304,10 @@ export function FeaturesTabs(): React.JSX.Element {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTabId(tab.id)}
+                onClick={() => {
+                  setActiveTabId(tab.id);
+                  setOpenCardIndex(0);
+                }}
                 className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer ${
                   isActive
                     ? 'gradient-bg text-white shadow-glow'
@@ -258,13 +329,27 @@ export function FeaturesTabs(): React.JSX.Element {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.3 }}
-          className={`grid gap-6 ${
-            activeTab.columns === 3 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2 max-w-4xl mx-auto'
-          }`}
         >
-          {activeTab.cards.map((card) => (
-            <FeatureCardItem key={card.title} card={card} />
-          ))}
+          <div className="md:hidden space-y-4">
+            {activeTab.cards.map((card, index) => (
+              <MobileFeatureAccordion
+                key={card.title}
+                card={card}
+                isOpen={openCardIndex === index}
+                onToggle={() => setOpenCardIndex((current) => (current === index ? -1 : index))}
+              />
+            ))}
+          </div>
+
+          <div
+            className={`hidden md:grid gap-6 ${
+              activeTab.columns === 3 ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-2 max-w-4xl mx-auto'
+            }`}
+          >
+            {activeTab.cards.map((card) => (
+              <FeatureCardItem key={card.title} card={card} />
+            ))}
+          </div>
         </motion.div>
       </AnimatePresence>
 

@@ -19,8 +19,8 @@ export function PricingSection() {
 
     return (
         <section id="pricing" className="pt-8 pb-20 md:pt-12 md:pb-28 relative">
-            {/* Background gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--coral)/0.06)] via-transparent to-[hsl(var(--amber)/0.08)]" />
+            {/* White phase overlay */}
+            <div className="absolute inset-0 bg-white/87 backdrop-blur-[2px]" />
 
             <div className="max-w-7xl mx-auto px-6 relative z-10">
                 {/* Header */}
@@ -87,7 +87,7 @@ export function PricingSection() {
                 </motion.div>
 
                 {/* Plans Grid */}
-                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {LANDING_PLANS.map((plan, index) => (
                         <motion.div
                             key={plan.id}

@@ -71,6 +71,13 @@ const CYCLE_PHASES: CyclePhase[] = [
   },
 ];
 
+const CYCLE_PHASE_POSITIONS = [
+  'left-1/2 top-0 -translate-x-1/2',
+  'right-0 top-1/2 -translate-y-1/2',
+  'left-1/2 bottom-0 -translate-x-1/2',
+  'left-0 top-1/2 -translate-y-1/2',
+] as const;
+
 function HeroCycleVisual(): React.JSX.Element {
   const [activePhase, setActivePhase] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -116,51 +123,53 @@ function HeroCycleVisual(): React.JSX.Element {
         className="glass-card rounded-3xl p-6 md:p-8 border border-[hsl(var(--border)/0.6)] shadow-medium"
         onMouseLeave={() => setIsPaused(false)}
       >
+        <p className="text-sm md:text-base font-semibold tracking-wide text-[hsl(var(--foreground))] text-center mb-6 md:mb-8">
+          Un processo di innovazione
+        </p>
+
         <div className="flex flex-col md:grid md:grid-cols-[1.2fr_1fr] gap-8 md:gap-10 md:items-center">
-          <div className="relative mx-auto md:mx-0 h-56 w-56 md:h-72 md:w-72">
-            <div className="absolute inset-7 md:inset-10 rounded-full border border-[hsl(var(--coral)/0.2)]" />
-            <div className="absolute inset-11 md:inset-16 rounded-full border border-[hsl(var(--amber)/0.2)]" />
+          <div className="flex items-center justify-center md:min-h-[30rem]">
+            <div className="relative h-[17.5rem] w-[17.5rem] md:h-[26rem] md:w-[26rem]">
+              <div className="absolute inset-8 md:inset-12 rounded-full border border-[hsl(var(--coral)/0.2)]" />
+              <div className="absolute inset-14 md:inset-20 rounded-full border border-[hsl(var(--amber)/0.2)]" />
 
-            {CYCLE_PHASES.map((phase, index) => {
-              const angle = (index / CYCLE_PHASES.length) * Math.PI * 2 - Math.PI / 2;
-              const radius = 96;
-              const x = Math.cos(angle) * radius;
-              const y = Math.sin(angle) * radius;
-              const isActive = activePhase === index;
-              const Icon = phase.icon;
+              {CYCLE_PHASES.map((phase, index) => {
+                const isActive = activePhase === index;
+                const Icon = phase.icon;
+                const positionClass = CYCLE_PHASE_POSITIONS[index];
 
-              return (
-                <motion.div
-                  key={phase.label}
-                  className="absolute left-1/2 top-1/2"
-                  style={{ transform: `translate(${x}px, ${y}px)` }}
-                >
-                  <button
-                    type="button"
-                    onMouseEnter={() => selectPhaseFromPointer(index)}
-                    onFocus={() => selectPhaseFromPointer(index)}
-                    onClick={() => selectPhaseFromTap(index)}
-                    className={`-translate-x-1/2 -translate-y-1/2 w-12 h-12 md:w-16 md:h-16 rounded-2xl border flex items-center justify-center transition-all duration-300 ${
-                      isActive
-                        ? 'gradient-bg border-transparent shadow-glow scale-105'
-                        : 'bg-[hsl(var(--card))] border-[hsl(var(--border))]'
-                    }`}
-                    aria-label={`Attiva fase ${phase.label}`}
+                return (
+                  <motion.div
+                    key={phase.label}
+                    className={`absolute ${positionClass}`}
                   >
-                    <Icon
-                      className={`w-5 h-5 md:w-6 md:h-6 ${
-                        isActive ? 'text-white' : 'text-[hsl(var(--muted-foreground))]'
+                    <button
+                      type="button"
+                      onMouseEnter={() => selectPhaseFromPointer(index)}
+                      onFocus={() => selectPhaseFromPointer(index)}
+                      onClick={() => selectPhaseFromTap(index)}
+                      className={`w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl border flex items-center justify-center transition-all duration-300 ${
+                        isActive
+                          ? 'gradient-bg border-transparent shadow-glow scale-105'
+                          : 'bg-[hsl(var(--card))] border-[hsl(var(--border))]'
                       }`}
-                    />
-                  </button>
-                </motion.div>
-              );
-            })}
+                      aria-label={`Attiva fase ${phase.label}`}
+                    >
+                      <Icon
+                        className={`w-6 h-6 md:w-8 md:h-8 ${
+                          isActive ? 'text-white' : 'text-[hsl(var(--muted-foreground))]'
+                        }`}
+                      />
+                    </button>
+                  </motion.div>
+                );
+              })}
 
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 md:w-24 md:h-24 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] flex items-center justify-center">
-              <span className="text-base md:text-lg font-semibold text-[hsl(var(--foreground))]">
-                {activePhase + 1}/4
-              </span>
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-32 md:h-32 rounded-full bg-[hsl(var(--background))] border border-[hsl(var(--border))] flex items-center justify-center">
+                <span className="text-lg md:text-3xl font-semibold text-[hsl(var(--foreground))]">
+                  {activePhase + 1}/4
+                </span>
+              </div>
             </div>
           </div>
 

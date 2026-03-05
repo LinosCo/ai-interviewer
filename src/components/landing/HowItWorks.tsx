@@ -17,7 +17,7 @@ export function HowItWorks(): React.JSX.Element {
           className="text-center mb-14"
         >
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
-            Un ciclo di miglioramento continuo,{' '}
+            Un processo di innovazione,{' '}
             <span className="gradient-text">mille applicazioni.</span>
           </h2>
           <p className="text-lg text-[hsl(var(--muted-foreground))] max-w-2xl mx-auto">

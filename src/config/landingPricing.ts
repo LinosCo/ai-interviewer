@@ -47,26 +47,9 @@ export interface PartnerPlan {
 
 export const LANDING_PLANS: LandingPlan[] = [
     {
-        id: 'free',
-        name: 'Free',
-        description: 'Per sempre gratuito',
-        monthlyPrice: 0,
-        yearlyPrice: 0,
-        showPrice: true,
-        features: [
-            '500 crediti/mese',
-            '1 progetto',
-            'Interviste AI',
-            'Analytics base',
-        ],
-        cta: 'Inizia Gratis',
-        ctaHref: '/register',
-        popular: false,
-    },
-    {
         id: 'starter',
         name: 'Starter',
-        description: 'Include tutto Free +',
+        description: 'Per partire con metodo',
         monthlyPrice: 69,
         yearlyPrice: 49,
         showPrice: true,
@@ -204,7 +187,7 @@ export function getYearlyDiscount(): number {
 /**
  * Format price for display
  */
-export function formatPrice(price: number | null, currency = 'EUR'): string {
+export function formatPrice(price: number | null): string {
     if (price === null) return 'Su misura';
     if (price === 0) return 'Gratis';
     return `€${price}`;

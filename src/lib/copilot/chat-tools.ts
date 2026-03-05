@@ -2432,7 +2432,12 @@ export function createCompetitorAnalysisTool(context: ToolContext) {
                             mentionCount: c.mentionCount,
                             platformsCited: c.platformsCited,
                             positioningNotes: c.profile?.positioningNotes ?? null,
-                            contentGaps: c.profile?.contentGaps ?? null,
+                            contentGaps: (() => {
+                                const val = c.profile?.contentGaps;
+                                if (!val) return null;
+                                const str = typeof val === 'string' ? val : JSON.stringify(val);
+                                return str.slice(0, 500);
+                            })(),
                         })),
                     })),
                 };

@@ -9,15 +9,15 @@ export interface CompetitorIntelligence {
   recentPositions: Array<{ platform: string; position: number | null; date: Date }>;
   profile: {
     positioningNotes: string | null;
-    contentGaps: unknown;
-    strengths: unknown;
-    weaknesses: unknown;
+    contentGaps: string | null;
+    strengths: string | null;
+    weaknesses: string | null;
     lastAnalyzedAt: Date | null;
   } | null;
 }
 
 export interface CompetitorReport {
-  brandName: string | null;
+  brandName: string;
   brandAvgPosition: number | null;
   competitors: CompetitorIntelligence[];
   scanCount: number;
@@ -109,10 +109,13 @@ export async function getCompetitorIntelligence(
           ? (resp.competitorPositions as Array<{ name?: string; position?: number | null }>)
           : [];
 
-        const match = compPositions.find(
-          (cp) => cp.name?.toLowerCase().includes(comp.name.toLowerCase()) ||
-                  comp.name.toLowerCase().includes(cp.name?.toLowerCase() ?? '')
-        );
+        // Fix 5: Guard empty/null competitor names in matching
+        const match = compPositions.find((cp) => {
+          if (!cp.name) return false;
+          const cpName = cp.name.toLowerCase();
+          const compName = comp.name.toLowerCase();
+          return cpName.includes(compName) || compName.includes(cpName);
+        });
 
         if (match) {
           mentionCount++;
@@ -132,14 +135,32 @@ export async function getCompetitorIntelligence(
         ? numericPositions.reduce((a, b) => a + b, 0) / numericPositions.length
         : null;
 
+      // Fix 4: Serialize profile fields with concrete types
+      const profile = comp.profile ? {
+        positioningNotes: comp.profile.positioningNotes,
+        contentGaps: comp.profile.contentGaps !== null && comp.profile.contentGaps !== undefined
+          ? JSON.stringify(comp.profile.contentGaps).slice(0, 500)
+          : null,
+        strengths: comp.profile.strengths !== null && comp.profile.strengths !== undefined
+          ? JSON.stringify(comp.profile.strengths).slice(0, 300)
+          : null,
+        weaknesses: comp.profile.weaknesses !== null && comp.profile.weaknesses !== undefined
+          ? JSON.stringify(comp.profile.weaknesses).slice(0, 300)
+          : null,
+        lastAnalyzedAt: comp.profile.lastAnalyzedAt,
+      } : null;
+
       return {
         name: comp.name,
         website: comp.website,
         avgPosition: avgPosition !== null ? Math.round(avgPosition * 10) / 10 : null,
         mentionCount,
         platformsCited: [...platformSet],
-        recentPositions: positions.slice(0, 5),
-        profile: comp.profile ?? null,
+        // Fix 2: Sort recentPositions by recency before slicing
+        recentPositions: positions
+          .sort((a, b) => b.date.getTime() - a.date.getTime())
+          .slice(0, 5),
+        profile,
       };
     });
 

@@ -336,6 +336,7 @@ export async function POST(req: Request) {
                 system: systemPrompt + SYSTEM_SUFFIX,
                 messages: inputMessages,
                 tools: toolSet,
+                // @ts-expect-error maxSteps is valid in ai v5 but TS overload resolution fails when tools is typed as any
                 maxSteps: 4,
                 temperature: 0.3,
                 abortSignal: AbortSignal.timeout(55000),
@@ -346,7 +347,8 @@ export async function POST(req: Request) {
             });
         };
 
-        let streamResult: ReturnType<typeof streamText> extends Promise<infer R> ? R : never;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let streamResult: Awaited<ReturnType<typeof attemptStream>> | undefined;
 
         try {
             if (anthropicApiKey) {
@@ -411,7 +413,7 @@ export async function POST(req: Request) {
                 if (capturedUsage) {
                     try {
                         await TokenTrackingService.logTokenUsage({
-                            userId: session.user.id,
+                            userId: session.user!.id,
                             organizationId: organization?.id,
                             projectId: projectId || undefined,
                             inputTokens: capturedUsage.promptTokens || capturedUsage.inputTokens || 0,
@@ -420,7 +422,7 @@ export async function POST(req: Request) {
                             model: modelUsed,
                             operation: 'copilot-chat',
                             resourceType: 'copilot',
-                            resourceId: session.user.id,
+                            resourceId: session.user!.id,
                             actionOverride: 'copilot_message'
                         });
                     } catch (err) {
@@ -433,7 +435,7 @@ export async function POST(req: Request) {
                     await prisma.copilotMessage.createMany({
                         data: [
                             { conversationId, role: 'user', content: message, toolsUsed: [] },
-                            { conversationId, role: 'assistant', content: finalText, toolsUsed: capturedToolsUsed }
+                            { conversationId, role: 'assistant', content: fullText, toolsUsed: capturedToolsUsed }
                         ]
                     });
                     await prisma.copilotConversation.update({
@@ -447,14 +449,14 @@ export async function POST(req: Request) {
                 // Log copilot session
                 const estimatedTokens = Math.ceil((message.length + fullText.length) / 4);
                 const sessionDate = new Date().toISOString().split('T')[0];
-                const sessionKey = `${session.user.id}-${sessionDate}`;
+                const sessionKey = `${session.user!.id}-${sessionDate}`;
                 try {
                     await prisma.copilotSession.upsert({
                         where: { id: sessionKey },
                         update: { messagesCount: { increment: 1 }, tokensUsed: { increment: estimatedTokens } },
                         create: {
                             id: sessionKey,
-                            userId: session.user.id,
+                            userId: session.user!.id as string,
                             organizationId: organization.id,
                             projectId: projectId || null,
                             messagesCount: 1,

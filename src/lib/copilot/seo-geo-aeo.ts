@@ -128,7 +128,9 @@ export async function getFeaturedSnippetOpportunities(
                 if (entry.position < 4 || entry.position > 20) continue;
                 if (entry.impressions < 100) continue;
 
-                // Deduplicate by query; prefer highest-impression record
+                // Deduplicate by query; prefer highest-impression record for totals,
+                // but preserve currentPosition from the first (most recent) row encountered
+                // since analytics rows are ordered date desc.
                 const existing = opportunityMap.get(entry.query);
                 if (existing && existing.impressions >= entry.impressions) continue;
 
@@ -136,7 +138,9 @@ export async function getFeaturedSnippetOpportunities(
 
                 opportunityMap.set(entry.query, {
                     query: entry.query,
-                    currentPosition: entry.position,
+                    // Keep the most-recent position if we already have one; only use
+                    // this (older) entry's position when first seeing the query.
+                    currentPosition: existing?.currentPosition ?? entry.position,
                     impressions: entry.impressions,
                     clicks: entry.clicks,
                     ctr: entry.ctr,

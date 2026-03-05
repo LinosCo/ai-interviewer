@@ -54,7 +54,8 @@ export class CopilotAlertEngine {
         severity: a.severity,
         title: a.title,
         body: a.body,
-        metadata: a.metadata ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        metadata: (a.metadata ?? null) as any,
       })),
       skipDuplicates: true,
     });
@@ -85,12 +86,12 @@ export class CopilotAlertEngine {
     const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const rows = await prisma.googleAnalytic.findMany({
+    const rows = await prisma.googleAnalyticsData.findMany({
       where: {
-        connection: { project: { organizationId } },
+        googleConnection: { project: { organizationId } },
         date: { gte: twoWeeksAgo },
       },
-      select: { date: true, sessions: true, connection: { select: { project: { select: { name: true } } } } },
+      select: { date: true, sessions: true, googleConnection: { select: { project: { select: { name: true } } } } },
       orderBy: { date: 'asc' },
     });
 

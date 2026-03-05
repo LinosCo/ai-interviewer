@@ -2456,7 +2456,7 @@ export function createSeoGeoAeoTool(context: ToolContext) {
             topic: z.string().optional().describe('Topic or keyword for citation-building recommendations.'),
             mode: z.enum(['featured_snippets', 'citation_building', 'both']).optional().default('both').describe('Which analysis to run.')
         }),
-        execute: async ({ projectId, topic, mode }: { projectId?: string; topic?: string; mode?: string }) => {
+        execute: async ({ projectId, topic, mode }: { projectId?: string; topic?: string; mode?: 'featured_snippets' | 'citation_building' | 'both' }) => {
             const { getFeaturedSnippetOpportunities, getCitationBuildingRecommendations } = await import('@/lib/copilot/seo-geo-aeo');
 
             const result: Record<string, unknown> = {};

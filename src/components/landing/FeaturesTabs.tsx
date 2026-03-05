@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   BarChart3,
@@ -29,6 +29,7 @@ interface Tab {
   id: string;
   label: string;
   icon: LucideIcon;
+  phaseDescription: string;
   columns: 2 | 3;
   cards: FeatureCard[];
 }
@@ -38,6 +39,7 @@ const TABS: Tab[] = [
     id: 'ascolta',
     label: 'ASCOLTA',
     icon: MessageSquare,
+    phaseDescription: 'Raccogli segnali da clienti, chat e mercato.',
     columns: 3,
     cards: [
       {
@@ -79,6 +81,7 @@ const TABS: Tab[] = [
     id: 'decidi',
     label: 'DECIDI',
     icon: Lightbulb,
+    phaseDescription: 'Trasforma i segnali in priorità e raccomandazioni operative.',
     columns: 2,
     cards: [
       {
@@ -111,6 +114,7 @@ const TABS: Tab[] = [
     id: 'esegui',
     label: 'ESEGUI',
     icon: Plug,
+    phaseDescription: 'Attiva integrazioni e automazioni sui flussi quotidiani.',
     columns: 2,
     cards: [
       {
@@ -136,6 +140,7 @@ const TABS: Tab[] = [
     id: 'monitora',
     label: 'MONITORA',
     icon: BarChart3,
+    phaseDescription: 'Misura impatto e risultati per riattivare il ciclo.',
     columns: 2,
     cards: [
       {
@@ -284,7 +289,54 @@ function MobileFeatureAccordion({
 export function FeaturesTabs(): React.JSX.Element {
   const [activeTabId, setActiveTabId] = useState<string>(TABS[0].id);
   const [openCardIndex, setOpenCardIndex] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [isAutoPaused, setIsAutoPaused] = useState(false);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeTab = TABS.find((tab) => tab.id === activeTabId) ?? TABS[0];
+  const activeTabIndex = Math.max(0, TABS.findIndex((tab) => tab.id === activeTab.id));
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const media = window.matchMedia('(min-width: 768px)');
+    const sync = () => setIsDesktop(media.matches);
+    sync();
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', sync);
+      return () => media.removeEventListener('change', sync);
+    }
+
+    media.addListener(sync);
+    return () => media.removeListener(sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktop || isAutoPaused) return;
+
+    const timer = setInterval(() => {
+      setActiveTabId((current) => {
+        const currentIndex = TABS.findIndex((tab) => tab.id === current);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % TABS.length;
+        return TABS[nextIndex].id;
+      });
+      setOpenCardIndex(0);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isDesktop, isAutoPaused]);
+
+  useEffect(() => {
+    return () => {
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    };
+  }, []);
+
+  const pauseAutoOnTap = () => {
+    setIsAutoPaused(true);
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => setIsAutoPaused(false), 3500);
+  };
 
   return (
     <>
@@ -294,9 +346,11 @@ export function FeaturesTabs(): React.JSX.Element {
         viewport={{ once: true }}
         transition={{ duration: 0.4, delay: 0.1 }}
         className="mb-6 md:mb-10 overflow-x-auto scrollbar-hide -mx-6 px-6 sticky md:static top-20 z-20 bg-[hsl(var(--background)/0.92)] md:bg-transparent backdrop-blur-sm md:backdrop-blur-none pb-2"
+        onMouseEnter={() => setIsAutoPaused(true)}
+        onMouseLeave={() => setIsAutoPaused(false)}
       >
         <div className="flex gap-3 min-w-max md:mx-auto md:w-fit">
-          {TABS.map((tab) => {
+          {TABS.map((tab, index) => {
             const isActive = tab.id === activeTabId;
             const TabIcon = tab.icon;
 
@@ -307,18 +361,41 @@ export function FeaturesTabs(): React.JSX.Element {
                 onClick={() => {
                   setActiveTabId(tab.id);
                   setOpenCardIndex(0);
+                  pauseAutoOnTap();
                 }}
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap cursor-pointer ${
+                onTouchStart={pauseAutoOnTap}
+                className={`flex items-center gap-2.5 px-6 md:px-7 py-3.5 rounded-2xl text-base font-semibold border transition-all duration-200 whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'gradient-bg text-white shadow-glow'
-                    : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--border))]'
+                    ? 'gradient-bg text-white shadow-glow border-transparent'
+                    : 'bg-[hsl(var(--card)/0.85)] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--coral)/0.35)]'
                 }`}
               >
+                <span
+                  className={`w-6 h-6 rounded-full border text-xs font-bold flex items-center justify-center ${
+                    isActive
+                      ? 'bg-white/20 border-white/30 text-white'
+                      : 'bg-[hsl(var(--secondary))] border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))]'
+                  }`}
+                >
+                  {index + 1}
+                </span>
                 <TabIcon className="w-4 h-4" />
                 {tab.label}
               </button>
             );
           })}
+        </div>
+
+        <div className="mt-4 text-center">
+          <p className="text-sm md:text-base text-[hsl(var(--muted-foreground))]">
+            <span className="font-semibold text-[hsl(var(--foreground))]">
+              Fase {activeTabIndex + 1} di {TABS.length}:
+            </span>{' '}
+            {activeTab.phaseDescription}
+          </p>
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+            I tool qui sotto appartengono alla fase selezionata.
+          </p>
         </div>
       </motion.div>
 

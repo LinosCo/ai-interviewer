@@ -21,10 +21,7 @@ interface StrategyCopilotProps {
 }
 
 const copilotAnchorStyle = {
-    left: 'auto',
-    top: 'auto',
-    right: '1rem',
-    bottom: '1rem',
+    inset: 'auto 1rem 1rem auto',
 } as const;
 
 const QUICK_ACTIONS = [
@@ -131,17 +128,12 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
     }, []);
 
     // If the landing chatbot embed leaked into dashboard via client-side navigation,
-    // remove it to avoid overlap/conflicts with Strategy Copilot.
+    // remove only its root container to avoid runtime errors while scripts execute.
     useEffect(() => {
         if (typeof document === 'undefined') return;
 
         const removeEmbeddedWidget = () => {
             document.getElementById('bt-root')?.remove();
-            document
-                .querySelectorAll('script[src*="/embed/chatbot.js"], script[src*="embed/chatbot.js"]')
-                .forEach((node) => {
-                    node.parentNode?.removeChild(node);
-                });
         };
 
         removeEmbeddedWidget();

@@ -17,12 +17,45 @@ export default function BrandingEditor({ bot, plan }: BrandingEditorProps) {
     const isPro = plan === 'PRO' || plan === 'BUSINESS' || plan === 'TRIAL';
     const updateAction = updateBotAction.bind(null, bot.id);
     const [logoPreview, setLogoPreview] = useState(bot.logoUrl || '');
+    const [logoUploading, setLogoUploading] = useState(false);
+    const [coverPreview, setCoverPreview] = useState(bot.landingImageUrl || '');
+    const [coverMode, setCoverMode] = useState<'upload' | 'url'>((bot.landingImageUrl && !bot.landingImageUrl.startsWith('/api/uploads')) ? 'url' : 'upload');
+    const [coverUploading, setCoverUploading] = useState(false);
 
     const handleSubmit = async (formData: FormData) => {
         // Appends scope
         formData.append('_scope', 'branding');
         await updateAction(formData);
         showToast('Branding updated!', 'success');
+    };
+
+    const handleCoverUpload = async (file: File) => {
+        if (file.size > 2 * 1024 * 1024) {
+            alert("L'immagine è troppo grande. Massimo 2MB.");
+            return;
+        }
+
+        setCoverUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('botId', bot.id);
+            fd.append('type', 'cover');
+
+            const res = await fetch('/api/uploads/image', { method: 'POST', body: fd });
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.error || 'Errore upload');
+                return;
+            }
+
+            const { url } = await res.json();
+            setCoverPreview(url);
+        } catch {
+            alert('Errore durante il caricamento. Riprova.');
+        } finally {
+            setCoverUploading(false);
+        }
     };
 
     if (!isPro) {
@@ -83,28 +116,43 @@ export default function BrandingEditor({ bot, plan }: BrandingEditorProps) {
                                     <input
                                         type="file"
                                         accept="image/*"
+                                        disabled={logoUploading}
                                         className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-2"
-                                        onChange={(e) => {
+                                        onChange={async (e) => {
                                             const file = e.target.files?.[0];
-                                            if (file) {
-                                                // Check size limit (max 500KB to ensure Base64 < 1MB limit of Server Actions)
-                                                // 500KB * 1.33 = ~665KB Base64. Safe.
-                                                if (file.size > 500 * 1024) {
-                                                    alert("L'immagine è troppo grande. Per favore usa un file più piccolo di 500KB.");
+                                            if (!file) return;
+
+                                            if (file.size > 2 * 1024 * 1024) {
+                                                alert("L'immagine è troppo grande. Massimo 2MB.");
+                                                return;
+                                            }
+
+                                            setLogoUploading(true);
+                                            try {
+                                                const fd = new FormData();
+                                                fd.append('file', file);
+                                                fd.append('botId', bot.id);
+                                                fd.append('type', 'logo');
+
+                                                const res = await fetch('/api/uploads/image', { method: 'POST', body: fd });
+                                                if (!res.ok) {
+                                                    const err = await res.json();
+                                                    alert(err.error || 'Errore upload logo');
                                                     return;
                                                 }
-                                                const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                    const res = reader.result as string;
-                                                    setLogoPreview(res);
-                                                    // No need for manual DOM update, we use controlled input below
-                                                };
-                                                reader.readAsDataURL(file);
+
+                                                const { url } = await res.json();
+                                                setLogoPreview(url);
+                                            } catch {
+                                                alert('Errore durante il caricamento. Riprova.');
+                                            } finally {
+                                                setLogoUploading(false);
                                             }
                                         }}
                                     />
                                     <input type="hidden" name="logoUrl" value={logoPreview} />
-                                    <p className="text-xs text-gray-400">Consigliato: PNG trasparente 200x200px.</p>
+                                    {logoUploading && <p className="text-xs text-amber-600">Caricamento logo...</p>}
+                                    <p className="text-xs text-gray-400">Consigliato: PNG trasparente — max 2MB.</p>
                                 </div>
                             </div>
                         </div>
@@ -160,14 +208,72 @@ export default function BrandingEditor({ bot, plan }: BrandingEditorProps) {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image URL</label>
-                                <input
-                                    name="landingImageUrl"
-                                    type="url"
-                                    defaultValue={bot.landingImageUrl || ''}
-                                    placeholder="https://..."
-                                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
-                                />
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
+
+                                <div className="flex gap-2 mb-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setCoverMode('upload')}
+                                        className={`text-xs px-3 py-1 rounded-full border transition-colors ${coverMode === 'upload' ? 'bg-amber-500 text-white border-amber-500' : 'text-gray-500 border-gray-200 hover:border-amber-300'}`}
+                                    >
+                                        Carica File
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCoverMode('url')}
+                                        className={`text-xs px-3 py-1 rounded-full border transition-colors ${coverMode === 'url' ? 'bg-amber-500 text-white border-amber-500' : 'text-gray-500 border-gray-200 hover:border-amber-300'}`}
+                                    >
+                                        Usa URL
+                                    </button>
+                                </div>
+
+                                <input type="hidden" name="landingImageUrl" value={coverPreview} />
+
+                                {coverMode === 'upload' ? (
+                                    <div className="space-y-2">
+                                        {coverPreview && (
+                                            <div className="w-full aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                                <img src={coverPreview} alt="Cover preview" className="w-full h-full object-contain" />
+                                            </div>
+                                        )}
+
+                                        <input
+                                            type="file"
+                                            accept="image/png,image/jpeg,image/webp,image/gif"
+                                            disabled={coverUploading}
+                                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 disabled:opacity-50"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) handleCoverUpload(file);
+                                            }}
+                                        />
+
+                                        {coverUploading && <p className="text-xs text-amber-600">Caricamento in corso...</p>}
+
+                                        {coverPreview && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setCoverPreview('')}
+                                                className="text-xs text-red-500 hover:text-red-700"
+                                            >
+                                                Rimuovi immagine
+                                            </button>
+                                        )}
+
+                                        <p className="text-xs text-gray-400">PNG, JPG, WebP o GIF — max 2MB</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <input
+                                            type="url"
+                                            value={coverPreview}
+                                            onChange={(e) => setCoverPreview(e.target.value)}
+                                            placeholder="https://..."
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                                        />
+                                        <p className="text-xs text-gray-400">URL diretto a un'immagine (no Google Drive)</p>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Video Embed URL</label>

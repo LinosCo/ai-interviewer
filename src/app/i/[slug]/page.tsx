@@ -48,11 +48,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     const defaultBrandName = process.env.NEXT_PUBLIC_BRAND_NAME || 'Voler AI';
     const brandName = bot.project?.organization?.name || defaultBrandName;
     const fullTitle = `${title} | ${brandName}`;
-    const description = bot.landingDescription || bot.researchGoal || `Partecipa all'intervista interattiva "${title}" - Un'esperienza conversazionale intelligente creata con Business Tuner.`;
-    const image = bot.landingImageUrl || bot.logoUrl;
+    const description = bot.landingDescription || bot.researchGoal || bot.introMessage || `Partecipa all'intervista "${title}" con ${brandName}.`;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://businesstuner.voler.ai';
     const canonicalUrl = `${appUrl}/i/${slug}`;
-    const fallbackSocialImage = `${appUrl}/opengraph-image`;
+    const socialImage = `${canonicalUrl}/opengraph-image`;
 
     return {
         title: fullTitle,
@@ -85,16 +84,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
             siteName: 'Business Tuner',
             title: fullTitle,
             description,
-            images: image ? [{
-                url: image,
+            images: [{
+                url: socialImage,
                 width: 1200,
                 height: 630,
                 alt: `${title} - Intervista interattiva`,
-            }] : [{
-                url: fallbackSocialImage,
-                width: 1200,
-                height: 630,
-                alt: `${brandName} - Interviste AI`,
             }],
         },
         twitter: {
@@ -103,14 +97,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
             creator: '@businesstuner',
             title: fullTitle,
             description,
-            images: image ? [image] : [fallbackSocialImage],
+            images: [socialImage],
         },
         other: {
             'theme-color': bot.primaryColor || '#f59e0b',
         },
     };
 }
-
 // Usage limit check component - renders error or nothing
 async function UsageLimitCheck({ organizationId }: { organizationId: string }) {
     const check = await canStartInterview(organizationId);

@@ -27,34 +27,34 @@ export function CTASection() {
           >
             <Sparkles className="w-4 h-4 text-[hsl(var(--coral))]" />
             <span className="text-sm font-medium text-[hsl(var(--coral))]">
-              Dall\'insight all\'azione in tempi rapidi
+              Dall&apos;insight all&apos;azione
             </span>
           </motion.div>
 
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-[hsl(var(--foreground))] mb-6">
-            Pronto a trasformare segnali dispersi in{' '}
-            <span className="gradient-text">decisioni migliori</span>?
+            Pronto a sintonizzare il tuo{' '}
+            <span className="gradient-text">business</span>?
           </h2>
 
           <p className="text-lg md:text-xl text-[hsl(var(--muted-foreground))] mb-10 max-w-2xl mx-auto">
-            Ascolta stakeholder, monitora reputazione, coordina attivita digitali
-            con il Copilot e fai crescere il team con una routine piu efficace.
+            Ascolta chi conta, decidi con i dati, esegui con costanza.
+            Il ciclo strategico parte da qui.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              href="/register"
+              className="gradient-bg text-white hover:opacity-90 text-lg px-8 py-4 font-semibold shadow-glow hover:scale-105 transition-transform rounded-xl inline-flex items-center justify-center gap-2"
+            >
+              Inizia la prova gratuita
+              <ArrowRight className="w-5 h-5" />
+            </Link>
             <Link
               href="/preview"
               className="bg-[hsl(var(--card))] text-[hsl(var(--coral))] hover:bg-[hsl(var(--card)/0.9)] text-lg px-8 py-4 font-semibold shadow-lg hover:scale-105 transition-transform border border-[hsl(var(--border)/0.5)] rounded-xl inline-flex items-center justify-center gap-2"
             >
               <Play className="w-5 h-5" />
               Testa un&apos;intervista
-            </Link>
-            <Link
-              href="/register"
-              className="gradient-bg text-white hover:opacity-90 text-lg px-8 py-4 font-semibold shadow-glow hover:scale-105 transition-transform rounded-xl inline-flex items-center justify-center gap-2"
-            >
-              Prova Gratis
-              <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
 
@@ -65,8 +65,8 @@ export function CTASection() {
             transition={{ delay: 0.8 }}
             className="mt-8 text-sm text-[hsl(var(--muted-foreground))]"
           >
-            Setup guidato &nbsp;&bull;&nbsp; Workflow no-code &nbsp;&bull;&nbsp;
-            Adozione semplice per il team
+            Setup guidato &nbsp;&bull;&nbsp; Team italiano &nbsp;&bull;&nbsp;
+            Adozione semplice
           </motion.p>
         </motion.div>
       </div>

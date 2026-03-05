@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const siteConfig = {
   name: "Business Tuner",
-  description: "Raccogli feedback qualitativi da clienti, dipendenti e stakeholder con interviste AI. Senza consulenti, senza sondaggi ignorati.",
+  description: "Raccogli segnali da clienti, team e mercato. Decidi con il Copilot AI. Esegui con automazioni. Monitora l'impatto. Una piattaforma, un ciclo continuo.",
   url: "https://businesstuner.voler.ai",
   links: {
     email: "businesstuner@voler.ai",
@@ -11,7 +11,7 @@ export const siteConfig = {
 
 export const defaultMetadata: Metadata = {
   title: {
-    default: `${siteConfig.name} - Ascolta il mercato. Decidi meglio.`,
+    default: `${siteConfig.name} — Il ciclo strategico AI per PMI e consulenti`,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
@@ -25,7 +25,9 @@ export const defaultMetadata: Metadata = {
     "NPS qualitativo",
     "voice of customer",
     "AI interviste",
-    "sondaggi intelligenti",
+    "copilot strategico",
+    "brand monitoring",
+    "automazioni marketing",
   ],
   authors: [{ name: "Business Tuner" }],
   creator: "Business Tuner",

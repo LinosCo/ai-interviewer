@@ -7,10 +7,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Icons } from '@/components/ui/business-tuner/Icons';
 
 const navLinks = [
-  { label: 'Strumenti', href: '#strumenti' },
   { label: 'Come funziona', href: '#come-funziona' },
+  { label: 'Strumenti', href: '#strumenti' },
+  { label: 'Per chi', href: '#per-chi' },
   { label: 'Pricing', href: '#pricing' },
-  { label: 'Diventa Partner', href: '/partner' },
   { label: 'FAQ', href: '#faq' },
 ];
 
@@ -80,7 +80,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
             href={session ? '/dashboard' : '/preview'}
             className="gradient-bg shadow-glow font-medium text-white px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
           >
-            {session ? 'Vai alla console' : 'Prova Gratis'}
+            {session ? 'Vai alla console' : 'Inizia ora'}
           </Link>
         </div>
 
@@ -127,7 +127,7 @@ export function LandingHeader({ session }: LandingHeaderProps) {
                   className="gradient-bg shadow-glow text-white font-medium py-3 rounded-xl text-center"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  {session ? 'Vai alla console' : 'Prova Gratis'}
+                  {session ? 'Vai alla console' : 'Inizia ora'}
                 </Link>
               </div>
             </nav>

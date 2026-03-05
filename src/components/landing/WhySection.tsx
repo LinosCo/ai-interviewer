@@ -5,7 +5,7 @@ import {
   Zap,
   Shield,
   Globe,
-  PiggyBank,
+  TrendingUp,
   HeartHandshake,
   RefreshCcw,
 } from 'lucide-react';
@@ -13,38 +13,38 @@ import {
 const reasons = [
   {
     icon: Zap,
-    title: 'AI Nativa',
+    title: 'AI nel cuore',
     description:
-      "Non un'integrazione posticcia, ma AI costruita nel cuore della piattaforma.",
+      "Non un'integrazione posticcia, ma AI costruita nel nucleo della piattaforma.",
   },
   {
     icon: Globe,
-    title: '100% Italiano',
+    title: 'Pensato in italiano',
     description:
-      'Comprende le sfumature della lingua italiana e del nostro modo di fare business.',
+      'Comprende il contesto, la lingua e il modo di fare business delle imprese italiane.',
   },
   {
-    icon: PiggyBank,
-    title: 'Prezzo Accessibile',
+    icon: TrendingUp,
+    title: 'Prezzo scalabile',
     description:
-      'Funzionalità enterprise a prezzi pensati per PMI e consulenti.',
+      'Funzionalità avanzate a prezzi sostenibili. Cresce con te, senza salti di costo imprevisti.',
   },
   {
     icon: Shield,
-    title: 'Privacy First',
-    description: 'I tuoi dati restano tuoi. GDPR compliant, server in Europa.',
+    title: 'Privacy concreta',
+    description: 'Dati cifrati, server EU, gestione GDPR. I tuoi dati restano tuoi.',
   },
   {
     icon: HeartHandshake,
-    title: 'Supporto Umano',
+    title: 'Supporto di persone',
     description:
       'Team italiano sempre disponibile. Niente chatbot per il supporto, solo persone.',
   },
   {
     icon: RefreshCcw,
-    title: 'Sempre Aggiornato',
+    title: 'Evoluzione continua',
     description:
-      'Nuove funzionalità ogni mese, basate sul feedback della community.',
+      'Nuove funzionalità ogni mese, guidate dal feedback della community.',
   },
 ];
 

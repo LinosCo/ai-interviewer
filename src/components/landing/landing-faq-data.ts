@@ -25,29 +25,9 @@ export const LANDING_FAQS = [
       "Il Copilot e il layer decisionale: legge i segnali dei vari moduli, costruisce visione d'insieme, propone playbook e suggerisce le prossime azioni per marketing, prodotto e operations.",
   },
   {
-    question: 'Posso automatizzare le azioni suggerite?',
-    answer:
-      'Si. Puoi instradare insight e suggerimenti verso i tuoi strumenti con webhook e n8n, creando workflow no-code per notifiche, task, contenuti e follow-up operativi.',
-  },
-  {
     question: 'Posso iniziare con un solo caso d\'uso?',
     answer:
       'Assolutamente. Puoi partire da un solo obiettivo (es. ascolto clienti o chatbot sul sito) e poi estendere gradualmente ad altri moduli mantenendo tutto nello stesso workspace.',
-  },
-  {
-    question: 'Come gestisco team e progetti interni?',
-    answer:
-      'Puoi organizzare il lavoro per team/progetto e mantenere governance chiara su accessi, ownership e responsabilita. Questo rende piu semplice scalare la collaborazione tra funzioni.',
-  },
-  {
-    question: 'Con quali sistemi posso integrarmi?',
-    answer:
-      'Puoi collegarti ai canali principali del tuo stack digitale: sito web, Search Console, monitoraggio SERP/AI e integrazioni operative via webhook o n8n per orchestrare i processi.',
-  },
-  {
-    question: 'E adatto anche ad agenzie e consulenti?',
-    answer:
-      'Si. E utile per chi gestisce piu clienti e vuole standardizzare discovery, insight e azioni: meno lavoro frammentato, piu qualita strategica percepita dal cliente.',
   },
   {
     question: 'I dati e le conversazioni sono protetti?',
@@ -58,5 +38,15 @@ export const LANDING_FAQS = [
     question: 'Posso fare una prova prima di decidere?',
     answer:
       'Si. Puoi vedere il prodotto in azione con demo guidata e partire in modo progressivo, validando il valore sul tuo contesto prima di estendere l\'adozione.',
+  },
+  {
+    question: 'Come funziona il modello a crediti?',
+    answer:
+      'Ogni organizzazione ha un budget mensile di crediti in base al piano. Ogni operazione AI consuma crediti. Quando i crediti mensili finiscono, il sistema usa automaticamente gli eventuali Credit Pack acquistati. I Credit Pack non scadono.',
+  },
+  {
+    question: 'Con quali sistemi posso integrarmi?',
+    answer:
+      'Puoi collegarti ai canali principali del tuo stack digitale: sito web, Search Console, monitoraggio SERP/AI e integrazioni operative via webhook o n8n per orchestrare i processi.',
   },
 ] as const;

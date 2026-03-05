@@ -7,22 +7,22 @@ export const SITE_TWITTER_HANDLE = '@businesstuner';
 export const DEFAULT_LOCALE = 'it_IT';
 
 export const BRAND_KEYWORDS: string[] = [
-  'ai marketing intelligence',
-  'stakeholder listening',
+  'ciclo strategico ai',
+  'interviste qualitative ai',
+  'feedback clienti',
   'brand monitoring',
-  'reputation monitoring',
   'copilot strategico',
-  'automazioni no-code',
-  'marketing intelligence per pmi',
+  'automazioni marketing',
+  'business intelligence pmi',
   'strumento per agenzie',
   'tool per consulenti strategici',
   'business tuner',
 ];
 
 export const HOME_PAGE_TITLE =
-  'AI Marketing Intelligence Operativa per PMI, Agenzie e Consulenti';
+  'Il ciclo strategico AI per PMI e consulenti';
 export const HOME_PAGE_DESCRIPTION =
-  'Ascolta stakeholder, monitora reputazione, decidi con il Copilot strategico e attiva automazioni no-code per lavorare con piu efficacia.';
+  'Raccogli segnali da clienti, team e mercato. Decidi con il Copilot AI. Esegui con automazioni. Monitora l\'impatto. Una piattaforma, un ciclo continuo.';
 
 export function absoluteUrl(path = '/'): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;

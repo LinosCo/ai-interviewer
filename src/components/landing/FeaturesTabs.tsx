@@ -321,7 +321,7 @@ export function FeaturesTabs(): React.JSX.Element {
         return TABS[nextIndex].id;
       });
       setOpenCardIndex(0);
-    }, 1000);
+    }, 10000);
 
     return () => clearInterval(timer);
   }, [isDesktop, isAutoPaused]);

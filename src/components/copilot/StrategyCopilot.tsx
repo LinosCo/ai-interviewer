@@ -381,7 +381,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
                         onClick={() => { setIsOpen(true); markAlertsRead(); }}
-                        className="fixed w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40 relative"
+                        className="fixed w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40"
                         style={copilotAnchorStyle}
                         title="Strategy Copilot"
                     >

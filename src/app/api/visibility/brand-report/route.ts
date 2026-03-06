@@ -31,6 +31,9 @@ export async function POST(request: Request) {
             sitemapUrl?: string;
             additionalUrls?: Array<{ url: string; label?: string }>;
         };
+        const hasWebsiteUrlOverride = Object.prototype.hasOwnProperty.call(body, 'websiteUrl');
+        const hasSitemapUrlOverride = Object.prototype.hasOwnProperty.call(body, 'sitemapUrl');
+        const hasAdditionalUrlsOverride = Object.prototype.hasOwnProperty.call(body, 'additionalUrls');
 
         if (!configId) {
             return NextResponse.json({ error: 'configId is required' }, { status: 400 });
@@ -88,6 +91,18 @@ export async function POST(request: Request) {
         });
         if (membership?.status !== 'ACTIVE') {
             return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
+        // Persist latest crawl sources on config so UI keeps them across reloads and reruns.
+        if (hasWebsiteUrlOverride || hasSitemapUrlOverride || hasAdditionalUrlsOverride) {
+            await prisma.visibilityConfig.update({
+                where: { id: config.id },
+                data: {
+                    ...(hasWebsiteUrlOverride && { websiteUrl: websiteUrlOverride ?? null }),
+                    ...(hasSitemapUrlOverride && { sitemapUrl: sitemapUrlOverride ?? null }),
+                    ...(hasAdditionalUrlsOverride && { additionalUrls: normalizedAdditionalUrls }),
+                },
+            });
         }
 
         const effectiveWebsiteUrl = websiteUrlOverride || config.websiteUrl;

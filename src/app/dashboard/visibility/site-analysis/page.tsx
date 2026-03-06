@@ -48,6 +48,7 @@ export default async function SiteAnalysisPage({
             id: true,
             brandName: true,
             websiteUrl: true,
+            sitemapUrl: true,
             additionalUrls: true,
         },
     });
@@ -83,6 +84,7 @@ export default async function SiteAnalysisPage({
                 configId={config.id}
                 brandName={config.brandName}
                 websiteUrl={config.websiteUrl}
+                initialSitemapUrl={config.sitemapUrl || ''}
                 initialAdditionalUrls={Array.isArray(config.additionalUrls) ? (config.additionalUrls as Array<{ url: string; label: string }>) : []}
                 initialReport={report as Parameters<typeof SiteAnalysisClient>[0]['initialReport']}
                 initialIsRunning={!!running}

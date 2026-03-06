@@ -1093,6 +1093,7 @@ model VisibilityConfig {
   updatedAt       DateTime                  @updatedAt
   projectId       String?
   websiteUrl      String?
+  sitemapUrl      String?
   additionalUrls  Json?
   competitors     Competitor[]
   projectShares   ProjectVisibilityConfig[]

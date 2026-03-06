@@ -139,10 +139,19 @@ function isLikelyScrapablePageUrl(rawUrl: string): boolean {
 
 function isLikelySitemapInput(rawUrl: string): boolean {
     const lower = rawUrl.toLowerCase();
-    return (
-        lower.includes('sitemap') &&
-        (lower.endsWith('.xml') || lower.endsWith('.xml.gz') || lower.includes('sitemap_index'))
-    );
+    try {
+        const parsed = new URL(rawUrl);
+        const pathname = parsed.pathname.toLowerCase();
+        if (pathname.endsWith('.xml') || pathname.endsWith('.xml.gz')) {
+            return pathname.includes('sitemap') || pathname.endsWith('sitemap.xml');
+        }
+        return pathname.includes('sitemap_index');
+    } catch {
+        return (
+            lower.includes('sitemap') &&
+            (lower.endsWith('.xml') || lower.endsWith('.xml.gz') || lower.includes('sitemap_index'))
+        );
+    }
 }
 
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {

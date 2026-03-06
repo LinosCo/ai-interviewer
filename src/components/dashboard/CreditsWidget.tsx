@@ -93,13 +93,16 @@ export function CreditsWidget() {
         );
     }
 
-    const percentage = credits.percentageUsed;
+    const usedPercentage = credits.percentageUsed;
+    const remainingPercentage = credits.monthlyLimit > 0
+        ? Math.max(0, Math.min(100, (credits.monthlyRemaining / credits.monthlyLimit) * 100))
+        : 0;
 
     // Color based on usage
     const getBarColor = () => {
-        if (percentage >= 95) return 'bg-red-500';
-        if (percentage >= 85) return 'bg-orange-500';
-        if (percentage >= 70) return 'bg-yellow-500';
+        if (usedPercentage >= 95) return 'bg-red-500';
+        if (usedPercentage >= 85) return 'bg-orange-500';
+        if (usedPercentage >= 70) return 'bg-yellow-500';
         return 'bg-green-500';
     };
 
@@ -125,19 +128,22 @@ export function CreditsWidget() {
             <div
                 className="h-1.5 bg-stone-200 rounded-full overflow-hidden mb-2"
                 role="progressbar"
-                aria-valuenow={Math.min(percentage, 100)}
+                aria-valuenow={remainingPercentage}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label="Utilizzo crediti mensili"
+                aria-label="Crediti mensili rimanenti"
             >
                 <div
                     className={`h-full ${getBarColor()} transition-all duration-300`}
-                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                    style={{ width: `${remainingPercentage}%` }}
                 />
             </div>
 
-            <div className="text-[10px] text-stone-500 mb-1">
+            <div className="text-[10px] text-stone-500 mb-0.5">
                 <span>Mensili: {credits.formatted.monthlyRemaining} rimasti</span>
+            </div>
+            <div className="text-[10px] text-stone-400 mb-1">
+                <span>Reset il {formatResetDate(credits.resetDate)}</span>
             </div>
 
             {credits.packAvailable > 0 && (
@@ -166,7 +172,7 @@ export function CreditsWidget() {
             )}
 
             {/* CTA for low credits */}
-            {percentage >= 85 ? (
+            {usedPercentage >= 85 ? (
                 <div className="flex gap-1.5 mt-2">
                     <Link
                         href="/dashboard/billing?tab=packs"
@@ -181,11 +187,7 @@ export function CreditsWidget() {
                         Upgrade
                     </Link>
                 </div>
-            ) : (
-                <div className="flex justify-between text-[10px] text-stone-400 mt-1">
-                    <span>Reset il {formatResetDate(credits.resetDate)}</span>
-                </div>
-            )}
+            ) : null}
         </div>
     );
 }

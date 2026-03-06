@@ -20,11 +20,6 @@ interface StrategyCopilotProps {
     userTier: string;
 }
 
-const copilotAnchorStyle = {
-    right: '1rem',
-    bottom: '1rem',
-} as const;
-
 const QUICK_ACTIONS = [
     { label: 'Come creo un\'intervista?', icon: Lightbulb, category: 'help' },
     { label: 'Mostra il mio utilizzo', icon: MessageSquare, category: 'account' },
@@ -128,8 +123,8 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
         };
     }, []);
 
-    // If the landing chatbot embed leaked into dashboard via client-side navigation,
-    // remove only its root container to avoid runtime errors while scripts execute.
+    // If the landing chatbot embed leaks into dashboard via client-side navigation,
+    // keep removing only its root container.
     useEffect(() => {
         if (typeof document === 'undefined') return;
 
@@ -139,11 +134,12 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
 
         removeEmbeddedWidget();
         const interval = window.setInterval(removeEmbeddedWidget, 1200);
-        const timeout = window.setTimeout(() => window.clearInterval(interval), 10000);
+        const observer = new MutationObserver(removeEmbeddedWidget);
+        observer.observe(document.body, { childList: true, subtree: true });
 
         return () => {
             window.clearInterval(interval);
-            window.clearTimeout(timeout);
+            observer.disconnect();
         };
     }, []);
 
@@ -381,8 +377,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
                         onClick={() => { setIsOpen(true); markAlertsRead(); }}
-                        className="fixed w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40"
-                        style={copilotAnchorStyle}
+                        className="fixed bottom-4 right-4 w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full shadow-lg flex items-center justify-center text-white hover:shadow-xl transition-shadow z-40 relative"
                         title="Strategy Copilot"
                     >
                         <Sparkles className="w-6 h-6" />
@@ -402,8 +397,7 @@ export function StrategyCopilot({ userTier }: StrategyCopilotProps) {
                         initial={{ opacity: 0, y: 20, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        className="fixed w-[calc(100vw-2rem)] max-w-[400px] h-[min(600px,calc(100vh-6rem))] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-40 border border-stone-200"
-                        style={copilotAnchorStyle}
+                        className="fixed bottom-4 right-4 w-[calc(100vw-2rem)] max-w-[400px] h-[min(600px,calc(100vh-6rem))] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-40 border border-stone-200"
                     >
                         {/* Header */}
                         <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4">

@@ -190,7 +190,8 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
 
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'BusinessTunerBot/1.0 (AI Assistant; +https://businesstuner.ai)'
+                'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
+                'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
             }
         });
 
@@ -216,7 +217,11 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
         }
 
         if (content.length < 30 && description.length < 30) {
-            throw new Error("Content too short or couldn't extract meaningful text");
+            const minimal = sanitizeExtractedText(
+                `${title}\n${description}\nPagina analizzata con contenuto testuale limitato.`,
+                500
+            );
+            content = minimal || title || url;
         }
 
         return {
@@ -385,7 +390,8 @@ export async function scrapeWebsiteWithSubpages(
     // 1. Scrape homepage first
     const response = await fetch(homepageUrl, {
         headers: {
-            'User-Agent': 'BusinessTunerBot/1.0 (AI Assistant; +https://businesstuner.ai)'
+            'User-Agent': 'Mozilla/5.0 (compatible; BrandAuditBot/1.0)',
+            'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8'
         }
     });
 

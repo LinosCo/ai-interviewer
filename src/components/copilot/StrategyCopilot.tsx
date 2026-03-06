@@ -21,7 +21,8 @@ interface StrategyCopilotProps {
 }
 
 const copilotAnchorStyle = {
-    inset: 'auto 1rem 1rem auto',
+    right: '1rem',
+    bottom: '1rem',
 } as const;
 
 const QUICK_ACTIONS = [

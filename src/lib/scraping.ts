@@ -372,12 +372,24 @@ export interface AdditionalUrl {
 export async function scrapeWebsiteWithSubpages(
     url: string,
     maxSubpages: number = 8,
-    additionalUrls: AdditionalUrl[] = []
+    additionalUrls: AdditionalUrl[] = [],
+    explicitSitemapUrl?: string
 ): Promise<MultiPageScrapedContent> {
     console.log(`[scraping] Starting multi-page scrape for ${url}`);
+    if (explicitSitemapUrl) {
+        console.log(`[scraping] Using explicit sitemap URL: ${explicitSitemapUrl}`);
+    }
 
     let homepageUrl = url;
-    if (isLikelySitemapInput(url)) {
+    if (explicitSitemapUrl && isLikelySitemapInput(explicitSitemapUrl)) {
+        try {
+            const parsed = new URL(explicitSitemapUrl);
+            homepageUrl = `${parsed.protocol}//${parsed.host}`;
+            console.log(`[scraping] Explicit sitemap URL provided. Using ${homepageUrl} as homepage base.`);
+        } catch {
+            // keep original URL if parsing fails
+        }
+    } else if (isLikelySitemapInput(url)) {
         try {
             const parsed = new URL(url);
             homepageUrl = `${parsed.protocol}//${parsed.host}`;
@@ -442,8 +454,10 @@ export async function scrapeWebsiteWithSubpages(
         let sitemapSource: string | null = null;
 
         try {
-            const sitemapResult = isLikelySitemapInput(url)
-                ? await parseProvidedSitemap(url)
+            const sitemapResult = explicitSitemapUrl
+                ? await parseProvidedSitemap(explicitSitemapUrl)
+                : isLikelySitemapInput(url)
+                    ? await parseProvidedSitemap(url)
                 : await parseSitemap(url);
 
             sitemapSource = sitemapResult.sitemapUrl;

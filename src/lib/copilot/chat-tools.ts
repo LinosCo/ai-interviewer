@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import Sitemapper from 'sitemapper';
 import { scrapeUrl } from '@/lib/scraping';
 import { assertOrganizationAccess, assertProjectAccess } from '@/lib/domain/workspace';
 import { CMSSuggestionGenerator } from '@/lib/cms/suggestion-generator';
@@ -15,6 +14,8 @@ import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 import { buildInsightActionMetadata } from '@/lib/insights/action-metadata';
 import { getKBCategories, searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { getDefaultStrategicMarketingKnowledge, getStrategicMarketingKnowledgeByOrg } from '@/lib/marketing/strategic-kb';
+import { parseProvidedSitemap } from '@/lib/visibility/site-crawler-engine';
+import { indexKnowledgeSource } from '@/lib/kb/semantic-search';
 
 type ToolContext = {
     userId: string;
@@ -1959,6 +1960,7 @@ export function createKnowledgeBaseTool(context: ToolContext) {
                         projectId: true,
                         brandName: true,
                         websiteUrl: true,
+                        sitemapUrl: true,
                         additionalUrls: true
                     }
                 });
@@ -2002,6 +2004,7 @@ export function createKnowledgeBaseTool(context: ToolContext) {
                         configId: cfg.id,
                         brandName: cfg.brandName,
                         websiteUrl: cfg.websiteUrl,
+                        sitemapUrl: cfg.sitemapUrl || null,
                         additionalUrls: parseAdditionalUrls(cfg.additionalUrls)
                     }));
 
@@ -2129,6 +2132,8 @@ export function createScrapeWebSourceTool(context: ToolContext) {
                             select: { id: true }
                         });
                         savedSourceId = saved.id;
+                        indexKnowledgeSource(saved.id, scraped.title, `URL: ${scraped.url}\n\nTitle: ${scraped.title}\n\n${scraped.content}`)
+                            .catch(err => console.error('[copilot scrapeWebSource] embedding failed:', err));
                     }
 
                     return {
@@ -2145,8 +2150,7 @@ export function createScrapeWebSourceTool(context: ToolContext) {
                     };
                 }
 
-                const sitemap = new Sitemapper();
-                const { sites } = await sitemap.fetch(url);
+                const { urls: sites } = await parseProvidedSitemap(url);
                 if (!sites || sites.length === 0) {
                     return { error: 'No URLs found in sitemap.' };
                 }
@@ -2171,6 +2175,8 @@ export function createScrapeWebSourceTool(context: ToolContext) {
                                 select: { id: true }
                             });
                             savedSourceId = saved.id;
+                            indexKnowledgeSource(saved.id, scraped.title, `URL: ${scraped.url}\n\nTitle: ${scraped.title}\n\n${scraped.content}`)
+                                .catch(err => console.error('[copilot scrapeWebSource] embedding failed:', err));
                         }
 
                         results.push({

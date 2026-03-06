@@ -106,6 +106,24 @@ function extractPageText($: cheerio.CheerioAPI): string {
     return sanitizeExtractedText(root.text());
 }
 
+function buildFallbackContent($: cheerio.CheerioAPI, description: string): string {
+    const parts: string[] = [];
+    const h1 = sanitizeExtractedText($('h1').first().text(), 400);
+    const h2 = sanitizeExtractedText($('h2').first().text(), 300);
+    const ogTitle = sanitizeExtractedText($('meta[property="og:title"]').attr('content') || '', 300);
+    const twitterTitle = sanitizeExtractedText($('meta[name="twitter:title"]').attr('content') || '', 300);
+    const bodyText = sanitizeExtractedText($('body').text(), 2500);
+
+    if (description) parts.push(description);
+    if (h1) parts.push(h1);
+    if (h2) parts.push(h2);
+    if (ogTitle) parts.push(ogTitle);
+    if (twitterTitle) parts.push(twitterTitle);
+    if (bodyText) parts.push(bodyText);
+
+    return sanitizeExtractedText(parts.join('\n\n'), 6000);
+}
+
 function normalizeComparableUrl(rawUrl: string): string | null {
     try {
         const parsed = new URL(rawUrl);
@@ -156,6 +174,20 @@ function isLikelySitemapInput(rawUrl: string): boolean {
 
 export async function scrapeUrl(url: string): Promise<ScrapedContent> {
     try {
+        if (isLikelySitemapInput(url)) {
+            const sitemap = await parseProvidedSitemap(url);
+            if (sitemap.urls.length > 0) {
+                const listedUrls = sitemap.urls.slice(0, 200).join('\n');
+                return {
+                    title: 'Sitemap',
+                    content: `Sitemap URL: ${sitemap.sitemapUrl || url}\n\nDiscovered URLs (${sitemap.urls.length}):\n${listedUrls}`,
+                    description: `Parsed sitemap with ${sitemap.urls.length} URLs`,
+                    url
+                };
+            }
+            throw new Error('Sitemap provided but no URLs were discovered');
+        }
+
         const response = await fetch(url, {
             headers: {
                 'User-Agent': 'BusinessTunerBot/1.0 (AI Assistant; +https://businesstuner.ai)'
@@ -174,9 +206,16 @@ export async function scrapeUrl(url: string): Promise<ScrapedContent> {
             || $('meta[property="og:description"]').attr('content')
             || '';
         const description = sanitizeExtractedText(rawDescription, 600);
-        const content = extractPageText($);
+        let content = extractPageText($);
 
-        if (content.length < 50) {
+        if (content.length < 120) {
+            const fallback = buildFallbackContent($, description);
+            if (fallback.length > content.length) {
+                content = fallback;
+            }
+        }
+
+        if (content.length < 30 && description.length < 30) {
             throw new Error("Content too short or couldn't extract meaningful text");
         }
 

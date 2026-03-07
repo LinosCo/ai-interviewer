@@ -83,6 +83,46 @@ interface Insight {
     isVirtual?: boolean;
 }
 
+interface CanonicalTip {
+    id: string;
+    originType: string;
+    title: string;
+    summary?: string | null;
+    status: string;
+    priority?: number | null;
+    category?: string | null;
+    contentKind?: string | null;
+    starred: boolean;
+    reasoning?: string | null;
+    strategicAlignment?: string | null;
+    methodologySummary?: string | null;
+    draftStatus?: string | null;
+    routingStatus?: string | null;
+    publishStatus?: string | null;
+    evidenceCount?: number;
+    routeCount?: number;
+    executionCount?: number;
+}
+
+interface CanonicalTipDetail extends CanonicalTip {
+    evidence: Array<{
+        id: string;
+        sourceType: string;
+        sourceLabel?: string | null;
+        detail: string;
+    }>;
+    routes: Array<{
+        id: string;
+        destinationType: string;
+        status: string;
+    }>;
+    executions: Array<{
+        id: string;
+        status: string;
+        startedAt: string;
+    }>;
+}
+
 interface TipHistoryItem {
     contentKind: string;
     category: string | null;
@@ -149,6 +189,26 @@ export default function InsightHubPage() {
     const { selectedProject, isAllProjectsSelected } = useProject();
     const { currentOrganization } = useOrganization();
     const [insights, setInsights] = useState<Insight[]>([]);
+    const [canonicalTips, setCanonicalTips] = useState<CanonicalTip[]>([]);
+    const [canonicalTipDetails, setCanonicalTipDetails] = useState<Record<string, CanonicalTipDetail>>({});
+    const [expandedCanonicalTipId, setExpandedCanonicalTipId] = useState<string | null>(null);
+    const [editingCanonicalTipId, setEditingCanonicalTipId] = useState<string | null>(null);
+    const [canonicalEditDraft, setCanonicalEditDraft] = useState<{
+        title: string;
+        summary: string;
+        reasoning: string;
+        strategicAlignment: string;
+        status: string;
+        starred: boolean;
+    }>({
+        title: '',
+        summary: '',
+        reasoning: '',
+        strategicAlignment: '',
+        status: 'NEW',
+        starred: false
+    });
+    const [savingCanonicalTipId, setSavingCanonicalTipId] = useState<string | null>(null);
     const [healthReport, setHealthReport] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -385,6 +445,42 @@ export default function InsightHubPage() {
         }
     };
 
+    const fetchCanonicalTips = async () => {
+        if (!projectId) {
+            setCanonicalTips([]);
+            setCanonicalTipDetails({});
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/projects/${projectId}/tips`);
+            if (!res.ok) {
+                setCanonicalTips([]);
+                return;
+            }
+            const data = await res.json();
+            setCanonicalTips(Array.isArray(data.tips) ? data.tips : []);
+        } catch (err) {
+            console.error('Error fetching canonical tips:', err);
+            setCanonicalTips([]);
+        }
+    };
+
+    const loadCanonicalTipDetail = async (tipId: string) => {
+        if (!projectId) return;
+        if (canonicalTipDetails[tipId]) return;
+        try {
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.tip?.id) {
+                setCanonicalTipDetails((prev) => ({ ...prev, [tipId]: data.tip }));
+            }
+        } catch (err) {
+            console.error('Error loading canonical tip detail:', err);
+        }
+    };
+
     const fetchStrategy = async () => {
         try {
             // Fetch project-level strategy if a project is selected, otherwise org-level
@@ -495,7 +591,12 @@ export default function InsightHubPage() {
         setWebsiteAnalysis(null);
         setTopSources([]);
         setTipHistoryByContentKind([]);
+        setCanonicalTips([]);
+        setCanonicalTipDetails({});
+        setExpandedCanonicalTipId(null);
+        setEditingCanonicalTipId(null);
         fetchInsights();
+        fetchCanonicalTips();
         fetchStrategy();
         fetchWebsiteAnalysis();
         fetchTopSources();
@@ -568,6 +669,7 @@ export default function InsightHubPage() {
             if (res.ok) {
                 showToast("Insights sincronizzati con successo!");
                 fetchInsights();
+                fetchCanonicalTips();
             } else {
                 showToast("Errore durante la sincronizzazione", "error");
             }
@@ -610,6 +712,104 @@ export default function InsightHubPage() {
         if (normalized === 'actioned') return 'completed';
         if (normalized === 'dismissed') return 'archived';
         return normalized;
+    };
+
+    const normalizeCanonicalStatus = (status: string | null | undefined) => {
+        const normalized = (status || 'NEW').toUpperCase();
+        if (normalized === 'COMPLETED') return 'completed';
+        if (normalized === 'ARCHIVED') return 'archived';
+        return normalized === 'REVIEWED' || normalized === 'APPROVED' || normalized === 'DRAFTED' || normalized === 'ROUTED' || normalized === 'AUTOMATED' || normalized === 'NEW'
+            ? 'active'
+            : 'active';
+    };
+
+    const getCanonicalAutomationState = (tip: CanonicalTip, detail?: CanonicalTipDetail | null) => {
+        const hasFailed = Boolean(
+            detail?.executions.some((execution) => execution.status === 'FAILED')
+            || detail?.routes.some((route) => route.status === 'FAILED')
+        );
+        if (hasFailed) return { key: 'failed', label: 'Failed', className: 'bg-red-50 text-red-700 border-red-200' };
+
+        const hasCompletedExecution = Boolean(detail?.executions.some((execution) => execution.status === 'SUCCEEDED'));
+        if (hasCompletedExecution || tip.status === 'COMPLETED') {
+            return { key: 'completed', label: 'Completed', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+        }
+
+        if (tip.status === 'AUTOMATED') {
+            return { key: 'automated', label: 'Automated', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+        }
+
+        const hasDispatched = Boolean(detail?.routes.some((route) => route.status === 'DISPATCHED'));
+        if (hasDispatched || tip.status === 'ROUTED') {
+            return { key: 'awaiting_approval', label: 'Awaiting approval', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+        }
+
+        if ((tip.routeCount ?? 0) > 0 || tip.routingStatus === 'PLANNED') {
+            return { key: 'ready_to_route', label: 'Ready to route', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+        }
+
+        return { key: 'manual_only', label: 'Manual only', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+    };
+
+    const openCanonicalEdit = async (tip: CanonicalTip) => {
+        setEditingCanonicalTipId(tip.id);
+        setCanonicalEditDraft({
+            title: tip.title || '',
+            summary: tip.summary || '',
+            reasoning: tip.reasoning || '',
+            strategicAlignment: tip.strategicAlignment || '',
+            status: tip.status || 'NEW',
+            starred: Boolean(tip.starred)
+        });
+        await loadCanonicalTipDetail(tip.id);
+    };
+
+    const saveCanonicalTipEdit = async (tipId: string) => {
+        if (!projectId) return;
+        setSavingCanonicalTipId(tipId);
+        try {
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(canonicalEditDraft)
+            });
+            if (!res.ok) {
+                showToast('Errore durante il salvataggio del tip', 'error');
+                return;
+            }
+            showToast('Tip aggiornato');
+            setEditingCanonicalTipId(null);
+            await fetchCanonicalTips();
+            setCanonicalTipDetails((prev) => {
+                const next = { ...prev };
+                delete next[tipId];
+                return next;
+            });
+            await loadCanonicalTipDetail(tipId);
+        } catch (err) {
+            console.error('Save canonical tip error:', err);
+            showToast('Errore di rete', 'error');
+        } finally {
+            setSavingCanonicalTipId(null);
+        }
+    };
+
+    const duplicateCanonicalTip = async (tipId: string) => {
+        if (!projectId) return;
+        try {
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}/duplicate`, {
+                method: 'POST',
+            });
+            if (!res.ok) {
+                showToast('Errore durante la duplicazione del tip', 'error');
+                return;
+            }
+            showToast('Tip duplicato');
+            await fetchCanonicalTips();
+        } catch (err) {
+            console.error('Duplicate canonical tip error:', err);
+            showToast('Errore di rete', 'error');
+        }
     };
 
     const handleInsightStatus = async (insightId: string, status: 'new' | 'starred' | 'completed' | 'archived') => {
@@ -1328,6 +1528,142 @@ export default function InsightHubPage() {
                         ))}
                     </div>
                 ) : (() => {
+                    const filteredCanonicalTips = canonicalTips
+                        .filter((tip) => {
+                            const status = normalizeCanonicalStatus(tip.status);
+                            if (statusFilter === 'active') return status === 'active';
+                            if (statusFilter === 'starred') return Boolean(tip.starred);
+                            if (statusFilter === 'completed') return status === 'completed';
+                            if (statusFilter === 'archived') return status === 'archived';
+                            return true;
+                        })
+                        .filter((tip) => {
+                            if (tipTypeFilter === 'all') return true;
+                            return tip.contentKind === tipTypeFilter || tip.category === tipTypeFilter;
+                        });
+
+                    if (filteredCanonicalTips.length > 0) {
+                        return (
+                            <div className="grid gap-6">
+                                {filteredCanonicalTips.map((tip) => {
+                                    const detail = canonicalTipDetails[tip.id];
+                                    const isExpanded = expandedCanonicalTipId === tip.id;
+                                    const isEditing = editingCanonicalTipId === tip.id;
+                                    const automationState = getCanonicalAutomationState(tip, detail);
+                                    return (
+                                        <Card key={tip.id} className="overflow-hidden border-slate-200 hover:border-amber-200 transition-all group hover:shadow-xl hover:shadow-slate-200/50">
+                                            <CardHeader className="pb-4">
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <div>
+                                                        <CardTitle className="text-xl font-extrabold text-slate-900 leading-tight">
+                                                            {tip.title}
+                                                        </CardTitle>
+                                                        <CardDescription className="mt-2 flex flex-wrap items-center gap-2">
+                                                            <Badge variant="outline" className="text-[10px] uppercase">{tip.originType}</Badge>
+                                                            <Badge variant="outline" className="text-[10px] uppercase">{tip.status}</Badge>
+                                                            <Badge variant="outline" className={`text-[10px] uppercase ${automationState.className}`}>{automationState.label}</Badge>
+                                                            {tip.contentKind && <Badge variant="outline" className="text-[10px] uppercase">{tip.contentKind}</Badge>}
+                                                            <span className="text-xs text-slate-500">Evidenze: {tip.evidenceCount ?? 0}</span>
+                                                            <span className="text-xs text-slate-500">Route: {tip.routeCount ?? 0}</span>
+                                                        </CardDescription>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 px-3 rounded-full text-xs"
+                                                            onClick={async () => {
+                                                                const next = isExpanded ? null : tip.id;
+                                                                setExpandedCanonicalTipId(next);
+                                                                if (next) await loadCanonicalTipDetail(next);
+                                                            }}
+                                                        >
+                                                            {isExpanded ? 'Nascondi' : 'Dettagli'}
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 px-3 rounded-full text-xs"
+                                                            onClick={() => openCanonicalEdit(tip)}
+                                                        >
+                                                            Modifica
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 px-3 rounded-full text-xs"
+                                                            onClick={() => duplicateCanonicalTip(tip.id)}
+                                                        >
+                                                            Duplica
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </CardHeader>
+                                            {(isExpanded || isEditing) && (
+                                                <CardContent className="pt-0 space-y-4">
+                                                    {isEditing ? (
+                                                        <div className="grid gap-3 rounded-xl border border-slate-200 p-4 bg-slate-50">
+                                                            <input className="h-9 rounded border border-slate-300 px-3 text-sm" value={canonicalEditDraft.title} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, title: e.target.value }))} />
+                                                            <textarea className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm" value={canonicalEditDraft.summary} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, summary: e.target.value }))} placeholder="Summary" />
+                                                            <textarea className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm" value={canonicalEditDraft.reasoning} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, reasoning: e.target.value }))} placeholder="Reasoning" />
+                                                            <textarea className="min-h-20 rounded border border-slate-300 px-3 py-2 text-sm" value={canonicalEditDraft.strategicAlignment} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, strategicAlignment: e.target.value }))} placeholder="Strategic alignment" />
+                                                            <div className="flex items-center gap-3">
+                                                                <select className="h-9 rounded border border-slate-300 px-3 text-sm" value={canonicalEditDraft.status} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, status: e.target.value }))}>
+                                                                    {['NEW', 'REVIEWED', 'APPROVED', 'DRAFTED', 'ROUTED', 'AUTOMATED', 'COMPLETED', 'ARCHIVED'].map((status) => (
+                                                                        <option key={status} value={status}>{status}</option>
+                                                                    ))}
+                                                                </select>
+                                                                <label className="flex items-center gap-2 text-xs text-slate-700">
+                                                                    <input type="checkbox" checked={canonicalEditDraft.starred} onChange={(e) => setCanonicalEditDraft((prev) => ({ ...prev, starred: e.target.checked }))} />
+                                                                    Prioritario
+                                                                </label>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Button size="sm" className="h-8 px-3 rounded-full text-xs" onClick={() => saveCanonicalTipEdit(tip.id)} disabled={savingCanonicalTipId === tip.id}>
+                                                                    {savingCanonicalTipId === tip.id ? 'Salvataggio...' : 'Salva'}
+                                                                </Button>
+                                                                <Button variant="outline" size="sm" className="h-8 px-3 rounded-full text-xs" onClick={() => setEditingCanonicalTipId(null)}>
+                                                                    Annulla
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ) : null}
+
+                                                    {isExpanded && detail && (
+                                                        <div className="space-y-3 rounded-xl border border-slate-200 p-4 bg-white">
+                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Summary:</span> {detail.summary || '—'}</p>
+                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Reasoning:</span> {detail.reasoning || '—'}</p>
+                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Strategic alignment:</span> {detail.strategicAlignment || '—'}</p>
+                                                            <p className="text-sm text-slate-700"><span className="font-semibold">Methodology summary:</span> {detail.methodologySummary || '—'}</p>
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Evidence</p>
+                                                                {detail.evidence.length ? detail.evidence.map((ev) => (
+                                                                    <div key={ev.id} className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 mb-1">{ev.sourceType}: {ev.detail}</div>
+                                                                )) : <p className="text-xs text-slate-500">Nessuna evidenza</p>}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Routes</p>
+                                                                {detail.routes.length ? detail.routes.map((route) => (
+                                                                    <div key={route.id} className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 mb-1">{route.destinationType} · {route.status}</div>
+                                                                )) : <p className="text-xs text-slate-500">Nessuna route</p>}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Execution history</p>
+                                                                {detail.executions.length ? detail.executions.map((execution) => (
+                                                                    <div key={execution.id} className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 mb-1">{execution.status} · {new Date(execution.startedAt).toLocaleString('it-IT')}</div>
+                                                                )) : <p className="text-xs text-slate-500">Nessuna esecuzione</p>}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            )}
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        );
+                    }
+
                     const filtered = insights
                         .filter(i => i.topicName !== "Health Report: Brand & Sito")
                         .filter(i => {

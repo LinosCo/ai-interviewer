@@ -15,6 +15,7 @@ import { checkIntegrationCreationAllowed } from '@/lib/trial-limits';
 import { buildInsightActionMetadata } from '@/lib/insights/action-metadata';
 import { getKBCategories, searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { getDefaultStrategicMarketingKnowledge, getStrategicMarketingKnowledgeByOrg } from '@/lib/marketing/strategic-kb';
+import { ProjectTipService } from '@/lib/projects/project-tip.service';
 
 type ToolContext = {
     userId: string;
@@ -2252,6 +2253,8 @@ export function createStrategicTipCreationTool(context: ToolContext) {
             reasoning: z.string().min(10).max(4000).describe('Strategic rationale and evidence behind the tip.'),
             priorityScore: z.number().min(0).max(100).optional().default(70),
             actions: z.array(strategicTipActionSchema).min(1).max(6),
+            canonicalWriteMode: z.enum(['legacy_dual_write', 'canonical_dual_write', 'canonical_only']).optional().default('legacy_dual_write')
+                .describe('Choose canonical write behavior: legacy_dual_write (default), canonical_dual_write, canonical_only.'),
             autoCreateContentDrafts: z.boolean().optional().default(true).describe('Generate CMS suggestions from content-related actions.'),
             autoDispatchRouting: z.boolean().optional().default(false).describe('If true, run n8n dispatch and tip routing rules after draft generation.')
         }),
@@ -2261,6 +2264,7 @@ export function createStrategicTipCreationTool(context: ToolContext) {
             reasoning,
             priorityScore,
             actions,
+            canonicalWriteMode,
             autoCreateContentDrafts,
             autoDispatchRouting
         }: {
@@ -2282,6 +2286,7 @@ export function createStrategicTipCreationTool(context: ToolContext) {
                     detail: string;
                 }>;
             }>;
+            canonicalWriteMode?: 'legacy_dual_write' | 'canonical_dual_write' | 'canonical_only';
             autoCreateContentDrafts?: boolean;
             autoDispatchRouting?: boolean;
         }) => {
@@ -2311,29 +2316,75 @@ export function createStrategicTipCreationTool(context: ToolContext) {
                     ...buildInsightActionMetadata(action)
                 }));
 
-                const insight = await prisma.crossChannelInsight.create({
-                    data: {
-                        organizationId: context.organizationId,
-                        projectId: targetProjectId,
-                        topicName,
-                        crossChannelScore: 85,
-                        priorityScore: Number(priorityScore ?? 70),
-                        status: 'new',
-                        interviewData: [],
-                        chatbotData: [],
-                        visibilityData: {
-                            source: 'copilot_strategic',
+                const writeMode = canonicalWriteMode ?? 'legacy_dual_write';
+                let canonicalTipId: string | null = null;
+                let insight: { id: string; projectId: string; topicName: string; priorityScore: number } | null = null;
+
+                if (writeMode === 'canonical_dual_write' || writeMode === 'canonical_only') {
+                    try {
+                        const canonicalTip = await ProjectTipService.createCopilotTip({
+                            projectId: targetProjectId,
+                            organizationId: context.organizationId,
+                            title: topicName,
+                            summary: reasoning.slice(0, 280),
+                            priority: Number(priorityScore ?? 70),
+                            category: 'copilot_strategic',
+                            contentKind: 'STRATEGIC_RECOMMENDATION',
+                            executionClass: 'COPILOT',
+                            reasoning,
+                            strategicAlignment: reasoning,
+                            actions: enrichedActions as any,
+                            evidence: enrichedActions.flatMap((action) => action.evidence ?? []) as any,
                             createdBy: context.userId,
-                            createdAt: new Date().toISOString(),
-                            globalReasoning: reasoning
-                        } as any,
-                        suggestedActions: enrichedActions as any
+                        });
+                        canonicalTipId = canonicalTip.id;
+                    } catch (error) {
+                        console.warn('[project-tip-canonical-write] copilot canonical tip creation failed', { targetProjectId, error });
                     }
-                });
+                }
+
+                if (writeMode === 'legacy_dual_write' || writeMode === 'canonical_dual_write') {
+                    insight = await prisma.crossChannelInsight.create({
+                        data: {
+                            organizationId: context.organizationId,
+                            projectId: targetProjectId,
+                            topicName,
+                            crossChannelScore: 85,
+                            priorityScore: Number(priorityScore ?? 70),
+                            status: 'new',
+                            interviewData: [],
+                            chatbotData: [],
+                            visibilityData: {
+                                source: 'copilot_strategic',
+                                createdBy: context.userId,
+                                createdAt: new Date().toISOString(),
+                                globalReasoning: reasoning
+                            } as any,
+                            suggestedActions: enrichedActions as any
+                        },
+                        select: {
+                            id: true,
+                            projectId: true,
+                            topicName: true,
+                            priorityScore: true,
+                        }
+                    });
+                }
+
+                if (writeMode === 'legacy_dual_write' && insight) {
+                    try {
+                        const result = await ProjectTipService.materializeFromCrossChannelInsight(insight.id);
+                        canonicalTipId = result.tipId;
+                    } catch (error) {
+                        console.warn('[project-tip-dual-write] copilot tip materialization failed', { insightId: insight.id, error });
+                    }
+                }
 
                 let suggestionIds: string[] = [];
                 if (autoCreateContentDrafts) {
-                    suggestionIds = await CMSSuggestionGenerator.generateFromInsight(insight.id);
+                    if (insight) {
+                        suggestionIds = await CMSSuggestionGenerator.generateFromInsight(insight.id);
+                    }
                 }
 
                 const routing = { dispatchedToN8N: false, routedRules: 0, routingFailures: 0 };
@@ -2378,12 +2429,18 @@ export function createStrategicTipCreationTool(context: ToolContext) {
 
                 return {
                     success: true,
+                    writePath: {
+                        mode: writeMode,
+                        legacyInsightId: insight?.id ?? null,
+                        canonicalTipId,
+                    },
                     insight: {
-                        id: insight.id,
-                        projectId: insight.projectId,
-                        topicName: insight.topicName,
-                        priorityScore: insight.priorityScore,
-                        actionsCount: enrichedActions.length
+                        id: insight?.id ?? null,
+                        projectId: insight?.projectId ?? targetProjectId,
+                        topicName: insight?.topicName ?? topicName,
+                        priorityScore: insight?.priorityScore ?? Number(priorityScore ?? 70),
+                        actionsCount: enrichedActions.length,
+                        canonicalTipId
                     },
                     automations: {
                         contentDraftsCreated: suggestionIds.length,

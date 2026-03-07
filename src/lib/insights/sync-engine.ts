@@ -3,6 +3,7 @@ import { getSystemLLM } from '@/lib/visibility/llm-providers';
 import { SerpMonitoringEngine } from '@/lib/visibility/serp-monitoring-engine';
 import { CONTENT_KIND_LABELS, type ContentKind } from '@/lib/cms/content-kinds';
 import { buildInsightActionMetadata } from '@/lib/insights/action-metadata';
+import { ProjectTipService } from '@/lib/projects/project-tip.service';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 
@@ -648,6 +649,11 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                     where: { id: existing.id },
                     data
                 });
+                try {
+                    await ProjectTipService.materializeFromCrossChannelInsight(updated.id);
+                } catch (error) {
+                    console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: updated.id, error });
+                }
                 existingByTopic.set(topicName, updated);
                 return updated;
             }
@@ -661,6 +667,11 @@ AZIONI CHE RICHIEDONO CONSULENZA (l'utente può richiedere supporto):
                     ...data
                 }
             });
+            try {
+                await ProjectTipService.materializeFromCrossChannelInsight(created.id);
+            } catch (error) {
+                console.warn('[project-tip-dual-write] cross-channel materialization failed', { insightId: created.id, error });
+            }
             existingByTopic.set(topicName, created);
             return created;
         };

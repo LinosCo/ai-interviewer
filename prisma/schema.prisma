@@ -194,10 +194,13 @@ model Organization {
   copilotAlerts          CopilotAlert[]
   crossChannelInsights   CrossChannelInsight[]
   mcpConnections         MCPConnection[]
+  methodologyProfiles    MethodologyProfile[]
   members                Membership[]
+  dataSources            DataSource[]
   creditPacks            OrgCreditPack[]
   creditTransactions     OrgCreditTransaction[]
   invoices               OrgInvoice[]
+  projectTips            ProjectTip[]
   sentNotifications      SentNotification[]
   platformSettings       PlatformSettings?      @relation(fields: [platformSettingsId], references: [id])
   projects               Project[]
@@ -333,9 +336,207 @@ model Project {
   mcpShares            ProjectMCPConnection[]
   projectTransfersTo   ProjectTransfer[]          @relation("DuplicatedProject")
   projectTransfersFrom ProjectTransfer[]          @relation("OriginalProject")
+  strategy             ProjectStrategy?
+  methodologyBindings  ProjectMethodologyBinding[]
+  dataSourceBindings   ProjectDataSourceBinding[]
+  projectTips          ProjectTip[]
   visibilityShares     ProjectVisibilityConfig[]
   visibilityConfigs    VisibilityConfig[]
   tipRoutingRules      TipRoutingRule[]
+}
+
+model ProjectStrategy {
+  id                  String   @id @default(cuid())
+  projectId           String   @unique
+  positioning         String?
+  valueProposition    String?
+  targetAudiences     Json?
+  strategicGoals      Json?
+  priorityKpis        Json?
+  keyOffers           Json?
+  constraints         Json?
+  toneGuidelines      String?
+  editorialPriorities Json?
+  channelPriorities   Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model MethodologyProfile {
+  id         String                    @id @default(cuid())
+  organizationId String
+  slug       String
+  name       String
+  category   String
+  knowledge  String
+  isDefault  Boolean                   @default(false)
+  status     MethodologyProfileStatus  @default(ACTIVE)
+  metadata   Json?
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectBindings ProjectMethodologyBinding[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status])
+}
+
+model ProjectMethodologyBinding {
+  id                  String                 @id @default(cuid())
+  projectId           String
+  methodologyProfileId String
+  role                ProjectMethodologyRole @default(PRIMARY)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  project             Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  methodologyProfile  MethodologyProfile     @relation(fields: [methodologyProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, methodologyProfileId])
+  @@index([projectId, role])
+}
+
+model DataSource {
+  id            String                  @id @default(cuid())
+  organizationId String
+  sourceType    DataSourceType
+  entityId      String
+  ownershipMode DataSourceOwnershipMode @default(DEDICATED)
+  label         String?
+  status        String?
+  metadata      Json?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+  organization  Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectBindings ProjectDataSourceBinding[]
+
+  @@unique([sourceType, entityId])
+  @@index([organizationId, sourceType])
+}
+
+model ProjectDataSourceBinding {
+  id             String                       @id @default(cuid())
+  projectId      String
+  dataSourceId   String
+  bindingRole    ProjectDataSourceBindingRole @default(PRIMARY)
+  channelIntent  String?
+  relevanceScore Float?
+  metadata       Json?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  project        Project                      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  dataSource     DataSource                   @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, dataSourceId])
+  @@index([projectId, bindingRole])
+}
+
+model ProjectTip {
+  id                 String           @id @default(cuid())
+  organizationId     String
+  projectId          String
+  originType         ProjectTipOriginType
+  originId           String?
+  originItemKey      String?
+  originFingerprint  String?          @unique
+  title              String
+  summary            String?
+  status             ProjectTipStatus @default(NEW)
+  priority           Float?
+  category           String?
+  contentKind        String?
+  executionClass     String?
+  approvalMode       TipApprovalMode  @default(MANUAL)
+  draftStatus        TipDraftStatus   @default(NONE)
+  routingStatus      TipRoutingStatus @default(NONE)
+  publishStatus      TipPublishStatus @default(NOT_APPLICABLE)
+  starred            Boolean          @default(false)
+  reasoning          String?
+  strategicAlignment String?
+  methodologySummary String?
+  methodologyRefs    Json?
+  sourceSnapshot     Json?
+  recommendedActions Json?
+  suggestedRouting   Json?
+  createdBy          String?
+  lastEditedBy       String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  organization       Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project            Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evidence           ProjectTipEvidence[]
+  revisions          ProjectTipRevision[]
+  routes             ProjectTipRoute[]
+  executions         ProjectTipExecution[]
+
+  @@index([projectId, status])
+  @@index([projectId, starred])
+  @@index([projectId, originType])
+}
+
+model ProjectTipEvidence {
+  id             String     @id @default(cuid())
+  tipId          String
+  sourceType     String
+  sourceEntityId String?
+  sourceLabel    String?
+  detail         String
+  metricValue    Float?
+  metricUnit     String?
+  sortOrder      Int        @default(0)
+  createdAt      DateTime   @default(now())
+  tip            ProjectTip @relation(fields: [tipId], references: [id], onDelete: Cascade)
+
+  @@index([tipId, sortOrder])
+}
+
+model ProjectTipRevision {
+  id            String                @id @default(cuid())
+  tipId         String
+  editorType    TipRevisionEditorType
+  editorUserId  String?
+  changeSummary String
+  snapshot      Json
+  createdAt     DateTime              @default(now())
+  tip           ProjectTip            @relation(fields: [tipId], references: [id], onDelete: Cascade)
+
+  @@index([tipId, createdAt])
+}
+
+model ProjectTipRoute {
+  id               String                  @id @default(cuid())
+  tipId            String
+  destinationType  TipRouteDestinationType
+  destinationRefId String?
+  policyMode       TipRoutePolicyMode      @default(MANUAL)
+  status           TipRouteStatus          @default(PLANNED)
+  payloadPreview   Json?
+  lastDispatchedAt DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  tip              ProjectTip              @relation(fields: [tipId], references: [id], onDelete: Cascade)
+  executions       ProjectTipExecution[]
+
+  @@index([tipId, status])
+}
+
+model ProjectTipExecution {
+  id              String             @id @default(cuid())
+  tipId           String
+  routeId         String?
+  runType         TipExecutionRunType
+  status          TipExecutionStatus @default(PENDING)
+  requestPayload  Json?
+  responsePayload Json?
+  errorMessage    String?
+  executedBy      String?
+  startedAt       DateTime           @default(now())
+  completedAt     DateTime?
+  tip             ProjectTip         @relation(fields: [tipId], references: [id], onDelete: Cascade)
+  route           ProjectTipRoute?   @relation(fields: [routeId], references: [id], onDelete: SetNull)
+
+  @@index([tipId, startedAt])
+  @@index([routeId, startedAt])
 }
 
 model OrgCreditTransaction {
@@ -2012,4 +2213,128 @@ enum TrainingPhase {
   DIALOGUING
   FINAL_QUIZZING
   COMPLETE
+}
+
+enum MethodologyProfileStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProjectMethodologyRole {
+  PRIMARY
+  SECONDARY
+}
+
+enum DataSourceType {
+  BOT
+  KNOWLEDGE_SOURCE
+  VISIBILITY_CONFIG
+  GOOGLE_CONNECTION
+  CMS_CONNECTION
+  MCP_CONNECTION
+  N8N_CONNECTION
+}
+
+enum DataSourceOwnershipMode {
+  DEDICATED
+  SHARED
+}
+
+enum ProjectDataSourceBindingRole {
+  PRIMARY
+  SECONDARY
+  REFERENCE
+  EXECUTION
+}
+
+enum ProjectTipOriginType {
+  CROSS_CHANNEL_INSIGHT
+  WEBSITE_ANALYSIS
+  BRAND_REPORT
+  COPILOT
+  MANUAL
+}
+
+enum ProjectTipStatus {
+  NEW
+  REVIEWED
+  APPROVED
+  DRAFTED
+  ROUTED
+  AUTOMATED
+  COMPLETED
+  ARCHIVED
+}
+
+enum TipApprovalMode {
+  MANUAL
+  AUTO_APPROVE
+  AUTO_EXECUTE
+}
+
+enum TipDraftStatus {
+  NONE
+  READY
+  GENERATED
+  FAILED
+}
+
+enum TipRoutingStatus {
+  NONE
+  PLANNED
+  READY
+  DISPATCHED
+  PARTIAL
+  FAILED
+}
+
+enum TipPublishStatus {
+  NOT_APPLICABLE
+  NOT_STARTED
+  DRAFT_READY
+  PUBLISHED
+  FAILED
+}
+
+enum TipRevisionEditorType {
+  SYSTEM
+  USER
+  COPILOT
+}
+
+enum TipRouteDestinationType {
+  CMS
+  MCP
+  N8N
+  WEBHOOK
+  SEO_INTERVENTION
+  INTERNAL_TASK
+}
+
+enum TipRoutePolicyMode {
+  MANUAL
+  AUTO_APPROVE
+  AUTO_EXECUTE
+}
+
+enum TipRouteStatus {
+  PLANNED
+  READY
+  DISPATCHED
+  SUCCEEDED
+  FAILED
+}
+
+enum TipExecutionRunType {
+  MANUAL
+  AUTOMATIC
+  COPILOT
+}
+
+enum TipExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
 }

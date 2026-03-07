@@ -142,6 +142,42 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                 </div>
             </div>
 
+            <section className="space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                    Loop operativo progetto
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-3">
+                    <Link href={`/dashboard/projects/${projectId}`} className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Overview</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Contesto progetto</p>
+                    </Link>
+                    <Link href="/dashboard/insights" className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Listen</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Segnali e fonti</p>
+                    </Link>
+                    <Link href="/dashboard/insights" className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Tips</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Tip canonici</p>
+                    </Link>
+                    <Link href={`/dashboard/projects/${projectId}/integrations`} className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Execute</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Routing e invio</p>
+                    </Link>
+                    <Link href={`/dashboard/projects/${projectId}/analytics`} className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Measure</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Risultati</p>
+                    </Link>
+                    <Link href="/dashboard/insights" className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Strategy</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Priorità e metodo</p>
+                    </Link>
+                    <Link href={`/dashboard/projects/${projectId}/integrations`} className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                        <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Connections</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Setup integrazioni</p>
+                    </Link>
+                </div>
+            </section>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Bots & Trackers */}
                 <div className="lg:col-span-2 space-y-10">

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { scrapeWebsiteWithSubpages, MultiPageScrapedContent, AdditionalUrl } from '@/lib/scraping';
 import { getSystemLLM } from './llm-providers';
+import { ProjectTipService } from '@/lib/projects/project-tip.service';
 import {
     defaultPublicationRouting,
     inferContentKind,
@@ -847,6 +848,11 @@ export class WebsiteAnalysisEngine {
                     promptsAddressed
                 }
             });
+            try {
+                await ProjectTipService.materializeFromWebsiteAnalysis(analysisId);
+            } catch (error) {
+                console.warn('[project-tip-dual-write] website-analysis materialization failed', { analysisId, error });
+            }
 
             console.log(`[website-analysis] Analysis complete. Score: ${overallScore}`);
             return { success: true, analysisId, overallScore };

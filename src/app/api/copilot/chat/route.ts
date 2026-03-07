@@ -6,6 +6,8 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { NextResponse } from 'next/server';
 import { buildCopilotSystemPrompt } from '@/lib/copilot/system-prompt';
 import { canAccessProjectData } from '@/lib/copilot/permissions';
+import { WorkspaceError } from '@/lib/domain/workspace';
+import { ProjectIntelligenceContextService } from '@/lib/projects/project-intelligence-context.service';
 import { searchPlatformKB } from '@/lib/copilot/platform-kb';
 import { PlanType } from '@/config/plans';
 import { getConfigValue } from '@/lib/config';
@@ -163,25 +165,40 @@ export async function POST(req: Request) {
 
         let projectContext = null;
         if (hasProjectAccess && projectId) {
-            // Verify project access
-            const project = await prisma.project.findFirst({
-                where: {
-                    id: projectId,
-                    organizationId: organization.id
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    strategicVision: true,
-                    valueProposition: true,
-                    bots: {
-                        select: { id: true }
-                    }
+            try {
+                const ctx = await ProjectIntelligenceContextService.getContext({
+                    projectId,
+                    viewerUserId: session.user.id,
+                    limitPerSource: 10,
+                });
+                projectContext = {
+                    projectId: ctx.projectId,
+                    projectName: ctx.projectName,
+                    strategy: ctx.strategy ? {
+                        positioning: ctx.strategy.positioning,
+                        valueProposition: ctx.strategy.valueProposition,
+                        targetAudiences: ctx.strategy.targetAudiences,
+                        strategicGoals: ctx.strategy.strategicGoals,
+                        toneGuidelines: ctx.strategy.toneGuidelines,
+                    } : null,
+                    methodologies: ctx.methodologies.map(m => ({ name: m.name, category: m.category, role: m.role })),
+                    tips: ctx.tips.slice(0, 10).map(t => ({
+                        title: t.title,
+                        summary: t.summary,
+                        status: t.status,
+                        priority: t.priority,
+                        category: t.category,
+                    })),
+                    routingCapabilities: ctx.routingCapabilities.filter(r => r.enabled),
+                };
+            } catch (err) {
+                if (err instanceof WorkspaceError) {
+                    return NextResponse.json(
+                        { error: err.message, code: err.code },
+                        { status: err.status }
+                    );
                 }
-            });
-
-            if (project) {
-                projectContext = await buildProjectContext(project);
+                throw err;
             }
         }
 

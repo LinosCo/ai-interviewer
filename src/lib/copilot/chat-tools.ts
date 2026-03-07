@@ -1510,11 +1510,11 @@ export function createVisibilityInsightsTool(context: ToolContext) {
 
 export function createProjectAiTipsTool(context: ToolContext) {
     return {
-        description: 'Fetch AI tips from Insights (CrossChannelInsight) plus Visibility tip actions, including evidence and source references.',
+        description: 'Fetch AI tips for the project. Returns canonical ProjectTip records first (primary source), with legacy CrossChannelInsight and Visibility tip actions as secondary/fallback sources.',
         inputSchema: z.object({
             projectId: z.string().optional().describe('Optional project ID. If omitted, uses selected/current project or all accessible projects.'),
             limit: z.number().optional().default(10).describe('Maximum records to return (hard-capped to 10).'),
-            statuses: z.array(z.string()).optional().describe('Optional insight status filter (es. new, starred, completed, archived).'),
+            statuses: z.array(z.string()).optional().describe('Optional status filter (for canonical tips: ACTIVE, DRAFT, ARCHIVED; for legacy: new, starred, completed, archived).'),
             includeActions: z.boolean().optional().default(true),
             includeVisibilityTips: z.boolean().optional().default(true)
         }),
@@ -1537,6 +1537,52 @@ export function createProjectAiTipsTool(context: ToolContext) {
                     return { error: 'No accessible project found for this request.' };
                 }
 
+                // --- Canonical tips (primary source) ---
+                const canonicalWhere: Record<string, unknown> = {
+                    organizationId: context.organizationId,
+                    projectId: { in: projectIds },
+                };
+                if (Array.isArray(statuses) && statuses.length > 0) {
+                    // Map any legacy status names to canonical equivalents
+                    const canonicalStatuses = statuses.map(s => {
+                        const upper = s.toUpperCase();
+                        if (upper === 'NEW' || upper === 'STARRED') return 'ACTIVE';
+                        if (upper === 'COMPLETED') return 'ARCHIVED';
+                        return upper;
+                    });
+                    canonicalWhere.status = { in: [...new Set(canonicalStatuses)] };
+                }
+                const canonicalTips = await prisma.projectTip.findMany({
+                    where: canonicalWhere as any,
+                    orderBy: [{ priority: 'desc' }, { updatedAt: 'desc' }],
+                    take: clampLimit(limit),
+                    select: {
+                        id: true,
+                        projectId: true,
+                        title: true,
+                        summary: true,
+                        status: true,
+                        priority: true,
+                        category: true,
+                        contentKind: true,
+                        approvalMode: true,
+                        draftStatus: true,
+                        routingStatus: true,
+                        publishStatus: true,
+                        starred: true,
+                        reasoning: true,
+                        strategicAlignment: true,
+                        methodologySummary: true,
+                        recommendedActions: true,
+                        originType: true,
+                        createdAt: true,
+                        updatedAt: true,
+                        project: { select: { name: true } },
+                        _count: { select: { evidence: true, routes: true, executions: true } }
+                    }
+                });
+
+                // --- Legacy insights (fallback/secondary source) ---
                 const insightWhere: Record<string, unknown> = {
                     organizationId: context.organizationId,
                     projectId: { in: projectIds }
@@ -1680,11 +1726,41 @@ export function createProjectAiTipsTool(context: ToolContext) {
                     };
                 });
 
+                const formattedCanonicalTips = canonicalTips.map((tip: any) => ({
+                    _source: 'canonical' as const,
+                    id: tip.id,
+                    projectId: tip.projectId,
+                    projectName: tip.project?.name || null,
+                    title: tip.title,
+                    summary: tip.summary,
+                    status: tip.status,
+                    priority: tip.priority,
+                    category: tip.category,
+                    contentKind: tip.contentKind,
+                    approvalMode: tip.approvalMode,
+                    draftStatus: tip.draftStatus,
+                    routingStatus: tip.routingStatus,
+                    publishStatus: tip.publishStatus,
+                    starred: tip.starred,
+                    reasoning: tip.reasoning,
+                    strategicAlignment: tip.strategicAlignment,
+                    methodologySummary: tip.methodologySummary,
+                    recommendedActions: tip.recommendedActions,
+                    originType: tip.originType,
+                    evidenceCount: tip._count?.evidence ?? 0,
+                    routeCount: tip._count?.routes ?? 0,
+                    executionCount: tip._count?.executions ?? 0,
+                    createdAt: tip.createdAt,
+                    updatedAt: tip.updatedAt,
+                }));
+
                 return {
                     scope: { projectIds },
+                    canonicalTips: formattedCanonicalTips,
                     aiTips: formattedInsights,
                     visibilityTips,
                     summary: {
+                        canonicalTipCount: formattedCanonicalTips.length,
                         insightCount: formattedInsights.length,
                         visibilityTipCount: visibilityTips.length
                     }
@@ -2253,8 +2329,8 @@ export function createStrategicTipCreationTool(context: ToolContext) {
             reasoning: z.string().min(10).max(4000).describe('Strategic rationale and evidence behind the tip.'),
             priorityScore: z.number().min(0).max(100).optional().default(70),
             actions: z.array(strategicTipActionSchema).min(1).max(6),
-            canonicalWriteMode: z.enum(['legacy_dual_write', 'canonical_dual_write', 'canonical_only']).optional().default('legacy_dual_write')
-                .describe('Choose canonical write behavior: legacy_dual_write (default), canonical_dual_write, canonical_only.'),
+            canonicalWriteMode: z.enum(['legacy_dual_write', 'canonical_dual_write', 'canonical_only']).optional().default('canonical_dual_write')
+                .describe('Choose canonical write behavior: canonical_dual_write (default), legacy_dual_write, canonical_only.'),
             autoCreateContentDrafts: z.boolean().optional().default(true).describe('Generate CMS suggestions from content-related actions.'),
             autoDispatchRouting: z.boolean().optional().default(false).describe('If true, run n8n dispatch and tip routing rules after draft generation.')
         }),

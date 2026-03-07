@@ -6,13 +6,16 @@ interface CopilotContext {
     projectContext?: {
         projectId: string;
         projectName: string;
-        botsCount: number;
-        conversationsCount: number;
-        topThemes: { name: string; count: number; sentiment: number }[];
-        avgSentiment: number;
-        period: string;
-        strategicVision?: string | null;
-        valueProposition?: string | null;
+        strategy: {
+            positioning: string | null;
+            valueProposition: string | null;
+            targetAudiences: unknown | null;
+            strategicGoals: unknown | null;
+            toneGuidelines: string | null;
+        } | null;
+        methodologies: { name: string; category: string; role: string }[];
+        tips: { title: string; summary: string | null; status: string; priority: number | null; category: string | null }[];
+        routingCapabilities: { kind: string; destinationType: string; label: string; enabled: boolean }[];
     } | null;
     strategicMarketingKnowledge?: string | null;
     strategicPlan?: string | null;
@@ -114,11 +117,7 @@ Non fare upselling aggressivo, ma informa in modo trasparente.`;
 ## Progetto attualmente selezionato
 ${ctx.projectContext ? `
 - Nome: ${ctx.projectContext.projectName}
-- Bot attivi: ${ctx.projectContext.botsCount}
-- Conversazioni (${ctx.projectContext.period}): ${ctx.projectContext.conversationsCount}
-- Sentiment medio: ${ctx.projectContext.avgSentiment > 0 ? '+' : ''}${(ctx.projectContext.avgSentiment * 100).toFixed(0)}%
-- Temi principali: ${ctx.projectContext.topThemes.slice(0, 5).map(t => t.name).join(', ')}
-${ctx.projectContext.strategicVision ? `- Visione Strategica di Progetto: ${ctx.projectContext.strategicVision}\n` : ''}${ctx.projectContext.valueProposition ? `- Value Proposition di Progetto: ${ctx.projectContext.valueProposition}\n` : ''}
+${ctx.projectContext.strategy?.positioning ? `- Positioning: ${ctx.projectContext.strategy.positioning}\n` : ''}${ctx.projectContext.strategy?.valueProposition ? `- Value Proposition: ${ctx.projectContext.strategy.valueProposition}\n` : ''}${ctx.projectContext.strategy?.toneGuidelines ? `- Tono: ${ctx.projectContext.strategy.toneGuidelines}\n` : ''}${ctx.projectContext.methodologies.length > 0 ? `- Metodologie: ${ctx.projectContext.methodologies.map(m => m.name).join(', ')}\n` : ''}${ctx.projectContext.tips.length > 0 ? `- Tip attivi (${ctx.projectContext.tips.length}): ${ctx.projectContext.tips.slice(0, 5).map(t => t.title).join(' | ')}\n` : ''}${ctx.projectContext.routingCapabilities.length > 0 ? `- Canali di routing abilitati: ${ctx.projectContext.routingCapabilities.map(r => r.label).join(', ')}\n` : ''}
 ` : 'Nessun progetto selezionato. Chiedi all\'utente di selezionare un progetto dalla dashboard.'}
 
 ## Come comportarti con i dati

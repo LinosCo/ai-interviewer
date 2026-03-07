@@ -572,7 +572,7 @@ export async function moveProjectToOrganization(params: {
     await tx.projectMCPConnection.deleteMany({ where: { projectId } });
   });
 
-  await syncTransferredProjectIntelligence({
+  const intelligenceTransfer = await syncTransferredProjectIntelligence({
     projectId,
     targetOrganizationId,
   });
@@ -584,6 +584,7 @@ export async function moveProjectToOrganization(params: {
   return {
     moved: true,
     sourceOrganizationId,
-    targetOrganizationId
+    targetOrganizationId,
+    intelligenceTransfer,
   };
 }

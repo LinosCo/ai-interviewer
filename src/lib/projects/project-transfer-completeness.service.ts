@@ -2,13 +2,33 @@ import { DataSourceOwnershipMode } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
 
+export type TransferCompletenessResult = {
+  movedTipsCount: number;
+  movedDedicatedSourceIds: string[];
+  sharedDedicatedSourceIds: string[];
+  sharedSourceSummaries: Array<{
+    id: string;
+    sourceType: string;
+    label: string | null;
+    organizationId: string;
+  }>;
+  methodologyDependencies: Array<{
+    bindingId: string;
+    methodologyProfileId: string;
+    methodologyName: string;
+    methodologyOrgId: string;
+    requiresFollowUp: boolean;
+  }>;
+  hasUnresolvedDependencies: boolean;
+};
+
 export async function syncTransferredProjectIntelligence(params: {
   projectId: string;
   targetOrganizationId: string;
-}): Promise<void> {
+}): Promise<TransferCompletenessResult> {
   const { projectId, targetOrganizationId } = params;
 
-  await prisma.projectTip.updateMany({
+  const { count: movedTipsCount } = await prisma.projectTip.updateMany({
     where: {
       projectId,
       organizationId: { not: targetOrganizationId },
@@ -25,8 +45,8 @@ export async function syncTransferredProjectIntelligence(params: {
   });
 
   const dedicatedSourceIds = [...new Set(dedicatedBindings.map((binding) => binding.dataSourceId))];
-  const dedicatedExclusiveSourceIds: string[] = [];
-  const dedicatedSharedAcrossProjects: string[] = [];
+  const movedDedicatedSourceIds: string[] = [];
+  const sharedDedicatedSourceIds: string[] = [];
 
   for (const dataSourceId of dedicatedSourceIds) {
     const bindingsCount = await prisma.projectDataSourceBinding.count({
@@ -34,31 +54,23 @@ export async function syncTransferredProjectIntelligence(params: {
     });
 
     if (bindingsCount <= 1) {
-      dedicatedExclusiveSourceIds.push(dataSourceId);
+      movedDedicatedSourceIds.push(dataSourceId);
     } else {
-      dedicatedSharedAcrossProjects.push(dataSourceId);
+      sharedDedicatedSourceIds.push(dataSourceId);
     }
   }
 
-  if (dedicatedExclusiveSourceIds.length > 0) {
+  if (movedDedicatedSourceIds.length > 0) {
     await prisma.dataSource.updateMany({
       where: {
-        id: { in: dedicatedExclusiveSourceIds },
+        id: { in: movedDedicatedSourceIds },
         organizationId: { not: targetOrganizationId },
       },
       data: { organizationId: targetOrganizationId },
     });
   }
 
-  if (dedicatedSharedAcrossProjects.length > 0) {
-    console.warn('[project-transfer-intelligence] dedicated data sources used by multiple projects; skipped org move', {
-      projectId,
-      targetOrganizationId,
-      dataSourceIds: dedicatedSharedAcrossProjects,
-    });
-  }
-
-  const sharedSources = await prisma.projectDataSourceBinding.findMany({
+  const sharedSourceResults = await prisma.projectDataSourceBinding.findMany({
     where: {
       projectId,
       dataSource: { ownershipMode: DataSourceOwnershipMode.SHARED },
@@ -68,7 +80,6 @@ export async function syncTransferredProjectIntelligence(params: {
         select: {
           id: true,
           sourceType: true,
-          entityId: true,
           label: true,
           organizationId: true,
         },
@@ -76,11 +87,41 @@ export async function syncTransferredProjectIntelligence(params: {
     },
   });
 
-  if (sharedSources.length > 0) {
-    console.warn('[project-transfer-intelligence] shared data sources require manual follow-up', {
-      projectId,
-      targetOrganizationId,
-      sharedDataSources: sharedSources.map((item) => item.dataSource),
-    });
-  }
+  const sharedSourceSummaries = sharedSourceResults.map((item) => item.dataSource);
+
+  const bindingRows = await prisma.projectMethodologyBinding.findMany({
+    where: { projectId },
+    select: {
+      id: true,
+      methodologyProfileId: true,
+      methodologyProfile: {
+        select: {
+          name: true,
+          organizationId: true,
+        },
+      },
+    },
+  });
+
+  const methodologyDependencies = bindingRows.map((row) => ({
+    bindingId: row.id,
+    methodologyProfileId: row.methodologyProfileId,
+    methodologyName: row.methodologyProfile.name,
+    methodologyOrgId: row.methodologyProfile.organizationId,
+    requiresFollowUp: row.methodologyProfile.organizationId !== targetOrganizationId,
+  }));
+
+  const hasUnresolvedDependencies =
+    sharedDedicatedSourceIds.length > 0 ||
+    sharedSourceSummaries.length > 0 ||
+    methodologyDependencies.some((dep) => dep.requiresFollowUp);
+
+  return {
+    movedTipsCount,
+    movedDedicatedSourceIds,
+    sharedDedicatedSourceIds,
+    sharedSourceSummaries,
+    methodologyDependencies,
+    hasUnresolvedDependencies,
+  };
 }

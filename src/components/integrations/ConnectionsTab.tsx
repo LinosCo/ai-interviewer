@@ -27,7 +27,7 @@ export function ConnectionsTab({ activeCount, ...gridProps }: ConnectionsTabProp
       state: googleReady ? 'Connesso' : 'Da completare',
       health: googleReady ? 'Sano' : 'Nessun feed attivo',
       coverage: googleReady ? 'Copertura: GA/GSC disponibili' : 'Copertura: assente',
-      scope: 'Scope: dedicato al progetto',
+      scope: 'Scope: a livello organizzazione',
       nextAction: googleReady ? 'Azione: valida GA4 + GSC periodicamente' : 'Azione: collega Google Analytics e Search Console',
     },
     {
@@ -43,7 +43,7 @@ export function ConnectionsTab({ activeCount, ...gridProps }: ConnectionsTabProp
       state: automationReady ? 'Connesso' : 'Da completare',
       health: automationReady ? 'Sano' : 'Automazione non attiva',
       coverage: automationReady ? 'Copertura: webhook n8n disponibile' : 'Copertura: assente',
-      scope: 'Scope: dedicato al progetto',
+      scope: 'Scope: a livello organizzazione',
       nextAction: automationReady ? 'Azione: abilita ricette di routing per i tip' : 'Azione: collega n8n e crea la prima ricetta',
     },
   ] as const;

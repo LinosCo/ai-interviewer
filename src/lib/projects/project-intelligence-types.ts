@@ -83,6 +83,7 @@ export type ProjectTipSnapshot = {
   sourceSnapshot: Prisma.JsonValue | null;
   recommendedActions: Prisma.JsonValue | null;
   suggestedRouting: Prisma.JsonValue | null;
+  reviewerNotes: string | null;
   createdBy: string | null;
   lastEditedBy: string | null;
   evidenceCount?: number;
@@ -142,11 +143,26 @@ export type ProjectTipExecutionSnapshot = {
   completedAt: string | null;
 };
 
+export type TipExplainabilityBlock = {
+  /** Short deterministic answer to "why does this tip exist?" */
+  whyThisTip: string;
+  /** What project inputs were used to generate this tip */
+  projectInputsUsed: string[];
+  /** Strategic context: derived from strategicAlignment */
+  strategyContext: string | null;
+  /** Methodology context: derived from methodologySummary */
+  methodologyContext: string | null;
+  /** Automation recommendation: derived from suggestedRouting + contentKind */
+  automationRecommendation: string | null;
+};
+
 export type ProjectTipDetailSnapshot = ProjectTipSnapshot & {
   evidence: ProjectTipEvidenceSnapshot[];
   revisions: ProjectTipRevisionSnapshot[];
   routes: ProjectTipRouteSnapshot[];
   executions: ProjectTipExecutionSnapshot[];
+  explainability: TipExplainabilityBlock;
+  reviewerNotes: string | null;
 };
 
 export type RoutingCapabilitySnapshot = {

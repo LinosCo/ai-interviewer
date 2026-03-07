@@ -23,6 +23,7 @@ import type {
   ProjectTipGroundingPayload,
   ProjectTipRouteSnapshot,
   ProjectTipSnapshot,
+  TipExplainabilityBlock,
 } from '@/lib/projects/project-intelligence-types';
 
 function buildOriginFingerprint(
@@ -77,6 +78,7 @@ function mapTipSnapshot(
     sourceSnapshot: tip.sourceSnapshot ?? null,
     recommendedActions: tip.recommendedActions ?? null,
     suggestedRouting: tip.suggestedRouting ?? null,
+    reviewerNotes: (tip as ProjectTip & { reviewerNotes?: string | null }).reviewerNotes ?? null,
     createdBy: tip.createdBy ?? null,
     lastEditedBy: tip.lastEditedBy ?? null,
     evidenceCount: counts?.evidenceCount,
@@ -84,6 +86,44 @@ function mapTipSnapshot(
     executionCount: counts?.executionCount,
     createdAt: tip.createdAt.toISOString(),
     updatedAt: tip.updatedAt.toISOString(),
+  };
+}
+
+function buildExplainability(
+  tip: ProjectTip & { reviewerNotes?: string | null },
+  evidenceCount: number
+): TipExplainabilityBlock {
+  const projectInputsUsed: string[] = [];
+  if (evidenceCount > 0) projectInputsUsed.push(`${evidenceCount} evidence signal${evidenceCount !== 1 ? 's' : ''}`);
+  if (tip.sourceSnapshot) projectInputsUsed.push('source data snapshot');
+  if (tip.methodologyRefs) projectInputsUsed.push('methodology references');
+
+  let automationRecommendation: string | null = null;
+  const routing = toRecord(tip.suggestedRouting);
+  if (routing) {
+    const dest = String(routing.destinationType || routing.destination || '').toLowerCase();
+    const kind = tip.contentKind || '';
+    if (dest) {
+      automationRecommendation = kind
+        ? `Route as ${kind} via ${dest}`
+        : `Route via ${dest}`;
+    }
+  } else if (tip.contentKind) {
+    automationRecommendation = `Content type: ${tip.contentKind} — configure a routing rule to automate dispatch`;
+  }
+
+  const whyThisTip = tip.reasoning
+    ? tip.reasoning.slice(0, 300)
+    : tip.summary
+    ? `Based on: ${tip.summary.slice(0, 250)}`
+    : 'No explicit reasoning recorded — tip was created manually or migrated.';
+
+  return {
+    whyThisTip,
+    projectInputsUsed,
+    strategyContext: tip.strategicAlignment ?? null,
+    methodologyContext: tip.methodologySummary ?? null,
+    automationRecommendation,
   };
 }
 
@@ -309,6 +349,7 @@ export type UpdateProjectTipInput = {
   methodologySummary?: string | null;
   recommendedActions?: unknown;
   suggestedRouting?: unknown;
+  reviewerNotes?: string | null;
   lastEditedBy?: string | null;
 };
 
@@ -540,6 +581,7 @@ export class ProjectTipService {
         ...(input.suggestedRouting !== undefined
           ? { suggestedRouting: toNullableJson(input.suggestedRouting as Prisma.InputJsonValue) }
           : {}),
+        ...(input.reviewerNotes !== undefined ? { reviewerNotes: input.reviewerNotes } : {}),
         ...(input.lastEditedBy !== undefined ? { lastEditedBy: input.lastEditedBy } : {}),
       },
     });
@@ -713,6 +755,8 @@ export class ProjectTipService {
       })),
       routes: tip.routes.map(mapTipRouteSnapshot),
       executions: tip.executions.map(mapTipExecutionSnapshot),
+      explainability: buildExplainability(tip as ProjectTip & { reviewerNotes?: string | null }, tip.evidence.length),
+      reviewerNotes: (tip as ProjectTip & { reviewerNotes?: string | null }).reviewerNotes ?? null,
     };
   }
 

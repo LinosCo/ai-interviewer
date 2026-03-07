@@ -121,6 +121,14 @@ interface CanonicalTipDetail extends CanonicalTip {
         status: string;
         startedAt: string;
     }>;
+    explainability?: {
+        whyThisTip: string;
+        projectInputsUsed: string[];
+        strategyContext: string | null;
+        methodologyContext: string | null;
+        automationRecommendation: string | null;
+    } | null;
+    reviewerNotes?: string | null;
 }
 
 interface TipHistoryItem {
@@ -209,6 +217,8 @@ export default function InsightHubPage() {
         starred: false
     });
     const [savingCanonicalTipId, setSavingCanonicalTipId] = useState<string | null>(null);
+    const [reviewerNotesDraftByTip, setReviewerNotesDraftByTip] = useState<Record<string, string>>({});
+    const [savingReviewerNotesTipId, setSavingReviewerNotesTipId] = useState<string | null>(null);
     const [healthReport, setHealthReport] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
@@ -791,6 +801,29 @@ export default function InsightHubPage() {
             showToast('Errore di rete', 'error');
         } finally {
             setSavingCanonicalTipId(null);
+        }
+    };
+
+    const saveReviewerNotes = async (tipId: string) => {
+        if (!projectId) return;
+        setSavingReviewerNotesTipId(tipId);
+        try {
+            const notes = reviewerNotesDraftByTip[tipId] ?? '';
+            const res = await fetch(`/api/projects/${projectId}/tips/${tipId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reviewerNotes: notes || null }),
+            });
+            if (!res.ok) { showToast('Errore salvataggio note', 'error'); return; }
+            setCanonicalTipDetails((prev) => ({
+                ...prev,
+                [tipId]: { ...prev[tipId], reviewerNotes: notes || null },
+            }));
+            showToast('Note aggiornate');
+        } catch {
+            showToast('Errore di rete', 'error');
+        } finally {
+            setSavingReviewerNotesTipId(null);
         }
     };
 
@@ -1652,6 +1685,42 @@ export default function InsightHubPage() {
                                                                 {detail.executions.length ? detail.executions.map((execution) => (
                                                                     <div key={execution.id} className="text-xs text-slate-600 bg-slate-100 rounded px-2 py-1 mb-1">{execution.status} · {new Date(execution.startedAt).toLocaleString('it-IT')}</div>
                                                                 )) : <p className="text-xs text-slate-500">Nessuna esecuzione</p>}
+                                                            </div>
+                                                            {detail.explainability && (
+                                                                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3 space-y-1.5">
+                                                                    <p className="text-xs font-semibold text-indigo-700">Perché questo tip</p>
+                                                                    <p className="text-xs text-slate-700">{detail.explainability.whyThisTip}</p>
+                                                                    {detail.explainability.projectInputsUsed.length > 0 && (
+                                                                        <p className="text-xs text-slate-500">Input usati: {detail.explainability.projectInputsUsed.join(', ')}</p>
+                                                                    )}
+                                                                    {detail.explainability.strategyContext && (
+                                                                        <p className="text-xs text-slate-600"><span className="font-medium">Strategia:</span> {detail.explainability.strategyContext}</p>
+                                                                    )}
+                                                                    {detail.explainability.methodologyContext && (
+                                                                        <p className="text-xs text-slate-600"><span className="font-medium">Metodologia:</span> {detail.explainability.methodologyContext}</p>
+                                                                    )}
+                                                                    {detail.explainability.automationRecommendation && (
+                                                                        <p className="text-xs text-slate-600"><span className="font-medium">Automazione:</span> {detail.explainability.automationRecommendation}</p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            <div>
+                                                                <p className="text-xs font-semibold text-slate-600 mb-1">Note revisore</p>
+                                                                <textarea
+                                                                    className="w-full min-h-16 rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-700 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                                                    placeholder="Aggiungi note interne..."
+                                                                    value={reviewerNotesDraftByTip[tip.id] ?? (detail.reviewerNotes || '')}
+                                                                    onChange={(e) => setReviewerNotesDraftByTip((prev) => ({ ...prev, [tip.id]: e.target.value }))}
+                                                                />
+                                                                {reviewerNotesDraftByTip[tip.id] !== undefined && reviewerNotesDraftByTip[tip.id] !== (detail.reviewerNotes || '') && (
+                                                                    <button
+                                                                        className="mt-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+                                                                        onClick={() => saveReviewerNotes(tip.id)}
+                                                                        disabled={savingReviewerNotesTipId === tip.id}
+                                                                    >
+                                                                        {savingReviewerNotesTipId === tip.id ? 'Salvataggio...' : 'Salva note'}
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     )}

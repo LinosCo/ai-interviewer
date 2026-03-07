@@ -35,6 +35,7 @@ const updateSchema = z
     methodologySummary: z.string().nullable().optional(),
     recommendedActions: z.unknown().optional(),
     suggestedRouting: z.unknown().optional(),
+    reviewerNotes: z.string().nullable().optional(),
   })
   .strict();
 

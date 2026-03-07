@@ -151,11 +151,11 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Overview</p>
                         <p className="text-[11px] text-slate-500 mt-1">Contesto progetto</p>
                     </Link>
-                    <Link href="/dashboard/insights" className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                    <Link href={`/dashboard/insights?projectId=${projectId}`} className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
                         <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Listen</p>
                         <p className="text-[11px] text-slate-500 mt-1">Segnali e fonti</p>
                     </Link>
-                    <Link href="/dashboard/insights" className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                    <Link href={`/dashboard/insights?projectId=${projectId}`} className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
                         <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Tips</p>
                         <p className="text-[11px] text-slate-500 mt-1">Tip canonici</p>
                     </Link>
@@ -167,7 +167,7 @@ export default async function ProjectCockpitPage({ params }: { params: Promise<{
                         <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Measure</p>
                         <p className="text-[11px] text-slate-500 mt-1">Risultati</p>
                     </Link>
-                    <Link href="/dashboard/insights" className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
+                    <Link href={`/dashboard/insights?projectId=${projectId}`} className="rounded-xl border border-slate-200 bg-white px-3 py-3 hover:border-amber-300 transition-colors">
                         <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Strategy</p>
                         <p className="text-[11px] text-slate-500 mt-1">Priorità e metodo</p>
                     </Link>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -194,7 +194,8 @@ const getExecutionClassLabel = (executionClass?: string | null): string => {
 
 export default function InsightHubPage() {
     const router = useRouter();
-    const { selectedProject, isAllProjectsSelected } = useProject();
+    const searchParams = useSearchParams();
+    const { selectedProject, setSelectedProject, projects, isAllProjectsSelected } = useProject();
     const { currentOrganization } = useOrganization();
     const [insights, setInsights] = useState<Insight[]>([]);
     const [canonicalTips, setCanonicalTips] = useState<CanonicalTip[]>([]);
@@ -237,6 +238,16 @@ export default function InsightHubPage() {
     const [topSources, setTopSources] = useState<any[]>([]);
     const [tipHistoryByContentKind, setTipHistoryByContentKind] = useState<TipHistoryItem[]>([]);
     const [routingConnectionsByProject, setRoutingConnectionsByProject] = useState<Record<string, RoutingConnectionState>>({});
+
+    // If arriving from a project cockpit link (?projectId=...), force-select that project
+    const cockpitProjectId = searchParams.get('projectId');
+    useEffect(() => {
+        if (!cockpitProjectId || !projects.length) return;
+        const match = projects.find((p) => p.id === cockpitProjectId);
+        if (match && selectedProject?.id !== match.id) {
+            setSelectedProject(match);
+        }
+    }, [cockpitProjectId, projects, selectedProject, setSelectedProject]);
 
     const toArraySize = (value: any): number => (Array.isArray(value) ? value.length : 0);
 
@@ -952,6 +963,18 @@ export default function InsightHubPage() {
 
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto">
+            {cockpitProjectId && selectedProject && !isAllProjectsSelected && (
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <button
+                        onClick={() => router.push(`/dashboard/projects/${cockpitProjectId}`)}
+                        className="hover:text-amber-600 transition-colors"
+                    >
+                        ← {selectedProject.name}
+                    </button>
+                    <span>/</span>
+                    <span className="text-slate-700 font-medium">AI Tips</span>
+                </div>
+            )}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">

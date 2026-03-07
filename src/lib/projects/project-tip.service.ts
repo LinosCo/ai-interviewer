@@ -5,6 +5,9 @@ import {
   TipDraftStatus,
   TipPublishStatus,
   TipRevisionEditorType,
+  TipRouteDestinationType,
+  TipRoutePolicyMode,
+  TipExecutionRunType,
   TipRoutingStatus,
   type ProjectTip,
   type ProjectTipStatus,
@@ -803,5 +806,143 @@ export class ProjectTipService {
     }
 
     return Array.from(buckets.values()).sort((a, b) => b.tipCount - a.tipCount);
+  }
+
+  // ─── Canonical Route & Execution Helpers ────────────────────────────────────
+
+  /**
+   * Find or create a canonical route for a tip/destination pair.
+   * Returns the route id for use with openExecution().
+   */
+  static async upsertRoute(params: {
+    tipId: string;
+    destinationType: TipRouteDestinationType;
+    destinationRefId?: string | null;
+    policyMode?: TipRoutePolicyMode;
+    payloadPreview?: Prisma.InputJsonValue | null;
+  }): Promise<string> {
+    const { tipId, destinationType, destinationRefId = null, policyMode = 'AUTO_EXECUTE', payloadPreview } = params;
+
+    const existing = await prisma.projectTipRoute.findFirst({
+      where: { tipId, destinationType, destinationRefId },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await prisma.projectTipRoute.update({
+        where: { id: existing.id },
+        data: {
+          status: 'READY',
+          ...(policyMode ? { policyMode } : {}),
+          ...(payloadPreview !== undefined ? { payloadPreview: toNullableJson(payloadPreview) } : {}),
+        },
+      });
+      return existing.id;
+    }
+
+    const created = await prisma.projectTipRoute.create({
+      data: {
+        tipId,
+        destinationType,
+        destinationRefId,
+        policyMode,
+        status: 'READY',
+        ...(payloadPreview !== undefined ? { payloadPreview: toNullableJson(payloadPreview) } : {}),
+      },
+      select: { id: true },
+    });
+    return created.id;
+  }
+
+  /**
+   * Open a new execution record in RUNNING state.
+   * Returns the execution id for use with markExecutionSuccess/Failure.
+   */
+  static async openExecution(params: {
+    tipId: string;
+    routeId: string | null;
+    runType: TipExecutionRunType;
+    requestPayload?: Prisma.InputJsonValue | null;
+  }): Promise<string> {
+    const { tipId, routeId, runType, requestPayload } = params;
+
+    const execution = await prisma.projectTipExecution.create({
+      data: {
+        tipId,
+        routeId,
+        runType,
+        status: 'RUNNING',
+        requestPayload: requestPayload !== undefined ? toNullableJson(requestPayload) : Prisma.DbNull,
+      },
+      select: { id: true },
+    });
+    return execution.id;
+  }
+
+  /**
+   * Mark an execution as SUCCEEDED and update the parent route + tip lifecycle.
+   */
+  static async markExecutionSuccess(params: {
+    executionId: string;
+    routeId: string | null;
+    responsePayload?: Prisma.InputJsonValue | null;
+  }): Promise<void> {
+    const { executionId, routeId, responsePayload } = params;
+
+    const execution = await prisma.projectTipExecution.update({
+      where: { id: executionId },
+      data: {
+        status: 'SUCCEEDED',
+        completedAt: new Date(),
+        ...(responsePayload !== undefined ? { responsePayload: toNullableJson(responsePayload) } : {}),
+      },
+      select: { tipId: true },
+    });
+
+    if (routeId) {
+      await prisma.projectTipRoute.update({
+        where: { id: routeId },
+        data: { status: 'SUCCEEDED', lastDispatchedAt: new Date() },
+      });
+    }
+
+    // Conservatively advance tip lifecycle: dispatched but not declared published
+    await prisma.projectTip.update({
+      where: { id: execution.tipId },
+      data: { routingStatus: 'DISPATCHED' },
+    });
+  }
+
+  /**
+   * Mark an execution as FAILED and update the parent route + tip lifecycle.
+   */
+  static async markExecutionFailure(params: {
+    executionId: string;
+    routeId: string | null;
+    errorMessage: string;
+  }): Promise<void> {
+    const { executionId, routeId, errorMessage } = params;
+
+    const execution = await prisma.projectTipExecution.update({
+      where: { id: executionId },
+      data: {
+        status: 'FAILED',
+        completedAt: new Date(),
+        errorMessage,
+      },
+      select: { tipId: true },
+    });
+
+    if (routeId) {
+      await prisma.projectTipRoute.update({
+        where: { id: routeId },
+        data: { status: 'FAILED' },
+      });
+    }
+
+    await prisma.projectTip.update({
+      where: { id: execution.tipId },
+      data: { routingStatus: 'FAILED' },
+    });
   }
 }

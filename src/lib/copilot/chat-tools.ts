@@ -3,7 +3,6 @@ import { z } from 'zod';
 import Sitemapper from 'sitemapper';
 import { scrapeUrl } from '@/lib/scraping';
 import { assertOrganizationAccess, assertProjectAccess } from '@/lib/domain/workspace';
-import { CMSSuggestionGenerator } from '@/lib/cms/suggestion-generator';
 import { TipRoutingExecutor } from '@/lib/cms/tip-routing-executor';
 import { N8NDispatcher } from '@/lib/integrations/n8n/dispatcher';
 import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
@@ -336,6 +335,185 @@ export function createProjectIntegrationsTool(context: ToolContext) {
             } catch (error: any) {
                 console.error('[Copilot Tool] Error fetching integrations:', error);
                 return { error: 'Failed to fetch integrations', details: error.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
+export function createManageCanonicalTipsTool(context: ToolContext) {
+    return {
+        description: 'List, view, update, duplicate or change status of canonical AI tips (ProjectTip). Use this for all tip management operations.',
+        inputSchema: z.object({
+            operation: z.enum(['list', 'get', 'update', 'duplicate', 'set_status']).default('list')
+                .describe('Operation: list (all tips), get (single tip detail), update (edit fields), duplicate (copy tip), set_status (change status).'),
+            projectId: z.string().optional().describe('Project ID. If omitted, uses selected/current project.'),
+            tipId: z.string().optional().describe('Required for get, update, duplicate, set_status.'),
+            // Filters for list operation
+            status: z.string().optional().describe('Filter by status for list operation (NEW, REVIEWED, APPROVED, DRAFTED, ROUTED, AUTOMATED).'),
+            starred: z.boolean().optional().describe('Filter by starred flag for list operation.'),
+            // Fields for update operation
+            title: z.string().optional().describe('New title (update only).'),
+            summary: z.string().optional().describe('New summary (update only).'),
+            priority: z.number().optional().describe('New priority 0-100 (update only).'),
+            category: z.string().optional().describe('New category (update only).'),
+            contentKind: z.string().optional().describe('New contentKind (update only).'),
+            executionClass: z.string().optional().describe('New executionClass (update only).'),
+            isStarred: z.boolean().optional().describe('Set starred flag (update only).'),
+            reasoning: z.string().optional().describe('Updated reasoning (update only).'),
+            strategicAlignment: z.string().optional().describe('Updated strategic alignment (update only).'),
+            // For set_status operation
+            newStatus: z.string().optional().describe('Target status for set_status (NEW, REVIEWED, APPROVED, DRAFTED, ROUTED, AUTOMATED).')
+        }),
+        execute: async ({
+            operation,
+            projectId,
+            tipId,
+            status,
+            starred,
+            title,
+            summary,
+            priority,
+            category,
+            contentKind,
+            executionClass,
+            isStarred,
+            reasoning,
+            strategicAlignment,
+            newStatus
+        }: {
+            operation?: 'list' | 'get' | 'update' | 'duplicate' | 'set_status';
+            projectId?: string;
+            tipId?: string;
+            status?: string;
+            starred?: boolean;
+            title?: string;
+            summary?: string;
+            priority?: number;
+            category?: string;
+            contentKind?: string;
+            executionClass?: string;
+            isStarred?: boolean;
+            reasoning?: string;
+            strategicAlignment?: string;
+            newStatus?: string;
+        }) => {
+            try {
+                const op = operation || 'list';
+                const targetProjectId = await resolveSingleProjectId(context, projectId);
+                if (!targetProjectId) {
+                    return { error: 'No accessible project found for this request.' };
+                }
+
+                if (op === 'list') {
+                    const tips = await ProjectTipService.listProjectTips({
+                        projectId: targetProjectId,
+                        viewerUserId: context.userId,
+                        ...(status ? { status: status as any } : {}),
+                        ...(starred !== undefined ? { starred } : {}),
+                    });
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        count: tips.length,
+                        tips
+                    };
+                }
+
+                if (!tipId) {
+                    return { error: 'tipId is required for this operation.' };
+                }
+
+                if (op === 'get') {
+                    const tip = await ProjectTipService.getProjectTip({
+                        projectId: targetProjectId,
+                        tipId,
+                        viewerUserId: context.userId,
+                    });
+                    if (!tip) {
+                        return { error: 'Tip not found in this project.' };
+                    }
+                    return { success: true, operation: op, projectId: targetProjectId, tip };
+                }
+
+                if (op === 'duplicate') {
+                    const duplicated = await ProjectTipService.duplicateTip({
+                        projectId: targetProjectId,
+                        tipId,
+                        actorUserId: context.userId,
+                        createdBy: context.userId,
+                    });
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        originalTipId: tipId,
+                        duplicatedTip: { id: duplicated.id, title: duplicated.title, status: duplicated.status }
+                    };
+                }
+
+                if (op === 'set_status') {
+                    if (!newStatus) {
+                        return { error: 'newStatus is required for set_status operation.' };
+                    }
+                    const updated = await ProjectTipService.updateTip({
+                        projectId: targetProjectId,
+                        tipId,
+                        actorUserId: context.userId,
+                        status: newStatus as any,
+                        lastEditedBy: context.userId,
+                    });
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        tip: { id: updated.id, title: updated.title, status: updated.status }
+                    };
+                }
+
+                // op === 'update'
+                const updateFields: Record<string, unknown> = {};
+                if (title !== undefined) updateFields.title = title;
+                if (summary !== undefined) updateFields.summary = summary;
+                if (priority !== undefined) updateFields.priority = priority;
+                if (category !== undefined) updateFields.category = category;
+                if (contentKind !== undefined) updateFields.contentKind = contentKind;
+                if (executionClass !== undefined) updateFields.executionClass = executionClass;
+                if (isStarred !== undefined) updateFields.starred = isStarred;
+                if (reasoning !== undefined) updateFields.reasoning = reasoning;
+                if (strategicAlignment !== undefined) updateFields.strategicAlignment = strategicAlignment;
+                if (status !== undefined) updateFields.status = status as any;
+
+                if (Object.keys(updateFields).length === 0) {
+                    return { error: 'No update fields provided for update operation.' };
+                }
+
+                const updated = await ProjectTipService.updateTip({
+                    projectId: targetProjectId,
+                    tipId,
+                    actorUserId: context.userId,
+                    lastEditedBy: context.userId,
+                    ...updateFields,
+                } as any);
+
+                return {
+                    success: true,
+                    operation: op,
+                    projectId: targetProjectId,
+                    tip: {
+                        id: updated.id,
+                        title: updated.title,
+                        summary: updated.summary,
+                        status: updated.status,
+                        priority: updated.priority,
+                        category: updated.category,
+                        contentKind: updated.contentKind,
+                        starred: updated.starred,
+                    }
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] manageCanonicalTips error:', error);
+                return { error: 'Failed to manage canonical tips', details: error?.message || 'Unknown error' };
             }
         }
     };
@@ -1356,11 +1534,6 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                                     recommendations: true
                                 }
                             },
-                            tipActions: {
-                                orderBy: { updatedAt: 'desc' },
-                                take: 20,
-                                select: { tipTitle: true, tipType: true, status: true, updatedAt: true }
-                            }
                         }
                     });
                 } catch (err: any) {
@@ -1407,11 +1580,6 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                                     recommendations: true
                                 }
                             },
-                            tipActions: {
-                                orderBy: { updatedAt: 'desc' },
-                                take: 20,
-                                select: { tipTitle: true, tipType: true, status: true, updatedAt: true }
-                            }
                         }
                     });
                 }
@@ -1491,13 +1659,7 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                         projectId: cfg.projectId,
                         isActive: cfg.isActive,
                         updatedAt: cfg.updatedAt,
-                        latestScan: cfg.scans?.[0] || null,
-                        tipActionsSummary: {
-                            active: cfg.tipActions.filter((t: any) => t.status === 'active').length,
-                            completed: cfg.tipActions.filter((t: any) => t.status === 'completed').length,
-                            dismissed: cfg.tipActions.filter((t: any) => t.status === 'dismissed').length
-                        },
-                        latestTipActions: cfg.tipActions.slice(0, 8)
+                        latestScan: cfg.scans?.[0] || null
                     }))
                 };
             } catch (error: any) {
@@ -1510,26 +1672,20 @@ export function createVisibilityInsightsTool(context: ToolContext) {
 
 export function createProjectAiTipsTool(context: ToolContext) {
     return {
-        description: 'Fetch AI tips for the project. Returns canonical ProjectTip records first (primary source), with legacy CrossChannelInsight and Visibility tip actions as secondary/fallback sources.',
+        description: 'Fetch canonical AI tips (ProjectTip) for the project. Returns only canonical ProjectTip records — use manageCanonicalTips for editing.',
         inputSchema: z.object({
             projectId: z.string().optional().describe('Optional project ID. If omitted, uses selected/current project or all accessible projects.'),
             limit: z.number().optional().default(10).describe('Maximum records to return (hard-capped to 10).'),
-            statuses: z.array(z.string()).optional().describe('Optional status filter (for canonical tips: ACTIVE, DRAFT, ARCHIVED; for legacy: new, starred, completed, archived).'),
-            includeActions: z.boolean().optional().default(true),
-            includeVisibilityTips: z.boolean().optional().default(true)
+            statuses: z.array(z.string()).optional().describe('Optional status filter (NEW, REVIEWED, APPROVED, DRAFTED, ROUTED, AUTOMATED).')
         }),
         execute: async ({
             projectId,
             limit,
-            statuses,
-            includeActions,
-            includeVisibilityTips
+            statuses
         }: {
             projectId?: string;
             limit?: number;
             statuses?: string[];
-            includeActions?: boolean;
-            includeVisibilityTips?: boolean;
         }) => {
             try {
                 const projectIds = await resolveAccessibleProjectIds(context, projectId);
@@ -1582,150 +1738,6 @@ export function createProjectAiTipsTool(context: ToolContext) {
                     }
                 });
 
-                // --- Legacy insights (fallback/secondary source) ---
-                const insightWhere: Record<string, unknown> = {
-                    organizationId: context.organizationId,
-                    projectId: { in: projectIds }
-                };
-                if (Array.isArray(statuses) && statuses.length > 0) {
-                    insightWhere.status = { in: statuses };
-                }
-
-                const insights = await prisma.crossChannelInsight.findMany({
-                    where: insightWhere as any,
-                    orderBy: [{ priorityScore: 'desc' }, { updatedAt: 'desc' }],
-                    take: clampLimit(limit),
-                    select: {
-                        id: true,
-                        projectId: true,
-                        topicName: true,
-                        status: true,
-                        priorityScore: true,
-                        crossChannelScore: true,
-                        interviewData: true,
-                        chatbotData: true,
-                        visibilityData: true,
-                        suggestedActions: true,
-                        createdAt: true,
-                        updatedAt: true,
-                        project: { select: { name: true } }
-                    }
-                });
-
-                let visibilityTips: Array<Record<string, unknown>> = [];
-                if (includeVisibilityTips !== false) {
-                    const configs = await prisma.visibilityConfig.findMany({
-                        where: {
-                            organizationId: context.organizationId,
-                            projectId: { in: projectIds }
-                        },
-                        select: {
-                            id: true,
-                            brandName: true,
-                            projectId: true,
-                            tipActions: {
-                                orderBy: { updatedAt: 'desc' },
-                                take: 40,
-                                select: {
-                                    id: true,
-                                    tipKey: true,
-                                    tipTitle: true,
-                                    tipType: true,
-                                    status: true,
-                                    completedAt: true,
-                                    dismissedAt: true,
-                                    updatedAt: true
-                                }
-                            }
-                        }
-                    });
-
-                    visibilityTips = configs.flatMap((cfg) =>
-                        cfg.tipActions.map((tip) => ({
-                            ...tip,
-                            configId: cfg.id,
-                            brandName: cfg.brandName,
-                            projectId: cfg.projectId
-                        }))
-                    );
-                }
-
-                const summarizeChannelData = (value: unknown) => {
-                    if (!value || typeof value !== 'object') return null;
-                    const record = value as Record<string, unknown>;
-                    return {
-                        keys: Object.keys(record).slice(0, 12),
-                        preview: JSON.stringify(record).slice(0, 900)
-                    };
-                };
-
-                const formattedInsights = insights.map((insight: any) => {
-                    const rawActions = Array.isArray(insight.suggestedActions)
-                        ? insight.suggestedActions as Array<Record<string, unknown>>
-                        : [];
-                    const actionItems = includeActions !== false
-                        ? rawActions.slice(0, 8).map((action) => {
-                            const evidence = Array.isArray(action.evidence)
-                                ? (action.evidence as Array<Record<string, unknown>>).slice(0, 4)
-                                : [];
-                            return {
-                                type: typeof action.type === 'string' ? action.type : 'N/D',
-                                target: typeof action.target === 'string' ? action.target : 'N/D',
-                                title: typeof action.title === 'string' ? action.title : null,
-                                body: typeof action.body === 'string' ? action.body : null,
-                                reasoning: typeof action.reasoning === 'string' ? action.reasoning : null,
-                                strategicAlignment: typeof action.strategicAlignment === 'string' ? action.strategicAlignment : null,
-                                coordination: typeof action.coordination === 'string' ? action.coordination : null,
-                                evidence
-                            };
-                        })
-                        : [];
-
-                    const sources = new Set<string>();
-                    const evidenceBySourceType: Record<string, number> = {};
-                    for (const action of actionItems) {
-                        const evidence = Array.isArray(action.evidence) ? action.evidence : [];
-                        for (const ev of evidence as Array<Record<string, unknown>>) {
-                            const sourceType = typeof ev.sourceType === 'string' ? ev.sourceType : null;
-                            const sourceRef = typeof ev.sourceRef === 'string' ? ev.sourceRef : null;
-                            if (sourceType || sourceRef) {
-                                sources.add(`${sourceType || 'source'}:${sourceRef || 'n/a'}`);
-                            }
-                            if (sourceType) {
-                                evidenceBySourceType[sourceType] = (evidenceBySourceType[sourceType] || 0) + 1;
-                            }
-                        }
-                    }
-
-                    const interviewSummary = summarizeChannelData(insight.interviewData);
-                    const chatbotSummary = summarizeChannelData(insight.chatbotData);
-                    const visibilitySummary = summarizeChannelData(insight.visibilityData);
-                    if (interviewSummary) sources.add(`cross_channel_interview:${insight.id}`);
-                    if (chatbotSummary) sources.add(`cross_channel_chatbot:${insight.id}`);
-                    if (visibilitySummary) sources.add(`cross_channel_visibility:${insight.id}`);
-
-                    return {
-                        id: insight.id,
-                        projectId: insight.projectId,
-                        projectName: insight.project?.name || null,
-                        topicName: insight.topicName,
-                        status: insight.status,
-                        priorityScore: insight.priorityScore,
-                        crossChannelScore: insight.crossChannelScore,
-                        actionsCount: rawActions.length,
-                        evidenceBySourceType,
-                        sources: Array.from(sources).slice(0, 20),
-                        dataSignals: {
-                            interview: interviewSummary,
-                            chatbot: chatbotSummary,
-                            visibility: visibilitySummary
-                        },
-                        actions: actionItems,
-                        createdAt: insight.createdAt,
-                        updatedAt: insight.updatedAt
-                    };
-                });
-
                 const formattedCanonicalTips = canonicalTips.map((tip: any) => ({
                     _source: 'canonical' as const,
                     id: tip.id,
@@ -1757,12 +1769,8 @@ export function createProjectAiTipsTool(context: ToolContext) {
                 return {
                     scope: { projectIds },
                     canonicalTips: formattedCanonicalTips,
-                    aiTips: formattedInsights,
-                    visibilityTips,
                     summary: {
                         canonicalTipCount: formattedCanonicalTips.length,
-                        insightCount: formattedInsights.length,
-                        visibilityTipCount: visibilityTips.length
                     }
                 };
             } catch (error: any) {
@@ -2322,17 +2330,15 @@ const strategicTipActionSchema = z.object({
 
 export function createStrategicTipCreationTool(context: ToolContext) {
     return {
-        description: 'Create a new AI Tip in Insights and optionally generate implementable CMS content drafts with routing automation.',
+        description: 'Create a new canonical AI Tip (ProjectTip) and optionally dispatch it to routing rules and n8n automation.',
         inputSchema: z.object({
             projectId: z.string().optional().describe('Project ID. If omitted, uses selected project in Copilot context.'),
             topicName: z.string().min(5).max(180).describe('Strategic AI tip title shown in Insights.'),
             reasoning: z.string().min(10).max(4000).describe('Strategic rationale and evidence behind the tip.'),
             priorityScore: z.number().min(0).max(100).optional().default(70),
             actions: z.array(strategicTipActionSchema).min(1).max(6),
-            canonicalWriteMode: z.enum(['legacy_dual_write', 'canonical_dual_write', 'canonical_only']).optional().default('canonical_dual_write')
-                .describe('Choose canonical write behavior: canonical_dual_write (default), legacy_dual_write, canonical_only.'),
-            autoCreateContentDrafts: z.boolean().optional().default(true).describe('Generate CMS suggestions from content-related actions.'),
-            autoDispatchRouting: z.boolean().optional().default(false).describe('If true, run n8n dispatch and tip routing rules after draft generation.')
+            autoCreateContentDrafts: z.boolean().optional().default(true).describe('Acknowledge that the canonical tip itself constitutes the content record.'),
+            autoDispatchRouting: z.boolean().optional().default(false).describe('If true, run n8n dispatch and tip routing rules using the canonical tip actions.')
         }),
         execute: async ({
             projectId,
@@ -2340,7 +2346,6 @@ export function createStrategicTipCreationTool(context: ToolContext) {
             reasoning,
             priorityScore,
             actions,
-            canonicalWriteMode,
             autoCreateContentDrafts,
             autoDispatchRouting
         }: {
@@ -2362,7 +2367,6 @@ export function createStrategicTipCreationTool(context: ToolContext) {
                     detail: string;
                 }>;
             }>;
-            canonicalWriteMode?: 'legacy_dual_write' | 'canonical_dual_write' | 'canonical_only';
             autoCreateContentDrafts?: boolean;
             autoDispatchRouting?: boolean;
         }) => {
@@ -2392,99 +2396,36 @@ export function createStrategicTipCreationTool(context: ToolContext) {
                     ...buildInsightActionMetadata(action)
                 }));
 
-                const writeMode = canonicalWriteMode ?? 'legacy_dual_write';
                 let canonicalTipId: string | null = null;
-                let insight: { id: string; projectId: string; topicName: string; priorityScore: number } | null = null;
-
-                if (writeMode === 'canonical_dual_write' || writeMode === 'canonical_only') {
-                    try {
-                        const canonicalTip = await ProjectTipService.createCopilotTip({
-                            projectId: targetProjectId,
-                            organizationId: context.organizationId,
-                            title: topicName,
-                            summary: reasoning.slice(0, 280),
-                            priority: Number(priorityScore ?? 70),
-                            category: 'copilot_strategic',
-                            contentKind: 'STRATEGIC_RECOMMENDATION',
-                            executionClass: 'COPILOT',
-                            reasoning,
-                            strategicAlignment: reasoning,
-                            actions: enrichedActions as any,
-                            evidence: enrichedActions.flatMap((action) => action.evidence ?? []) as any,
-                            createdBy: context.userId,
-                        });
-                        canonicalTipId = canonicalTip.id;
-                    } catch (error) {
-                        console.warn('[project-tip-canonical-write] copilot canonical tip creation failed', { targetProjectId, error });
-                    }
-                }
-
-                if (writeMode === 'legacy_dual_write' || writeMode === 'canonical_dual_write') {
-                    insight = await prisma.crossChannelInsight.create({
-                        data: {
-                            organizationId: context.organizationId,
-                            projectId: targetProjectId,
-                            topicName,
-                            crossChannelScore: 85,
-                            priorityScore: Number(priorityScore ?? 70),
-                            status: 'new',
-                            interviewData: [],
-                            chatbotData: [],
-                            visibilityData: {
-                                source: 'copilot_strategic',
-                                createdBy: context.userId,
-                                createdAt: new Date().toISOString(),
-                                globalReasoning: reasoning
-                            } as any,
-                            suggestedActions: enrichedActions as any
-                        },
-                        select: {
-                            id: true,
-                            projectId: true,
-                            topicName: true,
-                            priorityScore: true,
-                        }
+                try {
+                    const canonicalTip = await ProjectTipService.createCopilotTip({
+                        projectId: targetProjectId,
+                        organizationId: context.organizationId,
+                        title: topicName,
+                        summary: reasoning.slice(0, 280),
+                        priority: Number(priorityScore ?? 70),
+                        category: 'copilot_strategic',
+                        contentKind: 'STRATEGIC_RECOMMENDATION',
+                        executionClass: 'COPILOT',
+                        reasoning,
+                        strategicAlignment: reasoning,
+                        actions: enrichedActions as any,
+                        evidence: enrichedActions.flatMap((action) => action.evidence ?? []) as any,
+                        createdBy: context.userId,
                     });
-                }
-
-                if (writeMode === 'legacy_dual_write' && insight) {
-                    try {
-                        const result = await ProjectTipService.materializeFromCrossChannelInsight(insight.id);
-                        canonicalTipId = result.tipId;
-                    } catch (error) {
-                        console.warn('[project-tip-dual-write] copilot tip materialization failed', { insightId: insight.id, error });
-                    }
-                }
-
-                let suggestionIds: string[] = [];
-                if (autoCreateContentDrafts) {
-                    if (insight) {
-                        suggestionIds = await CMSSuggestionGenerator.generateFromInsight(insight.id);
-                    }
+                    canonicalTipId = canonicalTip.id;
+                } catch (error) {
+                    console.warn('[project-tip-canonical-write] copilot canonical tip creation failed', { targetProjectId, error });
                 }
 
                 const routing = { dispatchedToN8N: false, routedRules: 0, routingFailures: 0 };
-                if (autoDispatchRouting && suggestionIds.length > 0) {
-                    const suggestions = await prisma.cMSSuggestion.findMany({
-                        where: { id: { in: suggestionIds } },
-                        select: {
-                            id: true,
-                            title: true,
-                            body: true,
-                            type: true,
-                            targetSection: true,
-                            metaDescription: true,
-                            cmsPreviewUrl: true,
-                        },
-                    });
-                    const tipsPayload = suggestions.map((s) => ({
-                        id: s.id,
-                        title: s.title,
-                        content: s.body,
-                        contentKind: String(s.type),
-                        targetChannel: s.targetSection ?? undefined,
-                        metaDescription: s.metaDescription ?? undefined,
-                        url: s.cmsPreviewUrl ?? undefined,
+                if (autoDispatchRouting && canonicalTipId) {
+                    const tipsPayload = enrichedActions.map((action) => ({
+                        id: canonicalTipId!,
+                        title: action.title,
+                        content: action.body,
+                        contentKind: String(action.type),
+                        targetChannel: action.target,
                     }));
 
                     try {
@@ -2505,22 +2446,16 @@ export function createStrategicTipCreationTool(context: ToolContext) {
 
                 return {
                     success: true,
-                    writePath: {
-                        mode: writeMode,
-                        legacyInsightId: insight?.id ?? null,
-                        canonicalTipId,
-                    },
-                    insight: {
-                        id: insight?.id ?? null,
-                        projectId: insight?.projectId ?? targetProjectId,
-                        topicName: insight?.topicName ?? topicName,
-                        priorityScore: insight?.priorityScore ?? Number(priorityScore ?? 70),
+                    canonicalTipId,
+                    tip: {
+                        id: canonicalTipId,
+                        projectId: targetProjectId,
+                        topicName,
+                        priorityScore: Number(priorityScore ?? 70),
                         actionsCount: enrichedActions.length,
-                        canonicalTipId
                     },
                     automations: {
-                        contentDraftsCreated: suggestionIds.length,
-                        suggestionIds,
+                        contentDraftsCreated: canonicalTipId && autoCreateContentDrafts ? 1 : 0,
                         ...routing
                     }
                 };

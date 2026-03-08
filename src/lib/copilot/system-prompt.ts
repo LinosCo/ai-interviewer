@@ -13,12 +13,45 @@ interface CopilotContext {
             strategicGoals: unknown | null;
             toneGuidelines: string | null;
         } | null;
-        methodologies: { name: string; category: string; role: string }[];
+        methodologies: { name: string; category: string; role: string; knowledge?: string | null }[];
         tips: { title: string; summary: string | null; status: string; priority: number | null; category: string | null }[];
         routingCapabilities: { kind: string; destinationType: string; label: string; enabled: boolean }[];
     } | null;
     strategicMarketingKnowledge?: string | null;
     strategicPlan?: string | null;
+}
+
+const MAX_METHODOLOGY_SECTION_CHARS = 2000;
+const MAX_METHODOLOGIES = 3;
+const MAX_KNOWLEDGE_PER_METHODOLOGY = 500;
+
+/**
+ * Build a structured methodology section for the system prompt.
+ * Injects `knowledge` content (truncated) for richer copilot grounding.
+ * Limits: max 3 methodologies, ~500 chars knowledge each, 2000 chars total.
+ */
+function buildMethodologySection(
+    methodologies: { name: string; category: string; role: string; knowledge?: string | null }[]
+): string {
+    const subset = methodologies.slice(0, MAX_METHODOLOGIES);
+    let section = `## Metodologie del progetto\n`;
+
+    for (const m of subset) {
+        section += `### ${m.name} (${m.category})\n`;
+        if (m.knowledge) {
+            const truncated = m.knowledge.slice(0, MAX_KNOWLEDGE_PER_METHODOLOGY);
+            const ellipsis = m.knowledge.length > MAX_KNOWLEDGE_PER_METHODOLOGY ? '…' : '';
+            section += `${truncated}${ellipsis}\n`;
+        }
+        section += '\n';
+    }
+
+    // Hard cap to prevent context explosion
+    if (section.length > MAX_METHODOLOGY_SECTION_CHARS) {
+        section = section.slice(0, MAX_METHODOLOGY_SECTION_CHARS) + '…\n';
+    }
+
+    return section;
 }
 
 export function buildCopilotSystemPrompt(ctx: CopilotContext): string {
@@ -117,7 +150,7 @@ Non fare upselling aggressivo, ma informa in modo trasparente.`;
 ## Progetto attualmente selezionato
 ${ctx.projectContext ? `
 - Nome: ${ctx.projectContext.projectName}
-${ctx.projectContext.strategy?.positioning ? `- Positioning: ${ctx.projectContext.strategy.positioning}\n` : ''}${ctx.projectContext.strategy?.valueProposition ? `- Value Proposition: ${ctx.projectContext.strategy.valueProposition}\n` : ''}${ctx.projectContext.strategy?.toneGuidelines ? `- Tono: ${ctx.projectContext.strategy.toneGuidelines}\n` : ''}${ctx.projectContext.methodologies.length > 0 ? `- Metodologie: ${ctx.projectContext.methodologies.map(m => m.name).join(', ')}\n` : ''}${ctx.projectContext.tips.length > 0 ? `- Tip attivi (${ctx.projectContext.tips.length}): ${ctx.projectContext.tips.slice(0, 5).map(t => t.title).join(' | ')}\n` : ''}${ctx.projectContext.routingCapabilities.length > 0 ? `- Canali di routing abilitati: ${ctx.projectContext.routingCapabilities.map(r => r.label).join(', ')}\n` : ''}
+${ctx.projectContext.strategy?.positioning ? `- Positioning: ${ctx.projectContext.strategy.positioning}\n` : ''}${ctx.projectContext.strategy?.valueProposition ? `- Value Proposition: ${ctx.projectContext.strategy.valueProposition}\n` : ''}${ctx.projectContext.strategy?.toneGuidelines ? `- Tono: ${ctx.projectContext.strategy.toneGuidelines}\n` : ''}${ctx.projectContext.methodologies.length > 0 ? buildMethodologySection(ctx.projectContext.methodologies) : ''}${ctx.projectContext.tips.length > 0 ? `- Tip attivi (${ctx.projectContext.tips.length}): ${ctx.projectContext.tips.slice(0, 5).map(t => t.title).join(' | ')}\n` : ''}${ctx.projectContext.routingCapabilities.length > 0 ? `- Canali di routing abilitati: ${ctx.projectContext.routingCapabilities.map(r => r.label).join(', ')}\n` : ''}
 ` : 'Nessun progetto selezionato. Chiedi all\'utente di selezionare un progetto dalla dashboard.'}
 
 ## Come comportarti con i dati

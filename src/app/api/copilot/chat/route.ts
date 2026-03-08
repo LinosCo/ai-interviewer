@@ -28,6 +28,7 @@ import {
     createScrapeWebSourceTool,
     createStrategicTipCreationTool,
     createTipRoutingManagerTool,
+    createManageCanonicalTipsTool,
     createProjectConnectionsOpsTool,
     createCompetitorAnalysisTool,
     createSeoGeoAeoTool
@@ -181,7 +182,7 @@ export async function POST(req: Request) {
                         strategicGoals: ctx.strategy.strategicGoals,
                         toneGuidelines: ctx.strategy.toneGuidelines,
                     } : null,
-                    methodologies: ctx.methodologies.map(m => ({ name: m.name, category: m.category, role: m.role })),
+                    methodologies: ctx.methodologies.map(m => ({ name: m.name, category: m.category, role: m.role, knowledge: m.knowledge ?? null })),
                     tips: ctx.tips.slice(0, 10).map(t => ({
                         title: t.title,
                         summary: t.summary,
@@ -309,6 +310,9 @@ export async function POST(req: Request) {
             },
             manageTipRouting: {
                 ...createTipRoutingManagerTool(toolContext),
+            },
+            manageCanonicalTips: {
+                ...createManageCanonicalTipsTool(toolContext),
             },
             manageProjectConnections: {
                 ...createProjectConnectionsOpsTool(toolContext),

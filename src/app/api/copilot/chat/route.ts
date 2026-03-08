@@ -28,6 +28,7 @@ import {
     createScrapeWebSourceTool,
     createStrategicTipCreationTool,
     createTipRoutingManagerTool,
+    createManageCanonicalTipsTool,
     createProjectConnectionsOpsTool,
     createCompetitorAnalysisTool,
     createSeoGeoAeoTool
@@ -309,6 +310,9 @@ export async function POST(req: Request) {
             },
             manageTipRouting: {
                 ...createTipRoutingManagerTool(toolContext),
+            },
+            manageCanonicalTips: {
+                ...createManageCanonicalTipsTool(toolContext),
             },
             manageProjectConnections: {
                 ...createProjectConnectionsOpsTool(toolContext),

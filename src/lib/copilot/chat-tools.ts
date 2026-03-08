@@ -341,6 +341,185 @@ export function createProjectIntegrationsTool(context: ToolContext) {
     };
 }
 
+export function createManageCanonicalTipsTool(context: ToolContext) {
+    return {
+        description: 'List, view, update, duplicate or change status of canonical AI tips (ProjectTip). Use this for all tip management operations.',
+        inputSchema: z.object({
+            operation: z.enum(['list', 'get', 'update', 'duplicate', 'set_status']).default('list')
+                .describe('Operation: list (all tips), get (single tip detail), update (edit fields), duplicate (copy tip), set_status (change status).'),
+            projectId: z.string().optional().describe('Project ID. If omitted, uses selected/current project.'),
+            tipId: z.string().optional().describe('Required for get, update, duplicate, set_status.'),
+            // Filters for list operation
+            status: z.string().optional().describe('Filter by status for list operation (NEW, REVIEWED, APPROVED, DRAFTED, ROUTED, AUTOMATED).'),
+            starred: z.boolean().optional().describe('Filter by starred flag for list operation.'),
+            // Fields for update operation
+            title: z.string().optional().describe('New title (update only).'),
+            summary: z.string().optional().describe('New summary (update only).'),
+            priority: z.number().optional().describe('New priority 0-100 (update only).'),
+            category: z.string().optional().describe('New category (update only).'),
+            contentKind: z.string().optional().describe('New contentKind (update only).'),
+            executionClass: z.string().optional().describe('New executionClass (update only).'),
+            isStarred: z.boolean().optional().describe('Set starred flag (update only).'),
+            reasoning: z.string().optional().describe('Updated reasoning (update only).'),
+            strategicAlignment: z.string().optional().describe('Updated strategic alignment (update only).'),
+            // For set_status operation
+            newStatus: z.string().optional().describe('Target status for set_status (NEW, REVIEWED, APPROVED, DRAFTED, ROUTED, AUTOMATED).')
+        }),
+        execute: async ({
+            operation,
+            projectId,
+            tipId,
+            status,
+            starred,
+            title,
+            summary,
+            priority,
+            category,
+            contentKind,
+            executionClass,
+            isStarred,
+            reasoning,
+            strategicAlignment,
+            newStatus
+        }: {
+            operation?: 'list' | 'get' | 'update' | 'duplicate' | 'set_status';
+            projectId?: string;
+            tipId?: string;
+            status?: string;
+            starred?: boolean;
+            title?: string;
+            summary?: string;
+            priority?: number;
+            category?: string;
+            contentKind?: string;
+            executionClass?: string;
+            isStarred?: boolean;
+            reasoning?: string;
+            strategicAlignment?: string;
+            newStatus?: string;
+        }) => {
+            try {
+                const op = operation || 'list';
+                const targetProjectId = await resolveSingleProjectId(context, projectId);
+                if (!targetProjectId) {
+                    return { error: 'No accessible project found for this request.' };
+                }
+
+                if (op === 'list') {
+                    const tips = await ProjectTipService.listProjectTips({
+                        projectId: targetProjectId,
+                        viewerUserId: context.userId,
+                        ...(status ? { status: status as any } : {}),
+                        ...(starred !== undefined ? { starred } : {}),
+                    });
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        count: tips.length,
+                        tips
+                    };
+                }
+
+                if (!tipId) {
+                    return { error: 'tipId is required for this operation.' };
+                }
+
+                if (op === 'get') {
+                    const tip = await ProjectTipService.getProjectTip({
+                        projectId: targetProjectId,
+                        tipId,
+                        viewerUserId: context.userId,
+                    });
+                    if (!tip) {
+                        return { error: 'Tip not found in this project.' };
+                    }
+                    return { success: true, operation: op, projectId: targetProjectId, tip };
+                }
+
+                if (op === 'duplicate') {
+                    const duplicated = await ProjectTipService.duplicateTip({
+                        projectId: targetProjectId,
+                        tipId,
+                        actorUserId: context.userId,
+                        createdBy: context.userId,
+                    });
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        originalTipId: tipId,
+                        duplicatedTip: { id: duplicated.id, title: duplicated.title, status: duplicated.status }
+                    };
+                }
+
+                if (op === 'set_status') {
+                    if (!newStatus) {
+                        return { error: 'newStatus is required for set_status operation.' };
+                    }
+                    const updated = await ProjectTipService.updateTip({
+                        projectId: targetProjectId,
+                        tipId,
+                        actorUserId: context.userId,
+                        status: newStatus as any,
+                        lastEditedBy: context.userId,
+                    });
+                    return {
+                        success: true,
+                        operation: op,
+                        projectId: targetProjectId,
+                        tip: { id: updated.id, title: updated.title, status: updated.status }
+                    };
+                }
+
+                // op === 'update'
+                const updateFields: Record<string, unknown> = {};
+                if (title !== undefined) updateFields.title = title;
+                if (summary !== undefined) updateFields.summary = summary;
+                if (priority !== undefined) updateFields.priority = priority;
+                if (category !== undefined) updateFields.category = category;
+                if (contentKind !== undefined) updateFields.contentKind = contentKind;
+                if (executionClass !== undefined) updateFields.executionClass = executionClass;
+                if (isStarred !== undefined) updateFields.starred = isStarred;
+                if (reasoning !== undefined) updateFields.reasoning = reasoning;
+                if (strategicAlignment !== undefined) updateFields.strategicAlignment = strategicAlignment;
+                if (status !== undefined) updateFields.status = status as any;
+
+                if (Object.keys(updateFields).length === 0) {
+                    return { error: 'No update fields provided for update operation.' };
+                }
+
+                const updated = await ProjectTipService.updateTip({
+                    projectId: targetProjectId,
+                    tipId,
+                    actorUserId: context.userId,
+                    lastEditedBy: context.userId,
+                    ...updateFields,
+                } as any);
+
+                return {
+                    success: true,
+                    operation: op,
+                    projectId: targetProjectId,
+                    tip: {
+                        id: updated.id,
+                        title: updated.title,
+                        summary: updated.summary,
+                        status: updated.status,
+                        priority: updated.priority,
+                        category: updated.category,
+                        contentKind: updated.contentKind,
+                        starred: updated.starred,
+                    }
+                };
+            } catch (error: any) {
+                console.error('[Copilot Tool] manageCanonicalTips error:', error);
+                return { error: 'Failed to manage canonical tips', details: error?.message || 'Unknown error' };
+            }
+        }
+    };
+}
+
 const routingDestinationSchema = z.enum(['mcp', 'cms', 'n8n']);
 
 export function createTipRoutingManagerTool(context: ToolContext) {

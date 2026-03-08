@@ -1535,11 +1535,6 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                                     recommendations: true
                                 }
                             },
-                            tipActions: {
-                                orderBy: { updatedAt: 'desc' },
-                                take: 20,
-                                select: { tipTitle: true, tipType: true, status: true, updatedAt: true }
-                            }
                         }
                     });
                 } catch (err: any) {
@@ -1586,11 +1581,6 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                                     recommendations: true
                                 }
                             },
-                            tipActions: {
-                                orderBy: { updatedAt: 'desc' },
-                                take: 20,
-                                select: { tipTitle: true, tipType: true, status: true, updatedAt: true }
-                            }
                         }
                     });
                 }
@@ -1670,13 +1660,7 @@ export function createVisibilityInsightsTool(context: ToolContext) {
                         projectId: cfg.projectId,
                         isActive: cfg.isActive,
                         updatedAt: cfg.updatedAt,
-                        latestScan: cfg.scans?.[0] || null,
-                        tipActionsSummary: {
-                            active: cfg.tipActions.filter((t: any) => t.status === 'active').length,
-                            completed: cfg.tipActions.filter((t: any) => t.status === 'completed').length,
-                            dismissed: cfg.tipActions.filter((t: any) => t.status === 'dismissed').length
-                        },
-                        latestTipActions: cfg.tipActions.slice(0, 8)
+                        latestScan: cfg.scans?.[0] || null
                     }))
                 };
             } catch (error: any) {

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import Sitemapper from 'sitemapper';
 import { scrapeUrl } from '@/lib/scraping';
 import { assertOrganizationAccess, assertProjectAccess } from '@/lib/domain/workspace';
-import { CMSSuggestionGenerator } from '@/lib/cms/suggestion-generator';
 import { TipRoutingExecutor } from '@/lib/cms/tip-routing-executor';
 import { N8NDispatcher } from '@/lib/integrations/n8n/dispatcher';
 import { MCPGatewayService } from '@/lib/integrations/mcp/gateway.service';
